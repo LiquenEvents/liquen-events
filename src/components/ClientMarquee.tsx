@@ -12,23 +12,25 @@ import { clientLogos } from "@/data";
 function Mark({ name, logo }: { name: string; logo: string }) {
   const [failed, setFailed] = useState(false);
 
-  if (failed) {
-    return (
-      <span className="text-foreground/20 text-[10px] sm:text-xs font-medium tracking-[0.3em] uppercase flex-shrink-0">
-        {name}
-      </span>
-    );
-  }
-
+  // Every logo lives in an identical fixed box and is centred inside it, so
+  // all clients occupy exactly the same footprint regardless of their shape.
   return (
-    <Image
-      src={logo}
-      alt={name}
-      width={200}
-      height={64}
-      className="h-10 sm:h-12 w-auto object-contain opacity-50 hover:opacity-85 transition-opacity duration-300 brightness-0 invert flex-shrink-0"
-      onError={() => setFailed(true)}
-    />
+    <div className="flex-shrink-0 flex items-center justify-center w-32 sm:w-44 h-12 sm:h-16">
+      {failed ? (
+        <span className="text-foreground/25 text-[10px] sm:text-xs font-medium tracking-[0.22em] uppercase text-center leading-tight">
+          {name}
+        </span>
+      ) : (
+        <Image
+          src={logo}
+          alt={name}
+          width={220}
+          height={88}
+          className="max-h-full max-w-full w-auto h-auto object-contain opacity-55 hover:opacity-90 transition-opacity duration-300 brightness-0 invert"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </div>
   );
 }
 
@@ -37,7 +39,7 @@ export default function ClientMarquee() {
     <div className="relative py-6 border-y border-foreground/8 overflow-hidden">
       <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
       <div className="absolute inset-y-0 right-0 w-16 sm:w-24 bg-gradient-to-l from-surface to-transparent z-10 pointer-events-none" />
-      <div className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap">
+      <div className="flex items-center gap-6 sm:gap-10 animate-marquee whitespace-nowrap">
         {[...clientLogos, ...clientLogos].map((c, i) => (
           <Mark key={i} name={c.name} logo={c.logo} />
         ))}
