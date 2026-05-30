@@ -180,9 +180,28 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       }
     }
 
+    // ── Finanças reais (a partir dos pagamentos registados) ──
+    const todayKey = now.toISOString().slice(0, 10);
+    const horizon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60).toISOString().slice(0, 10);
+    let received = 0, outstanding = 0;
+    const upcoming: { id: string; name: string; amount: number; date: string; kind: string }[] = [];
+    for (const q of quotes) {
+      for (const p of q.payments ?? []) {
+        if (p.paid) received += p.amount;
+        else {
+          outstanding += p.amount;
+          if (p.date && p.date >= todayKey && p.date <= horizon) {
+            upcoming.push({ id: `${q.id}-${p.id}`, name: q.name, amount: p.amount, date: p.date, kind: p.kind });
+          }
+        }
+      }
+    }
+    upcoming.sort((a, b) => a.date.localeCompare(b.date));
+
     const accepted = byStatus['aceite'] ?? 0;
     const decided = accepted + (byStatus['rejeitado'] ?? 0);
     const conversion = decided > 0 ? Math.round((accepted / decided) * 100) : 0;
+    const avgTicket = accepted > 0 ? wonSum / accepted : 0;
     const avgResp = respCount ? respHoursSum / respCount : 0;
     const avgRespLabel = respCount === 0 ? '—' : avgResp < 1 ? `${Math.round(avgResp * 60)}min` : avgResp < 48 ? `${avgResp.toFixed(1)}h` : `${Math.round(avgResp / 24)}d`;
 
@@ -193,6 +212,9 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       total, thisMonth, conversion, avgRespLabel,
       avgGuests: guestsCount ? Math.round(guestsSum / guestsCount) : 0,
       pipelineSum, wonSum,
+      received, outstanding, avgTicket,
+      upcoming: upcoming.slice(0, 8),
+      hasPayments: received > 0 || outstanding > 0,
       months,
       hasRevenue: months.some((m) => m.revenue > 0),
       statusBars: (Object.keys(STATUS_META) as QuoteStatus[])
@@ -234,6 +256,54 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         <Kpi value={eur(stats.pipelineSum)} label="Em proposta" />
         <Kpi value={eur(stats.wonSum)} label="Ganho (aceite)" accent />
       </div>
+
+      {/* Financeiro */}
+      {stats.hasPayments && (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-6">
+          <Panel title="Finanças (pagamentos registados)">
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <Kpi value={eur(stats.received)} label="Recebido" accent />
+              <Kpi value={eur(stats.outstanding)} label="A receber" />
+              <Kpi value={eur(stats.avgTicket)} label="Ticket médio" />
+              <Kpi value={eur(stats.received + stats.outstanding)} label="Faturado total" />
+            </div>
+            {/* received vs outstanding bar */}
+            {(stats.received + stats.outstanding) > 0 && (
+              <div>
+                <div className="h-2 rounded-full overflow-hidden flex bg-foreground/6">
+                  <div className="h-full bg-moss transition-all duration-700" style={{ width: `${(stats.received / (stats.received + stats.outstanding)) * 100}%` }} />
+                  <div className="h-full bg-[#b5894a]/70 transition-all duration-700" style={{ width: `${(stats.outstanding / (stats.received + stats.outstanding)) * 100}%` }} />
+                </div>
+                <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-moss" /> Recebido</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#b5894a]/70" /> A receber</span>
+                </div>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Próximos pagamentos (60 dias)">
+            {stats.upcoming.length === 0 ? (
+              <p className="text-foreground/25 text-xs">Sem pagamentos previstos para os próximos 60 dias.</p>
+            ) : (
+              <div className="flex flex-col divide-y divide-foreground/6">
+                {stats.upcoming.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-foreground/65 text-sm truncate">{p.name}</p>
+                      <p className="text-foreground/30 text-[10px] capitalize">{p.kind}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <p className="text-moss text-sm font-medium tabular-nums">{eur(p.amount)}</p>
+                      <p className="text-foreground/30 text-[10px]">{new Date(p.date + 'T12:00:00').toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
 
       {/* Trends */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

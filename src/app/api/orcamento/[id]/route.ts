@@ -31,7 +31,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const allowed: (keyof Quote)[] = ['status', 'quotedPrice', 'adminNotes', 'checklist', 'payments'];
+  const allowed: (keyof Quote)[] = ['status', 'quotedPrice', 'adminNotes', 'checklist', 'payments', 'timeline'];
   const updates: Partial<Quote> = {};
   for (const key of allowed) {
     if (key in body) {

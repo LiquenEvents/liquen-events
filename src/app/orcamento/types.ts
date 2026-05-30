@@ -117,6 +117,14 @@ export interface ChecklistItem {
   done: boolean;
 }
 
+/** A single moment in the day-of run sheet (cronograma do evento). */
+export interface TimelineItem {
+  id: string;
+  time: string;   // "HH:MM"
+  title: string;
+  owner?: string; // responsável / fornecedor
+}
+
 export type PaymentKind = 'sinal' | 'pagamento' | 'saldo';
 
 export interface Payment {
@@ -154,6 +162,7 @@ export interface Quote extends QuoteFormData {
   messages?: QuoteMessage[];
   checklist?: ChecklistItem[];
   payments?: Payment[];
+  timeline?: TimelineItem[];
 }
 
 export interface Supplier {

@@ -16,6 +16,7 @@ import Propostas from './Propostas';
 import Tarefas from './Tarefas';
 import Fornecedores from './Fornecedores';
 import EventChecklist from './EventChecklist';
+import EventTimeline from './EventTimeline';
 import PaymentsPanel from './PaymentsPanel';
 import { ToastProvider } from './Toast';
 import CommandPalette, { type Command } from './CommandPalette';
@@ -625,6 +626,16 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
                     onChange={(checklist) => {
                       setQuotes((prev) => prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)));
                       setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                    }}
+                  />
+
+                  {/* Day-of run sheet */}
+                  <EventTimeline
+                    key={`tl-${selected.id}`}
+                    quote={selected}
+                    onChange={(timeline) => {
+                      setQuotes((prev) => prev.map((q) => (q.id === selected.id ? { ...q, timeline } : q)));
+                      setSelected((prev) => (prev ? { ...prev, timeline } : prev));
                     }}
                   />
 
