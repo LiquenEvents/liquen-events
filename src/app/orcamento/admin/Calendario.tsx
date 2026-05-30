@@ -19,6 +19,43 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? 'Evento';
 }
 
+/** Build and download an .ics calendar with every dated event. */
+function exportIcs(quotes: Quote[]) {
+  const dated = quotes.filter((q) => q.date);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Liquen Events//Back Office//PT',
+    'CALSCALE:GREGORIAN',
+  ];
+  for (const q of dated) {
+    const d = q.date.replace(/-/g, '');
+    const title = `${eventTypeLabel(q)} — ${q.name}`.replace(/[,;\\]/g, ' ');
+    const desc = [q.location && `Local: ${q.location}`, q.guests && `${q.guests} convidados`, q.phone && `Tel: ${q.phone}`]
+      .filter(Boolean).join(' \\n ');
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${q.id}@liquen-events.com`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${d}`,
+      `SUMMARY:${title}`,
+      desc ? `DESCRIPTION:${desc}` : '',
+      'END:VEVENT'
+    );
+  }
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.filter(Boolean).join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'liquen-eventos.ics';
+  a.click();
+  URL.revokeObjectURL(url);
+  void pad;
+}
+
 interface Props {
   quotes: Quote[];
   onOpen: (q: Quote) => void;
@@ -65,6 +102,9 @@ export default function Calendario({ quotes, onOpen }: Props) {
             <p className="text-foreground/30 text-[10px] tracking-[0.2em] uppercase mt-0.5">{monthEventCount} evento{monthEventCount !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex items-center gap-1">
+            <button onClick={() => exportIcs(quotes)} title="Exportar para calendário (.ics)" className="px-3 h-8 mr-1 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-moss hover:border-moss/40 transition-colors">
+              Exportar
+            </button>
             <button onClick={() => setCursor(new Date(year, month - 1, 1))} className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors">‹</button>
             <button onClick={() => { const d = new Date(); setCursor(new Date(d.getFullYear(), d.getMonth(), 1)); }} className="px-3 h-8 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-foreground/70 hover:border-foreground/30 transition-colors">Hoje</button>
             <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors">›</button>

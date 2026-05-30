@@ -20,8 +20,9 @@ import PaymentsPanel from './PaymentsPanel';
 import { ToastProvider } from './Toast';
 import CommandPalette, { type Command } from './CommandPalette';
 import NewQuoteModal from './NewQuoteModal';
+import Kanban from './Kanban';
 
-type View = 'overview' | 'pedidos' | 'clientes' | 'calendario' | 'propostas' | 'tarefas' | 'fornecedores' | 'estatisticas' | 'inbox';
+type View = 'overview' | 'pedidos' | 'kanban' | 'clientes' | 'calendario' | 'propostas' | 'tarefas' | 'fornecedores' | 'estatisticas' | 'inbox';
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: 'pendente', label: 'Pendente', color: 'bg-foreground/10 text-foreground/50' },
@@ -37,6 +38,9 @@ const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
   )},
   { id: 'pedidos', label: 'Pedidos', icon: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4" strokeLinecap="round"/></svg>
+  )},
+  { id: 'kanban', label: 'Pipeline', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>
   )},
   { id: 'clientes', label: 'Clientes', icon: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><path d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.5-1.8-4.3-4-4.8" strokeLinecap="round"/></svg>
@@ -194,6 +198,7 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
   const VIEW_TITLES: Record<View, string> = {
     overview: 'Visão Geral',
     pedidos: 'Pedidos',
+    kanban: 'Pipeline',
     clientes: 'Clientes',
     calendario: 'Calendário',
     propostas: 'Propostas',
@@ -206,6 +211,7 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
   const VIEW_SUB: Record<View, string> = {
     overview: 'O resumo do seu dia',
     pedidos: 'Pedidos de orçamento recebidos',
+    kanban: 'Arraste entre estados',
     clientes: 'Histórico por cliente',
     calendario: 'Os seus eventos no tempo',
     propostas: 'Todas as propostas enviadas',
@@ -281,9 +287,16 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
               <p className="text-foreground/25 text-[10px] truncate">Administração</p>
             </div>
           </div>
+          <a
+            href="/api/backup"
+            className="w-full mt-1 flex items-center gap-2 px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Backup
+          </a>
           <button
             onClick={logout}
-            className="w-full mt-1 text-left px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
+            className="w-full mt-0.5 text-left px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
           >
             Sair
           </button>
@@ -344,6 +357,20 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
         {view === 'overview' && (
           <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
             <Overview quotes={quotes} userName={userName} onOpen={openQuote} onGoStats={() => setView('estatisticas')} />
+          </div>
+        )}
+
+        {/* ── Pipeline (Kanban) ── */}
+        {view === 'kanban' && (
+          <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <Kanban
+              quotes={quotes}
+              onOpen={openQuote}
+              onStatusChange={(id, status) => {
+                setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+                setSelected((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
+              }}
+            />
           </div>
         )}
 
