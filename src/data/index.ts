@@ -36,11 +36,11 @@ export const clientLogos: ClientLogo[] = [
   { name: "Câmara Municipal de Évora",       logo: "/logos/clientes/camara-evora.avif" },
   { name: "PACT",                            logo: "/logos/clientes/pact.avif" },
   { name: "Clínica Dentária Santa Madalena", logo: "/logos/clientes/clinica-santa-madalena.avif" },
-  { name: "Casa Morgado Esporão",            logo: "/logos/clientes/casa-morgado-esporao.png" },
+  { name: "Casa Morgado Esporão",            logo: "/logos/clientes/casa-morgado-esporao.avif" },
   { name: "PortugalNuts",                    logo: "/logos/clientes/portugal-nuts.avif" },
   { name: "ESRI Portugal",                   logo: "/logos/clientes/esri.png" },
   { name: "Monte do Zambujal",               logo: "/logos/clientes/monte-zambujal.avif" },
-  { name: "EDIA",                            logo: "/logos/clientes/edia.png" },
+  { name: "EDIA",                            logo: "/logos/clientes/edia.avif" },
   { name: "Ordem dos Médicos Veterinários",  logo: "/logos/clientes/omv.png" },
 ];
 
