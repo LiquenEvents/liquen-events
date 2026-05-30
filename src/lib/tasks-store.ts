@@ -1,25 +1,23 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { randomUUID } from "node:crypto";
 import type { Task } from "@/app/orcamento/types";
-import { getSupabase } from "./supabase";
+import { createRepository, type Mapper } from "./repository";
 
-const TABLE = "tasks";
-const DATA_FILE = path.join(process.cwd(), "data", "tasks.json");
-
-async function fileRead(): Promise<Task[]> {
-  try {
-    return JSON.parse(await fs.readFile(DATA_FILE, "utf-8"));
-  } catch {
-    return [];
-  }
-}
-async function fileWrite(tasks: Task[]): Promise<void> {
-  await fs.writeFile(DATA_FILE, JSON.stringify(tasks, null, 2));
-}
-
-function rowToTask(r: Record<string, unknown>): Task {
-  return {
+export const mapper: Mapper<Task> = {
+  table: "tasks",
+  fileName: "tasks.json",
+  getId: (t) => t.id,
+  toRow: (t) => ({
+    id: t.id,
+    title: t.title,
+    done: t.done,
+    priority: t.priority,
+    due_date: t.dueDate || null,
+    quote_id: t.quoteId || null,
+    client_name: t.clientName || null,
+    assignee: t.assignee || null,
+    area: t.area || null,
+  }),
+  fromRow: (r) => ({
     id: String(r.id),
     title: String(r.title ?? ""),
     done: Boolean(r.done),
@@ -30,21 +28,18 @@ function rowToTask(r: Record<string, unknown>): Task {
     assignee: (r.assignee as string) ?? undefined,
     area: (r.area as string) ?? undefined,
     createdAt: String(r.created_at ?? new Date().toISOString()),
-  };
-}
+  }),
+  order: { column: "created_at", ascending: false },
+  fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+};
 
-export async function listTasks(): Promise<Task[]> {
-  const sb = getSupabase();
-  if (sb) {
-    const { data, error } = await sb.from(TABLE).select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(rowToTask);
-  }
-  const all = await fileRead();
-  return all.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-}
+const repo = createRepository(mapper);
 
-export async function createTask(input: Omit<Task, "id" | "createdAt" | "done"> & { done?: boolean }): Promise<Task> {
+export const listTasks = (): Promise<Task[]> => repo.list();
+
+export async function createTask(
+  input: Omit<Task, "id" | "createdAt" | "done"> & { done?: boolean },
+): Promise<Task> {
   const task: Task = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -57,57 +52,11 @@ export async function createTask(input: Omit<Task, "id" | "createdAt" | "done"> 
     assignee: input.assignee,
     area: input.area,
   };
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from(TABLE).insert({
-      id: task.id,
-      title: task.title,
-      done: task.done,
-      priority: task.priority,
-      due_date: task.dueDate || null,
-      quote_id: task.quoteId || null,
-      client_name: task.clientName || null,
-      assignee: task.assignee || null,
-      area: task.area || null,
-    });
-    if (error) throw error;
-    return task;
-  }
-  const all = await fileRead();
-  all.push(task);
-  await fileWrite(all);
+  await repo.create(task);
   return task;
 }
 
-export async function updateTask(id: string, updates: Partial<Task>): Promise<Task | null> {
-  const sb = getSupabase();
-  if (sb) {
-    const patch: Record<string, unknown> = {};
-    if ("done" in updates) patch.done = updates.done;
-    if ("title" in updates) patch.title = updates.title;
-    if ("priority" in updates) patch.priority = updates.priority;
-    if ("dueDate" in updates) patch.due_date = updates.dueDate || null;
-    if ("assignee" in updates) patch.assignee = updates.assignee || null;
-    if ("area" in updates) patch.area = updates.area || null;
-    const { data, error } = await sb.from(TABLE).update(patch).eq("id", id).select("*").maybeSingle();
-    if (error) throw error;
-    return data ? rowToTask(data) : null;
-  }
-  const all = await fileRead();
-  const idx = all.findIndex((t) => t.id === id);
-  if (idx === -1) return null;
-  all[idx] = { ...all[idx], ...updates };
-  await fileWrite(all);
-  return all[idx];
-}
+export const updateTask = (id: string, updates: Partial<Task>): Promise<Task | null> =>
+  repo.update(id, updates);
 
-export async function deleteTask(id: string): Promise<void> {
-  const sb = getSupabase();
-  if (sb) {
-    const { error } = await sb.from(TABLE).delete().eq("id", id);
-    if (error) throw error;
-    return;
-  }
-  const all = await fileRead();
-  await fileWrite(all.filter((t) => t.id !== id));
-}
+export const deleteTask = (id: string): Promise<void> => repo.remove(id);
