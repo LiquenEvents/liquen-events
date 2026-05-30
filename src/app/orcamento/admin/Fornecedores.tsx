@@ -28,7 +28,8 @@ export default function Fornecedores() {
     if (!form.name.trim()) return;
     const res = await fetch('/api/fornecedores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
     if (res.ok) {
-      setSuppliers((prev) => [...prev, await res.json()].sort((a, b) => a.name.localeCompare(b.name)));
+      const created = await res.json();
+      setSuppliers((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       setForm({ name: '', category: 'Catering', phone: '', email: '', location: '', notes: '' });
       setAdding(false);
     }
