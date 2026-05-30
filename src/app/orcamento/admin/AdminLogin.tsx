@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function AdminLogin() {
   const [password, setPassword] = useState('');
@@ -40,14 +41,24 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center px-6">
       <div className="w-full max-w-sm">
+        <div className="flex justify-center mb-8">
+          <Image
+            src="/logo-liquen-branco.png"
+            alt="Líquen Events"
+            width={150}
+            height={60}
+            priority
+            className="h-14 w-auto opacity-90"
+          />
+        </div>
         <p className="text-foreground/22 text-[10px] tracking-[0.5em] uppercase mb-6 text-center">
           Área Restrita
         </p>
         <h1
           className="text-foreground font-bold text-center mb-10"
-          style={{ fontFamily: 'var(--font-playfair)', fontSize: 'clamp(24px, 3vw, 36px)' }}
+          style={{ fontFamily: 'var(--font-playfair)', fontSize: 'clamp(22px, 2.6vw, 30px)' }}
         >
-          Painel Líquen
+          Painel de Gestão
         </h1>
         <form onSubmit={submit} className="flex flex-col gap-6">
           <div>
