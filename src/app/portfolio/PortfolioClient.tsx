@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import AnimateIn from "@/components/AnimateIn";
+import { blurFor } from "@/lib/blur";
 import { projects, type Project } from "./projects-data";
 
 const categories = ["Todos", ...Array.from(new Set(projects.map((p) => p.category)))];
@@ -26,6 +27,7 @@ function Showcase({ p, index }: { p: Project; index: number }) {
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover lb-photo-in"
+              {...blurFor(p.images[active])}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
             <span className="absolute top-4 left-4 text-[10px] tracking-[0.3em] uppercase text-cream/80 bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full border border-cream/10">

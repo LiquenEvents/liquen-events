@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
+import { blurFor } from "@/lib/blur";
 
 type Label = "Casamento" | "Corporativo" | "Conferência" | "Aéreo" | "Evento";
 interface Photo { src: string; label: Label; }
@@ -375,7 +376,7 @@ export default function GaleriaClient() {
               onClick={() => setLb(0)}
               className="relative col-span-2 row-span-2 h-full w-full overflow-hidden group focus:outline-none"
             >
-              <Image src={visible[0].src} alt={altFor(visible[0].label)} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority />
+              <Image src={visible[0].src} alt={altFor(visible[0].label)} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority {...blurFor(visible[0].src)} />
               <HoverOverlay label={visible[0].label} />
             </button>
 
@@ -387,7 +388,7 @@ export default function GaleriaClient() {
                   onClick={() => setLb(idx)}
                   className="relative hidden sm:block h-full w-full overflow-hidden group focus:outline-none"
                 >
-                  <Image src={visible[idx].src} alt={altFor(visible[idx].label)} fill sizes="25vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority />
+                  <Image src={visible[idx].src} alt={altFor(visible[idx].label)} fill sizes="25vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority {...blurFor(visible[idx].src)} />
                   <HoverOverlay label={visible[idx].label} />
                 </button>
               ) : null
@@ -414,6 +415,7 @@ export default function GaleriaClient() {
                     sizes="(max-width: 768px) 50vw, 33vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                     loading="lazy"
+                    {...blurFor(p.src)}
                   />
                   <HoverOverlay label={p.label} />
                 </button>
@@ -495,6 +497,7 @@ export default function GaleriaClient() {
                 sizes="90vw"
                 className="object-contain lb-photo-in"
                 priority
+                {...blurFor(pool[lb].src)}
               />
             </div>
 

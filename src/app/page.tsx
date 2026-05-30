@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import AnimateIn from "@/components/AnimateIn";
+import { blurFor } from "@/lib/blur";
 import CountUp from "@/components/CountUp";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { clients } from "@/data";
@@ -164,6 +165,7 @@ export default function Home() {
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    {...blurFor(s.image)}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent group-hover:from-black/70 transition-all duration-500" />
                   <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
@@ -222,6 +224,7 @@ export default function Home() {
                       fill
                       sizes="(max-width: 640px) 50vw, 50vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      {...blurFor(p.image)}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent group-hover:from-black/65 transition-all duration-500" />
                     <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-7">
@@ -263,6 +266,7 @@ export default function Home() {
                   fill
                   sizes="360px"
                   className="object-cover group-hover:brightness-75 transition-all duration-500"
+                  {...blurFor(src)}
                 />
               </div>
             ))}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import AnimateIn from "@/components/AnimateIn";
+import { blurFor } from "@/lib/blur";
 import { BreadcrumbJsonLd, JsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { SITE } from "@/lib/site";
@@ -64,7 +65,7 @@ export default async function ProjectPage({
 
       {/* ── Hero ── */}
       <section className="relative min-h-[75vh] flex items-end overflow-hidden">
-        <Image src={p.images[0]} alt={p.title} fill priority sizes="100vw" className="object-cover" />
+        <Image src={p.images[0]} alt={p.title} fill priority sizes="100vw" className="object-cover" {...blurFor(p.images[0])} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/20" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
           <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/45 mb-8">
@@ -119,6 +120,7 @@ export default async function ProjectPage({
                 fill
                 sizes={i === 0 ? "100vw" : "50vw"}
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
+                {...blurFor(src)}
               />
             </div>
           ))}
@@ -134,7 +136,7 @@ export default async function ProjectPage({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {others.map((o) => (
               <Link key={o.slug} href={`/portfolio/${o.slug}`} className="group relative overflow-hidden rounded-xl aspect-[3/4]">
-                <Image src={o.images[0]} alt={o.title} fill sizes="33vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+                <Image src={o.images[0]} alt={o.title} fill sizes="33vw" className="object-cover transition-transform duration-700 group-hover:scale-105" {...blurFor(o.images[0])} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
                 <div className="absolute bottom-0 p-5">
                   <p className="text-cream/55 text-[9px] tracking-[0.35em] uppercase mb-1.5">{o.category}</p>
