@@ -95,7 +95,7 @@ export default function SobrePage() {
                       className="text-moss text-4xl font-bold leading-none"
                       style={{ fontFamily: "var(--font-playfair)" }}
                     >
-                      <CountUp to={16} suffix="+" />
+                      <CountUp to={19} suffix="+" />
                     </p>
                     <p className="text-foreground/28 text-[10px] tracking-[0.28em] uppercase">Clientes</p>
                   </div>

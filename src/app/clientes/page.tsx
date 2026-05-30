@@ -46,22 +46,25 @@ const testimonials = [
 ];
 
 const clientLogos = [
-  { name: "Jose de Mello",             logo: "/logos/clientes/jose-de-mello.png" },
-  { name: "Fita Preta",                logo: "/logos/clientes/fita-preta.png" },
-  { name: "Câmara Municipal de Évora", logo: "/logos/clientes/camara-evora.png" },
-  { name: "Portugal NUTS",             logo: "/logos/clientes/portugal-nuts.png" },
-  { name: "Aernnova Aerospace",        logo: "/logos/clientes/aernnova.png" },
-  { name: "Mainova",                   logo: "/logos/clientes/mainova.png" },
-  { name: "Universidade de Évora",     logo: "/logos/clientes/universidade-evora.png" },
-  { name: "Convento do Espinheiro",    logo: "/logos/clientes/convento-espinheiro.png" },
-  { name: "Perez Llorca",              logo: "/logos/clientes/perez-llorca.png" },
-  { name: "PACT",                      logo: "/logos/clientes/pact.png" },
-  { name: "Clínica Santa",             logo: "/logos/clientes/clinica-santa.png" },
-  { name: "Casa Morgado Esporão",      logo: "/logos/clientes/casa-morgado-esporao.png" },
-  { name: "Monte do Zambujal",         logo: "/logos/clientes/monte-zambujal.png" },
-  { name: "EDIA",                      logo: "/logos/clientes/edia.png" },
-  { name: "ESRI",                      logo: "/logos/clientes/esri.png" },
-  { name: "Palácio Cadaval",           logo: "/logos/clientes/palacio-cadaval.png" },
+  { name: "José de Mello",                      logo: "/logos/clientes/jose-de-mello.png" },
+  { name: "Aernnova",                           logo: "/logos/clientes/aernnova.png" },
+  { name: "Mainova",                            logo: "/logos/clientes/mainova.png" },
+  { name: "Palácio Duques de Cadaval",          logo: "/logos/clientes/palacio-cadaval.png" },
+  { name: "Ravasqueira",                        logo: "/logos/clientes/ravasqueira.png" },
+  { name: "Fitapreta Vinhos",                   logo: "/logos/clientes/fitapreta.png" },
+  { name: "Universidade de Évora",              logo: "/logos/clientes/universidade-evora.png" },
+  { name: "Hilton Garden Inn",                  logo: "/logos/clientes/hilton-garden-inn.png" },
+  { name: "Convento do Espinheiro",             logo: "/logos/clientes/convento-espinheiro.png" },
+  { name: "Pérez-Llorca",                       logo: "/logos/clientes/perez-llorca.png" },
+  { name: "Câmara Municipal de Évora",          logo: "/logos/clientes/camara-evora.png" },
+  { name: "PACT",                               logo: "/logos/clientes/pact.png" },
+  { name: "Clínica Dentária Santa Madalena",    logo: "/logos/clientes/clinica-santa-madalena.png" },
+  { name: "Casa Morgado Esporão",               logo: "/logos/clientes/casa-morgado-esporao.png" },
+  { name: "PortugalNuts",                       logo: "/logos/clientes/portugal-nuts.png" },
+  { name: "ESRI Portugal",                      logo: "/logos/clientes/esri.png" },
+  { name: "Monte do Zambujal",                  logo: "/logos/clientes/monte-zambujal.png" },
+  { name: "EDIA",                               logo: "/logos/clientes/edia.png" },
+  { name: "Ordem dos Médicos Veterinários",     logo: "/logos/clientes/omv.png" },
 ];
 
 export default function ClientesPage() {
@@ -78,7 +81,7 @@ export default function ClientesPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/[0.06]">
             {[
-              { kind: "count" as const, to: 16, suffix: "+", label: "Clientes empresariais" },
+              { kind: "count" as const, to: 19, suffix: "+", label: "Clientes empresariais" },
               { kind: "count" as const, to: 100, suffix: "+", label: "Eventos realizados" },
               { kind: "static" as const, value: "5★", label: "Avaliação média" },
               { kind: "static" as const, value: "24h", label: "Tempo de resposta" },

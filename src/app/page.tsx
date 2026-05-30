@@ -5,10 +5,11 @@ import CountUp from "@/components/CountUp";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 
 const clients = [
-  "Jose de Mello", "Fita Preta", "Câmara Municipal de Évora", "Portugal NUTS",
-  "Aernnova Aerospace", "Mainova", "Universidade de Évora", "Convento do Espinheiro",
-  "Perez Llorca", "PACT", "Casa Morgado Esporão", "Monte do Zambujal",
-  "EDIA", "ESRI", "Palácio Cadaval", "Clínica Santa",
+  "José de Mello", "Aernnova", "Mainova", "Palácio Cadaval", "Ravasqueira",
+  "Fitapreta Vinhos", "Universidade de Évora", "Hilton Garden Inn", "Convento do Espinheiro",
+  "Pérez-Llorca", "Câmara Municipal de Évora", "PACT", "Clínica Santa Madalena",
+  "Casa Morgado Esporão", "PortugalNuts", "ESRI Portugal", "Monte do Zambujal",
+  "EDIA", "Ordem dos Médicos Veterinários",
 ];
 
 const services = [
@@ -46,7 +47,7 @@ type Stat =
   | { kind: "static"; value: string; label: string };
 
 const stats: Stat[] = [
-  { kind: "count",  to: 16,  suffix: "+", label: "Clientes empresariais" },
+  { kind: "count",  to: 19,  suffix: "+", label: "Clientes empresariais" },
   { kind: "count",  to: 100, suffix: "+", label: "Eventos realizados" },
   { kind: "static", value: "5★",          label: "Avaliação dos clientes" },
   { kind: "count",  to: 100, suffix: "%", label: "Soluções personalizadas" },
