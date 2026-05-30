@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import Image from 'next/image';
 import type { Quote, QuoteStatus } from '../types';
 import { formatPrice } from '../pricing';
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from '../data';
@@ -8,6 +9,9 @@ import ProposalBuilder from './ProposalBuilder';
 import ClientMessenger from './ClientMessenger';
 import StatsDashboard from './StatsDashboard';
 import Inbox from './Inbox';
+import Overview from './Overview';
+
+type View = 'overview' | 'pedidos' | 'estatisticas' | 'inbox';
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: 'pendente', label: 'Pendente', color: 'bg-foreground/10 text-foreground/50' },
@@ -17,22 +21,42 @@ const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: 'rejeitado', label: 'Rejeitado', color: 'bg-foreground/8 text-foreground/30' },
 ];
 
+const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
+  { id: 'overview', label: 'Visão Geral', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+  )},
+  { id: 'pedidos', label: 'Pedidos', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4" strokeLinecap="round"/></svg>
+  )},
+  { id: 'estatisticas', label: 'Estatísticas', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 3v18h18" strokeLinecap="round"/><path d="M7 14l3-4 3 3 4-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  )},
+  { id: 'inbox', label: 'Inbox', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 7l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+  )},
+];
+
 interface Props {
   initialQuotes: Quote[];
+  userName?: string;
 }
 
-export default function AdminClient({ initialQuotes }: Props) {
+export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Props) {
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [selected, setSelected] = useState<Quote | null>(null);
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | 'all'>('all');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<'recent' | 'old' | 'value'>('recent');
   const [saving, setSaving] = useState(false);
   const [editPrice, setEditPrice] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [editStatus, setEditStatus] = useState<QuoteStatus>('pendente');
   const [refreshing, setRefreshing] = useState(false);
-  const [view, setView] = useState<'pedidos' | 'estatisticas' | 'inbox'>('pedidos');
+  const [view, setView] = useState<View>('overview');
+  const [navOpen, setNavOpen] = useState(false);
 
   function openQuote(q: Quote) {
+    setView('pedidos');
     setSelected(q);
     setEditPrice(q.quotedPrice ? String(q.quotedPrice) : '');
     setEditNotes(q.adminNotes ?? '');
@@ -42,9 +66,7 @@ export default function AdminClient({ initialQuotes }: Props) {
   async function refresh() {
     setRefreshing(true);
     try {
-      const res = await fetch('/api/orcamento', {
-        headers: { 'x-admin-refresh': '1' },
-      });
+      const res = await fetch('/api/orcamento', { headers: { 'x-admin-refresh': '1' } });
       const data = await res.json();
       if (Array.isArray(data)) setQuotes(data);
     } finally {
@@ -63,9 +85,7 @@ export default function AdminClient({ initialQuotes }: Props) {
     try {
       const res = await fetch(`/api/orcamento/${selected.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: editStatus,
           quotedPrice: editPrice ? parseFloat(editPrice) : undefined,
@@ -80,7 +100,24 @@ export default function AdminClient({ initialQuotes }: Props) {
     }
   }
 
-  const filtered = filterStatus === 'all' ? quotes : quotes.filter((q) => q.status === filterStatus);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = filterStatus === 'all' ? quotes : quotes.filter((x) => x.status === filterStatus);
+    if (q) {
+      list = list.filter((x) =>
+        [x.name, x.email, x.phone, x.company, x.location, x.id]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q))
+      );
+    }
+    const sorted = [...list];
+    if (sort === 'recent') sorted.sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
+    else if (sort === 'old') sorted.sort((a, b) => +new Date(a.submittedAt) - +new Date(b.submittedAt));
+    else sorted.sort((a, b) => (b.quotedPrice ?? b.priceBreakdown?.total ?? 0) - (a.quotedPrice ?? a.priceBreakdown?.total ?? 0));
+    return sorted;
+  }, [quotes, filterStatus, search, sort]);
+
+  const pendingCount = quotes.filter((q) => q.status === 'pendente' || q.status === 'em_revisao').length;
 
   function statusBadge(status: QuoteStatus) {
     const s = STATUS_OPTIONS.find((o) => o.id === status);
@@ -91,42 +128,84 @@ export default function AdminClient({ initialQuotes }: Props) {
     );
   }
 
+  const VIEW_TITLES: Record<View, string> = {
+    overview: 'Visão Geral',
+    pedidos: 'Pedidos',
+    estatisticas: 'Estatísticas',
+    inbox: 'Inbox',
+  };
+
   return (
-    <div className="min-h-screen bg-surface">
-      {/* Header */}
-      <div className="border-b border-foreground/8 px-6 lg:px-12 py-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div>
-            <p className="text-foreground/22 text-[10px] tracking-[0.5em] uppercase mb-1">
-              Líquen Events
-            </p>
-            <h1
-              className="text-foreground font-bold"
-              style={{ fontFamily: 'var(--font-playfair)', fontSize: 'clamp(20px, 2.5vw, 28px)' }}
+    <div className="min-h-screen bg-surface flex">
+      {/* ── Sidebar ── */}
+      <aside
+        className={`fixed lg:sticky top-0 z-40 h-screen w-60 shrink-0 bg-surface-raised/60 border-r border-foreground/8 flex flex-col transition-transform duration-300 ${
+          navOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Brand */}
+        <div className="px-6 py-6 border-b border-foreground/8">
+          <Image src="/logo-liquen-branco.png" alt="Líquen Events" width={116} height={40} className="object-contain opacity-80" />
+          <p className="text-foreground/22 text-[9px] tracking-[0.4em] uppercase mt-3">Back Office</p>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-5 flex flex-col gap-1">
+          {NAV.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => { setView(item.id); setNavOpen(false); }}
+              className={`group flex items-center gap-3 px-3 py-2.5 rounded-md text-[11px] tracking-[0.18em] uppercase transition-colors ${
+                view === item.id
+                  ? 'bg-moss/15 text-moss'
+                  : 'text-foreground/40 hover:text-foreground/70 hover:bg-foreground/4'
+              }`}
             >
-              Painel de Orçamentos
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* View tabs */}
-            <div className="flex gap-1 mr-2 border border-foreground/12 rounded-sm p-0.5">
-              {([
-                ['pedidos', 'Pedidos'],
-                ['estatisticas', 'Estatísticas'],
-                ['inbox', 'Inbox'],
-              ] as const).map(([id, label]) => (
-                <button
-                  key={id}
-                  onClick={() => setView(id)}
-                  className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.2em] uppercase transition-colors ${
-                    view === id ? 'bg-moss text-cream' : 'text-foreground/40 hover:text-foreground/65'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <span className={view === item.id ? 'text-moss' : 'text-foreground/30 group-hover:text-foreground/55'}>
+                {item.icon}
+              </span>
+              {item.label}
+              {item.id === 'pedidos' && pendingCount > 0 && (
+                <span className="ml-auto text-[9px] bg-moss text-cream rounded-full px-1.5 py-0.5 tabular-nums">{pendingCount}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* User */}
+        <div className="px-3 py-4 border-t border-foreground/8">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-moss/20 text-moss flex items-center justify-center text-xs font-bold shrink-0">
+              {userName.slice(0, 1).toUpperCase()}
             </div>
-            <span className="text-foreground/30 text-xs hidden sm:inline">{quotes.length} pedido{quotes.length !== 1 ? 's' : ''}</span>
+            <div className="min-w-0">
+              <p className="text-foreground/65 text-xs font-medium truncate">{userName}</p>
+              <p className="text-foreground/25 text-[10px] truncate">Administração</p>
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            className="w-full mt-1 text-left px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
+          >
+            Sair
+          </button>
+        </div>
+      </aside>
+
+      {/* Backdrop (mobile) */}
+      {navOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setNavOpen(false)} />}
+
+      {/* ── Main ── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top bar */}
+        <header className="sticky top-0 z-20 bg-surface/92 backdrop-blur-md border-b border-foreground/8 px-5 lg:px-10 py-4 flex items-center gap-4">
+          <button className="lg:hidden text-foreground/50" onClick={() => setNavOpen(true)} aria-label="Menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round"/></svg>
+          </button>
+          <h1 className="text-foreground/80 font-bold text-lg" style={{ fontFamily: 'var(--font-playfair)' }}>
+            {VIEW_TITLES[view]}
+          </h1>
+          <div className="ml-auto flex items-center gap-3">
             <button
               onClick={refresh}
               disabled={refreshing}
@@ -134,330 +213,252 @@ export default function AdminClient({ initialQuotes }: Props) {
             >
               {refreshing ? 'A actualizar…' : 'Actualizar'}
             </button>
-            <button
-              onClick={logout}
-              className="px-4 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-sm hover:text-foreground/60 transition-colors"
-            >
-              Sair
-            </button>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {view === 'estatisticas' && (
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-8">
-          <StatsDashboard quotes={quotes} />
-        </div>
-      )}
+        {/* ── Overview ── */}
+        {view === 'overview' && (
+          <div className="px-5 lg:px-10 py-8">
+            <Overview quotes={quotes} userName={userName} onOpen={openQuote} onGoStats={() => setView('estatisticas')} />
+          </div>
+        )}
 
-      {view === 'inbox' && (
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-8">
-          <Inbox />
-        </div>
-      )}
+        {/* ── Estatísticas ── */}
+        {view === 'estatisticas' && (
+          <div className="px-5 lg:px-10 py-8">
+            <StatsDashboard quotes={quotes} />
+          </div>
+        )}
 
-      <div className={`max-w-7xl mx-auto px-6 lg:px-12 py-8 ${view === 'pedidos' ? '' : 'hidden'}`}>
-        {/* Status filter */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${
-              filterStatus === 'all'
-                ? 'bg-moss border-moss text-cream'
-                : 'border-foreground/15 text-foreground/35 hover:border-foreground/30'
-            }`}
-          >
-            Todos ({quotes.length})
-          </button>
-          {STATUS_OPTIONS.map((s) => {
-            const count = quotes.filter((q) => q.status === s.id).length;
-            return (
-              <button
-                key={s.id}
-                onClick={() => setFilterStatus(s.id)}
-                className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${
-                  filterStatus === s.id
-                    ? 'bg-moss border-moss text-cream'
-                    : 'border-foreground/15 text-foreground/35 hover:border-foreground/30'
-                }`}
-              >
-                {s.label} ({count})
-              </button>
-            );
-          })}
-        </div>
+        {/* ── Inbox ── */}
+        {view === 'inbox' && (
+          <div className="px-5 lg:px-10 py-8">
+            <Inbox />
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8">
-          {/* Quote list */}
-          <div className="flex flex-col gap-3">
-            {filtered.length === 0 && (
-              <div className="text-center py-16 text-foreground/25">
-                <p className="text-sm">Nenhum pedido encontrado.</p>
-              </div>
-            )}
-            {filtered.map((q) => {
-              const cat = CATEGORIES.find((c) => c.id === q.category);
-              const et = q.category && q.eventType
-                ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType)
-                : null;
+        {/* ── Pedidos ── */}
+        <div className={`px-5 lg:px-10 py-8 ${view === 'pedidos' ? '' : 'hidden'}`}>
+          {/* Controls */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
+            <div className="relative flex-1 max-w-md">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3" strokeLinecap="round"/></svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Procurar por nome, email, local, ID…"
+                className="w-full bg-surface-raised/50 border border-foreground/12 rounded-md pl-9 pr-3 py-2 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+              />
+            </div>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as typeof sort)}
+              className="bg-surface-raised/50 border border-foreground/12 rounded-md px-3 py-2 text-xs text-foreground/55 focus:outline-none focus:border-moss/45"
+            >
+              <option value="recent">Mais recentes</option>
+              <option value="old">Mais antigos</option>
+              <option value="value">Maior valor</option>
+            </select>
+          </div>
 
+          {/* Status filter */}
+          <div className="flex flex-wrap gap-2 mb-8">
+            <button
+              onClick={() => setFilterStatus('all')}
+              className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${
+                filterStatus === 'all' ? 'bg-moss border-moss text-cream' : 'border-foreground/15 text-foreground/35 hover:border-foreground/30'
+              }`}
+            >
+              Todos ({quotes.length})
+            </button>
+            {STATUS_OPTIONS.map((s) => {
+              const count = quotes.filter((q) => q.status === s.id).length;
               return (
                 <button
-                  key={q.id}
-                  type="button"
-                  onClick={() => openQuote(q)}
-                  className={`text-left p-5 rounded-sm border transition-all duration-200 ${
-                    selected?.id === q.id
-                      ? 'border-moss bg-moss/6'
-                      : 'border-foreground/10 hover:border-foreground/25 bg-surface-raised/40'
+                  key={s.id}
+                  onClick={() => setFilterStatus(s.id)}
+                  className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${
+                    filterStatus === s.id ? 'bg-moss border-moss text-cream' : 'border-foreground/15 text-foreground/35 hover:border-foreground/30'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <p className="text-foreground/70 text-sm font-medium">{q.name}</p>
-                      <p className="text-foreground/28 text-xs">{q.email}</p>
-                    </div>
-                    {statusBadge(q.status)}
-                  </div>
-                  <div className="flex items-center gap-4 text-foreground/30 text-[10px]">
-                    <span>{cat?.label ?? '—'}</span>
-                    {et && <><span className="w-px h-3 bg-foreground/12" /><span>{et.label}</span></>}
-                    <span className="w-px h-3 bg-foreground/12" />
-                    <span>{q.guests} pax</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/8">
-                    <span className="text-foreground/22 text-[10px] font-mono">{q.id}</span>
-                    <div className="flex items-center gap-3">
-                      {q.quotedPrice ? (
-                        <span className="text-moss text-xs font-medium">{formatPrice(q.quotedPrice)}</span>
-                      ) : q.priceBreakdown?.total ? (
-                        <span className="text-foreground/30 text-xs">
-                          ≈ {formatPrice(q.priceBreakdown.rangeMin)}–{formatPrice(q.priceBreakdown.rangeMax)}
-                        </span>
-                      ) : null}
-                      <span className="text-foreground/20 text-[10px]">
-                        {new Date(q.submittedAt).toLocaleDateString('pt-PT', {
-                          day: 'numeric',
-                          month: 'short',
-                        })}
-                      </span>
-                    </div>
-                  </div>
+                  {s.label} ({count})
                 </button>
               );
             })}
           </div>
 
-          {/* Detail panel */}
-          {selected ? (
-            <div className="border border-foreground/10 rounded-sm sticky top-8 max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-foreground/8 flex items-center justify-between">
-                <div>
-                  <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">
-                    {selected.id}
-                  </p>
-                  <p className="text-foreground/70 text-sm font-medium">{selected.name}</p>
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_440px] gap-8">
+            {/* List */}
+            <div className="flex flex-col gap-3">
+              {filtered.length === 0 && (
+                <div className="text-center py-16 text-foreground/25">
+                  <p className="text-sm">Nenhum pedido encontrado.</p>
                 </div>
-                <button
-                  onClick={() => setSelected(null)}
-                  className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="p-5 flex flex-col gap-6">
-                {/* Contact */}
-                <div>
-                  <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">Contacto</p>
-                  <div className="flex flex-col gap-1.5">
-                    <a href={`mailto:${selected.email}`} className="text-moss text-xs hover:underline">{selected.email}</a>
-                    <a href={`tel:${selected.phone}`} className="text-foreground/50 text-xs hover:text-foreground/70">{selected.phone}</a>
-                    {selected.company && <p className="text-foreground/35 text-xs">{selected.company}</p>}
-                    {selected.nif && <p className="text-foreground/25 text-xs">NIF: {selected.nif}</p>}
-                  </div>
-                </div>
-
-                {/* Event details */}
-                <div>
-                  <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">Evento</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { l: 'Tipo', v: CATEGORIES.find((c) => c.id === selected.category)?.label },
-                      { l: 'Sub-tipo', v: selected.category && selected.eventType ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find((e) => e.id === selected.eventType)?.label : null },
-                      { l: 'Pacote', v: PACKAGES.find((p) => p.id === selected.packageTier)?.label },
-                      { l: 'Convidados', v: selected.guests },
-                      { l: 'Data', v: selected.date ? new Date(selected.date + 'T12:00:00').toLocaleDateString('pt-PT') : '—' },
-                      { l: 'Local', v: selected.location || '—' },
-                      { l: 'Duração', v: `${selected.duration}h` },
-                      { l: 'Extras', v: `${selected.addons?.length ?? 0} serviços` },
-                    ].map(({ l, v }) => (
-                      <div key={l}>
-                        <p className="text-foreground/20 text-[9px] tracking-wide uppercase mb-0.5">{l}</p>
-                        <p className="text-foreground/55 text-xs">{v ?? '—'}</p>
+              )}
+              {filtered.map((q) => {
+                const cat = CATEGORIES.find((c) => c.id === q.category);
+                const et = q.category && q.eventType ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType) : null;
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => openQuote(q)}
+                    className={`text-left p-5 rounded-md border transition-all duration-200 ${
+                      selected?.id === q.id ? 'border-moss bg-moss/6' : 'border-foreground/10 hover:border-foreground/25 bg-surface-raised/40'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-foreground/70 text-sm font-medium">{q.name}</p>
+                        <p className="text-foreground/28 text-xs">{q.email}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      {statusBadge(q.status)}
+                    </div>
+                    <div className="flex items-center gap-4 text-foreground/30 text-[10px]">
+                      <span>{cat?.label ?? '—'}</span>
+                      {et && <><span className="w-px h-3 bg-foreground/12" /><span>{et.label}</span></>}
+                      <span className="w-px h-3 bg-foreground/12" />
+                      <span>{q.guests} pax</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/8">
+                      <span className="text-foreground/22 text-[10px] font-mono">{q.id}</span>
+                      <div className="flex items-center gap-3">
+                        {q.quotedPrice ? (
+                          <span className="text-moss text-xs font-medium">{formatPrice(q.quotedPrice)}</span>
+                        ) : q.priceBreakdown?.total ? (
+                          <span className="text-foreground/30 text-xs">≈ {formatPrice(q.priceBreakdown.rangeMin)}–{formatPrice(q.priceBreakdown.rangeMax)}</span>
+                        ) : null}
+                        <span className="text-foreground/20 text-[10px]">
+                          {new Date(q.submittedAt).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-                {/* Notes from client */}
-                {selected.notes && (
+            {/* Detail */}
+            {selected ? (
+              <div className="border border-foreground/10 rounded-md sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
+                <div className="px-5 py-4 border-b border-foreground/8 flex items-center justify-between sticky top-0 bg-surface-raised/80 backdrop-blur-sm">
                   <div>
-                    <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-2">Notas do Cliente</p>
-                    <p className="text-foreground/45 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
-                      {selected.notes}
-                    </p>
+                    <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">{selected.id}</p>
+                    <p className="text-foreground/70 text-sm font-medium">{selected.name}</p>
                   </div>
-                )}
+                  <button onClick={() => setSelected(null)} className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors">×</button>
+                </div>
 
-                {/* Price breakdown */}
-                <div>
-                  <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">Estimativa Calculada</p>
+                <div className="p-5 flex flex-col gap-6">
+                  {/* Contact */}
+                  <div>
+                    <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">Contacto</p>
+                    <div className="flex flex-col gap-1.5">
+                      <a href={`mailto:${selected.email}`} className="text-moss text-xs hover:underline">{selected.email}</a>
+                      <a href={`tel:${selected.phone}`} className="text-foreground/50 text-xs hover:text-foreground/70">{selected.phone}</a>
+                      {selected.company && <p className="text-foreground/35 text-xs">{selected.company}</p>}
+                      {selected.nif && <p className="text-foreground/25 text-xs">NIF: {selected.nif}</p>}
+                    </div>
+                  </div>
+
+                  {/* Event */}
+                  <div>
+                    <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">Evento</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { l: 'Tipo', v: CATEGORIES.find((c) => c.id === selected.category)?.label },
+                        { l: 'Sub-tipo', v: selected.category && selected.eventType ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find((e) => e.id === selected.eventType)?.label : null },
+                        { l: 'Pacote', v: PACKAGES.find((p) => p.id === selected.packageTier)?.label },
+                        { l: 'Convidados', v: selected.guests },
+                        { l: 'Data', v: selected.date ? new Date(selected.date + 'T12:00:00').toLocaleDateString('pt-PT') : '—' },
+                        { l: 'Local', v: selected.location || '—' },
+                        { l: 'Duração', v: `${selected.duration}h` },
+                        { l: 'Extras', v: `${selected.addons?.length ?? 0} serviços` },
+                      ].map(({ l, v }) => (
+                        <div key={l}>
+                          <p className="text-foreground/20 text-[9px] tracking-wide uppercase mb-0.5">{l}</p>
+                          <p className="text-foreground/55 text-xs">{v ?? '—'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Client notes */}
+                  {selected.notes && (
+                    <div>
+                      <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-2">Notas do Cliente</p>
+                      <p className="text-foreground/45 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">{selected.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Estimate */}
                   {selected.priceBreakdown && (
-                    <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
-                      {selected.priceBreakdown.locationSurcharge > 0 && (
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-foreground/35">Deslocação</span>
-                          <span className="text-foreground/50">{formatPrice(selected.priceBreakdown.locationSurcharge)}</span>
-                        </div>
-                      )}
-                      {selected.priceBreakdown.weekendSurcharge > 0 && (
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-foreground/35">Weekend +15%</span>
-                          <span className="text-foreground/50">{formatPrice(selected.priceBreakdown.weekendSurcharge)}</span>
-                        </div>
-                      )}
-                      {selected.priceBreakdown.addonsCost > 0 && (
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-foreground/35">Extras</span>
-                          <span className="text-foreground/50">{formatPrice(selected.priceBreakdown.addonsCost)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
-                        <span className="text-foreground/35">Subtotal</span>
-                        <span className="text-foreground/50">{formatPrice(selected.priceBreakdown.subtotal)}</span>
-                      </div>
-                      <div className="flex justify-between text-[10px]">
-                        <span className="text-foreground/35">IVA 23%</span>
-                        <span className="text-foreground/50">{formatPrice(selected.priceBreakdown.iva)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
-                        <span className="text-foreground/60">Total</span>
-                        <span className="text-moss">{formatPrice(selected.priceBreakdown.total)}</span>
+                    <div>
+                      <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">Estimativa Calculada</p>
+                      <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
+                        {selected.priceBreakdown.addonsCost > 0 && (
+                          <div className="flex justify-between text-[10px]"><span className="text-foreground/35">Extras</span><span className="text-foreground/50">{formatPrice(selected.priceBreakdown.addonsCost)}</span></div>
+                        )}
+                        <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8"><span className="text-foreground/35">Subtotal</span><span className="text-foreground/50">{formatPrice(selected.priceBreakdown.subtotal)}</span></div>
+                        <div className="flex justify-between text-[10px]"><span className="text-foreground/35">IVA 23%</span><span className="text-foreground/50">{formatPrice(selected.priceBreakdown.iva)}</span></div>
+                        <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8"><span className="text-foreground/60">Total</span><span className="text-moss">{formatPrice(selected.priceBreakdown.total)}</span></div>
                       </div>
                     </div>
                   )}
-                </div>
 
-                {/* Admin actions */}
-                <div className="border-t border-foreground/10 pt-5">
-                  <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">Acções Admin</p>
-
-                  <div className="flex flex-col gap-4">
-                    {/* Status */}
-                    <div>
-                      <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-                        Estado
-                      </label>
-                      <select
-                        value={editStatus}
-                        onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                        className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50"
-                      >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s.id} value={s.id}>{s.label}</option>
-                        ))}
-                      </select>
+                  {/* Admin actions */}
+                  <div className="border-t border-foreground/10 pt-5">
+                    <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">Gestão do Pedido</p>
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">Estado</label>
+                        <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as QuoteStatus)} className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50">
+                          {STATUS_OPTIONS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">Preço Final Cotado (€ s/IVA)</label>
+                        <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} placeholder="Ex: 12500" className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">Notas Internas</label>
+                        <textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notas internas sobre este pedido…" className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 resize-none" />
+                      </div>
+                      <button onClick={saveChanges} disabled={saving} className={`w-full py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${saving ? 'bg-moss/40 text-cream/50 cursor-not-allowed' : 'bg-moss text-cream hover:bg-moss-dark'}`}>
+                        {saving ? 'A guardar…' : 'Guardar Alterações →'}
+                      </button>
                     </div>
+                  </div>
 
-                    {/* Quoted price */}
-                    <div>
-                      <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-                        Preço Final Cotado (€ s/IVA)
-                      </label>
-                      <input
-                        type="number"
-                        value={editPrice}
-                        onChange={(e) => setEditPrice(e.target.value)}
-                        placeholder="Ex: 12500"
-                        className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50"
-                      />
-                    </div>
+                  <ProposalBuilder
+                    quote={selected}
+                    onSent={(total) => {
+                      setQuotes((prev) => prev.map((q) => (q.id === selected.id ? { ...q, status: 'cotado', quotedPrice: total } : q)));
+                      setSelected((prev) => (prev ? { ...prev, status: 'cotado', quotedPrice: total } : prev));
+                      setEditStatus('cotado');
+                    }}
+                  />
 
-                    {/* Admin notes */}
-                    <div>
-                      <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-                        Notas Internas
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        placeholder="Notas internas sobre este pedido…"
-                        className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 resize-none"
-                      />
-                    </div>
+                  <ClientMessenger
+                    key={selected.id}
+                    quote={selected}
+                    onSent={(messages) => {
+                      setQuotes((prev) => prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)));
+                      setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                    }}
+                  />
 
-                    <button
-                      onClick={saveChanges}
-                      disabled={saving}
-                      className={`w-full py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${
-                        saving
-                          ? 'bg-moss/40 text-cream/50 cursor-not-allowed'
-                          : 'bg-moss text-cream hover:bg-moss-dark'
-                      }`}
-                    >
-                      {saving ? 'A guardar…' : 'Guardar Alterações →'}
-                    </button>
+                  <div className="text-foreground/18 text-[10px] text-center">
+                    Submetido em {new Date(selected.submittedAt).toLocaleString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
-
-                {/* Proposal builder → PDF → email */}
-                <ProposalBuilder
-                  quote={selected}
-                  onSent={(total) => {
-                    setQuotes((prev) =>
-                      prev.map((q) =>
-                        q.id === selected.id ? { ...q, status: 'cotado', quotedPrice: total } : q
-                      )
-                    );
-                    setSelected((prev) =>
-                      prev ? { ...prev, status: 'cotado', quotedPrice: total } : prev
-                    );
-                    setEditStatus('cotado');
-                  }}
-                />
-
-                {/* Reply to client by email (logged) */}
-                <ClientMessenger
-                  key={selected.id}
-                  quote={selected}
-                  onSent={(messages) => {
-                    setQuotes((prev) =>
-                      prev.map((q) => (q.id === selected.id ? { ...q, messages } : q))
-                    );
-                    setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                  }}
-                />
-
-                <div className="text-foreground/18 text-[10px] text-center">
-                  Submetido em{' '}
-                  {new Date(selected.submittedAt).toLocaleString('pt-PT', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </div>
               </div>
-            </div>
-          ) : (
-            <div className="hidden lg:flex items-center justify-center border border-foreground/6 rounded-sm text-foreground/18 text-sm">
-              Seleccione um pedido para ver detalhes
-            </div>
-          )}
+            ) : (
+              <div className="hidden xl:flex items-center justify-center border border-foreground/6 rounded-md text-foreground/18 text-sm">
+                Seleccione um pedido para ver detalhes
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

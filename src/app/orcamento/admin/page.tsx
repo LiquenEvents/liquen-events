@@ -25,5 +25,6 @@ export default async function AdminPage() {
   }
 
   const quotes = await getQuotes();
-  return <AdminClient initialQuotes={quotes} />;
+  const userName = process.env.ADMIN_NAME ?? 'Catarina';
+  return <AdminClient initialQuotes={quotes} userName={userName} />;
 }
