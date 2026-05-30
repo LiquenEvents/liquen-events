@@ -138,6 +138,8 @@ export interface Task {
   dueDate?: string;
   quoteId?: string;
   clientName?: string;
+  assignee?: string;   // quem é responsável (sócio/membro da equipa)
+  area?: string;       // ex.: Comercial, Produção, Decoração, Financeiro
   createdAt: string;
 }
 

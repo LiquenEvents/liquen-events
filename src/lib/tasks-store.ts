@@ -27,6 +27,8 @@ function rowToTask(r: Record<string, unknown>): Task {
     dueDate: (r.due_date as string) ?? undefined,
     quoteId: (r.quote_id as string) ?? undefined,
     clientName: (r.client_name as string) ?? undefined,
+    assignee: (r.assignee as string) ?? undefined,
+    area: (r.area as string) ?? undefined,
     createdAt: String(r.created_at ?? new Date().toISOString()),
   };
 }
@@ -52,6 +54,8 @@ export async function createTask(input: Omit<Task, "id" | "createdAt" | "done"> 
     dueDate: input.dueDate,
     quoteId: input.quoteId,
     clientName: input.clientName,
+    assignee: input.assignee,
+    area: input.area,
   };
   const sb = getSupabase();
   if (sb) {
@@ -63,6 +67,8 @@ export async function createTask(input: Omit<Task, "id" | "createdAt" | "done"> 
       due_date: task.dueDate || null,
       quote_id: task.quoteId || null,
       client_name: task.clientName || null,
+      assignee: task.assignee || null,
+      area: task.area || null,
     });
     if (error) throw error;
     return task;
@@ -81,6 +87,8 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<Ta
     if ("title" in updates) patch.title = updates.title;
     if ("priority" in updates) patch.priority = updates.priority;
     if ("dueDate" in updates) patch.due_date = updates.dueDate || null;
+    if ("assignee" in updates) patch.assignee = updates.assignee || null;
+    if ("area" in updates) patch.area = updates.area || null;
     const { data, error } = await sb.from(TABLE).update(patch).eq("id", id).select("*").maybeSingle();
     if (error) throw error;
     return data ? rowToTask(data) : null;

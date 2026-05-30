@@ -54,8 +54,14 @@ create table if not exists public.tasks (
   priority    text not null default 'normal',  -- baixa | normal | alta
   due_date    date,
   quote_id    text,
-  client_name text
+  client_name text,
+  assignee    text,
+  area        text
 );
+
+-- If upgrading an existing database, add the new columns:
+alter table public.tasks add column if not exists assignee text;
+alter table public.tasks add column if not exists area text;
 
 create index if not exists tasks_done_idx on public.tasks (done);
 create index if not exists tasks_due_idx  on public.tasks (due_date);

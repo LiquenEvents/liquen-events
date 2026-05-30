@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       dueDate: body.dueDate || undefined,
       quoteId: body.quoteId || undefined,
       clientName: body.clientName || undefined,
+      assignee: body.assignee || undefined,
+      area: body.area || undefined,
     });
     return NextResponse.json(task);
   } catch (err) {
