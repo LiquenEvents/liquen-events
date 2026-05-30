@@ -22,9 +22,17 @@
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 2px; }
+::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2d5c3e; }
+::-webkit-scrollbar-thumb { background: #2d5c3e; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #4a7c59; }
+
+/* ── Focus: refined, accessible, on-brand ── */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #080808, 0 0 0 3px rgba(74, 124, 89, 0.6);
+  border-radius: 2px;
+}
 
 /* ── Smooth scroll ── */
 html { scroll-behavior: smooth; }
