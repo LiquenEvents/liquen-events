@@ -11,7 +11,6 @@ const nextConfig: NextConfig = {
 
   // ── Higiene de produção ──
   poweredByHeader: false,        // não expõe "X-Powered-By: Next.js"
-  compress: true,                // gzip/brotli nas respostas
   reactStrictMode: true,
 
   // Mantém o build a passar mesmo com avisos de lint (deploy resiliente)
