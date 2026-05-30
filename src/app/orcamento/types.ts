@@ -106,6 +106,11 @@ export interface PriceBreakdown {
   isEstimate: boolean;
 }
 
+export interface QuoteMessage {
+  at: string;
+  body: string;
+}
+
 export interface Quote extends QuoteFormData {
   id: string;
   submittedAt: string;
@@ -114,6 +119,7 @@ export interface Quote extends QuoteFormData {
   quotedPrice?: number;
   adminNotes?: string;
   lastUpdated?: string;
+  messages?: QuoteMessage[];
 }
 
 // ── Propostas (criadas internamente, enviadas em PDF ao cliente) ──

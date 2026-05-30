@@ -5,6 +5,8 @@ import type { Quote, QuoteStatus } from '../types';
 import { formatPrice } from '../pricing';
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from '../data';
 import ProposalBuilder from './ProposalBuilder';
+import ClientMessenger from './ClientMessenger';
+import StatsDashboard from './StatsDashboard';
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: 'pendente', label: 'Pendente', color: 'bg-foreground/10 text-foreground/50' },
@@ -28,6 +30,7 @@ export default function AdminClient({ initialQuotes, adminPass }: Props) {
   const [editNotes, setEditNotes] = useState('');
   const [editStatus, setEditStatus] = useState<QuoteStatus>('pendente');
   const [refreshing, setRefreshing] = useState(false);
+  const [view, setView] = useState<'pedidos' | 'estatisticas'>('pedidos');
 
   function openQuote(q: Quote) {
     setSelected(q);
@@ -101,7 +104,24 @@ export default function AdminClient({ initialQuotes, adminPass }: Props) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-foreground/30 text-xs">{quotes.length} pedido{quotes.length !== 1 ? 's' : ''}</span>
+            {/* View tabs */}
+            <div className="flex gap-1 mr-2 border border-foreground/12 rounded-sm p-0.5">
+              {([
+                ['pedidos', 'Pedidos'],
+                ['estatisticas', 'Estatísticas'],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setView(id)}
+                  className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.2em] uppercase transition-colors ${
+                    view === id ? 'bg-moss text-cream' : 'text-foreground/40 hover:text-foreground/65'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className="text-foreground/30 text-xs hidden sm:inline">{quotes.length} pedido{quotes.length !== 1 ? 's' : ''}</span>
             <button
               onClick={refresh}
               disabled={refreshing}
@@ -113,7 +133,13 @@ export default function AdminClient({ initialQuotes, adminPass }: Props) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-12 py-8">
+      {view === 'estatisticas' && (
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-8">
+          <StatsDashboard quotes={quotes} />
+        </div>
+      )}
+
+      <div className={`max-w-7xl mx-auto px-6 lg:px-12 py-8 ${view === 'pedidos' ? '' : 'hidden'}`}>
         {/* Status filter */}
         <div className="flex flex-wrap gap-2 mb-8">
           <button
@@ -384,6 +410,19 @@ export default function AdminClient({ initialQuotes, adminPass }: Props) {
                       prev ? { ...prev, status: 'cotado', quotedPrice: total } : prev
                     );
                     setEditStatus('cotado');
+                  }}
+                />
+
+                {/* Reply to client by email (logged) */}
+                <ClientMessenger
+                  key={selected.id}
+                  quote={selected}
+                  adminPass={adminPass}
+                  onSent={(messages) => {
+                    setQuotes((prev) =>
+                      prev.map((q) => (q.id === selected.id ? { ...q, messages } : q))
+                    );
+                    setSelected((prev) => (prev ? { ...prev, messages } : prev));
                   }}
                 />
 
