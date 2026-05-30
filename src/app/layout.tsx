@@ -80,6 +80,10 @@ export const metadata: Metadata = {
     shortcut: "/logo-liquen.png",
     apple: "/logo-liquen.png",
   },
+  // Add GOOGLE_SITE_VERIFICATION in the environment to verify Search Console.
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
 };
 
 export default function RootLayout({
