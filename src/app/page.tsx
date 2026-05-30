@@ -14,11 +14,11 @@ const services = [
 ];
 
 const featured = [
-  { title: "Aernnova Aerospace",   category: "Corporativo",   image: "/imagens/EW1_1392.jpg" },
-  { title: "Daniela & Guilherme",  category: "Casamento",     image: "/imagens/DaniGui_Preview12.jpg" },
-  { title: "João & Pedro",         category: "Casamento",     image: "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg" },
-  { title: "Câmara de Évora",      category: "Institucional", image: "/imagens/20_10_2025_0295.jpg" },
-  { title: "Matilde & Filipe",     category: "Casamento",     image: "/imagens/M&F0152.jpg" },
+  { title: "Aernnova Aerospace",   category: "Corporativo",   image: "/imagens/EW1_1392.jpg",             slug: "aernnova-aerospace" },
+  { title: "Daniela & Guilherme",  category: "Casamento",     image: "/imagens/DaniGui_Preview12.jpg",    slug: "daniela-e-guilherme" },
+  { title: "João & Pedro",         category: "Casamento",     image: "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg", slug: "joao-e-pedro" },
+  { title: "Câmara de Évora",      category: "Institucional", image: "/imagens/20_10_2025_0295.jpg",      slug: "camara-municipal-evora" },
+  { title: "Matilde & Filipe",     category: "Casamento",     image: "/imagens/M&F0152.jpg",              slug: "matilde-e-filipe" },
 ];
 
 const ribbon = [
@@ -43,6 +43,13 @@ const stats: Stat[] = [
   { kind: "count",  to: 100, suffix: "+", label: "Eventos realizados" },
   { kind: "static", value: "5★",          label: "Avaliação dos clientes" },
   { kind: "count",  to: 100, suffix: "%", label: "Soluções personalizadas" },
+];
+
+const process = [
+  { title: "Conversa inicial", desc: "Ouvimos a sua visão, gostos e orçamento — sem compromisso." },
+  { title: "Conceito & proposta", desc: "Desenhamos o conceito e apresentamos uma proposta detalhada, à medida." },
+  { title: "Planeamento", desc: "Tratamos de fornecedores, decoração, logística e de cada pormenor." },
+  { title: "O grande dia", desc: "Coordenamos tudo no local para que só tenha de viver o momento." },
 ];
 
 export default function Home() {
@@ -215,7 +222,7 @@ export default function Home() {
               return (
                 <AnimateIn key={p.title} delay={i * 50} className={`${span} ${i === 0 ? "col-span-2 row-span-2" : ""}`}>
                   <Link
-                    href="/portfolio"
+                    href={`/portfolio/${p.slug}`}
                     className="group relative block w-full h-full overflow-hidden rounded-xl"
                   >
                     <Image
@@ -272,6 +279,53 @@ export default function Home() {
             ))}
           </div>
         </Link>
+      </section>
+
+      {/* ── Process — how we work ── */}
+      <section className="py-16 lg:py-28 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12 lg:mb-20">
+              <div>
+                <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase mb-6 flex items-center gap-3">
+                  <span className="w-6 h-px bg-moss rounded-full flex-shrink-0" />
+                  Como trabalhamos
+                </p>
+                <h2
+                  className="text-foreground font-bold leading-[1.05] max-w-xl"
+                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4vw, 52px)" }}
+                >
+                  Do primeiro olá ao último brinde.
+                </h2>
+              </div>
+              <p className="text-foreground/40 text-sm leading-relaxed max-w-sm lg:text-right">
+                Um processo simples e transparente, pensado para que só tenha de viver o momento.
+              </p>
+            </div>
+          </AnimateIn>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/8 border border-foreground/8 rounded-xl overflow-hidden">
+            {process.map((step, i) => (
+              <AnimateIn key={step.title} delay={i * 70} className="h-full">
+                <div className="bg-surface h-full p-7 lg:p-9 group hover:bg-surface-raised/40 transition-colors duration-500">
+                  <div className="flex items-center justify-between mb-8">
+                    <span className="text-moss/70 text-xs font-mono tabular-nums tracking-widest">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="w-8 h-px bg-foreground/10 group-hover:w-12 group-hover:bg-moss/50 transition-all duration-500" />
+                  </div>
+                  <h3
+                    className="text-foreground text-xl font-bold mb-3"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p className="text-foreground/40 text-sm leading-[1.7]">{step.desc}</p>
+                </div>
+              </AnimateIn>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ── Stats ── */}
