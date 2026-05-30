@@ -467,7 +467,7 @@ export default function ContactForm() {
                     ].map((s, i) => (
                       <div
                         key={s.n}
-                        className={`flex items-center gap-6 px-7 py-5 ${i < 2 ? "border-b border-foreground/8" : ""}`}
+                        className={`flex items-center gap-4 px-5 py-4 sm:px-7 sm:py-5 ${i < 2 ? "border-b border-foreground/8" : ""}`}
                       >
                         <span className="text-moss/50 text-xs font-mono tabular-nums flex-shrink-0">
                           {s.n}
@@ -618,7 +618,7 @@ export default function ContactForm() {
                         <p className="text-foreground/35 text-sm mb-10">
                           Ajude-nos a perceber a dimensão e o timing.
                         </p>
-                        <div className="flex flex-col gap-10 mb-12">
+                        <div className="flex flex-col gap-7 sm:gap-10 mb-12">
                           <div>
                             <label className={labelCls}>Data Prevista</label>
                             <input

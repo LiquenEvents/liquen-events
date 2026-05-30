@@ -414,7 +414,7 @@ export default function ServicosPage() {
       </div>
 
       {/* ── Hero ── */}
-      <section className="relative min-h-screen flex items-end pb-0 pt-36 bg-surface overflow-hidden">
+      <section className="relative min-h-screen flex items-end pb-0 pt-24 md:pt-36 bg-surface overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -554,7 +554,7 @@ export default function ServicosPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/[0.055]">
             {stats.map((stat, i) => (
               <AnimateIn key={i} delay={i * 90}>
-                <div className="bg-surface px-8 py-16 flex flex-col items-center text-center">
+                <div className="bg-surface px-5 py-8 md:px-8 md:py-16 flex flex-col items-center text-center">
                   <p
                     className="text-foreground font-bold leading-none mb-3"
                     style={{
@@ -568,7 +568,7 @@ export default function ServicosPage() {
                       stat.value
                     )}
                   </p>
-                  <p className="text-foreground/28 text-[9px] tracking-[0.48em] uppercase">
+                  <p className="text-foreground/28 text-[10px] tracking-[0.45em] uppercase">
                     {stat.label}
                   </p>
                 </div>
@@ -581,7 +581,7 @@ export default function ServicosPage() {
       {/* ── Photo strip (edge-to-edge) ── */}
       <section className="bg-surface border-t border-foreground/8">
         <AnimateIn from="fade">
-          <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(180px, 28vw, 400px)" }}>
+          <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(150px, 35vw, 400px)" }}>
             {[
               { src: "/imagens/EW1_1100.jpg", label: "Eventos Corporativos" },
               { src: "/imagens/DaniGui_Preview19.jpg", label: "Casamentos" },
@@ -631,12 +631,12 @@ export default function ServicosPage() {
         {/* Sticky nav */}
         <div className="sticky top-16 z-30 bg-surface/[0.97] backdrop-blur-md border-b border-foreground/[0.06]">
           <div className="max-w-7xl mx-auto px-6 lg:px-16">
-            <div className="flex items-center gap-8 h-11">
+            <div className="flex items-center gap-5 sm:gap-8 h-11 overflow-x-auto scroll-hide">
               {navItems.map((cat, i) => (
                 <a
                   key={cat.id}
                   href={`#${cat.id}`}
-                  className="text-[9px] tracking-[0.45em] uppercase text-foreground/30 hover:text-moss transition-colors duration-300 flex items-center gap-2"
+                  className="text-[10px] tracking-[0.4em] uppercase text-foreground/30 hover:text-moss transition-colors duration-300 flex items-center gap-2 whitespace-nowrap"
                 >
                   <span className="text-moss/35 font-mono">0{i + 1}</span>
                   {cat.label}
@@ -650,7 +650,7 @@ export default function ServicosPage() {
           <section
             key={cat.id}
             id={cat.id}
-            className="py-28 lg:py-36 bg-surface border-t border-foreground/8"
+            className="py-14 md:py-28 lg:py-36 bg-surface border-t border-foreground/8"
           >
             <div className="max-w-7xl mx-auto px-6 lg:px-16">
               {/* Category header */}
@@ -719,7 +719,7 @@ export default function ServicosPage() {
       </div>
 
       {/* ── Como trabalhamos ── */}
-      <section className="py-28 lg:py-40 bg-surface-raised border-t border-foreground/8 overflow-hidden">
+      <section className="py-14 md:py-28 lg:py-40 bg-surface-raised border-t border-foreground/8 overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-20 lg:mb-28">
@@ -779,7 +779,7 @@ export default function ServicosPage() {
       </section>
 
       {/* ── O que nos distingue ── */}
-      <section className="py-28 lg:py-40 bg-surface border-t border-foreground/8">
+      <section className="py-14 md:py-28 lg:py-40 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10 mb-20">
@@ -810,7 +810,7 @@ export default function ServicosPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-foreground/[0.055]">
             {differentiators.map((d, i) => (
               <AnimateIn key={d.num} delay={i * 60}>
-                <div className="bg-surface p-10 lg:p-14 group hover:bg-surface-raised transition-colors duration-300 relative overflow-hidden">
+                <div className="bg-surface p-7 sm:p-10 lg:p-14 group hover:bg-surface-raised transition-colors duration-300 relative overflow-hidden">
                   <span
                     aria-hidden
                     className="absolute -bottom-4 -right-2 select-none pointer-events-none font-bold leading-none"
