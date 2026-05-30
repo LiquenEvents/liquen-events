@@ -13,9 +13,6 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,        // não expõe "X-Powered-By: Next.js"
   reactStrictMode: true,
 
-  // Mantém o build a passar mesmo com avisos de lint (deploy resiliente)
-  eslint: { ignoreDuringBuilds: true },
-
   // ── Cabeçalhos: segurança + cache agressivo dos estáticos ──
   async headers() {
     const securityHeaders = [
