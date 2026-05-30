@@ -366,6 +366,39 @@ export default function ServicosPage() {
         </AnimateIn>
       </section>
 
+      {/* ── Diferenciadores ── */}
+      <section className="py-28 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className="text-foreground/25 text-[10px] tracking-[0.48em] uppercase mb-16 flex items-center gap-3">
+              <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+              Porquê a Líquen
+            </p>
+          </AnimateIn>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/[0.06]">
+            {[
+              { n: '01', t: 'Chave na mão', d: 'Do conceito à execução, tratamos de tudo para que só tenha de aproveitar.' },
+              { n: '02', t: 'Rede de confiança', d: 'Fornecedores e parceiros selecionados ao detalhe, em todo o país.' },
+              { n: '03', t: 'Equipa dedicada', d: 'Um interlocutor único e uma equipa criativa do início ao fim.' },
+              { n: '04', t: 'Sem surpresas', d: 'Comunicação clara e uma proposta transparente, à sua medida.' },
+            ].map((item, i) => (
+              <AnimateIn key={item.n} delay={i * 70}>
+                <div className="bg-surface h-full p-8 lg:p-10 group hover:bg-surface-raised transition-colors duration-300">
+                  <p className="text-moss/55 text-[9px] tracking-[0.45em] font-mono uppercase mb-6">{item.n}</p>
+                  <h3
+                    className="text-foreground text-xl font-bold mb-3 group-hover:text-moss transition-colors duration-200"
+                    style={{ fontFamily: 'var(--font-playfair)' }}
+                  >
+                    {item.t}
+                  </h3>
+                  <p className="text-foreground/38 text-sm leading-relaxed">{item.d}</p>
+                </div>
+              </AnimateIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Process ── */}
       <section className="py-32 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
