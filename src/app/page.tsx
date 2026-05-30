@@ -4,7 +4,7 @@ import AnimateIn from "@/components/AnimateIn";
 import { blurFor } from "@/lib/blur";
 import CountUp from "@/components/CountUp";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
-import { clients } from "@/data";
+import ClientMarquee from "@/components/ClientMarquee";
 
 const services = [
   { title: "Corporativos", tag: "Empresas",     image: "/imagens/EW1_1408.jpg",            href: "/servicos#empresas" },
@@ -125,20 +125,7 @@ export default function Home() {
       </section>
 
       {/* ── Clients marquee ── */}
-      <div className="relative py-6 border-y border-foreground/8 overflow-hidden">
-        <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
-        <div className="absolute inset-y-0 right-0 w-16 sm:w-24 bg-gradient-to-l from-surface to-transparent z-10 pointer-events-none" />
-        <div className="flex gap-14 sm:gap-20 animate-marquee whitespace-nowrap">
-          {[...clients, ...clients].map((c, i) => (
-            <span
-              key={i}
-              className="text-foreground/20 text-[10px] sm:text-xs font-medium tracking-[0.3em] uppercase flex-shrink-0 hover:text-foreground/50 transition-colors cursor-default"
-            >
-              {c}
-            </span>
-          ))}
-        </div>
-      </div>
+      <ClientMarquee />
 
       {/* ── Services — minimal image tiles ── */}
       <section className="py-16 lg:py-24 bg-surface">
