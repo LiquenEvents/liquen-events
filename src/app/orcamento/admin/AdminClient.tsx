@@ -7,6 +7,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from '../data';
 import ProposalBuilder from './ProposalBuilder';
 import ClientMessenger from './ClientMessenger';
 import StatsDashboard from './StatsDashboard';
+import Inbox from './Inbox';
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: 'pendente', label: 'Pendente', color: 'bg-foreground/10 text-foreground/50' },
@@ -29,7 +30,7 @@ export default function AdminClient({ initialQuotes }: Props) {
   const [editNotes, setEditNotes] = useState('');
   const [editStatus, setEditStatus] = useState<QuoteStatus>('pendente');
   const [refreshing, setRefreshing] = useState(false);
-  const [view, setView] = useState<'pedidos' | 'estatisticas'>('pedidos');
+  const [view, setView] = useState<'pedidos' | 'estatisticas' | 'inbox'>('pedidos');
 
   function openQuote(q: Quote) {
     setSelected(q);
@@ -112,6 +113,7 @@ export default function AdminClient({ initialQuotes }: Props) {
               {([
                 ['pedidos', 'Pedidos'],
                 ['estatisticas', 'Estatísticas'],
+                ['inbox', 'Inbox'],
               ] as const).map(([id, label]) => (
                 <button
                   key={id}
@@ -145,6 +147,12 @@ export default function AdminClient({ initialQuotes }: Props) {
       {view === 'estatisticas' && (
         <div className="max-w-7xl mx-auto px-6 lg:px-12 py-8">
           <StatsDashboard quotes={quotes} />
+        </div>
+      )}
+
+      {view === 'inbox' && (
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-8">
+          <Inbox />
         </div>
       )}
 
