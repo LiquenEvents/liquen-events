@@ -79,7 +79,6 @@ const eventCards = [
 ];
 
 const guestRanges = ["Até 30", "30–80", "80–150", "150–300", "300+"];
-const budgetRanges = ["Até 2.000€", "2–5.000€", "5–10.000€", "10–20.000€", "20.000€+"];
 const stepLabels = ["Evento", "Dados", "Detalhes", "Mensagem"];
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -427,14 +426,6 @@ export default function ContactForm() {
                             <div className="flex flex-wrap gap-2 pt-1">
                               {guestRanges.map((r) => (
                                 <Pill key={r} label={r} selected={form.convidados === r} onClick={() => set("convidados", r)} />
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <label className={labelCls}>Orçamento Estimado</label>
-                            <div className="flex flex-wrap gap-2 pt-1">
-                              {budgetRanges.map((r) => (
-                                <Pill key={r} label={r} selected={form.orcamento === r} onClick={() => set("orcamento", r)} />
                               ))}
                             </div>
                           </div>
