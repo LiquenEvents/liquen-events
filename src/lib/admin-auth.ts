@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { NextRequest } from "next/server";
+import { verifyTotp } from "./totp";
 
 /**
  * Admin authentication for the internal dashboard.
@@ -54,6 +55,7 @@ function sessionSecret(): string {
 interface AdminUser {
   name: string;
   passwordHash: string;
+  totpSecret?: string;
 }
 
 function configuredUsers(): AdminUser[] | null {
@@ -77,6 +79,28 @@ function configuredUsers(): AdminUser[] | null {
 
 function sharedHash(): string {
   return process.env.ADMIN_PASSWORD_HASH ?? DEV_SHARED_HASH;
+}
+
+// ── Two-factor (TOTP) ──────────────────────────────────────────────────────
+function totpSecretFor(name: string): string | null {
+  const users = configuredUsers();
+  if (users) {
+    const u = users.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+    if (u?.totpSecret) return u.totpSecret;
+  }
+  return process.env.ADMIN_TOTP_SECRET || null;
+}
+
+/** Whether the given user must provide a 2FA code (a TOTP secret is configured). */
+export function totpRequired(name: string): boolean {
+  return totpSecretFor(name) !== null;
+}
+
+/** Verify a 2FA code for the user. Returns true when no 2FA is configured. */
+export function checkTotp(name: string, code: string): boolean {
+  const secret = totpSecretFor(name);
+  if (!secret) return true;
+  return verifyTotp(secret, code);
 }
 
 /**

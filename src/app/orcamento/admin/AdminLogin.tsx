@@ -7,6 +7,8 @@ import Image from 'next/image';
 export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -25,14 +27,20 @@ export default function AdminLogin() {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, name }),
+        body: JSON.stringify({ password, name, code }),
       });
-      if (!res.ok) {
-        setError('Palavra-passe incorreta.');
-        setLoading(false);
+      if (res.ok) {
+        router.refresh();
         return;
       }
-      router.refresh();
+      const data = await res.json().catch(() => ({}));
+      if (data?.needs2fa) {
+        setNeeds2fa(true);
+        setError(code ? 'Código de verificação inválido.' : 'Introduza o código de verificação.');
+      } else {
+        setError(data?.error ?? 'Palavra-passe incorreta.');
+      }
+      setLoading(false);
     } catch {
       setError('Erro de ligação. Tente novamente.');
       setLoading(false);
@@ -95,6 +103,29 @@ export default function AdminLogin() {
               placeholder="••••••••"
             />
           </div>
+          {needs2fa && (
+            <div>
+              <label
+                htmlFor="login-code"
+                className="block text-[10px] text-foreground/28 tracking-[0.45em] uppercase mb-3"
+              >
+                Código de verificação (2FA)
+              </label>
+              <input
+                id="login-code"
+                name="code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                autoFocus
+                className="w-full bg-transparent border-b border-foreground/15 pb-3 text-center text-lg tracking-[0.5em] text-foreground placeholder-foreground/18 focus:outline-none focus:border-moss/55 transition-colors duration-300"
+                placeholder="000000"
+              />
+            </div>
+          )}
           {error && (
             <p role="alert" aria-live="assertive" className="text-moss/80 text-xs">
               {error}
@@ -105,7 +136,7 @@ export default function AdminLogin() {
             disabled={loading}
             className="w-full py-3.5 bg-moss text-cream text-[11px] tracking-[0.2em] uppercase rounded-sm hover:bg-moss-dark transition-colors disabled:opacity-40"
           >
-            {loading ? 'A entrar…' : 'Entrar →'}
+            {loading ? 'A verificar…' : needs2fa ? 'Verificar →' : 'Entrar →'}
           </button>
         </form>
       </div>

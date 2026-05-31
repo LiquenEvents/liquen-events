@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE, ADMIN_NAME_COOKIE, createSession, verifyCredentials } from "@/lib/admin-auth";
+import {
+  ADMIN_COOKIE,
+  ADMIN_NAME_COOKIE,
+  createSession,
+  verifyCredentials,
+  totpRequired,
+  checkTotp,
+} from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -17,10 +24,12 @@ export async function POST(request: NextRequest) {
 
   let password = "";
   let name = "";
+  let code = "";
   try {
     const body = await request.json();
     password = String(body.password ?? "");
     name = String(body.name ?? "").trim().slice(0, 40);
+    code = String(body.code ?? "").trim();
   } catch {
     return NextResponse.json({ error: "Pedido inválido" }, { status: 400 });
   }
@@ -28,6 +37,22 @@ export async function POST(request: NextRequest) {
   const user = verifyCredentials(name, password);
   if (!user) {
     return NextResponse.json({ error: "Credenciais incorretas" }, { status: 401 });
+  }
+
+  // Second factor (TOTP), when configured for this account.
+  if (totpRequired(user.name)) {
+    if (!code) {
+      return NextResponse.json(
+        { needs2fa: true, error: "Introduza o código de verificação." },
+        { status: 401 },
+      );
+    }
+    if (!checkTotp(user.name, code)) {
+      return NextResponse.json(
+        { needs2fa: true, error: "Código de verificação inválido." },
+        { status: 401 },
+      );
+    }
   }
 
   const res = NextResponse.json({ ok: true });
