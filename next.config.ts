@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import bundleAnalyzer from "@next/bundle-analyzer";
 
 const nextConfig: NextConfig = {
   // Self-contained server bundle so the app can run in any container/cloud
@@ -76,4 +77,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap with the bundle analyzer (run `npm run analyze` to open the report).
+const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
+
+export default withBundleAnalyzer(nextConfig);

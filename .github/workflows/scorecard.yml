@@ -1,0 +1,37 @@
+name: OpenSSF Scorecard
+
+# Supply-chain / repo security posture score. Runs on main and weekly;
+# results land in the Security tab (and feed the public Scorecard, if enabled).
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 6 * * 1"
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2.4.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload results to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

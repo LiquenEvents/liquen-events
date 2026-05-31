@@ -18,6 +18,7 @@
     "test:e2e:ui": "playwright test --ui",
     "gen:blur": "node scripts/gen-blur.mjs",
     "gen:dims": "node scripts/gen-image-dims.mjs",
+    "analyze": "ANALYZE=true next build",
     "compress:images": "node scripts/compress-sources.mjs",
     "warm:cache": "node scripts/warm-image-cache.mjs",
     "format": "prettier --write .",
@@ -51,6 +52,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.6",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
