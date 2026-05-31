@@ -1,12 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
+import { blurFor } from "@/lib/blur";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 
 const pages = [
   ["Sobre", "/sobre"],
   ["Serviços", "/servicos"],
-  ["Portfolio", "/portfolio"],
   ["Galeria", "/galeria"],
   ["Clientes", "/clientes"],
   ["Contacto", "/contacto"],
@@ -14,20 +14,20 @@ const pages = [
 
 const stripPhotos = [
   { src: "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg", span: "col-span-2" },
-  { src: "/imagens/M&F0152.jpg",                                 span: "col-span-1" },
-  { src: "/imagens/EW1_1428.jpg",                                span: "col-span-1" },
+  { src: "/imagens/M&F0152.jpg", span: "col-span-1" },
+  { src: "/imagens/EW1_1428.jpg", span: "col-span-1" },
 ];
 
 export default function Footer() {
   return (
     <footer className="relative bg-transparent overflow-hidden">
-
       {/* ── Photo strip — full bleed, 4-col grid ── */}
-      <div className="grid grid-cols-4" style={{ height: "300px" }}>
+      <div className="grid grid-cols-4 h-[180px] sm:h-[240px] lg:h-[300px]">
         {stripPhotos.map((p, i) => (
           <div key={i} className={`relative overflow-hidden group ${p.span}`}>
             <Image
               src={p.src}
+              {...blurFor(p.src)}
               alt=""
               fill
               sizes="(max-width: 768px) 50vw, 25vw"
@@ -42,7 +42,6 @@ export default function Footer() {
       <div className="border-t border-foreground/6">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <div className="py-12 md:py-20 grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-16">
-
             {/* Brand column */}
             <div className="md:col-span-5 flex flex-col">
               <Image
@@ -53,7 +52,9 @@ export default function Footer() {
                 className="object-contain mb-5 opacity-65"
               />
               <p className="text-foreground/30 text-sm leading-[1.85] max-w-[260px] mb-7">
-                Organizamos eventos,<br />eternizamos memórias.
+                Organizamos eventos,
+                <br />
+                eternizamos memórias.
               </p>
 
               {/* Disponível badge */}
@@ -74,7 +75,16 @@ export default function Footer() {
                     label: "Instagram",
                     href: "https://www.instagram.com/liquen.events",
                     icon: (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <rect x="2" y="2" width="20" height="20" rx="5" />
                         <circle cx="12" cy="12" r="4" />
                         <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" />
@@ -85,7 +95,16 @@ export default function Footer() {
                     label: "Facebook",
                     href: "https://www.facebook.com/liquen.events",
                     icon: (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
                       </svg>
                     ),
@@ -118,7 +137,9 @@ export default function Footer() {
 
             {/* Pages */}
             <div className="md:col-span-3">
-              <p className="text-foreground/20 text-[10px] tracking-[0.42em] uppercase mb-8">Páginas</p>
+              <p className="text-foreground/20 text-[10px] tracking-[0.42em] uppercase mb-8">
+                Páginas
+              </p>
               <ul className="flex flex-col gap-4">
                 {pages.map(([label, href]) => (
                   <li key={href}>
@@ -135,7 +156,9 @@ export default function Footer() {
 
             {/* Contact */}
             <div className="md:col-span-4">
-              <p className="text-foreground/20 text-[10px] tracking-[0.42em] uppercase mb-8">Contacto</p>
+              <p className="text-foreground/20 text-[10px] tracking-[0.42em] uppercase mb-8">
+                Contacto
+              </p>
               <div className="flex flex-col gap-4 text-[13px] text-foreground/35 mb-10">
                 <a
                   href="mailto:liquen.alentejo@gmail.com"
@@ -158,7 +181,6 @@ export default function Footer() {
                 Pedir orçamento →
               </Link>
             </div>
-
           </div>
         </div>
       </div>
@@ -185,7 +207,6 @@ export default function Footer() {
           </p>
         </div>
       </div>
-
     </footer>
   );
 }

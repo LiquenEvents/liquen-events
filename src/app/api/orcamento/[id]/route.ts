@@ -13,7 +13,15 @@ export async function GET(
     if (!quote) {
       return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
     }
-    return NextResponse.json(quote);
+    // Public endpoint (confirmation page loads by reference id). Authenticated
+    // staff get the full record; anyone else gets a redacted view with no
+    // personal data, so an enumerated id can never leak PII.
+    if (isAuthed(request)) {
+      return NextResponse.json(quote);
+    }
+    const { name, email, phone, company, nif, notes, ...safe } = quote;
+    void [name, email, phone, company, nif, notes];
+    return NextResponse.json(safe);
   } catch (err) {
     console.error('[orcamento GET id]', err);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
@@ -31,7 +39,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const allowed: (keyof Quote)[] = ['status', 'quotedPrice', 'adminNotes', 'checklist', 'payments'];
+  const allowed: (keyof Quote)[] = ['status', 'quotedPrice', 'adminNotes', 'checklist', 'payments', 'timeline'];
   const updates: Partial<Quote> = {};
   for (const key of allowed) {
     if (key in body) {

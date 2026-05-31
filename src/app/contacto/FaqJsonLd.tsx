@@ -1,4 +1,5 @@
 import { FAQS } from "./faq-data";
+import { jsonLd } from "@/lib/jsonld";
 
 /** FAQPage structured data — can surface as expandable Q&A in Google. */
 export default function FaqJsonLd() {
@@ -14,7 +15,7 @@ export default function FaqJsonLd() {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: jsonLd(data) }}
     />
   );
 }

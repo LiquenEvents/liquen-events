@@ -1,0 +1,11 @@
+# Default owner for everything.
+* @franciscopalmagaspar
+
+# Security-sensitive areas — review with extra care.
+/src/lib/admin-auth.ts   @franciscopalmagaspar
+/src/lib/totp.ts         @franciscopalmagaspar
+/src/proxy.ts            @franciscopalmagaspar
+/src/middleware.ts       @franciscopalmagaspar
+/next.config.ts          @franciscopalmagaspar
+/.github/                @franciscopalmagaspar
+/SECURITY.md             @franciscopalmagaspar

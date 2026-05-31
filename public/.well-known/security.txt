@@ -1,0 +1,8 @@
+# Líquen Events — Security contact (RFC 9116)
+Contact: mailto:liquen.alentejo@gmail.com
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: pt, en
+Canonical: https://www.liquen-events.com/.well-known/security.txt
+
+# If you believe you have found a security vulnerability, please email us.
+# We appreciate responsible disclosure and will respond as quickly as we can.

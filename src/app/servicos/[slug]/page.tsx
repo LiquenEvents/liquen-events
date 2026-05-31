@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -54,7 +55,7 @@ export default async function ServiceDetailPage({
 
       {/* ── Hero ── */}
       <section className="relative min-h-[70vh] flex items-end overflow-hidden">
-        <Image src={svc.hero} alt={svc.title} fill priority sizes="100vw" className="object-cover" />
+        <Image src={svc.hero} {...blurFor(svc.hero)} alt={svc.title} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
           <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/45 mb-8">
@@ -112,7 +113,7 @@ export default async function ServiceDetailPage({
           {svc.gallery.map((src, i) => (
             <div key={i} className="relative aspect-[3/4] overflow-hidden group">
               <Image
-                src={src}
+                src={src} {...blurFor(src)}
                 alt={`${svc.title} — ${i + 1}`}
                 fill
                 sizes="(max-width: 1024px) 50vw, 25vw"
@@ -160,7 +161,7 @@ export default async function ServiceDetailPage({
                   href={`/servicos/${r.slug}`}
                   className="group relative overflow-hidden rounded-xl aspect-[16/9]"
                 >
-                  <Image src={r.hero} alt={r.title} fill sizes="50vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <Image src={r.hero} {...blurFor(r.hero)} alt={r.title} fill sizes="50vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent" />
                   <div className="absolute bottom-0 p-6">
                     <p className="text-moss/70 text-[9px] tracking-[0.35em] uppercase mb-1.5">{r.eyebrow}</p>

@@ -49,7 +49,6 @@ export default function NotFound() {
         <nav className="mt-14 pt-8 border-t border-foreground/8 flex flex-wrap gap-x-7 gap-y-2 justify-center">
           {[
             ["Serviços", "/servicos"],
-            ["Portfolio", "/portfolio"],
             ["Galeria", "/galeria"],
             ["Sobre", "/sobre"],
             ["Clientes", "/clientes"],

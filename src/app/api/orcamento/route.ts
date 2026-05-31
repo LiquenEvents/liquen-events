@@ -4,6 +4,10 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from '../../orcamento/d
 import { sendMail, esc } from '@/lib/mail';
 import { createQuote, listQuotes } from '@/lib/quotes-store';
 import { isAuthed } from '@/lib/admin-auth';
+import { sendPushToAll } from '@/lib/push';
+import { rateLimit, clientIp, sweep } from '@/lib/rate-limit';
+import { quotePayloadSchema, firstError } from '@/lib/validation';
+import { log } from '@/lib/logger';
 
 function generateId(): string {
   const now = Date.now().toString(36).toUpperCase();
@@ -58,12 +62,21 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { form, breakdown } = body;
-
-    if (!form || !form.name || !form.email) {
-      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 });
+    sweep();
+    const limited = rateLimit(`orcamento:${clientIp(request)}`, 5, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: 'Demasiados pedidos. Tente novamente dentro de momentos.' },
+        { status: 429, headers: { 'Retry-After': String(limited.retryAfter ?? 60) } }
+      );
     }
+
+    const body = await request.json().catch(() => null);
+    const parsed = quotePayloadSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
+    }
+    const { form, breakdown } = parsed.data as unknown as { form: QuoteFormData; breakdown: PriceBreakdown };
 
     const id = generateId();
 
@@ -83,19 +96,31 @@ export async function POST(request: NextRequest) {
         replyTo: form.email,
       });
     } catch (mailErr) {
-      console.error('[orcamento POST] email falhou', mailErr);
+      log.error('orcamento: email falhou', mailErr, { id });
     }
 
     // Persist (Supabase when configured; local file in dev).
     try {
       await createQuote(quote);
     } catch (storeErr) {
-      console.error('[orcamento POST] persistência falhou', storeErr);
+      log.error('orcamento: persistência falhou', storeErr, { id });
+    }
+
+    // Push notification to the team's devices.
+    try {
+      await sendPushToAll({
+        title: 'Novo pedido de orçamento',
+        body: `${form.name}${form.guests ? ` · ${form.guests} convidados` : ''}`,
+        url: '/orcamento/admin',
+        tag: 'novo-orcamento',
+      });
+    } catch (pushErr) {
+      log.error('orcamento: push falhou', pushErr, { id });
     }
 
     return NextResponse.json({ id, status: 'ok' });
   } catch (err) {
-    console.error('[orcamento POST]', err);
+    log.error('orcamento POST falhou', err);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
@@ -109,7 +134,7 @@ export async function GET(request: NextRequest) {
     const quotes = await listQuotes();
     return NextResponse.json(quotes);
   } catch (err) {
-    console.error('[orcamento GET]', err);
+    log.error('orcamento GET falhou', err);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

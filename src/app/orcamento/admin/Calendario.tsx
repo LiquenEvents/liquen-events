@@ -1,14 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import type { Quote } from '../types';
+import { useEffect, useMemo, useState } from 'react';
+import type { Quote, CalendarEvent, CalendarEventKind } from '../types';
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from '../data';
+import { useToast } from './Toast';
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 const STATUS_COLOR: Record<string, string> = {
   pendente: '#8a8a82', em_revisao: '#6a9c7a', cotado: '#4a7c59', aceite: '#2d5c3e', rejeitado: '#5a5a55',
+};
+
+const KIND_META: Record<CalendarEventKind, { label: string; color: string }> = {
+  reuniao:  { label: 'Reunião',  color: '#7a8caa' },
+  evento:   { label: 'Evento',   color: '#4a7c59' },
+  bloqueio: { label: 'Bloqueio', color: '#b5654a' },
+  nota:     { label: 'Nota',     color: '#a08a5a' },
 };
 
 function eventTypeLabel(q: Quote): string {
@@ -19,13 +27,101 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? 'Evento';
 }
 
+/** Build and download an .ics calendar with every dated event. */
+function exportIcs(quotes: Quote[]) {
+  const dated = quotes.filter((q) => q.date);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Liquen Events//Back Office//PT',
+    'CALSCALE:GREGORIAN',
+  ];
+  for (const q of dated) {
+    const d = q.date.replace(/-/g, '');
+    const title = `${eventTypeLabel(q)} — ${q.name}`.replace(/[,;\\]/g, ' ');
+    const desc = [q.location && `Local: ${q.location}`, q.guests && `${q.guests} convidados`, q.phone && `Tel: ${q.phone}`]
+      .filter(Boolean).join(' \\n ');
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${q.id}@liquen-events.com`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${d}`,
+      `SUMMARY:${title}`,
+      desc ? `DESCRIPTION:${desc}` : '',
+      'END:VEVENT'
+    );
+  }
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.filter(Boolean).join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'liquen-eventos.ics';
+  a.click();
+  URL.revokeObjectURL(url);
+  void pad;
+}
+
 interface Props {
   quotes: Quote[];
   onOpen: (q: Quote) => void;
 }
 
 export default function Calendario({ quotes, onOpen }: Props) {
+  const { toast } = useToast();
   const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+
+  // Standalone calendar entries (reuniões, marcações, bloqueios…)
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [modalDate, setModalDate] = useState<string | null>(null);
+  const [form, setForm] = useState<{ title: string; kind: CalendarEventKind; time: string; note: string }>({ title: '', kind: 'evento', time: '', note: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/calendario', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => Array.isArray(d) && setEvents(d))
+      .catch(() => {});
+  }, []);
+
+  async function addEvent() {
+    const title = form.title.trim();
+    if (!title || !modalDate || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/calendario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, title, date: modalDate }),
+      });
+      if (!res.ok) throw new Error();
+      const ev = await res.json();
+      setEvents((prev) => [...prev, ev]);
+      toast('Adicionado ao calendário', 'success');
+      setModalDate(null);
+      setForm({ title: '', kind: 'evento', time: '', note: '' });
+    } catch {
+      toast('Não foi possível guardar', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteEvent(id: string) {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+    await fetch(`/api/calendario/${id}`, { method: 'DELETE' }).catch(() => {});
+  }
+
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const e of events) {
+      if (!map.has(e.date)) map.set(e.date, []);
+      map.get(e.date)!.push(e);
+    }
+    return map;
+  }, [events]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, Quote[]>();
@@ -56,7 +152,12 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
   const monthEventCount = quotes.filter((q) => q.date && q.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`)).length;
 
+  const modalDateLabel = modalDate
+    ? new Date(modalDate + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
+
   return (
+    <>
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
       <div className="border border-foreground/10 rounded-md bg-surface-raised/30 p-5">
         <div className="flex items-center justify-between mb-5">
@@ -65,6 +166,9 @@ export default function Calendario({ quotes, onOpen }: Props) {
             <p className="text-foreground/30 text-[10px] tracking-[0.2em] uppercase mt-0.5">{monthEventCount} evento{monthEventCount !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex items-center gap-1">
+            <button onClick={() => exportIcs(quotes)} title="Exportar para calendário (.ics)" className="px-3 h-8 mr-1 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-moss hover:border-moss/40 transition-colors">
+              Exportar
+            </button>
             <button onClick={() => setCursor(new Date(year, month - 1, 1))} className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors">‹</button>
             <button onClick={() => { const d = new Date(); setCursor(new Date(d.getFullYear(), d.getMonth(), 1)); }} className="px-3 h-8 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-foreground/70 hover:border-foreground/30 transition-colors">Hoje</button>
             <button onClick={() => setCursor(new Date(year, month + 1, 1))} className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors">›</button>
@@ -78,20 +182,38 @@ export default function Calendario({ quotes, onOpen }: Props) {
           {cells.map((d, i) => {
             if (d === null) return <div key={i} />;
             const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const events = byDay.get(key) ?? [];
+            const dayQuotes = byDay.get(key) ?? [];
+            const dayEvents = eventsByDay.get(key) ?? [];
             const isToday = key === todayKey;
+            const total = dayQuotes.length + dayEvents.length;
             return (
-              <div key={i} className={`min-h-[64px] rounded-md border p-1.5 ${isToday ? 'border-moss/50 bg-moss/5' : 'border-foreground/8 bg-surface/30'}`}>
-                <span className={`text-[10px] tabular-nums ${isToday ? 'text-moss font-bold' : 'text-foreground/35'}`}>{d}</span>
+              <div
+                key={i}
+                onClick={() => { setModalDate(key); setForm({ title: '', kind: 'evento', time: '', note: '' }); }}
+                title="Clique para adicionar"
+                className={`group min-h-[64px] rounded-md border p-1.5 cursor-pointer transition-colors ${isToday ? 'border-moss/50 bg-moss/5' : 'border-foreground/8 bg-surface/30 hover:border-moss/30 hover:bg-moss/[0.03]'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] tabular-nums ${isToday ? 'text-moss font-bold' : 'text-foreground/35'}`}>{d}</span>
+                  <span className="text-moss/0 group-hover:text-moss/60 text-[11px] leading-none transition-colors">+</span>
+                </div>
                 <div className="flex flex-col gap-0.5 mt-0.5">
-                  {events.slice(0, 2).map((q) => (
-                    <button key={q.id} onClick={() => onOpen(q)} title={`${q.name} — ${eventTypeLabel(q)}`}
+                  {dayQuotes.slice(0, 2).map((q) => (
+                    <button key={q.id} onClick={(e) => { e.stopPropagation(); onOpen(q); }} title={`${q.name} — ${eventTypeLabel(q)}`}
                       className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:opacity-80 transition-opacity"
                       style={{ background: `${STATUS_COLOR[q.status]}26`, color: STATUS_COLOR[q.status] }}>
                       {q.name.split(' ')[0]}
                     </button>
                   ))}
-                  {events.length > 2 && <span className="text-foreground/30 text-[9px] px-1">+{events.length - 2}</span>}
+                  {dayEvents.slice(0, total > 3 ? 1 : 2).map((ev) => (
+                    <button key={ev.id} onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id); }} title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
+                      className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:line-through transition-all flex items-center gap-1"
+                      style={{ background: `${KIND_META[ev.kind].color}22`, color: KIND_META[ev.kind].color }}>
+                      <span className="w-1 h-1 rounded-full shrink-0" style={{ background: KIND_META[ev.kind].color }} />
+                      {ev.time ? `${ev.time} ` : ''}{ev.title}
+                    </button>
+                  ))}
+                  {total > 3 && <span className="text-foreground/30 text-[9px] px-1">+{total - 3}</span>}
                 </div>
               </div>
             );
@@ -121,5 +243,49 @@ export default function Calendario({ quotes, onOpen }: Props) {
         </div>
       </div>
     </div>
+
+    {/* Add-event modal */}
+    {modalDate && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setModalDate(null)}>
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div className="relative w-full max-w-md bg-surface-raised border border-foreground/12 rounded-lg p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">Novo no calendário</p>
+              <p className="text-foreground/70 text-sm capitalize">{modalDateLabel}</p>
+            </div>
+            <button onClick={() => setModalDate(null)} className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors">×</button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
+              <button key={k} onClick={() => setForm((f) => ({ ...f, kind: k }))}
+                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border transition-colors ${form.kind === k ? 'text-cream' : 'text-foreground/40 border-foreground/15 hover:border-foreground/30'}`}
+                style={form.kind === k ? { background: KIND_META[k].color, borderColor: KIND_META[k].color } : undefined}>
+                {KIND_META[k].label}
+              </button>
+            ))}
+          </div>
+
+          <input autoFocus value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => e.key === 'Enter' && addEvent()}
+            placeholder="Título (ex: Reunião com fornecedor)"
+            className="w-full bg-surface border border-foreground/15 rounded-md px-3 py-2.5 text-sm text-foreground/75 placeholder-foreground/25 focus:outline-none focus:border-moss/50 mb-2" />
+
+          <div className="flex gap-2 mb-2">
+            <input type="time" value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+              className="bg-surface border border-foreground/15 rounded-md px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 w-32" />
+            <input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+              placeholder="Nota (opcional)"
+              className="flex-1 bg-surface border border-foreground/15 rounded-md px-3 py-2 text-sm text-foreground/70 placeholder-foreground/25 focus:outline-none focus:border-moss/50" />
+          </div>
+
+          <button onClick={addEvent} disabled={saving || !form.title.trim()}
+            className={`w-full mt-3 py-2.5 rounded-md text-[11px] tracking-[0.2em] uppercase transition-colors ${saving || !form.title.trim() ? 'bg-moss/40 text-cream/50 cursor-not-allowed' : 'bg-moss text-cream hover:bg-moss-dark'}`}>
+            {saving ? 'A guardar…' : 'Adicionar ao calendário'}
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

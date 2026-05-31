@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { randomId, eur2 } from './util';
+import { useToast } from './Toast';
 import type { Quote, Payment, PaymentKind } from '../types';
 
 const KIND_LABEL: Record<PaymentKind, string> = { sinal: 'Sinal', pagamento: 'Pagamento', saldo: 'Saldo final' };
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function PaymentsPanel({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [payments, setPayments] = useState<Payment[]>(quote.payments ?? []);
   const [kind, setKind] = useState<PaymentKind>('sinal');
   const [amount, setAmount] = useState('');
@@ -60,7 +62,14 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
         a.download = `Recibo-${data.number.replace(/\//g, '-')}.pdf`;
         a.click();
       }
-      if (email && data.emailed) alert('Recibo enviado para ' + quote.email);
+      if (email) {
+        toast(
+          data.emailed ? `Recibo enviado para ${quote.email}` : 'Recibo gerado (e-mail não configurado)',
+          data.emailed ? 'success' : 'info'
+        );
+      } else {
+        toast('Recibo descarregado', 'success');
+      }
     } finally {
       setBusy(null);
     }

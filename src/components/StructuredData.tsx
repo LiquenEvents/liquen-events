@@ -1,4 +1,5 @@
 import { SITE, AREAS_SERVED, abs } from "@/lib/site";
+import { jsonLd } from "@/lib/jsonld";
 
 /**
  * Rich schema.org structured data (JSON-LD).
@@ -84,7 +85,7 @@ export default function StructuredData() {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: jsonLd(data) }}
     />
   );
 }

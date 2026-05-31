@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import type { Quote } from '../types';
 import AdminClient from './AdminClient';
 import AdminLogin from './AdminLogin';
-import { ADMIN_COOKIE, tokenValid } from '@/lib/admin-auth';
+import { ADMIN_COOKIE, ADMIN_NAME_COOKIE, readSession } from '@/lib/admin-auth';
 import { listQuotes } from '@/lib/quotes-store';
 
 export const metadata: Metadata = { title: 'Admin — Líquen Events' };
@@ -18,13 +18,14 @@ async function getQuotes(): Promise<Quote[]> {
 
 export default async function AdminPage() {
   const store = await cookies();
-  const authed = tokenValid(store.get(ADMIN_COOKIE)?.value);
+  const session = readSession(store.get(ADMIN_COOKIE)?.value);
 
-  if (!authed) {
+  if (!session) {
     return <AdminLogin />;
   }
 
   const quotes = await getQuotes();
-  const userName = process.env.ADMIN_NAME ?? 'Catarina';
+  // Trust the signed session name first; fall back to the display cookie.
+  const userName = session.name || store.get(ADMIN_NAME_COOKIE)?.value || process.env.ADMIN_NAME || 'Equipa';
   return <AdminClient initialQuotes={quotes} userName={userName} />;
 }

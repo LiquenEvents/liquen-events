@@ -16,9 +16,15 @@ import Propostas from './Propostas';
 import Tarefas from './Tarefas';
 import Fornecedores from './Fornecedores';
 import EventChecklist from './EventChecklist';
+import EventTimeline from './EventTimeline';
 import PaymentsPanel from './PaymentsPanel';
+import { ToastProvider } from './Toast';
+import CommandPalette, { type Command } from './CommandPalette';
+import NewQuoteModal from './NewQuoteModal';
+import Kanban from './Kanban';
+import NotificationBell from './NotificationBell';
 
-type View = 'overview' | 'pedidos' | 'clientes' | 'calendario' | 'propostas' | 'tarefas' | 'fornecedores' | 'estatisticas' | 'inbox';
+type View = 'overview' | 'pedidos' | 'kanban' | 'clientes' | 'calendario' | 'propostas' | 'tarefas' | 'fornecedores' | 'estatisticas' | 'inbox';
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: 'pendente', label: 'Pendente', color: 'bg-foreground/10 text-foreground/50' },
@@ -34,6 +40,9 @@ const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
   )},
   { id: 'pedidos', label: 'Pedidos', icon: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4" strokeLinecap="round"/></svg>
+  )},
+  { id: 'kanban', label: 'Pipeline', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>
   )},
   { id: 'clientes', label: 'Clientes', icon: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><path d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.5-1.8-4.3-4-4.8" strokeLinecap="round"/></svg>
@@ -76,12 +85,44 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<View>('overview');
   const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [newQuoteOpen, setNewQuoteOpen] = useState(false);
 
   // Full-screen tool surface: hide public nav, grain & chrome.
   useEffect(() => {
     document.body.classList.add('admin-mode');
     return () => document.body.classList.remove('admin-mode');
   }, []);
+
+  // ⌘K / Ctrl+K opens the command palette.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const paletteCommands: Command[] = useMemo(
+    () => [
+      {
+        id: 'action-new-quote',
+        label: 'Novo pedido (registo manual)',
+        group: 'Ações',
+        run: () => setNewQuoteOpen(true),
+      },
+      ...NAV.map((item) => ({
+        id: `nav-${item.id}`,
+        label: item.label,
+        group: 'Navegar',
+        run: () => setView(item.id),
+      })),
+    ],
+    []
+  );
 
   function openQuote(q: Quote) {
     setView('pedidos');
@@ -159,6 +200,7 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
   const VIEW_TITLES: Record<View, string> = {
     overview: 'Visão Geral',
     pedidos: 'Pedidos',
+    kanban: 'Pipeline',
     clientes: 'Clientes',
     calendario: 'Calendário',
     propostas: 'Propostas',
@@ -171,6 +213,7 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
   const VIEW_SUB: Record<View, string> = {
     overview: 'O resumo do seu dia',
     pedidos: 'Pedidos de orçamento recebidos',
+    kanban: 'Arraste entre estados',
     clientes: 'Histórico por cliente',
     calendario: 'Os seus eventos no tempo',
     propostas: 'Todas as propostas enviadas',
@@ -181,7 +224,20 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
   };
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-surface flex">
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        navCommands={paletteCommands}
+        quotes={quotes}
+        onOpenQuote={openQuote}
+      />
+      <NewQuoteModal
+        open={newQuoteOpen}
+        onClose={() => setNewQuoteOpen(false)}
+        onCreated={(q) => { setQuotes((prev) => [q, ...prev]); openQuote(q); }}
+      />
       {/* ── Sidebar ── */}
       <aside
         className={`fixed lg:sticky top-0 z-40 h-screen w-60 shrink-0 bg-surface-raised/60 border-r border-foreground/8 flex flex-col transition-transform duration-300 ${
@@ -233,9 +289,16 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
               <p className="text-foreground/25 text-[10px] truncate">Administração</p>
             </div>
           </div>
+          <a
+            href="/api/backup"
+            className="w-full mt-1 flex items-center gap-2 px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Backup
+          </a>
           <button
             onClick={logout}
-            className="w-full mt-1 text-left px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
+            className="w-full mt-0.5 text-left px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
           >
             Sair
           </button>
@@ -262,6 +325,24 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
             </h1>
           </div>
           <div className="ml-auto flex items-center gap-3 shrink-0">
+            <NotificationBell />
+            <button
+              onClick={() => setNewQuoteOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-moss text-cream text-[10px] tracking-[0.18em] uppercase rounded-md hover:bg-moss-dark transition-colors"
+              title="Criar pedido manualmente"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+              Novo
+            </button>
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="hidden sm:flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-md hover:border-foreground/25 hover:text-foreground/55 transition-colors"
+              title="Pesquisar (Ctrl K)"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" strokeLinecap="round" /></svg>
+              Pesquisar
+              <kbd className="text-[8px] border border-foreground/15 rounded px-1 py-0.5 ml-1">⌘K</kbd>
+            </button>
             <button
               onClick={refresh}
               disabled={refreshing}
@@ -279,6 +360,20 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
         {view === 'overview' && (
           <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
             <Overview quotes={quotes} userName={userName} onOpen={openQuote} onGoStats={() => setView('estatisticas')} />
+          </div>
+        )}
+
+        {/* ── Pipeline (Kanban) ── */}
+        {view === 'kanban' && (
+          <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <Kanban
+              quotes={quotes}
+              onOpen={openQuote}
+              onStatusChange={(id, status) => {
+                setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+                setSelected((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
+              }}
+            />
           </div>
         )}
 
@@ -306,7 +401,7 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
         {/* ── Tarefas ── */}
         {view === 'tarefas' && (
           <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
-            <Tarefas />
+            <Tarefas defaultAssignee={userName} />
           </div>
         )}
 
@@ -432,9 +527,11 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
               })}
             </div>
 
-            {/* Detail */}
+            {/* Detail — in-grid sticky panel on desktop, slide-over drawer on mobile */}
             {selected ? (
-              <div className="border border-foreground/10 rounded-md sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
+              <>
+              <div className="fixed inset-0 z-40 bg-black/50 xl:hidden" onClick={() => setSelected(null)} />
+              <div className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-surface-raised xl:bg-transparent border-l xl:border border-foreground/10 xl:rounded-md xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-none">
                 <div className="px-5 py-4 border-b border-foreground/8 flex items-center justify-between sticky top-0 bg-surface-raised/80 backdrop-blur-sm">
                   <div>
                     <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">{selected.id}</p>
@@ -534,6 +631,16 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
                     }}
                   />
 
+                  {/* Day-of run sheet */}
+                  <EventTimeline
+                    key={`tl-${selected.id}`}
+                    quote={selected}
+                    onChange={(timeline) => {
+                      setQuotes((prev) => prev.map((q) => (q.id === selected.id ? { ...q, timeline } : q)));
+                      setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                    }}
+                  />
+
                   {/* Payments & invoicing */}
                   <PaymentsPanel
                     key={`pay-${selected.id}`}
@@ -567,6 +674,7 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
                   </div>
                 </div>
               </div>
+              </>
             ) : (
               <div className="hidden xl:flex items-center justify-center border border-foreground/6 rounded-md text-foreground/18 text-sm">
                 Seleccione um pedido para ver detalhes
@@ -576,5 +684,6 @@ export default function AdminClient({ initialQuotes, userName = 'Catarina' }: Pr
         </div>
       </div>
     </div>
+    </ToastProvider>
   );
 }

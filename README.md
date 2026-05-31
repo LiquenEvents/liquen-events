@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Líquen Events
 
-## Getting Started
+Marketing site **and** quote/event back-office for Líquen Events (Évora, PT).
+Public site in a dark, editorial "Pixel Matters" style; an authenticated admin
+at `/orcamento/admin` for quotes, tasks, calendar, suppliers, proposals and an
+email inbox.
 
-First, run the development server:
+## Tech stack
+
+- **Next.js 16** (App Router) · **React 19** · **TypeScript**
+- **Tailwind CSS v4**
+- **Supabase** (Postgres) with a local-JSON fallback for dev
+- **Vitest** (unit) · **Playwright** (E2E)
+- Hosted on **Vercel** (also fully containerized — see below)
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # fill in what you need (all optional in dev)
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+With no env vars the app runs against a local JSON store under `data/`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Dev server |
+| `npm run build` / `start` | Production build / serve |
+| `npm run lint` / `typecheck` | ESLint / `tsc --noEmit` |
+| `npm test` / `test:watch` / `test:coverage` | Vitest |
+| `npm run test:e2e` | Playwright (needs `npx playwright install`) |
+| `npm run format` | Prettier |
+| `npm run gen:blur` / `gen:dims` | Regenerate image blur/size maps |
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+All configuration is via environment variables — see [`.env.example`](./.env.example).
+Nothing secret is committed; `.env*` is gitignored. The app validates env at
+startup and logs loudly about anything missing (`src/lib/env.ts`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Key security vars: `SESSION_SECRET` (required in prod), `ADMIN_PASSWORD_HASH`
+or `ADMIN_USERS`, `CRON_SECRET`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## CI/CD
 
-## Deploy on Vercel
+GitHub Actions:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **CI** (`ci.yml`) — lint · typecheck · unit tests · build · `npm audit`
+  (fails on high/critical) + a non-blocking Playwright E2E job.
+- **CodeQL** (`codeql.yml`) — security & quality code scanning, weekly + per PR.
+- **Lighthouse** (`lighthouse.yml`) — non-blocking performance / a11y / SEO /
+  best-practices budgets (`lighthouserc.json`).
+- **Dependabot** keeps npm deps and Actions patched.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+### Vercel (primary)
+Push to the branch; Vercel builds and deploys. The daily reminder cron is
+declared in [`vercel.json`](./vercel.json) (`0 7 * * *`), and form/cron
+functions get a longer `maxDuration` so email/push sends don't time out.
+
+### Docker (anywhere)
+The app builds a self-contained server (`output: "standalone"`):
+
+```bash
+docker build -t liquen-events .
+docker run -p 3000:3000 --env-file .env.local liquen-events
+```
+
+Runs as a non-root user with a container `HEALTHCHECK` against `/api/health`.
+
+## Operations
+
+- **Health probe:** `GET /api/health` → status, uptime, commit and which
+  integrations are configured (booleans only) — point an uptime monitor here.
+- **Cron:** `GET /api/cron/reminders` (daily) sends the team's summary; gated by
+  `CRON_SECRET`.
+- **Node:** pinned to 22 (`.nvmrc`, `engines`).
+
+## Security
+
+See [`SECURITY.md`](./SECURITY.md) and `/.well-known/security.txt`. Highlights:
+bcrypt + signed/expiring sessions, `__Host-` cookie, per-route auth, PII
+redaction, CSRF proxy, zod validation, rate-limiting, honeypot, hardened CSP
+with violation reporting, and a full set of security headers.

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
+import { blurFor } from "@/lib/blur";
+import { aspectFor } from "@/lib/image-meta";
 
 type Label = "Casamento" | "Corporativo" | "Conferência" | "Aéreo" | "Evento";
 interface Photo { src: string; label: Label; }
@@ -256,11 +258,22 @@ const photos: Photo[] = [
   { src: "/imagens/WhatsApp Image 2026-05-21 at 11.53.37.jpeg", label: "Evento" },
 ];
 
-// Masonry aspect-ratio pattern (after the hero)
-const ASPECTS = ["4/3","3/4","4/3","4/3","3/4","4/3","16/9","4/3","3/4","4/3","4/3","3/4"];
-function aspectFor(i: number, label: Label): string {
-  if (label === "Aéreo") return "16/9";
-  return ASPECTS[i % ASPECTS.length];
+// Human-readable collection (event) inferred from the file name — adds a
+// curated, gallery-grade caption. Only confident matches; otherwise null.
+function collectionFor(src: string): string | null {
+  const f = src.toLowerCase();
+  if (f.includes("danigui")) return "Daniela & Guilherme";
+  if (f.includes("joao_e_pedro") || f.includes("j&p-")) return "João & Pedro";
+  if (f.includes("carinho.mio")) return "Inês & Gonçalo";
+  if (f.includes("matilde&tom")) return "Matilde & Tomás";
+  if (f.includes("m&f")) return "Matilde & Filipe";
+  if (f.includes("natalia e jonathan")) return "Natália & Jonathan";
+  return null;
+}
+
+function captionFor(src: string, label: string): { caption: string; sub?: string } {
+  const c = collectionFor(src);
+  return c ? { caption: c, sub: label } : { caption: label };
 }
 
 // Descriptive alt text for image SEO/accessibility (instead of a bare label)
@@ -281,13 +294,16 @@ const PAGE = 24;
 const STRIP = 7;
 
 // Hover overlay — reused in hero cells and masonry cells
-function HoverOverlay({ label }: { label: string }) {
+function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   return (
     <>
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 p-3 flex items-end justify-between opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300 pointer-events-none">
-        <span className="text-white/75 text-[10px] tracking-[0.18em] uppercase font-medium">{label}</span>
-        <span className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 p-3.5 flex items-end justify-between gap-2 opacity-0 group-hover:opacity-100 translate-y-1.5 group-hover:translate-y-0 transition-all duration-300 pointer-events-none">
+        <span className="min-w-0">
+          <span className="block text-white/90 text-[12px] font-medium truncate" style={{ fontFamily: "var(--font-playfair)" }}>{caption}</span>
+          {sub && <span className="block text-white/45 text-[9px] tracking-[0.2em] uppercase mt-0.5">{sub}</span>}
+        </span>
+        <span className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
           <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0zm-3-3v6m-3-3h6" />
@@ -375,8 +391,8 @@ export default function GaleriaClient() {
               onClick={() => setLb(0)}
               className="relative col-span-2 row-span-2 h-full w-full overflow-hidden group focus:outline-none"
             >
-              <Image src={visible[0].src} alt={altFor(visible[0].label)} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority />
-              <HoverOverlay label={visible[0].label} />
+              <Image src={visible[0].src} alt={altFor(visible[0].label)} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority {...blurFor(visible[0].src)} />
+              <HoverOverlay {...captionFor(visible[0].src, visible[0].label)} />
             </button>
 
             {/* 4 fotos satélite — só em sm+ */}
@@ -387,8 +403,8 @@ export default function GaleriaClient() {
                   onClick={() => setLb(idx)}
                   className="relative hidden sm:block h-full w-full overflow-hidden group focus:outline-none"
                 >
-                  <Image src={visible[idx].src} alt={altFor(visible[idx].label)} fill sizes="25vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority />
-                  <HoverOverlay label={visible[idx].label} />
+                  <Image src={visible[idx].src} alt={altFor(visible[idx].label)} fill sizes="25vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority {...blurFor(visible[idx].src)} />
+                  <HoverOverlay {...captionFor(visible[idx].src, visible[idx].label)} />
                 </button>
               ) : null
             )}
@@ -405,7 +421,7 @@ export default function GaleriaClient() {
                 <button
                   onClick={() => setLb(idx)}
                   className="relative w-full overflow-hidden group focus:outline-none"
-                  style={{ aspectRatio: aspectFor(i, p.label) }}
+                  style={{ aspectRatio: aspectFor(p.src) }}
                 >
                   <Image
                     src={p.src}
@@ -414,8 +430,9 @@ export default function GaleriaClient() {
                     sizes="(max-width: 768px) 50vw, 33vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                     loading="lazy"
+                    {...blurFor(p.src)}
                   />
-                  <HoverOverlay label={p.label} />
+                  <HoverOverlay {...captionFor(p.src, p.label)} />
                 </button>
               </div>
               );
@@ -461,6 +478,12 @@ export default function GaleriaClient() {
               <span className="text-white/20 text-xs">/</span>
               <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
               <span className="w-px h-3 bg-white/10 mx-1" />
+              {collectionFor(pool[lb].src) && (
+                <span className="text-white/70 text-xs" style={{ fontFamily: "var(--font-playfair)" }}>
+                  {collectionFor(pool[lb].src)}
+                  <span className="text-white/20 mx-1.5">·</span>
+                </span>
+              )}
               <span className="text-white/30 text-[10px] tracking-[0.15em] uppercase">{pool[lb].label}</span>
             </div>
             <button
@@ -495,6 +518,7 @@ export default function GaleriaClient() {
                 sizes="90vw"
                 className="object-contain lb-photo-in"
                 priority
+                {...blurFor(pool[lb].src)}
               />
             </div>
 

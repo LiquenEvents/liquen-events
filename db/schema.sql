@@ -54,8 +54,14 @@ create table if not exists public.tasks (
   priority    text not null default 'normal',  -- baixa | normal | alta
   due_date    date,
   quote_id    text,
-  client_name text
+  client_name text,
+  assignee    text,
+  area        text
 );
+
+-- If upgrading an existing database, add the new columns:
+alter table public.tasks add column if not exists assignee text;
+alter table public.tasks add column if not exists area text;
 
 create index if not exists tasks_done_idx on public.tasks (done);
 create index if not exists tasks_due_idx  on public.tasks (due_date);
@@ -74,6 +80,24 @@ create table if not exists public.suppliers (
 
 create index if not exists suppliers_category_idx on public.suppliers (category);
 
+-- ── Eventos de calendário (entradas próprias, não ligadas a pedidos) ──
+create table if not exists public.calendar_events (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  event_date  date not null,
+  title       text not null,
+  kind        text not null default 'evento',  -- reuniao | evento | bloqueio | nota
+  event_time  text,
+  note        text
+);
+
+-- ── Subscrições de notificações push (Web Push) ─────────────────
+create table if not exists public.push_subscriptions (
+  endpoint    text primary key,
+  keys        jsonb not null,
+  created_at  timestamptz not null default now()
+);
+
 -- ── Segurança ───────────────────────────────────────────────────
 -- Ativamos RLS sem políticas públicas: só o servidor (service_role key,
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.
@@ -81,3 +105,5 @@ alter table public.quotes    enable row level security;
 alter table public.proposals enable row level security;
 alter table public.tasks     enable row level security;
 alter table public.suppliers enable row level security;
+alter table public.calendar_events enable row level security;
+alter table public.push_subscriptions enable row level security;

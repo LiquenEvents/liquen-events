@@ -17,8 +17,14 @@ interface FormData {
 }
 
 const EMPTY: FormData = {
-  eventType: "", nome: "", email: "", telefone: "",
-  data: "", convidados: "", orcamento: "", mensagem: "",
+  eventType: "",
+  nome: "",
+  email: "",
+  telefone: "",
+  data: "",
+  convidados: "",
+  orcamento: "",
+  mensagem: "",
 };
 
 const eventCards = [
@@ -26,8 +32,18 @@ const eventCards = [
     value: "Corporativo",
     desc: "Conferências, teambuildings, jantares",
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" />
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21"
+        />
       </svg>
     ),
   },
@@ -35,8 +51,18 @@ const eventCards = [
     value: "Casamento",
     desc: "O dia mais especial da vossa vida",
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
+        />
       </svg>
     ),
   },
@@ -44,8 +70,18 @@ const eventCards = [
     value: "Aniversário",
     desc: "Festas e celebrações memoráveis",
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8.25v-1.5m0 1.5c-1.355 0-2.697.056-4.024.166C6.845 8.51 6 9.473 6 10.608v2.513m6-4.871c1.355 0 2.697.056 4.024.166C17.155 8.51 18 9.473 18 10.608v2.513M15 8.25a3 3 0 11-6 0 3 3 0 016 0zm6 6a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 8.25v-1.5m0 1.5c-1.355 0-2.697.056-4.024.166C6.845 8.51 6 9.473 6 10.608v2.513m6-4.871c1.355 0 2.697.056 4.024.166C17.155 8.51 18 9.473 18 10.608v2.513M15 8.25a3 3 0 11-6 0 3 3 0 016 0zm6 6a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
       </svg>
     ),
   },
@@ -53,8 +89,18 @@ const eventCards = [
     value: "Jantar de Gala",
     desc: "Eventos sociais de prestígio",
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+        />
       </svg>
     ),
   },
@@ -62,8 +108,18 @@ const eventCards = [
     value: "Cultural",
     desc: "Arte, música e experiências únicas",
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"
+        />
       </svg>
     ),
   },
@@ -71,7 +127,13 @@ const eventCards = [
     value: "Outro",
     desc: "Evento personalizado à sua medida",
     icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        viewBox="0 0 24 24"
+      >
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
       </svg>
     ),
@@ -84,13 +146,19 @@ const stepLabels = ["Evento", "Dados", "Detalhes", "Mensagem"];
 // ── Helpers ───────────────────────────────────────────────────────
 
 function Pill({
-  label, selected, onClick,
-}: { label: string; selected: boolean; onClick: () => void }) {
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`px-4 py-2.5 rounded-sm text-xs tracking-[0.18em] uppercase border transition-all duration-200 ${
+      className={`px-4 py-3 sm:py-2.5 rounded-sm text-xs tracking-[0.18em] uppercase border transition-all duration-200 ${
         selected
           ? "bg-moss border-moss text-cream"
           : "border-foreground/15 text-foreground/38 hover:border-foreground/30 hover:text-foreground/65"
@@ -102,17 +170,29 @@ function Pill({
 }
 
 function NavBtn({
-  onClick, disabled = false, children, variant = "primary",
+  onClick,
+  disabled = false,
+  children,
+  variant = "primary",
 }: {
-  onClick?: () => void; disabled?: boolean; children: React.ReactNode; variant?: "primary" | "ghost";
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+  variant?: "primary" | "ghost";
 }) {
-  const base = "inline-flex items-center gap-3 text-[11px] tracking-[0.28em] uppercase transition-all duration-300";
+  const base =
+    "inline-flex items-center gap-3 text-[11px] tracking-[0.28em] uppercase transition-all duration-300";
   const styles =
     variant === "primary"
       ? `${base} px-9 py-4 bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3`
       : `${base} text-foreground/30 hover:text-foreground/60`;
   return (
-    <button type={variant === "primary" ? "button" : "button"} onClick={onClick} disabled={disabled} className={styles}>
+    <button
+      type={variant === "primary" ? "button" : "button"}
+      onClick={onClick}
+      disabled={disabled}
+      className={styles}
+    >
       {children}
     </button>
   );
@@ -120,7 +200,7 @@ function NavBtn({
 
 function ProgressBar({ step }: { step: number }) {
   return (
-    <div className="flex items-center gap-0 mb-14">
+    <div className="flex items-center gap-0 mb-9 sm:mb-14">
       {stepLabels.map((label, i) => (
         <div key={label} className="flex items-center flex-1 min-w-0">
           <div className="flex items-center gap-2.5 flex-shrink-0">
@@ -129,8 +209,8 @@ function ProgressBar({ step }: { step: number }) {
                 i + 1 < step
                   ? "bg-moss border-moss text-cream"
                   : i + 1 === step
-                  ? "border-moss text-moss"
-                  : "border-foreground/12 text-foreground/20"
+                    ? "border-moss text-moss"
+                    : "border-foreground/12 text-foreground/20"
               }`}
             >
               {i + 1 < step ? "✓" : i + 1}
@@ -145,7 +225,7 @@ function ProgressBar({ step }: { step: number }) {
           </div>
           {i < stepLabels.length - 1 && (
             <div
-              className={`flex-1 h-px mx-3 lg:mx-5 transition-all duration-500 ${
+              className={`flex-1 h-px mx-2 sm:mx-3 lg:mx-5 transition-all duration-500 ${
                 i + 1 < step ? "bg-moss/40" : "bg-foreground/8"
               }`}
             />
@@ -175,6 +255,7 @@ export default function ContactForm() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY);
+  const [website, setWebsite] = useState(""); // honeypot — must stay empty
 
   function set(key: keyof FormData, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -188,7 +269,7 @@ export default function ContactForm() {
       const res = await fetch("/api/contacto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, website }),
       });
       if (!res.ok) throw new Error("falha");
       setSent(true);
@@ -230,7 +311,8 @@ export default function ContactForm() {
                 fontSize: "clamp(44px, 7.5vw, 100px)",
               }}
             >
-              Vamos criar algo<br />
+              Vamos criar algo
+              <br />
               <span className="text-moss">extraordinário.</span>
             </h1>
           </div>
@@ -241,9 +323,8 @@ export default function ContactForm() {
       <section className="bg-surface">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
-
             {/* ── Left — Info ── */}
-            <div className="lg:border-r border-foreground/8 py-20 lg:pr-20">
+            <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
               <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
                 <span className="w-5 h-px bg-moss/50 rounded-full flex-shrink-0" />
                 Encontre-nos
@@ -251,14 +332,36 @@ export default function ContactForm() {
 
               <div className="flex flex-col divide-y divide-foreground/8 mb-12">
                 {[
-                  { label: "E-mail", value: "liquen.alentejo@gmail.com", href: "mailto:liquen.alentejo@gmail.com", sub: "Respondemos em menos de 24 horas" },
-                  { label: "Telefone", value: "+351 919 259 820", href: "tel:+351919259820", sub: "Seg–Sex, 9h–18h" },
-                  { label: "Localização", value: "Évora, Portugal", href: null, sub: "Reuniões presenciais disponíveis" },
+                  {
+                    label: "E-mail",
+                    value: "liquen.alentejo@gmail.com",
+                    href: "mailto:liquen.alentejo@gmail.com",
+                    sub: "Respondemos em menos de 24 horas",
+                  },
+                  {
+                    label: "Telefone",
+                    value: "+351 919 259 820",
+                    href: "tel:+351919259820",
+                    sub: "Seg–Sex, 9h–18h",
+                  },
+                  {
+                    label: "Localização",
+                    value: "Évora, Portugal",
+                    href: null,
+                    sub: "Reuniões presenciais disponíveis",
+                  },
                 ].map((item) => (
                   <div key={item.label} className="py-7">
-                    <p className="text-foreground/22 text-[10px] tracking-[0.45em] uppercase mb-2">{item.label}</p>
+                    <p className="text-foreground/22 text-[10px] tracking-[0.45em] uppercase mb-2">
+                      {item.label}
+                    </p>
                     {item.href ? (
-                      <a href={item.href} className="text-foreground text-sm font-medium hover:text-moss transition-colors block mb-1.5">{item.value}</a>
+                      <a
+                        href={item.href}
+                        className="text-foreground text-sm font-medium hover:text-moss transition-colors block mb-1.5"
+                      >
+                        {item.value}
+                      </a>
                     ) : (
                       <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
                     )}
@@ -274,9 +377,15 @@ export default function ContactForm() {
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-12"
               >
-                <span className="text-moss flex-shrink-0"><WhatsAppIcon /></span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/40 group-hover:text-foreground/65 transition-colors">Falar pelo WhatsApp</span>
-                <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">→</span>
+                <span className="text-moss flex-shrink-0">
+                  <WhatsAppIcon />
+                </span>
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/40 group-hover:text-foreground/65 transition-colors">
+                  Falar pelo WhatsApp
+                </span>
+                <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
+                  →
+                </span>
               </a>
 
               {/* Redes */}
@@ -285,8 +394,13 @@ export default function ContactForm() {
                   { label: "Instagram", href: "https://www.instagram.com/liquen.events" },
                   { label: "Facebook", href: "https://www.facebook.com/liquen.events" },
                 ].map((s) => (
-                  <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
-                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/28 hover:text-foreground/65 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40">
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/28 hover:text-foreground/65 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
+                  >
                     {s.label}
                   </a>
                 ))}
@@ -294,29 +408,56 @@ export default function ContactForm() {
 
               {/* Promise */}
               <div className="border-l-2 border-moss/40 pl-7 py-2">
-                <p className="text-foreground/58 text-base leading-relaxed mb-4" style={{ fontFamily: "var(--font-playfair)" }}>
-                  Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta personalizada.
+                <p
+                  className="text-foreground/58 text-base leading-relaxed mb-4"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta
+                  personalizada.
                 </p>
-                <p className="text-foreground/25 text-[10px] tracking-[0.3em] uppercase">— Equipa Líquen Events</p>
+                <p className="text-foreground/25 text-[10px] tracking-[0.3em] uppercase">
+                  — Equipa Líquen Events
+                </p>
               </div>
             </div>
 
             {/* ── Right — Multi-step form ── */}
-            <div className="py-20 lg:pl-20">
+            <div className="py-12 md:py-20 lg:pl-20">
               {sent ? (
                 /* ── Success ── */
                 <div className="flex flex-col items-start">
                   <div className="w-16 h-16 rounded-full bg-moss/15 border border-moss/30 flex items-center justify-center text-moss mb-12">
-                    <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    <svg
+                      className="w-7 h-7"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
                     </svg>
                   </div>
-                  <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-6">Enviado com sucesso</p>
-                  <h3 className="text-foreground font-bold leading-tight mb-5" style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 4vw, 60px)" }}>
-                    Mensagem<br />recebida.
+                  <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-6">
+                    Enviado com sucesso
+                  </p>
+                  <h3
+                    className="text-foreground font-bold leading-tight mb-5"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(36px, 4vw, 60px)",
+                    }}
+                  >
+                    Mensagem
+                    <br />
+                    recebida.
                   </h3>
                   <p className="text-foreground/40 text-sm leading-[1.85] max-w-sm mb-14">
-                    Obrigado{form.nome ? `, ${form.nome}` : ""}. Em breve entraremos em contacto para avançarmos juntos no seu evento.
+                    Obrigado{form.nome ? `, ${form.nome}` : ""}. Em breve entraremos em contacto
+                    para avançarmos juntos no seu evento.
                   </p>
                   {/* Next steps inline */}
                   <div className="w-full border border-foreground/8 overflow-hidden mb-10">
@@ -325,8 +466,13 @@ export default function ContactForm() {
                       { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas" },
                       { n: "03", t: "Enviamos proposta à medida", d: "Personalizada para si" },
                     ].map((s, i) => (
-                      <div key={s.n} className={`flex items-center gap-6 px-7 py-5 ${i < 2 ? "border-b border-foreground/8" : ""}`}>
-                        <span className="text-moss/50 text-xs font-mono tabular-nums flex-shrink-0">{s.n}</span>
+                      <div
+                        key={s.n}
+                        className={`flex items-center gap-4 px-5 py-4 sm:px-7 sm:py-5 ${i < 2 ? "border-b border-foreground/8" : ""}`}
+                      >
+                        <span className="text-moss/50 text-xs font-mono tabular-nums flex-shrink-0">
+                          {s.n}
+                        </span>
                         <div>
                           <p className="text-foreground text-sm font-medium">{s.t}</p>
                           <p className="text-foreground/28 text-xs mt-0.5">{s.d}</p>
@@ -334,9 +480,15 @@ export default function ContactForm() {
                       </div>
                     ))}
                   </div>
-                  <a href={whatsappHref} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/30 hover:text-moss transition-colors">
-                    <span className="text-moss"><WhatsAppIcon /></span>
+                  <a
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/30 hover:text-moss transition-colors"
+                  >
+                    <span className="text-moss">
+                      <WhatsAppIcon />
+                    </span>
                     Acompanhar pelo WhatsApp →
                   </a>
                 </div>
@@ -344,15 +496,37 @@ export default function ContactForm() {
                 /* ── Steps ── */
                 <>
                   <ProgressBar step={step} />
-                  <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
-
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      submit();
+                    }}
+                  >
+                    {/* Honeypot — hidden from humans, bots tend to fill it */}
+                    <input
+                      type="text"
+                      name="website"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      className="absolute -left-[9999px] h-0 w-0 opacity-0"
+                    />
                     {/* Step 1 — Tipo */}
                     {step === 1 && (
                       <div>
-                        <h2 className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
-                          Que tipo de evento<br />está a planear?
+                        <h2
+                          className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
+                          style={{ fontFamily: "var(--font-playfair)" }}
+                        >
+                          Que tipo de evento
+                          <br />
+                          está a planear?
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">Selecione a opção que melhor descreve o seu evento.</p>
+                        <p className="text-foreground/35 text-sm mb-10">
+                          Selecione a opção que melhor descreve o seu evento.
+                        </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-12">
                           {eventCards.map((ec) => (
                             <button
@@ -365,46 +539,81 @@ export default function ContactForm() {
                                   : "border-foreground/10 hover:border-foreground/22 hover:bg-surface-raised"
                               }`}
                             >
-                              <span className={`transition-colors duration-200 ${form.eventType === ec.value ? "text-moss" : "text-foreground/30"}`}>
+                              <span
+                                className={`transition-colors duration-200 ${form.eventType === ec.value ? "text-moss" : "text-foreground/30"}`}
+                              >
                                 {ec.icon}
                               </span>
                               <div>
-                                <p className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${form.eventType === ec.value ? "text-foreground" : "text-foreground/55"}`}>{ec.value}</p>
+                                <p
+                                  className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${form.eventType === ec.value ? "text-foreground" : "text-foreground/55"}`}
+                                >
+                                  {ec.value}
+                                </p>
                                 <p className="text-xs text-foreground/28 leading-snug">{ec.desc}</p>
                               </div>
                             </button>
                           ))}
                         </div>
-                        <NavBtn onClick={() => setStep(2)} disabled={!form.eventType}>Continuar →</NavBtn>
+                        <NavBtn onClick={() => setStep(2)} disabled={!form.eventType}>
+                          Continuar →
+                        </NavBtn>
                       </div>
                     )}
 
                     {/* Step 2 — Contacto */}
                     {step === 2 && (
                       <div>
-                        <h2 className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
+                        <h2
+                          className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
+                          style={{ fontFamily: "var(--font-playfair)" }}
+                        >
                           Diga-nos quem é.
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">Os seus dados de contacto para falarmos consigo.</p>
-                        <div className="flex flex-col gap-10 mb-12">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+                        <p className="text-foreground/35 text-sm mb-10">
+                          Os seus dados de contacto para falarmos consigo.
+                        </p>
+                        <div className="flex flex-col gap-7 sm:gap-10 mb-12">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-7 sm:gap-10">
                             <div>
                               <label className={labelCls}>Nome *</label>
-                              <input type="text" value={form.nome} onChange={(e) => set("nome", e.target.value)} className={inputCls} placeholder="O seu nome completo" />
+                              <input
+                                type="text"
+                                value={form.nome}
+                                onChange={(e) => set("nome", e.target.value)}
+                                className={inputCls}
+                                placeholder="O seu nome completo"
+                              />
                             </div>
                             <div>
                               <label className={labelCls}>E-mail *</label>
-                              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={inputCls} placeholder="email@exemplo.com" />
+                              <input
+                                type="email"
+                                value={form.email}
+                                onChange={(e) => set("email", e.target.value)}
+                                className={inputCls}
+                                placeholder="email@exemplo.com"
+                              />
                             </div>
                           </div>
                           <div>
                             <label className={labelCls}>Telefone</label>
-                            <input type="tel" value={form.telefone} onChange={(e) => set("telefone", e.target.value)} className={inputCls} placeholder="+351 9XX XXX XXX" />
+                            <input
+                              type="tel"
+                              value={form.telefone}
+                              onChange={(e) => set("telefone", e.target.value)}
+                              className={inputCls}
+                              placeholder="+351 9XX XXX XXX"
+                            />
                           </div>
                         </div>
                         <div className="flex items-center gap-6">
-                          <NavBtn variant="ghost" onClick={() => setStep(1)}>← Voltar</NavBtn>
-                          <NavBtn onClick={() => setStep(3)} disabled={!form.nome || !form.email}>Continuar →</NavBtn>
+                          <NavBtn variant="ghost" onClick={() => setStep(1)}>
+                            ← Voltar
+                          </NavBtn>
+                          <NavBtn onClick={() => setStep(3)} disabled={!form.nome || !form.email}>
+                            Continuar →
+                          </NavBtn>
                         </div>
                       </div>
                     )}
@@ -412,26 +621,43 @@ export default function ContactForm() {
                     {/* Step 3 — Detalhes */}
                     {step === 3 && (
                       <div>
-                        <h2 className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
+                        <h2
+                          className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
+                          style={{ fontFamily: "var(--font-playfair)" }}
+                        >
                           Detalhes do evento.
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">Ajude-nos a perceber a dimensão e o timing.</p>
-                        <div className="flex flex-col gap-10 mb-12">
+                        <p className="text-foreground/35 text-sm mb-10">
+                          Ajude-nos a perceber a dimensão e o timing.
+                        </p>
+                        <div className="flex flex-col gap-7 sm:gap-10 mb-12">
                           <div>
                             <label className={labelCls}>Data Prevista</label>
-                            <input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} className={inputCls} />
+                            <input
+                              type="date"
+                              value={form.data}
+                              onChange={(e) => set("data", e.target.value)}
+                              className={inputCls}
+                            />
                           </div>
                           <div>
                             <label className={labelCls}>Nº de Convidados</label>
                             <div className="flex flex-wrap gap-2 pt-1">
                               {guestRanges.map((r) => (
-                                <Pill key={r} label={r} selected={form.convidados === r} onClick={() => set("convidados", r)} />
+                                <Pill
+                                  key={r}
+                                  label={r}
+                                  selected={form.convidados === r}
+                                  onClick={() => set("convidados", r)}
+                                />
                               ))}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-6">
-                          <NavBtn variant="ghost" onClick={() => setStep(2)}>← Voltar</NavBtn>
+                          <NavBtn variant="ghost" onClick={() => setStep(2)}>
+                            ← Voltar
+                          </NavBtn>
                           <NavBtn onClick={() => setStep(4)}>Continuar →</NavBtn>
                         </div>
                       </div>
@@ -440,10 +666,15 @@ export default function ContactForm() {
                     {/* Step 4 — Mensagem */}
                     {step === 4 && (
                       <div>
-                        <h2 className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight" style={{ fontFamily: "var(--font-playfair)" }}>
+                        <h2
+                          className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
+                          style={{ fontFamily: "var(--font-playfair)" }}
+                        >
                           A sua visão.
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">Descreva o evento dos seus sonhos. Quanto mais detalhe, melhor.</p>
+                        <p className="text-foreground/35 text-sm mb-10">
+                          Descreva o evento dos seus sonhos. Quanto mais detalhe, melhor.
+                        </p>
                         <div className="flex flex-col gap-10 mb-10">
                           <div>
                             <label className={labelCls}>Mensagem *</label>
@@ -460,14 +691,36 @@ export default function ContactForm() {
                         {/* Resumo */}
                         {(form.eventType || form.convidados || form.orcamento || form.data) && (
                           <div className="border border-foreground/8 bg-surface-raised px-6 py-4 mb-8 flex flex-wrap gap-x-7 gap-y-2">
-                            {form.eventType && <span className="text-xs"><span className="text-foreground/22 mr-1.5">Evento</span><span className="text-foreground/50">{form.eventType}</span></span>}
-                            {form.convidados && <span className="text-xs"><span className="text-foreground/22 mr-1.5">Convidados</span><span className="text-foreground/50">{form.convidados}</span></span>}
-                            {form.orcamento && <span className="text-xs"><span className="text-foreground/22 mr-1.5">Orçamento</span><span className="text-foreground/50">{form.orcamento}</span></span>}
-                            {form.data && <span className="text-xs"><span className="text-foreground/22 mr-1.5">Data</span><span className="text-foreground/50">{form.data}</span></span>}
+                            {form.eventType && (
+                              <span className="text-xs">
+                                <span className="text-foreground/22 mr-1.5">Evento</span>
+                                <span className="text-foreground/50">{form.eventType}</span>
+                              </span>
+                            )}
+                            {form.convidados && (
+                              <span className="text-xs">
+                                <span className="text-foreground/22 mr-1.5">Convidados</span>
+                                <span className="text-foreground/50">{form.convidados}</span>
+                              </span>
+                            )}
+                            {form.orcamento && (
+                              <span className="text-xs">
+                                <span className="text-foreground/22 mr-1.5">Orçamento</span>
+                                <span className="text-foreground/50">{form.orcamento}</span>
+                              </span>
+                            )}
+                            {form.data && (
+                              <span className="text-xs">
+                                <span className="text-foreground/22 mr-1.5">Data</span>
+                                <span className="text-foreground/50">{form.data}</span>
+                              </span>
+                            )}
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-6">
-                          <NavBtn variant="ghost" onClick={() => setStep(3)}>← Voltar</NavBtn>
+                          <NavBtn variant="ghost" onClick={() => setStep(3)}>
+                            ← Voltar
+                          </NavBtn>
                           <button
                             type="submit"
                             disabled={!form.mensagem || sending}
@@ -475,7 +728,9 @@ export default function ContactForm() {
                           >
                             {sending ? "A enviar…" : "Enviar Pedido →"}
                           </button>
-                          <p className="text-foreground/20 text-xs tracking-wide">Resposta em 24h</p>
+                          <p className="text-foreground/20 text-xs tracking-wide">
+                            Resposta em 24h
+                          </p>
                         </div>
                         {error && (
                           <div className="mt-6 p-4 border border-moss/30 bg-moss/8 rounded-sm">
@@ -488,7 +743,6 @@ export default function ContactForm() {
                 </>
               )}
             </div>
-
           </div>
         </div>
       </section>

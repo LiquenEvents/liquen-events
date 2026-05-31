@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import type { Quote, QuoteStatus } from '../types';
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from '../data';
 import Reminders from './Reminders';
+import Agenda from './Agenda';
 
 const eur = (n: number) =>
   new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0);
@@ -54,7 +55,11 @@ interface Props {
 export default function Overview({ quotes, userName, onOpen, onGoStats }: Props) {
   const data = useMemo(() => {
     const now = new Date();
-    let thisMonth = 0, pipeline = 0, won = 0;
+    const todayKey = now.toISOString().slice(0, 10);
+    const weekEnd = new Date(now); weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndKey = weekEnd.toISOString().slice(0, 10);
+    let thisMonth = 0, pipeline = 0, won = 0, outstanding = 0;
+    let eventsToday = 0, eventsThisWeek = 0;
     const byStatus: Record<string, number> = {};
     const months = Array.from({ length: 6 }, () => 0);
 
@@ -62,6 +67,9 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
       byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
       if (q.status === 'cotado' && q.quotedPrice) pipeline += q.quotedPrice;
       if (q.status === 'aceite' && q.quotedPrice) won += q.quotedPrice;
+      for (const p of q.payments ?? []) if (!p.paid) outstanding += p.amount;
+      if (q.date === todayKey) eventsToday++;
+      if (q.date && q.date >= todayKey && q.date <= weekEndKey) eventsThisWeek++;
       const sd = new Date(q.submittedAt);
       if (sd.getFullYear() === now.getFullYear() && sd.getMonth() === now.getMonth()) thisMonth++;
       const monthsBack = (now.getFullYear() - sd.getFullYear()) * 12 + now.getMonth() - sd.getMonth();
@@ -80,11 +88,21 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
     const decided = accepted + (byStatus['rejeitado'] ?? 0);
     const conversion = decided > 0 ? Math.round((accepted / decided) * 100) : 0;
 
-    return { thisMonth, pipeline, won, months, needAction, recent, conversion, total: quotes.length };
+    return { thisMonth, pipeline, won, outstanding, eventsToday, eventsThisWeek, months, needAction, recent, conversion, total: quotes.length };
   }, [quotes]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 20 ? 'Boa tarde' : 'Boa noite';
+
+  // Smart headline: surface the most pressing things for today.
+  const headline = (() => {
+    const bits: string[] = [];
+    if (data.eventsToday > 0) bits.push(`${data.eventsToday} evento${data.eventsToday !== 1 ? 's' : ''} hoje`);
+    else if (data.eventsThisWeek > 0) bits.push(`${data.eventsThisWeek} evento${data.eventsThisWeek !== 1 ? 's' : ''} esta semana`);
+    if (data.needAction.length > 0) bits.push(`${data.needAction.length} pedido${data.needAction.length !== 1 ? 's' : ''} a precisar de atenção`);
+    if (bits.length === 0) return 'Tudo em dia. Nada urgente por agora.';
+    return `Tem ${bits.join(' e ')}.`;
+  })();
 
   return (
     <div className="flex flex-col gap-8">
@@ -96,24 +114,21 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
         <h2 className="text-foreground font-bold" style={{ fontFamily: 'var(--font-playfair)', fontSize: 'clamp(26px, 3.5vw, 40px)' }}>
           {greeting}, {userName}.
         </h2>
-        <p className="text-foreground/40 text-sm mt-2">
-          {data.needAction.length > 0
-            ? `Tem ${data.needAction.length} pedido${data.needAction.length !== 1 ? 's' : ''} a precisar de atenção.`
-            : 'Tudo em dia. Nenhum pedido pendente.'}
-        </p>
+        <p className="text-foreground/40 text-sm mt-2">{headline}</p>
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { v: String(data.total), l: 'Pedidos totais', accent: true },
           { v: String(data.thisMonth), l: 'Este mês' },
           { v: eur(data.pipeline), l: 'Em proposta' },
+          { v: eur(data.outstanding), l: 'A receber' },
           { v: eur(data.won), l: 'Ganho', accent: true },
         ].map((k) => (
           <div key={k.l} className="border border-foreground/10 rounded-md p-5 bg-surface-raised/40">
             <p className={`font-bold leading-none mb-2 ${k.accent ? 'text-moss' : 'text-foreground/80'}`}
-               style={{ fontFamily: 'var(--font-playfair)', fontSize: 'clamp(22px, 2.6vw, 32px)' }}>
+               style={{ fontFamily: 'var(--font-playfair)', fontSize: 'clamp(20px, 2.4vw, 30px)' }}>
               {k.v}
             </p>
             <p className="text-foreground/30 text-[9px] tracking-[0.25em] uppercase">{k.l}</p>
@@ -123,6 +138,9 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
 
       {/* Reminders */}
       <Reminders quotes={quotes} onOpen={onOpen} />
+
+      {/* Agenda — combines events, calendar entries, tasks & payments due */}
+      <Agenda quotes={quotes} onOpen={onOpen} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
         {/* Needs attention */}

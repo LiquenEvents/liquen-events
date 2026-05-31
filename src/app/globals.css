@@ -46,6 +46,37 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Mobile base ── */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  /* No grey flash on tap, no rubber-band white at the edges */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+/* Safe-area helpers for fixed / edge elements (notch & home indicator) */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+/* Safety net: never allow accidental horizontal scroll on small screens */
+body {
+  overflow-x: clip;
+}
+/* Tactile feedback on touch devices (there's no hover to rely on) */
+@media (hover: none) and (pointer: coarse) {
+  a:active,
+  button:active,
+  [role="button"]:active {
+    opacity: 0.65;
+    transition: opacity 0.06s ease;
+  }
+}
+
 /* ── Film grain overlay ── */
 body::before {
   content: "";
@@ -201,6 +232,23 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Route transition (Pixel-Matters-style page reveal) ── */
+@keyframes route-fade {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.route-fade {
+  animation: route-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Magnetic / hover lift used across CTAs ── */
+.lift {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+}
+.lift:hover {
+  transform: translateY(-2px);
+}
+
 /* ── Back-office: gentle view transition ── */
 @keyframes view-in {
   from { opacity: 0; transform: translateY(8px); }
@@ -237,7 +285,7 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   .anim-glow, .anim-scroll-line, .animate-marquee, .animate-scroll-line, .footer-ping { animation: none; }
   .animate-step-forward, .animate-step-back { animation: none; }
   .view-in { animation: none; }
-  .cursor-dot, .cursor-ring { display: none; }
+  .route-fade { animation: none; }
 }
 
 /* ── Print / PDF ── */

@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMail, esc } from '@/lib/mail';
+import { sendPushToAll } from '@/lib/push';
+import { rateLimit, clientIp, sweep } from '@/lib/rate-limit';
+import { contactSchema, firstError } from '@/lib/validation';
+import { log } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    const form = await request.json();
-
-    if (!form || !form.nome || !form.email || !form.mensagem) {
-      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 });
+    sweep();
+    const limited = rateLimit(`contacto:${clientIp(request)}`, 5, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: 'Demasiados pedidos. Tente novamente dentro de momentos.' },
+        { status: 429, headers: { 'Retry-After': String(limited.retryAfter ?? 60) } }
+      );
     }
+
+    const raw = await request.json().catch(() => null);
+    // Honeypot: a real visitor never fills the hidden "website" field. If it's
+    // set, this is a bot — pretend success and drop it silently.
+    if (raw && typeof raw === 'object' && (raw as Record<string, unknown>).website) {
+      return NextResponse.json({ status: 'ok' });
+    }
+    const parsed = contactSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
+    }
+    const form = parsed.data;
 
     const row = (label: string, value: unknown) =>
       value
@@ -38,12 +57,23 @@ export async function POST(request: NextRequest) {
         replyTo: form.email,
       });
     } catch (mailErr) {
-      console.error('[contacto POST] email falhou', mailErr);
+      log.error('contacto: email falhou', mailErr);
+    }
+
+    try {
+      await sendPushToAll({
+        title: 'Nova mensagem de contacto',
+        body: `${form.nome}${form.eventType ? ` · ${form.eventType}` : ''}`,
+        url: '/orcamento/admin',
+        tag: 'novo-contacto',
+      });
+    } catch (pushErr) {
+      log.error('contacto: push falhou', pushErr);
     }
 
     return NextResponse.json({ status: 'ok' });
   } catch (err) {
-    console.error('[contacto POST]', err);
+    log.error('contacto POST falhou', err);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

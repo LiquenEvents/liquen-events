@@ -1,0 +1,22 @@
+# gitleaks configuration — secret scanning.
+# Extends the bundled default rules and allowlists known-safe, non-secret values.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe, non-secret values"
+
+# Generated, high-entropy data files (image blur/size maps) — not secrets.
+paths = [
+  '''src/lib/blur-map\.json''',
+  '''src/lib/image-dims\.json''',
+  '''src/lib/logo-dims\.json''',
+  '''package-lock\.json''',
+  '''\.env\.example''',
+]
+
+regexes = [
+  # RFC 6238 published TOTP test-vector secret (tests only).
+  '''GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ''',
+]

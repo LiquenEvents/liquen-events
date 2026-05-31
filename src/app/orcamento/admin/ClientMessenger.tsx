@@ -8,12 +8,33 @@ interface Props {
   onSent?: (messages: QuoteMessage[]) => void;
 }
 
+// Quick-reply templates. {nome} is replaced with the client's first name.
+const TEMPLATES: { label: string; text: string }[] = [
+  {
+    label: 'Agradecer pedido',
+    text: 'Olá {nome},\n\nObrigada pelo seu pedido! Recebemos os detalhes do seu evento e a nossa equipa vai analisá-los com todo o cuidado. Entraremos em contacto em breve com os próximos passos.\n\nCom os melhores cumprimentos,\nEquipa Líquen Events',
+  },
+  {
+    label: 'Marcar reunião',
+    text: 'Olá {nome},\n\nGostaríamos de marcar uma breve conversa para perceber melhor a sua visão para o evento. Tem disponibilidade esta semana? Diga-nos os dias e horas que lhe forem mais convenientes.\n\nAté breve,\nEquipa Líquen Events',
+  },
+  {
+    label: 'Seguimento proposta',
+    text: 'Olá {nome},\n\nQueríamos saber se teve oportunidade de analisar a nossa proposta e se podemos esclarecer alguma questão. Estamos ao dispor para ajustar qualquer detalhe.\n\nCom os melhores cumprimentos,\nEquipa Líquen Events',
+  },
+];
+
 export default function ClientMessenger({ quote, onSent }: Props) {
   const [messages, setMessages] = useState<QuoteMessage[]>(quote.messages ?? []);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  const firstName = (quote.name || '').trim().split(/\s+/)[0] || '';
+  function applyTemplate(tpl: string) {
+    setText(tpl.replace(/\{nome\}/g, firstName));
+  }
 
   async function send() {
     const body = text.trim();
@@ -62,8 +83,22 @@ export default function ClientMessenger({ quote, onSent }: Props) {
         </div>
       )}
 
+      {/* Quick-reply templates */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {TEMPLATES.map((t) => (
+          <button
+            key={t.label}
+            type="button"
+            onClick={() => applyTemplate(t.text)}
+            className="text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 rounded-full border border-foreground/12 text-foreground/40 hover:border-moss/40 hover:text-moss transition-colors"
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <textarea
-        rows={3}
+        rows={4}
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Escreva a mensagem que será enviada por e-mail ao cliente…"

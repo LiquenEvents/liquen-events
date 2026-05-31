@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE } from "@/lib/site";
 import { SERVICES } from "./servicos/services-data";
-import { projects } from "./portfolio/projects-data";
 
 const base = SITE.url;
 
@@ -11,7 +10,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const core: MetadataRoute.Sitemap = [
     { url: base,                lastModified: now, changeFrequency: "weekly",  priority: 1.0 },
     { url: `${base}/servicos`,  lastModified: now, changeFrequency: "monthly", priority: 0.9 },
-    { url: `${base}/portfolio`, lastModified: now, changeFrequency: "weekly",  priority: 0.9 },
     { url: `${base}/contacto`,  lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/sobre`,     lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/galeria`,   lastModified: now, changeFrequency: "weekly",  priority: 0.7 },
@@ -25,12 +23,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.85,
   }));
 
-  const portfolio: MetadataRoute.Sitemap = projects.map((p) => ({
-    url: `${base}/portfolio/${p.slug}`,
-    lastModified: now,
-    changeFrequency: "monthly",
-    priority: 0.7,
-  }));
-
-  return [...core, ...services, ...portfolio];
+  return [...core, ...services];
 }

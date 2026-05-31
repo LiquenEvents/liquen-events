@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -7,6 +7,7 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
+import PageTransition from "@/components/PageTransition";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
 
 const inter = Inter({
@@ -82,6 +83,14 @@ export const metadata: Metadata = {
     : undefined,
 };
 
+export const viewport: Viewport = {
+  themeColor: "#080808",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -98,7 +107,9 @@ export default function RootLayout({
         <ScrollProgress />
         <StickyCTA />
         <Navbar />
-        <main id="conteudo" className="flex-1 pt-16">{children}</main>
+        <main id="conteudo" className="flex-1 pt-16">
+          <PageTransition>{children}</PageTransition>
+        </main>
         <Footer />
         <WhatsAppButton />
       </body>

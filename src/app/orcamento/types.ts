@@ -117,6 +117,14 @@ export interface ChecklistItem {
   done: boolean;
 }
 
+/** A single moment in the day-of run sheet (cronograma do evento). */
+export interface TimelineItem {
+  id: string;
+  time: string;   // "HH:MM"
+  title: string;
+  owner?: string; // responsável / fornecedor
+}
+
 export type PaymentKind = 'sinal' | 'pagamento' | 'saldo';
 
 export interface Payment {
@@ -138,6 +146,8 @@ export interface Task {
   dueDate?: string;
   quoteId?: string;
   clientName?: string;
+  assignee?: string;   // quem é responsável (sócio/membro da equipa)
+  area?: string;       // ex.: Comercial, Produção, Decoração, Financeiro
   createdAt: string;
 }
 
@@ -152,6 +162,20 @@ export interface Quote extends QuoteFormData {
   messages?: QuoteMessage[];
   checklist?: ChecklistItem[];
   payments?: Payment[];
+  timeline?: TimelineItem[];
+}
+
+/** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */
+export type CalendarEventKind = 'reuniao' | 'evento' | 'bloqueio' | 'nota';
+
+export interface CalendarEvent {
+  id: string;
+  date: string;        // yyyy-mm-dd
+  title: string;
+  kind: CalendarEventKind;
+  time?: string;       // "HH:MM" opcional
+  note?: string;
+  createdAt: string;
 }
 
 export interface Supplier {

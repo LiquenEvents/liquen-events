@@ -3,6 +3,8 @@ import ContactForm from "./ContactForm";
 import FAQ from "./FAQ";
 import FaqJsonLd from "./FaqJsonLd";
 import AnimateIn from "@/components/AnimateIn";
+import Image from "next/image";
+import { blurFor } from "@/lib/blur";
 import Link from "next/link";
 import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
@@ -21,22 +23,22 @@ const steps = [
   {
     step: "01",
     title: "Recebemos o seu pedido",
-    desc: "Analisamos os detalhes que partilhou e preparamos uma resposta personalizada ao seu evento.",
+    desc: "Analisamos o seu pedido e preparamos uma resposta à medida.",
   },
   {
     step: "02",
     title: "Entramos em contacto",
-    desc: "Em menos de 24 horas marcamos uma conversa para perceber melhor a sua visão e os seus objetivos.",
+    desc: "Em menos de 24 horas, marcamos uma conversa.",
   },
   {
     step: "03",
     title: "Proposta à medida",
-    desc: "Criamos uma proposta detalhada com orçamento transparente, adaptada ao seu estilo e expectativas.",
+    desc: "Proposta detalhada, com orçamento transparente.",
   },
   {
     step: "04",
     title: "Começamos a criar",
-    desc: "Com tudo aprovado, a nossa equipa trata de cada detalhe para que o seu evento seja verdadeiramente inesquecível.",
+    desc: "Tratamos de cada detalhe para um evento inesquecível.",
   },
 ];
 
@@ -48,7 +50,7 @@ export default function ContactoPage() {
       <ContactForm />
 
       {/* ── Depoimentos ── */}
-      <section className="py-24 bg-surface border-t border-foreground/8">
+      <section className="py-16 sm:py-24 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
@@ -75,8 +77,33 @@ export default function ContactoPage() {
         </div>
       </section>
 
+      {/* ── Image band ── */}
+      <section className="bg-surface border-t border-foreground/8">
+        <AnimateIn from="fade">
+          <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(180px, 38vw, 460px)" }}>
+            {[
+              "/imagens/Natalia e Jonathan-315.jpg",
+              "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
+              "/imagens/M&F0658.jpg",
+            ].map((src) => (
+              <div key={src} className="relative overflow-hidden group">
+                <Image
+                  src={src}
+                  {...blurFor(src)}
+                  alt="Evento organizado pela Líquen Events"
+                  fill
+                  sizes="33vw"
+                  className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-black/25 group-hover:bg-black/10 transition-colors duration-500" />
+              </div>
+            ))}
+          </div>
+        </AnimateIn>
+      </section>
+
       {/* ── O que acontece a seguir ── */}
-      <section className="py-28 bg-surface border-t border-foreground/8">
+      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-foreground/25 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
@@ -109,7 +136,7 @@ export default function ContactoPage() {
       </section>
 
       {/* ── FAQ ── */}
-      <section className="py-28 bg-surface border-t border-foreground/8">
+      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
@@ -135,7 +162,7 @@ export default function ContactoPage() {
       </section>
 
       {/* ── WhatsApp CTA ── */}
-      <section className="py-32 bg-moss-dark relative overflow-hidden border-t border-moss/20">
+      <section className="py-20 sm:py-32 bg-moss-dark relative overflow-hidden border-t border-moss/20">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{ background: "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(74,124,89,0.5) 0%, transparent 55%)" }}

@@ -1,0 +1,43 @@
+name: Lighthouse
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: lh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    name: Performance / A11y / SEO budgets
+    runs-on: ubuntu-latest
+    # Informational: surfaces scores on every PR without blocking the merge.
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Run Lighthouse CI
+        run: |
+          npm install -g @lhci/cli@0.14.x
+          lhci autorun

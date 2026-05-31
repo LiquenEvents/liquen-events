@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Keep npm dependencies patched (security + maintenance) weekly.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      dependencies:
+        patterns: ["*"]
+    labels: ["dependencies", "security"]
+  # Keep GitHub Actions pinned versions current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["ci", "security"]

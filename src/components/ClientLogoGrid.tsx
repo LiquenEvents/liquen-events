@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { logoHeight, logoDimsFor } from "@/lib/logo";
 
 interface Client {
   name: string;
@@ -10,16 +11,19 @@ interface Client {
 
 function ClientLogo({ client }: { client: Client }) {
   const [failed, setFailed] = useState(false);
+  const h = logoHeight(client.logo, 6400, 52, 88);
+  const d = logoDimsFor(client.logo);
 
   return (
-    <div className="h-28 bg-surface flex items-center justify-center px-8 hover:bg-surface-elevated transition-colors group">
-      {!failed ? (
+    <div className="h-36 bg-surface flex items-center justify-center px-6 hover:bg-surface-elevated transition-colors group">
+      {!failed && client.logo ? (
         <Image
           src={client.logo}
           alt={client.name}
-          width={140}
-          height={56}
-          className="object-contain max-h-14 w-auto opacity-40 group-hover:opacity-70 transition-opacity duration-300 brightness-0 invert"
+          width={d[0]}
+          height={d[1]}
+          style={{ height: `${h}px` }}
+          className="object-contain w-auto max-w-[78%] opacity-55 group-hover:opacity-90 transition-opacity duration-300 brightness-0 invert"
           onError={() => setFailed(true)}
         />
       ) : (

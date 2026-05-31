@@ -73,18 +73,21 @@ export default function TestimonialsCarousel() {
           </div>
 
           {/* Dots */}
-          <div className="flex gap-2.5 mt-10 lg:mt-14">
+          <div className="flex gap-0.5 mt-9 lg:mt-14 -ml-2">
             {testimonials.map((_, i) => (
               <button
                 key={i}
                 onClick={() => goTo(i)}
                 aria-label={`Testemunho ${i + 1}`}
-                className={`h-px transition-all duration-400 ${
-                  i === active
-                    ? "w-8 bg-moss"
-                    : "w-4 bg-foreground/20 hover:bg-foreground/40"
-                }`}
-              />
+                aria-current={i === active ? "true" : undefined}
+                className="group py-4 px-2 flex-shrink-0"
+              >
+                <span
+                  className={`block h-px transition-all duration-400 ${
+                    i === active ? "w-8 bg-moss" : "w-4 bg-foreground/20 group-hover:bg-foreground/40"
+                  }`}
+                />
+              </button>
             ))}
           </div>
         </AnimateIn>
