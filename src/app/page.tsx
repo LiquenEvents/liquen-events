@@ -110,27 +110,27 @@ export default function Home() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="relative min-h-[100svh] flex flex-col justify-center px-6 lg:px-16 py-24 lg:py-32 overflow-hidden">
+      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Image
           src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
-          alt="Líquen Events — evento aéreo"
+          alt="Líquen Events — evento aéreo no Alentejo"
           fill
           priority
           sizes="100vw"
-          className="object-cover object-center"
+          className="object-cover object-center scale-105"
         />
-        <div className="absolute inset-0 bg-black/35" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/5 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/45 to-transparent" />
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full">
-          <p className="text-white/50 text-xs tracking-[0.4em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
-            <span className="inline-block w-6 h-px bg-moss rounded-full flex-shrink-0" />
-            Organizamos Eventos · Eternizamos Memórias
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
+          <p className="text-white/45 text-[10px] sm:text-xs tracking-[0.45em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
+            <span className="inline-block w-8 h-px bg-moss flex-shrink-0" />
+            Organização de eventos · Évora
           </p>
           <h1
-            className="text-white text-[clamp(52px,9vw,128px)] font-bold leading-[0.9] tracking-tight mb-12 lg:mb-14"
-            style={{ fontFamily: "var(--font-playfair)" }}
+            className="text-white font-bold leading-[0.86] tracking-tight"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(56px, 10vw, 150px)" }}
           >
             {(
               [
@@ -139,7 +139,7 @@ export default function Home() {
                 { words: ["memória."], delay: 520, moss: true },
               ] as { words: string[]; delay: number; moss?: boolean }[]
             ).map(({ words, delay, moss }) => (
-              <span key={words.join("")} className="flex flex-wrap" style={{ gap: "0.28em" }}>
+              <span key={words.join("")} className="flex flex-wrap" style={{ gap: "0.26em" }}>
                 {words.map((word, i) => (
                   <span
                     key={word + i}
@@ -154,24 +154,26 @@ export default function Home() {
               </span>
             ))}
           </h1>
-          <div className="border-t border-white/10 pt-7 flex flex-wrap items-center gap-x-6 gap-y-4 anim-2">
+          <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-x-6 gap-y-4 anim-2">
             <Link
               href="/orcamento"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-moss text-cream text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-moss text-cream text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
             >
               Pedir Orçamento →
             </Link>
             <Link
               href="/galeria"
-              className="link-line text-xs text-white/45 hover:text-white/75 transition-colors tracking-[0.2em] uppercase"
+              className="link-line text-xs text-white/55 hover:text-white/85 transition-colors tracking-[0.2em] uppercase"
             >
               Ver galeria
             </Link>
           </div>
         </div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-3 anim-3">
-          <span className="text-white/25 text-[9px] tracking-[0.5em] uppercase">Scroll</span>
+        <div className="absolute bottom-8 right-6 lg:right-16 z-10 flex flex-col items-center gap-3 anim-3">
+          <span className="text-white/25 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
+            Scroll
+          </span>
           <div className="h-10 w-px overflow-hidden">
             <div className="w-full h-full bg-gradient-to-b from-white/50 to-transparent animate-scroll-line" />
           </div>
