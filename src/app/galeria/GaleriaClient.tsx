@@ -6,7 +6,10 @@ import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
 
 type Label = "Casamento" | "Corporativo" | "Conferência" | "Aéreo" | "Evento";
-interface Photo { src: string; label: Label; }
+interface Photo {
+  src: string;
+  label: Label;
+}
 
 const photos: Photo[] = [
   { src: "/imagens/20_10_2025_0044.jpg", label: "Conferência" },
@@ -288,7 +291,7 @@ function altFor(label: Label): string {
   return ALT_BY_LABEL[label] ?? `Evento da Líquen Events — ${label}`;
 }
 
-const CATS = ["Todos","Casamento","Corporativo","Conferência","Aéreo","Evento"] as const;
+const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
 const STRIP = 7;
@@ -300,13 +303,31 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       <div className="absolute bottom-0 left-0 right-0 p-3.5 flex items-end justify-between gap-2 opacity-0 group-hover:opacity-100 translate-y-1.5 group-hover:translate-y-0 transition-all duration-300 pointer-events-none">
         <span className="min-w-0">
-          <span className="block text-white/90 text-[12px] font-medium truncate" style={{ fontFamily: "var(--font-playfair)" }}>{caption}</span>
-          {sub && <span className="block text-white/45 text-[9px] tracking-[0.2em] uppercase mt-0.5">{sub}</span>}
+          <span
+            className="block text-white/90 text-[12px] font-medium truncate"
+            style={{ fontFamily: "var(--font-playfair)" }}
+          >
+            {caption}
+          </span>
+          {sub && (
+            <span className="block text-white/45 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+              {sub}
+            </span>
+          )}
         </span>
         <span className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0zm-3-3v6m-3-3h6" />
+          <svg
+            className="w-3.5 h-3.5 text-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0zm-3-3v6m-3-3h6"
+            />
           </svg>
         </span>
       </div>
@@ -326,15 +347,21 @@ export default function GaleriaClient() {
 
   // Lightbox navigation (through entire pool, not just shown)
   const close = useCallback(() => setLb(null), []);
-  const prev  = useCallback(() => setLb((i) => i !== null ? (i - 1 + pool.length) % pool.length : null), [pool.length]);
-  const next  = useCallback(() => setLb((i) => i !== null ? (i + 1) % pool.length : null), [pool.length]);
+  const prev = useCallback(
+    () => setLb((i) => (i !== null ? (i - 1 + pool.length) % pool.length : null)),
+    [pool.length],
+  );
+  const next = useCallback(
+    () => setLb((i) => (i !== null ? (i + 1) % pool.length : null)),
+    [pool.length],
+  );
 
   useEffect(() => {
     if (lb === null) return;
     const fn = (e: KeyboardEvent) => {
-      if (e.key === "Escape")      close();
-      if (e.key === "ArrowLeft")   prev();
-      if (e.key === "ArrowRight")  next();
+      if (e.key === "Escape") close();
+      if (e.key === "ArrowLeft") prev();
+      if (e.key === "ArrowRight") next();
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
@@ -342,26 +369,41 @@ export default function GaleriaClient() {
 
   useEffect(() => {
     document.body.style.overflow = lb !== null ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [lb]);
 
   function switchCat(c: Cat) {
     if (c === cat) return;
     setFading(true);
-    setTimeout(() => { setCat(c); setShown(PAGE); setFading(false); }, 160);
+    setTimeout(() => {
+      setCat(c);
+      setShown(PAGE);
+      setFading(false);
+    }, 160);
   }
 
   // Thumbnail strip around current photo
   const half = Math.floor(STRIP / 2);
   const stripStart = lb !== null ? Math.max(0, Math.min(lb - half, pool.length - STRIP)) : 0;
-  const stripIdx   = lb !== null ? Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k) : [];
+  const stripIdx =
+    lb !== null
+      ? Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k)
+      : [];
 
-  const counts = Object.fromEntries(CATS.map((c) => [c, c === "Todos" ? photos.length : photos.filter((p) => p.label === c).length])) as Record<Cat, number>;
+  const counts = Object.fromEntries(
+    CATS.map((c) => [
+      c,
+      c === "Todos" ? photos.length : photos.filter((p) => p.label === c).length,
+    ]),
+  ) as Record<Cat, number>;
 
   return (
     <>
       {/* ── Filtros ── */}
-      <div className="flex gap-2 mb-8 overflow-x-auto pb-1 scrollbar-none"
+      <div
+        className="flex gap-2 mb-8 overflow-x-auto pb-1 scrollbar-none"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {CATS.map((c) => (
@@ -375,14 +417,17 @@ export default function GaleriaClient() {
             }`}
           >
             {c}
-            <span className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/20"}`}>{counts[c]}</span>
+            <span
+              className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/20"}`}
+            >
+              {counts[c]}
+            </span>
           </button>
         ))}
       </div>
 
       {/* ── Grid ── */}
       <div style={{ opacity: fading ? 0 : 1, transition: "opacity 0.16s" }}>
-
         {/* Hero — mosaico editorial de 5 fotos */}
         {visible.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 grid-rows-2 gap-0.5 mb-0.5 h-[320px] sm:h-[480px] lg:h-[600px]">
@@ -391,7 +436,15 @@ export default function GaleriaClient() {
               onClick={() => setLb(0)}
               className="relative col-span-2 row-span-2 h-full w-full overflow-hidden group focus:outline-none"
             >
-              <Image src={visible[0].src} alt={altFor(visible[0].label)} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority {...blurFor(visible[0].src)} />
+              <Image
+                src={visible[0].src}
+                alt={altFor(visible[0].label)}
+                fill
+                sizes="(max-width: 640px) 100vw, 50vw"
+                className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                priority
+                {...blurFor(visible[0].src)}
+              />
               <HoverOverlay {...captionFor(visible[0].src, visible[0].label)} />
             </button>
 
@@ -403,10 +456,18 @@ export default function GaleriaClient() {
                   onClick={() => setLb(idx)}
                   className="relative hidden sm:block h-full w-full overflow-hidden group focus:outline-none"
                 >
-                  <Image src={visible[idx].src} alt={altFor(visible[idx].label)} fill sizes="25vw" className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority {...blurFor(visible[idx].src)} />
+                  <Image
+                    src={visible[idx].src}
+                    alt={altFor(visible[idx].label)}
+                    fill
+                    sizes="25vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                    priority
+                    {...blurFor(visible[idx].src)}
+                  />
                   <HoverOverlay {...captionFor(visible[idx].src, visible[idx].label)} />
                 </button>
-              ) : null
+              ) : null,
             )}
           </div>
         )}
@@ -417,24 +478,27 @@ export default function GaleriaClient() {
             {visible.slice(1).map((p, i) => {
               const idx = i + 1;
               return (
-              <div key={p.src} className={`break-inside-avoid mb-0.5${idx < 5 ? " sm:hidden" : ""}`}>
-                <button
-                  onClick={() => setLb(idx)}
-                  className="relative w-full overflow-hidden group focus:outline-none"
-                  style={{ aspectRatio: aspectFor(p.src) }}
+                <div
+                  key={p.src}
+                  className={`break-inside-avoid mb-0.5${idx < 5 ? " sm:hidden" : ""}`}
                 >
-                  <Image
-                    src={p.src}
-                    alt={altFor(p.label)}
-                    fill
-                    sizes="(max-width: 768px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                    loading="lazy"
-                    {...blurFor(p.src)}
-                  />
-                  <HoverOverlay {...captionFor(p.src, p.label)} />
-                </button>
-              </div>
+                  <button
+                    onClick={() => setLb(idx)}
+                    className="relative w-full overflow-hidden group focus:outline-none"
+                    style={{ aspectRatio: aspectFor(p.src) }}
+                  >
+                    <Image
+                      src={p.src}
+                      alt={altFor(p.label)}
+                      fill
+                      sizes="(max-width: 768px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                      loading="lazy"
+                      {...blurFor(p.src)}
+                    />
+                    <HoverOverlay {...captionFor(p.src, p.label)} />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -449,12 +513,19 @@ export default function GaleriaClient() {
             className="group px-10 py-3.5 border border-foreground/15 text-foreground/40 text-xs tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/70 transition-all duration-300 flex items-center gap-3"
           >
             Ver mais
-            <span className="text-foreground/25 group-hover:text-foreground/50 transition-colors">+{Math.min(PAGE, pool.length - shown)}</span>
+            <span className="text-foreground/25 group-hover:text-foreground/50 transition-colors">
+              +{Math.min(PAGE, pool.length - shown)}
+            </span>
           </button>
           <div className="relative w-40 h-px bg-foreground/8 overflow-hidden">
-            <div className="absolute left-0 top-0 h-full bg-moss/50 transition-all duration-500" style={{ width: `${(shown / pool.length) * 100}%` }} />
+            <div
+              className="absolute left-0 top-0 h-full bg-moss/50 transition-all duration-500"
+              style={{ width: `${(shown / pool.length) * 100}%` }}
+            />
           </div>
-          <p className="text-foreground/20 text-[10px] tracking-widest">{shown} de {pool.length}</p>
+          <p className="text-foreground/20 text-[10px] tracking-widest">
+            {shown} de {pool.length}
+          </p>
         </div>
       )}
 
@@ -463,35 +534,53 @@ export default function GaleriaClient() {
         <div
           className="fixed inset-0 z-50 bg-black flex flex-col select-none"
           onClick={close}
-          onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+          onTouchStart={(e) => {
+            touchX.current = e.touches[0].clientX;
+          }}
           onTouchEnd={(e) => {
             if (touchX.current === null) return;
             const dx = e.changedTouches[0].clientX - touchX.current;
-            if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+            if (Math.abs(dx) > 50) {
+              if (dx < 0) next();
+              else prev();
+            }
             touchX.current = null;
           }}
         >
           {/* Barra superior */}
-          <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex items-center justify-between px-5 py-3 flex-shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3">
               <span className="text-white/60 text-xs font-light tabular-nums">{lb + 1}</span>
               <span className="text-white/20 text-xs">/</span>
               <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
               <span className="w-px h-3 bg-white/10 mx-1" />
               {collectionFor(pool[lb].src) && (
-                <span className="text-white/70 text-xs" style={{ fontFamily: "var(--font-playfair)" }}>
+                <span
+                  className="text-white/70 text-xs"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
                   {collectionFor(pool[lb].src)}
                   <span className="text-white/20 mx-1.5">·</span>
                 </span>
               )}
-              <span className="text-white/30 text-[10px] tracking-[0.15em] uppercase">{pool[lb].label}</span>
+              <span className="text-white/30 text-[10px] tracking-[0.15em] uppercase">
+                {pool[lb].label}
+              </span>
             </div>
             <button
               onClick={close}
               className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -500,16 +589,27 @@ export default function GaleriaClient() {
           <div className="relative flex-1 flex items-center justify-center min-h-0">
             {/* Botão anterior */}
             <button
-              onClick={(e) => { e.stopPropagation(); prev(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                prev();
+              }}
               className="absolute left-3 md:left-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
             >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
 
             {/* Foto principal */}
-            <div className="relative w-full h-full mx-16 md:mx-20" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="relative w-full h-full mx-16 md:mx-20"
+              onClick={(e) => e.stopPropagation()}
+            >
               <Image
                 key={lb}
                 src={pool[lb].src}
@@ -524,11 +624,19 @@ export default function GaleriaClient() {
 
             {/* Botão próxima */}
             <button
-              onClick={(e) => { e.stopPropagation(); next(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                next();
+              }}
               className="absolute right-3 md:right-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
             >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
           </div>
@@ -548,13 +656,7 @@ export default function GaleriaClient() {
                     : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
                 }`}
               >
-                <Image
-                  src={pool[idx].src}
-                  alt=""
-                  fill
-                  sizes="72px"
-                  className="object-cover"
-                />
+                <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
               </button>
             ))}
           </div>

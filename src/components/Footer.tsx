@@ -175,7 +175,7 @@ export default function Footer() {
                 <span className="text-foreground/20">Évora, Portugal</span>
               </div>
               <Link
-                href="/contacto"
+                href="/orcamento"
                 className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/12 text-foreground/38 text-[11px] tracking-[0.25em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-all duration-300"
               >
                 Pedir orçamento →
