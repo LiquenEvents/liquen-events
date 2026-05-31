@@ -54,7 +54,13 @@ open public issues for security reports.
 - No secrets in source control (`.env*` is gitignored; only `.env.example`
   templates are committed). The service-role database key is server-only.
 
-## Known low-risk items
+## Known low-risk / accepted items
 - `npm audit` reports a moderate advisory in **postcss**, pulled in transitively
   by Next.js and used only at build time on our own CSS (no untrusted input).
   The advised "fix" downgrades Next.js, so we track it rather than apply it.
+- CodeQL flags "network data written to file" in `src/lib/push.ts`. This is
+  **by design** — storing a Web Push subscription is the feature. It is
+  mitigated: the subscription is validated and reconstructed via zod (https
+  endpoint, size caps) before persisting, and the file path is a fixed constant
+  (no path traversal). The endpoint that accepts it is also authenticated. The
+  file store is only a dev fallback; production uses Supabase. Accepted risk.
