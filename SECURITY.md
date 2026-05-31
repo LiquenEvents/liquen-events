@@ -59,6 +59,16 @@ open public issues for security reports.
 - No secrets in source control (`.env*` is gitignored; only `.env.example`
   templates are committed). The service-role database key is server-only.
 
+## Design decisions (documented risk acceptance)
+- **CSP keeps `'unsafe-inline'` for `script-src`.** A nonce-based CSP was
+  evaluated and deliberately **not** adopted: per the Next.js docs it forces
+  fully dynamic rendering, which would cost this marketing site its static
+  prerendering and CDN caching, for a marginal gain. The residual risk is low
+  here — there is no user-generated content rendered into scripts and every
+  other XSS control is in place (React auto-escaping, hardened JSON-LD inline
+  data, escaped outbound email HTML, and a CSP that locks down everything else
+  with violation reporting). Revisited periodically.
+
 ## Known low-risk / accepted items
 - `npm audit` reports a moderate advisory in **postcss**, pulled in transitively
   by Next.js and used only at build time on our own CSS (no untrusted input).
