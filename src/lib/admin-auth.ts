@@ -44,7 +44,7 @@ function sessionSecret(): string {
     // the configured password hash, but make the misconfiguration loud.
     console.error(
       "[auth] SESSION_SECRET is not set (or too short) in production. " +
-        "Set a random 32+ char SESSION_SECRET so sessions survive credential changes."
+        "Set a random 32+ char SESSION_SECRET so sessions survive credential changes.",
     );
     return `derived:${process.env.ADMIN_PASSWORD_HASH ?? DEV_SHARED_HASH}`;
   }
@@ -77,8 +77,22 @@ function configuredUsers(): AdminUser[] | null {
   return null;
 }
 
-function sharedHash(): string {
-  return process.env.ADMIN_PASSWORD_HASH ?? DEV_SHARED_HASH;
+/**
+ * The bcrypt hash the shared-password fallback checks against. In production we
+ * NEVER fall back to the public dev hash: if neither ADMIN_PASSWORD_HASH nor
+ * ADMIN_USERS is configured, return null so login is refused outright (the dev
+ * password "liquen2026" is committed and therefore public knowledge).
+ */
+function sharedHash(): string | null {
+  if (process.env.ADMIN_PASSWORD_HASH) return process.env.ADMIN_PASSWORD_HASH;
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[auth] No ADMIN_PASSWORD_HASH or ADMIN_USERS configured in production — " +
+        "admin login is disabled. Set one of them to enable the dashboard.",
+    );
+    return null;
+  }
+  return DEV_SHARED_HASH;
 }
 
 // ── Two-factor (TOTP) ──────────────────────────────────────────────────────
@@ -120,7 +134,8 @@ export function verifyCredentials(name: string, password: string): { name: strin
     return null;
   }
 
-  if (bcrypt.compareSync(password, sharedHash())) {
+  const hash = sharedHash();
+  if (hash && bcrypt.compareSync(password, hash)) {
     return { name: cleanName || "Equipa" };
   }
   return null;

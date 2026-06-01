@@ -8,20 +8,24 @@ export default function TestimonialsCarousel() {
   const [active, setActive] = useState(0);
   const [visible, setVisible] = useState(true);
 
-  const goTo = useCallback((i: number) => {
+  const transitionTo = useCallback((next: (current: number) => number) => {
     setVisible(false);
     setTimeout(() => {
-      setActive(i);
+      setActive(next);
       setVisible(true);
     }, 380);
   }, []);
 
+  const goTo = useCallback((i: number) => transitionTo(() => i), [transitionTo]);
+
   useEffect(() => {
     const id = setInterval(() => {
-      goTo((active + 1) % testimonials.length);
+      // Functional update so autoplay advances from the *current* slide
+      // instead of a stale closure value (which would freeze on slide 1).
+      transitionTo((current) => (current + 1) % testimonials.length);
     }, 6000);
     return () => clearInterval(id);
-  }, [goTo]);
+  }, [transitionTo]);
 
   const t = testimonials[active];
 
@@ -84,7 +88,9 @@ export default function TestimonialsCarousel() {
               >
                 <span
                   className={`block h-px transition-all duration-400 ${
-                    i === active ? "w-8 bg-moss" : "w-4 bg-foreground/20 group-hover:bg-foreground/40"
+                    i === active
+                      ? "w-8 bg-moss"
+                      : "w-4 bg-foreground/20 group-hover:bg-foreground/40"
                   }`}
                 />
               </button>

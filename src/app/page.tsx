@@ -17,7 +17,7 @@ const services = [
     title: "Casamentos",
     tag: "Celebrações",
     image: "/imagens/DaniGui_Preview20.jpg",
-    href: "/servicos#celebrações",
+    href: "/servicos#celebracoes",
   },
   {
     title: "Culturais",
@@ -29,7 +29,7 @@ const services = [
     title: "Privados",
     tag: "Celebrações",
     image: "/imagens/DaniGui_JantarFesta_27.jpg",
-    href: "/servicos#celebrações",
+    href: "/servicos#celebracoes",
   },
 ];
 
@@ -38,31 +38,26 @@ const featured = [
     title: "Aernnova Aerospace",
     category: "Corporativo",
     image: "/imagens/EW1_1392.jpg",
-    slug: "aernnova-aerospace",
   },
   {
     title: "Daniela & Guilherme",
     category: "Casamento",
     image: "/imagens/DaniGui_Preview12.jpg",
-    slug: "daniela-e-guilherme",
   },
   {
     title: "João & Pedro",
     category: "Casamento",
     image: "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg",
-    slug: "joao-e-pedro",
   },
   {
     title: "Câmara de Évora",
     category: "Institucional",
     image: "/imagens/20_10_2025_0295.jpg",
-    slug: "camara-municipal-evora",
   },
   {
     title: "Matilde & Filipe",
     category: "Casamento",
     image: "/imagens/M&F0152.jpg",
-    slug: "matilde-e-filipe",
   },
 ];
 
@@ -143,10 +138,8 @@ export default function Home() {
                 {words.map((word, i) => (
                   <span
                     key={word + i}
-                    className={`inline-block${moss ? " text-moss" : ""}`}
-                    style={{
-                      animation: `word-rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) ${delay + i * 110}ms both`,
-                    }}
+                    className={`inline-block word-rise${moss ? " text-moss" : ""}`}
+                    style={{ "--word-delay": `${delay + i * 110}ms` } as React.CSSProperties}
                   >
                     {word}
                   </span>
@@ -420,7 +413,10 @@ export default function Home() {
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
           {/* Image */}
-          <AnimateIn from="left" className="relative min-h-[300px] lg:min-h-[640px] overflow-hidden">
+          <AnimateIn
+            from="left"
+            className="relative min-h-[300px] lg:min-h-[640px] overflow-hidden"
+          >
             <Image
               src="/imagens/DaniGui_Adois_61.jpg"
               alt="Organização de eventos no Alentejo — Líquen Events"

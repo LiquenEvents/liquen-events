@@ -22,26 +22,43 @@
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2d5c3e; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #4a7c59; }
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2d5c3e;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a7c59;
+}
 
 /* ── Focus: refined, accessible, on-brand ── */
 :focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #080808, 0 0 0 3px rgba(74, 124, 89, 0.6);
+  box-shadow:
+    0 0 0 2px #080808,
+    0 0 0 3px rgba(74, 124, 89, 0.6);
   border-radius: 2px;
 }
 
 /* ── Smooth scroll ── */
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+}
 
 /* ── Base ── */
 body {
   background-color: #080808;
   color: #dedad4;
-  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  font-feature-settings:
+    "kern" 1,
+    "liga" 1,
+    "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -120,36 +137,71 @@ body::before {
 
 /* ── Keyframes ── */
 @keyframes marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 @keyframes lb-photo-in {
-  from { opacity: 0; transform: scale(0.98); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
-.lb-photo-in { animation: lb-photo-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.lb-photo-in {
+  animation: lb-photo-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 /* ── Hero CSS animations (no JS — always in viewport on load) ── */
-.anim-0 { animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.anim-1 { animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 180ms both; }
-.anim-2 { animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 360ms both; }
-.anim-3 { animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 560ms both; }
+.anim-0 {
+  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.anim-1 {
+  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 180ms both;
+}
+.anim-2 {
+  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 360ms both;
+}
+.anim-3 {
+  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 560ms both;
+}
 
 .animate-marquee {
   animation: marquee 50s linear infinite;
@@ -160,10 +212,20 @@ body::before {
 
 /* ── Scroll indicator ── */
 @keyframes scroll-line {
-  0%   { transform: translateY(-100%); opacity: 0; }
-  15%  { opacity: 1; }
-  85%  { opacity: 1; }
-  100% { transform: translateY(100%); opacity: 0; }
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
 }
 .animate-scroll-line {
   animation: scroll-line 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -171,9 +233,15 @@ body::before {
 
 /* ── Footer dot ping ── */
 @keyframes footer-ping {
-  75%, 100% { transform: scale(2.2); opacity: 0; }
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
-.footer-ping { animation: footer-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.footer-ping {
+  animation: footer-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
 
 /* ── Orçamento / Back-office full-screen mode ── */
 body.orcamento-mode footer,
@@ -208,12 +276,24 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 
 /* ── Wizard step transitions ── */
 @keyframes step-forward {
-  from { opacity: 0; transform: translateX(28px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 @keyframes step-back {
-  from { opacity: 0; transform: translateX(-28px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .animate-step-forward {
   animation: step-forward 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -223,19 +303,39 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 }
 
 /* ── Hide scrollbar visually, keep scroll functional ── */
-.scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
-.scroll-hide::-webkit-scrollbar { display: none; }
+.scroll-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scroll-hide::-webkit-scrollbar {
+  display: none;
+}
 
 /* ── Word-rise hero animation ── */
 @keyframes word-rise {
-  from { opacity: 0; transform: translateY(36px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.word-rise {
+  animation: word-rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) var(--word-delay, 0ms) both;
 }
 
 /* ── Route transition (Pixel-Matters-style page reveal) ── */
 @keyframes route-fade {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .route-fade {
   animation: route-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -243,7 +343,9 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 
 /* ── Magnetic / hover lift used across CTAs ── */
 .lift {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s ease;
 }
 .lift:hover {
   transform: translateY(-2px);
@@ -251,8 +353,14 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 
 /* ── Back-office: gentle view transition ── */
 @keyframes view-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .view-in {
   animation: view-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -265,7 +373,10 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   background: rgba(15, 15, 15, 0.35);
 }
 .bo-panel-hover {
-  transition: border-color 0.3s ease, background-color 0.3s ease, transform 0.3s ease;
+  transition:
+    border-color 0.3s ease,
+    background-color 0.3s ease,
+    transform 0.3s ease;
 }
 .bo-panel-hover:hover {
   border-color: rgba(222, 218, 212, 0.16);
@@ -281,17 +392,53 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-0, .anim-1, .anim-2, .anim-3 { animation: none; opacity: 1; }
-  .anim-glow, .anim-scroll-line, .animate-marquee, .animate-scroll-line, .footer-ping { animation: none; }
-  .animate-step-forward, .animate-step-back { animation: none; }
-  .view-in { animation: none; }
-  .route-fade { animation: none; }
+  .anim-0,
+  .anim-1,
+  .anim-2,
+  .anim-3 {
+    animation: none;
+    opacity: 1;
+  }
+  .anim-glow,
+  .anim-scroll-line,
+  .animate-marquee,
+  .animate-scroll-line,
+  .footer-ping {
+    animation: none;
+  }
+  .animate-step-forward,
+  .animate-step-back {
+    animation: none;
+  }
+  .view-in {
+    animation: none;
+  }
+  .route-fade {
+    animation: none;
+  }
+  .word-rise {
+    animation: none;
+    opacity: 1;
+  }
+  .lb-photo-in {
+    animation: none;
+  }
 }
 
 /* ── Print / PDF ── */
 @media print {
-  body::before { display: none !important; }
-  .no-print { display: none !important; }
-  nav, footer { display: none !important; }
-  body { background: #fff !important; color: #111 !important; }
+  body::before {
+    display: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  nav,
+  footer {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
 }

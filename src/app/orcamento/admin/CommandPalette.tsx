@@ -45,7 +45,7 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
           .filter((quote) =>
             [quote.name, quote.email, quote.id, quote.phone]
               .filter(Boolean)
-              .some((v) => String(v).toLowerCase().includes(q))
+              .some((v) => String(v).toLowerCase().includes(q)),
           )
           .slice(0, 6)
           .map((quote) => ({
@@ -98,15 +98,29 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
   let flatIndex = -1;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[12vh] px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[90] flex items-start justify-center pt-[12vh] px-4"
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pesquisar e navegar"
         className="relative w-full max-w-lg bg-surface-elevated/95 backdrop-blur-xl border border-foreground/12 rounded-xl shadow-2xl shadow-black/60 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-foreground/8">
-          <svg className="text-foreground/30" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="text-foreground/30"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" strokeLinecap="round" />
           </svg>
@@ -117,7 +131,9 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
             placeholder="Pesquisar ou navegar…"
             className="flex-1 bg-transparent text-foreground/80 text-sm placeholder-foreground/25 focus:outline-none"
           />
-          <kbd className="text-[9px] text-foreground/30 border border-foreground/12 rounded px-1.5 py-0.5 tracking-wider">ESC</kbd>
+          <kbd className="text-[9px] text-foreground/30 border border-foreground/12 rounded px-1.5 py-0.5 tracking-wider">
+            ESC
+          </kbd>
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto py-2">
@@ -126,7 +142,9 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
           )}
           {groups.map((g) => (
             <div key={g.name} className="mb-1">
-              <p className="px-4 py-1.5 text-foreground/22 text-[9px] tracking-[0.3em] uppercase">{g.name}</p>
+              <p className="px-4 py-1.5 text-foreground/22 text-[9px] tracking-[0.3em] uppercase">
+                {g.name}
+              </p>
               {g.items.map((c) => {
                 flatIndex++;
                 const idx = flatIndex;
@@ -134,13 +152,24 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
                   <button
                     key={c.id}
                     onMouseEnter={() => setActive(idx)}
-                    onClick={() => { c.run(); onClose(); }}
+                    onClick={() => {
+                      c.run();
+                      onClose();
+                    }}
                     className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-colors ${
                       active === idx ? "bg-moss/15" : "hover:bg-foreground/[0.04]"
                     }`}
                   >
-                    <span className={`text-sm ${active === idx ? "text-moss" : "text-foreground/65"}`}>{c.label}</span>
-                    {c.hint && <span className="text-foreground/25 text-xs truncate max-w-[180px]">{c.hint}</span>}
+                    <span
+                      className={`text-sm ${active === idx ? "text-moss" : "text-foreground/65"}`}
+                    >
+                      {c.label}
+                    </span>
+                    {c.hint && (
+                      <span className="text-foreground/25 text-xs truncate max-w-[180px]">
+                        {c.hint}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -149,8 +178,12 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
         </div>
 
         <div className="flex items-center gap-4 px-4 py-2.5 border-t border-foreground/8 text-foreground/25 text-[10px]">
-          <span className="flex items-center gap-1.5"><kbd className="border border-foreground/12 rounded px-1">↑↓</kbd> navegar</span>
-          <span className="flex items-center gap-1.5"><kbd className="border border-foreground/12 rounded px-1">↵</kbd> abrir</span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="border border-foreground/12 rounded px-1">↑↓</kbd> navegar
+          </span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="border border-foreground/12 rounded px-1">↵</kbd> abrir
+          </span>
         </div>
       </div>
     </div>

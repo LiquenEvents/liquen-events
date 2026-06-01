@@ -435,7 +435,7 @@ export default function ServicosPage() {
                   soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.
                 </p>
                 <Link
-                  href="/contacto"
+                  href="/orcamento"
                   className="inline-flex items-center gap-3 text-sm text-foreground/40 hover:text-foreground/70 transition-colors duration-300 group"
                 >
                   <span className="w-8 h-px bg-foreground/18 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
@@ -884,7 +884,10 @@ export default function ServicosPage() {
               </p>
             </AnimateIn>
           </div>
-          <AnimateIn from="right" className="relative min-h-[320px] lg:min-h-[560px] overflow-hidden order-1 lg:order-2">
+          <AnimateIn
+            from="right"
+            className="relative min-h-[320px] lg:min-h-[560px] overflow-hidden order-1 lg:order-2"
+          >
             <Image
               src="/imagens/JOAO_E_PEDRO_1Y1A3439.jpg"
               {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3439.jpg")}
@@ -934,7 +937,7 @@ export default function ServicosPage() {
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4">
               <Link
-                href="/contacto"
+                href="/orcamento"
                 className="inline-flex items-center gap-3 px-8 py-4 bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
               >
                 Pedir Orçamento →

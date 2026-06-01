@@ -1,64 +1,62 @@
-'use client';
+"use client";
 
-import { useReducer, useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import type { QuoteFormData, SelectedAddon } from './types';
-import { calculatePrice } from './pricing';
-import Step1Category from './steps/Step1Category';
-import Step2EventType from './steps/Step2EventType';
-import Step3Details from './steps/Step3Details';
-import Step4Package from './steps/Step4Package';
-import Step5Addons from './steps/Step5Addons';
-import Step6Preferences from './steps/Step6Preferences';
-import Step7Contact from './steps/Step7Contact';
-import PriceSidebar from './PriceSidebar';
+import { useReducer, useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import type { QuoteFormData, SelectedAddon } from "./types";
+import { calculatePrice } from "./pricing";
+import Step1Category from "./steps/Step1Category";
+import Step2EventType from "./steps/Step2EventType";
+import Step3Details from "./steps/Step3Details";
+import Step4Package from "./steps/Step4Package";
+import Step5Addons from "./steps/Step5Addons";
+import Step6Preferences from "./steps/Step6Preferences";
+import Step7Contact from "./steps/Step7Contact";
+import PriceSidebar from "./PriceSidebar";
 
 export type Action =
-  | { type: 'SET'; field: keyof QuoteFormData; value: unknown }
-  | { type: 'ADD_ADDON'; addon: SelectedAddon }
-  | { type: 'REMOVE_ADDON'; id: string }
-  | { type: 'UPDATE_ADDON'; id: string; updates: Partial<SelectedAddon> };
+  | { type: "SET"; field: keyof QuoteFormData; value: unknown }
+  | { type: "ADD_ADDON"; addon: SelectedAddon }
+  | { type: "REMOVE_ADDON"; id: string }
+  | { type: "UPDATE_ADDON"; id: string; updates: Partial<SelectedAddon> };
 
 const initialForm: QuoteFormData = {
   category: null,
   eventType: null,
-  eventName: '',
-  date: '',
-  endDate: '',
-  location: '',
-  locationType: 'lisboa',
+  eventName: "",
+  date: "",
+  endDate: "",
+  location: "",
+  locationType: "lisboa",
   guests: 0,
   duration: 4,
   isMultiDay: false,
-  packageTier: 'completo',
+  packageTier: "completo",
   addons: [],
   budgetRange: null,
-  urgency: 'standard',
-  notes: '',
-  referralSource: '',
-  name: '',
-  email: '',
-  phone: '',
-  company: '',
-  nif: '',
+  urgency: "standard",
+  notes: "",
+  referralSource: "",
+  name: "",
+  email: "",
+  phone: "",
+  company: "",
+  nif: "",
   acceptTerms: false,
   acceptMarketing: false,
 };
 
 function reducer(state: QuoteFormData, action: Action): QuoteFormData {
   switch (action.type) {
-    case 'SET':
+    case "SET":
       return { ...state, [action.field]: action.value };
-    case 'ADD_ADDON':
+    case "ADD_ADDON":
       return { ...state, addons: [...state.addons, action.addon] };
-    case 'REMOVE_ADDON':
+    case "REMOVE_ADDON":
       return { ...state, addons: state.addons.filter((a) => a.id !== action.id) };
-    case 'UPDATE_ADDON':
+    case "UPDATE_ADDON":
       return {
         ...state,
-        addons: state.addons.map((a) =>
-          a.id === action.id ? { ...a, ...action.updates } : a
-        ),
+        addons: state.addons.map((a) => (a.id === action.id ? { ...a, ...action.updates } : a)),
       };
     default:
       return state;
@@ -66,27 +64,28 @@ function reducer(state: QuoteFormData, action: Action): QuoteFormData {
 }
 
 const STEPS = [
-  { label: 'Categoria', short: '1' },
-  { label: 'Tipo', short: '2' },
-  { label: 'Detalhes', short: '3' },
-  { label: 'Pacote', short: '4' },
-  { label: 'Extras', short: '5' },
-  { label: 'Preferências', short: '6' },
-  { label: 'Contacto', short: '7' },
+  { label: "Categoria", short: "1" },
+  { label: "Tipo", short: "2" },
+  { label: "Detalhes", short: "3" },
+  { label: "Pacote", short: "4" },
+  { label: "Extras", short: "5" },
+  { label: "Preferências", short: "6" },
+  { label: "Contacto", short: "7" },
 ];
 
 function validateStep(step: number, form: QuoteFormData): string | null {
-  if (step === 1 && !form.category) return 'Por favor seleccione uma categoria de evento.';
-  if (step === 2 && !form.eventType) return 'Por favor seleccione o tipo de evento.';
+  if (step === 1 && !form.category) return "Por favor seleccione uma categoria de evento.";
+  if (step === 2 && !form.eventType) return "Por favor seleccione o tipo de evento.";
   if (step === 3) {
-    if (!form.date) return 'Por favor indique a data do evento.';
-    if (!form.guests || form.guests < 1) return 'Por favor indique o número de convidados.';
+    if (!form.date) return "Por favor indique a data do evento.";
+    if (!form.guests || form.guests < 1) return "Por favor indique o número de convidados.";
   }
   if (step === 7) {
-    if (!form.name.trim()) return 'Por favor indique o seu nome.';
-    if (!form.email.trim() || !form.email.includes('@')) return 'Por favor indique um email válido.';
-    if (!form.phone.trim()) return 'Por favor indique o seu telefone.';
-    if (!form.acceptTerms) return 'Por favor aceite os Termos e Condições para continuar.';
+    if (!form.name.trim()) return "Por favor indique o seu nome.";
+    if (!form.email.trim() || !form.email.includes("@"))
+      return "Por favor indique um email válido.";
+    if (!form.phone.trim()) return "Por favor indique o seu telefone.";
+    if (!form.acceptTerms) return "Por favor aceite os Termos e Condições para continuar.";
   }
   return null;
 }
@@ -94,7 +93,7 @@ function validateStep(step: number, form: QuoteFormData): string | null {
 export default function OrcamentoWizard() {
   const [form, dispatch] = useReducer(reducer, initialForm);
   const [step, setStep] = useState(1);
-  const [direction, setDirection] = useState<'forward' | 'back'>('forward');
+  const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [animKey, setAnimKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -103,36 +102,12 @@ export default function OrcamentoWizard() {
   const breakdown = calculatePrice(form);
   const totalSteps = STEPS.length;
 
-  const goNext = useCallback(() => {
-    const err = validateStep(step, form);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError(null);
-    if (step === totalSteps) {
-      handleSubmit();
-      return;
-    }
-    setDirection('forward');
-    setAnimKey((k) => k + 1);
-    setStep((s) => s + 1);
-  }, [step, form, totalSteps]);
-
-  const goBack = useCallback(() => {
-    if (step === 1) return;
-    setError(null);
-    setDirection('back');
-    setAnimKey((k) => k + 1);
-    setStep((s) => s - 1);
-  }, [step]);
-
-  async function handleSubmit() {
+  const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
-      const res = await fetch('/api/orcamento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/orcamento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ form, breakdown }),
       });
       const data = await res.json();
@@ -146,33 +121,54 @@ export default function OrcamentoWizard() {
               ...form,
               id: data.id,
               submittedAt: new Date().toISOString(),
-              status: 'pendente',
+              status: "pendente",
               priceBreakdown: breakdown,
-            })
+            }),
           );
         } catch {
           /* sessionStorage unavailable — confirmation falls back gracefully */
         }
         router.push(`/orcamento/confirmacao/${data.id}`);
       } else {
-        setError('Erro ao enviar o pedido. Por favor tente novamente.');
+        setError("Erro ao enviar o pedido. Por favor tente novamente.");
         setSubmitting(false);
       }
     } catch {
-      setError('Erro de ligação. Por favor verifique a sua internet e tente novamente.');
+      setError("Erro de ligação. Por favor verifique a sua internet e tente novamente.");
       setSubmitting(false);
     }
-  }
+  }, [form, breakdown, router]);
+
+  const goNext = useCallback(() => {
+    const err = validateStep(step, form);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setError(null);
+    if (step === totalSteps) {
+      handleSubmit();
+      return;
+    }
+    setDirection("forward");
+    setAnimKey((k) => k + 1);
+    setStep((s) => s + 1);
+  }, [step, form, totalSteps, handleSubmit]);
+
+  const goBack = useCallback(() => {
+    if (step === 1) return;
+    setError(null);
+    setDirection("back");
+    setAnimKey((k) => k + 1);
+    setStep((s) => s - 1);
+  }, [step]);
 
   // When category changes, reset event type
   useEffect(() => {
-    dispatch({ type: 'SET', field: 'eventType', value: null });
+    dispatch({ type: "SET", field: "eventType", value: null });
   }, [form.category]);
 
-  const animClass =
-    direction === 'forward'
-      ? 'animate-step-forward'
-      : 'animate-step-back';
+  const animClass = direction === "forward" ? "animate-step-forward" : "animate-step-back";
 
   function renderStep() {
     switch (step) {
@@ -216,10 +212,10 @@ export default function OrcamentoWizard() {
                   key={i}
                   className={`h-px rounded-full transition-all duration-500 ${
                     i < step - 1
-                      ? 'w-5 bg-moss'
+                      ? "w-5 bg-moss"
                       : i === step - 1
-                      ? 'w-5 bg-moss/50'
-                      : 'w-3 bg-foreground/12'
+                        ? "w-5 bg-moss/50"
+                        : "w-3 bg-foreground/12"
                   }`}
                 />
               ))}
@@ -256,8 +252,8 @@ export default function OrcamentoWizard() {
                 disabled={step === 1}
                 className={`flex items-center gap-2 px-6 py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase border transition-all duration-300 ${
                   step === 1
-                    ? 'border-foreground/8 text-foreground/18 cursor-not-allowed'
-                    : 'border-foreground/20 text-foreground/45 hover:border-foreground/40 hover:text-foreground/70'
+                    ? "border-foreground/8 text-foreground/18 cursor-not-allowed"
+                    : "border-foreground/20 text-foreground/45 hover:border-foreground/40 hover:text-foreground/70"
                 }`}
               >
                 ← Anterior
@@ -266,7 +262,8 @@ export default function OrcamentoWizard() {
               <div className="flex items-center gap-4">
                 {step < totalSteps && (
                   <span className="text-foreground/22 text-xs hidden sm:block">
-                    {totalSteps - step} passo{totalSteps - step !== 1 ? 's' : ''} restante{totalSteps - step !== 1 ? 's' : ''}
+                    {totalSteps - step} passo{totalSteps - step !== 1 ? "s" : ""} restante
+                    {totalSteps - step !== 1 ? "s" : ""}
                   </span>
                 )}
                 <button
@@ -275,15 +272,11 @@ export default function OrcamentoWizard() {
                   disabled={submitting}
                   className={`flex items-center gap-3 px-8 py-3.5 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all duration-300 shadow-lg shadow-moss/15 ${
                     submitting
-                      ? 'bg-moss/50 text-cream/50 cursor-not-allowed'
-                      : 'bg-moss text-cream hover:bg-moss-dark hover:gap-5'
+                      ? "bg-moss/50 text-cream/50 cursor-not-allowed"
+                      : "bg-moss text-cream hover:bg-moss-dark hover:gap-5"
                   }`}
                 >
-                  {submitting
-                    ? 'A enviar…'
-                    : step === totalSteps
-                    ? 'Enviar Pedido →'
-                    : 'Avançar →'}
+                  {submitting ? "A enviar…" : step === totalSteps ? "Enviar Pedido →" : "Avançar →"}
                 </button>
               </div>
             </div>

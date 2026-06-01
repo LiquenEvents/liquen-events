@@ -15,3 +15,12 @@ export function ratioFor(src: string, fallback = 4 / 3): number {
   const d = map[src];
   return d ? d[0] / d[1] : fallback;
 }
+
+/**
+ * Real [width, height] for an image, or null when unknown. Used for accurate
+ * Open Graph / Twitter card dimensions (avoids declaring a wrong aspect ratio).
+ */
+export function dimsFor(src: string): [number, number] | null {
+  const d = map[src];
+  return d && d.length === 2 ? [d[0], d[1]] : null;
+}

@@ -6,6 +6,7 @@ import AnimateIn from "@/components/AnimateIn";
 import CountUp from "@/components/CountUp";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
+import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = pageMetadata({
   title: "Sobre Nós — Empresa de Eventos em Évora",
@@ -32,8 +33,10 @@ const gallery = [
   { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-252.jpg", cls: "col-span-2" },
 ];
 
-const eyebrowLight = "text-white/35 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
-const eyebrowDark = "text-foreground/25 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
+const eyebrowLight =
+  "text-white/35 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
+const eyebrowDark =
+  "text-foreground/25 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 export default function SobrePage() {
   return (
@@ -93,8 +96,8 @@ export default function SobrePage() {
               <span className="text-moss">Eternizamos memórias.</span>
             </h2>
             <p className="text-foreground/45 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
-              Com sede em Évora, há mais de uma década que transformamos visões em experiências —
-              em todo o Portugal.
+              Com sede em Évora, desde 2018 que transformamos visões em experiências — em todo o
+              Portugal.
             </p>
           </AnimateIn>
           <AnimateIn from="right" delay={120}>
@@ -119,7 +122,12 @@ export default function SobrePage() {
             {[
               { kind: "count" as const, to: 100, suffix: "+", label: "Eventos realizados" },
               { kind: "count" as const, to: 19, suffix: "+", label: "Clientes empresariais" },
-              { kind: "count" as const, to: 10, suffix: "+", label: "Anos de experiência" },
+              {
+                kind: "count" as const,
+                to: new Date().getFullYear() - Number(SITE.founded),
+                suffix: "+",
+                label: "Anos de experiência",
+              },
               { kind: "static" as const, value: "5★", label: "Avaliação dos clientes" },
             ].map((s, i) => (
               <AnimateIn key={s.label} delay={i * 80} className="h-full">
@@ -130,7 +138,9 @@ export default function SobrePage() {
                   >
                     {s.kind === "count" ? <CountUp to={s.to} suffix={s.suffix} /> : s.value}
                   </p>
-                  <p className="text-foreground/30 text-[10px] tracking-[0.28em] uppercase">{s.label}</p>
+                  <p className="text-foreground/30 text-[10px] tracking-[0.28em] uppercase">
+                    {s.label}
+                  </p>
                 </div>
               </AnimateIn>
             ))}
@@ -182,7 +192,10 @@ export default function SobrePage() {
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 4.5vw, 64px)" }}
               >
                 Não organizamos apenas eventos.
-                <span className="text-cream/40"> Desenhamos experiências que ficam para sempre.</span>
+                <span className="text-cream/40">
+                  {" "}
+                  Desenhamos experiências que ficam para sempre.
+                </span>
               </p>
             </AnimateIn>
           </div>
@@ -233,7 +246,8 @@ export default function SobrePage() {
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
             <AnimateIn>
               <p className={`${eyebrowDark} mb-10`}>
-                <span className="w-5 h-px bg-moss/50 flex-shrink-0" />As pessoas
+                <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+                As pessoas
               </p>
               <span
                 className="block text-moss/25 text-6xl font-bold leading-none mb-6"

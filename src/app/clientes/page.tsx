@@ -9,6 +9,7 @@ import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { clientLogos } from "@/data";
+import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = pageMetadata({
   title: "Clientes — Quem Confia na Líquen Events",
@@ -176,7 +177,7 @@ export default function ClientesPage() {
                   className="text-foreground/10 font-bold leading-none"
                   style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
                 >
-                  2018
+                  {SITE.founded}
                 </span>
               </div>
             </AnimateIn>

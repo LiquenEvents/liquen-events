@@ -16,7 +16,7 @@ export const SITE = {
   region: "Alentejo",
   country: "PT",
   slogan: "Organizamos eventos, eternizamos memórias.",
-  founded: "2014",
+  founded: "2018",
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",
   ogImage: "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
