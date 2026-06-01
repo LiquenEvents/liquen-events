@@ -52,6 +52,9 @@ export default function ShortcutsModal({ open, onClose }: Props) {
     <div className="fixed inset-0 z-[90] flex items-center justify-center px-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Atalhos de teclado"
         className="relative w-full max-w-2xl bg-surface-elevated/95 backdrop-blur-xl border border-foreground/12 rounded-xl shadow-2xl shadow-black/60 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
