@@ -19,7 +19,7 @@ import { simpleParser } from "mailparser";
  * SMTP_HOST by swapping the leading "smtp." for "imap." (works for Gmail and
  * most providers), so the inbox lights up with just the send-mail config.
  */
-function imapHost(): string | undefined {
+export function imapHost(): string | undefined {
   if (process.env.IMAP_HOST) return process.env.IMAP_HOST;
   const smtp = process.env.SMTP_HOST;
   if (!smtp) return undefined;
