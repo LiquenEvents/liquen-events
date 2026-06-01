@@ -16,9 +16,8 @@ concurrency:
 jobs:
   lighthouse:
     name: Performance / A11y / SEO budgets
+    needs: []
     runs-on: ubuntu-latest
-    # Informational: surfaces scores on every PR without blocking the merge.
-    continue-on-error: true
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -30,14 +29,28 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
+
+      - name: Cache Next.js incremental build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-lh-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
 
       - name: Build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
-      - name: Run Lighthouse CI
-        run: |
-          npm install -g @lhci/cli@0.14.x
-          lhci autorun
+      - name: Run Lighthouse CI (desktop)
+        run: npx --yes @lhci/cli@0.14.x autorun
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+
+      - name: Run Lighthouse CI (mobile)
+        run: npx --yes @lhci/cli@0.14.x autorun --config=lighthouserc.mobile.json
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}

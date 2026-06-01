@@ -3,6 +3,7 @@ import { listQuotes } from "@/lib/quotes-store";
 import { listCalendarEvents } from "@/lib/calendar-store";
 import { sendPushToAll } from "@/lib/push";
 import { isAuthed } from "@/lib/admin-auth";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,21 +17,26 @@ export const maxDuration = 60;
  *   · payments due (or overdue) within 7 days
  *   · quotes still awaiting a first reply for 2+ days
  *
- * Protected by CRON_SECRET: the caller must send it as a Bearer token or
- * `?secret=` query param. When CRON_SECRET is unset (dev), it runs freely.
+ * Protected by CRON_SECRET: the caller must send it as a Bearer token in the
+ * Authorization header. When CRON_SECRET is unset (dev), it runs freely.
+ * Vercel Cron sends the header automatically; other schedulers must do the same.
  */
 function authorized(req: NextRequest): boolean {
   // A logged-in admin can always trigger it manually (e.g. to test).
   if (isAuthed(req)) return true;
   const secret = process.env.CRON_SECRET;
   if (!secret) return true;
-  const auth = req.headers.get("authorization");
-  if (auth === `Bearer ${secret}`) return true;
-  return req.nextUrl.searchParams.get("secret") === secret;
+  // Only accept the Bearer header — never a query param, which would expose
+  // the secret in server access logs and any referrer headers.
+  return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
+  new Intl.NumberFormat("pt-PT", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(n || 0);
 
 export async function GET(request: NextRequest) {
   if (!authorized(request)) {
@@ -57,8 +63,12 @@ export async function GET(request: NextRequest) {
 
     // 1. Events in the next 3 days (quotes + calendar entries)
     const upcomingEvents = [
-      ...quotes.filter((q) => q.date && q.date >= todayKey && q.date <= in3).map((q) => ({ date: q.date, label: q.name })),
-      ...calEvents.filter((e) => e.date >= todayKey && e.date <= in3).map((e) => ({ date: e.date, label: e.title })),
+      ...quotes
+        .filter((q) => q.date && q.date >= todayKey && q.date <= in3)
+        .map((q) => ({ date: q.date, label: q.name })),
+      ...calEvents
+        .filter((e) => e.date >= todayKey && e.date <= in3)
+        .map((e) => ({ date: e.date, label: e.title })),
     ].sort((a, b) => a.date.localeCompare(b.date));
 
     // 2. Payments due (or overdue) within 7 days
@@ -79,12 +89,14 @@ export async function GET(request: NextRequest) {
       (q) =>
         (q.status === "pendente" || q.status === "em_revisao") &&
         !(q.messages && q.messages.length > 0) &&
-        new Date(q.submittedAt).getTime() < twoDaysAgo
+        new Date(q.submittedAt).getTime() < twoDaysAgo,
     ).length;
 
     const lines: string[] = [];
     if (upcomingEvents.length > 0) {
-      lines.push(`${upcomingEvents.length} evento${upcomingEvents.length !== 1 ? "s" : ""} nos próximos 3 dias`);
+      lines.push(
+        `${upcomingEvents.length} evento${upcomingEvents.length !== 1 ? "s" : ""} nos próximos 3 dias`,
+      );
     }
     if (dueCount > 0) {
       lines.push(`${eur(dueSum)} a receber (${dueCount} pagamento${dueCount !== 1 ? "s" : ""})`);
@@ -106,7 +118,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ sent, summary: lines });
   } catch (err) {
-    console.error("[cron reminders]", err);
+    log.error("[cron reminders]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

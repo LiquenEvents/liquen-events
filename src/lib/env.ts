@@ -16,12 +16,18 @@ interface EnvCheck {
 
 const CHECKS: EnvCheck[] = [
   { name: "SESSION_SECRET", critical: true, enables: "tamper-proof admin sessions" },
-  { name: "ADMIN_PASSWORD_HASH", enables: "the shared admin password (else a dev default is used)" },
+  {
+    name: "ADMIN_PASSWORD_HASH",
+    enables: "the shared admin password (else a dev default is used)",
+  },
   { name: "SUPABASE_URL", enables: "persistent storage (else local file in dev)" },
   { name: "SUPABASE_SERVICE_ROLE_KEY", enables: "persistent storage writes" },
-  { name: "RESEND_API_KEY", enables: "outbound email notifications" },
+  { name: "SMTP_HOST", enables: "outbound email (SMTP)" },
+  { name: "SMTP_USER", enables: "outbound email (SMTP)" },
+  { name: "SMTP_PASS", enables: "outbound email (SMTP)" },
   { name: "VAPID_PUBLIC_KEY", enables: "web push notifications" },
   { name: "VAPID_PRIVATE_KEY", enables: "web push notifications" },
+  { name: "CRON_SECRET", enables: "protected daily digest cron endpoint" },
 ];
 
 let validated = false;
