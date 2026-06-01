@@ -682,7 +682,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         {/* ── Main ── */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-surface/85 backdrop-blur-xl border-b border-foreground/8 px-6 lg:px-12 py-6 flex items-center gap-4">
+          <header className="sticky top-0 z-20 bg-surface/85 backdrop-blur-xl border-b border-foreground/8 px-4 sm:px-6 lg:px-12 py-4 lg:py-6 flex items-center gap-3 sm:gap-4">
             <button
               className="lg:hidden text-foreground/50 -ml-1"
               onClick={() => setNavOpen(true)}
@@ -725,7 +725,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 >
                   <path d="M12 5v14M5 12h14" strokeLinecap="round" />
                 </svg>
-                Novo
+                <span className="hidden sm:inline">Novo</span>
               </button>
               <button
                 onClick={() => setPaletteOpen(true)}
@@ -781,7 +781,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Overview ── */}
           {view === "overview" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Overview
                 quotes={quotes}
                 userName={userName}
@@ -793,7 +793,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Pipeline (Kanban) ── */}
           {view === "kanban" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Kanban
                 quotes={quotes}
                 onOpen={openQuote}
@@ -807,56 +807,56 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Clientes ── */}
           {view === "clientes" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Clientes quotes={quotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Calendário ── */}
           {view === "calendario" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Calendario quotes={quotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Propostas ── */}
           {view === "propostas" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Propostas />
             </div>
           )}
 
           {/* ── Tarefas ── */}
           {view === "tarefas" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Tarefas defaultAssignee={userName} />
             </div>
           )}
 
           {/* ── Fornecedores ── */}
           {view === "fornecedores" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Fornecedores />
             </div>
           )}
 
           {/* ── Estatísticas ── */}
           {view === "estatisticas" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <StatsDashboard quotes={quotes} />
             </div>
           )}
 
           {/* ── Inbox ── */}
           {view === "inbox" && (
-            <div className="px-6 lg:px-12 py-10 lg:py-12 view-in">
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Inbox />
             </div>
           )}
 
           {/* ── Pedidos ── */}
           <div
-            className={`px-6 lg:px-12 py-10 lg:py-12 ${view === "pedidos" ? "view-in" : "hidden"}`}
+            className={`px-4 sm:px-6 lg:px-12 py-6 lg:py-12 ${view === "pedidos" ? "view-in" : "hidden"}`}
           >
             {/* Controls */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
