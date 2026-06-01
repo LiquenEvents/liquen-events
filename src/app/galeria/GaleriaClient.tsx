@@ -606,10 +606,7 @@ export default function GaleriaClient() {
             </button>
 
             {/* Foto principal */}
-            <div
-              className="relative w-full h-full mx-16 md:mx-20"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="absolute inset-0 mx-14 md:mx-20" onClick={(e) => e.stopPropagation()}>
               <Image
                 key={lb}
                 src={pool[lb].src}
@@ -617,7 +614,6 @@ export default function GaleriaClient() {
                 fill
                 sizes="90vw"
                 className="object-contain lb-photo-in"
-                priority
                 {...blurFor(pool[lb].src)}
               />
             </div>
