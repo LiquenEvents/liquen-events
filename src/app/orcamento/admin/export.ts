@@ -6,13 +6,6 @@
 import type { Quote } from "../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../data";
 
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
-
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {
     const et = EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType);
