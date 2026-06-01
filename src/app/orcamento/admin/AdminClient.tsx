@@ -881,42 +881,44 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   className="w-full bg-surface-raised/50 border border-foreground/12 rounded-md pl-9 pr-3 py-2 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
                 />
               </div>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="bg-surface-raised/50 border border-foreground/12 rounded-md px-3 py-2 text-xs text-foreground/55 focus:outline-none focus:border-moss/45"
-              >
-                <option value="recent">Mais recentes</option>
-                <option value="old">Mais antigos</option>
-                <option value="value">Maior valor</option>
-              </select>
-              <button
-                onClick={() => {
-                  downloadCsv(`pedidos-${dateStamp()}`, quotesToCsvRows(filtered));
-                  toast(
-                    `${filtered.length} pedido${filtered.length !== 1 ? "s" : ""} exportado${filtered.length !== 1 ? "s" : ""}`,
-                    "success",
-                  );
-                }}
-                className="flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.18em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors whitespace-nowrap"
-                title="Exportar a lista atual para CSV (Excel)"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+              <div className="flex gap-3">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as typeof sort)}
+                  className="flex-1 lg:flex-none bg-surface-raised/50 border border-foreground/12 rounded-md px-3 py-2 text-xs text-foreground/55 focus:outline-none focus:border-moss/45"
                 >
-                  <path
-                    d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Exportar
-              </button>
+                  <option value="recent">Mais recentes</option>
+                  <option value="old">Mais antigos</option>
+                  <option value="value">Maior valor</option>
+                </select>
+                <button
+                  onClick={() => {
+                    downloadCsv(`pedidos-${dateStamp()}`, quotesToCsvRows(filtered));
+                    toast(
+                      `${filtered.length} pedido${filtered.length !== 1 ? "s" : ""} exportado${filtered.length !== 1 ? "s" : ""}`,
+                      "success",
+                    );
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.18em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors whitespace-nowrap"
+                  title="Exportar a lista atual para CSV (Excel)"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path
+                      d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Exportar
+                </button>
+              </div>
             </div>
 
             {/* Status filter */}
