@@ -39,10 +39,8 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
-        scrolled
-          ? "bg-surface/90 backdrop-blur-md border-b border-foreground/8 shadow-sm shadow-black/5"
-          : "bg-gradient-to-b from-black/30 to-transparent backdrop-blur-[2px]"
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe bg-surface/90 backdrop-blur-md border-b border-foreground/8 transition-all duration-500 ${
+        scrolled ? "shadow-sm shadow-black/5" : ""
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
@@ -70,9 +68,6 @@ export default function Navbar() {
                 className={`link-line text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                   pathname === link.href ? "text-moss nav-active" : "text-moss/80 hover:text-moss"
                 }`}
-                style={{
-                  textShadow: scrolled ? "none" : "0 1px 8px rgba(0,0,0,0.45)",
-                }}
               >
                 {link.label}
               </Link>
@@ -83,7 +78,6 @@ export default function Navbar() {
             <Link
               href="/contacto"
               className="text-[11px] tracking-[0.2em] uppercase border border-moss/35 text-moss px-5 py-2 rounded-sm hover:border-moss/60 hover:bg-moss/10 transition-all duration-300"
-              style={{ textShadow: scrolled ? "none" : "0 1px 8px rgba(0,0,0,0.35)" }}
             >
               Contacto
             </Link>
@@ -102,13 +96,13 @@ export default function Navbar() {
             aria-expanded={isOpen}
           >
             <span
-              className={`block w-[18px] h-px ${scrolled || isOpen ? "bg-foreground/70" : "bg-white/85"} transition-all duration-300 mb-1.5 ${isOpen ? "rotate-45 translate-y-2" : ""}`}
+              className={`block w-[18px] h-px bg-foreground/70 transition-all duration-300 mb-1.5 ${isOpen ? "rotate-45 translate-y-2" : ""}`}
             />
             <span
-              className={`block w-[18px] h-px ${scrolled || isOpen ? "bg-foreground/70" : "bg-white/85"} transition-all duration-300 mb-1.5 ${isOpen ? "opacity-0" : ""}`}
+              className={`block w-[18px] h-px bg-foreground/70 transition-all duration-300 mb-1.5 ${isOpen ? "opacity-0" : ""}`}
             />
             <span
-              className={`block w-[18px] h-px ${scrolled || isOpen ? "bg-foreground/70" : "bg-white/85"} transition-all duration-300 ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
+              className={`block w-[18px] h-px bg-foreground/70 transition-all duration-300 ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
             />
           </button>
         </div>
