@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
@@ -533,142 +534,145 @@ export default function GaleriaClient() {
       )}
 
       {/* ── Lightbox ── */}
-      {lb !== null && (
-        <div
-          className="fixed inset-0 z-50 bg-black flex flex-col select-none"
-          onClick={close}
-          onTouchStart={(e) => {
-            touchX.current = e.touches[0].clientX;
-          }}
-          onTouchEnd={(e) => {
-            if (touchX.current === null) return;
-            const dx = e.changedTouches[0].clientX - touchX.current;
-            if (Math.abs(dx) > 50) {
-              if (dx < 0) next();
-              else prev();
-            }
-            touchX.current = null;
-          }}
-        >
-          {/* Barra superior */}
+      {lb !== null &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            className="flex items-center justify-between px-5 py-3 flex-shrink-0"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[60] bg-black flex flex-col select-none"
+            onClick={close}
+            onTouchStart={(e) => {
+              touchX.current = e.touches[0].clientX;
+            }}
+            onTouchEnd={(e) => {
+              if (touchX.current === null) return;
+              const dx = e.changedTouches[0].clientX - touchX.current;
+              if (Math.abs(dx) > 50) {
+                if (dx < 0) next();
+                else prev();
+              }
+              touchX.current = null;
+            }}
           >
-            <div className="flex items-center gap-3">
-              <span className="text-white/60 text-xs font-light tabular-nums">{lb + 1}</span>
-              <span className="text-white/20 text-xs">/</span>
-              <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
-              <span className="w-px h-3 bg-white/10 mx-1" />
-              {collectionFor(pool[lb].src) && (
-                <span
-                  className="text-white/70 text-xs"
-                  style={{ fontFamily: "var(--font-playfair)" }}
-                >
-                  {collectionFor(pool[lb].src)}
-                  <span className="text-white/20 mx-1.5">·</span>
+            {/* Barra superior */}
+            <div
+              className="flex items-center justify-between px-5 py-3 flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-white/60 text-xs font-light tabular-nums">{lb + 1}</span>
+                <span className="text-white/20 text-xs">/</span>
+                <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
+                <span className="w-px h-3 bg-white/10 mx-1" />
+                {collectionFor(pool[lb].src) && (
+                  <span
+                    className="text-white/70 text-xs"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {collectionFor(pool[lb].src)}
+                    <span className="text-white/20 mx-1.5">·</span>
+                  </span>
+                )}
+                <span className="text-white/30 text-[10px] tracking-[0.15em] uppercase">
+                  {pool[lb].label}
                 </span>
-              )}
-              <span className="text-white/30 text-[10px] tracking-[0.15em] uppercase">
-                {pool[lb].label}
-              </span>
-            </div>
-            <button
-              onClick={close}
-              aria-label="Fechar"
-              className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Área da foto + botões */}
-          <div className="relative flex-1 flex items-center justify-center min-h-0">
-            {/* Botão anterior */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                prev();
-              }}
-              aria-label="Foto anterior"
-              className="absolute left-3 md:left-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
-            >
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
-
-            {/* Foto principal */}
-            <div className="absolute inset-0 mx-14 md:mx-20" onClick={(e) => e.stopPropagation()}>
-              <Image
-                key={lb}
-                src={pool[lb].src}
-                alt={altFor(pool[lb].label)}
-                fill
-                sizes="90vw"
-                className="object-contain lb-photo-in"
-                {...blurFor(pool[lb].src)}
-              />
-            </div>
-
-            {/* Botão próxima */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                next();
-              }}
-              aria-label="Próxima foto"
-              className="absolute right-3 md:right-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
-            >
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Strip de thumbnails */}
-          <div
-            className="flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {stripIdx.map((idx) => (
+              </div>
               <button
-                key={idx}
-                onClick={() => setLb(idx)}
-                className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${
-                  idx === lb
-                    ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
-                    : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
-                }`}
+                onClick={close}
+                aria-label="Fechar"
+                className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
               >
-                <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
               </button>
-            ))}
-          </div>
+            </div>
 
-          {/* Dicas teclado */}
-          <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
-            ← → navegar · esc fechar · deslize no telemóvel
-          </p>
-        </div>
-      )}
+            {/* Área da foto + botões */}
+            <div className="relative flex-1 flex items-center justify-center min-h-0">
+              {/* Botão anterior */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  prev();
+                }}
+                aria-label="Foto anterior"
+                className="absolute left-3 md:left-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
+              >
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Foto principal */}
+              <div className="absolute inset-0 mx-14 md:mx-20" onClick={(e) => e.stopPropagation()}>
+                <Image
+                  key={lb}
+                  src={pool[lb].src}
+                  alt={altFor(pool[lb].label)}
+                  fill
+                  sizes="90vw"
+                  className="object-contain lb-photo-in"
+                  {...blurFor(pool[lb].src)}
+                />
+              </div>
+
+              {/* Botão próxima */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  next();
+                }}
+                aria-label="Próxima foto"
+                className="absolute right-3 md:right-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
+              >
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Strip de thumbnails */}
+            <div
+              className="flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {stripIdx.map((idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setLb(idx)}
+                  className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${
+                    idx === lb
+                      ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
+                      : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
+                  }`}
+                >
+                  <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+                </button>
+              ))}
+            </div>
+
+            {/* Dicas teclado */}
+            <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
+              ← → navegar · esc fechar · deslize no telemóvel
+            </p>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
