@@ -44,8 +44,11 @@ export default function Navbar() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="flex items-center justify-between h-[68px]">
-          <Link href="/" className="flex items-center shrink-0">
+        <div className="relative flex items-center justify-between h-[68px]">
+          <Link
+            href="/"
+            className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:translate-x-0 md:translate-y-0"
+          >
             <Image
               src="/logo-liquen-branco.png"
               alt="Líquen Events"
@@ -89,7 +92,7 @@ export default function Navbar() {
           </div>
 
           <button
-            className="md:hidden p-3 -mr-2"
+            className="md:hidden p-3 -mr-2 ml-auto"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="Menu"
             aria-expanded={isOpen}
