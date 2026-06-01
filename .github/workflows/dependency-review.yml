@@ -1,0 +1,25 @@
+name: Dependency Review
+
+# Inspects the diff in package-lock.json for newly introduced packages with
+# known vulnerabilities. Runs on every PR so vulnerable deps are blocked before
+# they ever land on main.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Scan new dependencies for CVEs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # Block PRs that add dependencies with HIGH or CRITICAL severity CVEs.
+          fail-on-severity: high
+          # Fail if a new dependency has an incompatible SPDX license.
+          deny-licenses: AGPL-3.0, GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0

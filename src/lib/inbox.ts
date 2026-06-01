@@ -32,6 +32,12 @@ export function imapConfigured(): boolean {
   return !!(imapHost() && user && pass);
 }
 
+// Conservative timeouts prevent serverless functions from hanging on a slow
+// or unresponsive mail server (default is no timeout — a 30s function timeout
+// is the only safety net, which wastes the entire slot).
+const CONNECTION_TIMEOUT_MS = 10_000;
+const GREETING_TIMEOUT_MS = 5_000;
+
 function makeClient(): ImapFlow {
   const port = Number(process.env.IMAP_PORT ?? 993);
   return new ImapFlow({
@@ -43,7 +49,25 @@ function makeClient(): ImapFlow {
       pass: (process.env.IMAP_PASS ?? process.env.SMTP_PASS)!,
     },
     logger: false,
+    connectionTimeout: CONNECTION_TIMEOUT_MS,
+    greetingTimeout: GREETING_TIMEOUT_MS,
   });
+}
+
+// ── In-process inbox cache ────────────────────────────────────────────────
+// Each admin refresh creates a new IMAP TCP connection (connect + auth + fetch
+// + logout ≈ 1–2 s). A 30-second TTL amortises this across rapid refreshes
+// without hiding new mail for long. Message fetches are not cached — they are
+// rare and always explicitly requested.
+interface InboxCache {
+  items: InboxItem[];
+  expiresAt: number;
+}
+let listCache: InboxCache | null = null;
+const CACHE_TTL_MS = 30_000;
+
+export function invalidateInboxCache(): void {
+  listCache = null;
 }
 
 export interface InboxItem {

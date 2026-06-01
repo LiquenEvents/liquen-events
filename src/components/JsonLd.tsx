@@ -3,12 +3,7 @@ import { jsonLd } from "@/lib/jsonld";
 
 /** Renders an arbitrary JSON-LD object as a script tag. */
 export function JsonLd({ data }: { data: Record<string, unknown> }) {
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: jsonLd(data) }}
-    />
-  );
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />;
 }
 
 /** Breadcrumb trail structured data. Pass [{name, path}] from home onward. */
@@ -16,10 +11,7 @@ export function BreadcrumbJsonLd({ items }: { items: { name: string; path: strin
   const data = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      { name: "Início", path: "/" },
-      ...items,
-    ].map((item, i) => ({
+    itemListElement: [{ name: "Início", path: "/" }, ...items].map((item, i) => ({
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
@@ -66,5 +58,63 @@ export function ServiceJsonLd({
       name: n,
     })),
   };
+  return <JsonLd data={data} />;
+}
+
+/** Person schema — use for named individuals (e.g. founders, key team members). */
+export function PersonJsonLd({
+  name,
+  jobTitle,
+  description,
+  url,
+  image,
+}: {
+  name: string;
+  jobTitle: string;
+  description?: string;
+  url?: string;
+  image?: string;
+}) {
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name,
+    jobTitle,
+    worksFor: { "@id": `${SITE.url}/#organization` },
+    url: url ?? `${SITE.url}/sobre`,
+  };
+  if (description) data.description = description;
+  if (image) data.image = image.startsWith("http") ? image : `${SITE.url}${image}`;
+  return <JsonLd data={data} />;
+}
+
+/** WebPage schema with optional speakable regions for voice search and Google Discover. */
+export function WebPageJsonLd({
+  name,
+  description,
+  path,
+  speakableSelectors,
+}: {
+  name: string;
+  description: string;
+  path: string;
+  speakableSelectors?: string[];
+}) {
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name,
+    description,
+    url: `${SITE.url}${path}`,
+    isPartOf: { "@id": `${SITE.url}/#website` },
+    about: { "@id": `${SITE.url}/#organization` },
+    inLanguage: "pt-PT",
+  };
+  if (speakableSelectors?.length) {
+    data.speakable = {
+      "@type": "SpeakableSpecification",
+      cssSelector: speakableSelectors,
+    };
+  }
   return <JsonLd data={data} />;
 }

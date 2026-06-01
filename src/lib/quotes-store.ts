@@ -1,5 +1,5 @@
-import type { Quote } from "@/app/orcamento/types";
-import { createRepository, type Mapper } from "./repository";
+import type { Quote, QuoteStatus } from "@/app/orcamento/types";
+import { createRepository, type Mapper, type PaginatedResult } from "./repository";
 
 /**
  * Storage layer for quote requests. The full quote is kept in a `data` jsonb
@@ -26,3 +26,15 @@ export const listQuotes = (): Promise<Quote[]> => repo.list();
 export const getQuote = (id: string): Promise<Quote | null> => repo.get(id);
 export const updateQuote = (id: string, updates: Partial<Quote>): Promise<Quote | null> =>
   repo.update(id, updates);
+
+export const listQuotesPaginated = (
+  limit: number,
+  offset: number,
+): Promise<PaginatedResult<Quote>> => repo.paginate(limit, offset);
+
+export const listQuotesByStatus = (
+  status: QuoteStatus,
+  limit: number,
+  offset: number,
+): Promise<PaginatedResult<Quote>> =>
+  repo.paginateWhere("status", status, (q) => q.status === status, limit, offset);

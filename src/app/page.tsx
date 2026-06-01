@@ -4,6 +4,7 @@ import AnimateIn from "@/components/AnimateIn";
 import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
+import { WebPageJsonLd } from "@/components/JsonLd";
 
 const services = [
   {
@@ -70,6 +71,12 @@ const ribbon = [
 export default function Home() {
   return (
     <>
+      <WebPageJsonLd
+        name="Líquen Events — Organização de Eventos em Évora, Alentejo e Portugal"
+        description="Empresa de organização de eventos em Évora. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento."
+        path="/"
+        speakableSelectors={["h1", "h2"]}
+      />
       {/* ── Hero ── */}
       <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Image

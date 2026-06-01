@@ -5,9 +5,12 @@ const VARS = [
   "ADMIN_PASSWORD_HASH",
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "RESEND_API_KEY",
+  "SMTP_HOST",
+  "SMTP_USER",
+  "SMTP_PASS",
   "VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
+  "CRON_SECRET",
 ] as const;
 
 /** validateEnv() is idempotent via a module-level flag, so each test needs a

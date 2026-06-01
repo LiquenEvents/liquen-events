@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
-import { BreadcrumbJsonLd } from "@/components/JsonLd";
+import { BreadcrumbJsonLd, PersonJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const metadata: Metadata = pageMetadata({
@@ -33,6 +33,13 @@ export default function SobrePage() {
   return (
     <>
       <BreadcrumbJsonLd items={[{ name: "Sobre", path: "/sobre" }]} />
+      <PersonJsonLd
+        name="Catarina Gaspar"
+        jobTitle="Fundadora & CEO"
+        description="Fundadora e CEO da Líquen Events, empresa de organização de eventos em Évora, Alentejo e Portugal desde 2018."
+        url="https://www.liquen-events.com/sobre"
+        image="/imagens/DaniGui_JantarFesta_27.jpg"
+      />
 
       {/* ── HERO ── */}
       <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">

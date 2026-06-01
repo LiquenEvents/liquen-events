@@ -3,46 +3,24 @@ import path from "path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "./supabase";
 
-/**
- * Unified data-access layer.
- *
- * Every entity is persisted through a single `Repository<T>` that hides the
- * "Supabase when configured, else a local JSON file (dev)" decision and the
- * CRUD plumbing that used to be copy-pasted into each store. The only
- * per-entity logic lives in a small `Mapper<T>`:
- *
- *   - toRow / fromRow  translate between the camelCase domain object and the
- *     snake_case database row (the bug-prone part — unit tested per store).
- *   - order / fileCompare  keep Supabase and the file fallback sorted alike.
- *
- * The Supabase backend handles the database row shape; the file backend stores
- * domain objects verbatim. Both satisfy the same `Backend<T>` contract, so the
- * Repository (and the update read-merge-write) is written and tested once.
- */
 export interface Mapper<T> {
-  /** Supabase table name. */
   table: string;
-  /** JSON file name under data/ for the dev fallback. */
   fileName: string;
-  /** Stable identity of an entity. */
   getId(entity: T): string;
-  /** Domain object → database row (snake_case columns). */
   toRow(entity: T): Record<string, unknown>;
-  /** Database row → domain object. */
   fromRow(row: Record<string, unknown>): T;
-  /** Columns to select; defaults to "*". Use "data" for jsonb-blob tables. */
   selectColumns?: string;
-  /** Default ordering applied to lists. */
   order?: { column: string; ascending: boolean };
-  /** Comparator mirroring `order` for the file backend. */
   fileCompare?: (a: T, b: T) => number;
-  /** Set updated_at on Supabase updates (table must have the column). */
   touch?: boolean;
-  /** Adjust a merged entity before an update is persisted (e.g. timestamps). */
   beforeUpdate?: (merged: T) => T;
 }
 
-/** Storage contract shared by the Supabase and file backends. */
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+}
+
 export interface Backend<T> {
   list(): Promise<T[]>;
   get(id: string): Promise<T | null>;
@@ -50,6 +28,14 @@ export interface Backend<T> {
   insert(entity: T): Promise<void>;
   persist(id: string, merged: T): Promise<void>;
   remove(id: string): Promise<void>;
+  listPaginated(limit: number, offset: number): Promise<PaginatedResult<T>>;
+  listFiltered(
+    column: string,
+    value: unknown,
+    predicate: (e: T) => boolean,
+    limit: number,
+    offset: number,
+  ): Promise<PaginatedResult<T>>;
 }
 
 // ── Supabase backend ──────────────────────────────────────────────────────
@@ -111,6 +97,32 @@ export class SupabaseBackend<T> implements Backend<T> {
     const { error } = await this.sb.from(this.m.table).delete().eq("id", id);
     if (error) throw error;
   }
+
+  async listPaginated(limit: number, offset: number): Promise<PaginatedResult<T>> {
+    const base = this.sb.from(this.m.table).select(this.cols, { count: "exact" });
+    const q = this.m.order
+      ? base.order(this.m.order.column, { ascending: this.m.order.ascending })
+      : base;
+    const { data, error, count } = await q.range(offset, offset + limit - 1);
+    if (error) throw error;
+    return { items: (data ?? []).map(this.map), total: count ?? 0 };
+  }
+
+  async listFiltered(
+    column: string,
+    value: unknown,
+    _predicate: (e: T) => boolean,
+    limit: number,
+    offset: number,
+  ): Promise<PaginatedResult<T>> {
+    const base = this.sb.from(this.m.table).select(this.cols, { count: "exact" }).eq(column, value);
+    const q = this.m.order
+      ? base.order(this.m.order.column, { ascending: this.m.order.ascending })
+      : base;
+    const { data, error, count } = await q.range(offset, offset + limit - 1);
+    if (error) throw error;
+    return { items: (data ?? []).map(this.map), total: count ?? 0 };
+  }
 }
 
 // ── File backend (dev fallback) ───────────────────────────────────────────
@@ -134,7 +146,9 @@ export class FileBackend<T> implements Backend<T> {
 
   private async write(rows: T[]): Promise<void> {
     await fs.mkdir(path.dirname(this.file), { recursive: true });
-    await fs.writeFile(this.file, JSON.stringify(rows, null, 2));
+    const tmp = `${this.file}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(rows, null, 2));
+    await fs.rename(tmp, this.file);
   }
 
   async list(): Promise<T[]> {
@@ -169,11 +183,26 @@ export class FileBackend<T> implements Backend<T> {
     const all = await this.read();
     await this.write(all.filter((e) => this.m.getId(e) !== id));
   }
+
+  async listPaginated(limit: number, offset: number): Promise<PaginatedResult<T>> {
+    const all = await this.list();
+    return { items: all.slice(offset, offset + limit), total: all.length };
+  }
+
+  async listFiltered(
+    _column: string,
+    _value: unknown,
+    predicate: (e: T) => boolean,
+    limit: number,
+    offset: number,
+  ): Promise<PaginatedResult<T>> {
+    const all = (await this.list()).filter(predicate);
+    return { items: all.slice(offset, offset + limit), total: all.length };
+  }
 }
 
 // ── Repository ─────────────────────────────────────────────────────────────
 export class Repository<T> {
-  /** `getBackend` is a thunk so backend selection stays lazy (per call), matching the previous getSupabase()-per-method behaviour. */
   constructor(
     private readonly mapper: Mapper<T>,
     private readonly getBackend: () => Backend<T>,
@@ -187,16 +216,28 @@ export class Repository<T> {
     return this.getBackend().get(id);
   }
 
-  /** Filtered list. `column` is the snake_case DB column; `predicate` is the equivalent for the file backend. */
   where(column: string, value: unknown, predicate: (e: T) => boolean): Promise<T[]> {
     return this.getBackend().query(column, value, predicate);
+  }
+
+  paginate(limit: number, offset: number): Promise<PaginatedResult<T>> {
+    return this.getBackend().listPaginated(limit, offset);
+  }
+
+  paginateWhere(
+    column: string,
+    value: unknown,
+    predicate: (e: T) => boolean,
+    limit: number,
+    offset: number,
+  ): Promise<PaginatedResult<T>> {
+    return this.getBackend().listFiltered(column, value, predicate, limit, offset);
   }
 
   create(entity: T): Promise<void> {
     return this.getBackend().insert(entity);
   }
 
-  /** Read-merge-write update. Returns the merged entity, or null if not found. */
   async update(id: string, updates: Partial<T>): Promise<T | null> {
     const backend = this.getBackend();
     const current = await backend.get(id);
@@ -212,7 +253,6 @@ export class Repository<T> {
   }
 }
 
-/** Build a repository that targets Supabase when configured, else the dev file. */
 export function createRepository<T>(mapper: Mapper<T>): Repository<T> {
   const baseDir = path.join(process.cwd(), "data");
   return new Repository<T>(mapper, () => {
