@@ -185,17 +185,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* ── Giant wordmark ── */}
-      <div className="border-t border-foreground/6 overflow-hidden">
-        <p
-          aria-hidden
-          className="select-none pointer-events-none font-bold tracking-[-0.02em] leading-none text-foreground/[0.052] px-4 lg:px-12 pt-6 pb-1"
-          style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(72px, 14.5vw, 218px)" }}
-        >
-          Líquen Events
-        </p>
-      </div>
-
       {/* ── Copyright bar ── */}
       <div className="border-t border-foreground/6 py-6">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
