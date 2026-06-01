@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useState, useCallback, useEffect } from "react";
+import { useReducer, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { QuoteFormData, SelectedAddon } from "./types";
 import { calculatePrice } from "./pricing";
@@ -17,7 +17,10 @@ export type Action =
   | { type: "SET"; field: keyof QuoteFormData; value: unknown }
   | { type: "ADD_ADDON"; addon: SelectedAddon }
   | { type: "REMOVE_ADDON"; id: string }
-  | { type: "UPDATE_ADDON"; id: string; updates: Partial<SelectedAddon> };
+  | { type: "UPDATE_ADDON"; id: string; updates: Partial<SelectedAddon> }
+  | { type: "HYDRATE"; value: QuoteFormData };
+
+const DRAFT_KEY = "liquen-quote-draft";
 
 const initialForm: QuoteFormData = {
   category: null,
@@ -47,6 +50,8 @@ const initialForm: QuoteFormData = {
 
 function reducer(state: QuoteFormData, action: Action): QuoteFormData {
   switch (action.type) {
+    case "HYDRATE":
+      return action.value;
     case "SET":
       return { ...state, [action.field]: action.value };
     case "ADD_ADDON":
@@ -98,6 +103,34 @@ export default function OrcamentoWizard() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
+  const hydrated = useRef(false);
+
+  // Restore an in-progress quote so a refresh or accidental close never loses
+  // the visitor's answers. Done after mount to avoid an SSR/hydration mismatch.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as { form?: QuoteFormData; step?: number };
+        if (draft.form) dispatch({ type: "HYDRATE", value: draft.form });
+        if (draft.step && draft.step >= 1 && draft.step <= STEPS.length) setStep(draft.step);
+      }
+    } catch {
+      /* corrupt/unavailable draft — start fresh */
+    }
+    hydrated.current = true;
+  }, []);
+
+  // Persist the draft as the visitor progresses (only after hydration, so the
+  // initial empty state never clobbers a saved draft).
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, step }));
+    } catch {
+      /* storage full/unavailable — non-critical */
+    }
+  }, [form, step]);
 
   const breakdown = calculatePrice(form);
   const totalSteps = STEPS.length;
@@ -127,6 +160,12 @@ export default function OrcamentoWizard() {
           );
         } catch {
           /* sessionStorage unavailable — confirmation falls back gracefully */
+        }
+        // Quote submitted — clear the saved draft so it doesn't reappear.
+        try {
+          localStorage.removeItem(DRAFT_KEY);
+        } catch {
+          /* ignore */
         }
         router.push(`/orcamento/confirmacao/${data.id}`);
       } else {
