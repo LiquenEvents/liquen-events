@@ -267,7 +267,7 @@ export default function ContactForm() {
           src="/imagens/DJI_20250913190635_0120_D.jpg"
           alt="Evento Líquen Events"
           fill
-          priority
+          preload
           sizes="100vw"
           className="object-cover"
         />

@@ -446,7 +446,7 @@ export default function GaleriaClient() {
                 fill
                 sizes="(max-width: 640px) 100vw, 50vw"
                 className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                priority
+                preload
                 {...blurFor(visible[0].src)}
               />
               <HoverOverlay {...captionFor(visible[0].src, visible[0].label)} />
@@ -466,7 +466,7 @@ export default function GaleriaClient() {
                     fill
                     sizes="25vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                    priority
+                    loading="eager"
                     {...blurFor(visible[idx].src)}
                   />
                   <HoverOverlay {...captionFor(visible[idx].src, visible[idx].label)} />

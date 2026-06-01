@@ -104,7 +104,7 @@ export default function ClientesPage() {
           src="/imagens/EW1_1393.jpg"
           alt="Evento corporativo Líquen Events"
           fill
-          priority
+          preload
           sizes="100vw"
           className="object-cover object-center"
           {...blurFor("/imagens/EW1_1393.jpg")}

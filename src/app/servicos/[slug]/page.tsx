@@ -60,7 +60,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
           {...blurFor(svc.hero)}
           alt={svc.title}
           fill
-          priority
+          preload
           sizes="100vw"
           className="object-cover"
         />
