@@ -7,21 +7,35 @@ import { simpleParser } from "mailparser";
  * (suited to serverless). Falls back gracefully when unconfigured.
  *
  * Env vars (default to the SMTP_* values when omitted):
- *   IMAP_HOST   e.g. imap.gmail.com
+ *   IMAP_HOST   e.g. imap.gmail.com — if omitted, derived from SMTP_HOST
+ *               (e.g. smtp.gmail.com → imap.gmail.com)
  *   IMAP_PORT   e.g. 993
  *   IMAP_USER   (default: SMTP_USER)
  *   IMAP_PASS   (default: SMTP_PASS)
  */
+
+/**
+ * The IMAP host to connect to. Prefers IMAP_HOST; otherwise derives it from
+ * SMTP_HOST by swapping the leading "smtp." for "imap." (works for Gmail and
+ * most providers), so the inbox lights up with just the send-mail config.
+ */
+function imapHost(): string | undefined {
+  if (process.env.IMAP_HOST) return process.env.IMAP_HOST;
+  const smtp = process.env.SMTP_HOST;
+  if (!smtp) return undefined;
+  return smtp.startsWith("smtp.") ? smtp.replace(/^smtp\./, "imap.") : smtp;
+}
+
 export function imapConfigured(): boolean {
   const user = process.env.IMAP_USER ?? process.env.SMTP_USER;
   const pass = process.env.IMAP_PASS ?? process.env.SMTP_PASS;
-  return !!(process.env.IMAP_HOST && user && pass);
+  return !!(imapHost() && user && pass);
 }
 
 function makeClient(): ImapFlow {
   const port = Number(process.env.IMAP_PORT ?? 993);
   return new ImapFlow({
-    host: process.env.IMAP_HOST!,
+    host: imapHost()!,
     port,
     secure: port === 993,
     auth: {
