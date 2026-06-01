@@ -66,6 +66,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Cleaner line breaks everywhere: balanced multi-line headings and
+   paragraphs without ugly orphan words. Gracefully ignored where unsupported. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+
 /* ── Mobile base ── */
 html {
   -webkit-text-size-adjust: 100%;

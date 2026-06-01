@@ -27,6 +27,16 @@ export default function Navbar() {
     setIsOpen(false);
   }, [pathname]);
 
+  // Lock background scroll while the mobile menu is open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
+
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
