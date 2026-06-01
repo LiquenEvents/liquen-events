@@ -90,6 +90,33 @@ export function quotesToCsvRows(quotes: Quote[]): (string | number)[][] {
   return [header, ...rows];
 }
 
+const PAYMENT_KIND_LABEL: Record<string, string> = {
+  sinal: "Sinal",
+  pagamento: "Pagamento",
+  saldo: "Saldo final",
+};
+
+/** Flatten every payment across all quotes into CSV rows (treasury export). */
+export function paymentsToCsvRows(quotes: Quote[]): (string | number)[][] {
+  const header = ["Evento (ID)", "Cliente", "Tipo", "Valor c/IVA (€)", "Data", "Estado", "Nota"];
+  const rows: (string | number)[][] = [];
+  for (const q of quotes) {
+    for (const p of q.payments ?? []) {
+      rows.push([
+        q.id,
+        q.name,
+        PAYMENT_KIND_LABEL[p.kind] ?? p.kind,
+        p.amount ?? 0,
+        p.date ?? "",
+        p.paid ? "Pago" : "Por receber",
+        p.note ?? "",
+      ]);
+    }
+  }
+  rows.sort((a, b) => String(a[4]).localeCompare(String(b[4])));
+  return [header, ...rows];
+}
+
 /** A short ISO date stamp for filenames, e.g. 2026-06-01. */
 export function dateStamp(): string {
   return new Date().toISOString().slice(0, 10);
@@ -148,6 +175,39 @@ export function printRunSheet(q: Quote): void {
         .join("")
     : `<li class="empty">Sem checklist definida.</li>`;
 
+  // Financial summary for the day-of (what's contracted, paid and still due).
+  const eur0 = (n: number) =>
+    new Intl.NumberFormat("pt-PT", {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 0,
+    }).format(n || 0);
+  const payments = (q.payments ?? [])
+    .slice()
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const contracted = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;
+  const paidSum = payments.filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);
+  const dueSum = payments.filter((p) => !p.paid).reduce((s, p) => s + p.amount, 0);
+  const financeBlock =
+    payments.length || contracted
+      ? `<h2>Pagamentos</h2>
+         <div class="facts">
+           ${contracted ? `<div><span class="k">Contratado</span><span class="v">${eur0(contracted)}</span></div>` : ""}
+           <div><span class="k">Recebido</span><span class="v">${eur0(paidSum)}</span></div>
+           <div><span class="k">Por receber</span><span class="v">${eur0(dueSum)}</span></div>
+         </div>
+         ${
+           payments.length
+             ? `<table><tbody>${payments
+                 .map(
+                   (p) =>
+                     `<tr><td class="t">${p.paid ? "✓" : "○"}</td><td>${PAYMENT_KIND_LABEL[p.kind] ?? p.kind}</td><td class="o">${p.date ? new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT") : "—"}</td><td style="text-align:right;font-weight:600">${eur0(p.amount)}</td></tr>`,
+                 )
+                 .join("")}</tbody></table>`
+             : ""
+         }`
+      : "";
+
   win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8" />
   <title>Run-sheet — ${escapeHtml(q.name)} — ${q.id}</title>
   <style>
@@ -191,6 +251,7 @@ export function printRunSheet(q: Quote): void {
     <table><tbody>${timelineRows}</tbody></table>
     <h2>Checklist de produção</h2>
     <ul>${checklistRows}</ul>
+    ${financeBlock}
     ${q.notes ? `<h2>Notas do cliente</h2><div class="notes">${escapeHtml(q.notes)}</div>` : ""}
     ${q.adminNotes ? `<h2>Notas internas</h2><div class="notes">${escapeHtml(q.adminNotes)}</div>` : ""}
     <div class="foot">Gerado em ${new Date().toLocaleString("pt-PT")} · Líquen Events</div>

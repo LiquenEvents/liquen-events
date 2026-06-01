@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Quote, QuoteStatus } from "../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
-import { downloadCsv, quotesToCsvRows, dateStamp } from "./export";
+import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -272,7 +272,18 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Export */}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {stats.hasPayments && (
+          <button
+            onClick={() =>
+              downloadCsv(`liquen-pagamentos-${dateStamp()}`, paymentsToCsvRows(quotes))
+            }
+            className="px-4 py-2 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.2em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-colors"
+            title="Exportar todos os pagamentos (tesouraria) para CSV"
+          >
+            Pagamentos ↓
+          </button>
+        )}
         <button
           onClick={() => downloadCsv(`liquen-pedidos-${dateStamp()}`, quotesToCsvRows(quotes))}
           className="px-4 py-2 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.2em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-colors"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toCsv, quotesToCsvRows } from "./export";
+import { toCsv, quotesToCsvRows, paymentsToCsvRows } from "./export";
 import type { Quote } from "../types";
 
 describe("toCsv", () => {
@@ -72,5 +72,35 @@ describe("quotesToCsvRows", () => {
     expect(rows).toHaveLength(2);
     // Should not throw and should still produce a valid CSV string.
     expect(typeof toCsv(rows)).toBe("string");
+  });
+});
+
+describe("paymentsToCsvRows", () => {
+  it("flattens payments across quotes, sorted by date, with a header", () => {
+    const a = {
+      id: "LQ-1",
+      name: "A",
+      payments: [
+        { id: "p2", kind: "saldo", amount: 5000, date: "2026-07-01", paid: false },
+        { id: "p1", kind: "sinal", amount: 1000, date: "2026-03-01", paid: true },
+      ],
+    } as unknown as Quote;
+    const b = {
+      id: "LQ-2",
+      name: "B",
+      payments: [{ id: "p3", kind: "pagamento", amount: 2000, date: "2026-05-01", paid: true }],
+    } as unknown as Quote;
+
+    const rows = paymentsToCsvRows([a, b]);
+    expect(rows[0][0]).toBe("Evento (ID)");
+    expect(rows).toHaveLength(4); // header + 3 payments
+    // Sorted by date ascending → first data row is the 2026-03-01 sinal.
+    expect(rows[1]).toContain("Sinal");
+    expect(rows[1]).toContain("Pago");
+  });
+
+  it("returns just the header when there are no payments", () => {
+    const q = { id: "x", name: "x" } as unknown as Quote;
+    expect(paymentsToCsvRows([q])).toHaveLength(1);
   });
 });
