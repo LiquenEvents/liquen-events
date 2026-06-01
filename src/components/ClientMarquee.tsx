@@ -34,7 +34,7 @@ function Mark({ name, logo }: { name: string; logo: string }) {
         width={d[0]}
         height={d[1]}
         style={{ height: `${h}px` }}
-        className="w-auto max-w-[140px] sm:max-w-[170px] object-contain opacity-60 hover:opacity-90 transition-opacity duration-300 brightness-0 invert"
+        className="w-auto max-w-[140px] sm:max-w-[170px] object-contain opacity-50 hover:opacity-80 transition-opacity duration-300 brightness-0"
         onError={() => setFailed(true)}
       />
     </div>

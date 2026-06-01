@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Empresa de organização de eventos em Évora, Alentejo e Portugal — casamentos, eventos corporativos e celebrações.",
     start_url: "/",
     display: "standalone",
-    background_color: "#080808",
-    theme_color: "#080808",
+    background_color: "#faf8f3",
+    theme_color: "#faf8f3",
     lang: "pt-PT",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

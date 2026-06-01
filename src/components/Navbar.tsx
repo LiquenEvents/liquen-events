@@ -39,22 +39,22 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
-        scrolled ? "border-b border-foreground/[0.07] backdrop-blur-sm" : ""
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe bg-surface/90 backdrop-blur-md border-b border-foreground/8 transition-all duration-500 ${
+        scrolled ? "shadow-sm shadow-black/5" : ""
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="relative flex items-center justify-between h-[68px]">
+        <div className="relative flex items-center justify-between h-[76px]">
           <Link
             href="/"
             className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:translate-x-0 md:translate-y-0"
           >
             <Image
-              src="/logo-liquen-branco.png"
+              src="/logo-liquen.png"
               alt="Líquen Events"
-              width={94}
-              height={56}
-              className="object-contain h-14 w-auto"
+              width={116}
+              height={69}
+              className="object-contain h-16 w-auto"
               priority
             />
           </Link>

@@ -45,11 +45,11 @@ export default function Footer() {
             {/* Brand column */}
             <div className="md:col-span-5 flex flex-col">
               <Image
-                src="/logo-liquen-branco.png"
+                src="/logo-liquen.png"
                 alt="Líquen Events"
                 width={134}
                 height={80}
-                className="object-contain mb-5 opacity-75 h-16 sm:h-20 w-auto"
+                className="object-contain mb-5 h-16 sm:h-20 w-auto"
               />
               <p className="text-foreground/30 text-sm leading-[1.85] max-w-[260px] mb-7">
                 Organizamos eventos,

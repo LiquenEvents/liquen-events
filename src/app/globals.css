@@ -1,26 +1,38 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream: #f0ece6;
-  --color-cream-dark: #ede8dc;
-  --color-ink: #1a1a1a;
-  --color-moss: #7c854b;
-  --color-moss-light: #9aa36a;
-  --color-moss-dark: #525a2f;
-  --color-gold: #c79a45;
-  --color-gold-dark: #a87f2c;
-  --color-surface: #080808;
-  --color-surface-raised: #0f0f0f;
-  --color-surface-elevated: #1a1a1a;
-  --color-foreground: #dedad4;
+  --color-cream: #f7f4ee;
+  --color-cream-dark: #ece7dc;
+  --color-ink: #2a2620;
+  --color-moss: #637a5f;
+  --color-moss-light: #86997f;
+  --color-moss-dark: #4c6150;
+  --color-gold: #d6ab3a;
+  --color-gold-dark: #b88f28;
+  --color-surface: #faf8f3;
+  --color-surface-raised: #f1ece2;
+  --color-surface-elevated: #ffffff;
+  --color-foreground: #2a2620;
   --font-sans: var(--font-inter);
   --font-display: var(--font-playfair);
 }
 
+/* Back office & quote wizard keep the dark surface (dense tools read better
+   dark). Overriding the tokens on these scopes re-themes them without
+   affecting the now-light public site. */
+body.admin-mode,
+body.orcamento-mode {
+  --color-surface: #080808;
+  --color-surface-raised: #0f0f0f;
+  --color-surface-elevated: #1a1a1a;
+  --color-foreground: #dedad4;
+  --color-cream: #f0ece6;
+}
+
 /* ── Selection ── */
 ::selection {
-  background: rgba(124, 133, 75, 0.28);
-  color: #dedad4;
+  background: rgba(214, 171, 58, 0.28);
+  color: #2a2620;
 }
 
 /* ── Scrollbar ── */
@@ -32,19 +44,19 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #525a2f;
+  background: #b8b0a0;
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #7c854b;
+  background: #637a5f;
 }
 
 /* ── Focus: refined, accessible, on-brand ── */
 :focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px #080808,
-    0 0 0 3px rgba(124, 133, 75, 0.6);
+    0 0 0 2px var(--color-surface),
+    0 0 0 3px rgba(99, 122, 95, 0.6);
   border-radius: 2px;
 }
 
@@ -58,8 +70,8 @@ html {
 
 /* ── Base ── */
 body {
-  background-color: #080808;
-  color: #dedad4;
+  background-color: var(--color-surface);
+  color: var(--color-foreground);
   font-feature-settings:
     "kern" 1,
     "liga" 1,

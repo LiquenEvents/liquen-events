@@ -84,18 +84,20 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#080808",
-  colorScheme: "dark",
+  themeColor: "#faf8f3",
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-PT" data-scroll-behavior="smooth" className={`${inter.variable} ${playfair.variable}`}>
+    <html
+      lang="pt-PT"
+      data-scroll-behavior="smooth"
+      className={`${inter.variable} ${playfair.variable}`}
+    >
       <body className="flex flex-col min-h-screen antialiased">
         <StructuredData />
         <a
@@ -107,7 +109,7 @@ export default function RootLayout({
         <ScrollProgress />
         <StickyCTA />
         <Navbar />
-        <main id="conteudo" className="flex-1 pt-16">
+        <main id="conteudo" className="flex-1 pt-20">
           <PageTransition>{children}</PageTransition>
         </main>
         <Footer />

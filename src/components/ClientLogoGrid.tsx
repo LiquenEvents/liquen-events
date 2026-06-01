@@ -23,7 +23,7 @@ function ClientLogo({ client }: { client: Client }) {
           width={d[0]}
           height={d[1]}
           style={{ height: `${h}px` }}
-          className="object-contain w-auto max-w-[78%] opacity-55 group-hover:opacity-90 transition-opacity duration-300 brightness-0 invert"
+          className="object-contain w-auto max-w-[78%] opacity-55 group-hover:opacity-90 transition-opacity duration-300 brightness-0"
           onError={() => setFailed(true)}
         />
       ) : (
