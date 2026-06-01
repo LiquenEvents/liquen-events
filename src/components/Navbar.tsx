@@ -39,7 +39,7 @@ export default function Navbar() {
             <Image
               src="/logo-liquen-branco.png"
               alt="Líquen Events"
-              width={128}
+              width={74}
               height={44}
               className="object-contain"
               priority

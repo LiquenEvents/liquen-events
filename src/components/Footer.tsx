@@ -47,7 +47,7 @@ export default function Footer() {
               <Image
                 src="/logo-liquen-branco.png"
                 alt="Líquen Events"
-                width={124}
+                width={70}
                 height={42}
                 className="object-contain mb-5 opacity-65"
               />

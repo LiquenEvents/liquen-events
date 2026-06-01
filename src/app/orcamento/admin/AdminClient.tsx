@@ -563,7 +563,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             <Image
               src="/logo-liquen-branco.png"
               alt="Líquen Events"
-              width={116}
+              width={67}
               height={40}
               className="object-contain opacity-80"
             />
