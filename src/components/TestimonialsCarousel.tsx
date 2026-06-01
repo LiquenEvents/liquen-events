@@ -7,6 +7,11 @@ import { testimonials } from "@/data";
 export default function TestimonialsCarousel() {
   const [active, setActive] = useState(0);
   const [visible, setVisible] = useState(true);
+  // Pause autoplay while the user is interacting (hover/focus) or the tab is
+  // hidden: saves needless re-renders off-screen and satisfies WCAG 2.2.2 — a
+  // >5s auto-advancing carousel must be pausable.
+  const [interacting, setInteracting] = useState(false);
+  const [docHidden, setDocHidden] = useState(false);
 
   const transitionTo = useCallback((next: (current: number) => number) => {
     setVisible(false);
@@ -19,18 +24,36 @@ export default function TestimonialsCarousel() {
   const goTo = useCallback((i: number) => transitionTo(() => i), [transitionTo]);
 
   useEffect(() => {
+    const onVisibility = () => setDocHidden(document.hidden);
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  const paused = interacting || docHidden;
+
+  useEffect(() => {
+    if (paused) return;
     const id = setInterval(() => {
       // Functional update so autoplay advances from the *current* slide
       // instead of a stale closure value (which would freeze on slide 1).
       transitionTo((current) => (current + 1) % testimonials.length);
     }, 6000);
     return () => clearInterval(id);
-  }, [transitionTo]);
+  }, [paused, transitionTo]);
 
   const t = testimonials[active];
 
   return (
-    <section className="relative py-20 lg:py-32 bg-surface border-t border-foreground/6 overflow-hidden">
+    <section
+      className="relative py-20 lg:py-32 bg-surface border-t border-foreground/6 overflow-hidden"
+      onMouseEnter={() => setInteracting(true)}
+      onMouseLeave={() => setInteracting(false)}
+      onFocus={() => setInteracting(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setInteracting(false);
+      }}
+    >
       {/* Decorative background quotation mark */}
       <div aria-hidden className="absolute -top-8 -left-6 pointer-events-none select-none">
         <span
