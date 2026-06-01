@@ -100,7 +100,7 @@ export default function ClientesPage() {
       <BreadcrumbJsonLd items={[{ name: "Clientes", path: "/clientes" }]} />
 
       {/* ── HERO ── */}
-      <section className="relative min-h-screen flex flex-col justify-end overflow-hidden">
+      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Image
           src="/imagens/EW1_1393.jpg"
           alt="Evento corporativo Líquen Events"

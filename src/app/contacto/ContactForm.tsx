@@ -281,7 +281,7 @@ export default function ContactForm() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden" style={{ height: "65vh", minHeight: "420px" }}>
+      <section className="relative overflow-hidden" style={{ height: "65svh", minHeight: "420px" }}>
         <Image
           src="/imagens/DJI_20250913190635_0120_D.jpg"
           alt="Evento Líquen Events"
