@@ -427,6 +427,7 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   .anim-scroll-line,
   .animate-marquee,
   .animate-scroll-line,
+  .animate-ping,
   .footer-ping {
     animation: none;
   }
