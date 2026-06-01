@@ -49,6 +49,9 @@
 /* ── Smooth scroll ── */
 html {
   scroll-behavior: smooth;
+  /* Anchored sections (e.g. /servicos#empresas) land below the fixed navbar
+     instead of being hidden under it. */
+  scroll-padding-top: 6rem;
 }
 
 /* ── Base ── */

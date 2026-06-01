@@ -772,7 +772,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     strokeLinejoin="round"
                   />
                 </svg>
-                {refreshing ? "A actualizar" : "Actualizar"}
+                <span className="hidden sm:inline">
+                  {refreshing ? "A actualizar" : "Actualizar"}
+                </span>
               </button>
             </div>
           </header>
