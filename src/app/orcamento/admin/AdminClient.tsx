@@ -24,6 +24,7 @@ import ShortcutsModal from "./ShortcutsModal";
 import NewQuoteModal from "./NewQuoteModal";
 import Kanban from "./Kanban";
 import NotificationBell from "./NotificationBell";
+import { downloadCsv, quotesToCsvRows, dateStamp, printRunSheet } from "./export";
 
 type View =
   | "overview"
@@ -840,6 +841,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <option value="old">Mais antigos</option>
                 <option value="value">Maior valor</option>
               </select>
+              <button
+                onClick={() => {
+                  downloadCsv(`pedidos-${dateStamp()}`, quotesToCsvRows(filtered));
+                  toast(
+                    `${filtered.length} pedido${filtered.length !== 1 ? "s" : ""} exportado${filtered.length !== 1 ? "s" : ""}`,
+                    "success",
+                  );
+                }}
+                className="flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.18em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors whitespace-nowrap"
+                title="Exportar a lista atual para CSV (Excel)"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path
+                    d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Exportar
+              </button>
             </div>
 
             {/* Status filter */}
@@ -956,12 +984,37 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         </p>
                         <p className="text-foreground/70 text-sm font-medium">{selected.name}</p>
                       </div>
-                      <button
-                        onClick={() => setSelected(null)}
-                        className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors"
-                      >
-                        ×
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => printRunSheet(selected)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-md hover:text-moss hover:bg-moss/10 transition-colors"
+                          title="Imprimir run-sheet do evento"
+                        >
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.7"
+                          >
+                            <path
+                              d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <rect x="6" y="14" width="12" height="7" rx="1" />
+                          </svg>
+                          Run-sheet
+                        </button>
+                        <button
+                          onClick={() => setSelected(null)}
+                          className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors px-1"
+                          aria-label="Fechar"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
 
                     <div className="p-5 flex flex-col gap-6">
