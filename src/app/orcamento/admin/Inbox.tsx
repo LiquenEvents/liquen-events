@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 
 interface Item {
   uid: number;
@@ -26,6 +26,22 @@ export default function Inbox() {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+
+  const [q, setQ] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return items.filter((m) => {
+      if (unreadOnly && m.seen) return false;
+      if (!needle) return true;
+      return [m.from, m.fromAddress, m.subject].some((v) =>
+        String(v).toLowerCase().includes(needle),
+      );
+    });
+  }, [items, q, unreadOnly]);
+
+  const unreadCount = useMemo(() => items.filter((m) => !m.seen).length, [items]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,6 +142,11 @@ export default function Inbox() {
         <div className="flex items-center justify-between mb-4">
           <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
             Caixa de entrada
+            {unreadCount > 0 && (
+              <span className="ml-2 text-moss normal-case tracking-normal">
+                {unreadCount} por ler
+              </span>
+            )}
           </p>
           <button
             onClick={load}
@@ -134,14 +155,48 @@ export default function Inbox() {
             {loading ? "…" : "Actualizar"}
           </button>
         </div>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="relative flex-1">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+            </svg>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Procurar remetente ou assunto…"
+              className="w-full bg-surface-raised/50 border border-foreground/12 rounded-md pl-8 pr-3 py-1.5 text-xs text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+            />
+          </div>
+          <button
+            onClick={() => setUnreadOnly((v) => !v)}
+            className={`px-3 py-1.5 rounded-md text-[10px] tracking-[0.15em] uppercase border transition-colors whitespace-nowrap ${
+              unreadOnly
+                ? "bg-moss border-moss text-cream"
+                : "border-foreground/15 text-foreground/40 hover:border-foreground/30"
+            }`}
+          >
+            Por ler
+          </button>
+        </div>
         {error && <p className="text-moss/70 text-xs mb-3">{error}</p>}
         {loading && items.length === 0 ? (
           <p className="text-foreground/25 text-sm py-12 text-center">A carregar…</p>
-        ) : items.length === 0 ? (
-          <p className="text-foreground/25 text-sm py-12 text-center">Sem mensagens.</p>
+        ) : shown.length === 0 ? (
+          <p className="text-foreground/25 text-sm py-12 text-center">
+            {items.length === 0 ? "Sem mensagens." : "Nenhuma mensagem corresponde."}
+          </p>
         ) : (
           <div className="flex flex-col">
-            {items.map((m) => (
+            {shown.map((m) => (
               <button
                 key={m.uid}
                 onClick={() => openMsg(m.uid)}
