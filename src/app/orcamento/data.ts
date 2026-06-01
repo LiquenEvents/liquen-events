@@ -198,47 +198,6 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       ],
     },
   ],
-  cultural: [
-    {
-      id: "cultural",
-      label: "Eventos Culturais",
-      description:
-        "Festivais, concertos, espectáculos e manifestações culturais de impacto e alcance.",
-      icon: "🎭",
-      minGuests: 100,
-      maxGuests: 5000,
-      basePrice: 3500,
-      pricePerPax: 10,
-      suggestedDuration: 8,
-      features: [
-        "Licenciamentos",
-        "Produção técnica",
-        "Gestão artística",
-        "Comunicação & PR",
-        "Segurança e logística",
-        "Gestão de bilheteira",
-      ],
-    },
-    {
-      id: "exposicoes",
-      label: "Exposições & Inaugurações",
-      description:
-        "Inaugurações de arte, showrooms e espaços expositivos com elegância e rigor curatorial.",
-      icon: "🖼️",
-      minGuests: 30,
-      maxGuests: 500,
-      basePrice: 2000,
-      pricePerPax: 0,
-      suggestedDuration: 4,
-      features: [
-        "Montagem da exposição",
-        "Iluminação curatorial",
-        "Gestão de convites",
-        "Catering de inauguração",
-        "Catalogação e press kit",
-      ],
-    },
-  ],
 };
 
 export const PACKAGES: {
@@ -601,7 +560,7 @@ export const ADDON_CATALOG: AddonCatalogItem[] = [
       completo: { label: "2 intérpretes + 2 idiomas + cabine", price: 820 },
       premium: { label: "Equipa multilingue + cabines + equipamento receptor", price: 1600 },
     },
-    eventTypes: ["conferencias", "lancamentos", "cultural"],
+    eventTypes: ["conferencias", "lancamentos"],
   },
   // Comunicação
   {

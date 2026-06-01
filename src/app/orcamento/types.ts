@@ -1,43 +1,31 @@
-export type EventCategory = 'empresas' | 'particulares' | 'cultural';
+export type EventCategory = "empresas" | "particulares";
 
 export type EventType =
-  | 'conferencias'
-  | 'teambuilding'
-  | 'lancamentos'
-  | 'jantares_empresa'
-  | 'casamentos'
-  | 'batizados'
-  | 'aniversarios'
-  | 'jantares_gala'
-  | 'cultural'
-  | 'exposicoes';
+  | "conferencias"
+  | "teambuilding"
+  | "lancamentos"
+  | "jantares_empresa"
+  | "casamentos"
+  | "batizados"
+  | "aniversarios"
+  | "jantares_gala";
 
 export type LocationType =
-  | 'lisboa'
-  | 'porto'
-  | 'grande_cidade'
-  | 'pequena_cidade'
-  | 'internacional';
+  | "lisboa"
+  | "porto"
+  | "grande_cidade"
+  | "pequena_cidade"
+  | "internacional";
 
-export type BudgetRange =
-  | 'ate_5k'
-  | '5k_15k'
-  | '15k_30k'
-  | '30k_60k'
-  | '60k_plus';
+export type BudgetRange = "ate_5k" | "5k_15k" | "15k_30k" | "30k_60k" | "60k_plus";
 
-export type Urgency = 'standard' | 'rush' | 'urgente';
+export type Urgency = "standard" | "rush" | "urgente";
 
-export type QuoteStatus =
-  | 'pendente'
-  | 'em_revisao'
-  | 'cotado'
-  | 'aceite'
-  | 'rejeitado';
+export type QuoteStatus = "pendente" | "em_revisao" | "cotado" | "aceite" | "rejeitado";
 
-export type PackageTier = 'essencial' | 'completo' | 'premium' | 'personalizado';
+export type PackageTier = "essencial" | "completo" | "premium" | "personalizado";
 
-export type AddonTier = 'essencial' | 'completo' | 'premium';
+export type AddonTier = "essencial" | "completo" | "premium";
 
 export interface AddonCatalogItem {
   id: string;
@@ -45,7 +33,7 @@ export interface AddonCatalogItem {
   description: string;
   category: string;
   icon: string;
-  pricingType: 'fixed' | 'per_pax' | 'per_unit';
+  pricingType: "fixed" | "per_pax" | "per_unit";
   tiers: {
     essencial: { label: string; price: number };
     completo: { label: string; price: number };
@@ -60,7 +48,7 @@ export interface SelectedAddon {
   tier: AddonTier;
   price: number;
   quantity: number;
-  pricingType: 'fixed' | 'per_pax' | 'per_unit';
+  pricingType: "fixed" | "per_pax" | "per_unit";
 }
 
 export interface QuoteFormData {
@@ -120,23 +108,23 @@ export interface ChecklistItem {
 /** A single moment in the day-of run sheet (cronograma do evento). */
 export interface TimelineItem {
   id: string;
-  time: string;   // "HH:MM"
+  time: string; // "HH:MM"
   title: string;
   owner?: string; // responsável / fornecedor
 }
 
-export type PaymentKind = 'sinal' | 'pagamento' | 'saldo';
+export type PaymentKind = "sinal" | "pagamento" | "saldo";
 
 export interface Payment {
   id: string;
   kind: PaymentKind;
-  amount: number;       // com IVA, em €
-  date: string;         // data do pagamento / previsto
+  amount: number; // com IVA, em €
+  date: string; // data do pagamento / previsto
   paid: boolean;
   note?: string;
 }
 
-export type TaskPriority = 'baixa' | 'normal' | 'alta';
+export type TaskPriority = "baixa" | "normal" | "alta";
 
 export interface Task {
   id: string;
@@ -146,8 +134,8 @@ export interface Task {
   dueDate?: string;
   quoteId?: string;
   clientName?: string;
-  assignee?: string;   // quem é responsável (sócio/membro da equipa)
-  area?: string;       // ex.: Comercial, Produção, Decoração, Financeiro
+  assignee?: string; // quem é responsável (sócio/membro da equipa)
+  area?: string; // ex.: Comercial, Produção, Decoração, Financeiro
   createdAt: string;
 }
 
@@ -166,14 +154,14 @@ export interface Quote extends QuoteFormData {
 }
 
 /** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */
-export type CalendarEventKind = 'reuniao' | 'evento' | 'bloqueio' | 'nota';
+export type CalendarEventKind = "reuniao" | "evento" | "bloqueio" | "nota";
 
 export interface CalendarEvent {
   id: string;
-  date: string;        // yyyy-mm-dd
+  date: string; // yyyy-mm-dd
   title: string;
   kind: CalendarEventKind;
-  time?: string;       // "HH:MM" opcional
+  time?: string; // "HH:MM" opcional
   note?: string;
   createdAt: string;
 }
@@ -190,7 +178,7 @@ export interface Supplier {
 }
 
 // ── Propostas (criadas internamente, enviadas em PDF ao cliente) ──
-export type ProposalStatus = 'rascunho' | 'enviada' | 'aceite' | 'rejeitada';
+export type ProposalStatus = "rascunho" | "enviada" | "aceite" | "rejeitada";
 
 export interface ProposalLineItem {
   description: string;

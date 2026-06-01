@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import type { QuoteFormData } from '../types';
-import type { Action } from '../OrcamentoWizard';
-import { CATEGORIES } from '../data';
+import Image from "next/image";
+import type { QuoteFormData } from "../types";
+import type { Action } from "../OrcamentoWizard";
+import { CATEGORIES } from "../data";
 
 interface Props {
   form: QuoteFormData;
@@ -11,12 +11,11 @@ interface Props {
 }
 
 const CATEGORY_IMAGES: Record<string, string> = {
-  empresas:     '/imagens/EW1_1398.jpg',
-  particulares: '/imagens/DaniGui_JantarFesta_24.jpg',
-  cultural:     '/imagens/20_10_2025_0227.jpg',
+  empresas: "/imagens/EW1_1398.jpg",
+  particulares: "/imagens/DaniGui_JantarFesta_24.jpg",
 };
 
-const NUMS = ['01', '02', '03'];
+const NUMS = ["01", "02", "03"];
 
 export default function Step1Category({ form, dispatch }: Props) {
   return (
@@ -27,11 +26,11 @@ export default function Step1Category({ form, dispatch }: Props) {
           <button
             key={cat.id}
             type="button"
-            onClick={() => dispatch({ type: 'SET', field: 'category', value: cat.id })}
+            onClick={() => dispatch({ type: "SET", field: "category", value: cat.id })}
             className={`relative group block overflow-hidden text-left transition-all duration-400 rounded-sm ${
-              active ? 'ring-1 ring-moss ring-offset-1 ring-offset-surface' : ''
+              active ? "ring-1 ring-moss ring-offset-1 ring-offset-surface" : ""
             }`}
-            style={{ aspectRatio: '21/9' }}
+            style={{ aspectRatio: "21/9" }}
           >
             <Image
               src={CATEGORY_IMAGES[cat.id]}
@@ -42,7 +41,7 @@ export default function Step1Category({ form, dispatch }: Props) {
             />
             <div
               className={`absolute inset-0 transition-colors duration-400 ${
-                active ? 'bg-black/40' : 'bg-black/65 group-hover:bg-black/52'
+                active ? "bg-black/40" : "bg-black/65 group-hover:bg-black/52"
               }`}
             />
 
@@ -59,7 +58,7 @@ export default function Step1Category({ form, dispatch }: Props) {
                 </p>
                 <p
                   className="text-white text-2xl font-bold leading-none"
-                  style={{ fontFamily: 'var(--font-playfair)' }}
+                  style={{ fontFamily: "var(--font-playfair)" }}
                 >
                   {cat.label}
                 </p>
@@ -68,7 +67,13 @@ export default function Step1Category({ form, dispatch }: Props) {
               {active ? (
                 <div className="w-7 h-7 bg-moss rounded-full flex items-center justify-center flex-shrink-0 ml-4 shadow-lg">
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <path d="M2.5 6.5l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M2.5 6.5l3 3 5-5"
+                      stroke="white"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </div>
               ) : (

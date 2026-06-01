@@ -36,16 +36,9 @@ const BY_CATEGORY: Record<EventCategory, string[]> = {
     "Credenciação de convidados",
     "Material de apoio / brindes",
   ],
-  cultural: [
-    "Cenografia e montagem",
-    "Licenças e autorizações",
-    "Equipa técnica (luz e som)",
-    "Comunicação e divulgação",
-    "Gestão de público",
-  ],
 };
 
 export function checklistTemplate(category: EventCategory | null): string[] {
-  const extra = category ? BY_CATEGORY[category] ?? [] : [];
+  const extra = category ? (BY_CATEGORY[category] ?? []) : [];
   return [...COMMON.slice(0, 6), ...extra, ...COMMON.slice(6)];
 }
