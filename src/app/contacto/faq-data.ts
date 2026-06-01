@@ -7,7 +7,7 @@ export const FAQS: FAQItem[] = [
   {
     question: "Que tipo de eventos organizam?",
     answer:
-      "Organizamos casamentos, eventos corporativos, conferências, festas privadas, batizados, aniversários e eventos culturais. Cada evento é planeado à medida do cliente.",
+      "Organizamos casamentos, eventos corporativos, conferências, festas privadas, batizados, aniversários e jantares de gala. Cada evento é planeado à medida do cliente.",
   },
   {
     question: "Em que zonas atuam?",

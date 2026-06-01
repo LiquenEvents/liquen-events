@@ -75,7 +75,7 @@ export default function StructuredData() {
           "Organização de casamentos",
           "Eventos corporativos e conferências",
           "Festas e celebrações privadas",
-          "Eventos culturais e institucionais",
+          "Jantares de gala e eventos sociais",
         ].map((service) => ({
           "@type": "Offer",
           itemOffered: { "@type": "Service", name: service, areaServed: "PT" },

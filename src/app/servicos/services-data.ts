@@ -7,16 +7,16 @@
 export interface ServiceDetail {
   slug: string;
   eyebrow: string;
-  title: string;          // H1 on the page
-  metaTitle: string;      // <title>
+  title: string; // H1 on the page
+  metaTitle: string; // <title>
   metaDescription: string;
   keywords: string[];
-  hero: string;           // hero image
-  intro: string[];        // intro paragraphs (keyword-rich)
-  includes: string[];     // what's included
-  gallery: string[];      // supporting images
+  hero: string; // hero image
+  intro: string[]; // intro paragraphs (keyword-rich)
+  includes: string[]; // what's included
+  gallery: string[]; // supporting images
   faqs: { q: string; a: string }[];
-  related: string[];      // slugs of related services
+  related: string[]; // slugs of related services
 }
 
 export const SERVICES: ServiceDetail[] = [
@@ -110,7 +110,7 @@ export const SERVICES: ServiceDetail[] = [
         a: "Sim, temos experiência em eventos com logística internacional, incluindo tradução simultânea, alojamento e transfers.",
       },
     ],
-    related: ["eventos-culturais", "jantares-de-gala"],
+    related: ["casamentos", "jantares-de-gala"],
   },
   {
     slug: "festas-e-aniversarios",
@@ -170,14 +170,14 @@ export const SERVICES: ServiceDetail[] = [
     hero: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg",
     intro: [
       "Para os momentos que pedem sofisticação, organizamos jantares de gala e eventos sociais de prestígio em Évora, Lisboa e por todo o Portugal.",
-      "Mesa posta premium, chef convidado, wine pairing e animação cultural — uma experiência cuidada ao pormenor, com a coordenação impecável que um evento de gala exige.",
+      "Mesa posta premium, chef convidado, wine pairing e animação ao vivo — uma experiência cuidada ao pormenor, com a coordenação impecável que um evento de gala exige.",
     ],
     includes: [
       "Mesa posta e decoração premium",
       "Chef convidado e menu de autor",
       "Wine pairing",
       "Cenografia e iluminação",
-      "Animação e programa cultural",
+      "Animação e entretenimento",
       "Coordenação integral do evento",
     ],
     gallery: [
@@ -185,42 +185,6 @@ export const SERVICES: ServiceDetail[] = [
       "/imagens/EW1_1404.jpg",
       "/imagens/M&F0512.jpg",
       "/imagens/DaniGui_JantarFesta_18.jpg",
-    ],
-    faqs: [],
-    related: ["eventos-corporativos", "casamentos"],
-  },
-  {
-    slug: "eventos-culturais",
-    eyebrow: "Cultura",
-    title: "Eventos Culturais, Exposições e Inaugurações",
-    metaTitle: "Eventos Culturais e Exposições — Évora e Alentejo",
-    metaDescription:
-      "Produção de eventos culturais, festivais, exposições e inaugurações em Évora, no Alentejo e em todo o Portugal. Cenografia, produção completa e coordenação profissional.",
-    keywords: [
-      "eventos culturais Évora",
-      "exposições Alentejo",
-      "inaugurações Évora",
-      "festivais Portugal",
-      "produção de eventos culturais",
-    ],
-    hero: "/imagens/20_10_2025_0302.jpg",
-    intro: [
-      "Criamos experiências culturais que transcendem o evento e ficam na memória coletiva. Produzimos festivais, exposições, inaugurações e manifestações culturais em Évora, no Alentejo e em todo o Portugal.",
-      "Da cenografia à produção, da gestão de público à coordenação, asseguramos eventos culturais de impacto e alcance alargado, com o rigor de uma equipa profissional.",
-    ],
-    includes: [
-      "Conceito criativo e cenografia",
-      "Produção completa",
-      "Licenças e autorizações",
-      "Equipa técnica (luz e som)",
-      "Comunicação e divulgação",
-      "Gestão de público e coordenação",
-    ],
-    gallery: [
-      "/imagens/20_10_2025_0044.jpg",
-      "/imagens/20_10_2025_0220.jpg",
-      "/imagens/20_10_2025_0358.jpg",
-      "/imagens/20_10_2025_0407.jpg",
     ],
     faqs: [],
     related: ["eventos-corporativos", "casamentos"],

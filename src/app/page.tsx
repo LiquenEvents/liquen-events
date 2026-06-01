@@ -19,12 +19,6 @@ const services = [
     href: "/servicos#celebracoes",
   },
   {
-    title: "Culturais",
-    tag: "Cultura",
-    image: "/imagens/20_10_2025_0358.jpg",
-    href: "/servicos#cultura",
-  },
-  {
     title: "Privados",
     tag: "Celebrações",
     image: "/imagens/DaniGui_JantarFesta_27.jpg",
@@ -167,7 +161,7 @@ export default function Home() {
               </Link>
             </div>
           </AnimateIn>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {services.map((s, i) => (
               <AnimateIn key={s.title} delay={i * 60}>
                 <Link
@@ -351,7 +345,7 @@ export default function Home() {
                   "Eventos corporativos em Lisboa",
                   "Conferências em Évora",
                   "Festas privadas",
-                  "Eventos culturais",
+                  "Jantares de gala",
                 ].map((t) => (
                   <span
                     key={t}

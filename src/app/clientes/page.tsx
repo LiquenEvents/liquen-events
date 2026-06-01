@@ -62,9 +62,9 @@ const mosaicItems = [
     cls: "col-span-4 row-span-1",
   },
   {
-    src: "/imagens/20_10_2025_0358.jpg",
-    alt: "Evento cultural",
-    label: "Cultural",
+    src: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg",
+    alt: "Jantar de gala",
+    label: "Gala",
     cls: "col-span-3 row-span-1",
   },
   {

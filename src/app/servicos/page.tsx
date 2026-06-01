@@ -10,7 +10,7 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 export const metadata: Metadata = pageMetadata({
   title: "Serviços — Casamentos e Eventos Corporativos no Alentejo",
   description:
-    "Organização de casamentos, eventos corporativos, conferências, festas e eventos culturais em Évora, Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
+    "Organização de casamentos, eventos corporativos, conferências e festas privadas em Évora, Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
   path: "/servicos",
   image: "/imagens/EW1_1408.jpg",
   keywords: [
@@ -25,7 +25,6 @@ export const metadata: Metadata = pageMetadata({
 const navItems = [
   { label: "Empresas", id: "empresas" },
   { label: "Celebrações", id: "celebracoes" },
-  { label: "Cultura", id: "cultura" },
 ];
 
 /* ── Mosaico editorial para categorias ── */
@@ -112,28 +111,6 @@ const categories: Category[] = [
         slug: "jantares-de-gala",
         desc: "Eventos sociais de prestígio com ambiente sofisticado e coordenação impecável.",
         image: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg",
-      },
-    ],
-  },
-  {
-    id: "cultura",
-    num: "03",
-    label: "Cultura",
-    subtitle: "Eventos culturais",
-    desc: "Experiências que transcendem o evento e ficam na memória colectiva.",
-    layout: "duo",
-    services: [
-      {
-        title: "Eventos Culturais",
-        slug: "eventos-culturais",
-        desc: "Experiências culturais únicas criadas com criatividade, dedicação e atenção a cada pormenor.",
-        image: "/imagens/20_10_2025_0302.jpg",
-      },
-      {
-        title: "Exposições & Inaugurações",
-        slug: "eventos-culturais",
-        desc: "Abertura de espaços e exposições com ambiente cuidado e coordenação profissional.",
-        image: "/imagens/20_10_2025_0044.jpg",
       },
     ],
   },
@@ -371,7 +348,7 @@ export default function ServicosPage() {
               </h1>
               <div className="border-t border-foreground/8 pt-9 anim-2">
                 <p className="text-foreground/35 text-[15px] leading-[1.85] max-w-sm mb-8">
-                  Especializados em eventos privados, corporativos, culturais e casamentos —
+                  Especializados em casamentos, eventos corporativos e celebrações privadas —
                   soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.
                 </p>
                 <Link
@@ -433,9 +410,9 @@ export default function ServicosPage() {
                 {/* Bottom-right */}
                 <div className="relative overflow-hidden">
                   <Image
-                    src="/imagens/20_10_2025_0220.jpg"
-                    {...blurFor("/imagens/20_10_2025_0220.jpg")}
-                    alt="Eventos culturais"
+                    src="/imagens/DaniGui_JantarFesta_1.jpg"
+                    {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
+                    alt="Celebrações privadas"
                     fill
                     sizes="(max-width: 1024px) 50vw, 18vw"
                     className="object-cover"
@@ -443,7 +420,7 @@ export default function ServicosPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                   <div className="absolute bottom-4 left-4">
                     <span className="text-cream/35 text-[8px] tracking-[0.4em] uppercase">
-                      Culturais
+                      Celebrações
                     </span>
                   </div>
                 </div>
@@ -636,7 +613,11 @@ export default function ServicosPage() {
                 label: "Casamentos",
                 anchor: "#celebracoes",
               },
-              { src: "/imagens/20_10_2025_0244.jpg", label: "Cultura", anchor: "#cultura" },
+              {
+                src: "/imagens/DaniGui_JantarFesta_27.jpg",
+                label: "Celebrações",
+                anchor: "#celebracoes",
+              },
             ].map((item) => (
               <a key={item.src} href={item.anchor} className="relative overflow-hidden group block">
                 <Image
