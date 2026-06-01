@@ -263,8 +263,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // Full-screen tool surface: hide public nav, grain & chrome.
   useEffect(() => {
@@ -418,6 +429,42 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       toast("Não foi possível guardar as alterações", "error");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Apply a status to every selected pedido in one go.
+  async function applyBulkStatus(status: QuoteStatus) {
+    const ids = [...selectedIds];
+    if (ids.length === 0 || bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/orcamento/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null),
+        ),
+      );
+      const updated = new Map<string, Quote>(results.filter(Boolean).map((u: Quote) => [u.id, u]));
+      if (updated.size > 0) {
+        setQuotes((prev) => prev.map((q) => updated.get(q.id) ?? q));
+        setSelected((prev) => (prev && updated.has(prev.id) ? updated.get(prev.id)! : prev));
+      }
+      const ok = updated.size;
+      const failed = ids.length - ok;
+      toast(
+        failed === 0
+          ? `${ok} pedido${ok !== 1 ? "s" : ""} atualizado${ok !== 1 ? "s" : ""}`
+          : `${ok} atualizado(s), ${failed} falhou(ram)`,
+        failed === 0 ? "success" : "error",
+      );
+      setSelectedIds(new Set());
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -900,6 +947,61 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               })}
             </div>
 
+            {/* Bulk actions */}
+            {selectedIds.size > 0 && (
+              <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-md border border-moss/30 bg-moss/8">
+                <span className="text-moss text-xs font-medium">
+                  {selectedIds.size} selecionado{selectedIds.size !== 1 ? "s" : ""}
+                </span>
+                {selectedIds.size < filtered.length && (
+                  <button
+                    onClick={() => setSelectedIds(new Set(filtered.map((q) => q.id)))}
+                    className="text-foreground/40 text-xs hover:text-moss transition-colors"
+                  >
+                    Selecionar todos ({filtered.length})
+                  </button>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
+                    Marcar como
+                  </span>
+                  <select
+                    disabled={bulkBusy}
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value as QuoteStatus;
+                      if (v) applyBulkStatus(v);
+                    }}
+                    className="bg-surface border border-foreground/15 rounded-md px-2 py-1.5 text-xs text-foreground/70 focus:outline-none focus:border-moss/50 disabled:opacity-50"
+                  >
+                    <option value="">{bulkBusy ? "A aplicar…" : "—"}</option>
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() =>
+                    downloadCsv(
+                      `pedidos-selecao-${dateStamp()}`,
+                      quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
+                    )
+                  }
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors"
+                >
+                  Exportar seleção
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="ml-auto text-foreground/40 text-xs hover:text-foreground/70 transition-colors"
+                >
+                  Limpar
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_440px] gap-8">
               {/* List */}
               <div className="flex flex-col gap-3">
@@ -914,57 +1016,73 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     q.category && q.eventType
                       ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType)
                       : null;
+                  const isSel = selectedIds.has(q.id);
                   return (
-                    <button
-                      key={q.id}
-                      type="button"
-                      onClick={() => openQuote(q)}
-                      className={`text-left p-5 rounded-md border transition-all duration-200 ${
-                        selected?.id === q.id
-                          ? "border-moss bg-moss/6"
-                          : "border-foreground/10 hover:border-foreground/25 bg-surface-raised/40"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div>
-                          <p className="text-foreground/70 text-sm font-medium">{q.name}</p>
-                          <p className="text-foreground/28 text-xs">{q.email}</p>
+                    <div key={q.id} className="relative">
+                      <label
+                        className="absolute left-3.5 top-5 z-10 flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSel}
+                          onChange={() => toggleSelect(q.id)}
+                          className="w-4 h-4 accent-[#4a7c59] cursor-pointer"
+                          aria-label={`Selecionar pedido de ${q.name}`}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => openQuote(q)}
+                        className={`w-full text-left p-5 pl-12 rounded-md border transition-all duration-200 ${
+                          selected?.id === q.id
+                            ? "border-moss bg-moss/6"
+                            : isSel
+                              ? "border-moss/40 bg-moss/[0.04]"
+                              : "border-foreground/10 hover:border-foreground/25 bg-surface-raised/40"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <p className="text-foreground/70 text-sm font-medium">{q.name}</p>
+                            <p className="text-foreground/28 text-xs">{q.email}</p>
+                          </div>
+                          {statusBadge(q.status)}
                         </div>
-                        {statusBadge(q.status)}
-                      </div>
-                      <div className="flex items-center gap-4 text-foreground/30 text-[10px]">
-                        <span>{cat?.label ?? "—"}</span>
-                        {et && (
-                          <>
-                            <span className="w-px h-3 bg-foreground/12" />
-                            <span>{et.label}</span>
-                          </>
-                        )}
-                        <span className="w-px h-3 bg-foreground/12" />
-                        <span>{q.guests} pax</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/8">
-                        <span className="text-foreground/22 text-[10px] font-mono">{q.id}</span>
-                        <div className="flex items-center gap-3">
-                          {q.quotedPrice ? (
-                            <span className="text-moss text-xs font-medium">
-                              {formatPrice(q.quotedPrice)}
-                            </span>
-                          ) : q.priceBreakdown?.total ? (
-                            <span className="text-foreground/30 text-xs">
-                              ≈ {formatPrice(q.priceBreakdown.rangeMin)}–
-                              {formatPrice(q.priceBreakdown.rangeMax)}
-                            </span>
-                          ) : null}
-                          <span className="text-foreground/20 text-[10px]">
-                            {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
-                              day: "numeric",
-                              month: "short",
-                            })}
-                          </span>
+                        <div className="flex items-center gap-4 text-foreground/30 text-[10px]">
+                          <span>{cat?.label ?? "—"}</span>
+                          {et && (
+                            <>
+                              <span className="w-px h-3 bg-foreground/12" />
+                              <span>{et.label}</span>
+                            </>
+                          )}
+                          <span className="w-px h-3 bg-foreground/12" />
+                          <span>{q.guests} pax</span>
                         </div>
-                      </div>
-                    </button>
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/8">
+                          <span className="text-foreground/22 text-[10px] font-mono">{q.id}</span>
+                          <div className="flex items-center gap-3">
+                            {q.quotedPrice ? (
+                              <span className="text-moss text-xs font-medium">
+                                {formatPrice(q.quotedPrice)}
+                              </span>
+                            ) : q.priceBreakdown?.total ? (
+                              <span className="text-foreground/30 text-xs">
+                                ≈ {formatPrice(q.priceBreakdown.rangeMin)}–
+                                {formatPrice(q.priceBreakdown.rangeMax)}
+                              </span>
+                            ) : null}
+                            <span className="text-foreground/20 text-[10px]">
+                              {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
