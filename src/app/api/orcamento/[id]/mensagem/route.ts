@@ -1,22 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-import type { QuoteMessage } from '../../../../orcamento/types';
-import { getQuote, updateQuote } from '@/lib/quotes-store';
-import { sendMail, esc, MAIL_TO } from '@/lib/mail';
-import { isAuthed } from '@/lib/admin-auth';
+import { NextRequest, NextResponse } from "next/server";
+import type { QuoteMessage } from "../../../../orcamento/types";
+import { getQuote, updateQuote } from "@/lib/quotes-store";
+import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { isAuthed } from "@/lib/admin-auth";
+import { log } from "@/lib/logger";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
 function authorized(request: NextRequest): boolean {
   return isAuthed(request);
 }
 
 // Reply to the client by email, from within the dashboard.
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!authorized(request)) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   const { id } = await params;
@@ -24,13 +22,13 @@ export async function POST(
   try {
     const quote = await getQuote(id);
     if (!quote) {
-      return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
     }
 
     const body = await request.json();
-    const message = String(body.message ?? '').trim();
+    const message = String(body.message ?? "").trim();
     if (!message) {
-      return NextResponse.json({ error: 'Mensagem vazia.' }, { status: 400 });
+      return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });
     }
 
     const html = `
@@ -57,7 +55,7 @@ export async function POST(
 
     return NextResponse.json({ ok: true, emailed: mail.sent, quote: updated });
   } catch (err) {
-    console.error('[mensagem POST]', err);
-    return NextResponse.json({ error: 'Erro ao enviar a mensagem' }, { status: 500 });
+    log.error("mensagem POST falhou", err);
+    return NextResponse.json({ error: "Erro ao enviar a mensagem" }, { status: 500 });
   }
 }

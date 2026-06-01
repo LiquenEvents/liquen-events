@@ -7,6 +7,7 @@ import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderProposalPdf } from "@/lib/proposal-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { isAuthed } from "@/lib/admin-auth";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const proposals = await listProposalsForQuote(id);
     return NextResponse.json(proposals);
   } catch (err) {
-    console.error("[proposta GET]", err);
+    log.error("proposta GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
@@ -141,12 +142,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
       await createProposal(proposal);
     } catch (e) {
-      console.error("[proposta POST] guardar proposta falhou", e);
+      log.error("guardar proposta falhou", e);
     }
     try {
       await updateQuote(id, { status: "cotado", quotedPrice: total });
     } catch (e) {
-      console.error("[proposta POST] actualizar pedido falhou", e);
+      log.error("actualizar pedido falhou", e);
     }
 
     return NextResponse.json({
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       pdfBase64: pdfBuffer.toString("base64"),
     });
   } catch (err) {
-    console.error("[proposta POST]", err);
+    log.error("proposta POST falhou", err);
     return NextResponse.json({ error: "Erro ao gerar a proposta" }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,10 @@ export async function POST(request: NextRequest) {
     const message = String(body.message ?? "").trim();
 
     if (!to || !message) {
-      return NextResponse.json({ error: "Destinatário e mensagem são obrigatórios." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Destinatário e mensagem são obrigatórios." },
+        { status: 400 },
+      );
     }
 
     const html = `
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest) {
     const mail = await sendMail({ to, replyTo: MAIL_TO, subject, html, text: message });
     return NextResponse.json({ ok: true, emailed: mail.sent });
   } catch (err) {
-    console.error("[inbox reply POST]", err);
+    log.error("inbox reply POST falhou", err);
     return NextResponse.json({ error: "Erro ao enviar a resposta." }, { status: 500 });
   }
 }

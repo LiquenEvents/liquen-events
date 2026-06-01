@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { log } from "@/lib/logger";
 
 export default function Error({
   error,
@@ -11,7 +12,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    log.error("erro renderizado no boundary de página", error);
   }, [error]);
 
   return (
@@ -28,8 +29,8 @@ export default function Error({
           Ocorreu um erro inesperado.
         </h1>
         <p className="text-foreground/40 text-sm leading-[1.8] max-w-md mx-auto mb-12">
-          Pedimos desculpa pelo incómodo. Tente novamente — se o problema
-          persistir, contacte-nos diretamente e teremos todo o gosto em ajudar.
+          Pedimos desculpa pelo incómodo. Tente novamente — se o problema persistir, contacte-nos
+          diretamente e teremos todo o gosto em ajudar.
         </p>
         <div className="flex flex-wrap gap-4 justify-center">
           <button

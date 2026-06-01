@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listCalendarEvents, createCalendarEvent } from "@/lib/calendar-store";
 import type { CalendarEventKind } from "@/app/orcamento/types";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(await listCalendarEvents());
   } catch (err) {
-    console.error("[calendario GET]", err);
+    log.error("calendario GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(event);
   } catch (err) {
-    console.error("[calendario POST]", err);
+    log.error("calendario POST falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { log } from "./logger";
 
 /**
  * SMTP transport built from environment variables. Returns null when the
@@ -50,11 +51,18 @@ interface SendArgs {
  * Sends an email. Resolves with `{ sent: false }` (never throws) when SMTP
  * isn't configured, so a form submission still completes for the visitor.
  */
-export async function sendMail({ subject, html, text, replyTo, to, attachments }: SendArgs): Promise<{ sent: boolean }> {
+export async function sendMail({
+  subject,
+  html,
+  text,
+  replyTo,
+  to,
+  attachments,
+}: SendArgs): Promise<{ sent: boolean }> {
   const transport = getTransport();
   if (!transport) {
-    console.warn(
-      "[mail] SMTP não configurado — email NÃO enviado. Defina SMTP_HOST, SMTP_USER e SMTP_PASS nas variáveis de ambiente."
+    log.warn(
+      "mail: SMTP não configurado — email não enviado (defina SMTP_HOST, SMTP_USER e SMTP_PASS)",
     );
     return { sent: false };
   }
@@ -65,7 +73,15 @@ export async function sendMail({ subject, html, text, replyTo, to, attachments }
     content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content),
     contentType: a.contentType,
   }));
-  await transport.sendMail({ from, to: to ?? MAIL_TO, subject, html, text, replyTo, attachments: attach });
+  await transport.sendMail({
+    from,
+    to: to ?? MAIL_TO,
+    subject,
+    html,
+    text,
+    replyTo,
+    attachments: attach,
+  });
   return { sent: true };
 }
 
