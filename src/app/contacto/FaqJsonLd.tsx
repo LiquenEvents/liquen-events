@@ -8,14 +8,9 @@ export default function FaqJsonLd() {
     "@type": "FAQPage",
     mainEntity: FAQS.map((f) => ({
       "@type": "Question",
-      name: f.question,
-      acceptedAnswer: { "@type": "Answer", text: f.answer },
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
     })),
   };
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: jsonLd(data) }}
-    />
-  );
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />;
 }

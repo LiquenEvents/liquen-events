@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { saveSubscription, removeSubscription, pushConfigured } from "@/lib/push";
 import { pushSubscriptionSchema } from "@/lib/validation";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     await saveSubscription(parsed.data);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[push subscribe]", err);
+    log.error("[push subscribe]", err);
     return NextResponse.json({ error: "Erro" }, { status: 500 });
   }
 }

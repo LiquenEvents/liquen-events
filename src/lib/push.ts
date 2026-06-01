@@ -33,7 +33,7 @@ export function pushConfigured(): boolean {
     webpush.setVapidDetails(
       process.env.VAPID_SUBJECT ?? "mailto:liquen.alentejo@gmail.com",
       pub,
-      priv
+      priv,
     );
     configured = true;
   }
@@ -49,7 +49,10 @@ async function fileRead(): Promise<PushSub[]> {
   }
 }
 async function fileWrite(subs: PushSub[]): Promise<void> {
-  await fs.writeFile(DATA_FILE, JSON.stringify(subs, null, 2));
+  await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+  const tmp = `${DATA_FILE}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(subs, null, 2));
+  await fs.rename(tmp, DATA_FILE);
 }
 
 export async function saveSubscription(sub: PushSub): Promise<void> {
@@ -90,7 +93,10 @@ async function listSubscriptions(): Promise<PushSub[]> {
   const sb = getSupabase();
   if (sb) {
     const { data } = await sb.from(TABLE).select("endpoint, keys");
-    return (data ?? []).map((r) => ({ endpoint: r.endpoint as string, keys: r.keys as PushSub["keys"] }));
+    return (data ?? []).map((r) => ({
+      endpoint: r.endpoint as string,
+      keys: r.keys as PushSub["keys"],
+    }));
   }
   return fileRead();
 }
@@ -122,7 +128,7 @@ export async function sendPushToAll(payload: PushPayload): Promise<{ sent: numbe
           await removeSubscription(sub.endpoint).catch(() => {});
         }
       }
-    })
+    }),
   );
 
   return { sent };

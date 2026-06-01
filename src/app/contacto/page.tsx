@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import ContactForm from "./ContactForm";
-import FAQ from "./FAQ";
 import FaqJsonLd from "./FaqJsonLd";
+import FAQAccordion from "@/components/FAQAccordion";
+import { FAQS } from "./faq-data";
 import AnimateIn from "@/components/AnimateIn";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
@@ -170,7 +171,7 @@ export default function ContactoPage() {
                   Se não encontrar a resposta que procura, contacte-nos diretamente.
                 </p>
               </div>
-              <FAQ />
+              <FAQAccordion faqs={FAQS} />
             </div>
           </AnimateIn>
         </div>

@@ -160,6 +160,102 @@ export default function SobrePage() {
         </div>
       </section>
 
+      {/* ── NÚMEROS ── */}
+      <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/[0.06]">
+              {[
+                { value: "8+", label: "Anos a criar memórias", sub: "Desde 2018" },
+                { value: "120+", label: "Eventos realizados", sub: "Casamentos & corporativos" },
+                { value: "19+", label: "Clientes corporativos", sub: "Empresas & instituições" },
+                { value: "4", label: "Regiões de Portugal", sub: "Évora · Lisboa · Alentejo · ++" },
+              ].map((s) => (
+                <div key={s.label} className="bg-surface p-8 lg:p-10">
+                  <p
+                    className="text-foreground font-bold leading-none"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(36px, 4vw, 60px)",
+                    }}
+                  >
+                    {s.value}
+                  </p>
+                  <p className="text-foreground/72 text-sm font-medium mt-3">{s.label}</p>
+                  <p className="text-foreground/30 text-[10px] tracking-[0.22em] uppercase mt-1.5">
+                    {s.sub}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </AnimateIn>
+        </div>
+      </section>
+
+      {/* ── PERCURSO ── */}
+      <section className="py-20 lg:py-32 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className={`${eyebrowDark} mb-14`}>
+              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />O nosso percurso
+            </p>
+          </AnimateIn>
+          <div className="flex flex-col">
+            {[
+              {
+                year: "2018",
+                title: "Fundação em Évora",
+                desc: "A Líquen Events nasce com uma visão clara: transformar eventos em experiências únicas, com a sensibilidade e o calor do Alentejo.",
+              },
+              {
+                year: "2020",
+                title: "Primeiro grande evento corporativo",
+                desc: "Coordenamos o primeiro grande evento empresarial para a Aernnova Aerospace, marcando a entrada no segmento corporativo.",
+              },
+              {
+                year: "2022",
+                title: "Expansão a Lisboa e Portugal",
+                desc: "Alargamos a nossa área de atuação a Lisboa, Setúbal e outros pontos do país, mantendo sempre as raízes alentejanas.",
+              },
+              {
+                year: "2024",
+                title: "50 casamentos realizados",
+                desc: "Um marco significativo: mais de 50 casamentos coordenados com sucesso, de celebrações íntimas a grandes galas.",
+              },
+              {
+                year: "2025",
+                title: "Certificação de excelência",
+                desc: "Reconhecidos por mais de 19 empresas e instituições como parceiro de confiança para eventos de alto nível.",
+              },
+            ].map((item, i) => (
+              <AnimateIn key={item.year} delay={i * 60}>
+                <div className="grid grid-cols-1 lg:grid-cols-[140px_1fr] gap-4 lg:gap-16 py-9 border-t border-foreground/8">
+                  <span
+                    className="text-foreground/15 font-bold leading-none self-start"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(22px, 2.5vw, 32px)",
+                    }}
+                  >
+                    {item.year}
+                  </span>
+                  <div>
+                    <h3
+                      className="text-foreground font-bold text-lg mb-2.5"
+                      style={{ fontFamily: "var(--font-playfair)" }}
+                    >
+                      {item.title}
+                    </h3>
+                    <p className="text-foreground/58 text-sm leading-[1.85]">{item.desc}</p>
+                  </div>
+                </div>
+              </AnimateIn>
+            ))}
+            <div className="border-t border-foreground/8" />
+          </div>
+        </div>
+      </section>
+
       {/* ── FOUNDER ── */}
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listTasks, createTask } from "@/lib/tasks-store";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(await listTasks());
   } catch (err) {
-    console.error("[tarefas GET]", err);
+    log.error("[tarefas GET]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(task);
   } catch (err) {
-    console.error("[tarefas POST]", err);
+    log.error("[tarefas POST]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

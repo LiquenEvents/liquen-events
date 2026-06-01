@@ -9,12 +9,12 @@ import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quotePayloadSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
+export const runtime = "nodejs";
 export const maxDuration = 30;
 
 function generateId(): string {
-  const now = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `LIQ-${now}-${rand}`;
+  const uuid = crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase();
+  return `LIQ-${uuid}`;
 }
 
 const eur = (n: number) =>

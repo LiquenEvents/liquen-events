@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { imapConfigured, listInbox } from "@/lib/inbox";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,10 @@ export async function GET(request: NextRequest) {
     const messages = await listInbox(30);
     return NextResponse.json({ configured: true, messages });
   } catch (err) {
-    console.error("[inbox GET]", err);
-    return NextResponse.json({ configured: true, messages: [], error: "Não foi possível ligar ao e-mail." }, { status: 502 });
+    log.error("[inbox GET]", err);
+    return NextResponse.json(
+      { configured: true, messages: [], error: "Não foi possível ligar ao e-mail." },
+      { status: 502 },
+    );
   }
 }

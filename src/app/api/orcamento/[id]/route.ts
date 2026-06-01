@@ -1,17 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import type { Quote } from '../../../orcamento/types';
-import { getQuote, updateQuote } from '@/lib/quotes-store';
-import { isAuthed } from '@/lib/admin-auth';
+import { NextRequest, NextResponse } from "next/server";
+import { getQuote, updateQuote } from "@/lib/quotes-store";
+import { isAuthed } from "@/lib/admin-auth";
+import { quoteUpdateSchema, firstError } from "@/lib/validation";
+import { log } from "@/lib/logger";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const runtime = "nodejs";
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
     const quote = await getQuote(id);
     if (!quote) {
-      return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     }
     // Public endpoint (confirmation page loads by reference id). Authenticated
     // staff get the full record; anyone else gets a redacted view with no
@@ -23,38 +23,32 @@ export async function GET(
     void [name, email, phone, company, nif, notes];
     return NextResponse.json(safe);
   } catch (err) {
-    console.error('[orcamento GET id]', err);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    log.error("[orcamento GET id]", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   const { id } = await params;
-  const body = await request.json();
 
-  const allowed: (keyof Quote)[] = ['status', 'quotedPrice', 'adminNotes', 'checklist', 'payments', 'timeline'];
-  const updates: Partial<Quote> = {};
-  for (const key of allowed) {
-    if (key in body) {
-      (updates as Record<string, unknown>)[key] = body[key];
-    }
+  const raw = await request.json().catch(() => null);
+  const parsed = quoteUpdateSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
   }
 
   try {
-    const updated = await updateQuote(id, updates);
+    const updated = await updateQuote(id, parsed.data);
     if (!updated) {
-      return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     }
     return NextResponse.json(updated);
   } catch (err) {
-    console.error('[orcamento PATCH]', err);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    log.error("[orcamento PATCH]", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

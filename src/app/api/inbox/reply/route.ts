@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { inboxReplySchema, firstError } from "@/lib/validation";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -9,14 +11,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   try {
-    const body = await request.json();
-    const to = String(body.to ?? "").trim();
-    const subject = String(body.subject ?? "").trim() || "Re: o seu e-mail";
-    const message = String(body.message ?? "").trim();
-
-    if (!to || !message) {
-      return NextResponse.json({ error: "Destinatário e mensagem são obrigatórios." }, { status: 400 });
+    const raw = await request.json().catch(() => null);
+    const parsed = inboxReplySchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
     }
+    const { to, subject, message } = parsed.data;
 
     const html = `
     <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const mail = await sendMail({ to, replyTo: MAIL_TO, subject, html, text: message });
     return NextResponse.json({ ok: true, emailed: mail.sent });
   } catch (err) {
-    console.error("[inbox reply POST]", err);
+    log.error("[inbox reply POST]", err);
     return NextResponse.json({ error: "Erro ao enviar a resposta." }, { status: 500 });
   }
 }

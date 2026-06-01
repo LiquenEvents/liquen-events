@@ -3,6 +3,7 @@ import { getQuote } from "@/lib/quotes-store";
 import { renderInvoicePdf } from "@/lib/invoice-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { isAuthed } from "@/lib/admin-auth";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       pdfBase64: pdfBuffer.toString("base64"),
     });
   } catch (err) {
-    console.error("[fatura POST]", err);
+    log.error("[fatura POST]", err);
     return NextResponse.json({ error: "Erro ao gerar o recibo" }, { status: 500 });
   }
 }

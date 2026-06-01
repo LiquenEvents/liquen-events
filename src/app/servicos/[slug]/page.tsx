@@ -7,6 +7,7 @@ import AnimateIn from "@/components/AnimateIn";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "../services-data";
+import FAQAccordion from "@/components/FAQAccordion";
 
 export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
@@ -146,23 +147,31 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
       {/* ── FAQ ── */}
       {svc.faqs.length > 0 && (
         <section className="py-24 bg-surface border-t border-foreground/8">
-          <div className="max-w-3xl mx-auto px-6 lg:px-16">
-            <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/50" /> Perguntas frequentes
-            </p>
-            <div className="flex flex-col">
-              {svc.faqs.map((f) => (
-                <div key={f.q} className="border-t border-foreground/8 py-7">
-                  <h2
-                    className="text-foreground/80 text-base mb-3"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {f.q}
-                  </h2>
-                  <p className="text-foreground/78 text-sm leading-[1.9]">{f.a}</p>
-                </div>
-              ))}
-              <div className="border-t border-foreground/8" />
+          <div className="max-w-7xl mx-auto px-6 lg:px-16">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-16 items-start">
+              <div className="lg:sticky" style={{ top: "6rem" }}>
+                <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-6 flex items-center gap-3">
+                  <span className="w-5 h-px bg-gold/50" /> Perguntas frequentes
+                </p>
+                <h2
+                  className="text-foreground text-3xl lg:text-4xl font-bold leading-tight"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  Tem
+                  <br />
+                  dúvidas?
+                </h2>
+                <p className="text-foreground/55 text-sm leading-relaxed mt-5 max-w-xs">
+                  Não encontra o que procura? Fale connosco diretamente.
+                </p>
+                <Link
+                  href="/contacto"
+                  className="inline-flex items-center gap-2 mt-7 text-[11px] tracking-[0.28em] uppercase text-moss hover:gap-4 transition-all duration-300"
+                >
+                  Contactar →
+                </Link>
+              </div>
+              <FAQAccordion faqs={svc.faqs} />
             </div>
           </div>
         </section>

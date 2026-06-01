@@ -28,6 +28,9 @@ const CHECKS: EnvCheck[] = [
   { name: "VAPID_PUBLIC_KEY", enables: "web push notifications" },
   { name: "VAPID_PRIVATE_KEY", enables: "web push notifications" },
   { name: "CRON_SECRET", enables: "protected daily digest cron endpoint" },
+  { name: "IMAP_HOST", enables: "inbox — reading incoming emails via IMAP" },
+  { name: "IMAP_USER", enables: "inbox — IMAP authentication" },
+  { name: "IMAP_PASS", enables: "inbox — IMAP authentication" },
 ];
 
 let validated = false;
@@ -60,5 +63,11 @@ export function validateEnv(): void {
   }
   if (!missingCritical.length && !missing.length) {
     log.info("Environment validated — all known variables present");
+  }
+
+  // SESSION_SECRET quality check — a short secret is equivalent to no secret.
+  const secret = process.env.SESSION_SECRET;
+  if (isProd && secret && secret.length < 32) {
+    log.warn("SESSION_SECRET is set but shorter than 32 characters — use a random 32+ char value");
   }
 }

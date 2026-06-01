@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // Self-contained server bundle so the app can run in any container/cloud
   // (Vercel ignores this and uses its own build).
   output: "standalone",
+
+  // Compress responses with gzip/brotli for self-hosted deployments.
+  // Vercel and most CDNs do this at the edge, so it's a no-op there.
+  compress: true,
+
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
@@ -13,6 +18,10 @@ const nextConfig: NextConfig = {
     // Serve images inline instead of as attachment downloads
     contentDispositionType: "inline",
   },
+
+  // Prevent Next.js from bundling server-only packages that use native addons
+  // or binary modules — let Node.js load them at runtime instead.
+  serverExternalPackages: ["bcryptjs", "imapflow", "nodemailer", "mailparser", "sharp"],
 
   poweredByHeader: false,
   reactStrictMode: true,
@@ -33,7 +42,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https: wss:",
+      "connect-src 'self'",
       "worker-src 'self'",
       "manifest-src 'self'",
       "object-src 'none'",
@@ -66,6 +75,11 @@ const nextConfig: NextConfig = {
 
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Immutable hashed assets — fingerprinted by Next.js build, safe to cache forever
+      {
+        source: "/_next/static/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       {
         source: "/imagens/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],

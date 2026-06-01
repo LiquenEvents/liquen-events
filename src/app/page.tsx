@@ -1,9 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import AnimateIn from "@/components/AnimateIn";
 import { blurFor } from "@/lib/blur";
-import TestimonialsCarousel from "@/components/TestimonialsCarousel";
-import ClientMarquee from "@/components/ClientMarquee";
+import StatsStrip from "@/components/StatsStrip";
+
+// Below-fold client components — deferred so they don't inflate the initial JS bundle.
+const TestimonialsCarousel = dynamic(() => import("@/components/TestimonialsCarousel"), {
+  ssr: false,
+});
+const ClientMarquee = dynamic(() => import("@/components/ClientMarquee"), { ssr: false });
 
 const services = [
   {
@@ -139,6 +145,9 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Stats ── */}
+      <StatsStrip />
+
       {/* ── Clients marquee ── */}
       <ClientMarquee />
 
@@ -173,7 +182,7 @@ export default function Home() {
                     src={s.image}
                     alt={s.title}
                     fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                     {...blurFor(s.image)}
                   />
@@ -298,6 +307,92 @@ export default function Home() {
 
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
+
+      {/* ── Como trabalhamos ── */}
+      <section className="py-20 lg:py-32 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-16">
+          <AnimateIn>
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-14 lg:mb-20">
+              <div>
+                <p className="text-foreground/68 text-xs tracking-[0.35em] uppercase mb-4 flex items-center gap-3">
+                  <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+                  Como trabalhamos
+                </p>
+                <h2
+                  className="text-foreground font-bold leading-[1.05]"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(28px, 4vw, 52px)",
+                  }}
+                >
+                  Um processo simples,
+                  <br />
+                  <span className="text-moss">um resultado extraordinário.</span>
+                </h2>
+              </div>
+              <Link
+                href="/orcamento"
+                className="group hidden lg:inline-flex items-center gap-3 text-xs text-foreground/68 hover:text-moss transition-colors duration-300 tracking-[0.28em] uppercase"
+              >
+                Começar agora
+                <span className="w-6 h-px bg-foreground/18 group-hover:bg-moss group-hover:w-10 transition-all duration-500" />
+              </Link>
+            </div>
+          </AnimateIn>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/[0.06]">
+            {[
+              {
+                n: "01",
+                title: "Consulta gratuita",
+                desc: "Ouvimos a sua ideia num primeiro contacto sem qualquer compromisso. A sua visão é o nosso ponto de partida.",
+              },
+              {
+                n: "02",
+                title: "Proposta à medida",
+                desc: "Em menos de 24 horas enviamos uma proposta detalhada com orçamento transparente, adaptada ao seu evento.",
+              },
+              {
+                n: "03",
+                title: "Execução impecável",
+                desc: "Tratamos de cada detalhe — decoração, logística, fornecedores e coordenação completa no dia do evento.",
+              },
+              {
+                n: "04",
+                title: "Memórias eternas",
+                desc: "O resultado: um evento que fica na memória de todos os presentes, do primeiro ao último momento.",
+              },
+            ].map((step, i) => (
+              <AnimateIn key={step.n} delay={i * 70}>
+                <div className="bg-surface p-8 lg:p-10 flex flex-col h-full min-h-[220px]">
+                  <span className="text-moss/30 text-[10px] font-mono tracking-[0.4em] mb-7 block">
+                    {step.n}
+                  </span>
+                  <h3
+                    className="text-foreground font-bold text-lg mb-4 leading-snug"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p className="text-foreground/55 text-sm leading-[1.85] flex-1">{step.desc}</p>
+                </div>
+              </AnimateIn>
+            ))}
+          </div>
+
+          <AnimateIn delay={180}>
+            <div className="mt-6 lg:hidden">
+              <Link
+                href="/orcamento"
+                className="group inline-flex items-center gap-3 text-xs text-foreground/68 hover:text-moss transition-colors duration-300 tracking-[0.28em] uppercase"
+              >
+                Começar agora
+                <span className="w-6 h-px bg-foreground/18 group-hover:bg-moss group-hover:w-10 transition-all duration-500" />
+              </Link>
+            </div>
+          </AnimateIn>
+        </div>
+      </section>
 
       {/* ── SEO content — organização de eventos em Évora, Lisboa e Portugal ── */}
       <section className="bg-surface border-t border-foreground/8">

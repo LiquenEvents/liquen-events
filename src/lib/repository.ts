@@ -134,7 +134,9 @@ export class FileBackend<T> implements Backend<T> {
 
   private async write(rows: T[]): Promise<void> {
     await fs.mkdir(path.dirname(this.file), { recursive: true });
-    await fs.writeFile(this.file, JSON.stringify(rows, null, 2));
+    const tmp = `${this.file}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(rows, null, 2));
+    await fs.rename(tmp, this.file);
   }
 
   async list(): Promise<T[]> {
