@@ -38,6 +38,20 @@ export default function StructuredData() {
         addressRegion: SITE.region,
         addressCountry: SITE.country,
       },
+      // Approximate geo for Évora — helps local-pack / map relevance.
+      geo: {
+        "@type": "GeoCoordinates",
+        latitude: 38.5714,
+        longitude: -7.9135,
+      },
+      openingHoursSpecification: [
+        {
+          "@type": "OpeningHoursSpecification",
+          dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          opens: "09:00",
+          closes: "18:00",
+        },
+      ],
       areaServed: AREAS_SERVED.map((name) => ({ "@type": "City", name })),
       knowsLanguage: ["pt-PT", "en"],
       sameAs: [SITE.instagram, SITE.facebook],
