@@ -3,10 +3,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
-import CountUp from "@/components/CountUp";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
-import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = pageMetadata({
   title: "Sobre Nós — Empresa de Eventos em Évora",
@@ -16,13 +14,6 @@ export const metadata: Metadata = pageMetadata({
   image: "/imagens/M&F0497.jpg",
   keywords: ["empresa de eventos Évora", "organização de eventos Alentejo", "sobre Líquen Events"],
 });
-
-const values = [
-  { title: "Criatividade", desc: "Conceitos originais, pensados de raiz." },
-  { title: "Excelência", desc: "A perfeição está nos detalhes." },
-  { title: "Compromisso", desc: "O seu evento, tratado como nosso." },
-  { title: "Transparência", desc: "Orçamentos claros, sem surpresas." },
-];
 
 const gallery = [
   { src: "/imagens/Natalia e Jonathan-167.jpg", cls: "col-span-2 row-span-2" },
@@ -115,39 +106,6 @@ export default function SobrePage() {
         </div>
       </section>
 
-      {/* ── STATS ── */}
-      <section className="bg-surface border-y border-foreground/8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-foreground/[0.06]">
-            {[
-              { kind: "count" as const, to: 100, suffix: "+", label: "Eventos realizados" },
-              { kind: "count" as const, to: 19, suffix: "+", label: "Clientes empresariais" },
-              {
-                kind: "count" as const,
-                to: new Date().getFullYear() - Number(SITE.founded),
-                suffix: "+",
-                label: "Anos de experiência",
-              },
-              { kind: "static" as const, value: "5★", label: "Avaliação dos clientes" },
-            ].map((s, i) => (
-              <AnimateIn key={s.label} delay={i * 80} className="h-full">
-                <div className="flex flex-col items-center justify-center text-center py-12 lg:py-16 px-4 gap-2.5 h-full">
-                  <p
-                    className="text-moss text-4xl lg:text-6xl font-bold leading-none"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {s.kind === "count" ? <CountUp to={s.to} suffix={s.suffix} /> : s.value}
-                  </p>
-                  <p className="text-foreground/30 text-[10px] tracking-[0.28em] uppercase">
-                    {s.label}
-                  </p>
-                </div>
-              </AnimateIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── EDITORIAL PHOTO GRID ── */}
       <section className="bg-surface">
         <AnimateIn from="fade">
@@ -198,33 +156,6 @@ export default function SobrePage() {
                 </span>
               </p>
             </AnimateIn>
-          </div>
-        </div>
-      </section>
-
-      {/* ── VALUES — minimal ── */}
-      <section className="py-20 lg:py-32 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <p className={`${eyebrowDark} mb-12 lg:mb-20`}>
-              <span className="w-5 h-px bg-moss/50 flex-shrink-0" />O que nos guia
-            </p>
-          </AnimateIn>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/8 border border-foreground/8 rounded-2xl overflow-hidden">
-            {values.map((v, i) => (
-              <AnimateIn key={v.title} delay={i * 70} className="h-full">
-                <div className="bg-surface h-full p-8 lg:p-10 group hover:bg-surface-raised/40 transition-colors duration-500">
-                  <span className="text-moss/60 text-xs font-mono tabular-nums">0{i + 1}</span>
-                  <h3
-                    className="text-foreground text-xl lg:text-2xl font-bold mt-6 mb-3"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {v.title}
-                  </h3>
-                  <p className="text-foreground/40 text-sm leading-[1.65]">{v.desc}</p>
-                </div>
-              </AnimateIn>
-            ))}
           </div>
         </div>
       </section>

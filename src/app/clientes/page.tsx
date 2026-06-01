@@ -3,7 +3,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
-import CountUp from "@/components/CountUp";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
@@ -181,37 +180,6 @@ export default function ClientesPage() {
                 </span>
               </div>
             </AnimateIn>
-          </div>
-        </div>
-      </section>
-
-      {/* ── STATS ── */}
-      <section className="bg-surface border-b border-foreground/8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-foreground/[0.06]">
-            {[
-              { kind: "count" as const, to: 19, suffix: "+", label: "Clientes empresariais" },
-              { kind: "count" as const, to: 100, suffix: "+", label: "Eventos realizados" },
-              { kind: "static" as const, value: "5★", label: "Avaliação média" },
-              { kind: "static" as const, value: "24h", label: "Tempo de resposta" },
-            ].map((s, i) => (
-              <AnimateIn key={s.label} delay={i * 80} className="h-full">
-                <div className="flex flex-col items-center justify-center text-center py-16 lg:py-20 px-6 gap-4 h-full group hover:bg-surface-raised/30 transition-colors duration-500">
-                  <p
-                    className="text-moss font-bold leading-none"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(46px, 5vw, 78px)",
-                    }}
-                  >
-                    {s.kind === "count" ? <CountUp to={s.to} suffix={s.suffix} /> : s.value}
-                  </p>
-                  <p className="text-foreground/28 text-[10px] tracking-[0.32em] uppercase">
-                    {s.label}
-                  </p>
-                </div>
-              </AnimateIn>
-            ))}
           </div>
         </div>
       </section>

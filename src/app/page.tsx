@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import AnimateIn from "@/components/AnimateIn";
 import { blurFor } from "@/lib/blur";
-import CountUp from "@/components/CountUp";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
 
@@ -72,33 +71,6 @@ const ribbon = [
   "/imagens/EW1_1330.jpg",
   "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
   "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
-];
-
-type Stat =
-  | { kind: "count"; to: number; suffix: string; label: string }
-  | { kind: "static"; value: string; label: string };
-
-const stats: Stat[] = [
-  { kind: "count", to: 19, suffix: "+", label: "Clientes empresariais" },
-  { kind: "count", to: 100, suffix: "+", label: "Eventos realizados" },
-  { kind: "static", value: "5★", label: "Avaliação dos clientes" },
-  { kind: "count", to: 100, suffix: "%", label: "Soluções personalizadas" },
-];
-
-const process = [
-  { title: "Conversa inicial", desc: "Ouvimos a sua visão, gostos e orçamento — sem compromisso." },
-  {
-    title: "Conceito & proposta",
-    desc: "Desenhamos o conceito e apresentamos uma proposta detalhada, à medida.",
-  },
-  {
-    title: "Planeamento",
-    desc: "Tratamos de fornecedores, decoração, logística e de cada pormenor.",
-  },
-  {
-    title: "O grande dia",
-    desc: "Coordenamos tudo no local para que só tenha de viver o momento.",
-  },
 ];
 
 export default function Home() {
@@ -328,82 +300,6 @@ export default function Home() {
             ))}
           </div>
         </Link>
-      </section>
-
-      {/* ── Process — how we work ── */}
-      <section className="py-16 lg:py-28 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-16">
-          <AnimateIn>
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12 lg:mb-20">
-              <div>
-                <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase mb-6 flex items-center gap-3">
-                  <span className="w-6 h-px bg-moss rounded-full flex-shrink-0" />
-                  Como trabalhamos
-                </p>
-                <h2
-                  className="text-foreground font-bold leading-[1.05] max-w-xl"
-                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4vw, 52px)" }}
-                >
-                  Do primeiro olá ao último brinde.
-                </h2>
-              </div>
-              <p className="text-foreground/40 text-sm leading-relaxed max-w-sm lg:text-right">
-                Um processo simples e transparente, pensado para que só tenha de viver o momento.
-              </p>
-            </div>
-          </AnimateIn>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/8 border border-foreground/8 rounded-xl overflow-hidden">
-            {process.map((step, i) => (
-              <AnimateIn key={step.title} delay={i * 70} className="h-full">
-                <div className="bg-surface h-full p-5 sm:p-7 lg:p-9 group hover:bg-surface-raised/40 transition-colors duration-500">
-                  <div className="flex items-center justify-between mb-8">
-                    <span className="text-moss/70 text-xs font-mono tabular-nums tracking-widest">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span className="w-8 h-px bg-foreground/10 group-hover:w-12 group-hover:bg-moss/50 transition-all duration-500" />
-                  </div>
-                  <h3
-                    className="text-foreground text-xl font-bold mb-3"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {step.title}
-                  </h3>
-                  <p className="text-foreground/40 text-sm leading-[1.7]">{step.desc}</p>
-                </div>
-              </AnimateIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats ── */}
-      <section className="py-16 lg:py-24 bg-moss-dark relative overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(74,124,89,0.4) 0%, transparent 55%)",
-          }}
-        />
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 lg:gap-20">
-            {stats.map((s, i) => (
-              <AnimateIn key={s.label} delay={i * 80}>
-                <div
-                  className="text-cream text-4xl sm:text-5xl lg:text-7xl font-bold mb-3 lg:mb-4"
-                  style={{ fontFamily: "var(--font-playfair)" }}
-                >
-                  {s.kind === "count" ? <CountUp to={s.to} suffix={s.suffix} /> : s.value}
-                </div>
-                <div className="w-5 h-px bg-cream/25 mb-2 lg:mb-3" />
-                <div className="text-cream/50 text-[10px] sm:text-xs tracking-[0.2em] uppercase">
-                  {s.label}
-                </div>
-              </AnimateIn>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* ── Testimonials ── */}

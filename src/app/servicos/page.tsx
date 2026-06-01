@@ -28,52 +28,6 @@ const navItems = [
   { label: "Cultura", id: "cultura" },
 ];
 
-const process = [
-  {
-    step: "01",
-    title: "Briefing",
-    desc: "Ouvimos a sua ideia e definimos o conceito.",
-  },
-  {
-    step: "02",
-    title: "Proposta",
-    desc: "Proposta detalhada, com orçamento transparente.",
-  },
-  {
-    step: "03",
-    title: "Produção",
-    desc: "Fornecedores, logística, decoração e coordenação.",
-  },
-  {
-    step: "04",
-    title: "Execução",
-    desc: "Presentes no dia, para tudo correr na perfeição.",
-  },
-];
-
-const differentiators = [
-  {
-    num: "01",
-    title: "Coordenação Total",
-    desc: "Um único ponto de contacto, do primeiro olá ao último brinde.",
-  },
-  {
-    num: "02",
-    title: "À Sua Medida",
-    desc: "Cada projeto construído à volta da sua visão, estilo e orçamento.",
-  },
-  {
-    num: "03",
-    title: "Rede de Excelência",
-    desc: "Fornecedores de confiança, selecionados ao longo de anos.",
-  },
-  {
-    num: "04",
-    title: "Presença Total",
-    desc: "Coordenação no local para que cada momento corra na perfeição.",
-  },
-];
-
 /* ── Mosaico editorial para categorias ── */
 type ServiceCard = {
   title: string;
@@ -385,20 +339,6 @@ export default function ServicosPage() {
         path="/servicos"
       />
 
-      {/* ── Ticker ── */}
-      <div className="bg-surface border-b border-foreground/[0.055] overflow-hidden">
-        <div className="flex animate-marquee whitespace-nowrap py-2.5">
-          {[...Array(8)].map((_, i) => (
-            <span
-              key={i}
-              className="text-foreground/18 text-[9px] tracking-[0.55em] uppercase flex-shrink-0 px-6"
-            >
-              Casamentos · Eventos Corporativos · Celebrações Privadas · Eventos Culturais
-            </span>
-          ))}
-        </div>
-      </div>
-
       {/* ── Hero ── */}
       <section className="relative min-h-[100svh] flex items-end pb-0 pt-24 md:pt-36 bg-surface overflow-hidden">
         <div
@@ -593,24 +533,6 @@ export default function ServicosPage() {
         </AnimateIn>
       </section>
 
-      {/* ── Large text marquee ── */}
-      <section className="bg-surface border-t border-foreground/[0.055] overflow-hidden py-10 lg:py-14">
-        <div className="flex animate-marquee whitespace-nowrap">
-          {[...Array(4)].map((_, i) => (
-            <span
-              key={i}
-              className="flex-shrink-0 font-bold text-foreground/[0.055] tracking-tight pr-16"
-              style={{
-                fontFamily: "var(--font-playfair)",
-                fontSize: "clamp(56px, 8vw, 108px)",
-              }}
-            >
-              EMPRESAS · CASAMENTOS · CELEBRAÇÕES · CULTURA
-            </span>
-          ))}
-        </div>
-      </section>
-
       {/* ── Service categories ── */}
       <div className="relative">
         {/* Sticky nav */}
@@ -702,129 +624,6 @@ export default function ServicosPage() {
           </section>
         ))}
       </div>
-
-      {/* ── Como trabalhamos ── */}
-      <section className="py-14 md:py-28 lg:py-40 bg-surface-raised border-t border-foreground/8 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-20 lg:mb-28">
-              <div>
-                <p className="text-foreground/25 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center gap-3">
-                  <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
-                  Como trabalhamos
-                </p>
-                <h2
-                  className="text-foreground font-bold leading-none"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(38px, 5vw, 70px)",
-                  }}
-                >
-                  Do conceito
-                  <br />
-                  <span className="text-moss">à execução</span>
-                </h2>
-              </div>
-              <p className="text-foreground/30 text-sm leading-[1.85] max-w-xs">
-                Quatro etapas que transformam a sua ideia num evento que fica na memória.
-              </p>
-            </div>
-          </AnimateIn>
-
-          {/* Steps — horizontal on desktop */}
-          <div className="relative">
-            {/* Connecting line */}
-            <div className="hidden lg:block absolute top-5 left-5 right-5 h-px bg-foreground/[0.06]" />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
-              {process.map((p, i) => (
-                <AnimateIn key={p.step} delay={i * 80}>
-                  <div className="relative group">
-                    {/* Step number circle */}
-                    <div className="relative flex items-center mb-8 lg:mb-10">
-                      <div className="w-10 h-10 rounded-full border border-foreground/[0.08] bg-surface-raised flex items-center justify-center flex-shrink-0 group-hover:border-moss/40 transition-colors duration-300">
-                        <span className="text-moss/55 text-[9px] tracking-[0.3em] font-mono">
-                          {p.step}
-                        </span>
-                      </div>
-                    </div>
-                    <h3
-                      className="text-foreground text-xl font-bold mb-3 group-hover:text-moss transition-colors duration-200"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
-                      {p.title}
-                    </h3>
-                    <p className="text-foreground/33 text-sm leading-[1.85]">{p.desc}</p>
-                  </div>
-                </AnimateIn>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── O que nos distingue ── */}
-      <section className="py-14 md:py-28 lg:py-40 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10 mb-20">
-              <div>
-                <p className="text-foreground/25 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center gap-3">
-                  <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
-                  Porquê a Líquen
-                </p>
-                <h2
-                  className="text-foreground font-bold leading-none"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(38px, 5vw, 70px)",
-                  }}
-                >
-                  O que nos
-                  <br />
-                  <span className="text-moss">distingue</span>
-                </h2>
-              </div>
-              <p className="text-foreground/30 text-sm leading-[1.85] max-w-xs">
-                A nossa abordagem combina atenção ao detalhe, criatividade e uma rede de parceiros
-                de excelência — para que cada evento seja único.
-              </p>
-            </div>
-          </AnimateIn>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-foreground/[0.055]">
-            {differentiators.map((d, i) => (
-              <AnimateIn key={d.num} delay={i * 60}>
-                <div className="bg-surface p-7 sm:p-10 lg:p-14 group hover:bg-surface-raised transition-colors duration-300 relative overflow-hidden">
-                  <span
-                    aria-hidden
-                    className="absolute -bottom-4 -right-2 select-none pointer-events-none font-bold leading-none"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(80px, 10vw, 150px)",
-                      color: "rgba(222,218,212,0.025)",
-                    }}
-                  >
-                    {d.num}
-                  </span>
-                  <div className="relative">
-                    <p className="text-moss/50 text-[9px] tracking-[0.48em] font-mono uppercase mb-7">
-                      {d.num}
-                    </p>
-                    <h3
-                      className="text-foreground text-2xl font-bold mb-4 group-hover:text-moss transition-colors duration-200"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
-                      {d.title}
-                    </h3>
-                    <p className="text-foreground/33 text-sm leading-[1.85] max-w-xs">{d.desc}</p>
-                  </div>
-                </div>
-              </AnimateIn>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ── Second photo strip ── */}
       <section className="bg-surface border-t border-foreground/8">
