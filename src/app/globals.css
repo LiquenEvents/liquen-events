@@ -362,7 +362,10 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   }
 }
 .route-fade {
-  animation: route-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* `backwards` (not `both`): applies the start state before the animation but
+     does NOT leave a lingering transform afterwards — a persistent transform
+     would create a containing block and break position:fixed overlays inside. */
+  animation: route-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 /* ── Magnetic / hover lift used across CTAs ── */
