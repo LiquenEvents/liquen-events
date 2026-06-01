@@ -87,6 +87,16 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
+/* Stop iOS Safari from auto-zooming when a form field is focused (it zooms
+   whenever the font is < 16px). Only bump on small screens so the desktop
+   look is untouched. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
 /* Safe-area helpers for fixed / edge elements (notch & home indicator) */
 .pt-safe {
   padding-top: env(safe-area-inset-top);
