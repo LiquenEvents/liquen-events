@@ -993,6 +993,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 >
                   Exportar seleção
                 </button>
+                {(() => {
+                  const emails = filtered
+                    .filter((q) => selectedIds.has(q.id) && q.email)
+                    .map((q) => q.email);
+                  if (emails.length === 0) return null;
+                  return (
+                    <a
+                      href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors"
+                      title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
+                    >
+                      Email ({emails.length})
+                    </a>
+                  );
+                })()}
                 <button
                   onClick={() => setSelectedIds(new Set())}
                   className="ml-auto text-foreground/40 text-xs hover:text-foreground/70 transition-colors"
