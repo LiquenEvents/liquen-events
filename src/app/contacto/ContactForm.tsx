@@ -146,7 +146,7 @@ function Pill({
       className={`px-4 py-3 sm:py-2.5 rounded-sm text-xs tracking-[0.18em] uppercase border transition-all duration-200 ${
         selected
           ? "bg-moss border-moss text-cream"
-          : "border-foreground/15 text-foreground/38 hover:border-foreground/30 hover:text-foreground/65"
+          : "border-foreground/15 text-foreground/38 hover:border-foreground/30 hover:text-foreground/78"
       }`}
     >
       {label}
@@ -170,7 +170,7 @@ function NavBtn({
   const styles =
     variant === "primary"
       ? `${base} px-9 py-4 bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3`
-      : `${base} text-foreground/55 hover:text-foreground/60`;
+      : `${base} text-foreground/72 hover:text-foreground/60`;
   return (
     <button
       type={variant === "primary" ? "button" : "button"}
@@ -195,14 +195,14 @@ function ProgressBar({ step }: { step: number }) {
                   ? "bg-moss border-moss text-cream"
                   : i + 1 === step
                     ? "border-moss text-moss"
-                    : "border-foreground/12 text-foreground/45"
+                    : "border-foreground/12 text-foreground/78"
               }`}
             >
               {i + 1 < step ? "✓" : i + 1}
             </div>
             <span
               className={`hidden sm:block text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 whitespace-nowrap ${
-                i + 1 <= step ? "text-foreground/50" : "text-foreground/18"
+                i + 1 <= step ? "text-foreground/68" : "text-foreground/18"
               }`}
             >
               {label}
@@ -257,7 +257,7 @@ export default function ContactForm() {
   const inputCls =
     "w-full bg-transparent border-b border-foreground/15 pb-4 text-sm text-foreground placeholder-foreground/18 focus:outline-none focus:border-moss/55 transition-colors duration-300";
 
-  const labelCls = "block text-[10px] text-foreground/50 tracking-[0.45em] uppercase mb-4";
+  const labelCls = "block text-[10px] text-foreground/68 tracking-[0.45em] uppercase mb-4";
 
   return (
     <>
@@ -299,7 +299,7 @@ export default function ContactForm() {
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
             {/* ── Left — Info ── */}
             <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
-              <p className="text-foreground/50 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
+              <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
                 Encontre-nos
               </p>
@@ -326,7 +326,7 @@ export default function ContactForm() {
                   },
                 ].map((item) => (
                   <div key={item.label} className="py-7">
-                    <p className="text-foreground/45 text-[10px] tracking-[0.45em] uppercase mb-2">
+                    <p className="text-foreground/78 text-[10px] tracking-[0.45em] uppercase mb-2">
                       {item.label}
                     </p>
                     {item.href ? (
@@ -339,7 +339,7 @@ export default function ContactForm() {
                     ) : (
                       <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
                     )}
-                    <p className="text-foreground/50 text-xs">{item.sub}</p>
+                    <p className="text-foreground/68 text-xs">{item.sub}</p>
                   </div>
                 ))}
               </div>
@@ -350,7 +350,7 @@ export default function ContactForm() {
                 className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
               >
                 <span className="text-moss flex-shrink-0 text-sm">✦</span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/40 group-hover:text-foreground/65 transition-colors">
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/60 group-hover:text-foreground/78 transition-colors">
                   Prefere um orçamento detalhado? Use o simulador
                 </span>
                 <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
@@ -368,7 +368,7 @@ export default function ContactForm() {
                 <span className="text-moss flex-shrink-0">
                   <WhatsAppIcon className="w-4 h-4" />
                 </span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/40 group-hover:text-foreground/65 transition-colors">
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/60 group-hover:text-foreground/78 transition-colors">
                   Falar pelo WhatsApp
                 </span>
                 <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
@@ -387,7 +387,7 @@ export default function ContactForm() {
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/50 hover:text-foreground/65 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
+                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/68 hover:text-foreground/78 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
                   >
                     {s.label}
                   </a>
@@ -397,13 +397,13 @@ export default function ContactForm() {
               {/* Promise */}
               <div className="border-l-2 border-moss/40 pl-7 py-2">
                 <p
-                  className="text-foreground/58 text-base leading-relaxed mb-4"
+                  className="text-foreground/72 text-base leading-relaxed mb-4"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
                   Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta
                   personalizada.
                 </p>
-                <p className="text-foreground/50 text-[10px] tracking-[0.3em] uppercase">
+                <p className="text-foreground/68 text-[10px] tracking-[0.3em] uppercase">
                   — Equipa Líquen Events
                 </p>
               </div>
@@ -429,7 +429,7 @@ export default function ContactForm() {
                       />
                     </svg>
                   </div>
-                  <p className="text-foreground/50 text-[10px] tracking-[0.5em] uppercase mb-6">
+                  <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-6">
                     Enviado com sucesso
                   </p>
                   <h3
@@ -443,7 +443,7 @@ export default function ContactForm() {
                     <br />
                     recebida.
                   </h3>
-                  <p className="text-foreground/40 text-sm leading-[1.85] max-w-sm mb-14">
+                  <p className="text-foreground/60 text-sm leading-[1.85] max-w-sm mb-14">
                     Obrigado{form.nome ? `, ${form.nome}` : ""}. Em breve entraremos em contacto
                     para avançarmos juntos no seu evento.
                   </p>
@@ -463,7 +463,7 @@ export default function ContactForm() {
                         </span>
                         <div>
                           <p className="text-foreground text-sm font-medium">{s.t}</p>
-                          <p className="text-foreground/50 text-xs mt-0.5">{s.d}</p>
+                          <p className="text-foreground/68 text-xs mt-0.5">{s.d}</p>
                         </div>
                       </div>
                     ))}
@@ -472,7 +472,7 @@ export default function ContactForm() {
                     href={WHATSAPP_HREF_CTA}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/55 hover:text-moss transition-colors"
+                    className="flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/72 hover:text-moss transition-colors"
                   >
                     <span className="text-moss">
                       <WhatsAppIcon className="w-4 h-4" />
@@ -528,17 +528,17 @@ export default function ContactForm() {
                               }`}
                             >
                               <span
-                                className={`transition-colors duration-200 ${form.eventType === ec.value ? "text-moss" : "text-foreground/55"}`}
+                                className={`transition-colors duration-200 ${form.eventType === ec.value ? "text-moss" : "text-foreground/72"}`}
                               >
                                 {ec.icon}
                               </span>
                               <div>
                                 <p
-                                  className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${form.eventType === ec.value ? "text-foreground" : "text-foreground/55"}`}
+                                  className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${form.eventType === ec.value ? "text-foreground" : "text-foreground/72"}`}
                                 >
                                   {ec.value}
                                 </p>
-                                <p className="text-xs text-foreground/50 leading-snug">{ec.desc}</p>
+                                <p className="text-xs text-foreground/68 leading-snug">{ec.desc}</p>
                               </div>
                             </button>
                           ))}
@@ -712,26 +712,26 @@ export default function ContactForm() {
                           <div className="border border-foreground/8 bg-surface-raised px-6 py-4 mb-8 flex flex-wrap gap-x-7 gap-y-2">
                             {form.eventType && (
                               <span className="text-xs">
-                                <span className="text-foreground/45 mr-1.5">Evento</span>
-                                <span className="text-foreground/50">{form.eventType}</span>
+                                <span className="text-foreground/78 mr-1.5">Evento</span>
+                                <span className="text-foreground/68">{form.eventType}</span>
                               </span>
                             )}
                             {form.convidados && (
                               <span className="text-xs">
-                                <span className="text-foreground/45 mr-1.5">Convidados</span>
-                                <span className="text-foreground/50">{form.convidados}</span>
+                                <span className="text-foreground/78 mr-1.5">Convidados</span>
+                                <span className="text-foreground/68">{form.convidados}</span>
                               </span>
                             )}
                             {form.orcamento && (
                               <span className="text-xs">
-                                <span className="text-foreground/45 mr-1.5">Orçamento</span>
-                                <span className="text-foreground/50">{form.orcamento}</span>
+                                <span className="text-foreground/78 mr-1.5">Orçamento</span>
+                                <span className="text-foreground/68">{form.orcamento}</span>
                               </span>
                             )}
                             {form.data && (
                               <span className="text-xs">
-                                <span className="text-foreground/45 mr-1.5">Data</span>
-                                <span className="text-foreground/50">{form.data}</span>
+                                <span className="text-foreground/78 mr-1.5">Data</span>
+                                <span className="text-foreground/68">{form.data}</span>
                               </span>
                             )}
                           </div>
@@ -747,7 +747,7 @@ export default function ContactForm() {
                           >
                             {sending ? "A enviar…" : "Enviar Pedido →"}
                           </button>
-                          <p className="text-foreground/45 text-xs tracking-wide">
+                          <p className="text-foreground/78 text-xs tracking-wide">
                             Resposta em 24h
                           </p>
                         </div>

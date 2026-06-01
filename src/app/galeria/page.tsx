@@ -31,7 +31,7 @@ export default function GaleriaPage() {
 
       <section className="py-24 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <p className="text-foreground/50 text-[10px] tracking-[0.48em] uppercase mb-8 flex items-center gap-3">
+          <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-8 flex items-center gap-3">
             <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
             Redes sociais
           </p>
@@ -41,7 +41,7 @@ export default function GaleriaPage() {
           >
             Siga-nos no Instagram
           </h2>
-          <p className="text-foreground/40 text-sm leading-relaxed mb-10 max-w-md">
+          <p className="text-foreground/60 text-sm leading-relaxed mb-10 max-w-md">
             Partilhamos os bastidores dos nossos eventos e inspirações diárias.
           </p>
           <a

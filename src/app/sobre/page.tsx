@@ -27,7 +27,7 @@ const gallery = [
 const eyebrowLight =
   "text-white/35 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
 const eyebrowDark =
-  "text-foreground/50 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
+  "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 export default function SobrePage() {
   return (
@@ -86,7 +86,7 @@ export default function SobrePage() {
               <br />
               <span className="text-moss">Eternizamos memórias.</span>
             </h2>
-            <p className="text-foreground/45 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
+            <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
               Com sede em Évora, desde 2018 que transformamos visões em experiências — em todo o
               Portugal.
             </p>
@@ -187,7 +187,7 @@ export default function SobrePage() {
                 &ldquo;
               </span>
               <p
-                className="text-foreground/65 leading-[1.5]"
+                className="text-foreground/78 leading-[1.5]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3vw, 38px)" }}
               >
                 Cada evento é uma oportunidade de criar algo extraordinário. É o que nos move.

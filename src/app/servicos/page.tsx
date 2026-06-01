@@ -330,7 +330,7 @@ export default function ServicosPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-end">
             {/* Left — headline */}
             <div className="lg:col-span-7 pb-2">
-              <p className="text-foreground/50 text-[10px] tracking-[0.5em] uppercase mb-10 anim-0 flex items-center gap-3">
+              <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-10 anim-0 flex items-center gap-3">
                 <span className="w-6 h-px bg-gold flex-shrink-0" />O que oferecemos
               </p>
               <h1
@@ -353,7 +353,7 @@ export default function ServicosPage() {
                 </p>
                 <Link
                   href="/orcamento"
-                  className="inline-flex items-center gap-3 text-sm text-foreground/40 hover:text-foreground/70 transition-colors duration-300 group"
+                  className="inline-flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground/70 transition-colors duration-300 group"
                 >
                   <span className="w-8 h-px bg-foreground/18 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
                   Pedir orçamento
@@ -435,7 +435,7 @@ export default function ServicosPage() {
                 <a
                   key={cat.id}
                   href={`#${cat.id}`}
-                  className="text-foreground/45 text-[9px] tracking-[0.45em] uppercase hover:text-foreground/60 transition-colors duration-300"
+                  className="text-foreground/78 text-[9px] tracking-[0.45em] uppercase hover:text-foreground/60 transition-colors duration-300"
                 >
                   <span className="text-moss/35 mr-2 font-mono">0{i + 1}</span>
                   {cat.label}
@@ -520,7 +520,7 @@ export default function ServicosPage() {
                 <a
                   key={cat.id}
                   href={`#${cat.id}`}
-                  className="text-[10px] tracking-[0.4em] uppercase text-foreground/55 hover:text-moss transition-colors duration-300 flex items-center gap-2 whitespace-nowrap"
+                  className="text-[10px] tracking-[0.4em] uppercase text-foreground/72 hover:text-moss transition-colors duration-300 flex items-center gap-2 whitespace-nowrap"
                 >
                   <span className="text-moss/35 font-mono">0{i + 1}</span>
                   {cat.label}
@@ -553,7 +553,7 @@ export default function ServicosPage() {
                   </span>
                   <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 pt-4">
                     <div>
-                      <p className="text-foreground/50 text-[10px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
+                      <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
                         <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                         {cat.subtitle}
                       </p>
@@ -590,7 +590,7 @@ export default function ServicosPage() {
                 <div className="mt-8 flex justify-end">
                   <Link
                     href={`/servicos/${cat.services[0].slug}`}
-                    className="group inline-flex items-center gap-3 text-xs text-foreground/55 hover:text-foreground/65 transition-colors duration-300 tracking-[0.3em] uppercase"
+                    className="group inline-flex items-center gap-3 text-xs text-foreground/72 hover:text-foreground/78 transition-colors duration-300 tracking-[0.3em] uppercase"
                   >
                     <span>Ver detalhes</span>
                     <span className="w-6 h-px bg-foreground/20 group-hover:w-10 transition-all duration-500" />
@@ -648,7 +648,7 @@ export default function ServicosPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2">
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28 order-2 lg:order-1">
             <AnimateIn>
-              <p className="text-foreground/50 text-[10px] tracking-[0.48em] uppercase mb-6 flex items-center gap-3">
+              <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-6 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 Onde atuamos
               </p>
@@ -658,7 +658,7 @@ export default function ServicosPage() {
               >
                 Évora, Lisboa e todo o Portugal
               </h2>
-              <p className="text-foreground/45 text-base lg:text-lg leading-[1.8] max-w-md">
+              <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] max-w-md">
                 Casamentos, eventos corporativos e celebrações — do conceito à execução, com a
                 sensibilidade do Alentejo e a exigência de uma equipa profissional.
               </p>

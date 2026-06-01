@@ -43,7 +43,7 @@ export default function FAQ() {
           >
             <span
               className={`text-sm lg:text-base leading-snug transition-colors duration-200 ${
-                open === i ? "text-foreground" : "text-foreground/55 group-hover:text-foreground/80"
+                open === i ? "text-foreground" : "text-foreground/72 group-hover:text-foreground/80"
               }`}
             >
               {faq.q}
@@ -52,7 +52,7 @@ export default function FAQ() {
               className={`flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center text-xs transition-all duration-300 ${
                 open === i
                   ? "border-moss text-moss rotate-45"
-                  : "border-foreground/15 text-foreground/55"
+                  : "border-foreground/15 text-foreground/72"
               }`}
             >
               +

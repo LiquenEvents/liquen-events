@@ -57,7 +57,7 @@ export default function ContactoPage() {
       <section className="py-16 sm:py-24 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
-            <p className="text-foreground/55 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
+            <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
               <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />O que dizem os nossos
               clientes
             </p>
@@ -73,7 +73,7 @@ export default function ContactoPage() {
                     &ldquo;
                   </span>
                   <p
-                    className="text-foreground/55 text-sm leading-[1.9] flex-1"
+                    className="text-foreground/72 text-sm leading-[1.9] flex-1"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
                     {t.quote}
@@ -118,7 +118,7 @@ export default function ContactoPage() {
       <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
-            <p className="text-foreground/50 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
+            <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
               <span className="w-5 h-px bg-gold/50 flex-shrink-0" />O que acontece a seguir
             </p>
           </AnimateIn>
@@ -137,7 +137,7 @@ export default function ContactoPage() {
                       {p.title}
                     </h3>
                   </div>
-                  <p className="lg:col-span-4 text-foreground/40 text-sm leading-relaxed max-w-xl">
+                  <p className="lg:col-span-4 text-foreground/60 text-sm leading-relaxed max-w-xl">
                     {p.desc}
                   </p>
                 </div>
@@ -154,7 +154,7 @@ export default function ContactoPage() {
           <AnimateIn>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
               <div className="lg:sticky" style={{ top: "6rem" }}>
-                <p className="text-foreground/55 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
+                <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
                   <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
                   Perguntas frequentes
                 </p>

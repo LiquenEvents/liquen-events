@@ -86,7 +86,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
       <section className="py-24 bg-surface">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-16">
           <AnimateIn>
-            <div className="flex flex-col gap-6 text-foreground/50 text-[16px] leading-[1.9]">
+            <div className="flex flex-col gap-6 text-foreground/68 text-[16px] leading-[1.9]">
               {svc.intro.map((p, i) => (
                 <p
                   key={i}
@@ -108,12 +108,12 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
           </AnimateIn>
           <AnimateIn delay={120}>
             <div className="border border-foreground/10 rounded-xl p-8 bg-surface-raised/40">
-              <p className="text-foreground/50 text-[10px] tracking-[0.4em] uppercase mb-6">
+              <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-6">
                 O que inclui
               </p>
               <ul className="flex flex-col gap-4">
                 {svc.includes.map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-foreground/55 text-sm">
+                  <li key={item} className="flex items-start gap-3 text-foreground/72 text-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-moss mt-1.5 flex-shrink-0" />
                     {item}
                   </li>
@@ -147,7 +147,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
       {svc.faqs.length > 0 && (
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-3xl mx-auto px-6 lg:px-16">
-            <p className="text-foreground/50 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+            <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
               <span className="w-5 h-px bg-gold/50" /> Perguntas frequentes
             </p>
             <div className="flex flex-col">
@@ -159,7 +159,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                   >
                     {f.q}
                   </h2>
-                  <p className="text-foreground/45 text-sm leading-[1.9]">{f.a}</p>
+                  <p className="text-foreground/78 text-sm leading-[1.9]">{f.a}</p>
                 </div>
               ))}
               <div className="border-t border-foreground/8" />
@@ -172,7 +172,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
       {related.length > 0 && (
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-7xl mx-auto px-6 lg:px-16">
-            <p className="text-foreground/50 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+            <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
               <span className="w-5 h-px bg-gold/50" /> Outros serviços
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

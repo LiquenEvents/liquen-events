@@ -417,12 +417,12 @@ export default function GaleriaClient() {
             className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
               cat === c
                 ? "bg-moss text-cream shadow-lg shadow-moss/20"
-                : "bg-foreground/5 text-foreground/40 hover:bg-foreground/10 hover:text-foreground/70"
+                : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10 hover:text-foreground/70"
             }`}
           >
             {c}
             <span
-              className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/45"}`}
+              className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/78"}`}
             >
               {counts[c]}
             </span>
@@ -514,10 +514,10 @@ export default function GaleriaClient() {
         <div className="mt-14 flex flex-col items-center gap-4">
           <button
             onClick={() => setShown((s) => Math.min(s + PAGE, pool.length))}
-            className="group px-10 py-3.5 border border-foreground/15 text-foreground/40 text-xs tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/70 transition-all duration-300 flex items-center gap-3"
+            className="group px-10 py-3.5 border border-foreground/15 text-foreground/60 text-xs tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/70 transition-all duration-300 flex items-center gap-3"
           >
             Ver mais
-            <span className="text-foreground/50 group-hover:text-foreground/50 transition-colors">
+            <span className="text-foreground/68 group-hover:text-foreground/68 transition-colors">
               +{Math.min(PAGE, pool.length - shown)}
             </span>
           </button>
@@ -527,7 +527,7 @@ export default function GaleriaClient() {
               style={{ width: `${(shown / pool.length) * 100}%` }}
             />
           </div>
-          <p className="text-foreground/45 text-[10px] tracking-widest">
+          <p className="text-foreground/78 text-[10px] tracking-widest">
             {shown} de {pool.length}
           </p>
         </div>

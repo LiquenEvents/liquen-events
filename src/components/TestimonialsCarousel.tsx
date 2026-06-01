@@ -45,7 +45,7 @@ export default function TestimonialsCarousel() {
         <AnimateIn>
           <div className="flex items-center gap-4 mb-10 lg:mb-16">
             <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
-            <p className="text-foreground/50 text-[10px] tracking-[0.48em] uppercase">
+            <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase">
               O que dizem os clientes
             </p>
           </div>

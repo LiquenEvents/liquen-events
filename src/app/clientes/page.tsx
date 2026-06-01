@@ -46,7 +46,7 @@ const testimonials = [
 ];
 
 const eyebrow =
-  "text-foreground/50 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
+  "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 const mosaicItems = [
   {
@@ -159,7 +159,7 @@ export default function ClientesPage() {
           <div className="grid lg:grid-cols-[1fr_auto] gap-16 lg:gap-24 items-end">
             <AnimateIn>
               <p
-                className="text-foreground/55 leading-[1.72]"
+                className="text-foreground/72 leading-[1.72]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 2.8vw, 36px)" }}
               >
                 De grandes empresas a celebrações de família, são dezenas os que confiam à Líquen
@@ -290,7 +290,7 @@ export default function ClientesPage() {
                     &ldquo;
                   </span>
                   <blockquote
-                    className="text-foreground/58 leading-[1.72] flex-1"
+                    className="text-foreground/72 leading-[1.72] flex-1"
                     style={{
                       fontFamily: "var(--font-playfair)",
                       fontSize: "clamp(16px, 1.7vw, 19px)",

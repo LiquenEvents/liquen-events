@@ -71,7 +71,7 @@ export default function Navbar() {
                   pathname === link.href
                     ? "text-moss nav-active"
                     : scrolled
-                      ? "text-foreground/55 hover:text-foreground"
+                      ? "text-foreground/72 hover:text-foreground"
                       : "text-white/75 hover:text-white"
                 }`}
               >
@@ -85,7 +85,7 @@ export default function Navbar() {
               href="/contacto"
               className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
                 scrolled
-                  ? "border-foreground/18 text-foreground/55 hover:border-foreground/35 hover:text-foreground"
+                  ? "border-foreground/18 text-foreground/72 hover:border-foreground/35 hover:text-foreground"
                   : "border-white/30 text-white/80 hover:border-white/60 hover:text-white"
               }`}
             >
@@ -143,7 +143,7 @@ export default function Navbar() {
               href={link.href}
               aria-current={pathname === link.href ? "page" : undefined}
               className={`py-4 text-[11px] tracking-[0.22em] uppercase border-b border-foreground/6 ${
-                pathname === link.href ? "text-moss" : "text-foreground/40 hover:text-foreground/70"
+                pathname === link.href ? "text-moss" : "text-foreground/60 hover:text-foreground/70"
               }`}
               style={{
                 opacity: isOpen ? 1 : 0,
@@ -158,7 +158,7 @@ export default function Navbar() {
           ))}
           <Link
             href="/contacto"
-            className="mt-4 inline-block text-center text-[11px] tracking-[0.22em] uppercase border border-foreground/15 text-foreground/40 px-5 py-3.5 rounded-sm hover:border-foreground/30 hover:text-foreground/65 transition-colors"
+            className="mt-4 inline-block text-center text-[11px] tracking-[0.22em] uppercase border border-foreground/15 text-foreground/60 px-5 py-3.5 rounded-sm hover:border-foreground/30 hover:text-foreground/78 transition-colors"
             style={{
               opacity: isOpen ? 1 : 0,
               transform: isOpen ? "none" : "translateY(6px)",
