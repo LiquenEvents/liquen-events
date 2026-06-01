@@ -205,20 +205,43 @@ export default function SobrePage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="py-24 lg:py-40 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
+        <Image
+          src="/imagens/DaniGui_Adois_61.jpg"
+          alt="Evento Líquen Events"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
+        />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
+            <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+              <span className="w-8 h-px bg-moss" />
+              Vamos criar juntos
+              <span className="w-8 h-px bg-moss" />
+            </p>
             <h2
-              className="text-foreground text-4xl sm:text-5xl lg:text-7xl font-bold leading-tight mb-10 max-w-2xl"
-              style={{ fontFamily: "var(--font-playfair)" }}
+              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 7vw, 96px)" }}
             >
-              Vamos trabalhar juntos?
+              Vamos trabalhar
+              <br />
+              <span className="text-moss">juntos?</span>
             </h2>
           </AnimateIn>
-          <AnimateIn delay={150}>
+          <AnimateIn delay={110}>
+            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
+              Da primeira conversa ao último brinde, tratamos de cada detalhe do seu evento.
+            </p>
+          </AnimateIn>
+          <AnimateIn delay={180}>
             <Link
               href="/contacto"
-              className="inline-flex items-center gap-3 px-7 py-4 bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
+              className="inline-flex items-center gap-3 px-9 py-4 bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
             >
               Entrar em Contacto →
             </Link>

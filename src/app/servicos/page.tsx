@@ -701,49 +701,51 @@ export default function ServicosPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="relative py-14 md:py-28 lg:py-48 bg-surface border-t border-foreground/8 overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 65% 80% at 0% 105%, rgba(74,124,89,0.11) 0%, transparent 58%)",
-          }}
+      <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
+        <Image
+          src="/imagens/EW1_1330.jpg"
+          alt="Evento corporativo Líquen Events"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/EW1_1330.jpg")}
         />
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
+        <div className="absolute inset-0 bg-black/65" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-foreground/25 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-moss flex-shrink-0" />
-              <span className="text-moss/65">Próximo passo</span>
+            <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+              <span className="w-8 h-px bg-moss" />
+              Próximo passo
+              <span className="w-8 h-px bg-moss" />
             </p>
-          </AnimateIn>
-          <AnimateIn delay={80}>
             <h2
-              className="text-foreground font-bold leading-[0.9] tracking-tight mb-6 max-w-3xl"
-              style={{
-                fontFamily: "var(--font-playfair)",
-                fontSize: "clamp(48px, 7.5vw, 108px)",
-              }}
+              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 110px)" }}
             >
               Tem um evento
               <br />
               <span className="text-moss">em mente?</span>
             </h2>
-            <p className="text-foreground/30 text-base leading-[1.85] mb-14 max-w-md">
+          </AnimateIn>
+          <AnimateIn delay={110}>
+            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
               Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma
               proposta à sua medida.
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-4 justify-center">
               <Link
                 href="/orcamento"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
+                className="inline-flex items-center gap-3 px-9 py-4 bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 Pedir Orçamento →
               </Link>
               <Link
                 href="/galeria"
-                className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/12 text-foreground/42 font-medium hover:border-foreground/25 hover:text-foreground/72 transition-all duration-300 text-sm tracking-widest uppercase"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
               >
                 Ver a galeria
               </Link>

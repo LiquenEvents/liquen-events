@@ -367,71 +367,54 @@ export default function Home() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="relative py-24 lg:py-60 bg-surface border-t border-foreground/8 overflow-hidden">
-        <span
-          aria-hidden
-          className="absolute -bottom-10 -right-10 select-none pointer-events-none font-bold leading-none text-foreground/[0.028]"
-          style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(140px, 34vw, 560px)" }}
-        >
-          Memória
-        </span>
+      <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
+        <Image
+          src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
+          alt="Evento Líquen Events"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
+        />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-foreground/22 text-[9px] tracking-[0.55em] uppercase mb-10 lg:mb-20 flex items-center gap-3">
-              <span className="w-5 h-px bg-moss flex-shrink-0" />
+            <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+              <span className="w-8 h-px bg-moss" />
               Próximo passo
+              <span className="w-8 h-px bg-moss" />
             </p>
-          </AnimateIn>
-
-          <AnimateIn delay={60}>
             <h2
-              className="font-bold leading-[0.88] tracking-tight text-foreground mb-10 lg:mb-20"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(48px, 13vw, 196px)" }}
+              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 116px)" }}
             >
               Tem um evento
               <br />
               <span className="text-moss">em mente?</span>
             </h2>
           </AnimateIn>
-
           <AnimateIn delay={110}>
-            <div className="w-full h-px bg-foreground/8 mb-10 lg:mb-16" />
+            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
+              Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em
+              menos de 24 horas.
+            </p>
           </AnimateIn>
-
-          <AnimateIn delay={170}>
-            <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-8 lg:gap-12">
-              <div>
-                <p className="text-foreground/18 text-[9px] tracking-[0.5em] uppercase mb-3">
-                  Email
-                </p>
-                <a
-                  href="mailto:liquen.alentejo@gmail.com"
-                  className="group flex items-center gap-3 text-foreground/50 hover:text-foreground transition-colors duration-500 break-all sm:break-normal"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(16px, 2.4vw, 34px)",
-                  }}
-                >
-                  liquen.alentejo@gmail.com
-                  <span className="hidden sm:inline-block w-8 h-px bg-foreground/20 group-hover:w-16 group-hover:bg-moss transition-all duration-500 flex-shrink-0" />
-                </a>
-              </div>
-
-              <div className="flex flex-wrap gap-3 flex-shrink-0">
-                <Link
-                  href="/contacto"
-                  className="inline-flex items-center gap-2 px-6 py-3.5 bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-4 transition-all duration-300 text-xs tracking-widest uppercase shadow-lg shadow-moss/15"
-                >
-                  Iniciar projeto →
-                </Link>
-                <Link
-                  href="/galeria"
-                  className="inline-flex items-center gap-2 px-6 py-3.5 border border-foreground/12 text-foreground/40 font-medium hover:border-foreground/28 hover:text-foreground/70 transition-all duration-300 text-xs tracking-widest uppercase"
-                >
-                  Ver galeria
-                </Link>
-              </div>
+          <AnimateIn delay={180}>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Link
+                href="/orcamento"
+                className="inline-flex items-center gap-3 px-9 py-4 bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+              >
+                Pedir Orçamento →
+              </Link>
+              <Link
+                href="/galeria"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
+              >
+                Ver galeria
+              </Link>
             </div>
           </AnimateIn>
         </div>
