@@ -109,7 +109,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ScrollProgress />
         <StickyCTA />
         <Navbar />
-        <main id="conteudo" className="flex-1 pt-20">
+        <main id="conteudo" className="flex-1 pt-24">
           <PageTransition>{children}</PageTransition>
         </main>
         <Footer />

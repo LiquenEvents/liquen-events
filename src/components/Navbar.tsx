@@ -44,7 +44,7 @@ export default function Navbar() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="relative flex items-center justify-between h-[76px]">
+        <div className="relative flex items-center justify-between h-[92px]">
           <Link
             href="/"
             className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:translate-x-0 md:translate-y-0"
@@ -52,9 +52,9 @@ export default function Navbar() {
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
-              width={116}
-              height={69}
-              className="object-contain h-16 w-auto"
+              width={134}
+              height={80}
+              className="object-contain h-[72px] w-auto"
               priority
             />
           </Link>
