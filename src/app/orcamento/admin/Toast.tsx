@@ -35,7 +35,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <div className="fixed bottom-6 right-6 z-[80] flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
-          <ToastItem key={t.id} toast={t} onClose={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))} />
+          <ToastItem
+            key={t.id}
+            toast={t}
+            onClose={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+          />
         ))}
       </div>
     </ToastContext.Provider>
@@ -43,7 +47,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 const DOT: Record<ToastKind, string> = {
-  success: "#4a7c59",
+  success: "#7c854b",
   error: "#b5654a",
   info: "#8a8a82",
 };
@@ -61,7 +65,10 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
       }`}
     >
-      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: DOT[toast.kind] }} />
+      <span
+        className="w-2 h-2 rounded-full flex-shrink-0"
+        style={{ background: DOT[toast.kind] }}
+      />
       <p className="flex-1 text-foreground/75 text-sm leading-snug">{toast.message}</p>
       <button
         onClick={onClose}

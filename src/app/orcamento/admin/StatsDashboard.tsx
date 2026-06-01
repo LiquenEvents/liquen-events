@@ -14,9 +14,9 @@ const eur = (n: number) =>
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },
-  em_revisao: { label: "Em Revisão", color: "#6a9c7a" },
-  cotado: { label: "Cotado", color: "#4a7c59" },
-  aceite: { label: "Aceite", color: "#2d5c3e" },
+  em_revisao: { label: "Em Revisão", color: "#9aa36a" },
+  cotado: { label: "Cotado", color: "#7c854b" },
+  aceite: { label: "Aceite", color: "#525a2f" },
   rejeitado: { label: "Rejeitado", color: "#5a5a55" },
 };
 
@@ -101,7 +101,7 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
           <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${(d.value / max) * 100}%`, background: d.color ?? "#4a7c59" }}
+              style={{ width: `${(d.value / max) * 100}%`, background: d.color ?? "#7c854b" }}
             />
           </div>
         </div>

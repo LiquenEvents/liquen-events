@@ -322,7 +322,7 @@ export default function ServicosPage() {
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 70% 60% at -10% 80%, rgba(74,124,89,0.07) 0%, transparent 55%)",
+              "radial-gradient(ellipse 70% 60% at -10% 80%, rgba(124, 133, 75,0.07) 0%, transparent 55%)",
           }}
         />
 
@@ -331,7 +331,7 @@ export default function ServicosPage() {
             {/* Left — headline */}
             <div className="lg:col-span-7 pb-2">
               <p className="text-foreground/25 text-[10px] tracking-[0.5em] uppercase mb-10 anim-0 flex items-center gap-3">
-                <span className="w-6 h-px bg-moss flex-shrink-0" />O que oferecemos
+                <span className="w-6 h-px bg-gold flex-shrink-0" />O que oferecemos
               </p>
               <h1
                 className="text-foreground font-bold leading-[0.88] tracking-tight mb-12 anim-1"
@@ -554,7 +554,7 @@ export default function ServicosPage() {
                   <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 pt-4">
                     <div>
                       <p className="text-foreground/25 text-[10px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
-                        <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+                        <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                         {cat.subtitle}
                       </p>
                       <h2
@@ -649,7 +649,7 @@ export default function ServicosPage() {
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28 order-2 lg:order-1">
             <AnimateIn>
               <p className="text-foreground/25 text-[10px] tracking-[0.48em] uppercase mb-6 flex items-center gap-3">
-                <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 Onde atuamos
               </p>
               <h2
@@ -697,9 +697,9 @@ export default function ServicosPage() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
               Próximo passo
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"

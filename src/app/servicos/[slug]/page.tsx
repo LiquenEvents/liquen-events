@@ -148,7 +148,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-3xl mx-auto px-6 lg:px-16">
             <p className="text-foreground/25 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-moss/50" /> Perguntas frequentes
+              <span className="w-5 h-px bg-gold/50" /> Perguntas frequentes
             </p>
             <div className="flex flex-col">
               {svc.faqs.map((f) => (
@@ -173,7 +173,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <p className="text-foreground/25 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-moss/50" /> Outros serviços
+              <span className="w-5 h-px bg-gold/50" /> Outros serviços
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {related.map((r) => (
@@ -215,7 +215,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 65% 80% at 0% 105%, rgba(74,124,89,0.11) 0%, transparent 58%)",
+              "radial-gradient(ellipse 65% 80% at 0% 105%, rgba(124, 133, 75,0.11) 0%, transparent 58%)",
           }}
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">

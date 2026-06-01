@@ -1046,7 +1046,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           type="checkbox"
                           checked={isSel}
                           onChange={() => toggleSelect(q.id)}
-                          className="w-4 h-4 accent-[#4a7c59] cursor-pointer"
+                          className="w-4 h-4 accent-[#7c854b] cursor-pointer"
                           aria-label={`Selecionar pedido de ${q.name}`}
                         />
                       </label>

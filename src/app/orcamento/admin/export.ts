@@ -213,8 +213,8 @@ export function printRunSheet(q: Quote): void {
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; margin: 0; padding: 40px; }
-    .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2d5c3e; padding-bottom: 16px; margin-bottom: 24px; }
-    .brand { font-size: 13px; letter-spacing: .25em; text-transform: uppercase; color: #2d5c3e; font-weight: 700; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #525a2f; padding-bottom: 16px; margin-bottom: 24px; }
+    .brand { font-size: 13px; letter-spacing: .25em; text-transform: uppercase; color: #525a2f; font-weight: 700; }
     h1 { font-size: 26px; margin: 6px 0 2px; }
     .sub { color: #666; font-size: 13px; }
     .id { color: #999; font-size: 11px; font-family: monospace; }
@@ -222,16 +222,16 @@ export function printRunSheet(q: Quote): void {
     .facts div { border-bottom: 1px solid #eee; padding: 6px 0; display: flex; justify-content: space-between; gap: 12px; }
     .facts .k { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     .facts .v { color: #111; font-size: 13px; font-weight: 600; text-align: right; }
-    h2 { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: #2d5c3e; margin: 28px 0 10px; }
+    h2 { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: #525a2f; margin: 28px 0 10px; }
     table { width: 100%; border-collapse: collapse; }
     td { padding: 8px 6px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: top; }
-    td.t { width: 70px; font-weight: 700; color: #2d5c3e; white-space: nowrap; }
+    td.t { width: 70px; font-weight: 700; color: #525a2f; white-space: nowrap; }
     td.o { color: #777; width: 150px; }
     td.empty, li.empty { color: #aaa; font-style: italic; }
     ul { list-style: none; padding: 0; margin: 0; }
     li { padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; gap: 10px; align-items: center; }
     li.done { color: #888; text-decoration: line-through; }
-    .box { width: 16px; height: 16px; border: 1.5px solid #999; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #2d5c3e; flex: 0 0 auto; }
+    .box { width: 16px; height: 16px; border: 1.5px solid #999; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #525a2f; flex: 0 0 auto; }
     .notes { margin-top: 24px; padding: 12px 14px; background: #f7f6f3; border-radius: 6px; font-size: 13px; color: #333; white-space: pre-wrap; }
     .foot { margin-top: 40px; color: #aaa; font-size: 11px; text-align: center; }
     @media print { body { padding: 24px; } .foot { position: fixed; bottom: 12px; left: 0; right: 0; } }

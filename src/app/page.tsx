@@ -86,7 +86,7 @@ export default function Home() {
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
           <p className="text-white/45 text-[10px] sm:text-xs tracking-[0.45em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
-            <span className="inline-block w-8 h-px bg-moss flex-shrink-0" />
+            <span className="inline-block w-8 h-px bg-gold flex-shrink-0" />
             Organização de eventos · Évora
           </p>
           <h1
@@ -148,7 +148,7 @@ export default function Home() {
           <AnimateIn>
             <div className="flex items-end justify-between mb-8 lg:mb-12">
               <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
-                <span className="w-6 h-px bg-moss rounded-full flex-shrink-0" />O que fazemos
+                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />O que fazemos
               </p>
               <Link
                 href="/servicos"
@@ -202,7 +202,7 @@ export default function Home() {
           <AnimateIn>
             <div className="flex items-end justify-between mb-8 lg:mb-12">
               <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
-                <span className="w-6 h-px bg-moss rounded-full flex-shrink-0" />
+                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
                 Trabalho selecionado
               </p>
               <Link
@@ -322,7 +322,7 @@ export default function Home() {
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
             <AnimateIn>
               <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase mb-6 flex items-center gap-3">
-                <span className="w-6 h-px bg-moss rounded-full flex-shrink-0" />
+                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
                 Onde atuamos
               </p>
               <h2
@@ -376,9 +376,9 @@ export default function Home() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
               Próximo passo
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"

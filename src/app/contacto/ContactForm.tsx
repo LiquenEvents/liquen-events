@@ -275,7 +275,7 @@ export default function ContactForm() {
         <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
           <div className="max-w-7xl mx-auto w-full">
             <p className="text-cream/35 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-              <span className="w-5 h-px bg-moss/60 rounded-full flex-shrink-0" />
+              <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
               Fale connosco
             </p>
             <h1
@@ -300,7 +300,7 @@ export default function ContactForm() {
             {/* ── Left — Info ── */}
             <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
               <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
-                <span className="w-5 h-px bg-moss/50 rounded-full flex-shrink-0" />
+                <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
                 Encontre-nos
               </p>
 

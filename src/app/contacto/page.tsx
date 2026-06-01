@@ -16,7 +16,11 @@ export const metadata: Metadata = pageMetadata({
   description:
     "Contacte a Líquen Events para organizar o seu evento em Évora, Alentejo, Lisboa ou em qualquer ponto de Portugal. Respondemos em menos de 24 horas com uma proposta à medida.",
   path: "/contacto",
-  keywords: ["contacto Líquen Events", "orçamento de eventos Évora", "organização de eventos Alentejo"],
+  keywords: [
+    "contacto Líquen Events",
+    "orçamento de eventos Évora",
+    "organização de eventos Alentejo",
+  ],
 });
 
 const steps = [
@@ -54,16 +58,24 @@ export default function ContactoPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
-              <span className="w-6 h-px bg-moss rounded-full flex-shrink-0" />
-              O que dizem os nossos clientes
+              <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />O que dizem os nossos
+              clientes
             </p>
           </AnimateIn>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-foreground/[0.06]">
             {testimonials.slice(1).map((t, i) => (
               <AnimateIn key={t.name} delay={i * 80}>
                 <div className="bg-surface p-10 lg:p-12 flex flex-col gap-6 h-full">
-                  <span className="text-moss/30 text-4xl font-bold leading-none" style={{ fontFamily: "var(--font-playfair)" }}>&ldquo;</span>
-                  <p className="text-foreground/55 text-sm leading-[1.9] flex-1" style={{ fontFamily: "var(--font-playfair)" }}>
+                  <span
+                    className="text-moss/30 text-4xl font-bold leading-none"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    &ldquo;
+                  </span>
+                  <p
+                    className="text-foreground/55 text-sm leading-[1.9] flex-1"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
                     {t.quote}
                   </p>
                   <div>
@@ -107,8 +119,7 @@ export default function ContactoPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-foreground/25 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
-              <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
-              O que acontece a seguir
+              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />O que acontece a seguir
             </p>
           </AnimateIn>
           <div>
@@ -116,7 +127,9 @@ export default function ContactoPage() {
               <AnimateIn key={p.step} delay={i * 70}>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-foreground/8">
                   <div className="lg:col-span-1 flex items-start gap-4">
-                    <span className="text-foreground/15 text-xs font-mono mt-1 tabular-nums">{p.step}</span>
+                    <span className="text-foreground/15 text-xs font-mono mt-1 tabular-nums">
+                      {p.step}
+                    </span>
                     <h3
                       className="text-foreground text-lg font-bold"
                       style={{ fontFamily: "var(--font-playfair)" }}
@@ -142,14 +155,16 @@ export default function ContactoPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
               <div className="lg:sticky" style={{ top: "6rem" }}>
                 <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
-                  <span className="w-6 h-px bg-moss rounded-full flex-shrink-0" />
+                  <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
                   Perguntas frequentes
                 </p>
                 <h2
                   className="text-foreground text-4xl lg:text-5xl font-bold leading-tight"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
-                  Tem<br />dúvidas?
+                  Tem
+                  <br />
+                  dúvidas?
                 </h2>
                 <p className="text-foreground/35 text-sm leading-relaxed mt-6 max-w-xs">
                   Se não encontrar a resposta que procura, contacte-nos diretamente.
@@ -165,7 +180,10 @@ export default function ContactoPage() {
       <section className="py-20 sm:py-32 bg-moss-dark relative overflow-hidden border-t border-moss/20">
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(74,124,89,0.5) 0%, transparent 55%)" }}
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(124, 133, 75,0.5) 0%, transparent 55%)",
+          }}
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
           <AnimateIn>
@@ -177,10 +195,13 @@ export default function ContactoPage() {
               className="text-cream font-bold leading-tight mb-6"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5vw, 72px)" }}
             >
-              Prefere falar<br />agora?
+              Prefere falar
+              <br />
+              agora?
             </h2>
             <p className="text-cream/45 text-base leading-relaxed max-w-md mb-12">
-              Fale connosco diretamente pelo WhatsApp. Estamos disponíveis de segunda a sexta, das 9h às 18h.
+              Fale connosco diretamente pelo WhatsApp. Estamos disponíveis de segunda a sexta, das
+              9h às 18h.
             </p>
             <div className="flex flex-wrap gap-4">
               <a

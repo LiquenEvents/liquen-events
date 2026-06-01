@@ -5,7 +5,7 @@ import type { Task, TaskPriority } from "../types";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#b5654a" },
-  normal: { label: "Normal", color: "#6a9c7a" },
+  normal: { label: "Normal", color: "#9aa36a" },
   baixa: { label: "Baixa", color: "#8a8a82" },
 };
 

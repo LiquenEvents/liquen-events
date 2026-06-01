@@ -9,10 +9,8 @@ export default function PageHeader({ label, title, description }: PageHeaderProp
     <section className="pt-24 sm:pt-28 md:pt-44 pb-10 md:pb-20 px-6 lg:px-16 bg-surface border-b border-foreground/6">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-7 md:mb-16 anim-0">
-          <span className="block w-8 h-px bg-moss/50 flex-shrink-0" />
-          <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase">
-            {label}
-          </p>
+          <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
+          <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase">{label}</p>
         </div>
 
         <h1

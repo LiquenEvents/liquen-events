@@ -51,7 +51,7 @@ export default function SobrePage() {
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-28 pt-40">
           <AnimateIn>
             <p className={`${eyebrowLight} mb-8`}>
-              <span className="w-8 h-px bg-moss flex-shrink-0" />
+              <span className="w-8 h-px bg-gold flex-shrink-0" />
               Quem somos
             </p>
           </AnimateIn>
@@ -76,7 +76,7 @@ export default function SobrePage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
           <AnimateIn from="left">
             <p className={`${eyebrowDark} mb-8`}>
-              <span className="w-5 h-px bg-moss/50 flex-shrink-0" />A nossa essência
+              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />A nossa essência
             </p>
             <h2
               className="text-foreground font-bold leading-[1.05]"
@@ -177,7 +177,7 @@ export default function SobrePage() {
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
             <AnimateIn>
               <p className={`${eyebrowDark} mb-10`}>
-                <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 As pessoas
               </p>
               <span
@@ -193,7 +193,7 @@ export default function SobrePage() {
                 Cada evento é uma oportunidade de criar algo extraordinário. É o que nos move.
               </p>
               <div className="mt-10 flex items-center gap-4">
-                <span className="w-8 h-px bg-moss/50" />
+                <span className="w-8 h-px bg-gold/50" />
                 <div>
                   <p className="text-foreground text-sm font-semibold">Catarina Gaspar</p>
                   <p className="text-foreground/35 text-xs mt-0.5">Fundadora &amp; CEO</p>
@@ -220,9 +220,9 @@ export default function SobrePage() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
               Vamos criar juntos
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"

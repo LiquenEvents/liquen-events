@@ -116,7 +116,7 @@ export default function ClientesPage() {
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
           <AnimateIn>
             <p className="text-white/35 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3 mb-10">
-              <span className="w-8 h-px bg-moss flex-shrink-0" />
+              <span className="w-8 h-px bg-gold flex-shrink-0" />
               Quem confia em nós
             </p>
           </AnimateIn>
@@ -190,7 +190,7 @@ export default function ClientesPage() {
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-14">
             <AnimateIn>
               <p className={`${eyebrow} mb-4`}>
-                <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 Empresas &amp; instituições
               </p>
               <h2
@@ -219,7 +219,7 @@ export default function ClientesPage() {
             {/* Quote side */}
             <AnimateIn className="flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-28">
               <p className={`${eyebrow} mb-12`}>
-                <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 Testemunhos
               </p>
               <span
@@ -237,7 +237,7 @@ export default function ClientesPage() {
                 coordenação perfeita, permitiu-nos desfrutar do evento sem qualquer preocupação.
               </blockquote>
               <div className="mt-10 pt-7 border-t border-foreground/10 flex items-center gap-5">
-                <div className="w-8 h-px bg-moss flex-shrink-0" />
+                <div className="w-8 h-px bg-gold flex-shrink-0" />
                 <div>
                   <p className="text-foreground text-sm font-semibold tracking-wide">
                     Alexandra Teixeira
@@ -299,7 +299,7 @@ export default function ClientesPage() {
                     {t.text}
                   </blockquote>
                   <figcaption className="mt-8 pt-6 border-t border-foreground/8 flex items-center gap-4">
-                    <div className="w-6 h-px bg-moss flex-shrink-0" />
+                    <div className="w-6 h-px bg-gold flex-shrink-0" />
                     <div>
                       <p className="text-foreground text-sm font-semibold">{t.name}</p>
                       <p className="text-moss/60 text-[10px] mt-0.5 tracking-[0.18em] uppercase">
@@ -319,7 +319,7 @@ export default function ClientesPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-10">
             <p className={eyebrow}>
-              <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
+              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
               Momentos dos nossos eventos
             </p>
           </AnimateIn>
@@ -366,9 +366,9 @@ export default function ClientesPage() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
               Próximo evento
-              <span className="w-8 h-px bg-moss" />
+              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.88] tracking-tight mb-6"

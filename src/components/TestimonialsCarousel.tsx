@@ -44,7 +44,7 @@ export default function TestimonialsCarousel() {
       <div className="max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
         <AnimateIn>
           <div className="flex items-center gap-4 mb-10 lg:mb-16">
-            <span className="block w-8 h-px bg-moss/50 flex-shrink-0" />
+            <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
             <p className="text-foreground/28 text-[10px] tracking-[0.48em] uppercase">
               O que dizem os clientes
             </p>
@@ -67,7 +67,7 @@ export default function TestimonialsCarousel() {
                 &ldquo;{t.quote}&rdquo;
               </p>
               <div className="flex items-center gap-5">
-                <div className="w-8 h-px bg-moss/50" />
+                <div className="w-8 h-px bg-gold/50" />
                 <div>
                   <p className="text-foreground text-sm font-medium">{t.name}</p>
                   <p className="text-foreground/35 text-xs tracking-wide mt-0.5">{t.role}</p>

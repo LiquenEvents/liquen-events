@@ -34,21 +34,26 @@ export default function GlobalError({
         }}
       >
         <div style={{ maxWidth: 460, textAlign: "center" }}>
-          <p style={{ letterSpacing: "0.4em", textTransform: "uppercase", fontSize: 10, opacity: 0.4 }}>
+          <p
+            style={{
+              letterSpacing: "0.4em",
+              textTransform: "uppercase",
+              fontSize: 10,
+              opacity: 0.4,
+            }}
+          >
             Erro
           </p>
-          <h1 style={{ fontSize: 28, fontWeight: 700, margin: "16px 0" }}>
-            Algo correu mal.
-          </h1>
+          <h1 style={{ fontSize: 28, fontWeight: 700, margin: "16px 0" }}>Algo correu mal.</h1>
           <p style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.55, marginBottom: 28 }}>
-            Pedimos desculpa pelo incómodo. Tente novamente — se o problema
-            persistir, contacte-nos diretamente.
+            Pedimos desculpa pelo incómodo. Tente novamente — se o problema persistir, contacte-nos
+            diretamente.
           </p>
           <button
             onClick={reset}
             style={{
               padding: "14px 32px",
-              background: "#4a7c59",
+              background: "#7c854b",
               color: "#f5f3ee",
               border: "none",
               borderRadius: 3,
