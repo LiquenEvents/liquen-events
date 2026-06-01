@@ -82,7 +82,7 @@ export default function Home() {
           src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
           alt="Líquen Events — evento aéreo no Alentejo"
           fill
-          priority
+          preload
           sizes="100vw"
           className="object-cover object-center scale-105"
         />

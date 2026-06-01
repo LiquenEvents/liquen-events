@@ -380,7 +380,7 @@ export default function ServicosPage() {
                     fill
                     sizes="(max-width: 1024px) 50vw, 22vw"
                     className="object-cover"
-                    priority
+                    preload
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                   <div className="absolute bottom-4 left-4">
@@ -396,7 +396,7 @@ export default function ServicosPage() {
                     {...blurFor("/imagens/EW1_1414.jpg")}
                     alt="Eventos corporativos"
                     fill
-                    priority
+                    loading="eager"
                     sizes="(max-width: 1024px) 50vw, 18vw"
                     className="object-cover"
                   />

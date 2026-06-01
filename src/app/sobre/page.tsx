@@ -40,7 +40,7 @@ export default function SobrePage() {
           src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
           alt="Líquen Events — celebração"
           fill
-          priority
+          preload
           sizes="100vw"
           className="object-cover object-center"
           {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3204.jpg")}

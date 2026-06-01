@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { log } from "@/lib/logger";
 
 /**
  * Global error boundary — catches failures in the root layout itself, which
@@ -15,7 +16,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     // Structured client-side report; in production this is a JSON line.
-    console.error("[global-error]", error);
+    log.error("erro global da aplicação", error);
   }, [error]);
 
   return (

@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { NextRequest } from "next/server";
 import { verifyTotp } from "./totp";
+import { log } from "./logger";
 
 /**
  * Admin authentication for the internal dashboard.
@@ -42,9 +43,8 @@ function sessionSecret(): string {
   if (process.env.NODE_ENV === "production") {
     // Don't lock the team out of their own dashboard: derive a stable key from
     // the configured password hash, but make the misconfiguration loud.
-    console.error(
-      "[auth] SESSION_SECRET is not set (or too short) in production. " +
-        "Set a random 32+ char SESSION_SECRET so sessions survive credential changes.",
+    log.error(
+      "auth: SESSION_SECRET não definido (ou demasiado curto) em produção — defina um SESSION_SECRET aleatório de 32+ caracteres",
     );
     return `derived:${process.env.ADMIN_PASSWORD_HASH ?? DEV_SHARED_HASH}`;
   }
@@ -70,9 +70,9 @@ function configuredUsers(): AdminUser[] | null {
     ) {
       return parsed;
     }
-    console.error("[auth] ADMIN_USERS has an unexpected shape; ignoring.");
+    log.error("auth: ADMIN_USERS tem um formato inesperado; ignorado");
   } catch {
-    console.error("[auth] ADMIN_USERS is not valid JSON; ignoring.");
+    log.error("auth: ADMIN_USERS não é JSON válido; ignorado");
   }
   return null;
 }
@@ -86,9 +86,8 @@ function configuredUsers(): AdminUser[] | null {
 function sharedHash(): string | null {
   if (process.env.ADMIN_PASSWORD_HASH) return process.env.ADMIN_PASSWORD_HASH;
   if (process.env.NODE_ENV === "production") {
-    console.error(
-      "[auth] No ADMIN_PASSWORD_HASH or ADMIN_USERS configured in production — " +
-        "admin login is disabled. Set one of them to enable the dashboard.",
+    log.error(
+      "auth: sem ADMIN_PASSWORD_HASH nem ADMIN_USERS em produção — login de admin desativado",
     );
     return null;
   }

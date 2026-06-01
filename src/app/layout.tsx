@@ -64,8 +64,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: SITE.ogImage,
-        width: 1920,
-        height: 1080,
+        width: 2048,
+        height: 1152,
         alt: "Líquen Events — organização de eventos em Évora e Portugal",
       },
     ],
