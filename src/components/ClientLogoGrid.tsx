@@ -27,7 +27,7 @@ function ClientLogo({ client }: { client: Client }) {
           onError={() => setFailed(true)}
         />
       ) : (
-        <span className="text-foreground/25 text-xs font-medium tracking-widest uppercase text-center group-hover:text-foreground/50 transition-colors leading-relaxed">
+        <span className="text-foreground/50 text-xs font-medium tracking-widest uppercase text-center group-hover:text-foreground/50 transition-colors leading-relaxed">
           {client.name}
         </span>
       )}

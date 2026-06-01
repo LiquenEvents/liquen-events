@@ -10,7 +10,7 @@ export default function PageHeader({ label, title, description }: PageHeaderProp
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-7 md:mb-16 anim-0">
           <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
-          <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase">{label}</p>
+          <p className="text-foreground/50 text-[10px] tracking-[0.5em] uppercase">{label}</p>
         </div>
 
         <h1
@@ -26,7 +26,7 @@ export default function PageHeader({ label, title, description }: PageHeaderProp
         {description && (
           <>
             <div className="border-t border-foreground/8 mt-7 md:mt-12 pt-7 md:pt-10 anim-2">
-              <p className="text-foreground/35 text-[15px] sm:text-base max-w-xl leading-[1.75]">
+              <p className="text-foreground/60 text-[15px] sm:text-base max-w-xl leading-[1.75]">
                 {description}
               </p>
             </div>

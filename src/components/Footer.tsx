@@ -51,7 +51,7 @@ export default function Footer() {
                 height={128}
                 className="object-contain mb-6 h-28 sm:h-36 w-auto"
               />
-              <p className="text-foreground/30 text-sm leading-[1.85] max-w-[260px] mb-7">
+              <p className="text-foreground/55 text-sm leading-[1.85] max-w-[260px] mb-7">
                 Organizamos eventos,
                 <br />
                 eternizamos memórias.
@@ -63,7 +63,7 @@ export default function Footer() {
                   <span className="footer-ping absolute inline-flex h-full w-full rounded-full bg-moss opacity-60" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-moss" />
                 </span>
-                <span className="text-[10px] tracking-[0.32em] uppercase text-foreground/30">
+                <span className="text-[10px] tracking-[0.32em] uppercase text-foreground/55">
                   Disponível para novos eventos
                 </span>
               </div>
@@ -116,7 +116,7 @@ export default function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="text-foreground/28 hover:text-foreground/70 transition-colors duration-300"
+                    className="text-foreground/50 hover:text-foreground/70 transition-colors duration-300"
                   >
                     {s.icon}
                   </a>
@@ -128,7 +128,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp"
-                  className="text-foreground/28 hover:text-moss transition-colors duration-300"
+                  className="text-foreground/50 hover:text-moss transition-colors duration-300"
                 >
                   <WhatsAppIcon className="w-[18px] h-[18px]" />
                 </a>
@@ -137,7 +137,7 @@ export default function Footer() {
 
             {/* Pages */}
             <div className="md:col-span-3">
-              <p className="text-foreground/20 text-[10px] tracking-[0.42em] uppercase mb-8">
+              <p className="text-foreground/45 text-[10px] tracking-[0.42em] uppercase mb-8">
                 Páginas
               </p>
               <ul className="flex flex-col gap-4">
@@ -145,7 +145,7 @@ export default function Footer() {
                   <li key={href}>
                     <Link
                       href={href}
-                      className="link-line text-[13px] text-foreground/35 hover:text-foreground/68 transition-colors duration-300"
+                      className="link-line text-[13px] text-foreground/60 hover:text-foreground/68 transition-colors duration-300"
                     >
                       {label}
                     </Link>
@@ -156,10 +156,10 @@ export default function Footer() {
 
             {/* Contact */}
             <div className="md:col-span-4">
-              <p className="text-foreground/20 text-[10px] tracking-[0.42em] uppercase mb-8">
+              <p className="text-foreground/45 text-[10px] tracking-[0.42em] uppercase mb-8">
                 Contacto
               </p>
-              <div className="flex flex-col gap-4 text-[13px] text-foreground/35 mb-10">
+              <div className="flex flex-col gap-4 text-[13px] text-foreground/60 mb-10">
                 <a
                   href="mailto:liquen.alentejo@gmail.com"
                   className="link-line hover:text-foreground/65 transition-colors duration-300"
@@ -172,7 +172,7 @@ export default function Footer() {
                 >
                   +351 919 259 820
                 </a>
-                <span className="text-foreground/20">Évora, Portugal</span>
+                <span className="text-foreground/45">Évora, Portugal</span>
               </div>
               <Link
                 href="/orcamento"
@@ -188,7 +188,7 @@ export default function Footer() {
       {/* ── Copyright bar ── */}
       <div className="border-t border-foreground/6 py-6">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <p className="text-[11px] text-foreground/20 tracking-wide">
+          <p className="text-[11px] text-foreground/45 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — Todos os direitos reservados
           </p>
           <p className="text-[11px] text-foreground/14 tracking-[0.28em] uppercase">

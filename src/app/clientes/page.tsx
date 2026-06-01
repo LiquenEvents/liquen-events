@@ -46,7 +46,7 @@ const testimonials = [
 ];
 
 const eyebrow =
-  "text-foreground/25 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
+  "text-foreground/50 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 const mosaicItems = [
   {

@@ -27,7 +27,7 @@ const gallery = [
 const eyebrowLight =
   "text-white/35 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
 const eyebrowDark =
-  "text-foreground/25 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
+  "text-foreground/50 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 export default function SobrePage() {
   return (
@@ -196,7 +196,7 @@ export default function SobrePage() {
                 <span className="w-8 h-px bg-gold/50" />
                 <div>
                   <p className="text-foreground text-sm font-semibold">Catarina Gaspar</p>
-                  <p className="text-foreground/35 text-xs mt-0.5">Fundadora &amp; CEO</p>
+                  <p className="text-foreground/60 text-xs mt-0.5">Fundadora &amp; CEO</p>
                 </div>
               </div>
             </AnimateIn>

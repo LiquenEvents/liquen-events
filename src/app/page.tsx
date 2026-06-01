@@ -147,12 +147,12 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-16">
           <AnimateIn>
             <div className="flex items-end justify-between mb-8 lg:mb-12">
-              <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
+              <p className="text-foreground/55 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
                 <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />O que fazemos
               </p>
               <Link
                 href="/servicos"
-                className="group text-xs text-foreground/30 hover:text-foreground/60 transition-colors flex items-center gap-1.5"
+                className="group text-xs text-foreground/55 hover:text-foreground/60 transition-colors flex items-center gap-1.5"
               >
                 Ver serviços
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">
@@ -201,13 +201,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-16">
           <AnimateIn>
             <div className="flex items-end justify-between mb-8 lg:mb-12">
-              <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
+              <p className="text-foreground/55 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
                 <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
                 Trabalho selecionado
               </p>
               <Link
                 href="/galeria"
-                className="group text-xs text-foreground/30 hover:text-foreground/60 transition-colors flex items-center gap-1.5"
+                className="group text-xs text-foreground/55 hover:text-foreground/60 transition-colors flex items-center gap-1.5"
               >
                 Ver tudo
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">
@@ -321,7 +321,7 @@ export default function Home() {
           {/* Text — trimmed */}
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
             <AnimateIn>
-              <p className="text-foreground/30 text-xs tracking-[0.3em] uppercase mb-6 flex items-center gap-3">
+              <p className="text-foreground/55 text-xs tracking-[0.3em] uppercase mb-6 flex items-center gap-3">
                 <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
                 Onde atuamos
               </p>

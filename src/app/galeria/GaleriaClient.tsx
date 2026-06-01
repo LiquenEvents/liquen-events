@@ -422,7 +422,7 @@ export default function GaleriaClient() {
           >
             {c}
             <span
-              className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/20"}`}
+              className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/45"}`}
             >
               {counts[c]}
             </span>
@@ -517,7 +517,7 @@ export default function GaleriaClient() {
             className="group px-10 py-3.5 border border-foreground/15 text-foreground/40 text-xs tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/70 transition-all duration-300 flex items-center gap-3"
           >
             Ver mais
-            <span className="text-foreground/25 group-hover:text-foreground/50 transition-colors">
+            <span className="text-foreground/50 group-hover:text-foreground/50 transition-colors">
               +{Math.min(PAGE, pool.length - shown)}
             </span>
           </button>
@@ -527,7 +527,7 @@ export default function GaleriaClient() {
               style={{ width: `${(shown / pool.length) * 100}%` }}
             />
           </div>
-          <p className="text-foreground/20 text-[10px] tracking-widest">
+          <p className="text-foreground/45 text-[10px] tracking-widest">
             {shown} de {pool.length}
           </p>
         </div>

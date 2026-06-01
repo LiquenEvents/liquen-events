@@ -52,7 +52,7 @@ export default function FAQ() {
               className={`flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center text-xs transition-all duration-300 ${
                 open === i
                   ? "border-moss text-moss rotate-45"
-                  : "border-foreground/15 text-foreground/30"
+                  : "border-foreground/15 text-foreground/55"
               }`}
             >
               +

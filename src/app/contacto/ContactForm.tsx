@@ -170,7 +170,7 @@ function NavBtn({
   const styles =
     variant === "primary"
       ? `${base} px-9 py-4 bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3`
-      : `${base} text-foreground/30 hover:text-foreground/60`;
+      : `${base} text-foreground/55 hover:text-foreground/60`;
   return (
     <button
       type={variant === "primary" ? "button" : "button"}
@@ -195,7 +195,7 @@ function ProgressBar({ step }: { step: number }) {
                   ? "bg-moss border-moss text-cream"
                   : i + 1 === step
                     ? "border-moss text-moss"
-                    : "border-foreground/12 text-foreground/20"
+                    : "border-foreground/12 text-foreground/45"
               }`}
             >
               {i + 1 < step ? "✓" : i + 1}
@@ -257,7 +257,7 @@ export default function ContactForm() {
   const inputCls =
     "w-full bg-transparent border-b border-foreground/15 pb-4 text-sm text-foreground placeholder-foreground/18 focus:outline-none focus:border-moss/55 transition-colors duration-300";
 
-  const labelCls = "block text-[10px] text-foreground/28 tracking-[0.45em] uppercase mb-4";
+  const labelCls = "block text-[10px] text-foreground/50 tracking-[0.45em] uppercase mb-4";
 
   return (
     <>
@@ -299,7 +299,7 @@ export default function ContactForm() {
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
             {/* ── Left — Info ── */}
             <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
-              <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
+              <p className="text-foreground/50 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
                 Encontre-nos
               </p>
@@ -326,7 +326,7 @@ export default function ContactForm() {
                   },
                 ].map((item) => (
                   <div key={item.label} className="py-7">
-                    <p className="text-foreground/22 text-[10px] tracking-[0.45em] uppercase mb-2">
+                    <p className="text-foreground/45 text-[10px] tracking-[0.45em] uppercase mb-2">
                       {item.label}
                     </p>
                     {item.href ? (
@@ -339,7 +339,7 @@ export default function ContactForm() {
                     ) : (
                       <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
                     )}
-                    <p className="text-foreground/28 text-xs">{item.sub}</p>
+                    <p className="text-foreground/50 text-xs">{item.sub}</p>
                   </div>
                 ))}
               </div>
@@ -387,7 +387,7 @@ export default function ContactForm() {
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/28 hover:text-foreground/65 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
+                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/50 hover:text-foreground/65 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
                   >
                     {s.label}
                   </a>
@@ -403,7 +403,7 @@ export default function ContactForm() {
                   Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta
                   personalizada.
                 </p>
-                <p className="text-foreground/25 text-[10px] tracking-[0.3em] uppercase">
+                <p className="text-foreground/50 text-[10px] tracking-[0.3em] uppercase">
                   — Equipa Líquen Events
                 </p>
               </div>
@@ -429,7 +429,7 @@ export default function ContactForm() {
                       />
                     </svg>
                   </div>
-                  <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-6">
+                  <p className="text-foreground/50 text-[10px] tracking-[0.5em] uppercase mb-6">
                     Enviado com sucesso
                   </p>
                   <h3
@@ -463,7 +463,7 @@ export default function ContactForm() {
                         </span>
                         <div>
                           <p className="text-foreground text-sm font-medium">{s.t}</p>
-                          <p className="text-foreground/28 text-xs mt-0.5">{s.d}</p>
+                          <p className="text-foreground/50 text-xs mt-0.5">{s.d}</p>
                         </div>
                       </div>
                     ))}
@@ -472,7 +472,7 @@ export default function ContactForm() {
                     href={WHATSAPP_HREF_CTA}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/30 hover:text-moss transition-colors"
+                    className="flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/55 hover:text-moss transition-colors"
                   >
                     <span className="text-moss">
                       <WhatsAppIcon className="w-4 h-4" />
@@ -512,7 +512,7 @@ export default function ContactForm() {
                           <br />
                           está a planear?
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">
+                        <p className="text-foreground/60 text-sm mb-10">
                           Selecione a opção que melhor descreve o seu evento.
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-12">
@@ -528,7 +528,7 @@ export default function ContactForm() {
                               }`}
                             >
                               <span
-                                className={`transition-colors duration-200 ${form.eventType === ec.value ? "text-moss" : "text-foreground/30"}`}
+                                className={`transition-colors duration-200 ${form.eventType === ec.value ? "text-moss" : "text-foreground/55"}`}
                               >
                                 {ec.icon}
                               </span>
@@ -538,7 +538,7 @@ export default function ContactForm() {
                                 >
                                   {ec.value}
                                 </p>
-                                <p className="text-xs text-foreground/28 leading-snug">{ec.desc}</p>
+                                <p className="text-xs text-foreground/50 leading-snug">{ec.desc}</p>
                               </div>
                             </button>
                           ))}
@@ -558,7 +558,7 @@ export default function ContactForm() {
                         >
                           Diga-nos quem é.
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">
+                        <p className="text-foreground/60 text-sm mb-10">
                           Os seus dados de contacto para falarmos consigo.
                         </p>
                         <div className="flex flex-col gap-7 sm:gap-10 mb-12">
@@ -627,7 +627,7 @@ export default function ContactForm() {
                         >
                           Detalhes do evento.
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">
+                        <p className="text-foreground/60 text-sm mb-10">
                           Ajude-nos a perceber a dimensão e o timing.
                         </p>
                         <div className="flex flex-col gap-7 sm:gap-10 mb-12">
@@ -688,7 +688,7 @@ export default function ContactForm() {
                         >
                           A sua visão.
                         </h2>
-                        <p className="text-foreground/35 text-sm mb-10">
+                        <p className="text-foreground/60 text-sm mb-10">
                           Descreva o evento dos seus sonhos. Quanto mais detalhe, melhor.
                         </p>
                         <div className="flex flex-col gap-10 mb-10">
@@ -712,25 +712,25 @@ export default function ContactForm() {
                           <div className="border border-foreground/8 bg-surface-raised px-6 py-4 mb-8 flex flex-wrap gap-x-7 gap-y-2">
                             {form.eventType && (
                               <span className="text-xs">
-                                <span className="text-foreground/22 mr-1.5">Evento</span>
+                                <span className="text-foreground/45 mr-1.5">Evento</span>
                                 <span className="text-foreground/50">{form.eventType}</span>
                               </span>
                             )}
                             {form.convidados && (
                               <span className="text-xs">
-                                <span className="text-foreground/22 mr-1.5">Convidados</span>
+                                <span className="text-foreground/45 mr-1.5">Convidados</span>
                                 <span className="text-foreground/50">{form.convidados}</span>
                               </span>
                             )}
                             {form.orcamento && (
                               <span className="text-xs">
-                                <span className="text-foreground/22 mr-1.5">Orçamento</span>
+                                <span className="text-foreground/45 mr-1.5">Orçamento</span>
                                 <span className="text-foreground/50">{form.orcamento}</span>
                               </span>
                             )}
                             {form.data && (
                               <span className="text-xs">
-                                <span className="text-foreground/22 mr-1.5">Data</span>
+                                <span className="text-foreground/45 mr-1.5">Data</span>
                                 <span className="text-foreground/50">{form.data}</span>
                               </span>
                             )}
@@ -747,7 +747,7 @@ export default function ContactForm() {
                           >
                             {sending ? "A enviar…" : "Enviar Pedido →"}
                           </button>
-                          <p className="text-foreground/20 text-xs tracking-wide">
+                          <p className="text-foreground/45 text-xs tracking-wide">
                             Resposta em 24h
                           </p>
                         </div>
