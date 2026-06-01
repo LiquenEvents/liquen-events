@@ -42,7 +42,7 @@ export default function Navbar() {
       className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
         scrolled
           ? "bg-surface/90 backdrop-blur-md border-b border-foreground/8 shadow-sm shadow-black/5"
-          : ""
+          : "bg-gradient-to-b from-black/30 to-transparent backdrop-blur-[2px]"
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
