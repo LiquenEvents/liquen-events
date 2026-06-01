@@ -54,7 +54,7 @@ export default function Navbar() {
               alt="Líquen Events"
               width={94}
               height={56}
-              className="object-contain h-14 w-auto md:h-10"
+              className="object-contain h-14 w-auto"
               priority
             />
           </Link>
