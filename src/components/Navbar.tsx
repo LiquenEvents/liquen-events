@@ -39,8 +39,10 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe bg-surface/90 backdrop-blur-md border-b border-foreground/8 transition-all duration-500 ${
-        scrolled ? "shadow-sm shadow-black/5" : ""
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
+        scrolled
+          ? "bg-surface/90 backdrop-blur-md border-b border-foreground/8 shadow-sm shadow-black/5"
+          : ""
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
@@ -68,7 +70,9 @@ export default function Navbar() {
                 className={`link-line text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                   pathname === link.href
                     ? "text-moss nav-active"
-                    : "text-foreground/38 hover:text-foreground/75"
+                    : scrolled
+                      ? "text-foreground/55 hover:text-foreground"
+                      : "text-white/75 hover:text-white"
                 }`}
               >
                 {link.label}
@@ -79,7 +83,11 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             <Link
               href="/contacto"
-              className="text-[11px] tracking-[0.2em] uppercase border border-foreground/18 text-foreground/40 px-5 py-2 rounded-sm hover:border-foreground/35 hover:text-foreground/65 transition-all duration-300"
+              className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
+                scrolled
+                  ? "border-foreground/18 text-foreground/55 hover:border-foreground/35 hover:text-foreground"
+                  : "border-white/30 text-white/80 hover:border-white/60 hover:text-white"
+              }`}
             >
               Contacto
             </Link>
@@ -98,13 +106,13 @@ export default function Navbar() {
             aria-expanded={isOpen}
           >
             <span
-              className={`block w-[18px] h-px bg-foreground/60 transition-all duration-300 mb-1.5 ${isOpen ? "rotate-45 translate-y-2" : ""}`}
+              className={`block w-[18px] h-px ${scrolled || isOpen ? "bg-foreground/70" : "bg-white/85"} transition-all duration-300 mb-1.5 ${isOpen ? "rotate-45 translate-y-2" : ""}`}
             />
             <span
-              className={`block w-[18px] h-px bg-foreground/60 transition-all duration-300 mb-1.5 ${isOpen ? "opacity-0" : ""}`}
+              className={`block w-[18px] h-px ${scrolled || isOpen ? "bg-foreground/70" : "bg-white/85"} transition-all duration-300 mb-1.5 ${isOpen ? "opacity-0" : ""}`}
             />
             <span
-              className={`block w-[18px] h-px bg-foreground/60 transition-all duration-300 ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
+              className={`block w-[18px] h-px ${scrolled || isOpen ? "bg-foreground/70" : "bg-white/85"} transition-all duration-300 ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
             />
           </button>
         </div>
