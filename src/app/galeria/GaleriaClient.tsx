@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
@@ -342,7 +342,10 @@ export default function GaleriaClient() {
   const [lb, setLb] = useState<number | null>(null);
   const touchX = useRef<number | null>(null);
 
-  const pool = cat === "Todos" ? photos : photos.filter((p) => p.label === cat);
+  const pool = useMemo(
+    () => (cat === "Todos" ? photos : photos.filter((p) => p.label === cat)),
+    [cat],
+  );
   const visible = pool.slice(0, shown);
 
   // Lightbox navigation (through entire pool, not just shown)
@@ -572,6 +575,7 @@ export default function GaleriaClient() {
             </div>
             <button
               onClick={close}
+              aria-label="Fechar"
               className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -593,6 +597,7 @@ export default function GaleriaClient() {
                 e.stopPropagation();
                 prev();
               }}
+              aria-label="Foto anterior"
               className="absolute left-3 md:left-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
             >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -624,6 +629,7 @@ export default function GaleriaClient() {
                 e.stopPropagation();
                 next();
               }}
+              aria-label="Próxima foto"
               className="absolute right-3 md:right-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
             >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
