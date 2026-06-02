@@ -1,0 +1,62 @@
+name: Release
+
+# Creates a GitHub Release when a version tag is pushed.
+# The container workflow (container.yml) handles building and pushing the
+# Docker image for the same tag — this workflow just creates the release notes.
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build changelog
+        id: changelog
+        shell: bash
+        run: |
+          CURRENT="${{ github.ref_name }}"
+          PREV=$(git tag --sort=-version:refname | grep -v "^${CURRENT}$" | head -1)
+
+          if [ -n "$PREV" ]; then
+            RANGE="${PREV}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          FEAT=$(git log $RANGE --pretty="- %s (%h)" --grep="^feat" 2>/dev/null || true)
+          FIX=$(git log $RANGE --pretty="- %s (%h)" --grep="^fix" 2>/dev/null || true)
+          MAINT=$(git log $RANGE --pretty="- %s (%h)" --grep="^chore\|^ci\|^docs\|^refactor\|^perf" 2>/dev/null || true)
+
+          BODY=""
+          [ -n "$FEAT" ]  && BODY="${BODY}## Novidades\n${FEAT}\n\n"
+          [ -n "$FIX" ]   && BODY="${BODY}## Correções\n${FIX}\n\n"
+          [ -n "$MAINT" ] && BODY="${BODY}## Manutenção\n${MAINT}\n\n"
+          [ -z "$BODY" ]  && BODY="$(git log $RANGE --pretty='- %s (%h)')\n\n"
+
+          BODY="${BODY}---\n**Imagem Docker**: \`ghcr.io/\${{ github.repository }}:${CURRENT}\`"
+
+          {
+            echo 'body<<CHANGELOG_EOF'
+            printf "%b" "$BODY"
+            echo ''
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.body }}
+          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          make_latest: true

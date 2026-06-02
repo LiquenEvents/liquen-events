@@ -17,17 +17,18 @@ export const maxDuration = 60;
  *   · payments due (or overdue) within 7 days
  *   · quotes still awaiting a first reply for 2+ days
  *
- * Protected by CRON_SECRET: the caller must send it as a Bearer token or
- * `?secret=` query param. When CRON_SECRET is unset (dev), it runs freely.
+ * Protected by CRON_SECRET: the caller must send it as a Bearer token in the
+ * Authorization header. When CRON_SECRET is unset (dev), it runs freely.
+ * Vercel Cron sends the header automatically; other schedulers must do the same.
  */
 function authorized(req: NextRequest): boolean {
   // A logged-in admin can always trigger it manually (e.g. to test).
   if (isAuthed(req)) return true;
   const secret = process.env.CRON_SECRET;
   if (!secret) return true;
-  const auth = req.headers.get("authorization");
-  if (auth === `Bearer ${secret}`) return true;
-  return req.nextUrl.searchParams.get("secret") === secret;
+  // Only accept the Bearer header — never a query param, which would expose
+  // the secret in server access logs and referrer headers.
+  return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 const eur = (n: number) =>

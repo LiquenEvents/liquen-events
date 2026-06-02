@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   build:
-    name: Build · SBOM · Scan · Push
+    name: Build · Scan · Push · SBOM
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +40,36 @@ jobs:
             type=semver,pattern={{version}}
             type=sha
 
-      - name: Build & push
+      # ── Phase 1: build locally (no push) for security scan ────────
+      - name: Build image (no push — scan first)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: liquen-events:scan-target
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Phase 2: scan — fail on CRITICAL/HIGH unfixed vulns ───────
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: liquen-events:scan-target
+          format: sarif
+          output: trivy.sarif
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload scan results to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif
+
+      # ── Phase 3: push only if scan passed ─────────────────────────
+      - name: Push image
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -49,28 +78,14 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
+      # ── Phase 4: SBOM on the published digest ─────────────────────
       - name: Generate SBOM (CycloneDX)
         uses: anchore/sbom-action@v0
         with:
           image: ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
           output-file: sbom.cdx.json
-
-      - name: Scan image (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
-          format: sarif
-          output: trivy.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-
-      - name: Upload Trivy results to Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy.sarif
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4

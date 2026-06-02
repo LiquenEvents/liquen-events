@@ -29,9 +29,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # Fall back to npm install if the lockfile is out of sync with sharp's
-        # platform-specific optional deps (a known cross-platform npm quirk).
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Audit dependencies (fail on high/critical)
         run: npm audit --audit-level=high
@@ -45,19 +43,30 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Cache Next.js incremental build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
+
       - name: Build
         run: npm run build
         env:
-          # Keep the production build self-contained; real secrets are injected
-          # by the deploy platform, not needed for a type-safe build.
           NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Check bundle size
+        run: node scripts/check-bundle-size.mjs
 
   e2e:
     name: E2E (Playwright)
+    needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Informational for now: runs the suite but never blocks the PR (the browser
-    # environment can't be validated from the dev sandbox).
+    # Informational for now: runs the suite but never blocks the PR.
+    # Remove continue-on-error once the E2E suite is stable in CI.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -69,10 +78,19 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
+
+      - name: Cache Next.js incremental build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
 
       - name: Build
         run: npm run build
