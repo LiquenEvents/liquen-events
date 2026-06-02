@@ -92,7 +92,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                   key={i}
                   dangerouslySetInnerHTML={{
                     __html: p.replace(
-                      /(Líquen Events|Évora|Alentejo|Lisboa|Portugal)/g,
+                      /(Líquen Events|Alentejo|Lisboa|Portugal)/g,
                       '<strong class="text-foreground/75 font-medium">$1</strong>',
                     ),
                   }}

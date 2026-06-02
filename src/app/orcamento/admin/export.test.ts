@@ -37,7 +37,7 @@ describe("quotesToCsvRows", () => {
     packageTier: "completo",
     guests: 120,
     date: "2026-06-20",
-    location: "Évora",
+    location: "Lisboa",
     duration: 8,
     quotedPrice: 15000,
     priceBreakdown: { total: 14000 },

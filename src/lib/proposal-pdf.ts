@@ -38,14 +38,21 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
     s: string,
     x: number,
     yy: number,
-    opts: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {}
-  ) => page.drawText(s, { x, y: yy, font: opts.font ?? font, size: opts.size ?? 10, color: opts.color ?? INK });
+    opts: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
+  ) =>
+    page.drawText(s, {
+      x,
+      y: yy,
+      font: opts.font ?? font,
+      size: opts.size ?? 10,
+      color: opts.color ?? INK,
+    });
 
   const textRight = (
     s: string,
     xRight: number,
     yy: number,
-    opts: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {}
+    opts: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) => {
     const f = opts.font ?? font;
     const size = opts.size ?? 10;
@@ -53,7 +60,12 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
   };
 
   const hr = (yy: number) =>
-    page.drawLine({ start: { x: MARGIN, y: yy }, end: { x: right, y: yy }, thickness: 0.7, color: LINE });
+    page.drawLine({
+      start: { x: MARGIN, y: yy },
+      end: { x: right, y: yy },
+      thickness: 0.7,
+      color: LINE,
+    });
 
   // ── Header ──
   text("LÍQUEN EVENTS", MARGIN, y, { font: bold, size: 20, color: MOSS });
@@ -153,7 +165,7 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
       `Proposta válida até ${new Date(p.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`,
       MARGIN,
       y,
-      { size: 9, color: MUTED }
+      { size: 9, color: MUTED },
     );
     y -= 18;
   }
@@ -195,6 +207,6 @@ function drawFooter(page: PDFPage, font: PDFFont) {
     thickness: 0.7,
     color: LINE,
   });
-  const parts = "liquen.alentejo@gmail.com   ·   +351 919 259 820   ·   Évora, Portugal";
+  const parts = "liquen.alentejo@gmail.com   ·   +351 919 259 820   ·   Portugal";
   page.drawText(parts, { x: MARGIN, y, font, size: 8, color: MUTED });
 }

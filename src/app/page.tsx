@@ -71,7 +71,9 @@ export default function Home() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
+      {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed
+          behind the transparent fixed navbar. */}
+      <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Image
           src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
           alt="Líquen Events — evento aéreo no Alentejo"
@@ -87,7 +89,7 @@ export default function Home() {
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
           <p className="text-white/45 text-[10px] sm:text-xs tracking-[0.45em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
             <span className="inline-block w-8 h-px bg-gold flex-shrink-0" />
-            Organização de eventos · Évora
+            Organização de eventos
           </p>
           <h1
             className="text-white font-bold leading-[0.86] tracking-tight"
@@ -299,7 +301,7 @@ export default function Home() {
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
 
-      {/* ── SEO content — organização de eventos em Évora, Lisboa e Portugal ── */}
+      {/* ── SEO content — organização de eventos no Alentejo, Lisboa e Portugal ── */}
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
           {/* Image */}
@@ -329,9 +331,8 @@ export default function Home() {
                 className="text-foreground font-bold leading-[1.05] mb-8"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4vw, 56px)" }}
               >
-                Eventos em Évora,
-                <br />
-                Lisboa e todo o Portugal
+                Eventos em Lisboa
+                <br />e todo o Portugal
               </h2>
               <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] max-w-lg">
                 Casamentos, eventos corporativos e celebrações — do conceito à execução, tratamos de
@@ -343,7 +344,7 @@ export default function Home() {
                 {[
                   "Casamentos no Alentejo",
                   "Eventos corporativos em Lisboa",
-                  "Conferências em Évora",
+                  "Conferências",
                   "Festas privadas",
                   "Jantares de gala",
                 ].map((t) => (

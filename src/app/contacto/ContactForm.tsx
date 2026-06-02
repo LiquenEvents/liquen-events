@@ -320,7 +320,7 @@ export default function ContactForm() {
                   },
                   {
                     label: "Localização",
-                    value: "Évora, Portugal",
+                    value: "Portugal",
                     href: null,
                     sub: "Reuniões presenciais disponíveis",
                   },

@@ -49,12 +49,14 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe bg-surface/90 backdrop-blur-md border-b border-foreground/8 transition-all duration-500 ${
-        scrolled ? "shadow-sm shadow-black/5" : ""
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
+        scrolled
+          ? "bg-surface/55 backdrop-blur-md border-b border-foreground/8 shadow-sm shadow-black/5"
+          : "bg-transparent border-b border-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="relative flex items-center justify-between h-[92px]">
+        <div className="relative flex items-center justify-between h-[140px]">
           <Link
             href="/"
             className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:translate-x-0 md:translate-y-0"
@@ -62,9 +64,9 @@ export default function Navbar() {
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
-              width={134}
-              height={80}
-              className="object-contain h-[72px] w-auto"
+              width={210}
+              height={125}
+              className="object-contain h-[120px] w-auto"
               preload
             />
           </Link>

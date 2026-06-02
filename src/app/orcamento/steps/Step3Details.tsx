@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import type { QuoteFormData, LocationType } from '../types';
-import type { Action } from '../OrcamentoWizard';
-import { LOCATION_LABELS } from '../data';
-import { EVENT_TYPES_BY_CATEGORY } from '../data';
+import { useState } from "react";
+import type { QuoteFormData, LocationType } from "../types";
+import type { Action } from "../OrcamentoWizard";
+import { LOCATION_LABELS } from "../data";
+import { EVENT_TYPES_BY_CATEGORY } from "../data";
 
 interface Props {
   form: QuoteFormData;
@@ -12,10 +12,16 @@ interface Props {
 }
 
 const DURATION_PRESETS = [2, 4, 6, 8, 10, 12];
-const LOCATION_OPTIONS: LocationType[] = ['lisboa', 'porto', 'grande_cidade', 'pequena_cidade', 'internacional'];
+const LOCATION_OPTIONS: LocationType[] = [
+  "lisboa",
+  "porto",
+  "grande_cidade",
+  "pequena_cidade",
+  "internacional",
+];
 
 export default function Step3Details({ form, dispatch }: Props) {
-  const [guestInput, setGuestInput] = useState(String(form.guests || ''));
+  const [guestInput, setGuestInput] = useState(String(form.guests || ""));
 
   const et =
     form.category && form.eventType
@@ -29,22 +35,23 @@ export default function Step3Details({ form, dispatch }: Props) {
     setGuestInput(val);
     const n = parseInt(val, 10);
     if (!isNaN(n) && n >= 1) {
-      dispatch({ type: 'SET', field: 'guests', value: n });
+      dispatch({ type: "SET", field: "guests", value: n });
     }
   }
 
   const inputClass =
-    'w-full bg-transparent border-b border-foreground/15 pb-3 text-sm text-foreground placeholder-foreground/18 focus:outline-none focus:border-moss/55 transition-colors duration-300';
-  const labelClass =
-    'block text-[10px] text-foreground/28 tracking-[0.45em] uppercase mb-3';
+    "w-full bg-transparent border-b border-foreground/15 pb-3 text-sm text-foreground placeholder-foreground/18 focus:outline-none focus:border-moss/55 transition-colors duration-300";
+  const labelClass = "block text-[10px] text-foreground/28 tracking-[0.45em] uppercase mb-3";
 
   return (
     <div>
       <h2
         className="text-foreground font-bold leading-[0.92] mb-3"
-        style={{ fontFamily: 'var(--font-playfair)', fontSize: 'clamp(28px, 4vw, 44px)' }}
+        style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 44px)" }}
       >
-        Detalhes<br />do evento
+        Detalhes
+        <br />
+        do evento
       </h2>
       <p className="text-foreground/35 text-sm leading-relaxed mb-10 max-w-md">
         Quanto mais detalhe partilhar, mais personalizada será a nossa proposta.
@@ -58,7 +65,7 @@ export default function Step3Details({ form, dispatch }: Props) {
             type="text"
             placeholder="Ex: Conferência Anual XYZ 2026"
             value={form.eventName}
-            onChange={(e) => dispatch({ type: 'SET', field: 'eventName', value: e.target.value })}
+            onChange={(e) => dispatch({ type: "SET", field: "eventName", value: e.target.value })}
             className={inputClass}
           />
         </div>
@@ -70,8 +77,8 @@ export default function Step3Details({ form, dispatch }: Props) {
             <input
               type="date"
               value={form.date}
-              min={new Date().toISOString().split('T')[0]}
-              onChange={(e) => dispatch({ type: 'SET', field: 'date', value: e.target.value })}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => dispatch({ type: "SET", field: "date", value: e.target.value })}
               className={inputClass}
             />
           </div>
@@ -82,14 +89,16 @@ export default function Step3Details({ form, dispatch }: Props) {
               </label>
               <button
                 type="button"
-                onClick={() => dispatch({ type: 'SET', field: 'isMultiDay', value: !form.isMultiDay })}
+                onClick={() =>
+                  dispatch({ type: "SET", field: "isMultiDay", value: !form.isMultiDay })
+                }
                 className={`w-9 h-5 rounded-full transition-colors duration-250 relative ${
-                  form.isMultiDay ? 'bg-moss' : 'bg-foreground/15'
+                  form.isMultiDay ? "bg-moss" : "bg-foreground/15"
                 }`}
               >
                 <span
                   className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-250 ${
-                    form.isMultiDay ? 'left-4' : 'left-0.5'
+                    form.isMultiDay ? "left-4" : "left-0.5"
                   }`}
                 />
               </button>
@@ -98,8 +107,8 @@ export default function Step3Details({ form, dispatch }: Props) {
               <input
                 type="date"
                 value={form.endDate}
-                min={form.date || new Date().toISOString().split('T')[0]}
-                onChange={(e) => dispatch({ type: 'SET', field: 'endDate', value: e.target.value })}
+                min={form.date || new Date().toISOString().split("T")[0]}
+                onChange={(e) => dispatch({ type: "SET", field: "endDate", value: e.target.value })}
                 className={inputClass}
                 placeholder="Data de fim"
               />
@@ -113,9 +122,9 @@ export default function Step3Details({ form, dispatch }: Props) {
             <label className={labelClass}>Cidade / Local</label>
             <input
               type="text"
-              placeholder="Ex: Lisboa, Évora, Sintra…"
+              placeholder="Ex: Lisboa, Sintra, Comporta…"
               value={form.location}
-              onChange={(e) => dispatch({ type: 'SET', field: 'location', value: e.target.value })}
+              onChange={(e) => dispatch({ type: "SET", field: "location", value: e.target.value })}
               className={inputClass}
             />
           </div>
@@ -123,7 +132,13 @@ export default function Step3Details({ form, dispatch }: Props) {
             <label className={labelClass}>Região *</label>
             <select
               value={form.locationType}
-              onChange={(e) => dispatch({ type: 'SET', field: 'locationType', value: e.target.value as LocationType })}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET",
+                  field: "locationType",
+                  value: e.target.value as LocationType,
+                })
+              }
               className="w-full bg-transparent border-b border-foreground/15 pb-3 text-sm text-foreground focus:outline-none focus:border-moss/55 transition-colors duration-300 appearance-none cursor-pointer"
             >
               {LOCATION_OPTIONS.map((loc) => (
@@ -155,7 +170,7 @@ export default function Step3Details({ form, dispatch }: Props) {
               const n = parseInt(guestInput, 10);
               if (isNaN(n) || n < minGuests) {
                 setGuestInput(String(minGuests));
-                dispatch({ type: 'SET', field: 'guests', value: minGuests });
+                dispatch({ type: "SET", field: "guests", value: minGuests });
               }
             }}
             className={inputClass}
@@ -170,7 +185,7 @@ export default function Step3Details({ form, dispatch }: Props) {
                 value={Math.min(form.guests || minGuests, 500)}
                 onChange={(e) => {
                   setGuestInput(e.target.value);
-                  dispatch({ type: 'SET', field: 'guests', value: parseInt(e.target.value, 10) });
+                  dispatch({ type: "SET", field: "guests", value: parseInt(e.target.value, 10) });
                 }}
                 className="w-full accent-moss h-px"
               />
@@ -190,11 +205,11 @@ export default function Step3Details({ form, dispatch }: Props) {
               <button
                 key={h}
                 type="button"
-                onClick={() => dispatch({ type: 'SET', field: 'duration', value: h })}
+                onClick={() => dispatch({ type: "SET", field: "duration", value: h })}
                 className={`px-4 py-2 rounded-sm text-xs tracking-[0.15em] uppercase border transition-all duration-200 ${
                   form.duration === h
-                    ? 'bg-moss border-moss text-cream'
-                    : 'border-foreground/15 text-foreground/40 hover:border-foreground/35 hover:text-foreground/70'
+                    ? "bg-moss border-moss text-cream"
+                    : "border-foreground/15 text-foreground/40 hover:border-foreground/35 hover:text-foreground/70"
                 }`}
               >
                 {h}h
@@ -208,7 +223,11 @@ export default function Step3Details({ form, dispatch }: Props) {
               max={72}
               value={form.duration}
               onChange={(e) =>
-                dispatch({ type: 'SET', field: 'duration', value: parseInt(e.target.value, 10) || 1 })
+                dispatch({
+                  type: "SET",
+                  field: "duration",
+                  value: parseInt(e.target.value, 10) || 1,
+                })
               }
               className="w-20 bg-transparent border-b border-foreground/15 pb-2 text-sm text-foreground focus:outline-none focus:border-moss/55 text-center"
             />

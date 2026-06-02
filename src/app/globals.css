@@ -9,8 +9,11 @@
   --color-moss-dark: #4c6150;
   --color-gold: #d6ab3a;
   --color-gold-dark: #b88f28;
-  --color-surface: #faf8f3;
-  --color-surface-raised: #f1ece2;
+  /* Public site paper surfaces — clean white.
+     cream/cream-dark stay off-white: they're light text/accents on dark
+     sections, not page backgrounds. */
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
   --color-surface-elevated: #ffffff;
   --color-foreground: #2a2620;
   --font-sans: var(--font-inter);

@@ -5,12 +5,12 @@ import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Galeria de Eventos — Évora e Alentejo",
+  title: "Galeria de Eventos — Alentejo",
   description:
-    "Galeria de fotografias dos eventos organizados pela Líquen Events em Évora, Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
+    "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
   path: "/galeria",
   image: "/imagens/DaniGui_Preview20.jpg",
-  keywords: ["galeria de eventos", "fotografias de casamentos Alentejo", "eventos Évora"],
+  keywords: ["galeria de eventos", "fotografias de casamentos Alentejo"],
 });
 
 export default function GaleriaPage() {

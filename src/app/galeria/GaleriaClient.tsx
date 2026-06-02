@@ -284,7 +284,7 @@ function captionFor(src: string, label: string): { caption: string; sub?: string
 const ALT_BY_LABEL: Record<Label, string> = {
   Casamento: "Casamento organizado pela Líquen Events no Alentejo",
   Corporativo: "Evento corporativo organizado pela Líquen Events",
-  Conferência: "Conferência organizada pela Líquen Events em Évora",
+  Conferência: "Conferência organizada pela Líquen Events",
   Aéreo: "Vista aérea de evento da Líquen Events",
   Evento: "Evento organizado pela Líquen Events em Portugal",
 };

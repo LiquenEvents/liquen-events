@@ -3,12 +3,7 @@ import { jsonLd } from "@/lib/jsonld";
 
 /** Renders an arbitrary JSON-LD object as a script tag. */
 export function JsonLd({ data }: { data: Record<string, unknown> }) {
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: jsonLd(data) }}
-    />
-  );
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />;
 }
 
 /** Breadcrumb trail structured data. Pass [{name, path}] from home onward. */
@@ -16,10 +11,7 @@ export function BreadcrumbJsonLd({ items }: { items: { name: string; path: strin
   const data = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      { name: "Início", path: "/" },
-      ...items,
-    ].map((item, i) => ({
+    itemListElement: [{ name: "Início", path: "/" }, ...items].map((item, i) => ({
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
@@ -61,7 +53,7 @@ export function ServiceJsonLd({
     serviceType: name,
     url: `${SITE.url}${path}`,
     provider: { "@id": `${SITE.url}/#organization` },
-    areaServed: ["Évora", "Lisboa", "Alentejo", "Portugal"].map((n) => ({
+    areaServed: ["Lisboa", "Alentejo", "Portugal"].map((n) => ({
       "@type": "City",
       name: n,
     })),

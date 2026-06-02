@@ -7,12 +7,12 @@ import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Sobre Nós — Empresa de Eventos em Évora",
+  title: "Sobre Nós — Empresa de Eventos",
   description:
-    "Conheça a Líquen Events, empresa de organização de eventos com sede em Évora. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",
+    "Conheça a Líquen Events, empresa de organização de eventos. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",
   path: "/sobre",
   image: "/imagens/M&F0497.jpg",
-  keywords: ["empresa de eventos Évora", "organização de eventos Alentejo", "sobre Líquen Events"],
+  keywords: ["organização de eventos Alentejo", "sobre Líquen Events"],
 });
 
 const gallery = [
@@ -87,8 +87,7 @@ export default function SobrePage() {
               <span className="text-moss">Eternizamos memórias.</span>
             </h2>
             <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
-              Com sede em Évora, desde 2018 que transformamos visões em experiências — em todo o
-              Portugal.
+              Desde 2018 que transformamos visões em experiências — em todo o Portugal.
             </p>
           </AnimateIn>
           <AnimateIn from="right" delay={120}>

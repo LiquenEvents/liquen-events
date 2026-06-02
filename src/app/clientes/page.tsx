@@ -13,13 +13,9 @@ import { SITE } from "@/lib/site";
 export const metadata: Metadata = pageMetadata({
   title: "Clientes — Quem Confia na Líquen Events",
   description:
-    "Empresas e instituições que confiam na Líquen Events em Évora e no Alentejo: José de Mello, Aernnova, Mainova, Universidade de Évora, Câmara Municipal de Évora, Pérez-Llorca e muito mais.",
+    "Empresas e instituições que confiam na Líquen Events: José de Mello, Aernnova, Mainova, Universidade de Évora, Câmara Municipal de Évora, Pérez-Llorca e muito mais.",
   path: "/clientes",
-  keywords: [
-    "clientes Líquen Events",
-    "eventos corporativos Évora",
-    "empresas de eventos Alentejo",
-  ],
+  keywords: ["clientes Líquen Events", "empresas de eventos Alentejo"],
 });
 
 const testimonials = [

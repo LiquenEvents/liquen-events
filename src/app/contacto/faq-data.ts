@@ -11,8 +11,7 @@ export const FAQS: FAQItem[] = [
   },
   {
     question: "Em que zonas atuam?",
-    answer:
-      "Temos sede em Évora e atuamos em todo o território nacional, incluindo Lisboa, Alentejo e Algarve.",
+    answer: "Atuamos em todo o território nacional, incluindo Lisboa, Alentejo e Algarve.",
   },
   {
     question: "Com quanto tempo de antecedência devo reservar?",

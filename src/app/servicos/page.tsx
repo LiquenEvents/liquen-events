@@ -10,12 +10,11 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 export const metadata: Metadata = pageMetadata({
   title: "Serviços — Casamentos e Eventos Corporativos no Alentejo",
   description:
-    "Organização de casamentos, eventos corporativos, conferências e festas privadas em Évora, Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
+    "Organização de casamentos, eventos corporativos, conferências e festas privadas no Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
   path: "/servicos",
   image: "/imagens/EW1_1408.jpg",
   keywords: [
     "wedding planner Alentejo",
-    "organização de casamentos Évora",
     "eventos corporativos Lisboa",
     "conferências e congressos",
     "organização de festas Alentejo",
@@ -312,7 +311,7 @@ export default function ServicosPage() {
       <BreadcrumbJsonLd items={[{ name: "Serviços", path: "/servicos" }]} />
       <ServiceJsonLd
         name="Organização de eventos, casamentos e eventos corporativos"
-        description="Organização de casamentos, eventos corporativos, conferências e celebrações em Évora, Lisboa e todo o Portugal — da decoração à coordenação."
+        description="Organização de casamentos, eventos corporativos, conferências e celebrações em Lisboa e todo o Portugal — da decoração à coordenação."
         path="/servicos"
       />
 
@@ -656,7 +655,7 @@ export default function ServicosPage() {
                 className="text-foreground font-bold leading-[1.05] mb-8"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 52px)" }}
               >
-                Évora, Lisboa e todo o Portugal
+                Lisboa e todo o Portugal
               </h2>
               <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] max-w-md">
                 Casamentos, eventos corporativos e celebrações — do conceito à execução, com a

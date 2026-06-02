@@ -12,7 +12,7 @@ export const SITE = {
   email: "liquen.alentejo@gmail.com",
   phone: "+351919259820",
   phoneDisplay: "+351 919 259 820",
-  city: "Évora",
+  city: "Alentejo",
   region: "Alentejo",
   country: "PT",
   slogan: "Organizamos eventos, eternizamos memórias.",
@@ -22,9 +22,8 @@ export const SITE = {
   ogImage: "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
 } as const;
 
-/** Cities/areas served — ordered by SEO priority (Évora/Alentejo first). */
+/** Cities/areas served — ordered by SEO priority (Alentejo first). */
 export const AREAS_SERVED = [
-  "Évora",
   "Alentejo",
   "Lisboa",
   "Portugal",
@@ -36,23 +35,17 @@ export const AREAS_SERVED = [
   "Comporta",
 ] as const;
 
-/** Default keyword set, location-weighted toward Évora/Alentejo. */
+/** Default keyword set, location-weighted toward Alentejo. */
 export const SITE_KEYWORDS = [
-  "organização de eventos Évora",
-  "empresa de eventos Évora",
-  "wedding planner Évora",
   "wedding planner Alentejo",
   "casamentos Alentejo",
-  "casamentos Évora",
   "organização de casamentos Portugal",
-  "eventos corporativos Évora",
   "eventos corporativos Lisboa",
   "empresa de eventos Alentejo",
   "organização de eventos Lisboa",
   "organização de eventos Portugal",
   "planeamento de eventos",
   "decoração de eventos Alentejo",
-  "eventos de empresa Évora",
   "Líquen Events",
 ] as const;
 

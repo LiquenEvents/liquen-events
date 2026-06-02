@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${SITE.name} — Organização de Eventos`,
     short_name: SITE.name,
     description:
-      "Empresa de organização de eventos em Évora, Alentejo e Portugal — casamentos, eventos corporativos e celebrações.",
+      "Empresa de organização de eventos no Alentejo e em Portugal — casamentos, eventos corporativos e celebrações.",
     start_url: "/",
     display: "standalone",
     background_color: "#faf8f3",

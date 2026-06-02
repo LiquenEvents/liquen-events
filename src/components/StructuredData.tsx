@@ -9,7 +9,7 @@ import { jsonLd } from "@/lib/jsonld";
  *  - WebSite (enables sitelinks search box potential)
  *  - Service catalog (weddings, corporate, social) for service-intent queries
  *
- * This is what helps the site surface for "empresa de eventos Évora",
+ * This is what helps the site surface for "empresa de eventos Alentejo",
  * "wedding planner Alentejo", etc., and earn rich results.
  */
 export default function StructuredData() {
@@ -28,7 +28,7 @@ export default function StructuredData() {
       image: abs(SITE.ogImage),
       logo: abs("/logo-liquen.png"),
       description:
-        "Empresa de organização de eventos com sede em Évora. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal.",
+        "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal.",
       slogan: SITE.slogan,
       foundingDate: SITE.founded,
       priceRange: "€€€",
@@ -38,7 +38,7 @@ export default function StructuredData() {
         addressRegion: SITE.region,
         addressCountry: SITE.country,
       },
-      // Approximate geo for Évora — helps local-pack / map relevance.
+      // Approximate geo (Alentejo) — helps local-pack / map relevance.
       geo: {
         "@type": "GeoCoordinates",
         latitude: 38.5714,

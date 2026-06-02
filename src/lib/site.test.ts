@@ -23,7 +23,7 @@ describe("SITE identity invariants", () => {
     expect(SITE.locale).toBe("pt_PT");
   });
 
-  it("lists Évora first among the areas served (SEO priority)", () => {
-    expect(AREAS_SERVED[0]).toBe("Évora");
+  it("lists Alentejo first among the areas served (SEO priority)", () => {
+    expect(AREAS_SERVED[0]).toBe("Alentejo");
   });
 });

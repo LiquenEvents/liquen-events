@@ -9,7 +9,7 @@ const faqs = [
   },
   {
     q: "Trabalham em todo o território nacional?",
-    a: "Sim. Apesar de termos sede em Évora, trabalhamos em todo Portugal continental e ilhas. Temos uma vasta rede de fornecedores e parceiros em diversas regiões.",
+    a: "Sim. Trabalhamos em todo o Portugal continental e ilhas. Temos uma vasta rede de fornecedores e parceiros em diversas regiões.",
   },
   {
     q: "Podem assumir apenas parte da organização?",

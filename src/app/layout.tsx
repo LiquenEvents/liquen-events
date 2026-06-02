@@ -22,9 +22,9 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
-const TITLE = "Líquen Events — Organização de Eventos em Évora, Alentejo e Portugal";
+const TITLE = "Líquen Events — Organização de Eventos no Alentejo e em Portugal";
 const DESCRIPTION =
-  "Empresa de organização de eventos em Évora. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.";
+  "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
         url: SITE.ogImage,
         width: 2048,
         height: 1152,
-        alt: "Líquen Events — organização de eventos em Évora e Portugal",
+        alt: "Líquen Events — organização de eventos em Portugal",
       },
     ],
   },

@@ -14,13 +14,9 @@ import { testimonials, WHATSAPP_HREF_CTA } from "@/data";
 export const metadata: Metadata = pageMetadata({
   title: "Contacto — Peça o Seu Orçamento de Evento",
   description:
-    "Contacte a Líquen Events para organizar o seu evento em Évora, Alentejo, Lisboa ou em qualquer ponto de Portugal. Respondemos em menos de 24 horas com uma proposta à medida.",
+    "Contacte a Líquen Events para organizar o seu evento no Alentejo, Lisboa ou em qualquer ponto de Portugal. Respondemos em menos de 24 horas com uma proposta à medida.",
   path: "/contacto",
-  keywords: [
-    "contacto Líquen Events",
-    "orçamento de eventos Évora",
-    "organização de eventos Alentejo",
-  ],
+  keywords: ["contacto Líquen Events", "organização de eventos Alentejo"],
 });
 
 const steps = [

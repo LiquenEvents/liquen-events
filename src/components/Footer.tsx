@@ -172,7 +172,7 @@ export default function Footer() {
                 >
                   +351 919 259 820
                 </a>
-                <span className="text-foreground/78">Évora, Portugal</span>
+                <span className="text-foreground/78">Portugal</span>
               </div>
               <Link
                 href="/orcamento"
@@ -191,9 +191,7 @@ export default function Footer() {
           <p className="text-[11px] text-foreground/78 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — Todos os direitos reservados
           </p>
-          <p className="text-[11px] text-foreground/14 tracking-[0.28em] uppercase">
-            Évora · Portugal
-          </p>
+          <p className="text-[11px] text-foreground/14 tracking-[0.28em] uppercase">Portugal</p>
         </div>
       </div>
     </footer>
