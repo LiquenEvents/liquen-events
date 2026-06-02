@@ -561,11 +561,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {/* Brand */}
           <div className="px-6 py-6 border-b border-foreground/8">
             <Image
-              src="/logo-liquen-branco.png"
+              src="/logo-liquen.png"
               alt="Líquen Events"
               width={67}
               height={40}
-              className="object-contain opacity-80"
+              className="object-contain opacity-85"
             />
             <p className="text-foreground/22 text-[9px] tracking-[0.4em] uppercase mt-3">
               Back Office

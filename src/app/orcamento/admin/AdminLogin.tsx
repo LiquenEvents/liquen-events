@@ -52,7 +52,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
           <Image
-            src="/logo-liquen-branco.png"
+            src="/logo-liquen.png"
             alt="Líquen Events"
             width={100}
             height={60}

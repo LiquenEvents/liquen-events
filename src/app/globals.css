@@ -17,16 +17,21 @@
   --font-display: var(--font-playfair);
 }
 
-/* Back office & quote wizard keep the dark surface (dense tools read better
-   dark). Overriding the tokens on these scopes re-themes them without
-   affecting the now-light public site. */
-body.admin-mode,
+/* Quote wizard keeps the dark surface. */
 body.orcamento-mode {
   --color-surface: #080808;
   --color-surface-raised: #0f0f0f;
   --color-surface-elevated: #1a1a1a;
   --color-foreground: #dedad4;
   --color-cream: #f0ece6;
+}
+
+/* Back office: clean white surface. */
+body.admin-mode {
+  --color-surface: #ffffff;
+  --color-surface-raised: #f4f3f0;
+  --color-surface-elevated: #ffffff;
+  --color-foreground: #2a2620;
 }
 
 /* ── Selection ── */
@@ -299,17 +304,17 @@ body.admin-mode main {
 body.admin-mode::before {
   display: none !important;
 }
-/* Quieter, hairline scrollbars inside the back-office panels */
+/* Scrollbars for the white admin surface */
 body.admin-mode ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 body.admin-mode ::-webkit-scrollbar-thumb {
-  background: rgba(222, 218, 212, 0.12);
+  background: rgba(42, 38, 32, 0.12);
   border-radius: 999px;
 }
 body.admin-mode ::-webkit-scrollbar-thumb:hover {
-  background: rgba(222, 218, 212, 0.22);
+  background: rgba(99, 122, 95, 0.45);
 }
 
 /* ── Wizard step transitions ── */
@@ -409,9 +414,9 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 
 /* ── Back-office: hairline panel + soft hover lift ── */
 .bo-panel {
-  border: 1px solid rgba(222, 218, 212, 0.08);
+  border: 1px solid rgba(42, 38, 32, 0.08);
   border-radius: 10px;
-  background: rgba(15, 15, 15, 0.35);
+  background: rgba(244, 243, 240, 0.6);
 }
 .bo-panel-hover {
   transition:
@@ -420,8 +425,8 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
     transform 0.3s ease;
 }
 .bo-panel-hover:hover {
-  border-color: rgba(222, 218, 212, 0.16);
-  background: rgba(15, 15, 15, 0.6);
+  border-color: rgba(42, 38, 32, 0.14);
+  background: rgba(236, 234, 229, 0.8);
 }
 
 /* Eyebrow label — shared editorial micro-heading */
@@ -429,6 +434,11 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   font-size: 10px;
   letter-spacing: 0.35em;
   text-transform: uppercase;
+  color: rgba(42, 38, 32, 0.38);
+}
+
+/* On orcamento (dark) mode the eyebrow reverts to its original light tint */
+body.orcamento-mode .eyebrow {
   color: rgba(222, 218, 212, 0.28);
 }
 
