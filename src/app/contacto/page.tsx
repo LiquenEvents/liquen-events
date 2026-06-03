@@ -9,7 +9,9 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
-import { testimonials, WHATSAPP_HREF_CTA } from "@/data";
+import { WHATSAPP_HREF_CTA } from "@/data";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
 export const metadata: Metadata = pageMetadata({
   title: "Contacto — Peça o Seu Orçamento de Evento",
@@ -19,30 +21,10 @@ export const metadata: Metadata = pageMetadata({
   keywords: ["contacto Líquen Events", "organização de eventos Alentejo"],
 });
 
-const steps = [
-  {
-    step: "01",
-    title: "Recebemos o seu pedido",
-    desc: "Analisamos o seu pedido e preparamos uma resposta à medida.",
-  },
-  {
-    step: "02",
-    title: "Entramos em contacto",
-    desc: "Em menos de 24 horas, marcamos uma conversa.",
-  },
-  {
-    step: "03",
-    title: "Proposta à medida",
-    desc: "Proposta detalhada, com orçamento transparente.",
-  },
-  {
-    step: "04",
-    title: "Começamos a criar",
-    desc: "Tratamos de cada detalhe para um evento inesquecível.",
-  },
-];
-
-export default function ContactoPage() {
+export default async function ContactoPage() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const steps = t.contacto.steps.map((s, i) => ({ step: `0${i + 1}`, ...s }));
   return (
     <>
       <BreadcrumbJsonLd items={[{ name: "Contacto", path: "/contacto" }]} />
@@ -54,13 +36,13 @@ export default function ContactoPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
-              <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />O que dizem os nossos
-              clientes
+              <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+              {t.contacto.testimonialsEyebrow}
             </p>
           </AnimateIn>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-foreground/[0.06]">
-            {testimonials.slice(1).map((t, i) => (
-              <AnimateIn key={t.name} delay={i * 80}>
+            {t.testimonials.slice(1).map((item, i) => (
+              <AnimateIn key={item.name} delay={i * 80}>
                 <div className="bg-surface p-10 lg:p-12 flex flex-col gap-6 h-full">
                   <span
                     className="text-moss/30 text-4xl font-bold leading-none"
@@ -72,11 +54,11 @@ export default function ContactoPage() {
                     className="text-foreground/72 text-sm leading-[1.9] flex-1"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
-                    {t.quote}
+                    {item.quote}
                   </p>
                   <div>
-                    <p className="text-foreground text-sm font-semibold">{t.name}</p>
-                    <p className="text-moss text-xs mt-1 tracking-wide">{t.role}</p>
+                    <p className="text-foreground text-sm font-semibold">{item.name}</p>
+                    <p className="text-moss text-xs mt-1 tracking-wide">{item.role}</p>
                   </div>
                 </div>
               </AnimateIn>
@@ -115,7 +97,8 @@ export default function ContactoPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />O que acontece a seguir
+              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+              {t.contacto.nextEyebrow}
             </p>
           </AnimateIn>
           <div>
@@ -152,18 +135,18 @@ export default function ContactoPage() {
               <div className="lg:sticky" style={{ top: "6rem" }}>
                 <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
                   <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
-                  Perguntas frequentes
+                  {t.contacto.faqEyebrow}
                 </p>
                 <h2
                   className="text-foreground text-4xl lg:text-5xl font-bold leading-tight"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
-                  Tem
+                  {t.contacto.faqTitleLine1}
                   <br />
-                  dúvidas?
+                  {t.contacto.faqTitleLine2}
                 </h2>
                 <p className="text-foreground/60 text-sm leading-relaxed mt-6 max-w-xs">
-                  Se não encontrar a resposta que procura, contacte-nos diretamente.
+                  {t.contacto.faqSub}
                 </p>
               </div>
               <FAQ />
@@ -185,19 +168,18 @@ export default function ContactoPage() {
           <AnimateIn>
             <p className="text-cream/30 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
               <span className="w-5 h-px bg-cream/30 rounded-full flex-shrink-0" />
-              Resposta imediata
+              {t.contacto.whatsappEyebrow}
             </p>
             <h2
               className="text-cream font-bold leading-tight mb-6"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5vw, 72px)" }}
             >
-              Prefere falar
+              {t.contacto.whatsappTitleLine1}
               <br />
-              agora?
+              {t.contacto.whatsappTitleLine2}
             </h2>
             <p className="text-cream/45 text-base leading-relaxed max-w-md mb-12">
-              Fale connosco diretamente pelo WhatsApp. Estamos disponíveis de segunda a sexta, das
-              9h às 18h.
+              {t.contacto.whatsappText}
             </p>
             <div className="flex flex-wrap gap-4">
               <a
@@ -207,13 +189,13 @@ export default function ContactoPage() {
                 className="inline-flex items-center gap-3 px-8 py-4 bg-cream text-ink font-medium rounded-sm hover:bg-cream-dark transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
-                Abrir WhatsApp →
+                {t.common.abrirWhatsApp} →
               </a>
               <Link
                 href="mailto:liquen.alentejo@gmail.com"
                 className="inline-flex items-center gap-3 px-8 py-4 border border-cream/20 text-cream/60 font-medium rounded-sm hover:border-cream/40 hover:text-cream/85 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
               >
-                Enviar e-mail
+                {t.common.enviarEmail}
               </Link>
             </div>
           </AnimateIn>

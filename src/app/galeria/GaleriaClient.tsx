@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
+import { useTranslations } from "@/components/LocaleProvider";
 
 type Label = "Casamento" | "Corporativo" | "Conferência" | "Aéreo" | "Evento";
 interface Photo {
@@ -292,23 +293,6 @@ function collectionFor(src: string): string | null {
   return null;
 }
 
-function captionFor(src: string, label: string): { caption: string; sub?: string } {
-  const c = collectionFor(src);
-  return c ? { caption: c, sub: label } : { caption: label };
-}
-
-// Descriptive alt text for image SEO/accessibility (instead of a bare label)
-const ALT_BY_LABEL: Record<Label, string> = {
-  Casamento: "Casamento organizado pela Líquen Events no Alentejo",
-  Corporativo: "Evento corporativo organizado pela Líquen Events",
-  Conferência: "Conferência organizada pela Líquen Events",
-  Aéreo: "Vista aérea de evento da Líquen Events",
-  Evento: "Evento organizado pela Líquen Events em Portugal",
-};
-function altFor(label: Label): string {
-  return ALT_BY_LABEL[label] ?? `Evento da Líquen Events — ${label}`;
-}
-
 const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
@@ -364,6 +348,16 @@ export default function GaleriaClient() {
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const open = lb !== null;
+  const { t } = useTranslations();
+
+  // Localized display helpers — internal label keys stay PT (used for
+  // filtering); only what the user reads is translated.
+  const labelText = (l: Label) => t.galeria.labels[l];
+  const altText = (l: Label) => t.galeria.alt[l];
+  const caption = (src: string, label: Label): { caption: string; sub?: string } => {
+    const c = collectionFor(src);
+    return c ? { caption: c, sub: labelText(label) } : { caption: labelText(label) };
+  };
 
   const pool = useMemo(
     () => (cat === "Todos" ? photos : photos.filter((p) => p.label === cat)),
@@ -488,7 +482,7 @@ export default function GaleriaClient() {
                 : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10 hover:text-foreground/70"
             }`}
           >
-            {c}
+            {t.galeria.labels[c]}
             <span
               className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/78"}`}
             >
@@ -510,14 +504,14 @@ export default function GaleriaClient() {
             >
               <Image
                 src={visible[0].src}
-                alt={altFor(visible[0].label)}
+                alt={altText(visible[0].label)}
                 fill
                 sizes="(max-width: 640px) 100vw, 50vw"
                 className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                 loading="eager"
                 {...blurFor(visible[0].src)}
               />
-              <HoverOverlay {...captionFor(visible[0].src, visible[0].label)} />
+              <HoverOverlay {...caption(visible[0].src, visible[0].label)} />
             </button>
 
             {/* 4 fotos satélite — só em sm+ */}
@@ -530,14 +524,14 @@ export default function GaleriaClient() {
                 >
                   <Image
                     src={visible[idx].src}
-                    alt={altFor(visible[idx].label)}
+                    alt={altText(visible[idx].label)}
                     fill
                     sizes="25vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                     loading="eager"
                     {...blurFor(visible[idx].src)}
                   />
-                  <HoverOverlay {...captionFor(visible[idx].src, visible[idx].label)} />
+                  <HoverOverlay {...caption(visible[idx].src, visible[idx].label)} />
                 </button>
               ) : null,
             )}
@@ -561,14 +555,14 @@ export default function GaleriaClient() {
                   >
                     <Image
                       src={p.src}
-                      alt={altFor(p.label)}
+                      alt={altText(p.label)}
                       fill
                       sizes="(max-width: 768px) 50vw, 33vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                       loading="lazy"
                       {...blurFor(p.src)}
                     />
-                    <HoverOverlay {...captionFor(p.src, p.label)} />
+                    <HoverOverlay {...caption(p.src, p.label)} />
                   </button>
                 </div>
               );
@@ -584,7 +578,7 @@ export default function GaleriaClient() {
             onClick={() => setShown((s) => Math.min(s + PAGE, pool.length))}
             className="group px-10 py-3.5 border border-foreground/15 text-foreground/60 text-xs tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/70 transition-all duration-300 flex items-center gap-3"
           >
-            Ver mais
+            {t.galeria.verMais}
             <span className="text-foreground/45 group-hover:text-moss transition-colors">
               +{Math.min(PAGE, pool.length - shown)}
             </span>
@@ -596,7 +590,7 @@ export default function GaleriaClient() {
             />
           </div>
           <p className="text-foreground/78 text-[10px] tracking-widest">
-            {shown} de {pool.length}
+            {shown} {t.galeria.de} {pool.length}
           </p>
         </div>
       )}
@@ -609,7 +603,7 @@ export default function GaleriaClient() {
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label={`Galeria — ${pool[lb].label}, foto ${lb + 1} de ${pool.length}`}
+            aria-label={`${t.galeria.lbGallery} — ${labelText(pool[lb].label)}, ${t.galeria.lbPhoto} ${lb + 1} ${t.galeria.lbOf} ${pool.length}`}
             tabIndex={-1}
             className="fixed inset-0 z-[60] bg-black flex flex-col select-none focus:outline-none"
             onClick={close}
@@ -646,13 +640,13 @@ export default function GaleriaClient() {
                   </span>
                 )}
                 <span className="text-white/30 text-[10px] tracking-[0.15em] uppercase">
-                  {pool[lb].label}
+                  {labelText(pool[lb].label)}
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setPlaying((p) => !p)}
-                  aria-label={playing ? "Pausar slideshow" : "Iniciar slideshow"}
+                  aria-label={playing ? t.galeria.lbPause : t.galeria.lbPlay}
                   aria-pressed={playing}
                   className={`p-2 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
                 >
@@ -669,7 +663,7 @@ export default function GaleriaClient() {
                 </button>
                 <button
                   onClick={close}
-                  aria-label="Fechar"
+                  aria-label={t.galeria.lbClose}
                   className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -702,7 +696,7 @@ export default function GaleriaClient() {
                   e.stopPropagation();
                   prev();
                 }}
-                aria-label="Foto anterior"
+                aria-label={t.galeria.lbPrev}
                 className="absolute left-3 md:left-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
               >
                 <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -723,7 +717,7 @@ export default function GaleriaClient() {
                 <Image
                   key={lb}
                   src={pool[lb].src}
-                  alt={altFor(pool[lb].label)}
+                  alt={altText(pool[lb].label)}
                   fill
                   sizes="90vw"
                   className={`object-contain ${playing ? "lb-kenburns" : "lb-photo-in"}`}
@@ -750,7 +744,7 @@ export default function GaleriaClient() {
                   e.stopPropagation();
                   next();
                 }}
-                aria-label="Próxima foto"
+                aria-label={t.galeria.lbNext}
                 className="absolute right-3 md:right-6 z-10 p-3 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/8"
               >
                 <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -4,26 +4,13 @@ import AnimateIn from "@/components/AnimateIn";
 import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
-const services = [
-  {
-    title: "Corporativos",
-    tag: "Empresas",
-    image: "/imagens/EW1_1408.jpg",
-    href: "/servicos#empresas",
-  },
-  {
-    title: "Casamentos",
-    tag: "Celebrações",
-    image: "/imagens/DaniGui_Preview20.jpg",
-    href: "/servicos#celebracoes",
-  },
-  {
-    title: "Privados",
-    tag: "Celebrações",
-    image: "/imagens/DaniGui_JantarFesta_27.jpg",
-    href: "/servicos#celebracoes",
-  },
+const serviceLinks = [
+  { image: "/imagens/EW1_1408.jpg", href: "/servicos#empresas" },
+  { image: "/imagens/DaniGui_Preview20.jpg", href: "/servicos#celebracoes" },
+  { image: "/imagens/DaniGui_JantarFesta_27.jpg", href: "/servicos#celebracoes" },
 ];
 
 const ribbon = [
@@ -39,7 +26,10 @@ const ribbon = [
   "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
 ];
 
-export default function Home() {
+export default async function Home() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const services = serviceLinks.map((s, i) => ({ ...s, ...t.home.services[i] }));
   return (
     <>
       {/* ── Hero ── */}
@@ -61,51 +51,48 @@ export default function Home() {
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
           <p className="text-white/45 text-[10px] sm:text-xs tracking-[0.45em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
             <span className="inline-block w-8 h-px bg-gold flex-shrink-0" />
-            Organização de eventos
+            {t.home.eyebrow}
           </p>
           <h1
             className="text-white font-bold leading-[0.86] tracking-tight"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(56px, 10vw, 150px)" }}
           >
-            {(
-              [
-                { words: ["Eventos", "que"], delay: 180 },
-                { words: ["ficam", "na"], delay: 360 },
-                { words: ["memória."], delay: 520, moss: true },
-              ] as { words: string[]; delay: number; moss?: boolean }[]
-            ).map(({ words, delay, moss }) => (
-              <span key={words.join("")} className="flex flex-wrap" style={{ gap: "0.26em" }}>
-                {words.map((word, i) => (
-                  <span
-                    key={word + i}
-                    className={`inline-block word-rise${moss ? " text-moss" : ""}`}
-                    style={{ "--word-delay": `${delay + i * 110}ms` } as React.CSSProperties}
-                  >
-                    {word}
-                  </span>
-                ))}
-              </span>
-            ))}
+            {t.home.heroLines.map(({ words, moss }, lineIndex) => {
+              const delay = [180, 360, 520][lineIndex] ?? 520;
+              return (
+                <span key={words.join("")} className="flex flex-wrap" style={{ gap: "0.26em" }}>
+                  {words.map((word, i) => (
+                    <span
+                      key={word + i}
+                      className={`inline-block word-rise${moss ? " text-moss" : ""}`}
+                      style={{ "--word-delay": `${delay + i * 110}ms` } as React.CSSProperties}
+                    >
+                      {word}
+                    </span>
+                  ))}
+                </span>
+              );
+            })}
           </h1>
           <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-x-6 gap-y-4 anim-2">
             <Link
               href="/orcamento"
               className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-cream text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
             >
-              Pedir Orçamento →
+              {t.common.pedirOrcamento} →
             </Link>
             <Link
               href="/galeria"
               className="link-line text-xs text-white/55 hover:text-white/85 transition-colors tracking-[0.2em] uppercase"
             >
-              Ver galeria
+              {t.common.verGaleria}
             </Link>
           </div>
         </div>
 
         <div className="absolute bottom-8 right-6 lg:right-16 z-10 flex flex-col items-center gap-3 anim-3">
           <span className="text-white/25 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
-            Scroll
+            {t.home.scroll}
           </span>
           <div className="h-10 w-px overflow-hidden">
             <div className="w-full h-full bg-gradient-to-b from-white/50 to-transparent animate-scroll-line" />
@@ -122,13 +109,14 @@ export default function Home() {
           <AnimateIn>
             <div className="flex items-end justify-between mb-8 lg:mb-12">
               <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
-                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />O que fazemos
+                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+                {t.home.servicesEyebrow}
               </p>
               <Link
                 href="/servicos"
                 className="group text-xs text-foreground/72 hover:text-moss transition-colors flex items-center gap-1.5"
               >
-                Ver serviços
+                {t.common.verServicos}
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">
                   →
                 </span>
@@ -177,7 +165,7 @@ export default function Home() {
           <div className="absolute inset-y-0 right-0 w-20 sm:w-32 bg-gradient-to-l from-surface to-transparent z-20 pointer-events-none" />
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
             <span className="px-5 py-2.5 bg-surface/70 backdrop-blur-sm border border-cream/10 rounded-full text-cream/80 text-[10px] sm:text-[11px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-              Ver galeria →
+              {t.common.verGaleria} →
             </span>
           </div>
           <div className="flex gap-2 animate-marquee w-max">
@@ -227,34 +215,28 @@ export default function Home() {
             <AnimateIn>
               <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-6 flex items-center gap-3">
                 <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
-                Onde atuamos
+                {t.home.areasEyebrow}
               </p>
               <h2
                 className="text-foreground font-bold leading-[1.05] mb-8"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4vw, 56px)" }}
               >
-                Eventos em Lisboa
-                <br />e todo o Portugal
+                {t.home.areasTitleLine1}
+                <br />
+                {t.home.areasTitleLine2}
               </h2>
               <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] max-w-lg">
-                Casamentos, eventos corporativos e celebrações — do conceito à execução, tratamos de
-                cada detalhe para que só tenha de viver o momento.
+                {t.home.areasText}
               </p>
             </AnimateIn>
             <AnimateIn delay={120}>
               <div className="mt-10 flex flex-wrap gap-2.5">
-                {[
-                  "Casamentos no Alentejo",
-                  "Eventos corporativos em Lisboa",
-                  "Conferências",
-                  "Festas privadas",
-                  "Jantares de gala",
-                ].map((t) => (
+                {t.home.areasTags.map((tag) => (
                   <span
-                    key={t}
+                    key={tag}
                     className="text-xs tracking-wide text-foreground/60 border border-foreground/12 rounded-full px-4 py-2"
                   >
-                    {t}
+                    {tag}
                   </span>
                 ))}
               </div>
@@ -280,22 +262,21 @@ export default function Home() {
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
-              Próximo passo
+              {t.home.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 116px)" }}
             >
-              Tem um evento
+              {t.home.ctaTitleLine1}
               <br />
-              <span className="text-moss">em mente?</span>
+              <span className="text-moss">{t.home.ctaTitleLine2}</span>
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
             <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
-              Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em
-              menos de 24 horas.
+              {t.home.ctaText}
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
@@ -304,13 +285,13 @@ export default function Home() {
                 href="/orcamento"
                 className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
-                Pedir Orçamento →
+                {t.common.pedirOrcamento} →
               </Link>
               <Link
                 href="/galeria"
                 className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
               >
-                Ver galeria
+                {t.common.verGaleria}
               </Link>
             </div>
           </AnimateIn>

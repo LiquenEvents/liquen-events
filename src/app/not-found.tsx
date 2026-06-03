@@ -1,12 +1,16 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Página não encontrada",
   robots: { index: false, follow: false },
 };
 
-export default function NotFound() {
+export default async function NotFound() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   return (
     <section className="min-h-[80vh] flex items-center justify-center px-6 bg-surface">
       <div className="max-w-xl text-center">
@@ -18,40 +22,39 @@ export default function NotFound() {
         </p>
         <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
           <span className="w-5 h-px bg-moss/50" />
-          Página não encontrada
+          {t.errors.notFoundEyebrow}
         </p>
         <h1
           className="text-foreground font-bold leading-tight mb-6"
           style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 48px)" }}
         >
-          Este caminho não existe.
+          {t.errors.notFoundTitle}
         </h1>
         <p className="text-foreground/40 text-sm leading-[1.8] max-w-md mx-auto mb-12">
-          A página que procura pode ter sido movida ou já não está disponível. Mas o seu próximo
-          evento ainda está à espera de ser criado.
+          {t.errors.notFoundText}
         </p>
         <div className="flex flex-wrap gap-4 justify-center">
           <Link
             href="/"
             className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
           >
-            Voltar ao início →
+            {t.common.voltarInicio} →
           </Link>
           <Link
             href="/contacto"
             className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/12 text-foreground/45 font-medium rounded-sm hover:border-foreground/25 hover:text-foreground/75 transition-all duration-300 text-sm tracking-widest uppercase"
           >
-            Falar connosco
+            {t.common.falarConnosco}
           </Link>
         </div>
 
         {/* Quick links — keep the crawler & visitor moving */}
         <nav className="mt-14 pt-8 border-t border-foreground/8 flex flex-wrap gap-x-7 gap-y-2 justify-center">
           {[
-            ["Serviços", "/servicos"],
-            ["Galeria", "/galeria"],
-            ["Sobre", "/sobre"],
-            ["Clientes", "/clientes"],
+            [t.nav.servicos, "/servicos"],
+            [t.nav.galeria, "/galeria"],
+            [t.nav.sobre, "/sobre"],
+            [t.nav.clientes, "/clientes"],
           ].map(([label, href]) => (
             <Link
               key={href}

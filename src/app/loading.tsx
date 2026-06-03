@@ -1,4 +1,8 @@
-export default function Loading() {
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
+
+export default async function Loading() {
+  const t = getDictionary(await getLocale());
   return (
     <div className="min-h-[70vh] flex items-center justify-center bg-surface">
       <div className="flex flex-col items-center gap-5">
@@ -7,7 +11,7 @@ export default function Loading() {
           <span className="relative inline-flex rounded-full h-3 w-3 bg-moss" />
         </span>
         <p className="text-foreground/25 text-[10px] tracking-[0.5em] uppercase">
-          A carregar
+          {t.errors.loading}
         </p>
       </div>
     </div>

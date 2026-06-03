@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { WHATSAPP_HREF_CTA } from "@/data";
+import { useTranslations } from "@/components/LocaleProvider";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -36,6 +37,8 @@ const EVENT_TYPES: EventOption[] = [
 ];
 
 export default function OrcamentoForm() {
+  const { t } = useTranslations();
+  const to = t.orcamento;
   const router = useRouter();
   const [eventType, setEventType] = useState("");
   const [nome, setNome] = useState("");
@@ -51,8 +54,8 @@ export default function OrcamentoForm() {
   // Data mínima = hoje (não faz sentido pedir orçamento para uma data passada).
   const [minDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const nomeErr = touched.nome && nome.trim().length < 2 ? "Indique o seu nome" : "";
-  const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? "Email inválido" : "";
+  const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
+  const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
   const ready = nome.trim().length >= 2 && /\S+@\S+\.\S+/.test(email) && eventType !== "";
 
   async function submit(e: React.FormEvent) {
@@ -99,7 +102,7 @@ export default function OrcamentoForm() {
       }
       router.push(`/orcamento/confirmacao/${json.id}`);
     } catch {
-      setError("Não foi possível enviar. Tente novamente ou fale connosco pelo WhatsApp.");
+      setError(to.error);
       setSending(false);
     }
   }
@@ -128,24 +131,22 @@ export default function OrcamentoForm() {
             href="/"
             className="text-cream/70 text-[11px] tracking-[0.3em] uppercase hover:text-cream transition-colors inline-flex items-center gap-2 w-fit"
           >
-            ← Líquen Events
+            ← {to.back}
           </Link>
           <div>
             <p className="text-cream/40 text-[10px] tracking-[0.5em] uppercase mb-7 flex items-center gap-3">
               <span className="w-6 h-px bg-gold/60 flex-shrink-0" />
-              Pedido de orçamento
+              {to.eyebrow}
             </p>
             <h1
               className="text-cream font-bold leading-[0.92] tracking-tight mb-8"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 4vw, 68px)" }}
             >
-              Conte-nos
+              {to.titleLine1}
               <br />
-              <span className="text-moss-light">a sua ideia.</span>
+              <span className="text-moss-light">{to.titleMoss}</span>
             </h1>
-            <p className="text-cream/45 text-sm leading-[1.8] max-w-xs">
-              Sem compromisso. Respondemos com uma proposta à medida em menos de 24&nbsp;horas.
-            </p>
+            <p className="text-cream/45 text-sm leading-[1.8] max-w-xs">{to.lead}</p>
           </div>
         </div>
       </aside>
@@ -159,13 +160,13 @@ export default function OrcamentoForm() {
               href="/"
               className="text-foreground/55 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
             >
-              ← Líquen Events
+              ← {to.back}
             </Link>
             <h1
               className="text-foreground font-bold leading-[0.95] tracking-tight"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 9vw, 52px)" }}
             >
-              Conte-nos <span className="text-moss">a sua ideia.</span>
+              {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
             </h1>
           </div>
 
@@ -184,9 +185,9 @@ export default function OrcamentoForm() {
 
             {/* Tipo de evento */}
             <fieldset className="group">
-              <legend className={labelCls}>Tipo de evento *</legend>
+              <legend className={labelCls}>{to.labelTipo}</legend>
               <div className="flex flex-wrap gap-2.5">
-                {EVENT_TYPES.map((o) => {
+                {EVENT_TYPES.map((o, i) => {
                   const active = eventType === o.label;
                   return (
                     <button
@@ -200,7 +201,7 @@ export default function OrcamentoForm() {
                           : "border-foreground/15 text-foreground/50 hover:border-foreground/35 hover:text-foreground/80"
                       }`}
                     >
-                      {o.label}
+                      {to.eventTypeLabels[i] ?? o.label}
                     </button>
                   );
                 })}
@@ -211,7 +212,7 @@ export default function OrcamentoForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
               <div className="group">
                 <label htmlFor="of-data" className={labelCls}>
-                  Data do evento
+                  {to.labelData}
                 </label>
                 <input
                   id="of-data"
@@ -224,7 +225,7 @@ export default function OrcamentoForm() {
               </div>
               <div className="group">
                 <label htmlFor="of-pessoas" className={labelCls}>
-                  Nº de pessoas
+                  {to.labelPessoas}
                 </label>
                 <input
                   id="of-pessoas"
@@ -235,7 +236,7 @@ export default function OrcamentoForm() {
                   value={pessoas}
                   onChange={(e) => setPessoas(e.target.value)}
                   className={inputCls}
-                  placeholder="Ex.: 120"
+                  placeholder={to.phPessoas}
                 />
               </div>
             </div>
@@ -244,7 +245,7 @@ export default function OrcamentoForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
               <div className="group">
                 <label htmlFor="of-nome" className={labelCls}>
-                  Nome *
+                  {to.labelNome}
                 </label>
                 <input
                   id="of-nome"
@@ -252,16 +253,16 @@ export default function OrcamentoForm() {
                   autoComplete="name"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  onBlur={() => setTouched((t) => ({ ...t, nome: true }))}
+                  onBlur={() => setTouched((prev) => ({ ...prev, nome: true }))}
                   aria-invalid={!!nomeErr}
                   className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
-                  placeholder="O seu nome"
+                  placeholder={to.phNome}
                 />
                 {nomeErr && <p className={hintCls}>{nomeErr}</p>}
               </div>
               <div className="group">
                 <label htmlFor="of-email" className={labelCls}>
-                  Email *
+                  {to.labelEmail}
                 </label>
                 <input
                   id="of-email"
@@ -269,10 +270,10 @@ export default function OrcamentoForm() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                  onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                   aria-invalid={!!emailErr}
                   className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
-                  placeholder="email@exemplo.com"
+                  placeholder={to.phEmail}
                 />
                 {emailErr && <p className={hintCls}>{emailErr}</p>}
               </div>
@@ -281,7 +282,7 @@ export default function OrcamentoForm() {
             {/* Telefone */}
             <div className="group">
               <label htmlFor="of-telefone" className={labelCls}>
-                Telefone
+                {to.labelTelefone}
               </label>
               <input
                 id="of-telefone"
@@ -290,14 +291,14 @@ export default function OrcamentoForm() {
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
                 className={inputCls}
-                placeholder="+351 9XX XXX XXX"
+                placeholder={to.phTelefone}
               />
             </div>
 
             {/* Mensagem */}
             <div className="group">
               <label htmlFor="of-mensagem" className={labelCls}>
-                Mensagem
+                {to.labelMensagem}
               </label>
               <textarea
                 id="of-mensagem"
@@ -305,7 +306,7 @@ export default function OrcamentoForm() {
                 onChange={(e) => setMensagem(e.target.value)}
                 rows={4}
                 className={`${inputCls} resize-none`}
-                placeholder="Conte-nos o que imagina para o seu evento — local, ambiente, detalhes especiais…"
+                placeholder={to.phMensagem}
               />
             </div>
 
@@ -322,10 +323,10 @@ export default function OrcamentoForm() {
                       className="inline-block w-3.5 h-3.5 rounded-full border border-cream/30 border-t-cream animate-spin"
                       aria-hidden
                     />
-                    A enviar…
+                    {to.enviando}
                   </>
                 ) : (
-                  "Enviar pedido →"
+                  `${to.enviar} →`
                 )}
               </button>
               <a
@@ -335,7 +336,7 @@ export default function OrcamentoForm() {
                 className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/45 hover:text-moss transition-colors"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
-                ou pelo WhatsApp
+                {to.ouWhatsApp}
               </a>
             </div>
 
@@ -345,10 +346,7 @@ export default function OrcamentoForm() {
               </div>
             )}
 
-            <p className="text-foreground/25 text-[11px] leading-relaxed">
-              Os campos marcados com&nbsp;* são obrigatórios. Resposta em menos de 24&nbsp;horas
-              úteis.
-            </p>
+            <p className="text-foreground/25 text-[11px] leading-relaxed">{to.requiredNote}</p>
           </form>
         </div>
       </main>

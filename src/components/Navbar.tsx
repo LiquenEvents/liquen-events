@@ -4,18 +4,21 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-
-const links = [
-  { href: "/sobre", label: "Sobre" },
-  { href: "/servicos", label: "Serviços" },
-  { href: "/galeria", label: "Galeria" },
-  { href: "/clientes", label: "Clientes" },
-];
+import { useTranslations } from "./LocaleProvider";
+import LanguageToggle from "./LanguageToggle";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const { t } = useTranslations();
+
+  const links = [
+    { href: "/sobre", label: t.nav.sobre },
+    { href: "/servicos", label: t.nav.servicos },
+    { href: "/galeria", label: t.nav.galeria },
+    { href: "/clientes", label: t.nav.clientes },
+  ];
 
   // Pages whose hero is a full-bleed dark image sitting *under* the transparent
   // navbar. On those, the unscrolled nav needs light text + a subtle scrim to
@@ -112,6 +115,11 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
+            <LanguageToggle light={light} />
+            <span
+              className={`h-3 w-px ${light ? "bg-white/20" : "bg-foreground/15"}`}
+              aria-hidden
+            />
             <Link
               href="/contacto"
               className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
@@ -120,13 +128,13 @@ export default function Navbar() {
                   : "border-moss/35 text-moss hover:border-moss/60 hover:bg-moss/10"
               }`}
             >
-              Contacto
+              {t.nav.contacto}
             </Link>
             <Link
               href="/orcamento"
               className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
             >
-              Orçamento →
+              {t.nav.orcamento} →
             </Link>
           </div>
 
@@ -166,7 +174,7 @@ export default function Navbar() {
                 : "opacity 0.1s ease, transform 0.1s ease",
             }}
           >
-            Pedir Orçamento →
+            {t.nav.pedirOrcamento} →
           </Link>
           {links.map((link, i) => (
             <Link
@@ -198,8 +206,17 @@ export default function Navbar() {
                 : "opacity 0.1s ease, transform 0.1s ease",
             }}
           >
-            Contacto
+            {t.nav.contacto}
           </Link>
+          <div
+            className="mt-6 flex justify-center"
+            style={{
+              opacity: isOpen ? 1 : 0,
+              transition: isOpen ? "opacity 0.3s ease 250ms" : "opacity 0.1s ease",
+            }}
+          >
+            <LanguageToggle />
+          </div>
         </div>
       </div>
     </nav>

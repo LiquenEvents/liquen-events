@@ -8,6 +8,9 @@ import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
 import PageTransition from "@/components/PageTransition";
+import { LocaleProvider } from "@/components/LocaleProvider";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary, htmlLang } from "@/lib/i18n";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
 
 const inter = Inter({
@@ -91,29 +94,33 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   return (
     <html
-      lang="pt-PT"
+      lang={htmlLang(locale)}
       data-scroll-behavior="smooth"
       className={`${inter.variable} ${playfair.variable}`}
     >
       <body className="flex flex-col min-h-screen antialiased">
-        <StructuredData />
-        <a
-          href="#conteudo"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-cream focus:rounded-md focus:text-sm"
-        >
-          Saltar para o conteúdo
-        </a>
-        <ScrollProgress />
-        <StickyCTA />
-        <Navbar />
-        <main id="conteudo" className="flex-1 pt-24">
-          <PageTransition>{children}</PageTransition>
-        </main>
-        <Footer />
-        <WhatsAppButton />
+        <LocaleProvider locale={locale}>
+          <StructuredData />
+          <a
+            href="#conteudo"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-cream focus:rounded-md focus:text-sm"
+          >
+            {t.skipLink}
+          </a>
+          <ScrollProgress />
+          <StickyCTA />
+          <Navbar />
+          <main id="conteudo" className="flex-1 pt-24">
+            <PageTransition>{children}</PageTransition>
+          </main>
+          <Footer locale={locale} />
+          <WhatsAppButton />
+        </LocaleProvider>
       </body>
     </html>
   );

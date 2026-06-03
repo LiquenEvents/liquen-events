@@ -7,6 +7,8 @@ import AnimateIn from "@/components/AnimateIn";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "../services-data";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
 export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
@@ -31,10 +33,12 @@ export async function generateMetadata({
 
 export default async function ServiceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const svc = getService(slug);
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const svc = getService(slug, locale);
   if (!svc) notFound();
 
-  const related = svc.related.map(getService).filter(Boolean) as NonNullable<
+  const related = svc.related.map((r) => getService(r, locale)).filter(Boolean) as NonNullable<
     ReturnType<typeof getService>
   >[];
 
@@ -68,7 +72,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
           <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/45 mb-8">
             <Link href="/servicos" className="hover:text-cream transition-colors">
-              Serviços
+              {t.nav.servicos}
             </Link>
             <span>/</span>
             <span className="text-cream/70">{svc.eyebrow}</span>
@@ -102,14 +106,14 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                 href="/orcamento"
                 className="inline-flex items-center gap-3 mt-4 text-sm text-moss hover:gap-5 transition-all duration-300 tracking-widest uppercase"
               >
-                Pedir orçamento →
+                {t.common.pedirOrcamento} →
               </Link>
             </div>
           </AnimateIn>
           <AnimateIn delay={120}>
             <div className="border border-foreground/10 rounded-xl p-8 bg-surface-raised/40">
               <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-6">
-                O que inclui
+                {t.servicoDetalhe.includesTitle}
               </p>
               <ul className="flex flex-col gap-4">
                 {svc.includes.map((item) => (
@@ -148,7 +152,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-3xl mx-auto px-6 lg:px-16">
             <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/50" /> Perguntas frequentes
+              <span className="w-5 h-px bg-gold/50" /> {t.servicoDetalhe.faqTitle}
             </p>
             <div className="flex flex-col">
               {svc.faqs.map((f) => (
@@ -173,7 +177,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/50" /> Outros serviços
+              <span className="w-5 h-px bg-gold/50" /> {t.servicoDetalhe.relatedTitle}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {related.map((r) => (
@@ -223,13 +227,13 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
             className="text-foreground font-bold leading-[0.95] mb-12 max-w-2xl"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5.5vw, 76px)" }}
           >
-            Vamos planear o seu evento?
+            {t.servicoDetalhe.ctaTitle}
           </h2>
           <Link
             href="/orcamento"
             className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
           >
-            Pedir orçamento →
+            {t.common.pedirOrcamento} →
           </Link>
         </div>
       </section>

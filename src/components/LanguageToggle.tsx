@@ -1,0 +1,59 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { LANG_COOKIE, type Locale } from "@/lib/i18n";
+import { useTranslations } from "./LocaleProvider";
+
+/**
+ * PT | EN switch. Writes the language cookie and refreshes the server tree so
+ * the new locale is rendered (correct <html lang>, no flash). `light` mirrors
+ * the navbar's dark-hero treatment so it stays legible over imagery.
+ */
+export default function LanguageToggle({ light = false }: { light?: boolean }) {
+  const router = useRouter();
+  const { locale, t } = useTranslations();
+  const [pending, startTransition] = useTransition();
+
+  function choose(next: Locale) {
+    if (next === locale) return;
+    document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    startTransition(() => router.refresh());
+  }
+
+  const base = "text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";
+  const activeCls = light ? "text-white" : "text-moss";
+  const idleCls = light
+    ? "text-white/45 hover:text-white/80"
+    : "text-foreground/40 hover:text-moss";
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 ${pending ? "opacity-60" : ""}`}
+      role="group"
+      aria-label={t.langToggle.label}
+    >
+      <button
+        type="button"
+        onClick={() => choose("pt")}
+        aria-pressed={locale === "pt"}
+        aria-label={t.langToggle.switchToPt}
+        className={`${base} ${locale === "pt" ? activeCls : idleCls}`}
+      >
+        {t.langToggle.pt}
+      </button>
+      <span className={light ? "text-white/25" : "text-foreground/20"} aria-hidden>
+        /
+      </span>
+      <button
+        type="button"
+        onClick={() => choose("en")}
+        aria-pressed={locale === "en"}
+        aria-label={t.langToggle.switchToEn}
+        className={`${base} ${locale === "en" ? activeCls : idleCls}`}
+      >
+        {t.langToggle.en}
+      </button>
+    </div>
+  );
+}

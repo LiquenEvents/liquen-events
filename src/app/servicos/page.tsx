@@ -6,6 +6,8 @@ import AnimateIn from "@/components/AnimateIn";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
 export const metadata: Metadata = pageMetadata({
   title: "Serviços — Casamentos e Eventos Corporativos no Alentejo",
@@ -21,10 +23,7 @@ export const metadata: Metadata = pageMetadata({
   ],
 });
 
-const navItems = [
-  { label: "Empresas", id: "empresas" },
-  { label: "Celebrações", id: "celebracoes" },
-];
+const navMeta = [{ id: "empresas" }, { id: "celebracoes" }];
 
 /* ── Mosaico editorial para categorias ── */
 type ServiceCard = {
@@ -44,73 +43,29 @@ type Category = {
   services: ServiceCard[];
 };
 
-const categories: Category[] = [
+// Locale-independent metadata (ids, images, slugs, layout). Display text comes
+// from the dictionary (t.servicos.categories) and is merged in at render time.
+const categoryMeta = [
   {
     id: "empresas",
     num: "01",
-    label: "Empresas",
-    subtitle: "Para empresas",
-    desc: "Elevamos a imagem da sua marca através de eventos que transformam equipas e celebram conquistas.",
-    layout: "mosaic-right",
+    layout: "mosaic-right" as const,
     services: [
-      {
-        title: "Conferências & Congressos",
-        slug: "eventos-corporativos",
-        desc: "Organização completa de conferências empresariais, da logística ao audiovisual.",
-        image: "/imagens/EW1_1330.jpg",
-      },
-      {
-        title: "Teambuilding",
-        slug: "eventos-corporativos",
-        desc: "Actividades e experiências que unem equipas e fortalecem a cultura organizacional.",
-        image: "/imagens/EW1_0576.jpg",
-      },
-      {
-        title: "Lançamentos de Produto",
-        slug: "eventos-corporativos",
-        desc: "Eventos de impacto para apresentar novos produtos ao mercado com criatividade.",
-        image: "/imagens/EW1_0697.jpg",
-      },
-      {
-        title: "Jantares de Empresa",
-        slug: "eventos-corporativos",
-        desc: "Desde jantares de Natal a gala awards, criamos momentos de celebração memoráveis.",
-        image: "/imagens/EW1_1404.jpg",
-      },
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1330.jpg" },
+      { slug: "eventos-corporativos", image: "/imagens/EW1_0576.jpg" },
+      { slug: "eventos-corporativos", image: "/imagens/EW1_0697.jpg" },
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1404.jpg" },
     ],
   },
   {
     id: "celebracoes",
     num: "02",
-    label: "Celebrações",
-    subtitle: "Para particulares",
-    desc: "Os momentos mais importantes da sua vida, planeados ao pormenor com cuidado e elegância.",
-    layout: "mosaic-left",
+    layout: "mosaic-left" as const,
     services: [
-      {
-        title: "Casamentos",
-        slug: "casamentos",
-        desc: "O vosso dia mais especial, planeado ao pormenor. Da escolha do espaço ao último detalhe.",
-        image: "/imagens/DaniGui_Preview18.jpg",
-      },
-      {
-        title: "Batizados & Comunhões",
-        slug: "festas-e-aniversarios",
-        desc: "Celebrações familiares íntimas e cheias de significado, organizadas com carinho.",
-        image: "/imagens/DaniGui_JantarFesta_11.jpg",
-      },
-      {
-        title: "Festas de Aniversário",
-        slug: "festas-e-aniversarios",
-        desc: "Festas temáticas ou clássicas para todas as idades. Cada aniversário é uma história.",
-        image: "/imagens/DaniGui_JantarFesta_1.jpg",
-      },
-      {
-        title: "Jantares de Gala",
-        slug: "jantares-de-gala",
-        desc: "Eventos sociais de prestígio com ambiente sofisticado e coordenação impecável.",
-        image: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg",
-      },
+      { slug: "casamentos", image: "/imagens/DaniGui_Preview18.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_11.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_1.jpg" },
+      { slug: "jantares-de-gala", image: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg" },
     ],
   },
 ];
@@ -120,11 +75,13 @@ function ServiceCard({
   service,
   index,
   catNum,
+  cta,
   sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw",
 }: {
   service: ServiceCard;
   index: number;
   catNum: string;
+  cta: string;
   sizes?: string;
 }) {
   return (
@@ -171,7 +128,7 @@ function ServiceCard({
           {service.desc}
         </p>
         <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-150">
-          Ver mais →
+          {cta} →
         </span>
       </div>
     </Link>
@@ -179,7 +136,7 @@ function ServiceCard({
 }
 
 /* ── Mosaic grid — 4 services ── */
-function MosaicGrid({ cat }: { cat: Category }) {
+function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
   const [s0, s1, s2, s3] = cat.services;
   const isRight = cat.layout === "mosaic-right";
 
@@ -199,6 +156,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s0}
               index={0}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 65vw"
             />
           </div>
@@ -208,6 +166,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s1}
               index={1}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 35vw"
             />
           </div>
@@ -217,6 +176,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s2}
               index={2}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -226,6 +186,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s3}
               index={3}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -238,6 +199,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s0}
               index={0}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 35vw"
             />
           </div>
@@ -247,6 +209,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s1}
               index={1}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 65vw"
             />
           </div>
@@ -256,6 +219,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s2}
               index={2}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -265,6 +229,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
               service={s3}
               index={3}
               catNum={cat.num}
+              cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -275,7 +240,7 @@ function MosaicGrid({ cat }: { cat: Category }) {
 }
 
 /* ── Duo grid — 2 services ── */
-function DuoGrid({ cat }: { cat: Category }) {
+function DuoGrid({ cat, cta }: { cat: Category; cta: string }) {
   return (
     <div
       className="grid grid-cols-1 sm:grid-cols-2 gap-2"
@@ -287,6 +252,7 @@ function DuoGrid({ cat }: { cat: Category }) {
           service={s}
           index={i}
           catNum={cat.num}
+          cta={cta}
           sizes="(max-width: 640px) 100vw, 50vw"
         />
       ))}
@@ -295,17 +261,38 @@ function DuoGrid({ cat }: { cat: Category }) {
 }
 
 /* ── Mobile card list ── */
-function MobileCardStack({ cat }: { cat: Category }) {
+function MobileCardStack({ cat, cta }: { cat: Category; cta: string }) {
   return (
     <div className="grid grid-cols-2 gap-2" style={{ gridAutoRows: "clamp(200px, 48vw, 320px)" }}>
       {cat.services.map((s, i) => (
-        <ServiceCard key={s.title} service={s} index={i} catNum={cat.num} sizes="50vw" />
+        <ServiceCard key={s.title} service={s} index={i} catNum={cat.num} cta={cta} sizes="50vw" />
       ))}
     </div>
   );
 }
 
-export default function ServicosPage() {
+export default async function ServicosPage() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const ts = t.servicos;
+  const navItems = navMeta.map((m, i) => ({ ...m, label: ts.nav[i] }));
+  const categories: Category[] = categoryMeta.map((m, ci) => {
+    const ct = ts.categories[ci];
+    return {
+      id: m.id,
+      num: m.num,
+      layout: m.layout,
+      label: ct.label,
+      subtitle: ct.subtitle,
+      desc: ct.desc,
+      services: m.services.map((s, si) => ({
+        slug: s.slug,
+        image: s.image,
+        title: ct.services[si].title,
+        desc: ct.services[si].desc,
+      })),
+    };
+  });
   return (
     <>
       <BreadcrumbJsonLd items={[{ name: "Serviços", path: "/servicos" }]} />
@@ -330,7 +317,8 @@ export default function ServicosPage() {
             {/* Left — headline */}
             <div className="lg:col-span-7 pb-2">
               <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-10 anim-0 flex items-center gap-3">
-                <span className="w-6 h-px bg-gold flex-shrink-0" />O que oferecemos
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {ts.heroEyebrow}
               </p>
               <h1
                 className="text-foreground font-bold leading-[0.88] tracking-tight mb-12 anim-1"
@@ -339,23 +327,22 @@ export default function ServicosPage() {
                   fontSize: "clamp(52px, 8.5vw, 118px)",
                 }}
               >
-                Cada evento,
+                {ts.heroTitle[0]}
                 <br />
-                uma história
+                {ts.heroTitle[1]}
                 <br />
-                <span className="text-moss">por contar.</span>
+                <span className="text-moss">{ts.heroTitle[2]}</span>
               </h1>
               <div className="border-t border-foreground/8 pt-9 anim-2">
                 <p className="text-foreground/60 text-[15px] leading-[1.85] max-w-sm mb-8">
-                  Especializados em casamentos, eventos corporativos e celebrações privadas —
-                  soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.
+                  {ts.heroLead}
                 </p>
                 <Link
                   href="/orcamento"
-                  className="inline-flex items-center gap-3 text-sm text-foreground/60 hover:text-foreground/70 transition-colors duration-300 group"
+                  className="inline-flex items-center gap-3 text-sm text-foreground/60 hover:text-moss transition-colors duration-300 group"
                 >
                   <span className="w-8 h-px bg-foreground/18 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
-                  Pedir orçamento
+                  {t.common.pedirOrcamento}
                 </Link>
               </div>
             </div>
@@ -402,7 +389,7 @@ export default function ServicosPage() {
                   <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent" />
                   <div className="absolute bottom-4 left-4">
                     <span className="text-cream/35 text-[8px] tracking-[0.4em] uppercase">
-                      Corporativos
+                      {ts.imgCorporativos}
                     </span>
                   </div>
                 </div>
@@ -419,7 +406,7 @@ export default function ServicosPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                   <div className="absolute bottom-4 left-4">
                     <span className="text-cream/35 text-[8px] tracking-[0.4em] uppercase">
-                      Celebrações
+                      {ts.imgCelebracoes}
                     </span>
                   </div>
                 </div>
@@ -484,9 +471,9 @@ export default function ServicosPage() {
         <AnimateIn from="fade">
           <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(150px, 35vw, 400px)" }}>
             {[
-              { src: "/imagens/EW1_1408.jpg", label: "Eventos Corporativos" },
-              { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", label: "Casamentos" },
-              { src: "/imagens/20_10_2025_0358.jpg", label: "Celebrações" },
+              { src: "/imagens/EW1_1408.jpg", label: ts.band1[0] },
+              { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", label: ts.band1[1] },
+              { src: "/imagens/20_10_2025_0358.jpg", label: ts.band1[2] },
             ].map((item, i) => (
               <div key={i} className="relative overflow-hidden group">
                 <Image
@@ -576,11 +563,15 @@ export default function ServicosPage() {
               {/* Mosaic grid — desktop only */}
               <AnimateIn delay={60}>
                 <div className="hidden lg:block">
-                  {cat.layout === "duo" ? <DuoGrid cat={cat} /> : <MosaicGrid cat={cat} />}
+                  {cat.layout === "duo" ? (
+                    <DuoGrid cat={cat} cta={ts.verMais} />
+                  ) : (
+                    <MosaicGrid cat={cat} cta={ts.verMais} />
+                  )}
                 </div>
                 {/* Mobile card stack */}
                 <div className="lg:hidden">
-                  <MobileCardStack cat={cat} />
+                  <MobileCardStack cat={cat} cta={ts.verMais} />
                 </div>
               </AnimateIn>
 
@@ -591,7 +582,7 @@ export default function ServicosPage() {
                     href={`/servicos/${cat.services[0].slug}`}
                     className="group inline-flex items-center gap-3 text-xs text-foreground/72 hover:text-foreground/78 transition-colors duration-300 tracking-[0.3em] uppercase"
                   >
-                    <span>Ver detalhes</span>
+                    <span>{ts.verDetalhes}</span>
                     <span className="w-6 h-px bg-foreground/20 group-hover:w-10 transition-all duration-500" />
                   </Link>
                 </div>
@@ -606,15 +597,15 @@ export default function ServicosPage() {
         <AnimateIn from="fade">
           <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(160px, 35vw, 440px)" }}>
             {[
-              { src: "/imagens/EW1_1342.jpg", label: "Corporativo", anchor: "#empresas" },
+              { src: "/imagens/EW1_1342.jpg", label: ts.band2[0], anchor: "#empresas" },
               {
                 src: "/imagens/Natalia e Jonathan-167.jpg",
-                label: "Casamentos",
+                label: ts.band2[1],
                 anchor: "#celebracoes",
               },
               {
                 src: "/imagens/DaniGui_JantarFesta_27.jpg",
-                label: "Celebrações",
+                label: ts.band2[2],
                 anchor: "#celebracoes",
               },
             ].map((item) => (
@@ -649,17 +640,16 @@ export default function ServicosPage() {
             <AnimateIn>
               <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-6 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                Onde atuamos
+                {ts.seoEyebrow}
               </p>
               <h2
                 className="text-foreground font-bold leading-[1.05] mb-8"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 52px)" }}
               >
-                Lisboa e todo o Portugal
+                {ts.seoTitle}
               </h2>
               <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] max-w-md">
-                Casamentos, eventos corporativos e celebrações — do conceito à execução, com a
-                sensibilidade do Alentejo e a exigência de uma equipa profissional.
+                {ts.seoText}
               </p>
             </AnimateIn>
           </div>
@@ -697,23 +687,20 @@ export default function ServicosPage() {
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
-              Próximo passo
+              {ts.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 110px)" }}
             >
-              Tem um evento
+              {ts.ctaTitleLine1}
               <br />
-              <span className="text-moss">em mente?</span>
+              <span className="text-moss">{ts.ctaTitleMoss}</span>
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
-              Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma
-              proposta à sua medida.
-            </p>
+            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
@@ -721,13 +708,13 @@ export default function ServicosPage() {
                 href="/orcamento"
                 className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
-                Pedir Orçamento →
+                {t.common.pedirOrcamento} →
               </Link>
               <Link
                 href="/galeria"
                 className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
               >
-                Ver a galeria
+                {ts.ctaGaleria}
               </Link>
             </div>
           </AnimateIn>

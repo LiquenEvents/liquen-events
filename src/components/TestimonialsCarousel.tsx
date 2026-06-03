@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import AnimateIn from "./AnimateIn";
-import { testimonials } from "@/data";
+import { useTranslations } from "./LocaleProvider";
 
 export default function TestimonialsCarousel() {
+  const { t: dict } = useTranslations();
+  const testimonials = dict.testimonials;
   const [active, setActive] = useState(0);
   const [visible, setVisible] = useState(true);
   // Pause autoplay while the user is interacting (hover/focus) or the tab is
@@ -40,7 +42,7 @@ export default function TestimonialsCarousel() {
       transitionTo((current) => (current + 1) % testimonials.length);
     }, 6000);
     return () => clearInterval(id);
-  }, [paused, transitionTo]);
+  }, [paused, transitionTo, testimonials.length]);
 
   const t = testimonials[active];
 
@@ -69,7 +71,7 @@ export default function TestimonialsCarousel() {
           <div className="flex items-center gap-4 mb-10 lg:mb-16">
             <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
             <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase">
-              O que dizem os clientes
+              {dict.common.clientsSay}
             </p>
           </div>
         </AnimateIn>

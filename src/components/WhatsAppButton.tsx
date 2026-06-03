@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
+import { useTranslations } from "./LocaleProvider";
 
 export default function WhatsAppButton() {
   const [visible, setVisible] = useState(false);
+  const { t } = useTranslations();
 
   useEffect(() => {
     const id = setTimeout(() => setVisible(true), 1500);
@@ -17,7 +19,7 @@ export default function WhatsAppButton() {
       href={WHATSAPP_HREF}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Contactar pelo WhatsApp"
+      aria-label={t.common.contactWhatsApp}
       className={`whatsapp-fixed fixed z-50 flex items-center gap-2.5 bg-[#25D366] text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-[#25D366]/25 hover:scale-105 transition-all duration-500 ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}

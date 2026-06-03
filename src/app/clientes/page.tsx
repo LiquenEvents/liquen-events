@@ -9,6 +9,8 @@ import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { clientLogos } from "@/data";
 import { SITE } from "@/lib/site";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
 export const metadata: Metadata = pageMetadata({
   title: "Clientes — Quem Confia na Líquen Events",
@@ -17,29 +19,6 @@ export const metadata: Metadata = pageMetadata({
   path: "/clientes",
   keywords: ["clientes Líquen Events", "empresas de eventos Alentejo"],
 });
-
-const testimonials = [
-  {
-    name: "António Bettencourt",
-    text: "O ambiente criado pela vossa equipa elevou a imagem do nosso evento. Ficámos impressionados com a sofisticação da decoração.",
-    event: "Evento Corporativo",
-  },
-  {
-    name: "Stephanie & Mizio",
-    text: "Everything was exactly how we'd envisioned and you created a beautiful space for us!",
-    event: "Evento Privado",
-  },
-  {
-    name: "Teresinha Malta",
-    text: "Serviço de excelência, com muito carinho e disponibilidade por parte de toda a equipa. Superaram todas as expectativas.",
-    event: "Evento Social",
-  },
-  {
-    name: "Ana Pinho",
-    text: "Excelente, recomendo sem qualquer reserva. Uma equipa de confiança do início ao fim.",
-    event: "Evento Privado",
-  },
-];
 
 const eyebrow =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
@@ -89,7 +68,10 @@ const mosaicItems = [
   },
 ];
 
-export default function ClientesPage() {
+export default async function ClientesPage() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const testimonials = t.clientes.testimonials;
   return (
     <>
       <BreadcrumbJsonLd items={[{ name: "Clientes", path: "/clientes" }]} />
@@ -113,7 +95,7 @@ export default function ClientesPage() {
           <AnimateIn>
             <p className="text-white/35 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3 mb-10">
               <span className="w-8 h-px bg-gold flex-shrink-0" />
-              Quem confia em nós
+              {t.clientes.heroEyebrow}
             </p>
           </AnimateIn>
           <AnimateIn delay={80}>
@@ -124,24 +106,23 @@ export default function ClientesPage() {
                 fontSize: "clamp(58px, 10.5vw, 148px)",
               }}
             >
-              Os Nossos
+              {t.clientes.heroTitleLine1}
               <br />
-              <em className="not-italic text-moss">Clientes.</em>
+              <em className="not-italic text-moss">{t.clientes.heroTitleMoss}</em>
             </h1>
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="mt-10 border-l-2 border-moss/50 pl-6 max-w-md">
-              <p className="text-white/45 text-base leading-[1.8]">
-                Empresas, instituições e famílias que nos escolheram para os seus momentos mais
-                especiais — e que nos honram com a sua confiança.
-              </p>
+              <p className="text-white/45 text-base leading-[1.8]">{t.clientes.heroLead}</p>
             </div>
           </AnimateIn>
         </div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
-          <span className="text-white/30 text-[8px] tracking-[0.45em] uppercase">Scroll</span>
+          <span className="text-white/30 text-[8px] tracking-[0.45em] uppercase">
+            {t.clientes.scroll}
+          </span>
           <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
         </div>
       </section>
@@ -158,15 +139,15 @@ export default function ClientesPage() {
                 className="text-foreground/72 leading-[1.72]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 2.8vw, 36px)" }}
               >
-                De grandes empresas a celebrações de família, são dezenas os que confiam à Líquen
-                Events os seus momentos mais importantes — e a essa confiança respondemos com{" "}
-                <span className="text-moss">rigor, criatividade e dedicação</span> em cada detalhe.
+                {t.clientes.leadPre}
+                <span className="text-moss">{t.clientes.leadMoss}</span>
+                {t.clientes.leadPost}
               </p>
             </AnimateIn>
             <AnimateIn delay={100} className="hidden lg:block">
               <div className="flex flex-col items-end gap-1.5 text-right min-w-[120px]">
                 <span className="text-foreground/12 text-[9px] tracking-[0.45em] uppercase block">
-                  Desde
+                  {t.clientes.desde}
                 </span>
                 <span
                   className="text-foreground/10 font-bold leading-none"
@@ -187,18 +168,18 @@ export default function ClientesPage() {
             <AnimateIn>
               <p className={`${eyebrow} mb-4`}>
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                Empresas &amp; instituições
+                {t.clientes.logosEyebrow}
               </p>
               <h2
                 className="text-foreground font-bold leading-[1.05]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 3.8vw, 50px)" }}
               >
-                Marcas que confiam em nós
+                {t.clientes.logosTitle}
               </h2>
             </AnimateIn>
             <AnimateIn delay={80} className="hidden lg:block">
               <span className="text-foreground/12 text-[9px] tracking-[0.4em] uppercase">
-                {clientLogos.length} clientes
+                {clientLogos.length} {t.clientes.clientesCount}
               </span>
             </AnimateIn>
           </div>
@@ -216,7 +197,7 @@ export default function ClientesPage() {
             <AnimateIn className="flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-28">
               <p className={`${eyebrow} mb-12`}>
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                Testemunhos
+                {t.clientes.featuredEyebrow}
               </p>
               <span
                 className="text-moss/15 leading-[0.75] select-none block -mb-2"
@@ -229,17 +210,16 @@ export default function ClientesPage() {
                 className="text-foreground/75 leading-[1.65] mt-4"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.2vw, 27px)" }}
               >
-                A dedicação da equipa em criar ambientes mágicos, com decoração impecável e
-                coordenação perfeita, permitiu-nos desfrutar do evento sem qualquer preocupação.
+                {t.clientes.featuredQuote}
               </blockquote>
               <div className="mt-10 pt-7 border-t border-foreground/10 flex items-center gap-5">
                 <div className="w-8 h-px bg-gold flex-shrink-0" />
                 <div>
                   <p className="text-foreground text-sm font-semibold tracking-wide">
-                    Alexandra Teixeira
+                    {t.clientes.featuredName}
                   </p>
                   <p className="text-moss/65 text-[10px] mt-1 tracking-[0.2em] uppercase">
-                    Evento Social
+                    {t.clientes.featuredRole}
                   </p>
                 </div>
               </div>
@@ -270,13 +250,13 @@ export default function ClientesPage() {
               className="text-foreground font-bold leading-[1.05]"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.2vw, 42px)" }}
             >
-              Palavras de quem confiou.
+              {t.clientes.gridTitle}
             </h2>
           </AnimateIn>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/[0.05]">
-            {testimonials.map((t, i) => (
-              <AnimateIn key={t.name} delay={i * 55} className="h-full">
+            {testimonials.map((item, i) => (
+              <AnimateIn key={item.name} delay={i * 55} className="h-full">
                 <figure className="h-full flex flex-col p-8 lg:p-10 bg-surface hover:bg-surface-raised/25 transition-colors duration-500">
                   <span
                     className="text-moss/20 text-5xl leading-none mb-5 select-none"
@@ -292,14 +272,14 @@ export default function ClientesPage() {
                       fontSize: "clamp(16px, 1.7vw, 19px)",
                     }}
                   >
-                    {t.text}
+                    {item.text}
                   </blockquote>
                   <figcaption className="mt-8 pt-6 border-t border-foreground/8 flex items-center gap-4">
                     <div className="w-6 h-px bg-gold flex-shrink-0" />
                     <div>
-                      <p className="text-foreground text-sm font-semibold">{t.name}</p>
+                      <p className="text-foreground text-sm font-semibold">{item.name}</p>
                       <p className="text-moss/60 text-[10px] mt-0.5 tracking-[0.18em] uppercase">
-                        {t.event}
+                        {item.event}
                       </p>
                     </div>
                   </figcaption>
@@ -316,7 +296,7 @@ export default function ClientesPage() {
           <AnimateIn className="mb-10">
             <p className={eyebrow}>
               <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-              Momentos dos nossos eventos
+              {t.clientes.mosaicEyebrow}
             </p>
           </AnimateIn>
           <AnimateIn from="fade" delay={80}>
@@ -337,7 +317,7 @@ export default function ClientesPage() {
                   <div className="absolute inset-0 bg-black/25 group-hover:bg-black/5 transition-colors duration-700" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <span className="absolute bottom-4 left-4 text-white/0 group-hover:text-white/65 transition-all duration-500 text-[9px] tracking-[0.42em] uppercase font-medium">
-                    {item.label}
+                    {t.clientes.mosaicLabels[i] ?? item.label}
                   </span>
                 </div>
               ))}
@@ -363,21 +343,21 @@ export default function ClientesPage() {
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
-              Próximo evento
+              {t.clientes.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.88] tracking-tight mb-6"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(50px, 9vw, 128px)" }}
             >
-              Junte-se aos
+              {t.clientes.ctaTitleLine1}
               <br />
-              nossos clientes.
+              {t.clientes.ctaTitleLine2}
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
             <p className="text-white/38 text-base leading-relaxed max-w-sm mb-14">
-              Conte-nos a sua ideia e mostramos-lhe como a podemos transformar num evento memorável.
+              {t.clientes.ctaText}
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
@@ -385,7 +365,7 @@ export default function ClientesPage() {
               href="/contacto"
               className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
             >
-              Falar Connosco →
+              {t.common.falarConnosco} →
             </Link>
           </AnimateIn>
         </div>

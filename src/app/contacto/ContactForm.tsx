@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { WHATSAPP_HREF_CTA } from "@/data";
+import { useTranslations } from "@/components/LocaleProvider";
 
 // ── Data ─────────────────────────────────────────────────────────
 
@@ -124,10 +125,6 @@ const eventCards = [
   },
 ];
 
-const guestRanges = ["Até 30", "30–80", "80–150", "150–300", "300+"];
-const budgetRanges = ["< 5.000 €", "5.000–15.000 €", "15.000–30.000 €", "30.000 €+", "A definir"];
-const stepLabels = ["Evento", "Dados", "Detalhes", "Mensagem"];
-
 // ── Helpers ───────────────────────────────────────────────────────
 
 function Pill({
@@ -183,10 +180,10 @@ function NavBtn({
   );
 }
 
-function ProgressBar({ step }: { step: number }) {
+function ProgressBar({ step, labels }: { step: number; labels: string[] }) {
   return (
     <div className="flex items-center gap-0 mb-9 sm:mb-14">
-      {stepLabels.map((label, i) => (
+      {labels.map((label, i) => (
         <div key={label} className="flex items-center flex-1 min-w-0">
           <div className="flex items-center gap-2.5 flex-shrink-0">
             <div
@@ -208,7 +205,7 @@ function ProgressBar({ step }: { step: number }) {
               {label}
             </span>
           </div>
-          {i < stepLabels.length - 1 && (
+          {i < labels.length - 1 && (
             <div
               className={`flex-1 h-px mx-2 sm:mx-3 lg:mx-5 transition-all duration-500 ${
                 i + 1 < step ? "bg-moss/40" : "bg-foreground/8"
@@ -224,6 +221,8 @@ function ProgressBar({ step }: { step: number }) {
 // ── Main ──────────────────────────────────────────────────────────
 
 export default function ContactForm() {
+  const { t } = useTranslations();
+  const tf = t.contacto.form;
   const [step, setStep] = useState(1);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -248,7 +247,7 @@ export default function ContactForm() {
       if (!res.ok) throw new Error("falha");
       setSent(true);
     } catch {
-      setError("Não foi possível enviar. Tente novamente ou contacte-nos pelo WhatsApp.");
+      setError(tf.error);
     } finally {
       setSending(false);
     }
@@ -276,7 +275,7 @@ export default function ContactForm() {
           <div className="max-w-7xl mx-auto w-full">
             <p className="text-cream/35 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
               <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
-              Fale connosco
+              {tf.heroEyebrow}
             </p>
             <h1
               className="text-cream font-bold leading-[0.88] tracking-tight"
@@ -285,9 +284,9 @@ export default function ContactForm() {
                 fontSize: "clamp(44px, 7.5vw, 100px)",
               }}
             >
-              Vamos criar algo
+              {tf.heroTitleLine1}
               <br />
-              <span className="text-moss">extraordinário.</span>
+              <span className="text-moss">{tf.heroTitleMoss}</span>
             </h1>
           </div>
         </div>
@@ -301,28 +300,28 @@ export default function ContactForm() {
             <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
               <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
-                Encontre-nos
+                {tf.infoEyebrow}
               </p>
 
               <div className="flex flex-col divide-y divide-foreground/8 mb-12">
                 {[
                   {
-                    label: "E-mail",
+                    label: tf.emailLabel,
                     value: "liquen.alentejo@gmail.com",
                     href: "mailto:liquen.alentejo@gmail.com",
-                    sub: "Respondemos em menos de 24 horas",
+                    sub: tf.emailSub,
                   },
                   {
-                    label: "Telefone",
+                    label: tf.phoneLabel,
                     value: "+351 919 259 820",
                     href: "tel:+351919259820",
-                    sub: "Seg–Sex, 9h–18h",
+                    sub: tf.phoneSub,
                   },
                   {
-                    label: "Localização",
-                    value: "Portugal",
+                    label: tf.locationLabel,
+                    value: tf.locationValue,
                     href: null,
-                    sub: "Reuniões presenciais disponíveis",
+                    sub: tf.locationSub,
                   },
                 ].map((item) => (
                   <div key={item.label} className="py-7">
@@ -351,7 +350,7 @@ export default function ContactForm() {
               >
                 <span className="text-moss flex-shrink-0 text-sm">✦</span>
                 <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/60 group-hover:text-foreground/78 transition-colors">
-                  Pedir orçamento para o seu evento
+                  {tf.quoteLink}
                 </span>
                 <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
                   →
@@ -369,7 +368,7 @@ export default function ContactForm() {
                   <WhatsAppIcon className="w-4 h-4" />
                 </span>
                 <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/60 group-hover:text-foreground/78 transition-colors">
-                  Falar pelo WhatsApp
+                  {tf.whatsappLink}
                 </span>
                 <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
                   →
@@ -400,11 +399,10 @@ export default function ContactForm() {
                   className="text-foreground/72 text-base leading-relaxed mb-4"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
-                  Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta
-                  personalizada.
+                  {tf.promise}
                 </p>
                 <p className="text-foreground/68 text-[10px] tracking-[0.3em] uppercase">
-                  — Equipa Líquen Events
+                  {tf.promiseSign}
                 </p>
               </div>
             </div>
@@ -430,7 +428,7 @@ export default function ContactForm() {
                     </svg>
                   </div>
                   <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-6">
-                    Enviado com sucesso
+                    {tf.successEyebrow}
                   </p>
                   <h3
                     className="text-foreground font-bold leading-tight mb-5"
@@ -439,21 +437,18 @@ export default function ContactForm() {
                       fontSize: "clamp(36px, 4vw, 60px)",
                     }}
                   >
-                    Mensagem
+                    {tf.successTitle1}
                     <br />
-                    recebida.
+                    {tf.successTitle2}
                   </h3>
                   <p className="text-foreground/60 text-sm leading-[1.85] max-w-sm mb-14">
-                    Obrigado{form.nome ? `, ${form.nome}` : ""}. Em breve entraremos em contacto
-                    para avançarmos juntos no seu evento.
+                    {tf.successThanks}
+                    {form.nome ? `, ${form.nome}` : ""}
+                    {tf.successText}
                   </p>
                   {/* Next steps inline */}
                   <div className="w-full border border-foreground/8 overflow-hidden mb-10">
-                    {[
-                      { n: "01", t: "Analisamos o seu pedido", d: "Nas próximas horas" },
-                      { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas" },
-                      { n: "03", t: "Enviamos proposta à medida", d: "Personalizada para si" },
-                    ].map((s, i) => (
+                    {tf.successSteps.map((s, i) => (
                       <div
                         key={s.n}
                         className={`flex items-center gap-4 px-5 py-4 sm:px-7 sm:py-5 ${i < 2 ? "border-b border-foreground/8" : ""}`}
@@ -477,13 +472,13 @@ export default function ContactForm() {
                     <span className="text-moss">
                       <WhatsAppIcon className="w-4 h-4" />
                     </span>
-                    Acompanhar pelo WhatsApp →
+                    {tf.successWhatsApp} →
                   </a>
                 </div>
               ) : (
                 /* ── Steps ── */
                 <>
-                  <ProgressBar step={step} />
+                  <ProgressBar step={step} labels={tf.stepLabels} />
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -508,43 +503,46 @@ export default function ContactForm() {
                           className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
                           style={{ fontFamily: "var(--font-playfair)" }}
                         >
-                          Que tipo de evento
+                          {tf.step1Title1}
                           <br />
-                          está a planear?
+                          {tf.step1Title2}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">
-                          Selecione a opção que melhor descreve o seu evento.
-                        </p>
+                        <p className="text-foreground/60 text-sm mb-10">{tf.step1Sub}</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-12">
-                          {eventCards.map((ec) => (
-                            <button
-                              key={ec.value}
-                              type="button"
-                              onClick={() => set("eventType", ec.value)}
-                              className={`flex flex-col items-start gap-3 p-5 border text-left transition-all duration-200 ${
-                                form.eventType === ec.value
-                                  ? "border-moss bg-moss/10"
-                                  : "border-foreground/10 hover:border-foreground/22 hover:bg-surface-raised"
-                              }`}
-                            >
-                              <span
-                                className={`transition-colors duration-200 ${form.eventType === ec.value ? "text-moss" : "text-foreground/72"}`}
+                          {eventCards.map((ec, i) => {
+                            const card = tf.eventCards[i] ?? { value: ec.value, desc: ec.desc };
+                            return (
+                              <button
+                                key={card.value}
+                                type="button"
+                                onClick={() => set("eventType", card.value)}
+                                className={`flex flex-col items-start gap-3 p-5 border text-left transition-all duration-200 ${
+                                  form.eventType === card.value
+                                    ? "border-moss bg-moss/10"
+                                    : "border-foreground/10 hover:border-foreground/22 hover:bg-surface-raised"
+                                }`}
                               >
-                                {ec.icon}
-                              </span>
-                              <div>
-                                <p
-                                  className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${form.eventType === ec.value ? "text-foreground" : "text-foreground/72"}`}
+                                <span
+                                  className={`transition-colors duration-200 ${form.eventType === card.value ? "text-moss" : "text-foreground/72"}`}
                                 >
-                                  {ec.value}
-                                </p>
-                                <p className="text-xs text-foreground/68 leading-snug">{ec.desc}</p>
-                              </div>
-                            </button>
-                          ))}
+                                  {ec.icon}
+                                </span>
+                                <div>
+                                  <p
+                                    className={`text-sm font-semibold mb-0.5 transition-colors duration-200 ${form.eventType === card.value ? "text-foreground" : "text-foreground/72"}`}
+                                  >
+                                    {card.value}
+                                  </p>
+                                  <p className="text-xs text-foreground/68 leading-snug">
+                                    {card.desc}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                         <NavBtn onClick={() => setStep(2)} disabled={!form.eventType}>
-                          Continuar →
+                          {tf.continuar} →
                         </NavBtn>
                       </div>
                     )}
@@ -556,16 +554,14 @@ export default function ContactForm() {
                           className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
                           style={{ fontFamily: "var(--font-playfair)" }}
                         >
-                          Diga-nos quem é.
+                          {tf.step2Title}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">
-                          Os seus dados de contacto para falarmos consigo.
-                        </p>
+                        <p className="text-foreground/60 text-sm mb-10">{tf.step2Sub}</p>
                         <div className="flex flex-col gap-7 sm:gap-10 mb-12">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-7 sm:gap-10">
                             <div>
                               <label htmlFor="cf-nome" className={labelCls}>
-                                Nome *
+                                {tf.labelNome}
                               </label>
                               <input
                                 id="cf-nome"
@@ -574,12 +570,12 @@ export default function ContactForm() {
                                 value={form.nome}
                                 onChange={(e) => set("nome", e.target.value)}
                                 className={inputCls}
-                                placeholder="O seu nome completo"
+                                placeholder={tf.phName}
                               />
                             </div>
                             <div>
                               <label htmlFor="cf-email" className={labelCls}>
-                                E-mail *
+                                {tf.labelEmail}
                               </label>
                               <input
                                 id="cf-email"
@@ -588,13 +584,13 @@ export default function ContactForm() {
                                 value={form.email}
                                 onChange={(e) => set("email", e.target.value)}
                                 className={inputCls}
-                                placeholder="email@exemplo.com"
+                                placeholder={tf.phEmail}
                               />
                             </div>
                           </div>
                           <div>
                             <label htmlFor="cf-telefone" className={labelCls}>
-                              Telefone
+                              {tf.labelTelefone}
                             </label>
                             <input
                               id="cf-telefone"
@@ -603,16 +599,16 @@ export default function ContactForm() {
                               value={form.telefone}
                               onChange={(e) => set("telefone", e.target.value)}
                               className={inputCls}
-                              placeholder="+351 9XX XXX XXX"
+                              placeholder={tf.phPhone}
                             />
                           </div>
                         </div>
                         <div className="flex items-center gap-6">
                           <NavBtn variant="ghost" onClick={() => setStep(1)}>
-                            ← Voltar
+                            ← {tf.voltar}
                           </NavBtn>
                           <NavBtn onClick={() => setStep(3)} disabled={!form.nome || !form.email}>
-                            Continuar →
+                            {tf.continuar} →
                           </NavBtn>
                         </div>
                       </div>
@@ -625,28 +621,26 @@ export default function ContactForm() {
                           className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
                           style={{ fontFamily: "var(--font-playfair)" }}
                         >
-                          Detalhes do evento.
+                          {tf.step3Title}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">
-                          Ajude-nos a perceber a dimensão e o timing.
-                        </p>
+                        <p className="text-foreground/60 text-sm mb-10">{tf.step3Sub}</p>
                         <div className="flex flex-col gap-7 sm:gap-10 mb-12">
                           <div>
                             <label htmlFor="cf-data" className={labelCls}>
-                              Data Prevista
+                              {tf.labelData}
                             </label>
                             <input
                               id="cf-data"
                               type="date"
                               value={form.data}
                               onChange={(e) => set("data", e.target.value)}
-                              className={inputCls}
+                              className={`${inputCls} [color-scheme:light]`}
                             />
                           </div>
                           <div>
-                            <span className={labelCls}>Nº de Convidados</span>
+                            <span className={labelCls}>{tf.labelConvidados}</span>
                             <div className="flex flex-wrap gap-2 pt-1">
-                              {guestRanges.map((r) => (
+                              {tf.guestRanges.map((r) => (
                                 <Pill
                                   key={r}
                                   label={r}
@@ -657,9 +651,9 @@ export default function ContactForm() {
                             </div>
                           </div>
                           <div>
-                            <span className={labelCls}>Orçamento (opcional)</span>
+                            <span className={labelCls}>{tf.labelOrcamento}</span>
                             <div className="flex flex-wrap gap-2 pt-1">
-                              {budgetRanges.map((r) => (
+                              {tf.budgetRanges.map((r) => (
                                 <Pill
                                   key={r}
                                   label={r}
@@ -672,9 +666,9 @@ export default function ContactForm() {
                         </div>
                         <div className="flex items-center gap-6">
                           <NavBtn variant="ghost" onClick={() => setStep(2)}>
-                            ← Voltar
+                            ← {tf.voltar}
                           </NavBtn>
-                          <NavBtn onClick={() => setStep(4)}>Continuar →</NavBtn>
+                          <NavBtn onClick={() => setStep(4)}>{tf.continuar} →</NavBtn>
                         </div>
                       </div>
                     )}
@@ -686,15 +680,13 @@ export default function ContactForm() {
                           className="text-foreground text-2xl lg:text-3xl font-bold mb-3 leading-tight"
                           style={{ fontFamily: "var(--font-playfair)" }}
                         >
-                          A sua visão.
+                          {tf.step4Title}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">
-                          Descreva o evento dos seus sonhos. Quanto mais detalhe, melhor.
-                        </p>
+                        <p className="text-foreground/60 text-sm mb-10">{tf.step4Sub}</p>
                         <div className="flex flex-col gap-10 mb-10">
                           <div>
                             <label htmlFor="cf-mensagem" className={labelCls}>
-                              Mensagem *
+                              {tf.labelMensagem}
                             </label>
                             <textarea
                               id="cf-mensagem"
@@ -703,7 +695,7 @@ export default function ContactForm() {
                               onChange={(e) => set("mensagem", e.target.value)}
                               rows={7}
                               className={`${inputCls} resize-none`}
-                              placeholder={`${form.eventType ? `Tipo de evento: ${form.eventType}\n\n` : ""}Local preferido, temática, inspirações, detalhes especiais...`}
+                              placeholder={`${form.eventType ? `${tf.msgPrefix}${form.eventType}\n\n` : ""}${tf.phMensagem}`}
                             />
                           </div>
                         </div>
@@ -712,25 +704,31 @@ export default function ContactForm() {
                           <div className="border border-foreground/8 bg-surface-raised px-6 py-4 mb-8 flex flex-wrap gap-x-7 gap-y-2">
                             {form.eventType && (
                               <span className="text-xs">
-                                <span className="text-foreground/78 mr-1.5">Evento</span>
+                                <span className="text-foreground/78 mr-1.5">
+                                  {tf.summaryEvento}
+                                </span>
                                 <span className="text-foreground/68">{form.eventType}</span>
                               </span>
                             )}
                             {form.convidados && (
                               <span className="text-xs">
-                                <span className="text-foreground/78 mr-1.5">Convidados</span>
+                                <span className="text-foreground/78 mr-1.5">
+                                  {tf.summaryConvidados}
+                                </span>
                                 <span className="text-foreground/68">{form.convidados}</span>
                               </span>
                             )}
                             {form.orcamento && (
                               <span className="text-xs">
-                                <span className="text-foreground/78 mr-1.5">Orçamento</span>
+                                <span className="text-foreground/78 mr-1.5">
+                                  {tf.summaryOrcamento}
+                                </span>
                                 <span className="text-foreground/68">{form.orcamento}</span>
                               </span>
                             )}
                             {form.data && (
                               <span className="text-xs">
-                                <span className="text-foreground/78 mr-1.5">Data</span>
+                                <span className="text-foreground/78 mr-1.5">{tf.summaryData}</span>
                                 <span className="text-foreground/68">{form.data}</span>
                               </span>
                             )}
@@ -738,17 +736,17 @@ export default function ContactForm() {
                         )}
                         <div className="flex flex-wrap items-center gap-6">
                           <NavBtn variant="ghost" onClick={() => setStep(3)}>
-                            ← Voltar
+                            ← {tf.voltar}
                           </NavBtn>
                           <button
                             type="submit"
                             disabled={!form.mensagem || sending}
                             className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3"
                           >
-                            {sending ? "A enviar…" : "Enviar Pedido →"}
+                            {sending ? tf.enviando : `${tf.enviar} →`}
                           </button>
                           <p className="text-foreground/78 text-xs tracking-wide">
-                            Resposta em 24h
+                            {tf.resposta24}
                           </p>
                         </div>
                         {error && (

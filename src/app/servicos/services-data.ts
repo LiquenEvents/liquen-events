@@ -185,6 +185,110 @@ export const SERVICES: ServiceDetail[] = [
   },
 ];
 
-export function getService(slug: string): ServiceDetail | undefined {
-  return SERVICES.find((s) => s.slug === slug);
+/**
+ * English overrides for the visible copy (eyebrow, H1 title, intro, includes,
+ * FAQs). metaTitle/metaDescription/keywords stay Portuguese — PT is the
+ * canonical, indexed language; the EN versions are a reading option.
+ */
+type ServiceCopy = Pick<ServiceDetail, "eyebrow" | "title" | "intro" | "includes" | "faqs">;
+
+const SERVICES_EN: Record<string, ServiceCopy> = {
+  casamentos: {
+    eyebrow: "Wedding Planning",
+    title: "Wedding Planning in the Alentejo and across Portugal",
+    intro: [
+      "Your wedding is one of a kind — and it deserves to be planned down to the last detail. Líquen Events is a wedding planner organising weddings throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues.",
+      "We guide the couple from the first sketch to the final toast: concept and aesthetics, venue selection, floral décor, catering, music, stationery and full day-of coordination. Every detail considered, so all you have to do is live the moment.",
+    ],
+    includes: [
+      "Full wedding planning",
+      "Day-of coordination",
+      "Floral décor and scenography",
+      "Venue and supplier selection",
+      "Catering and menu tasting",
+      "Seating plan and stationery",
+    ],
+    faqs: [
+      {
+        q: "How far in advance should I hire a wedding planner?",
+        a: "We recommend at least 12 months in advance, especially if the venue is in high demand. For more intimate weddings, we can organise on shorter timelines.",
+      },
+      {
+        q: "Do you organise weddings outside the Alentejo?",
+        a: "Yes. We organise weddings throughout mainland Portugal and the islands, with a network of trusted suppliers in several regions.",
+      },
+    ],
+  },
+  "eventos-corporativos": {
+    eyebrow: "For Companies",
+    title: "Corporate Events in Lisbon",
+    intro: [
+      "We elevate your brand's image through corporate events that transform teams and celebrate achievements. Líquen Events organises conferences, congresses, team-building and company dinners in Lisbon and across Portugal.",
+      "From logistics to audiovisual, from registration management to on-site coordination, we handle everything with the rigour a professional event demands — so your company can focus solely on results.",
+    ],
+    includes: [
+      "Conferences and congresses",
+      "Team building and team activations",
+      "Product launches",
+      "Company dinners and gala awards",
+      "Audiovisual, stage and scenography",
+      "Registration and accreditation management",
+    ],
+    faqs: [
+      {
+        q: "Do you organise company events in Lisbon?",
+        a: "Yes. We produce corporate events in Lisbon and across the country, with a team and suppliers in different regions.",
+      },
+      {
+        q: "Do you handle events with international guests?",
+        a: "Yes, we have experience with international logistics, including simultaneous translation, accommodation and transfers.",
+      },
+    ],
+  },
+  "festas-e-aniversarios": {
+    eyebrow: "Private Celebrations",
+    title: "Birthday Parties and Private Celebrations",
+    intro: [
+      "Every celebration is a story. We organise birthday parties, christenings, communions and private celebrations in the Alentejo and across Portugal — themed or classic, intimate or large-scale.",
+      "From concept to décor, from catering to entertainment, we create memorable moments with the attention to detail that sets Líquen Events apart.",
+    ],
+    includes: [
+      "Birthday parties (all ages)",
+      "Christenings and communions",
+      "Themed concept and full décor",
+      "Catering, cake and dessert table",
+      "Entertainment and activities",
+      "Full day-of coordination",
+    ],
+    faqs: [
+      {
+        q: "Do you organise small, intimate parties?",
+        a: "Yes. We adapt to any size — from intimate family celebrations to large parties — always with the same care.",
+      },
+    ],
+  },
+  "jantares-de-gala": {
+    eyebrow: "Social Events",
+    title: "Gala Dinners and Prestige Social Events",
+    intro: [
+      "For moments that call for sophistication, we organise gala dinners and prestige social events in Lisbon and throughout Portugal.",
+      "Premium table settings, guest chef, wine pairing and live entertainment — a meticulously crafted experience, with the impeccable coordination a gala event demands.",
+    ],
+    includes: [
+      "Premium table settings and décor",
+      "Guest chef and signature menu",
+      "Wine pairing",
+      "Scenography and lighting",
+      "Entertainment and performances",
+      "End-to-end event coordination",
+    ],
+    faqs: [],
+  },
+};
+
+export function getService(slug: string, locale: "pt" | "en" = "pt"): ServiceDetail | undefined {
+  const svc = SERVICES.find((s) => s.slug === slug);
+  if (!svc) return undefined;
+  if (locale === "en" && SERVICES_EN[slug]) return { ...svc, ...SERVICES_EN[slug] };
+  return svc;
 }

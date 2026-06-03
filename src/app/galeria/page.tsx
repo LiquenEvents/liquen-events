@@ -3,6 +3,8 @@ import PageHeader from "@/components/PageHeader";
 import GaleriaClient from "./GaleriaClient";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
 export const metadata: Metadata = pageMetadata({
   title: "Galeria de Eventos — Alentejo",
@@ -13,14 +15,16 @@ export const metadata: Metadata = pageMetadata({
   keywords: ["galeria de eventos", "fotografias de casamentos Alentejo"],
 });
 
-export default function GaleriaPage() {
+export default async function GaleriaPage() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   return (
     <>
       <BreadcrumbJsonLd items={[{ name: "Galeria", path: "/galeria" }]} />
       <PageHeader
-        label="Os nossos momentos"
-        title="Galeria"
-        description="Casamentos, eventos corporativos e celebrações — capturados ao pormenor."
+        label={t.galeria.headerLabel}
+        title={t.galeria.headerTitle}
+        description={t.galeria.headerDesc}
       />
 
       <section className="py-16 bg-surface">
@@ -33,16 +37,16 @@ export default function GaleriaPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-8 flex items-center gap-3">
             <span className="w-5 h-px bg-moss/50 flex-shrink-0" />
-            Redes sociais
+            {t.galeria.instaEyebrow}
           </p>
           <h2
             className="text-foreground text-4xl font-bold mb-5"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
-            Siga-nos no Instagram
+            {t.galeria.instaTitle}
           </h2>
           <p className="text-foreground/60 text-sm leading-relaxed mb-10 max-w-md">
-            Partilhamos os bastidores dos nossos eventos e inspirações diárias.
+            {t.galeria.instaText}
           </p>
           <a
             href="https://www.instagram.com/liquen.events"

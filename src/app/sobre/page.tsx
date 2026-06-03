@@ -5,6 +5,8 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
 export const metadata: Metadata = pageMetadata({
   title: "Sobre Nós — Empresa de Eventos",
@@ -29,7 +31,9 @@ const eyebrowLight =
 const eyebrowDark =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
-export default function SobrePage() {
+export default async function SobrePage() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   return (
     <>
       <BreadcrumbJsonLd items={[{ name: "Sobre", path: "/sobre" }]} />
@@ -52,7 +56,7 @@ export default function SobrePage() {
           <AnimateIn>
             <p className={`${eyebrowLight} mb-8`}>
               <span className="w-8 h-px bg-gold flex-shrink-0" />
-              Quem somos
+              {t.sobre.heroEyebrow}
             </p>
           </AnimateIn>
           <AnimateIn delay={80}>
@@ -60,13 +64,16 @@ export default function SobrePage() {
               className="text-white font-bold leading-[0.88] tracking-tight"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(54px, 10vw, 150px)" }}
             >
-              Sobre a <span className="text-moss">Líquen.</span>
+              {t.sobre.heroTitlePre}
+              <span className="text-moss">{t.sobre.heroTitleMoss}</span>
             </h1>
           </AnimateIn>
         </div>
 
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
-          <span className="text-white/30 text-[8px] tracking-[0.45em] uppercase">Scroll</span>
+          <span className="text-white/30 text-[8px] tracking-[0.45em] uppercase">
+            {t.sobre.scroll}
+          </span>
           <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
         </div>
       </section>
@@ -76,18 +83,19 @@ export default function SobrePage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
           <AnimateIn from="left">
             <p className={`${eyebrowDark} mb-8`}>
-              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />A nossa essência
+              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+              {t.sobre.manifestoEyebrow}
             </p>
             <h2
               className="text-foreground font-bold leading-[1.05]"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(32px, 5vw, 68px)" }}
             >
-              Organizamos eventos.
+              {t.sobre.manifestoTitleLine1}
               <br />
-              <span className="text-moss">Eternizamos memórias.</span>
+              <span className="text-moss">{t.sobre.manifestoTitleLine2}</span>
             </h2>
             <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
-              Desde 2018 que transformamos visões em experiências — em todo o Portugal.
+              {t.sobre.manifestoText}
             </p>
           </AnimateIn>
           <AnimateIn from="right" delay={120}>
@@ -148,11 +156,8 @@ export default function SobrePage() {
                 className="text-cream font-bold leading-[1.12] max-w-4xl"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 4.5vw, 64px)" }}
               >
-                Não organizamos apenas eventos.
-                <span className="text-cream/40">
-                  {" "}
-                  Desenhamos experiências que ficam para sempre.
-                </span>
+                {t.sobre.statementLead}
+                <span className="text-cream/40">{t.sobre.statementRest}</span>
               </p>
             </AnimateIn>
           </div>
@@ -177,7 +182,7 @@ export default function SobrePage() {
             <AnimateIn>
               <p className={`${eyebrowDark} mb-10`}>
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                As pessoas
+                {t.sobre.founderEyebrow}
               </p>
               <span
                 className="block text-moss/25 text-6xl font-bold leading-none mb-6"
@@ -189,13 +194,13 @@ export default function SobrePage() {
                 className="text-foreground/78 leading-[1.5]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3vw, 38px)" }}
               >
-                Cada evento é uma oportunidade de criar algo extraordinário. É o que nos move.
+                {t.sobre.founderQuote}
               </p>
               <div className="mt-10 flex items-center gap-4">
                 <span className="w-8 h-px bg-gold/50" />
                 <div>
-                  <p className="text-foreground text-sm font-semibold">Catarina Gaspar</p>
-                  <p className="text-foreground/60 text-xs mt-0.5">Fundadora &amp; CEO</p>
+                  <p className="text-foreground text-sm font-semibold">{t.sobre.founderName}</p>
+                  <p className="text-foreground/60 text-xs mt-0.5">{t.sobre.founderRole}</p>
                 </div>
               </div>
             </AnimateIn>
@@ -220,21 +225,21 @@ export default function SobrePage() {
           <AnimateIn>
             <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
-              Vamos criar juntos
+              {t.sobre.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 7vw, 96px)" }}
             >
-              Vamos trabalhar
+              {t.sobre.ctaTitleLine1}
               <br />
-              <span className="text-moss">juntos?</span>
+              <span className="text-moss">{t.sobre.ctaTitleMoss}</span>
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
             <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
-              Da primeira conversa ao último brinde, tratamos de cada detalhe do seu evento.
+              {t.sobre.ctaText}
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
@@ -242,7 +247,7 @@ export default function SobrePage() {
               href="/contacto"
               className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
             >
-              Entrar em Contacto →
+              {t.common.entrarContacto} →
             </Link>
           </AnimateIn>
         </div>
