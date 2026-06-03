@@ -26,34 +26,6 @@ const services = [
   },
 ];
 
-const featured = [
-  {
-    title: "Aernnova Aerospace",
-    category: "Corporativo",
-    image: "/imagens/EW1_1392.jpg",
-  },
-  {
-    title: "Daniela & Guilherme",
-    category: "Casamento",
-    image: "/imagens/DaniGui_Preview12.jpg",
-  },
-  {
-    title: "João & Pedro",
-    category: "Casamento",
-    image: "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg",
-  },
-  {
-    title: "Câmara de Évora",
-    category: "Institucional",
-    image: "/imagens/20_10_2025_0295.jpg",
-  },
-  {
-    title: "Matilde & Filipe",
-    category: "Casamento",
-    image: "/imagens/M&F0152.jpg",
-  },
-];
-
 const ribbon = [
   "/imagens/Natalia e Jonathan-167.jpg",
   "/imagens/EW1_0697.jpg",
@@ -194,76 +166,6 @@ export default function Home() {
                 </Link>
               </AnimateIn>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Featured work — editorial mosaic ── */}
-      <section className="pb-16 lg:pb-24 bg-surface">
-        <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-16">
-          <AnimateIn>
-            <div className="flex items-end justify-between mb-8 lg:mb-12">
-              <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
-                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
-                Trabalho selecionado
-              </p>
-              <Link
-                href="/galeria"
-                className="group text-xs text-foreground/72 hover:text-foreground/60 transition-colors flex items-center gap-1.5"
-              >
-                Ver tudo
-                <span className="group-hover:translate-x-0.5 transition-transform inline-block">
-                  →
-                </span>
-              </Link>
-            </div>
-          </AnimateIn>
-
-          <div className="grid grid-cols-2 lg:grid-cols-12 gap-2 lg:gap-3 auto-rows-[180px] sm:auto-rows-[220px] lg:auto-rows-[200px]">
-            {[
-              "lg:col-span-7 lg:row-span-2",
-              "lg:col-span-5",
-              "lg:col-span-5",
-              "lg:col-span-6 row-span-1 lg:row-span-1",
-              "lg:col-span-6",
-            ].map((span, i) => {
-              const p = featured[i];
-              return (
-                <AnimateIn
-                  key={p.title}
-                  delay={i * 50}
-                  className={`${span} ${i === 0 ? "col-span-2 row-span-2" : ""}`}
-                >
-                  <Link
-                    href="/galeria"
-                    className="group relative block w-full h-full overflow-hidden rounded-xl"
-                  >
-                    <Image
-                      src={p.image}
-                      alt={p.title}
-                      fill
-                      sizes={
-                        i === 0 ? "(max-width: 640px) 100vw, 50vw" : "(max-width: 640px) 50vw, 50vw"
-                      }
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                      {...blurFor(p.image)}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent group-hover:from-black/65 transition-all duration-500" />
-                    <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-7">
-                      <p className="text-cream/55 text-[8px] sm:text-[9px] tracking-[0.35em] uppercase mb-1">
-                        {p.category}
-                      </p>
-                      <h3
-                        className="text-cream text-sm sm:text-lg lg:text-2xl font-bold group-hover:text-moss transition-colors duration-200 leading-tight"
-                        style={{ fontFamily: "var(--font-playfair)" }}
-                      >
-                        {p.title}
-                      </h3>
-                    </div>
-                  </Link>
-                </AnimateIn>
-              );
-            })}
           </div>
         </div>
       </section>

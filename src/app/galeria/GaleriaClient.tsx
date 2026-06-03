@@ -296,6 +296,7 @@ const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Ev
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
 const STRIP = 7;
+const SLIDE_MS = 5000; // ritmo do slideshow cinematográfico
 
 // Hover overlay — reused in hero cells and masonry cells
 function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
@@ -341,6 +342,7 @@ export default function GaleriaClient() {
   const [shown, setShown] = useState(PAGE);
   const [fading, setFading] = useState(false);
   const [lb, setLb] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
   const touchX = useRef<number | null>(null);
 
   const pool = useMemo(
@@ -350,7 +352,10 @@ export default function GaleriaClient() {
   const visible = pool.slice(0, shown);
 
   // Lightbox navigation (through entire pool, not just shown)
-  const close = useCallback(() => setLb(null), []);
+  const close = useCallback(() => {
+    setLb(null);
+    setPlaying(false);
+  }, []);
   const prev = useCallback(
     () => setLb((i) => (i !== null ? (i - 1 + pool.length) % pool.length : null)),
     [pool.length],
@@ -366,10 +371,23 @@ export default function GaleriaClient() {
       if (e.key === "Escape") close();
       if (e.key === "ArrowLeft") prev();
       if (e.key === "ArrowRight") next();
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        setPlaying((p) => !p);
+      }
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
   }, [lb, close, prev, next]);
+
+  // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
+  // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
+  useEffect(() => {
+    if (lb === null || !playing) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const id = window.setTimeout(next, SLIDE_MS);
+    return () => window.clearTimeout(id);
+  }, [lb, playing, next]);
 
   useEffect(() => {
     document.body.style.overflow = lb !== null ? "hidden" : "";
@@ -576,21 +594,50 @@ export default function GaleriaClient() {
                   {pool[lb].label}
                 </span>
               </div>
-              <button
-                onClick={close}
-                aria-label="Fechar"
-                className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPlaying((p) => !p)}
+                  aria-label={playing ? "Pausar slideshow" : "Iniciar slideshow"}
+                  aria-pressed={playing}
+                  className={`p-2 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
+                >
+                  {playing ? (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <rect x="6" y="5" width="4" height="14" rx="1" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.8-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={close}
+                  aria-label="Fechar"
+                  className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
+
+            {/* Barra de progresso do slideshow — reinicia a cada foto */}
+            {playing && (
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/8 z-20 pointer-events-none">
+                <div
+                  key={lb}
+                  className="lb-progress h-full bg-gradient-to-r from-moss to-moss-light origin-left"
+                />
+              </div>
+            )}
 
             {/* Área da foto + botões */}
             <div className="relative flex-1 flex items-center justify-center min-h-0">
@@ -614,14 +661,17 @@ export default function GaleriaClient() {
               </button>
 
               {/* Foto principal */}
-              <div className="absolute inset-0 mx-14 md:mx-20" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="absolute inset-0 mx-14 md:mx-20 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Image
                   key={lb}
                   src={pool[lb].src}
                   alt={altFor(pool[lb].label)}
                   fill
                   sizes="90vw"
-                  className="object-contain lb-photo-in"
+                  className={`object-contain ${playing ? "lb-kenburns" : "lb-photo-in"}`}
                   {...blurFor(pool[lb].src)}
                 />
               </div>
