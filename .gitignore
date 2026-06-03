@@ -48,3 +48,9 @@ next-env.d.ts
 
 # Playwright MCP screenshot/console artifacts
 .playwright-mcp/
+
+# Stray scratch screenshots at the repo root (never commit these; real images
+# live under public/). Root-anchored so public/**/*.png is unaffected.
+/*.png
+/*.jpg
+/*.jpeg

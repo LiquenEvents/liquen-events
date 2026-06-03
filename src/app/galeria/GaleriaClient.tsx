@@ -547,7 +547,7 @@ export default function GaleriaClient() {
               <HoverOverlay {...caption(visible[0].src, visible[0].label)} />
             </button>
 
-            {/* 4 fotos satélite — só em sm+ */}
+            {/* 4 fotos satélite — só em sm+ (lazy: não descarrega no telemóvel) */}
             {[1, 2, 3, 4].map((idx) =>
               visible.length > idx ? (
                 <button
@@ -561,7 +561,7 @@ export default function GaleriaClient() {
                     fill
                     sizes="25vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                    loading="eager"
+                    loading="lazy"
                     {...blurFor(visible[idx].src)}
                   />
                   <HoverOverlay {...caption(visible[idx].src, visible[idx].label)} />
