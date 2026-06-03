@@ -344,6 +344,9 @@ export default function GaleriaClient() {
   const [lb, setLb] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const touchX = useRef<number | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const open = lb !== null;
 
   const pool = useMemo(
     () => (cat === "Todos" ? photos : photos.filter((p) => p.label === cat)),
@@ -369,16 +372,46 @@ export default function GaleriaClient() {
     if (lb === null) return;
     const fn = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
-      if (e.key === "ArrowLeft") prev();
-      if (e.key === "ArrowRight") next();
-      if (e.key === " " || e.code === "Space") {
+      else if (e.key === "ArrowLeft") prev();
+      else if (e.key === "ArrowRight") next();
+      else if (e.key === " " || e.code === "Space") {
         e.preventDefault();
         setPlaying((p) => !p);
+      } else if (e.key === "Tab" && dialogRef.current) {
+        // Trap focus inside the lightbox dialog.
+        const f = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, a[href], [tabindex]:not([tabindex="-1"])',
+        );
+        if (!f.length) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        const active = document.activeElement;
+        if (!dialogRef.current.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
   }, [lb, close, prev, next]);
+
+  // Move focus into the dialog on open; restore it to the trigger on close.
+  useEffect(() => {
+    if (!open) return;
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    const id = requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      restoreFocusRef.current?.focus?.();
+    };
+  }, [open]);
 
   // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
   // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
@@ -556,7 +589,12 @@ export default function GaleriaClient() {
         typeof document !== "undefined" &&
         createPortal(
           <div
-            className="fixed inset-0 z-[60] bg-black flex flex-col select-none"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Galeria — ${pool[lb].label}, foto ${lb + 1} de ${pool.length}`}
+            tabIndex={-1}
+            className="fixed inset-0 z-[60] bg-black flex flex-col select-none focus:outline-none"
             onClick={close}
             onTouchStart={(e) => {
               touchX.current = e.touches[0].clientX;

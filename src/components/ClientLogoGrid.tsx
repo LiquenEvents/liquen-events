@@ -15,7 +15,7 @@ function ClientLogo({ client }: { client: Client }) {
   const d = logoDimsFor(client.logo);
 
   return (
-    <div className="h-36 bg-surface flex items-center justify-center px-6 hover:bg-surface-elevated transition-colors group">
+    <div className="h-36 bg-surface flex items-center justify-center px-6 border-r border-b border-foreground/[0.07] hover:bg-surface-elevated transition-colors group">
       {!failed && client.logo ? (
         <Image
           src={client.logo}
@@ -27,7 +27,7 @@ function ClientLogo({ client }: { client: Client }) {
           onError={() => setFailed(true)}
         />
       ) : (
-        <span className="text-foreground/68 text-xs font-medium tracking-widest uppercase text-center group-hover:text-foreground/68 transition-colors leading-relaxed">
+        <span className="text-foreground/45 text-[10px] sm:text-[11px] font-medium tracking-[0.15em] uppercase text-center group-hover:text-foreground/70 transition-colors leading-snug">
           {client.name}
         </span>
       )}
@@ -35,9 +35,13 @@ function ClientLogo({ client }: { client: Client }) {
   );
 }
 
+/**
+ * Bordered grid (cell borders, not gap-px) so a partial final row ends in clean
+ * whitespace instead of an empty grey cell — robust at every column count.
+ */
 export default function ClientLogoGrid({ clients }: { clients: Client[] }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-px bg-foreground/6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 border-t border-l border-foreground/[0.07]">
       {clients.map((client) => (
         <ClientLogo key={client.name} client={client} />
       ))}

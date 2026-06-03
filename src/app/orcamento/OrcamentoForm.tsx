@@ -48,6 +48,8 @@ export default function OrcamentoForm() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState<{ nome?: boolean; email?: boolean }>({});
+  // Data mínima = hoje (não faz sentido pedir orçamento para uma data passada).
+  const [minDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? "Indique o seu nome" : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? "Email inválido" : "";
@@ -214,6 +216,7 @@ export default function OrcamentoForm() {
                 <input
                   id="of-data"
                   type="date"
+                  min={minDate}
                   value={data}
                   onChange={(e) => setData(e.target.value)}
                   className={`${inputCls} [color-scheme:dark]`}

@@ -32,7 +32,10 @@ export const clientLogos: ClientLogo[] = [
   { name: "ESRI Portugal", logo: "/logos/clientes/esri.avif" },
   { name: "Monte do Zambujal", logo: "/logos/clientes/monte-zambujal.avif" },
   { name: "EDIA", logo: "/logos/clientes/edia.avif" },
-  { name: "Ordem dos Médicos Veterinários", logo: "/logos/clientes/omv.avif" },
+  // O emblema heráldico da OMV é demasiado detalhado para a silhueta
+  // monocromática da grelha (fica um borrão). Mostra-se como texto — limpo e
+  // legível. Substituir por uma versão wordmark se existir.
+  { name: "Ordem dos Médicos Veterinários", logo: "" },
 ];
 
 // ── Testimonials ──────────────────────────────────────────────────────────────
