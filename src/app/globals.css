@@ -389,6 +389,16 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   animation: step-back 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ── Offscreen rendering skip ──
+   Lets the browser skip layout/paint of far-offscreen blocks (huge win on the
+   245-photo gallery masonry, where laying out every item caused long tasks).
+   `auto <length>` remembers each item's real size after first render, so
+   scrolling back never re-lays-out and the scrollbar stays stable. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
 /* ── Hide scrollbar visually, keep scroll functional ── */
 .scroll-hide {
   -ms-overflow-style: none;

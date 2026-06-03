@@ -296,6 +296,20 @@ function collectionFor(src: string): string | null {
 const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
+
+// URL-hash slugs for each category, so a filtered view is shareable &
+// bookmarkable (e.g. /galeria#casamentos) and survives the back button.
+const CAT_SLUGS: Record<Cat, string> = {
+  Todos: "",
+  Casamento: "casamentos",
+  Corporativo: "corporativos",
+  Conferência: "conferencias",
+  Aéreo: "aereos",
+  Evento: "eventos",
+};
+function catFromSlug(slug: string): Cat {
+  return (CATS.find((c) => CAT_SLUGS[c] === slug) as Cat) ?? "Todos";
+}
 const STRIP = 7;
 const SLIDE_MS = 5000; // ritmo do slideshow cinematográfico
 
@@ -349,6 +363,20 @@ export default function GaleriaClient() {
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const open = lb !== null;
   const { t } = useTranslations();
+
+  // Sync the active filter with the URL hash so categories are shareable and
+  // the browser back button restores the previous filter. Read post-hydration
+  // (avoids any SSR/CSR mismatch) and on every hashchange.
+  useEffect(() => {
+    const apply = () => {
+      const c = catFromSlug(window.location.hash.replace(/^#/, ""));
+      setCat((prev) => (prev === c ? prev : c));
+      setShown(PAGE);
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+  }, []);
 
   // Localized display helpers — internal label keys stay PT (used for
   // filtering); only what the user reads is translated.
@@ -448,6 +476,11 @@ export default function GaleriaClient() {
       setShown(PAGE);
       setFading(false);
     }, 160);
+    // Reflect the filter in the URL (shareable / bookmarkable) without adding a
+    // history entry per click.
+    const slug = CAT_SLUGS[c];
+    const url = slug ? `#${slug}` : window.location.pathname + window.location.search;
+    window.history.replaceState(null, "", url);
   }
 
   // Thumbnail strip around current photo
@@ -546,7 +579,7 @@ export default function GaleriaClient() {
               return (
                 <div
                   key={p.src}
-                  className={`break-inside-avoid mb-0.5${idx < 5 ? " sm:hidden" : ""}`}
+                  className={`cv-auto break-inside-avoid mb-0.5${idx < 5 ? " sm:hidden" : ""}`}
                 >
                   <button
                     onClick={() => setLb(idx)}
