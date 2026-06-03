@@ -81,7 +81,7 @@ export default function Navbar() {
         <div className="relative flex items-center justify-between h-[140px]">
           <Link
             href="/"
-            className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:translate-x-0 md:translate-y-0"
+            className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
           >
             <Image
               src="/logo-liquen.png"
@@ -93,7 +93,7 @@ export default function Navbar() {
             />
           </Link>
 
-          <div className="hidden md:flex items-center gap-9">
+          <div className="hidden lg:flex items-center gap-6 xl:gap-9">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -114,7 +114,7 @@ export default function Navbar() {
             ))}
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <LanguageToggle light={light} />
             <span
               className={`h-3 w-px ${light ? "bg-white/20" : "bg-foreground/15"}`}
@@ -139,7 +139,7 @@ export default function Navbar() {
           </div>
 
           <button
-            className="md:hidden p-3 -mr-2 ml-auto"
+            className="lg:hidden p-3 -mr-2 ml-auto"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="Menu"
             aria-expanded={isOpen}
@@ -158,7 +158,7 @@ export default function Navbar() {
       </div>
 
       <div
-        className={`md:hidden overflow-y-auto overscroll-contain transition-all duration-400 bg-surface/96 backdrop-blur-md border-t border-foreground/6 ${
+        className={`lg:hidden overflow-y-auto overscroll-contain transition-all duration-400 bg-surface/96 backdrop-blur-md border-t border-foreground/6 ${
           isOpen ? "max-h-[80vh] pb-8" : "max-h-0"
         }`}
       >

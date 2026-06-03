@@ -6,6 +6,7 @@ import { useTranslations } from "./LocaleProvider";
 
 export default function StickyCTA() {
   const [visible, setVisible] = useState(false);
+  const [atFooter, setAtFooter] = useState(false);
   const pathname = usePathname();
   const { t } = useTranslations();
 
@@ -27,12 +28,26 @@ export default function StickyCTA() {
     };
   }, []);
 
+  // Hide the floating CTA once the footer is in view so it never overlaps the
+  // copyright / footer links.
+  useEffect(() => {
+    const footer = document.querySelector("footer");
+    if (!footer) return;
+    const io = new IntersectionObserver(([entry]) => setAtFooter(entry.isIntersecting), {
+      rootMargin: "0px 0px -40px 0px",
+    });
+    io.observe(footer);
+    return () => io.disconnect();
+  }, [pathname]);
+
   if (hidden) return null;
+
+  const show = visible && !atFooter;
 
   return (
     <div
       className={`hidden lg:block fixed bottom-7 left-7 z-40 transition-all duration-500 ${
-        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+        show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
       <Link
