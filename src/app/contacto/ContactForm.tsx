@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
-import { WHATSAPP_HREF_CTA } from "@/data";
+import { waHref } from "@/data";
 import { useTranslations } from "@/components/LocaleProvider";
 
 // ── Data ─────────────────────────────────────────────────────────
@@ -359,7 +359,7 @@ export default function ContactForm() {
 
               {/* WhatsApp */}
               <a
-                href={WHATSAPP_HREF_CTA}
+                href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-12"
@@ -464,7 +464,7 @@ export default function ContactForm() {
                     ))}
                   </div>
                   <a
-                    href={WHATSAPP_HREF_CTA}
+                    href={waHref(t.common.whatsappPrefill)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/72 hover:text-moss transition-colors"

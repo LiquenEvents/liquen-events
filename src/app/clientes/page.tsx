@@ -12,13 +12,16 @@ import { SITE } from "@/lib/site";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Clientes — Quem Confia na Líquen Events",
-  description:
-    "Empresas e instituições que confiam na Líquen Events: José de Mello, Aernnova, Mainova, Universidade de Évora, Câmara Municipal de Évora, Pérez-Llorca e muito mais.",
-  path: "/clientes",
-  keywords: ["clientes Líquen Events", "empresas de eventos Alentejo"],
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return pageMetadata({
+    title: t.meta.clientesTitle,
+    description: t.meta.clientesDescription,
+    path: "/clientes",
+    keywords: ["clientes Líquen Events", "empresas de eventos Alentejo"],
+    ogLocale: t.meta.ogLocale,
+  });
+}
 
 const eyebrow =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";

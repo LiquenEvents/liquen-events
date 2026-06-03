@@ -61,6 +61,32 @@ export const pt = {
     enviarEmail: "Enviar e-mail",
     contactWhatsApp: "Contactar pelo WhatsApp",
     clientsSay: "O que dizem os clientes",
+    whatsappPrefill: "Olá, gostaria de saber mais sobre a organização de eventos.",
+  },
+
+  meta: {
+    ogLocale: "pt_PT",
+    homeTitle: "Líquen Events — Organização de Eventos no Alentejo e em Portugal",
+    homeDescription:
+      "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.",
+    sobreTitle: "Sobre Nós — Empresa de Eventos",
+    sobreDescription:
+      "Conheça a Líquen Events, empresa de organização de eventos. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",
+    servicosTitle: "Serviços — Casamentos e Eventos Corporativos no Alentejo",
+    servicosDescription:
+      "Organização de casamentos, eventos corporativos, conferências e festas privadas no Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
+    galeriaTitle: "Galeria de Eventos — Alentejo",
+    galeriaDescription:
+      "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
+    clientesTitle: "Clientes — Quem Confia na Líquen Events",
+    clientesDescription:
+      "Empresas e instituições que confiam na Líquen Events: José de Mello, Aernnova, Mainova, Universidade de Évora, Câmara Municipal de Évora, Pérez-Llorca e muito mais.",
+    contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
+    contactoDescription:
+      "Contacte a Líquen Events para organizar o seu evento no Alentejo, Lisboa ou em qualquer ponto de Portugal. Respondemos em menos de 24 horas com uma proposta à medida.",
+    orcamentoTitle: "Pedido de Orçamento",
+    orcamentoDescription:
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas.",
   },
 
   home: {

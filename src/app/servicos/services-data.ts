@@ -190,12 +190,18 @@ export const SERVICES: ServiceDetail[] = [
  * FAQs). metaTitle/metaDescription/keywords stay Portuguese — PT is the
  * canonical, indexed language; the EN versions are a reading option.
  */
-type ServiceCopy = Pick<ServiceDetail, "eyebrow" | "title" | "intro" | "includes" | "faqs">;
+type ServiceCopy = Pick<
+  ServiceDetail,
+  "eyebrow" | "title" | "intro" | "includes" | "faqs" | "metaTitle" | "metaDescription"
+>;
 
 const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
     eyebrow: "Wedding Planning",
     title: "Wedding Planning in the Alentejo and across Portugal",
+    metaTitle: "Wedding Planner in the Alentejo — Wedding Planning",
+    metaDescription:
+      "Wedding planner in the Alentejo. We organise complete weddings — floral décor, catering, day-of coordination — at estates, quintas and unique venues across Portugal.",
     intro: [
       "Your wedding is one of a kind — and it deserves to be planned down to the last detail. Líquen Events is a wedding planner organising weddings throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues.",
       "We guide the couple from the first sketch to the final toast: concept and aesthetics, venue selection, floral décor, catering, music, stationery and full day-of coordination. Every detail considered, so all you have to do is live the moment.",
@@ -222,6 +228,9 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   "eventos-corporativos": {
     eyebrow: "For Companies",
     title: "Corporate Events in Lisbon",
+    metaTitle: "Corporate Events in Lisbon — Conferences & Companies",
+    metaDescription:
+      "Corporate event planning in Lisbon and across Portugal: conferences, congresses, team-building, product launches and company dinners. Full turnkey production.",
     intro: [
       "We elevate your brand's image through corporate events that transform teams and celebrate achievements. Líquen Events organises conferences, congresses, team-building and company dinners in Lisbon and across Portugal.",
       "From logistics to audiovisual, from registration management to on-site coordination, we handle everything with the rigour a professional event demands — so your company can focus solely on results.",
@@ -248,6 +257,9 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   "festas-e-aniversarios": {
     eyebrow: "Private Celebrations",
     title: "Birthday Parties and Private Celebrations",
+    metaTitle: "Birthday Parties & Private Celebrations in the Alentejo",
+    metaDescription:
+      "Planning of birthday parties, christenings, communions and private celebrations in the Alentejo. Concept, décor, catering and bespoke entertainment.",
     intro: [
       "Every celebration is a story. We organise birthday parties, christenings, communions and private celebrations in the Alentejo and across Portugal — themed or classic, intimate or large-scale.",
       "From concept to décor, from catering to entertainment, we create memorable moments with the attention to detail that sets Líquen Events apart.",
@@ -270,6 +282,9 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   "jantares-de-gala": {
     eyebrow: "Social Events",
     title: "Gala Dinners and Prestige Social Events",
+    metaTitle: "Gala Dinners & Social Events — Portugal",
+    metaDescription:
+      "Planning of gala dinners and prestige social events in Lisbon and Portugal. Sophisticated atmosphere, premium table settings and impeccable coordination.",
     intro: [
       "For moments that call for sophistication, we organise gala dinners and prestige social events in Lisbon and throughout Portugal.",
       "Premium table settings, guest chef, wine pairing and live entertainment — a meticulously crafted experience, with the impeccable coordination a gala event demands.",

@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import OrcamentoForm from "./OrcamentoForm";
+import { getLocale } from "@/lib/i18n/server";
+import { getDictionary } from "@/lib/i18n";
 
-export const metadata: Metadata = {
-  title: "Pedido de Orçamento",
-  description:
-    "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return {
+    title: t.meta.orcamentoTitle,
+    description: t.meta.orcamentoDescription,
+  };
+}
 
 export default function OrcamentoPage() {
   return <OrcamentoForm />;

@@ -25,66 +25,67 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
-const TITLE = "Líquen Events — Organização de Eventos no Alentejo e em Portugal";
-const DESCRIPTION =
-  "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.";
-
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE.url),
-  title: {
-    default: TITLE,
-    template: "%s | Líquen Events",
-  },
-  description: DESCRIPTION,
-  applicationName: SITE.name,
-  authors: [{ name: SITE.name, url: SITE.url }],
-  creator: SITE.name,
-  publisher: SITE.name,
-  keywords: [...SITE_KEYWORDS],
-  category: "Event Planning",
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  const title = t.meta.homeTitle;
+  const description = t.meta.homeDescription;
+  return {
+    metadataBase: new URL(SITE.url),
+    title: {
+      default: title,
+      template: "%s | Líquen Events",
+    },
+    description,
+    applicationName: SITE.name,
+    authors: [{ name: SITE.name, url: SITE.url }],
+    creator: SITE.name,
+    publisher: SITE.name,
+    keywords: [...SITE_KEYWORDS],
+    category: "Event Planning",
+    robots: {
       index: true,
       follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1,
-    },
-  },
-  alternates: {
-    canonical: "/",
-    languages: { "pt-PT": "/" },
-  },
-  openGraph: {
-    type: "website",
-    locale: SITE.locale,
-    siteName: SITE.name,
-    url: SITE.url,
-    title: TITLE,
-    description: DESCRIPTION,
-    images: [
-      {
-        url: SITE.ogImage,
-        width: 2048,
-        height: 1152,
-        alt: "Líquen Events — organização de eventos em Portugal",
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+        "max-video-preview": -1,
       },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: TITLE,
-    description: DESCRIPTION,
-    images: [SITE.ogImage],
-  },
-  // Favicon/ícones gerados a partir de src/app/icon.png e apple-icon.png (logo Líquen).
-  // Add GOOGLE_SITE_VERIFICATION in the environment to verify Search Console.
-  verification: process.env.GOOGLE_SITE_VERIFICATION
-    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
-    : undefined,
-};
+    },
+    alternates: {
+      canonical: "/",
+      languages: { "pt-PT": "/" },
+    },
+    openGraph: {
+      type: "website",
+      locale: t.meta.ogLocale,
+      siteName: SITE.name,
+      url: SITE.url,
+      title,
+      description,
+      images: [
+        {
+          url: SITE.ogImage,
+          width: 2048,
+          height: 1152,
+          alt: "Líquen Events — organização de eventos em Portugal",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [SITE.ogImage],
+    },
+    // Favicon/ícones gerados a partir de src/app/icon.png e apple-icon.png (logo Líquen).
+    // Add GOOGLE_SITE_VERIFICATION in the environment to verify Search Console.
+    verification: process.env.GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+      : undefined,
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#faf8f3",

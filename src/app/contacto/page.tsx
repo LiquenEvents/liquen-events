@@ -9,17 +9,20 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
-import { WHATSAPP_HREF_CTA } from "@/data";
+import { waHref } from "@/data";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Contacto — Peça o Seu Orçamento de Evento",
-  description:
-    "Contacte a Líquen Events para organizar o seu evento no Alentejo, Lisboa ou em qualquer ponto de Portugal. Respondemos em menos de 24 horas com uma proposta à medida.",
-  path: "/contacto",
-  keywords: ["contacto Líquen Events", "organização de eventos Alentejo"],
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return pageMetadata({
+    title: t.meta.contactoTitle,
+    description: t.meta.contactoDescription,
+    path: "/contacto",
+    keywords: ["contacto Líquen Events", "organização de eventos Alentejo"],
+    ogLocale: t.meta.ogLocale,
+  });
+}
 
 export default async function ContactoPage() {
   const locale = await getLocale();
@@ -183,7 +186,7 @@ export default async function ContactoPage() {
             </p>
             <div className="flex flex-wrap gap-4">
               <a
-                href={WHATSAPP_HREF_CTA}
+                href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-3 px-8 py-4 bg-cream text-ink font-medium rounded-sm hover:bg-cream-dark transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"

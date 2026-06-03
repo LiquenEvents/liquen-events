@@ -9,11 +9,12 @@ interface PageMetaInput {
   ogTitle?: string; // optional richer title for social cards
   image?: string; // optional page-specific OG image
   keywords?: string[];
+  ogLocale?: string; // e.g. "pt_PT" | "en_US" (defaults to the site locale)
 }
 
 /** Builds consistent, SEO-complete metadata for a route. */
 export function pageMetadata(input: PageMetaInput): Metadata {
-  const { title, description, path, ogTitle, image, keywords } = input;
+  const { title, description, path, ogTitle, image, keywords, ogLocale } = input;
   const ogImage = image ?? SITE.ogImage;
   // Declare the image's real dimensions when known so social cards render with
   // the correct aspect ratio; fall back to the OG standard 1200×630.
@@ -26,7 +27,7 @@ export function pageMetadata(input: PageMetaInput): Metadata {
     alternates: { canonical: path },
     openGraph: {
       type: "website",
-      locale: SITE.locale,
+      locale: ogLocale ?? SITE.locale,
       siteName: SITE.name,
       url: `${SITE.url}${path}`,
       title: ogTitle ?? `${title} | ${SITE.name}`,

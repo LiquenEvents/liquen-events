@@ -8,14 +8,17 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Sobre Nós — Empresa de Eventos",
-  description:
-    "Conheça a Líquen Events, empresa de organização de eventos. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",
-  path: "/sobre",
-  image: "/imagens/M&F0497.jpg",
-  keywords: ["organização de eventos Alentejo", "sobre Líquen Events"],
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return pageMetadata({
+    title: t.meta.sobreTitle,
+    description: t.meta.sobreDescription,
+    path: "/sobre",
+    image: "/imagens/M&F0497.jpg",
+    keywords: ["organização de eventos Alentejo", "sobre Líquen Events"],
+    ogLocale: t.meta.ogLocale,
+  });
+}
 
 const gallery = [
   { src: "/imagens/Natalia e Jonathan-167.jpg", cls: "col-span-2 row-span-2" },

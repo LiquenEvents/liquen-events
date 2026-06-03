@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
-import { WHATSAPP_HREF_CTA } from "@/data";
+import { waHref } from "@/data";
 import { useTranslations } from "@/components/LocaleProvider";
 
 /**
@@ -330,7 +330,7 @@ export default function OrcamentoForm() {
                 )}
               </button>
               <a
-                href={WHATSAPP_HREF_CTA}
+                href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/45 hover:text-moss transition-colors"

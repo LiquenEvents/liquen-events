@@ -9,19 +9,22 @@ import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Serviços — Casamentos e Eventos Corporativos no Alentejo",
-  description:
-    "Organização de casamentos, eventos corporativos, conferências e festas privadas no Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
-  path: "/servicos",
-  image: "/imagens/EW1_1408.jpg",
-  keywords: [
-    "wedding planner Alentejo",
-    "eventos corporativos Lisboa",
-    "conferências e congressos",
-    "organização de festas Alentejo",
-  ],
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return pageMetadata({
+    title: t.meta.servicosTitle,
+    description: t.meta.servicosDescription,
+    path: "/servicos",
+    image: "/imagens/EW1_1408.jpg",
+    keywords: [
+      "wedding planner Alentejo",
+      "eventos corporativos Lisboa",
+      "conferências e congressos",
+      "organização de festas Alentejo",
+    ],
+    ogLocale: t.meta.ogLocale,
+  });
+}
 
 const navMeta = [{ id: "empresas" }, { id: "celebracoes" }];
 

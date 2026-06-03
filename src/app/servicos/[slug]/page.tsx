@@ -20,14 +20,16 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const svc = getService(slug);
-  if (!svc) return { title: "Serviço não encontrado" };
+  const locale = await getLocale();
+  const svc = getService(slug, locale);
+  if (!svc) return { title: locale === "en" ? "Service not found" : "Serviço não encontrado" };
   return pageMetadata({
     title: svc.metaTitle,
     description: svc.metaDescription,
     path: `/servicos/${svc.slug}`,
     image: svc.hero,
     keywords: svc.keywords,
+    ogLocale: getDictionary(locale).meta.ogLocale,
   });
 }
 

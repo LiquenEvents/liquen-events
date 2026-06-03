@@ -62,6 +62,32 @@ export const en: Dict = {
     enviarEmail: "Send e-mail",
     contactWhatsApp: "Contact us on WhatsApp",
     clientsSay: "What our clients say",
+    whatsappPrefill: "Hi, I'd like to know more about your event planning services.",
+  },
+
+  meta: {
+    ogLocale: "en_US",
+    homeTitle: "Líquen Events — Event Planning in the Alentejo and Portugal",
+    homeDescription:
+      "Event planning company. Weddings, corporate events and celebrations across the Alentejo, Lisbon and Portugal. Bespoke solutions — request a quote.",
+    sobreTitle: "About Us — Event Company",
+    sobreDescription:
+      "Meet Líquen Events, an event planning company. Over 100 events across the Alentejo, Lisbon and Portugal — weddings, corporate events and celebrations.",
+    servicosTitle: "Services — Weddings and Corporate Events in the Alentejo",
+    servicosDescription:
+      "Planning of weddings, corporate events, conferences and private parties in the Alentejo, Lisbon and across Portugal. Bespoke solutions for your event.",
+    galeriaTitle: "Event Gallery — Alentejo",
+    galeriaDescription:
+      "Photo gallery of events organised by Líquen Events in the Alentejo and across Portugal — weddings, corporate events, conferences and celebrations.",
+    clientesTitle: "Clients — Who Trusts Líquen Events",
+    clientesDescription:
+      "Companies and institutions that trust Líquen Events: José de Mello, Aernnova, Mainova, University of Évora, Évora City Council, Pérez-Llorca and many more.",
+    contactoTitle: "Contact — Request Your Event Quote",
+    contactoDescription:
+      "Contact Líquen Events to plan your event in the Alentejo, Lisbon or anywhere in Portugal. We reply within 24 hours with a tailored proposal.",
+    orcamentoTitle: "Quote Request",
+    orcamentoDescription:
+      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 hours.",
   },
 
   home: {

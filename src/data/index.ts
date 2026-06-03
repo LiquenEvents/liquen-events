@@ -4,6 +4,11 @@ export const WHATSAPP_PHONE = "351919259820";
 export const WHATSAPP_HREF = `https://wa.me/${WHATSAPP_PHONE}`;
 export const WHATSAPP_HREF_CTA = `${WHATSAPP_HREF}?text=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20a%20organiza%C3%A7%C3%A3o%20de%20eventos.`;
 
+/** WhatsApp deep-link with a (locale-aware) pre-filled message. */
+export function waHref(message: string): string {
+  return `${WHATSAPP_HREF}?text=${encodeURIComponent(message)}`;
+}
+
 // ── Clients ───────────────────────────────────────────────────────────────────
 // Client logos — drop the PNGs (transparent, rendered white) into
 // public/logos/clientes/ with these exact file names. Missing logos fall back

@@ -6,14 +6,17 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Galeria de Eventos — Alentejo",
-  description:
-    "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
-  path: "/galeria",
-  image: "/imagens/DaniGui_Preview20.jpg",
-  keywords: ["galeria de eventos", "fotografias de casamentos Alentejo"],
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const t = getDictionary(await getLocale());
+  return pageMetadata({
+    title: t.meta.galeriaTitle,
+    description: t.meta.galeriaDescription,
+    path: "/galeria",
+    image: "/imagens/DaniGui_Preview20.jpg",
+    keywords: ["galeria de eventos", "fotografias de casamentos Alentejo"],
+    ogLocale: t.meta.ogLocale,
+  });
+}
 
 export default async function GaleriaPage() {
   const locale = await getLocale();
