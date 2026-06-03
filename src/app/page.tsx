@@ -126,7 +126,7 @@ export default function Home() {
               </p>
               <Link
                 href="/servicos"
-                className="group text-xs text-foreground/72 hover:text-foreground/60 transition-colors flex items-center gap-1.5"
+                className="group text-xs text-foreground/72 hover:text-moss transition-colors flex items-center gap-1.5"
               >
                 Ver serviços
                 <span className="group-hover:translate-x-0.5 transition-transform inline-block">

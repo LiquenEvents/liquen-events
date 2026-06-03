@@ -434,7 +434,7 @@ export default function ServicosPage() {
                 <a
                   key={cat.id}
                   href={`#${cat.id}`}
-                  className="text-foreground/78 text-[9px] tracking-[0.45em] uppercase hover:text-foreground/60 transition-colors duration-300"
+                  className="text-foreground/78 text-[9px] tracking-[0.45em] uppercase hover:text-moss transition-colors duration-300"
                 >
                   <span className="text-moss/35 mr-2 font-mono">0{i + 1}</span>
                   {cat.label}

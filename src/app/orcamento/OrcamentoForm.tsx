@@ -219,7 +219,7 @@ export default function OrcamentoForm() {
                   min={minDate}
                   value={data}
                   onChange={(e) => setData(e.target.value)}
-                  className={`${inputCls} [color-scheme:dark]`}
+                  className={`${inputCls} [color-scheme:light]`}
                 />
               </div>
               <div className="group">
@@ -340,8 +340,8 @@ export default function OrcamentoForm() {
             </div>
 
             {error && (
-              <div className="p-4 border border-moss/30 bg-moss/8 rounded-sm">
-                <p className="text-moss-light text-sm">{error}</p>
+              <div role="alert" className="p-4 border border-moss/30 bg-moss/8 rounded-sm">
+                <p className="text-moss-dark text-sm">{error}</p>
               </div>
             )}
 

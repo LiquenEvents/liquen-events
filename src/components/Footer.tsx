@@ -116,7 +116,7 @@ export default function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="text-foreground/68 hover:text-foreground/70 transition-colors duration-300"
+                    className="text-foreground/68 hover:text-moss transition-colors duration-300"
                   >
                     {s.icon}
                   </a>
@@ -145,7 +145,7 @@ export default function Footer() {
                   <li key={href}>
                     <Link
                       href={href}
-                      className="link-line text-[13px] text-foreground/60 hover:text-foreground/68 transition-colors duration-300"
+                      className="link-line text-[13px] text-foreground/60 hover:text-moss transition-colors duration-300"
                     >
                       {label}
                     </Link>

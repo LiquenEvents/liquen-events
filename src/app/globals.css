@@ -20,13 +20,15 @@
   --font-display: var(--font-playfair);
 }
 
-/* Quote wizard keeps the dark surface. */
+/* Pedido de orçamento — clean white surface, matching the rest of the site.
+   Stays full-screen/focused (footer, WhatsApp & scroll-progress hidden below),
+   but the form itself is light. The left image panel keeps its own cream-on-
+   photo styling, so --color-cream is left at the default light value. */
 body.orcamento-mode {
-  --color-surface: #080808;
-  --color-surface-raised: #0f0f0f;
-  --color-surface-elevated: #1a1a1a;
-  --color-foreground: #dedad4;
-  --color-cream: #f0ece6;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-foreground: #2a2620;
 }
 
 /* Back office: clean white surface. */
@@ -179,6 +181,13 @@ body::before {
   transform-origin: left;
   transform: scaleX(1);
   background: var(--color-moss);
+}
+
+/* Active nav link over a dark hero — light underline follows the light text */
+.nav-active-light::after {
+  transform-origin: left;
+  transform: scaleX(1);
+  background: currentColor;
 }
 
 /* ── Keyframes ── */

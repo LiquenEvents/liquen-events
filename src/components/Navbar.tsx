@@ -17,6 +17,18 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
 
+  // Pages whose hero is a full-bleed dark image sitting *under* the transparent
+  // navbar. On those, the unscrolled nav needs light text + a subtle scrim to
+  // stay legible; white-topped pages (/servicos, /galeria, /orcamento, …) keep
+  // the moss treatment. Once scrolled, the frosted backdrop takes over for all.
+  const overDarkHero =
+    pathname === "/" ||
+    pathname === "/sobre" ||
+    pathname === "/clientes" ||
+    pathname === "/contacto" ||
+    pathname.startsWith("/servicos/");
+  const light = !scrolled && overDarkHero;
+
   useEffect(() => {
     let frame = 0;
     const onScroll = () => {
@@ -55,7 +67,14 @@ export default function Navbar() {
           : "bg-transparent border-b border-transparent"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      {/* Legibility scrim — only over dark hero images, fades to nothing */}
+      {light && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/35 via-black/10 to-transparent"
+        />
+      )}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
         <div className="relative flex items-center justify-between h-[140px]">
           <Link
             href="/"
@@ -78,7 +97,13 @@ export default function Navbar() {
                 href={link.href}
                 aria-current={pathname === link.href ? "page" : undefined}
                 className={`link-line text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
-                  pathname === link.href ? "text-moss nav-active" : "text-moss/80 hover:text-moss"
+                  light
+                    ? pathname === link.href
+                      ? "text-white nav-active-light"
+                      : "text-white/80 hover:text-white"
+                    : pathname === link.href
+                      ? "text-moss nav-active"
+                      : "text-moss/80 hover:text-moss"
                 }`}
               >
                 {link.label}
@@ -89,7 +114,11 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             <Link
               href="/contacto"
-              className="text-[11px] tracking-[0.2em] uppercase border border-moss/35 text-moss px-5 py-2 rounded-sm hover:border-moss/60 hover:bg-moss/10 transition-all duration-300"
+              className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
+                light
+                  ? "border-white/35 text-white/90 hover:border-white/70 hover:bg-white/10"
+                  : "border-moss/35 text-moss hover:border-moss/60 hover:bg-moss/10"
+              }`}
             >
               Contacto
             </Link>
@@ -108,13 +137,13 @@ export default function Navbar() {
             aria-expanded={isOpen}
           >
             <span
-              className={`block w-[18px] h-px bg-foreground/70 transition-all duration-300 mb-1.5 ${isOpen ? "rotate-45 translate-y-2" : ""}`}
+              className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "rotate-45 translate-y-2" : ""}`}
             />
             <span
-              className={`block w-[18px] h-px bg-foreground/70 transition-all duration-300 mb-1.5 ${isOpen ? "opacity-0" : ""}`}
+              className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "opacity-0" : ""}`}
             />
             <span
-              className={`block w-[18px] h-px bg-foreground/70 transition-all duration-300 ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
+              className={`block w-[18px] h-px transition-all duration-300 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
             />
           </button>
         </div>

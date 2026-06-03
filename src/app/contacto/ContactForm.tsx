@@ -170,7 +170,7 @@ function NavBtn({
   const styles =
     variant === "primary"
       ? `${base} px-9 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3`
-      : `${base} text-foreground/72 hover:text-foreground/60`;
+      : `${base} text-foreground/72 hover:text-moss`;
   return (
     <button
       type={variant === "primary" ? "button" : "button"}
@@ -752,8 +752,11 @@ export default function ContactForm() {
                           </p>
                         </div>
                         {error && (
-                          <div className="mt-6 p-4 border border-moss/30 bg-moss/8 rounded-sm">
-                            <p className="text-moss/80 text-sm">{error}</p>
+                          <div
+                            role="alert"
+                            className="mt-6 p-4 border border-moss/30 bg-moss/8 rounded-sm"
+                          >
+                            <p className="text-moss-dark text-sm">{error}</p>
                           </div>
                         )}
                       </div>

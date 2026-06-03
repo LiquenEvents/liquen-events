@@ -213,6 +213,22 @@ const photos: Photo[] = [
   { src: "/imagens/Natalia e Jonathan-617.jpg", label: "Casamento" },
   { src: "/imagens/Natalia e Jonathan-619.jpg", label: "Casamento" },
   { src: "/imagens/Natalia e Jonathan-620.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-905.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-907 (1).jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-908 (1).jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-909.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-911 (1).jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-914 (1).jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-915 (1).jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-916 (1).jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-918.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-923.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-925.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-1131.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-1146.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-1163.jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-1357 (1).jpg", label: "Casamento" },
+  { src: "/imagens/teresinhaeze-1434.jpg", label: "Casamento" },
   { src: "/imagens/WhatsApp Image 2026-05-18 at 19.08.04.jpeg", label: "Evento" },
   { src: "/imagens/WhatsApp Image 2026-05-18 at 19.08.04 (1).jpeg", label: "Evento" },
   { src: "/imagens/WhatsApp Image 2026-05-18 at 19.08.04 (2).jpeg", label: "Evento" },
@@ -270,6 +286,7 @@ function collectionFor(src: string): string | null {
   if (f.includes("joao_e_pedro") || f.includes("j&p-")) return "João & Pedro";
   if (f.includes("ines-goncalo")) return "Inês & Gonçalo";
   if (f.includes("matilde-tomas")) return "Matilde & Tomás";
+  if (f.includes("teresinhaeze")) return "Teresinha & Zé";
   if (f.includes("m&f")) return "Matilde & Filipe";
   if (f.includes("natalia e jonathan")) return "Natália & Jonathan";
   return null;
@@ -568,7 +585,7 @@ export default function GaleriaClient() {
             className="group px-10 py-3.5 border border-foreground/15 text-foreground/60 text-xs tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/70 transition-all duration-300 flex items-center gap-3"
           >
             Ver mais
-            <span className="text-foreground/68 group-hover:text-foreground/68 transition-colors">
+            <span className="text-foreground/45 group-hover:text-moss transition-colors">
               +{Math.min(PAGE, pool.length - shown)}
             </span>
           </button>
