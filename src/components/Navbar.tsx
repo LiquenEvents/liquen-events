@@ -95,7 +95,7 @@ export default function Navbar() {
             </Link>
             <Link
               href="/orcamento"
-              className="text-[11px] tracking-[0.2em] uppercase bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
+              className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
             >
               Orçamento →
             </Link>
@@ -128,7 +128,7 @@ export default function Navbar() {
         <div className="px-6 pt-6 flex flex-col">
           <Link
             href="/orcamento"
-            className="mb-5 inline-block text-center text-[11px] tracking-[0.22em] uppercase bg-moss text-cream px-5 py-3.5 rounded-sm"
+            className="mb-5 inline-block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-cream px-5 py-3.5 rounded-sm"
             style={{
               opacity: isOpen ? 1 : 0,
               transform: isOpen ? "none" : "translateY(6px)",

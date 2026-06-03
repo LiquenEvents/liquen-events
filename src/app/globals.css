@@ -432,6 +432,37 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   transform: translateY(-2px);
 }
 
+/* ── Light sweep on primary CTAs — subtle premium shimmer on hover ── */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    110deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.16) 48%,
+    transparent 68%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.btn-shine:hover::after,
+.btn-shine:focus-visible::after {
+  transform: translateX(130%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-shine::after {
+    display: none;
+  }
+}
+
 /* ── Back-office: gentle view transition ── */
 @keyframes view-in {
   from {

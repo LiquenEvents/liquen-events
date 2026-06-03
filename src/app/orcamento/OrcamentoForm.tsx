@@ -47,7 +47,10 @@ export default function OrcamentoForm() {
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState<{ nome?: boolean; email?: boolean }>({});
 
+  const nomeErr = touched.nome && nome.trim().length < 2 ? "Indique o seu nome" : "";
+  const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? "Email inválido" : "";
   const ready = nome.trim().length >= 2 && /\S+@\S+\.\S+/.test(email) && eventType !== "";
 
   async function submit(e: React.FormEvent) {
@@ -101,7 +104,9 @@ export default function OrcamentoForm() {
 
   const inputCls =
     "w-full bg-transparent border-b border-foreground/15 pb-3.5 text-base text-foreground placeholder-foreground/20 focus:outline-none focus:border-moss/55 transition-colors duration-300";
-  const labelCls = "block text-[10px] text-foreground/55 tracking-[0.4em] uppercase mb-3.5";
+  const labelCls =
+    "block text-[10px] text-foreground/55 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
+  const hintCls = "mt-2 text-[11px] tracking-wide text-gold/80";
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr]">
@@ -176,7 +181,7 @@ export default function OrcamentoForm() {
             />
 
             {/* Tipo de evento */}
-            <fieldset>
+            <fieldset className="group">
               <legend className={labelCls}>Tipo de evento *</legend>
               <div className="flex flex-wrap gap-2.5">
                 {EVENT_TYPES.map((o) => {
@@ -202,7 +207,7 @@ export default function OrcamentoForm() {
 
             {/* Data + Nº de pessoas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
-              <div>
+              <div className="group">
                 <label htmlFor="of-data" className={labelCls}>
                   Data do evento
                 </label>
@@ -214,7 +219,7 @@ export default function OrcamentoForm() {
                   className={`${inputCls} [color-scheme:dark]`}
                 />
               </div>
-              <div>
+              <div className="group">
                 <label htmlFor="of-pessoas" className={labelCls}>
                   Nº de pessoas
                 </label>
@@ -234,7 +239,7 @@ export default function OrcamentoForm() {
 
             {/* Nome + Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
-              <div>
+              <div className="group">
                 <label htmlFor="of-nome" className={labelCls}>
                   Nome *
                 </label>
@@ -244,11 +249,14 @@ export default function OrcamentoForm() {
                   autoComplete="name"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  className={inputCls}
+                  onBlur={() => setTouched((t) => ({ ...t, nome: true }))}
+                  aria-invalid={!!nomeErr}
+                  className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
                   placeholder="O seu nome"
                 />
+                {nomeErr && <p className={hintCls}>{nomeErr}</p>}
               </div>
-              <div>
+              <div className="group">
                 <label htmlFor="of-email" className={labelCls}>
                   Email *
                 </label>
@@ -258,14 +266,17 @@ export default function OrcamentoForm() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={inputCls}
+                  onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                  aria-invalid={!!emailErr}
+                  className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
                   placeholder="email@exemplo.com"
                 />
+                {emailErr && <p className={hintCls}>{emailErr}</p>}
               </div>
             </div>
 
             {/* Telefone */}
-            <div>
+            <div className="group">
               <label htmlFor="of-telefone" className={labelCls}>
                 Telefone
               </label>
@@ -281,7 +292,7 @@ export default function OrcamentoForm() {
             </div>
 
             {/* Mensagem */}
-            <div>
+            <div className="group">
               <label htmlFor="of-mensagem" className={labelCls}>
                 Mensagem
               </label>
@@ -300,9 +311,19 @@ export default function OrcamentoForm() {
               <button
                 type="submit"
                 disabled={!ready || sending}
-                className="inline-flex items-center gap-3 px-9 py-4 bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3"
+                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3"
               >
-                {sending ? "A enviar…" : "Enviar pedido →"}
+                {sending ? (
+                  <>
+                    <span
+                      className="inline-block w-3.5 h-3.5 rounded-full border border-cream/30 border-t-cream animate-spin"
+                      aria-hidden
+                    />
+                    A enviar…
+                  </>
+                ) : (
+                  "Enviar pedido →"
+                )}
               </button>
               <a
                 href={WHATSAPP_HREF_CTA}

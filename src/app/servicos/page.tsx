@@ -719,7 +719,7 @@ export default function ServicosPage() {
             <div className="flex flex-wrap gap-4 justify-center">
               <Link
                 href="/orcamento"
-                className="inline-flex items-center gap-3 px-9 py-4 bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 Pedir Orçamento →
               </Link>

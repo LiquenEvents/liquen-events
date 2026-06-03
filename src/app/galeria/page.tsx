@@ -48,7 +48,7 @@ export default function GaleriaPage() {
             href="https://www.instagram.com/liquen.events"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 px-8 py-4 bg-moss text-cream font-medium text-sm tracking-widest uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300"
+            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium text-sm tracking-widest uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300"
           >
             @liquen.events →
           </a>

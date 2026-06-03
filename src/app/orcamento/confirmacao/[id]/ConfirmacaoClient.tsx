@@ -258,7 +258,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
         <div className="mt-12 flex flex-wrap gap-4">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-8 py-3.5 bg-moss text-cream text-[11px] tracking-[0.2em] uppercase rounded-sm hover:bg-moss-dark transition-colors shadow-lg shadow-moss/15"
+            className="inline-flex items-center gap-2 px-8 py-3.5 btn-shine bg-moss text-cream text-[11px] tracking-[0.2em] uppercase rounded-sm hover:bg-moss-dark transition-colors shadow-lg shadow-moss/15"
           >
             Voltar ao Início →
           </Link>

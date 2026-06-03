@@ -27,13 +27,13 @@ export default function NotFound() {
           Este caminho não existe.
         </h1>
         <p className="text-foreground/40 text-sm leading-[1.8] max-w-md mx-auto mb-12">
-          A página que procura pode ter sido movida ou já não está disponível.
-          Mas o seu próximo evento ainda está à espera de ser criado.
+          A página que procura pode ter sido movida ou já não está disponível. Mas o seu próximo
+          evento ainda está à espera de ser criado.
         </p>
         <div className="flex flex-wrap gap-4 justify-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-3 px-8 py-4 bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
+            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
           >
             Voltar ao início →
           </Link>
