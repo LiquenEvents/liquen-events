@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "name": "Maria Teste",
+    "email": "maria.teste@exemplo.com",
+    "phone": "+351 912 345 678",
+    "company": "",
+    "nif": "",
+    "guests": 120,
+    "date": "2026-09-12",
+    "notes": "Casamento ao ar livre no Alentejo, ao fim da tarde. Cerca de 120 convidados.",
+    "category": "particulares",
+    "eventType": "casamentos",
+    "eventName": "Casamento",
+    "id": "LIQ-MPXCSMFV-AJ7R",
+    "submittedAt": "2026-06-03T00:54:03.163Z",
+    "status": "pendente"
+  }
+]

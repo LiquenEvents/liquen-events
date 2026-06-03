@@ -351,7 +351,7 @@ export default function ContactForm() {
               >
                 <span className="text-moss flex-shrink-0 text-sm">✦</span>
                 <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/60 group-hover:text-foreground/78 transition-colors">
-                  Prefere um orçamento detalhado? Use o simulador
+                  Pedir orçamento para o seu evento
                 </span>
                 <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
                   →

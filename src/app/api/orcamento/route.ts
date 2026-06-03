@@ -27,9 +27,11 @@ const eur = (n: number) =>
 function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown): string {
   const cat = CATEGORIES.find((c) => c.id === form.category)?.label ?? "—";
   const et =
-    form.category && form.eventType
-      ? (EVENT_TYPES_BY_CATEGORY[form.category]?.find((e) => e.id === form.eventType)?.label ?? "—")
-      : "—";
+    (form.category && form.eventType
+      ? EVENT_TYPES_BY_CATEGORY[form.category]?.find((e) => e.id === form.eventType)?.label
+      : undefined) ??
+    form.eventName ??
+    "—";
   const pkg = PACKAGES.find((p) => p.id === form.packageTier)?.label ?? form.packageTier;
 
   const row = (label: string, value: unknown) =>

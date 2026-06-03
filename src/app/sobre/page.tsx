@@ -21,7 +21,7 @@ const gallery = [
   { src: "/imagens/DaniGui_Adois_61.jpg", cls: "col-span-1" },
   { src: "/imagens/20_10_2025_0375.jpg", cls: "col-span-1" },
   { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-252.jpg", cls: "col-span-2" },
+  { src: "/imagens/ines-goncalo-252.jpg", cls: "col-span-2" },
 ];
 
 const eyebrowLight =

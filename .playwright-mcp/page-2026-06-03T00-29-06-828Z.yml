@@ -1,0 +1,325 @@
+- generic [ref=e1]:
+  - link "Saltar para o conteúdo" [ref=e2] [cursor=pointer]:
+    - /url: "#conteudo"
+  - link "Pedir orçamento →" [ref=e185] [cursor=pointer]:
+    - /url: /orcamento
+    - generic [ref=e189]: Pedir orçamento
+    - generic [ref=e190]: →
+  - navigation [ref=e3]:
+    - generic [ref=e5]:
+      - link "Líquen Events" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "Líquen Events" [ref=e7]
+      - generic [ref=e8]:
+        - link "Sobre" [ref=e9] [cursor=pointer]:
+          - /url: /sobre
+        - link "Serviços" [ref=e10] [cursor=pointer]:
+          - /url: /servicos
+        - link "Galeria" [ref=e11] [cursor=pointer]:
+          - /url: /galeria
+        - link "Clientes" [ref=e12] [cursor=pointer]:
+          - /url: /clientes
+      - generic [ref=e13]:
+        - link "Contacto" [ref=e14] [cursor=pointer]:
+          - /url: /contacto
+        - link "Orçamento →" [ref=e15] [cursor=pointer]:
+          - /url: /orcamento
+  - main [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e19]:
+        - paragraph [ref=e22]: Os nossos momentos
+        - heading "Galeria" [level=1] [ref=e23]
+        - paragraph [ref=e25]: Casamentos, eventos corporativos e celebrações — capturados ao pormenor.
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - button "Todos 247" [ref=e29]:
+            - text: Todos
+            - generic [ref=e30]: "247"
+          - button "Casamento 151" [ref=e31]:
+            - text: Casamento
+            - generic [ref=e32]: "151"
+          - button "Corporativo 31" [ref=e33]:
+            - text: Corporativo
+            - generic [ref=e34]: "31"
+          - button "Conferência 11" [ref=e35]:
+            - text: Conferência
+            - generic [ref=e36]: "11"
+          - button "Aéreo 7" [ref=e37]:
+            - text: Aéreo
+            - generic [ref=e38]: "7"
+          - button "Evento 47" [ref=e39]:
+            - text: Evento
+            - generic [ref=e40]: "47"
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - button "Conferência organizada pela Líquen Events Conferência" [active] [ref=e43]:
+              - img "Conferência organizada pela Líquen Events" [ref=e44]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e45]:
+              - img "Conferência organizada pela Líquen Events" [ref=e46]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e47]:
+              - img "Conferência organizada pela Líquen Events" [ref=e48]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e49]:
+              - img "Conferência organizada pela Líquen Events" [ref=e50]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e51]:
+              - img "Conferência organizada pela Líquen Events" [ref=e52]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+          - generic [ref=e53]:
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e55]:
+              - img "Conferência organizada pela Líquen Events" [ref=e56]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e58]:
+              - img "Conferência organizada pela Líquen Events" [ref=e59]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e61]:
+              - img "Conferência organizada pela Líquen Events" [ref=e62]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e64]:
+              - img "Conferência organizada pela Líquen Events" [ref=e65]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e67]:
+              - img "Conferência organizada pela Líquen Events" [ref=e68]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Conferência organizada pela Líquen Events Conferência" [ref=e70]:
+              - img "Conferência organizada pela Líquen Events" [ref=e71]
+              - generic:
+                - generic:
+                  - generic: Conferência
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e73]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e74]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e76]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e77]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e79]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e80]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e82]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e83]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e85]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e86]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e88]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e89]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e91]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e92]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e94]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e95]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e97]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e98]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e100]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e101]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e103]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e104]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e106]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e107]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+            - button "Casamento organizado pela Líquen Events no Alentejo Daniela & Guilherme Casamento" [ref=e109]:
+              - img "Casamento organizado pela Líquen Events no Alentejo" [ref=e110]
+              - generic:
+                - generic:
+                  - generic: Daniela & Guilherme
+                  - generic: Casamento
+                - generic:
+                  - img
+        - generic [ref=e111]:
+          - button "Ver mais +24" [ref=e112]:
+            - text: Ver mais
+            - generic [ref=e113]: "+24"
+          - paragraph [ref=e116]: 24 de 247
+      - generic [ref=e118]:
+        - paragraph [ref=e119]: Redes sociais
+        - heading "Siga-nos no Instagram" [level=2] [ref=e121]
+        - paragraph [ref=e122]: Partilhamos os bastidores dos nossos eventos e inspirações diárias.
+        - link "@liquen.events →" [ref=e123] [cursor=pointer]:
+          - /url: https://www.instagram.com/liquen.events
+  - contentinfo [ref=e124]:
+    - generic [ref=e134]:
+      - generic [ref=e135]:
+        - img "Líquen Events" [ref=e136]
+        - paragraph [ref=e137]:
+          - text: Organizamos eventos,
+          - text: eternizamos memórias.
+        - generic [ref=e142]: Disponível para novos eventos
+        - generic [ref=e143]:
+          - link "Instagram" [ref=e144] [cursor=pointer]:
+            - /url: https://www.instagram.com/liquen.events
+            - img [ref=e145]
+          - link "Facebook" [ref=e149] [cursor=pointer]:
+            - /url: https://www.facebook.com/liquen.events
+            - img [ref=e150]
+          - link "WhatsApp" [ref=e152] [cursor=pointer]:
+            - /url: https://wa.me/351919259820
+            - img [ref=e153]
+      - generic [ref=e155]:
+        - paragraph [ref=e156]: Páginas
+        - list [ref=e157]:
+          - listitem [ref=e158]:
+            - link "Sobre" [ref=e159] [cursor=pointer]:
+              - /url: /sobre
+          - listitem [ref=e160]:
+            - link "Serviços" [ref=e161] [cursor=pointer]:
+              - /url: /servicos
+          - listitem [ref=e162]:
+            - link "Galeria" [ref=e163] [cursor=pointer]:
+              - /url: /galeria
+          - listitem [ref=e164]:
+            - link "Clientes" [ref=e165] [cursor=pointer]:
+              - /url: /clientes
+          - listitem [ref=e166]:
+            - link "Contacto" [ref=e167] [cursor=pointer]:
+              - /url: /contacto
+      - generic [ref=e168]:
+        - paragraph [ref=e169]: Contacto
+        - generic [ref=e170]:
+          - link "liquen.alentejo@gmail.com" [ref=e171] [cursor=pointer]:
+            - /url: mailto:liquen.alentejo@gmail.com
+          - link "+351 919 259 820" [ref=e172] [cursor=pointer]:
+            - /url: tel:+351919259820
+          - generic [ref=e173]: Portugal
+        - link "Pedir orçamento →" [ref=e174] [cursor=pointer]:
+          - /url: /orcamento
+    - generic [ref=e176]:
+      - paragraph [ref=e177]: © 2026 Líquen Events — Todos os direitos reservados
+      - paragraph [ref=e178]: Portugal
+  - link "Contactar pelo WhatsApp" [ref=e180] [cursor=pointer]:
+    - /url: https://wa.me/351919259820
+    - img [ref=e181]
+    - generic [ref=e183]: WhatsApp
+  - alert [ref=e179]
+  - generic [ref=e191]:
+    - generic [ref=e192]:
+      - generic [ref=e193]:
+        - generic [ref=e194]: "1"
+        - generic [ref=e195]: /
+        - generic [ref=e196]: "247"
+        - generic [ref=e198]: Conferência
+      - button "Fechar" [ref=e199]:
+        - img [ref=e200]
+    - generic [ref=e202]:
+      - button "Foto anterior" [ref=e203]:
+        - img [ref=e204]
+      - img "Conferência organizada pela Líquen Events" [ref=e207]
+      - button "Próxima foto" [ref=e208]:
+        - img [ref=e209]
+    - generic [ref=e211]:
+      - button [ref=e212]
+      - button [ref=e213]
+      - button [ref=e214]
+      - button [ref=e215]
+      - button [ref=e216]
+      - button [ref=e217]
+      - button [ref=e218]
+    - paragraph [ref=e219]: ← → navegar · esc fechar · deslize no telemóvel

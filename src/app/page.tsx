@@ -60,7 +60,7 @@ const ribbon = [
   "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
   "/imagens/DaniGui_Adois_61.jpg",
   "/imagens/20_10_2025_0220.jpg",
-  "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-252.jpg",
+  "/imagens/ines-goncalo-252.jpg",
   "/imagens/M&F0497.jpg",
   "/imagens/EW1_1330.jpg",
   "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",

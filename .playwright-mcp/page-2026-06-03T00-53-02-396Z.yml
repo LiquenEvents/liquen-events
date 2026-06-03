@@ -1,0 +1,78 @@
+- generic [active] [ref=e1]:
+  - link "Saltar para o conteúdo" [ref=e2] [cursor=pointer]:
+    - /url: "#conteudo"
+  - navigation [ref=e3]:
+    - generic [ref=e5]:
+      - link "Líquen Events" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "Líquen Events" [ref=e7]
+      - generic [ref=e8]:
+        - link "Sobre" [ref=e9] [cursor=pointer]:
+          - /url: /sobre
+        - link "Serviços" [ref=e10] [cursor=pointer]:
+          - /url: /servicos
+        - link "Galeria" [ref=e11] [cursor=pointer]:
+          - /url: /galeria
+        - link "Clientes" [ref=e12] [cursor=pointer]:
+          - /url: /clientes
+      - generic [ref=e13]:
+        - link "Contacto" [ref=e14] [cursor=pointer]:
+          - /url: /contacto
+        - link "Orçamento →" [ref=e15] [cursor=pointer]:
+          - /url: /orcamento
+  - main [ref=e16]:
+    - paragraph [ref=e22]: A carregar
+  - contentinfo [ref=e23]:
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - img "Líquen Events" [ref=e35]
+        - paragraph [ref=e36]:
+          - text: Organizamos eventos,
+          - text: eternizamos memórias.
+        - generic [ref=e41]: Disponível para novos eventos
+        - generic [ref=e42]:
+          - link "Instagram" [ref=e43] [cursor=pointer]:
+            - /url: https://www.instagram.com/liquen.events
+            - img [ref=e44]
+          - link "Facebook" [ref=e48] [cursor=pointer]:
+            - /url: https://www.facebook.com/liquen.events
+            - img [ref=e49]
+          - link "WhatsApp" [ref=e51] [cursor=pointer]:
+            - /url: https://wa.me/351919259820
+            - img [ref=e52]
+      - generic [ref=e54]:
+        - paragraph [ref=e55]: Páginas
+        - list [ref=e56]:
+          - listitem [ref=e57]:
+            - link "Sobre" [ref=e58] [cursor=pointer]:
+              - /url: /sobre
+          - listitem [ref=e59]:
+            - link "Serviços" [ref=e60] [cursor=pointer]:
+              - /url: /servicos
+          - listitem [ref=e61]:
+            - link "Galeria" [ref=e62] [cursor=pointer]:
+              - /url: /galeria
+          - listitem [ref=e63]:
+            - link "Clientes" [ref=e64] [cursor=pointer]:
+              - /url: /clientes
+          - listitem [ref=e65]:
+            - link "Contacto" [ref=e66] [cursor=pointer]:
+              - /url: /contacto
+      - generic [ref=e67]:
+        - paragraph [ref=e68]: Contacto
+        - generic [ref=e69]:
+          - link "liquen.alentejo@gmail.com" [ref=e70] [cursor=pointer]:
+            - /url: mailto:liquen.alentejo@gmail.com
+          - link "+351 919 259 820" [ref=e71] [cursor=pointer]:
+            - /url: tel:+351919259820
+          - generic [ref=e72]: Portugal
+        - link "Pedir orçamento →" [ref=e73] [cursor=pointer]:
+          - /url: /orcamento
+    - generic [ref=e75]:
+      - paragraph [ref=e76]: © 2026 Líquen Events — Todos os direitos reservados
+      - paragraph [ref=e77]: Portugal
+  - link "Contactar pelo WhatsApp":
+    - /url: https://wa.me/351919259820
+    - img
+    - generic: WhatsApp
+  - alert [ref=e78]

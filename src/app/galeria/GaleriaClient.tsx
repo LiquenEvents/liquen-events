@@ -87,22 +87,22 @@ const photos: Photo[] = [
   { src: "/imagens/EW1_1427.jpg", label: "Corporativo" },
   { src: "/imagens/EW1_1428.jpg", label: "Corporativo" },
   { src: "/imagens/EW1_1505.jpg", label: "Corporativo" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-157.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-242.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-250.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-251.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-252.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-253.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-278.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-282.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-346.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-421.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-498.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-499.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-502.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-506.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-509.jpg", label: "Casamento" },
-  { src: "/imagens/Inês&Gonçalo_weddingphotos_@carinho.mio-510.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-157.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-242.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-250.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-251.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-252.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-253.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-278.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-282.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-346.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-421.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-498.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-499.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-502.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-506.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-509.jpg", label: "Casamento" },
+  { src: "/imagens/ines-goncalo-510.jpg", label: "Casamento" },
   { src: "/imagens/J&P-1Y1A1828.jpg", label: "Casamento" },
   { src: "/imagens/J&P-1Y1A1833.jpg", label: "Casamento" },
   { src: "/imagens/J&P-1Y1A1933.jpg", label: "Casamento" },
@@ -193,10 +193,10 @@ const photos: Photo[] = [
   { src: "/imagens/M&F0670.jpg", label: "Casamento" },
   { src: "/imagens/M&F0678.jpg", label: "Casamento" },
   { src: "/imagens/M&F0712.jpg", label: "Casamento" },
-  { src: "/imagens/Matilde&Tomás27.jpg", label: "Casamento" },
-  { src: "/imagens/Matilde&Tomás28.jpg", label: "Casamento" },
-  { src: "/imagens/Matilde&Tomás35.jpg", label: "Casamento" },
-  { src: "/imagens/Matilde&Tomás36.jpg", label: "Casamento" },
+  { src: "/imagens/matilde-tomas-27.jpg", label: "Casamento" },
+  { src: "/imagens/matilde-tomas-28.jpg", label: "Casamento" },
+  { src: "/imagens/matilde-tomas-35.jpg", label: "Casamento" },
+  { src: "/imagens/matilde-tomas-36.jpg", label: "Casamento" },
   { src: "/imagens/Natalia e Jonathan-5.jpg", label: "Casamento" },
   { src: "/imagens/Natalia e Jonathan-7.jpg", label: "Casamento" },
   { src: "/imagens/Natalia e Jonathan-8.jpg", label: "Casamento" },
@@ -268,8 +268,8 @@ function collectionFor(src: string): string | null {
   const f = src.toLowerCase();
   if (f.includes("danigui")) return "Daniela & Guilherme";
   if (f.includes("joao_e_pedro") || f.includes("j&p-")) return "João & Pedro";
-  if (f.includes("carinho.mio")) return "Inês & Gonçalo";
-  if (f.includes("matilde&tom")) return "Matilde & Tomás";
+  if (f.includes("ines-goncalo")) return "Inês & Gonçalo";
+  if (f.includes("matilde-tomas")) return "Matilde & Tomás";
   if (f.includes("m&f")) return "Matilde & Filipe";
   if (f.includes("natalia e jonathan")) return "Natália & Jonathan";
   return null;
@@ -446,7 +446,7 @@ export default function GaleriaClient() {
                 fill
                 sizes="(max-width: 640px) 100vw, 50vw"
                 className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                preload
+                loading="eager"
                 {...blurFor(visible[0].src)}
               />
               <HoverOverlay {...captionFor(visible[0].src, visible[0].label)} />
@@ -624,6 +624,19 @@ export default function GaleriaClient() {
                   className="object-contain lb-photo-in"
                   {...blurFor(pool[lb].src)}
                 />
+              </div>
+
+              {/* Pré-carrega os vizinhos (anterior/seguinte) para que ← → seja
+                  instantâneo — fetch na mesma resolução do visor, fora de ecrã. */}
+              <div
+                aria-hidden
+                className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
+              >
+                {Array.from(new Set([(lb - 1 + pool.length) % pool.length, (lb + 1) % pool.length]))
+                  .filter((i) => i !== lb)
+                  .map((i) => (
+                    <Image key={i} src={pool[i].src} alt="" fill sizes="90vw" loading="eager" />
+                  ))}
               </div>
 
               {/* Botão próxima */}

@@ -1,0 +1,252 @@
+- generic [ref=e1]:
+  - link "Saltar para o conteúdo" [ref=e2] [cursor=pointer]:
+    - /url: "#conteudo"
+  - generic:
+    - link "Pedir orçamento →":
+      - /url: /orcamento
+      - generic: Pedir orçamento
+      - generic: →
+  - navigation [ref=e3]:
+    - generic [ref=e5]:
+      - link "Líquen Events" [active] [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "Líquen Events" [ref=e7]
+      - generic [ref=e8]:
+        - link "Sobre" [ref=e9] [cursor=pointer]:
+          - /url: /sobre
+        - link "Serviços" [ref=e10] [cursor=pointer]:
+          - /url: /servicos
+        - link "Galeria" [ref=e11] [cursor=pointer]:
+          - /url: /galeria
+        - link "Clientes" [ref=e12] [cursor=pointer]:
+          - /url: /clientes
+      - generic [ref=e13]:
+        - link "Contacto" [ref=e14] [cursor=pointer]:
+          - /url: /contacto
+        - link "Orçamento →" [ref=e15] [cursor=pointer]:
+          - /url: /orcamento
+  - main [ref=e16]:
+    - generic [ref=e128]:
+      - generic [ref=e129]:
+        - img "Líquen Events — evento aéreo no Alentejo" [ref=e130]
+        - generic [ref=e134]:
+          - paragraph [ref=e135]: Organização de eventos
+          - heading "Eventos que ficam na memória." [level=1] [ref=e137]:
+            - generic [ref=e138]:
+              - generic [ref=e139]: Eventos
+              - generic [ref=e140]: que
+            - generic [ref=e141]:
+              - generic [ref=e142]: ficam
+              - generic [ref=e143]: na
+            - generic [ref=e145]: memória.
+          - generic [ref=e146]:
+            - link "Pedir Orçamento →" [ref=e147] [cursor=pointer]:
+              - /url: /orcamento
+            - link "Ver galeria" [ref=e148] [cursor=pointer]:
+              - /url: /galeria
+        - generic [ref=e150]: Scroll
+      - generic [ref=e154]:
+        - img "José de Mello" [ref=e156]
+        - img "Aernnova" [ref=e158]
+        - img "Mainova" [ref=e160]
+        - img "Palácio Duques de Cadaval" [ref=e162]
+        - img "Ravasqueira" [ref=e164]
+        - img "Fitapreta Vinhos" [ref=e166]
+        - img "Universidade de Évora" [ref=e168]
+        - img "Hilton Garden Inn" [ref=e170]
+        - img "Convento do Espinheiro" [ref=e172]
+        - img "Pérez-Llorca" [ref=e174]
+        - img "Câmara Municipal de Évora" [ref=e176]
+        - img "PACT" [ref=e178]
+        - img "Clínica Dentária Santa Madalena" [ref=e180]
+        - img "Casa Morgado Esporão" [ref=e182]
+        - img "PortugalNuts" [ref=e184]
+        - img "ESRI Portugal" [ref=e186]
+        - img "Monte do Zambujal" [ref=e188]
+        - img "EDIA" [ref=e190]
+        - img "Ordem dos Médicos Veterinários" [ref=e192]
+        - img "José de Mello" [ref=e194]
+        - img "Aernnova" [ref=e196]
+        - img "Mainova" [ref=e198]
+        - img "Palácio Duques de Cadaval" [ref=e200]
+        - img "Ravasqueira" [ref=e202]
+        - img "Fitapreta Vinhos" [ref=e204]
+        - img "Universidade de Évora" [ref=e206]
+        - img "Hilton Garden Inn" [ref=e208]
+        - img "Convento do Espinheiro" [ref=e210]
+        - img "Pérez-Llorca" [ref=e212]
+        - img "Câmara Municipal de Évora" [ref=e214]
+        - img "PACT" [ref=e216]
+        - img "Clínica Dentária Santa Madalena" [ref=e218]
+        - img "Casa Morgado Esporão" [ref=e220]
+        - img "PortugalNuts" [ref=e222]
+        - img "ESRI Portugal" [ref=e224]
+        - img "Monte do Zambujal" [ref=e226]
+        - img "EDIA" [ref=e228]
+        - img "Ordem dos Médicos Veterinários" [ref=e230]
+      - generic [ref=e232]:
+        - generic [ref=e234]:
+          - paragraph [ref=e235]: O que fazemos
+          - link "Ver serviços →" [ref=e237] [cursor=pointer]:
+            - /url: /servicos
+            - text: Ver serviços
+            - generic [ref=e238]: →
+        - generic [ref=e239]:
+          - link "Corporativos Empresas Corporativos" [ref=e241] [cursor=pointer]:
+            - /url: /servicos#empresas
+            - img "Corporativos" [ref=e242]
+            - generic [ref=e244]:
+              - paragraph [ref=e245]: Empresas
+              - heading "Corporativos" [level=3] [ref=e246]
+          - link "Casamentos Celebrações Casamentos" [ref=e248] [cursor=pointer]:
+            - /url: /servicos#celebracoes
+            - img "Casamentos" [ref=e249]
+            - generic [ref=e251]:
+              - paragraph [ref=e252]: Celebrações
+              - heading "Casamentos" [level=3] [ref=e253]
+          - link "Privados Celebrações Privados" [ref=e255] [cursor=pointer]:
+            - /url: /servicos#celebracoes
+            - img "Privados" [ref=e256]
+            - generic [ref=e258]:
+              - paragraph [ref=e259]: Celebrações
+              - heading "Privados" [level=3] [ref=e260]
+      - generic [ref=e262]:
+        - generic [ref=e264]:
+          - paragraph [ref=e265]: Trabalho selecionado
+          - link "Ver tudo →" [ref=e267] [cursor=pointer]:
+            - /url: /galeria
+            - text: Ver tudo
+            - generic [ref=e268]: →
+        - generic [ref=e269]:
+          - link "Aernnova Aerospace Corporativo Aernnova Aerospace" [ref=e271] [cursor=pointer]:
+            - /url: /galeria
+            - img "Aernnova Aerospace" [ref=e272]
+            - generic [ref=e274]:
+              - paragraph [ref=e275]: Corporativo
+              - heading "Aernnova Aerospace" [level=3] [ref=e276]
+          - link "Daniela & Guilherme Casamento Daniela & Guilherme" [ref=e278] [cursor=pointer]:
+            - /url: /galeria
+            - img "Daniela & Guilherme" [ref=e279]
+            - generic [ref=e281]:
+              - paragraph [ref=e282]: Casamento
+              - heading "Daniela & Guilherme" [level=3] [ref=e283]
+          - link "João & Pedro Casamento João & Pedro" [ref=e285] [cursor=pointer]:
+            - /url: /galeria
+            - img "João & Pedro" [ref=e286]
+            - generic [ref=e288]:
+              - paragraph [ref=e289]: Casamento
+              - heading "João & Pedro" [level=3] [ref=e290]
+          - link "Câmara de Évora Institucional Câmara de Évora" [ref=e292] [cursor=pointer]:
+            - /url: /galeria
+            - img "Câmara de Évora" [ref=e293]
+            - generic [ref=e295]:
+              - paragraph [ref=e296]: Institucional
+              - heading "Câmara de Évora" [level=3] [ref=e297]
+          - link "Matilde & Filipe Casamento Matilde & Filipe" [ref=e299] [cursor=pointer]:
+            - /url: /galeria
+            - img "Matilde & Filipe" [ref=e300]
+            - generic [ref=e302]:
+              - paragraph [ref=e303]: Casamento
+              - heading "Matilde & Filipe" [level=3] [ref=e304]
+      - link "Ver galeria →" [ref=e306] [cursor=pointer]:
+        - /url: /galeria
+        - generic:
+          - generic: Ver galeria →
+      - generic [ref=e328]:
+        - generic: “
+        - generic [ref=e329]:
+          - paragraph [ref=e333]: O que dizem os clientes
+          - generic [ref=e334]:
+            - generic [ref=e336]:
+              - paragraph [ref=e337]: “O ambiente criado pela vossa equipa elevou a imagem do nosso evento. Ficámos impressionados com a sofisticação da decoração.”
+              - generic [ref=e340]:
+                - paragraph [ref=e341]: António Bettencourt
+                - paragraph [ref=e342]: Evento Corporativo
+            - generic [ref=e343]:
+              - button "Testemunho 1" [ref=e344]
+              - button "Testemunho 2" [ref=e346]
+              - button "Testemunho 3" [ref=e348]
+              - button "Testemunho 4" [ref=e350]
+      - generic [ref=e353]:
+        - img "Organização de eventos no Alentejo — Líquen Events" [ref=e355]
+        - generic [ref=e357]:
+          - generic [ref=e358]:
+            - paragraph [ref=e359]: Onde atuamos
+            - heading "Eventos em Lisboa e todo o Portugal" [level=2] [ref=e361]:
+              - text: Eventos em Lisboa
+              - text: e todo o Portugal
+            - paragraph [ref=e362]: Casamentos, eventos corporativos e celebrações — do conceito à execução, tratamos de cada detalhe para que só tenha de viver o momento.
+          - generic [ref=e364]:
+            - generic [ref=e365]: Casamentos no Alentejo
+            - generic [ref=e366]: Eventos corporativos em Lisboa
+            - generic [ref=e367]: Conferências
+            - generic [ref=e368]: Festas privadas
+            - generic [ref=e369]: Jantares de gala
+      - generic [ref=e370]:
+        - img "Evento Líquen Events" [ref=e371]
+        - generic [ref=e374]:
+          - generic [ref=e375]:
+            - paragraph [ref=e376]: Próximo passo
+            - heading "Tem um evento em mente?" [level=2] [ref=e379]:
+              - text: Tem um evento
+              - text: em mente?
+          - paragraph [ref=e381]: Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas.
+          - generic [ref=e383]:
+            - link "Pedir Orçamento →" [ref=e384] [cursor=pointer]:
+              - /url: /orcamento
+            - link "Ver galeria" [ref=e385] [cursor=pointer]:
+              - /url: /galeria
+  - contentinfo [ref=e23]:
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - img "Líquen Events" [ref=e35]
+        - paragraph [ref=e36]:
+          - text: Organizamos eventos,
+          - text: eternizamos memórias.
+        - generic [ref=e41]: Disponível para novos eventos
+        - generic [ref=e42]:
+          - link "Instagram" [ref=e43] [cursor=pointer]:
+            - /url: https://www.instagram.com/liquen.events
+            - img [ref=e44]
+          - link "Facebook" [ref=e48] [cursor=pointer]:
+            - /url: https://www.facebook.com/liquen.events
+            - img [ref=e49]
+          - link "WhatsApp" [ref=e51] [cursor=pointer]:
+            - /url: https://wa.me/351919259820
+            - img [ref=e52]
+      - generic [ref=e54]:
+        - paragraph [ref=e55]: Páginas
+        - list [ref=e56]:
+          - listitem [ref=e57]:
+            - link "Sobre" [ref=e58] [cursor=pointer]:
+              - /url: /sobre
+          - listitem [ref=e59]:
+            - link "Serviços" [ref=e60] [cursor=pointer]:
+              - /url: /servicos
+          - listitem [ref=e61]:
+            - link "Galeria" [ref=e62] [cursor=pointer]:
+              - /url: /galeria
+          - listitem [ref=e63]:
+            - link "Clientes" [ref=e64] [cursor=pointer]:
+              - /url: /clientes
+          - listitem [ref=e65]:
+            - link "Contacto" [ref=e66] [cursor=pointer]:
+              - /url: /contacto
+      - generic [ref=e67]:
+        - paragraph [ref=e68]: Contacto
+        - generic [ref=e69]:
+          - link "liquen.alentejo@gmail.com" [ref=e70] [cursor=pointer]:
+            - /url: mailto:liquen.alentejo@gmail.com
+          - link "+351 919 259 820" [ref=e71] [cursor=pointer]:
+            - /url: tel:+351919259820
+          - generic [ref=e72]: Portugal
+        - link "Pedir orçamento →" [ref=e73] [cursor=pointer]:
+          - /url: /orcamento
+    - generic [ref=e75]:
+      - paragraph [ref=e76]: © 2026 Líquen Events — Todos os direitos reservados
+      - paragraph [ref=e77]: Portugal
+  - link "Contactar pelo WhatsApp" [ref=e386] [cursor=pointer]:
+    - /url: https://wa.me/351919259820
+    - img [ref=e387]
+    - generic [ref=e389]: WhatsApp
+  - alert [ref=e78]: Líquen Events — Organização de Eventos no Alentejo e em Portugal
