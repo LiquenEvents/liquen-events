@@ -24,6 +24,10 @@ const ribbon = [
   "/imagens/EW1_1330.jpg",
   "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
   "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
+  "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
+  "/imagens/stephanie-mizio-715.jpg",
+  "/imagens/image6.jpeg",
+  "/imagens/mom-0961.jpg",
 ];
 
 export default async function Home() {

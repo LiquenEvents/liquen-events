@@ -46,7 +46,7 @@ const mosaicItems = [
     cls: "col-span-3 row-span-1",
   },
   {
-    src: "/imagens/JOAO_E_PEDRO_1Y1A3232.jpg",
+    src: "/imagens/stephanie-mizio-715.jpg",
     alt: "Casamento",
     label: "Casamento",
     cls: "col-span-4 row-span-1",
@@ -58,13 +58,13 @@ const mosaicItems = [
     cls: "col-span-3 row-span-1",
   },
   {
-    src: "/imagens/DaniGui_JantarFesta_27.jpg",
+    src: "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
     alt: "Gala",
     label: "Gala",
     cls: "col-span-7 row-span-1",
   },
   {
-    src: "/imagens/20_10_2025_0295.jpg",
+    src: "/imagens/hd-edited.jpg",
     alt: "Evento institucional",
     label: "Institucional",
     cls: "col-span-5 row-span-1",
@@ -231,12 +231,12 @@ export default async function ClientesPage() {
             {/* Photo side */}
             <div className="relative min-h-[380px] lg:min-h-0">
               <Image
-                src="/imagens/DaniGui_JantarFesta_1.jpg"
+                src="/imagens/428708341-339551125742979-6565889301500133407-n.jpg"
                 alt="Jantar de evento Líquen Events"
                 fill
                 sizes="(max-width: 1024px) 100vw, 45vw"
                 className="object-cover object-center"
-                {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
+                {...blurFor("/imagens/428708341-339551125742979-6565889301500133407-n.jpg")}
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[#080808] via-[#080808]/15 to-transparent lg:block hidden" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/30 to-transparent lg:hidden" />

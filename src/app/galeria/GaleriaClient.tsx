@@ -277,6 +277,142 @@ const photos: Photo[] = [
   { src: "/imagens/WhatsApp Image 2026-05-21 at 11.53.36 (2).jpeg", label: "Evento" },
   { src: "/imagens/WhatsApp Image 2026-05-21 at 11.53.36 (3).jpeg", label: "Evento" },
   { src: "/imagens/WhatsApp Image 2026-05-21 at 11.53.37.jpeg", label: "Evento" },
+  // ── Novas coleções (2026) ──
+  { src: "/imagens/17860278387017661.jpg", label: "Evento" },
+  { src: "/imagens/17920798061835097.jpg", label: "Evento" },
+  { src: "/imagens/18002809616226216.jpg", label: "Evento" },
+  { src: "/imagens/18009541247101258.jpg", label: "Evento" },
+  { src: "/imagens/18030963605093473.jpg", label: "Evento" },
+  { src: "/imagens/18299242414135399.jpg", label: "Evento" },
+  { src: "/imagens/428658838-339551135742978-7904331374079927456-n.jpg", label: "Evento" },
+  { src: "/imagens/428694133-339551105742981-427109035692944303-n.jpg", label: "Evento" },
+  { src: "/imagens/428708341-339551125742979-6565889301500133407-n.jpg", label: "Evento" },
+  { src: "/imagens/am20241026-miaejoao-1065.jpg", label: "Casamento" },
+  { src: "/imagens/am20241026-miaejoao-1066.jpg", label: "Casamento" },
+  { src: "/imagens/am20241026-miaejoao-1076.jpg", label: "Casamento" },
+  { src: "/imagens/hd-edited.jpg", label: "Evento" },
+  { src: "/imagens/image0.jpeg", label: "Evento" },
+  { src: "/imagens/image2-1.jpeg", label: "Evento" },
+  { src: "/imagens/image2.jpeg", label: "Evento" },
+  { src: "/imagens/image4-1.jpeg", label: "Evento" },
+  { src: "/imagens/image5-1.jpeg", label: "Evento" },
+  { src: "/imagens/image6.jpeg", label: "Evento" },
+  { src: "/imagens/image7.jpeg", label: "Evento" },
+  { src: "/imagens/imagem-whatsapp-2025-08-18-as-23-01-39-4a836a89.jpg", label: "Evento" },
+  { src: "/imagens/matilde-e-tomas0654-1.jpg", label: "Casamento" },
+  { src: "/imagens/matilde-e-tomas0663.jpg", label: "Casamento" },
+  { src: "/imagens/matilde-e-tomas0669.jpg", label: "Casamento" },
+  { src: "/imagens/mom-0961.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-152.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-16.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-2.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-20.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-21.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-23.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-24.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-25.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-292.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-35.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-350.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-36.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-37.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-391.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-397.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-402.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-403.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-404.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-405.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-406.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-407.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-408.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-409.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-410.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-441.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-523.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-526.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-548.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-553-1.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-553.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-555-1.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-555.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-556.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-557.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-558.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-559.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-560.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-561-1.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-561.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-562.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-563.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-564.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-565.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-566.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-567.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-568.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-569.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-570.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-571-1.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-571.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-572.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-573.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-574.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-575.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-576.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-577.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-578.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-579.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-580.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-581.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-582.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-584.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-586.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-587.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-588.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-589.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-591.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-596.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-597.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-629.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-630.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-636.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-669.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-688.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-689.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-690.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-7.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-714.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-715.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-719.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-756.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-757.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-758.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-759.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-760.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-765.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-766.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-767.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-770.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-781.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-782.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-803.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-804.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-805.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-808.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-810.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-812-1.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-812.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-813.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-814.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-833.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-834-1.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-834.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-835.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-837.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-838-1.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-838.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-840.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-937.jpg", label: "Casamento" },
+  { src: "/imagens/stephanie-mizio-940.jpg", label: "Casamento" },
 ];
 
 // Human-readable collection (event) inferred from the file name — adds a
@@ -286,12 +422,38 @@ function collectionFor(src: string): string | null {
   if (f.includes("danigui")) return "Daniela & Guilherme";
   if (f.includes("joao_e_pedro") || f.includes("j&p-")) return "João & Pedro";
   if (f.includes("ines-goncalo")) return "Inês & Gonçalo";
-  if (f.includes("matilde-tomas")) return "Matilde & Tomás";
+  if (f.includes("matilde-tomas") || f.includes("matilde-e-tomas")) return "Matilde & Tomás";
   if (f.includes("teresinhaeze")) return "Teresinha & Zé";
   if (f.includes("m&f")) return "Matilde & Filipe";
   if (f.includes("natalia e jonathan")) return "Natália & Jonathan";
+  if (f.includes("stephanie-mizio")) return "Stephanie & Mizio";
+  if (f.includes("miaejoao")) return "Mia & João";
   return null;
 }
+
+// Interleave by collection/event so consecutive photos in the grid aren't all
+// from the same event (round-robin across collections). Deterministic, so the
+// order stays stable between renders and SSR/CSR.
+function interleaveByCollection(list: Photo[]): Photo[] {
+  const groups = new Map<string, Photo[]>();
+  for (const p of list) {
+    const key = collectionFor(p.src) ?? `cat:${p.label}`;
+    let arr = groups.get(key);
+    if (!arr) {
+      arr = [];
+      groups.set(key, arr);
+    }
+    arr.push(p);
+  }
+  const buckets = [...groups.values()];
+  const out: Photo[] = [];
+  for (let i = 0; out.length < list.length; i++) {
+    for (const b of buckets) if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
+
+const GALLERY = interleaveByCollection(photos);
 
 const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
 type Cat = (typeof CATS)[number];
@@ -388,7 +550,7 @@ export default function GaleriaClient() {
   };
 
   const pool = useMemo(
-    () => (cat === "Todos" ? photos : photos.filter((p) => p.label === cat)),
+    () => (cat === "Todos" ? GALLERY : GALLERY.filter((p) => p.label === cat)),
     [cat],
   );
   const visible = pool.slice(0, shown);
@@ -494,7 +656,7 @@ export default function GaleriaClient() {
   const counts = Object.fromEntries(
     CATS.map((c) => [
       c,
-      c === "Todos" ? photos.length : photos.filter((p) => p.label === c).length,
+      c === "Todos" ? GALLERY.length : GALLERY.filter((p) => p.label === c).length,
     ]),
   ) as Record<Cat, number>;
 
@@ -512,12 +674,12 @@ export default function GaleriaClient() {
             className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
               cat === c
                 ? "bg-moss text-cream shadow-lg shadow-moss/20"
-                : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10 hover:text-foreground/70"
+                : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
             }`}
           >
             {t.galeria.labels[c]}
             <span
-              className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-foreground/78"}`}
+              className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-white/35"}`}
             >
               {counts[c]}
             </span>
@@ -609,20 +771,20 @@ export default function GaleriaClient() {
         <div className="mt-14 flex flex-col items-center gap-4">
           <button
             onClick={() => setShown((s) => Math.min(s + PAGE, pool.length))}
-            className="group px-10 py-3.5 border border-foreground/15 text-foreground/60 text-xs tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/70 transition-all duration-300 flex items-center gap-3"
+            className="group px-10 py-3.5 border border-white/15 text-white/60 text-xs tracking-[0.2em] uppercase rounded-full hover:border-white/40 hover:text-white/90 transition-all duration-300 flex items-center gap-3"
           >
             {t.galeria.verMais}
-            <span className="text-foreground/45 group-hover:text-moss transition-colors">
+            <span className="text-white/45 group-hover:text-moss-light transition-colors">
               +{Math.min(PAGE, pool.length - shown)}
             </span>
           </button>
-          <div className="relative w-40 h-px bg-foreground/8 overflow-hidden">
+          <div className="relative w-40 h-px bg-white/10 overflow-hidden">
             <div
-              className="absolute left-0 top-0 h-full bg-moss/50 transition-all duration-500"
+              className="absolute left-0 top-0 h-full bg-moss/60 transition-all duration-500"
               style={{ width: `${(shown / pool.length) * 100}%` }}
             />
           </div>
-          <p className="text-foreground/78 text-[10px] tracking-widest">
+          <p className="text-white/40 text-[10px] tracking-widest">
             {shown} {t.galeria.de} {pool.length}
           </p>
         </div>

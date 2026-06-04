@@ -28,6 +28,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const navMeta = [{ id: "empresas" }, { id: "celebracoes" }];
 
+const eyebrowLight =
+  "text-white/40 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
+
 /* ── Mosaico editorial para categorias ── */
 type ServiceCard = {
   title: string;
@@ -43,6 +46,7 @@ type Category = {
   subtitle: string;
   desc: string;
   layout: "mosaic-right" | "mosaic-left" | "duo";
+  band: string;
   services: ServiceCard[];
 };
 
@@ -53,10 +57,15 @@ const categoryMeta = [
     id: "empresas",
     num: "01",
     layout: "mosaic-right" as const,
+    band: "/imagens/EW1_1408.jpg",
     services: [
+      // Conferências — sala ampla montada (banquete/plenário)
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1408.jpg" },
+      // Teambuilding — pessoas reunidas no pátio ao final do dia
       { slug: "eventos-corporativos", image: "/imagens/EW1_1330.jpg" },
-      { slug: "eventos-corporativos", image: "/imagens/EW1_0576.jpg" },
+      // Lançamentos — cenografia e detalhe
       { slug: "eventos-corporativos", image: "/imagens/EW1_0697.jpg" },
+      // Jantares de empresa — mesa posta
       { slug: "eventos-corporativos", image: "/imagens/EW1_1404.jpg" },
     ],
   },
@@ -64,6 +73,7 @@ const categoryMeta = [
     id: "celebracoes",
     num: "02",
     layout: "mosaic-left" as const,
+    band: "/imagens/Natalia e Jonathan-167.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/DaniGui_Preview18.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_11.jpg" },
@@ -71,6 +81,16 @@ const categoryMeta = [
       { slug: "jantares-de-gala", image: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg" },
     ],
   },
+];
+
+// Full-bleed editorial photo grid (mirrors the Sobre page rhythm).
+const editorial = [
+  { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2 row-span-2" },
+  { src: "/imagens/428658838-339551135742978-7904331374079927456-n.jpg", cls: "col-span-2" },
+  { src: "/imagens/DJI_20250913190635_0120_D.jpg", cls: "col-span-1" },
+  { src: "/imagens/20_10_2025_0407.jpg", cls: "col-span-1" },
+  { src: "/imagens/stephanie-mizio-715.jpg", cls: "col-span-2" },
+  { src: "/imagens/DaniGui_Adois_61.jpg", cls: "col-span-2" },
 ];
 
 /* ── Service card ── */
@@ -112,6 +132,13 @@ function ServiceCard({
         </span>
       </div>
 
+      {/* Persistent clickability affordance (desktop) */}
+      <div className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/45 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500">
+        <span className="text-sm leading-none transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+          ↗
+        </span>
+      </div>
+
       {/* Bottom content */}
       <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 lg:p-7">
         <p className="text-moss/60 text-[9px] tracking-[0.5em] font-mono uppercase mb-2">
@@ -130,6 +157,10 @@ function ServiceCard({
         <p className="text-cream/40 text-xs leading-relaxed md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
           {service.desc}
         </p>
+        {/* Mobile: persistent CTA; desktop: reveal on hover */}
+        <span className="md:hidden inline-flex items-center text-moss text-[10px] tracking-[0.3em] uppercase mt-2.5">
+          {cta} →
+        </span>
         <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-150">
           {cta} →
         </span>
@@ -145,10 +176,10 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
 
   return (
     <div
-      className="grid gap-2"
+      className="grid gap-1.5"
       style={{
         gridTemplateColumns: "repeat(3, 1fr)",
-        gridTemplateRows: "clamp(220px,28vw,400px) clamp(220px,28vw,400px)",
+        gridTemplateRows: "clamp(240px,30vw,440px) clamp(240px,30vw,440px)",
       }}
     >
       {isRight ? (
@@ -242,31 +273,10 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
   );
 }
 
-/* ── Duo grid — 2 services ── */
-function DuoGrid({ cat, cta }: { cat: Category; cta: string }) {
-  return (
-    <div
-      className="grid grid-cols-1 sm:grid-cols-2 gap-2"
-      style={{ height: "clamp(280px, 36vw, 520px)" }}
-    >
-      {cat.services.map((s, i) => (
-        <ServiceCard
-          key={s.title}
-          service={s}
-          index={i}
-          catNum={cat.num}
-          cta={cta}
-          sizes="(max-width: 640px) 100vw, 50vw"
-        />
-      ))}
-    </div>
-  );
-}
-
 /* ── Mobile card list ── */
 function MobileCardStack({ cat, cta }: { cat: Category; cta: string }) {
   return (
-    <div className="grid grid-cols-2 gap-2" style={{ gridAutoRows: "clamp(200px, 48vw, 320px)" }}>
+    <div className="grid grid-cols-2 gap-1.5" style={{ gridAutoRows: "clamp(210px, 50vw, 340px)" }}>
       {cat.services.map((s, i) => (
         <ServiceCard key={s.title} service={s} index={i} catNum={cat.num} cta={cta} sizes="50vw" />
       ))}
@@ -285,6 +295,7 @@ export default async function ServicosPage() {
       id: m.id,
       num: m.num,
       layout: m.layout,
+      band: m.band,
       label: ct.label,
       subtitle: ct.subtitle,
       desc: ct.desc,
@@ -305,162 +316,157 @@ export default async function ServicosPage() {
         path="/servicos"
       />
 
-      {/* ── Hero ── */}
-      <section className="relative min-h-[100svh] flex items-end pb-0 pt-24 md:pt-36 bg-surface overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 70% 60% at -10% 80%, rgba(124, 133, 75,0.07) 0%, transparent 55%)",
-          }}
+      {/* ── HERO — full-bleed immersive ── */}
+      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
+        <Image
+          src="/imagens/EW1_1330.jpg"
+          alt="Evento organizado pela Líquen Events ao final do dia"
+          fill
+          preload
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/EW1_1330.jpg")}
         />
+        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
 
-        <div className="relative max-w-7xl mx-auto px-6 lg:px-16 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-end">
-            {/* Left — headline */}
-            <div className="lg:col-span-7 pb-2">
-              <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-10 anim-0 flex items-center gap-3">
-                <span className="w-6 h-px bg-gold flex-shrink-0" />
-                {ts.heroEyebrow}
-              </p>
-              <h1
-                className="text-foreground font-bold leading-[0.88] tracking-tight mb-12 anim-1"
-                style={{
-                  fontFamily: "var(--font-playfair)",
-                  fontSize: "clamp(52px, 8.5vw, 118px)",
-                }}
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20 pt-40">
+          <AnimateIn>
+            <p className={`${eyebrowLight} mb-8`}>
+              <span className="w-8 h-px bg-gold flex-shrink-0" />
+              {ts.heroEyebrow}
+            </p>
+          </AnimateIn>
+          <AnimateIn delay={80}>
+            <h1
+              className="text-white font-bold leading-[0.9] tracking-tight"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(52px, 9vw, 132px)" }}
+            >
+              {ts.heroTitle[0]}
+              <br />
+              {ts.heroTitle[1]} <span className="text-moss">{ts.heroTitle[2]}</span>
+            </h1>
+          </AnimateIn>
+          <AnimateIn delay={150}>
+            <div className="mt-9 flex flex-col sm:flex-row sm:items-end gap-7 sm:gap-12">
+              <p className="text-white/60 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
+              <Link
+                href="/orcamento"
+                className="inline-flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors duration-300 group flex-shrink-0"
               >
-                {ts.heroTitle[0]}
-                <br />
-                {ts.heroTitle[1]}
-                <br />
-                <span className="text-moss">{ts.heroTitle[2]}</span>
-              </h1>
-              <div className="border-t border-foreground/8 pt-9 anim-2">
-                <p className="text-foreground/60 text-[15px] leading-[1.85] max-w-sm mb-8">
-                  {ts.heroLead}
-                </p>
-                <Link
-                  href="/orcamento"
-                  className="inline-flex items-center gap-3 text-sm text-foreground/60 hover:text-moss transition-colors duration-300 group"
-                >
-                  <span className="w-8 h-px bg-foreground/18 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
-                  {t.common.pedirOrcamento}
-                </Link>
-              </div>
+                <span className="w-8 h-px bg-white/30 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
+                {t.common.pedirOrcamento}
+              </Link>
             </div>
+          </AnimateIn>
 
-            {/* Right — image composition */}
-            <div className="lg:col-span-5 anim-2">
-              <div
-                className="relative grid gap-2"
-                style={{
-                  height: "clamp(380px, 60vh, 620px)",
-                  gridTemplateColumns: "1.15fr 1fr",
-                  gridTemplateRows: "1fr 1fr",
-                }}
-              >
-                {/* Tall left image */}
-                <div className="row-span-2 relative overflow-hidden">
-                  <Image
-                    src="/imagens/DaniGui_Adois_61.jpg"
-                    {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
-                    alt="Casamentos"
-                    fill
-                    sizes="(max-width: 1024px) 50vw, 22vw"
-                    className="object-cover"
-                    preload
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                  <div className="absolute bottom-4 left-4">
-                    <span className="text-cream/35 text-[8px] tracking-[0.4em] uppercase">
-                      Casamentos
-                    </span>
-                  </div>
-                </div>
-                {/* Top-right */}
-                <div className="relative overflow-hidden">
-                  <Image
-                    src="/imagens/EW1_1414.jpg"
-                    {...blurFor("/imagens/EW1_1414.jpg")}
-                    alt="Eventos corporativos"
-                    fill
-                    loading="eager"
-                    sizes="(max-width: 1024px) 50vw, 18vw"
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent" />
-                  <div className="absolute bottom-4 left-4">
-                    <span className="text-cream/35 text-[8px] tracking-[0.4em] uppercase">
-                      {ts.imgCorporativos}
-                    </span>
-                  </div>
-                </div>
-                {/* Bottom-right */}
-                <div className="relative overflow-hidden">
-                  <Image
-                    src="/imagens/DaniGui_JantarFesta_1.jpg"
-                    {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
-                    alt="Celebrações privadas"
-                    fill
-                    sizes="(max-width: 1024px) 50vw, 18vw"
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                  <div className="absolute bottom-4 left-4">
-                    <span className="text-cream/35 text-[8px] tracking-[0.4em] uppercase">
-                      {ts.imgCelebracoes}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom nav */}
-          <div className="flex items-center justify-between mt-12 pt-5 border-t border-foreground/8 anim-3">
-            <div className="flex items-center gap-5 sm:gap-12">
+          {/* Category quick-nav */}
+          <AnimateIn delay={230}>
+            <div className="mt-12 pt-6 border-t border-white/12 flex items-center gap-6 sm:gap-12">
               {navItems.map((cat, i) => (
                 <a
                   key={cat.id}
                   href={`#${cat.id}`}
-                  className="text-foreground/78 text-[9px] tracking-[0.45em] uppercase hover:text-moss transition-colors duration-300"
+                  className="text-white/65 text-[10px] tracking-[0.42em] uppercase hover:text-moss-light transition-colors duration-300"
                 >
-                  <span className="text-moss/35 mr-2 font-mono">0{i + 1}</span>
+                  <span className="text-moss-light/60 mr-2 font-mono">0{i + 1}</span>
                   {cat.label}
                 </a>
               ))}
             </div>
-            <div className="hidden lg:flex flex-col items-center gap-1.5 pb-4">
-              <div className="w-px h-10 bg-foreground/10 relative overflow-hidden">
-                <div className="absolute inset-x-0 top-0 h-full bg-moss/50 animate-scroll-line" />
-              </div>
-            </div>
-          </div>
+          </AnimateIn>
         </div>
       </section>
 
-      {/* ── Photo band (event backgrounds) ── */}
+      {/* ── Service categories ── */}
+      {categories.map((cat) => (
+        <div key={cat.id}>
+          {/* Cinematic category band */}
+          <section
+            id={cat.id}
+            className="relative overflow-hidden border-t border-foreground/8 scroll-mt-[60px]"
+            style={{ minHeight: "clamp(440px, 76vh, 840px)" }}
+          >
+            <Image
+              src={cat.band}
+              alt={cat.label}
+              fill
+              sizes="100vw"
+              className="object-cover object-center"
+              {...blurFor(cat.band)}
+            />
+            <div className="absolute inset-0 bg-black/55" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/15 to-[#080808]/45" />
+
+            <div className="relative z-10 h-full flex items-end">
+              <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 py-16 lg:py-24">
+                <AnimateIn>
+                  <span
+                    className="block text-white/12 font-bold leading-none mb-6 select-none"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(64px, 9vw, 150px)",
+                    }}
+                    aria-hidden
+                  >
+                    {cat.num}
+                  </span>
+                  <p className={`${eyebrowLight} mb-5`}>
+                    <span className="w-6 h-px bg-gold flex-shrink-0" />
+                    {cat.subtitle}
+                  </p>
+                  <h2
+                    className="text-white font-bold leading-[0.95] mb-6"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(44px, 6vw, 92px)",
+                    }}
+                  >
+                    {cat.label}
+                  </h2>
+                  <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+                    <p className="text-white/60 text-base leading-[1.8] max-w-md">{cat.desc}</p>
+                    <Link
+                      href={`/servicos/${cat.services[0].slug}`}
+                      className="group inline-flex items-center gap-3 text-xs text-white/65 hover:text-white transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
+                    >
+                      <span>{ts.verDetalhes}</span>
+                      <span className="w-7 h-px bg-white/30 group-hover:w-12 transition-all duration-500" />
+                    </Link>
+                  </div>
+                </AnimateIn>
+              </div>
+            </div>
+          </section>
+
+          {/* Service mosaic — full-bleed, image-forward */}
+          <section className="bg-surface">
+            <AnimateIn from="fade">
+              <div className="hidden lg:block p-1.5">
+                <MosaicGrid cat={cat} cta={ts.verMais} />
+              </div>
+              <div className="lg:hidden p-1.5">
+                <MobileCardStack cat={cat} cta={ts.verMais} />
+              </div>
+            </AnimateIn>
+          </section>
+        </div>
+      ))}
+
+      {/* ── Editorial photo grid (full-bleed) ── */}
       <section className="bg-surface border-t border-foreground/8">
         <AnimateIn from="fade">
-          <div
-            className="grid grid-cols-2 lg:grid-cols-4 gap-px"
-            style={{ height: "clamp(280px, 46vw, 520px)" }}
-          >
-            {[
-              "/imagens/M&F0152.jpg",
-              "/imagens/DJI_20250913190635_0120_D.jpg",
-              "/imagens/20_10_2025_0407.jpg",
-              "/imagens/DaniGui_Adois_61.jpg",
-            ].map((src) => (
-              <div key={src} className="relative overflow-hidden group">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]">
+            {editorial.map((g, i) => (
+              <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
                 <Image
-                  src={src}
-                  {...blurFor(src)}
+                  src={g.src}
                   alt="Evento organizado pela Líquen Events"
                   fill
-                  sizes="(max-width: 768px) 50vw, 25vw"
-                  className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"
+                  sizes="(max-width: 768px) 50vw, 50vw"
+                  className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+                  {...blurFor(g.src)}
                 />
                 <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
               </div>
@@ -469,219 +475,54 @@ export default async function ServicosPage() {
         </AnimateIn>
       </section>
 
-      {/* ── Photo strip (edge-to-edge) ── */}
-      <section className="bg-surface border-t border-foreground/8">
-        <AnimateIn from="fade">
-          <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(150px, 35vw, 400px)" }}>
-            {[
-              { src: "/imagens/EW1_1408.jpg", label: ts.band1[0] },
-              { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", label: ts.band1[1] },
-              { src: "/imagens/20_10_2025_0358.jpg", label: ts.band1[2] },
-            ].map((item, i) => (
-              <div key={i} className="relative overflow-hidden group">
-                <Image
-                  src={item.src}
-                  {...blurFor(item.src)}
-                  alt={item.label}
-                  fill
-                  sizes="33vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/35 group-hover:bg-black/15 transition-colors duration-500" />
-                <div className="absolute inset-0 flex items-end p-5">
-                  <span className="text-[9px] tracking-[0.4em] uppercase text-white/55 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    {item.label}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </AnimateIn>
-      </section>
-
-      {/* ── Service categories ── */}
-      <div className="relative">
-        {/* Sticky nav */}
-        <div className="sticky top-[calc(60px+env(safe-area-inset-top))] z-30 bg-surface/[0.97] backdrop-blur-md border-b border-foreground/[0.06]">
-          <div className="max-w-7xl mx-auto px-6 lg:px-16">
-            <div className="flex items-center gap-5 sm:gap-8 h-11 overflow-x-auto scroll-hide">
-              {navItems.map((cat, i) => (
-                <a
-                  key={cat.id}
-                  href={`#${cat.id}`}
-                  className="text-[10px] tracking-[0.4em] uppercase text-foreground/72 hover:text-moss transition-colors duration-300 flex items-center gap-2 whitespace-nowrap"
-                >
-                  <span className="text-moss/35 font-mono">0{i + 1}</span>
-                  {cat.label}
-                </a>
-              ))}
-            </div>
+      {/* ── Cinematic statement (where we work) ── */}
+      <section
+        className="relative overflow-hidden border-t border-foreground/8"
+        style={{ minHeight: "clamp(420px, 70vh, 800px)" }}
+      >
+        <Image
+          src="/imagens/JOAO_E_PEDRO_1Y1A3439.jpg"
+          alt="Evento Líquen Events em Portugal"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3439.jpg")}
+        />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
+        <div className="relative z-10 h-full flex items-center">
+          <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
+            <AnimateIn>
+              <p className={`${eyebrowLight} mb-7`}>
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {ts.seoEyebrow}
+              </p>
+              <h2
+                className="text-cream font-bold leading-[1.04] mb-7 max-w-3xl"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(32px, 5vw, 76px)" }}
+              >
+                {ts.seoTitle}
+              </h2>
+              <p className="text-cream/55 text-base lg:text-lg leading-[1.85] max-w-xl">
+                {ts.seoText}
+              </p>
+            </AnimateIn>
           </div>
         </div>
-
-        {categories.map((cat) => (
-          <section
-            key={cat.id}
-            id={cat.id}
-            className="py-14 md:py-28 lg:py-36 bg-surface border-t border-foreground/8"
-          >
-            <div className="max-w-7xl mx-auto px-6 lg:px-16">
-              {/* Category header */}
-              <AnimateIn>
-                <div className="relative mb-16 lg:mb-20">
-                  <span
-                    className="absolute -top-8 -left-2 select-none pointer-events-none font-bold leading-none"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(100px, 18vw, 240px)",
-                      color: "rgba(222,218,212,0.022)",
-                    }}
-                    aria-hidden
-                  >
-                    {cat.num}
-                  </span>
-                  <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 pt-4">
-                    <div>
-                      <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
-                        <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                        {cat.subtitle}
-                      </p>
-                      <h2
-                        className="text-foreground font-bold leading-none"
-                        style={{
-                          fontFamily: "var(--font-playfair)",
-                          fontSize: "clamp(42px, 5.5vw, 80px)",
-                        }}
-                      >
-                        {cat.label}
-                      </h2>
-                    </div>
-                    <p className="text-foreground/32 text-sm leading-[1.85] max-w-xs lg:max-w-sm lg:text-right">
-                      {cat.desc}
-                    </p>
-                  </div>
-                </div>
-              </AnimateIn>
-
-              {/* Mosaic grid — desktop only */}
-              <AnimateIn delay={60}>
-                <div className="hidden lg:block">
-                  {cat.layout === "duo" ? (
-                    <DuoGrid cat={cat} cta={ts.verMais} />
-                  ) : (
-                    <MosaicGrid cat={cat} cta={ts.verMais} />
-                  )}
-                </div>
-                {/* Mobile card stack */}
-                <div className="lg:hidden">
-                  <MobileCardStack cat={cat} cta={ts.verMais} />
-                </div>
-              </AnimateIn>
-
-              {/* View all link */}
-              <AnimateIn delay={120}>
-                <div className="mt-8 flex justify-end">
-                  <Link
-                    href={`/servicos/${cat.services[0].slug}`}
-                    className="group inline-flex items-center gap-3 text-xs text-foreground/72 hover:text-foreground/78 transition-colors duration-300 tracking-[0.3em] uppercase"
-                  >
-                    <span>{ts.verDetalhes}</span>
-                    <span className="w-6 h-px bg-foreground/20 group-hover:w-10 transition-all duration-500" />
-                  </Link>
-                </div>
-              </AnimateIn>
-            </div>
-          </section>
-        ))}
-      </div>
-
-      {/* ── Second photo strip ── */}
-      <section className="bg-surface border-t border-foreground/8">
-        <AnimateIn from="fade">
-          <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(160px, 35vw, 440px)" }}>
-            {[
-              { src: "/imagens/EW1_1342.jpg", label: ts.band2[0], anchor: "#empresas" },
-              {
-                src: "/imagens/Natalia e Jonathan-167.jpg",
-                label: ts.band2[1],
-                anchor: "#celebracoes",
-              },
-              {
-                src: "/imagens/DaniGui_JantarFesta_27.jpg",
-                label: ts.band2[2],
-                anchor: "#celebracoes",
-              },
-            ].map((item) => (
-              <a key={item.src} href={item.anchor} className="relative overflow-hidden group block">
-                <Image
-                  src={item.src}
-                  {...blurFor(item.src)}
-                  alt={item.label}
-                  fill
-                  sizes="33vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/45 group-hover:bg-black/20 transition-colors duration-500" />
-                <div className="absolute inset-0 flex items-end p-5 lg:p-7">
-                  <span className="text-[9px] tracking-[0.42em] uppercase text-white/55 group-hover:text-white/85 transition-colors duration-300">
-                    {item.label}
-                  </span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </AnimateIn>
       </section>
 
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
 
-      {/* ── SEO content — image + short text ── */}
-      <section className="bg-surface border-t border-foreground/8">
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28 order-2 lg:order-1">
-            <AnimateIn>
-              <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-6 flex items-center gap-3">
-                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                {ts.seoEyebrow}
-              </p>
-              <h2
-                className="text-foreground font-bold leading-[1.05] mb-8"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 52px)" }}
-              >
-                {ts.seoTitle}
-              </h2>
-              <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] max-w-md">
-                {ts.seoText}
-              </p>
-            </AnimateIn>
-          </div>
-          <AnimateIn
-            from="right"
-            className="relative min-h-[320px] lg:min-h-[560px] overflow-hidden order-1 lg:order-2"
-          >
-            <Image
-              src="/imagens/JOAO_E_PEDRO_1Y1A3439.jpg"
-              {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3439.jpg")}
-              alt="Evento Líquen Events em Portugal"
-              fill
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-black/20" />
-          </AnimateIn>
-        </div>
-      </section>
-
       {/* ── CTA ── */}
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
         <Image
-          src="/imagens/EW1_1330.jpg"
-          alt="Evento corporativo Líquen Events"
+          src="/imagens/M&F0497.jpg"
+          alt="Evento Líquen Events"
           fill
           sizes="100vw"
           className="object-cover object-center"
-          {...blurFor("/imagens/EW1_1330.jpg")}
+          {...blurFor("/imagens/M&F0497.jpg")}
         />
         <div className="absolute inset-0 bg-black/65" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />

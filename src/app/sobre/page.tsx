@@ -22,9 +22,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const gallery = [
   { src: "/imagens/Natalia e Jonathan-167.jpg", cls: "col-span-2 row-span-2" },
-  { src: "/imagens/EW1_1342.jpg", cls: "col-span-2" },
+  { src: "/imagens/matilde-e-tomas0654-1.jpg", cls: "col-span-2" },
   { src: "/imagens/DaniGui_Adois_61.jpg", cls: "col-span-1" },
-  { src: "/imagens/20_10_2025_0375.jpg", cls: "col-span-1" },
+  { src: "/imagens/stephanie-mizio-350.jpg", cls: "col-span-1" },
   { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2" },
   { src: "/imagens/ines-goncalo-252.jpg", cls: "col-span-2" },
 ];
@@ -170,16 +170,17 @@ export default async function SobrePage() {
       {/* ── FOUNDER ── */}
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="relative min-h-[360px] lg:min-h-[560px] overflow-hidden">
-            <Image
-              src="/imagens/DaniGui_JantarFesta_27.jpg"
-              alt="Líquen Events"
-              fill
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover"
-              {...blurFor("/imagens/DaniGui_JantarFesta_27.jpg")}
-            />
-            <div className="absolute inset-0 bg-black/20" />
+          <div className="relative flex items-center justify-center px-6 py-14 lg:py-0 min-h-[440px] lg:min-h-[560px]">
+            <div className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden rounded-2xl shadow-2xl shadow-black/25 ring-1 ring-foreground/5">
+              <Image
+                src="/imagens/catarina-gaspar.jpg"
+                alt="Catarina Gaspar — Fundadora & CEO da Líquen Events"
+                fill
+                sizes="(max-width: 1024px) 80vw, 340px"
+                className="object-cover"
+                {...blurFor("/imagens/catarina-gaspar.jpg")}
+              />
+            </div>
           </div>
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
             <AnimateIn>
