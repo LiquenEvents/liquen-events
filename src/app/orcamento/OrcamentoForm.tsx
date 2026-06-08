@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,10 @@ import { useTranslations } from "@/components/LocaleProvider";
  */
 
 type Cat = "empresas" | "particulares" | null;
+
+// Local draft so a visitor who navigates away and returns doesn't lose what
+// they typed. Stored on the visitor's own device; cleared on a successful send.
+const DRAFT_KEY = "liquen-orcamento-draft";
 
 interface EventOption {
   label: string;
@@ -53,6 +57,42 @@ export default function OrcamentoForm() {
   const [touched, setTouched] = useState<{ nome?: boolean; email?: boolean }>({});
   // Data mínima = hoje (não faz sentido pedir orçamento para uma data passada).
   const [minDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // Restaura o rascunho guardado (uma vez, após montar — evita mismatch de SSR).
+  const firstSave = useRef(true);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      const d = JSON.parse(saved) as Record<string, string>;
+      if (d.eventType) setEventType(d.eventType);
+      if (d.nome) setNome(d.nome);
+      if (d.email) setEmail(d.email);
+      if (d.telefone) setTelefone(d.telefone);
+      if (d.data) setData(d.data);
+      if (d.pessoas) setPessoas(d.pessoas);
+      if (d.mensagem) setMensagem(d.mensagem);
+    } catch {
+      /* localStorage indisponível — segue sem rascunho */
+    }
+  }, []);
+
+  // Grava o rascunho a cada alteração. Salta a 1ª execução para não escrever o
+  // estado vazio inicial por cima de um rascunho ainda por restaurar acima.
+  useEffect(() => {
+    if (firstSave.current) {
+      firstSave.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ eventType, nome, email, telefone, data, pessoas, mensagem }),
+      );
+    } catch {
+      /* ignora */
+    }
+  }, [eventType, nome, email, telefone, data, pessoas, mensagem]);
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
@@ -100,6 +140,12 @@ export default function OrcamentoForm() {
       } catch {
         /* sessionStorage indisponível — a confirmação usa o fallback genérico */
       }
+      // Pedido enviado: limpa o rascunho local para não reaparecer depois.
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        /* ignora */
+      }
       router.push(`/orcamento/confirmacao/${json.id}`);
     } catch {
       setError(to.error);
@@ -138,14 +184,16 @@ export default function OrcamentoForm() {
               <span className="w-6 h-px bg-gold/60 flex-shrink-0" />
               {to.eyebrow}
             </p>
-            <h1
+            {/* Decorative panel heading — the page's real <h1> lives in the
+                <main> column (rendered for every viewport, mobile-first). */}
+            <p
               className="text-cream font-bold leading-[0.92] tracking-tight mb-8"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 4vw, 68px)" }}
             >
               {to.titleLine1}
               <br />
               <span className="text-moss-light">{to.titleMoss}</span>
-            </h1>
+            </p>
             <p className="text-cream/45 text-sm leading-[1.8] max-w-xs">{to.lead}</p>
           </div>
         </div>

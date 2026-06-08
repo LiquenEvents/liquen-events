@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { SITE } from "@/lib/site";
 
 interface Item {
   uid: number;
@@ -112,8 +113,7 @@ export default function Inbox() {
         <p className="text-foreground/55 text-sm mb-3">Caixa de e-mail por ligar</p>
         <div className="text-foreground/40 text-xs max-w-md mx-auto leading-relaxed text-left space-y-2">
           <p>
-            Para ler aqui os e-mails de <span className="text-moss">liquen.alentejo@gmail.com</span>
-            :
+            Para ler aqui os e-mails de <span className="text-moss">{SITE.email}</span>:
           </p>
           <p>
             1. No Gmail, ativar <span className="text-foreground/60">IMAP</span> em Definições →
@@ -178,6 +178,7 @@ export default function Inbox() {
           </div>
           <button
             onClick={() => setUnreadOnly((v) => !v)}
+            aria-pressed={unreadOnly}
             className={`px-3 py-1.5 rounded-md text-[10px] tracking-[0.15em] uppercase border transition-colors whitespace-nowrap ${
               unreadOnly
                 ? "bg-moss border-moss text-cream"
@@ -187,7 +188,11 @@ export default function Inbox() {
             Por ler
           </button>
         </div>
-        {error && <p className="text-moss/70 text-xs mb-3">{error}</p>}
+        {error && (
+          <p role="status" className="text-moss/70 text-xs mb-3">
+            {error}
+          </p>
+        )}
         {loading && items.length === 0 ? (
           <p className="text-foreground/25 text-sm py-12 text-center">A carregar…</p>
         ) : shown.length === 0 ? (
@@ -244,7 +249,9 @@ export default function Inbox() {
                 Responder
               </p>
               {sent ? (
-                <p className="text-moss text-xs">✓ Resposta enviada para {open.fromAddress}.</p>
+                <p role="status" className="text-moss text-xs">
+                  ✓ Resposta enviada para {open.fromAddress}.
+                </p>
               ) : (
                 <>
                   <textarea

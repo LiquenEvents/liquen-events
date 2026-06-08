@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { NextRequest } from "next/server";
 import { verifyTotp } from "./totp";
@@ -37,16 +37,34 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const DEV_SHARED_HASH = "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u";
 
 // --- Secret ---------------------------------------------------------------
+// Last-resort key when production is fully misconfigured. Random per process so
+// session tokens can NEVER be forged with a known/public value (see below).
+let randomFallbackSecret: string | null = null;
+
 function sessionSecret(): string {
   const s = process.env.SESSION_SECRET ?? process.env.ADMIN_SESSION_SECRET;
   if (s && s.length >= 16) return s;
   if (process.env.NODE_ENV === "production") {
-    // Don't lock the team out of their own dashboard: derive a stable key from
-    // the configured password hash, but make the misconfiguration loud.
-    log.error(
-      "auth: SESSION_SECRET não definido (ou demasiado curto) em produção — defina um SESSION_SECRET aleatório de 32+ caracteres",
-    );
-    return `derived:${process.env.ADMIN_PASSWORD_HASH ?? DEV_SHARED_HASH}`;
+    const hash = process.env.ADMIN_PASSWORD_HASH;
+    if (hash) {
+      // Don't lock the team out: derive a stable, NON-public key from the
+      // (secret) configured password hash. Still — set a real SESSION_SECRET.
+      log.error(
+        "auth: SESSION_SECRET não definido (ou demasiado curto) em produção — a derivar do ADMIN_PASSWORD_HASH; defina um SESSION_SECRET aleatório de 32+ caracteres",
+      );
+      return `derived:${hash}`;
+    }
+    // Neither SESSION_SECRET nor ADMIN_PASSWORD_HASH is set: login is already
+    // disabled (sharedHash() === null), so there are no real sessions to keep.
+    // Use a random per-process key — NEVER the public, committed DEV_SHARED_HASH,
+    // which would let anyone forge a valid admin session cookie.
+    if (!randomFallbackSecret) {
+      randomFallbackSecret = randomBytes(32).toString("base64url");
+      log.error(
+        "auth: SESSION_SECRET e ADMIN_PASSWORD_HASH ausentes em produção — login de admin desativado; a usar chave de sessão aleatória por processo",
+      );
+    }
+    return randomFallbackSecret;
   }
   return "liquen-dev-session-secret-change-me";
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getQuote } from "@/lib/quotes-store";
 import { renderInvoicePdf } from "@/lib/invoice-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { SITE } from "@/lib/site";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         <h2 style="font-size:18px;margin:0 0 12px">Recibo — Líquen Events</h2>
         <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(quote.name)},</p>
         <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo o recibo no valor de <strong style="color:#7c854b">${eur(amount)}</strong>.</p>
-        <p style="font-size:13px;color:#777;margin-top:20px">Líquen Events · ${esc(MAIL_TO)} · +351 919 259 820</p>
+        <p style="font-size:13px;color:#777;margin-top:20px">Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}</p>
       </div>`;
       const mail = await sendMail({
         to: quote.email,

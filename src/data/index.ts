@@ -1,6 +1,10 @@
 // ── Shared constants ─────────────────────────────────────────────────────────
 
-export const WHATSAPP_PHONE = "351919259820";
+import { SITE } from "@/lib/site";
+
+// Single source of truth: derive the WhatsApp number from SITE.phone so it can
+// never drift from the canonical contact details in lib/site.ts.
+export const WHATSAPP_PHONE = SITE.phone.replace(/\D/g, "");
 export const WHATSAPP_HREF = `https://wa.me/${WHATSAPP_PHONE}`;
 export const WHATSAPP_HREF_CTA = `${WHATSAPP_HREF}?text=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20a%20organiza%C3%A7%C3%A3o%20de%20eventos.`;
 

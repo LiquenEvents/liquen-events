@@ -110,7 +110,7 @@ function ServiceCard({
   return (
     <Link
       href={`/servicos/${service.slug}`}
-      className="group relative block overflow-hidden bg-surface-raised h-full w-full"
+      className="group relative block overflow-hidden bg-surface-raised h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
     >
       <Image
         src={service.image}
@@ -544,7 +544,7 @@ export default async function ServicosPage() {
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
+            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">

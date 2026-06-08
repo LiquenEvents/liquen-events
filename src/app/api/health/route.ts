@@ -17,7 +17,7 @@ export async function GET() {
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
     checks: {
       database: isDatabaseConfigured() ? "configured" : "fallback",
-      email: Boolean(process.env.SMTP_HOST || process.env.RESEND_API_KEY),
+      email: Boolean(process.env.SMTP_HOST),
       push: Boolean(process.env.VAPID_PUBLIC_KEY),
     },
   };

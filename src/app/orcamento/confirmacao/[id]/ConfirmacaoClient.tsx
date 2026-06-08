@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Quote } from "../../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../../data";
+import { SITE } from "@/lib/site";
 import { useTranslations } from "@/components/LocaleProvider";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -94,7 +95,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
             <br />
             <span className="text-moss">{tc.titleMoss}</span>
           </h1>
-          <p className="text-foreground/45 text-sm leading-[1.85] max-w-lg">{tc.lead}</p>
+          <p className="text-foreground/68 text-sm leading-[1.85] max-w-lg">{tc.lead}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-8">
@@ -185,14 +186,14 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
               </>
             ) : (
               <div className="px-6 py-5 border-b border-foreground/8">
-                <p className="text-foreground/40 text-sm leading-relaxed">{tc.noDataNote}</p>
+                <p className="text-foreground/68 text-sm leading-relaxed">{tc.noDataNote}</p>
               </div>
             )}
 
             {/* Footer note */}
             <div className="px-6 py-5 flex items-center gap-3">
               <span className="w-1 h-1 rounded-full bg-moss/50 shrink-0" />
-              <p className="text-foreground/30 text-[10px] leading-relaxed">{tc.footerNote}</p>
+              <p className="text-foreground/60 text-[10px] leading-relaxed">{tc.footerNote}</p>
             </div>
           </div>
 
@@ -209,8 +210,8 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                       {`0${i + 1}`}
                     </span>
                     <div>
-                      <p className="text-foreground/60 text-xs font-medium mb-0.5">{item.label}</p>
-                      <p className="text-foreground/28 text-[11px] leading-relaxed">{item.desc}</p>
+                      <p className="text-foreground/72 text-xs font-medium mb-0.5">{item.label}</p>
+                      <p className="text-foreground/60 text-[11px] leading-relaxed">{item.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -219,16 +220,13 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
 
             <div className="border border-moss/20 bg-moss/8 rounded-sm p-5">
               <div className="w-5 h-px bg-moss/40 mb-4" />
-              <p className="text-foreground/50 text-xs leading-relaxed mb-4">{tc.contactIntro}</p>
+              <p className="text-foreground/68 text-xs leading-relaxed mb-4">{tc.contactIntro}</p>
               <div className="flex flex-col gap-2">
-                <a
-                  href="mailto:liquen.alentejo@gmail.com"
-                  className="text-moss text-xs hover:underline"
-                >
-                  liquen.alentejo@gmail.com
+                <a href={`mailto:${SITE.email}`} className="text-moss text-xs hover:underline">
+                  {SITE.email}
                 </a>
-                <a href="tel:+351919259820" className="text-moss text-xs hover:underline">
-                  +351 919 259 820
+                <a href={`tel:${SITE.phone}`} className="text-moss text-xs hover:underline">
+                  {SITE.phoneDisplay}
                 </a>
               </div>
             </div>

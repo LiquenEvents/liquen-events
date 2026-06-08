@@ -268,6 +268,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Does the detail panel have edits (status/price/notes) not yet saved? Used to
+  // warn before switching/closing a quote so work is never silently lost.
+  const isDirty =
+    !!selected &&
+    (editStatus !== selected.status ||
+      editNotes !== (selected.adminNotes ?? "") ||
+      editPrice !== (selected.quotedPrice ? String(selected.quotedPrice) : ""));
+  // Latest value mirrored into a ref for listeners bound earlier (e.g. Escape).
+  const dirtyRef = useRef(false);
+  useEffect(() => {
+    dirtyRef.current = isDirty;
+  }, [isDirty]);
+
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -360,6 +373,36 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     return () => window.removeEventListener("keydown", onKey);
   }, [focusSearch]);
 
+  // Escape dismisses the open drawer/nav — but only when no modal is capturing
+  // it (the palette / new-quote / shortcuts dialogs handle their own Escape).
+  useEffect(() => {
+    if (paletteOpen || newQuoteOpen || shortcutsOpen) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (navOpen) setNavOpen(false);
+      else if (selected) {
+        if (
+          !dirtyRef.current ||
+          window.confirm("Tem alterações por guardar neste pedido. Descartar?")
+        ) {
+          setSelected(null);
+        }
+      }
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [paletteOpen, newQuoteOpen, shortcutsOpen, navOpen, selected]);
+
+  // Lock background scroll while the mobile nav drawer is open.
+  useEffect(() => {
+    if (!navOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [navOpen]);
+
   const paletteCommands: Command[] = useMemo(
     () => [
       {
@@ -378,7 +421,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     [],
   );
 
+  // Returns true to proceed; if there are unsaved edits, asks for confirmation.
+  function discardGuard(): boolean {
+    if (!isDirty) return true;
+    return window.confirm("Tem alterações por guardar neste pedido. Descartar?");
+  }
+  function closeDetail() {
+    if (discardGuard()) setSelected(null);
+  }
+
   function openQuote(q: Quote) {
+    if (!discardGuard()) return;
     setView("pedidos");
     setSelected(q);
     setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
@@ -581,6 +634,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   setView(item.id);
                   setNavOpen(false);
                 }}
+                aria-current={view === item.id ? "page" : undefined}
                 className={`group relative flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-md text-[11px] tracking-[0.18em] uppercase transition-all duration-200 ${
                   view === item.id
                     ? "bg-moss/12 text-moss"
@@ -712,6 +766,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               <NotificationBell />
               <button
                 onClick={() => setNewQuoteOpen(true)}
+                aria-label="Novo pedido"
                 className="flex items-center gap-2 px-4 py-2 bg-moss text-cream text-[10px] tracking-[0.18em] uppercase rounded-md hover:bg-moss-dark transition-colors"
                 title="Criar pedido manualmente"
               >
@@ -751,6 +806,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               <button
                 onClick={refresh}
                 disabled={refreshing}
+                aria-label="Actualizar pedidos"
                 className="group flex items-center gap-2 px-4 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.22em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors"
               >
                 <svg
@@ -1064,7 +1120,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div>
                             <p className="text-foreground/70 text-sm font-medium">{q.name}</p>
-                            <p className="text-foreground/28 text-xs">{q.email}</p>
+                            <p className="text-foreground/50 text-xs">{q.email}</p>
                           </div>
                           {statusBadge(q.status)}
                         </div>
@@ -1080,7 +1136,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <span>{q.guests} pax</span>
                         </div>
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/8">
-                          <span className="text-foreground/22 text-[10px] font-mono">{q.id}</span>
+                          <span className="text-foreground/40 text-[10px] font-mono">{q.id}</span>
                           <div className="flex items-center gap-3">
                             {q.quotedPrice ? (
                               <span className="text-moss text-xs font-medium">
@@ -1109,10 +1165,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {/* Detail — in-grid sticky panel on desktop, slide-over drawer on mobile */}
               {selected ? (
                 <>
-                  <div
-                    className="fixed inset-0 z-40 bg-black/50 xl:hidden"
-                    onClick={() => setSelected(null)}
-                  />
+                  <div className="fixed inset-0 z-40 bg-black/50 xl:hidden" onClick={closeDetail} />
                   <div className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-surface-raised xl:bg-transparent border-l xl:border border-foreground/10 xl:rounded-md xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-none">
                     <div className="px-5 py-4 border-b border-foreground/8 flex items-center justify-between sticky top-0 bg-surface-raised/80 backdrop-blur-sm">
                       <div>
@@ -1145,7 +1198,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           Run-sheet
                         </button>
                         <button
-                          onClick={() => setSelected(null)}
+                          onClick={closeDetail}
                           className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors px-1"
                           aria-label="Fechar"
                         >
@@ -1322,10 +1375,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 resize-none"
                             />
                           </div>
+                          {isDirty && !saving && (
+                            <p
+                              role="status"
+                              className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold/80 -mb-1"
+                            >
+                              <span className="w-1 h-1 rounded-full bg-gold/80" />
+                              Alterações por guardar
+                            </p>
+                          )}
                           <button
                             onClick={saveChanges}
-                            disabled={saving}
-                            className={`w-full py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${saving ? "bg-moss/40 text-cream/50 cursor-not-allowed" : "bg-moss text-cream hover:bg-moss-dark"}`}
+                            disabled={saving || !isDirty}
+                            className={`w-full py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${saving || !isDirty ? "bg-moss/40 text-cream/50 cursor-not-allowed" : "bg-moss text-cream hover:bg-moss-dark"}`}
                           >
                             {saving ? "A guardar…" : "Guardar Alterações →"}
                           </button>

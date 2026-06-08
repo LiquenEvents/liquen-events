@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import { SITE } from "@/lib/site";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
 const INK = rgb(0.1, 0.1, 0.1);
@@ -135,7 +136,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     thickness: 0.7,
     color: LINE,
   });
-  page.drawText("liquen.alentejo@gmail.com   ·   +351 919 259 820   ·   Portugal", {
+  page.drawText(`${SITE.email}   ·   ${SITE.phoneDisplay}   ·   Portugal`, {
     x: MARGIN,
     y: MARGIN - 16,
     font,

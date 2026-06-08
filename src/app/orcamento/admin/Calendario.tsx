@@ -141,10 +141,28 @@ export default function Calendario({ quotes, onOpen }: Props) {
     }
   }
 
-  async function deleteEvent(id: string) {
+  async function deleteEvent(id: string, title: string) {
+    // Single-click delete is a footgun on a tiny target — confirm first.
+    if (!window.confirm(`Remover "${title}" do calendário?`)) return;
     setEvents((prev) => prev.filter((e) => e.id !== id));
     await fetch(`/api/calendario/${id}`, { method: "DELETE" }).catch(() => {});
   }
+
+  // Open the "add event" modal for a given day (shared by click + keyboard).
+  function openAdd(key: string) {
+    setModalDate(key);
+    setForm({ title: "", kind: "evento", time: "", note: "" });
+  }
+
+  // Escape closes the add-event modal.
+  useEffect(() => {
+    if (!modalDate) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModalDate(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalDate]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -224,6 +242,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               </button>
               <button
                 onClick={() => setCursor(new Date(year, month - 1, 1))}
+                aria-label="Mês anterior"
                 className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors"
               >
                 ‹
@@ -239,6 +258,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               </button>
               <button
                 onClick={() => setCursor(new Date(year, month + 1, 1))}
+                aria-label="Mês seguinte"
                 className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors"
               >
                 ›
@@ -264,15 +284,23 @@ export default function Calendario({ quotes, onOpen }: Props) {
               const dayEvents = eventsByDay.get(key) ?? [];
               const isToday = key === todayKey;
               const total = dayQuotes.length + dayEvents.length;
+              const dayLabel = `${d} de ${MONTHS[month]}${isToday ? " (hoje)" : ""} — ${
+                total > 0 ? `${total} evento${total !== 1 ? "s" : ""}; ` : ""
+              }Enter para adicionar`;
               return (
                 <div
                   key={i}
-                  onClick={() => {
-                    setModalDate(key);
-                    setForm({ title: "", kind: "evento", time: "", note: "" });
+                  role="button"
+                  tabIndex={0}
+                  aria-label={dayLabel}
+                  onClick={() => openAdd(key)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openAdd(key);
+                    }
                   }}
-                  title="Clique para adicionar"
-                  className={`group min-h-[64px] rounded-md border p-1.5 cursor-pointer transition-colors ${isToday ? "border-moss/50 bg-moss/5" : "border-foreground/8 bg-surface/30 hover:border-moss/30 hover:bg-moss/[0.03]"}`}
+                  className={`group min-h-[64px] rounded-md border p-1.5 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/55 ${isToday ? "border-moss/50 bg-moss/5" : "border-foreground/8 bg-surface/30 hover:border-moss/30 hover:bg-moss/[0.03]"}`}
                 >
                   <div className="flex items-center justify-between">
                     <span
@@ -292,8 +320,9 @@ export default function Calendario({ quotes, onOpen }: Props) {
                           e.stopPropagation();
                           onOpen(q);
                         }}
+                        aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
                         title={`${q.name} — ${eventTypeLabel(q)}`}
-                        className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:opacity-80 transition-opacity"
+                        className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/40"
                         style={{
                           background: `${STATUS_COLOR[q.status]}26`,
                           color: STATUS_COLOR[q.status],
@@ -307,10 +336,11 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         key={ev.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteEvent(ev.id);
+                          deleteEvent(ev.id, ev.title);
                         }}
+                        aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:line-through transition-all flex items-center gap-1"
+                        className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:line-through transition-all flex items-center gap-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/40"
                         style={{
                           background: `${KIND_META[ev.kind].color}22`,
                           color: KIND_META[ev.kind].color,
@@ -382,6 +412,9 @@ export default function Calendario({ quotes, onOpen }: Props) {
         >
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Adicionar ao calendário — ${modalDateLabel}`}
             className="relative w-full max-w-md bg-surface-raised border border-foreground/12 rounded-lg p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -394,6 +427,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               </div>
               <button
                 onClick={() => setModalDate(null)}
+                aria-label="Fechar"
                 className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors"
               >
                 ×

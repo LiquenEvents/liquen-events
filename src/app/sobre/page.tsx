@@ -242,7 +242,7 @@ export default async function SobrePage() {
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
+            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">
               {t.sobre.ctaText}
             </p>
           </AnimateIn>

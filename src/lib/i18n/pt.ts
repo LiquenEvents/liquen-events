@@ -315,6 +315,8 @@ export const pt = {
       enviar: "Enviar Pedido",
       enviando: "A enviar…",
       resposta24: "Resposta em 24h",
+      errNome: "Indique o seu nome",
+      errEmail: "Email inválido",
       error: "Não foi possível enviar. Tente novamente ou contacte-nos pelo WhatsApp.",
       successEyebrow: "Enviado com sucesso",
       successTitle1: "Mensagem",

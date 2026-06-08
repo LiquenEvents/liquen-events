@@ -7,6 +7,7 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
+import Analytics from "@/components/Analytics";
 import PageTransition from "@/components/PageTransition";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { getLocale } from "@/lib/i18n/server";
@@ -107,6 +108,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale}>
           <StructuredData />
+          <Analytics />
           <a
             href="#conteudo"
             className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-cream focus:rounded-md focus:text-sm"

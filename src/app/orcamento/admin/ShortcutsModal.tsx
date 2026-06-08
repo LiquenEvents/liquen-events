@@ -33,6 +33,14 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
       { keys: ["G", "I"], label: "Inbox" },
     ],
   },
+  {
+    title: "Pipeline — com um cartão focado",
+    items: [
+      { keys: ["Enter"], label: "Abrir o pedido" },
+      { keys: ["←"], label: "Mover para a coluna anterior" },
+      { keys: ["→"], label: "Mover para a coluna seguinte" },
+    ],
+  },
 ];
 
 /** A discoverable cheat-sheet for the back-office keyboard shortcuts (opens with "?"). */

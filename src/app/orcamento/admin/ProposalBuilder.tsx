@@ -1,10 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import type { Quote, ProposalLineItem } from '../types';
+import { useState } from "react";
+import type { Quote, ProposalLineItem } from "../types";
 
 const eur = (n: number) =>
-  new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n || 0);
+  new Intl.NumberFormat("pt-PT", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 2,
+  }).format(n || 0);
 
 interface Props {
   quote: Quote;
@@ -14,16 +18,21 @@ interface Props {
 export default function ProposalBuilder({ quote, onSent }: Props) {
   const seedPrice = quote.quotedPrice || quote.priceBreakdown?.subtotal || 0;
   const [items, setItems] = useState<ProposalLineItem[]>([
-    { description: 'Organização e produção do evento', qty: 1, unitPrice: Math.round(seedPrice) },
+    { description: "Organização e produção do evento", qty: 1, unitPrice: Math.round(seedPrice) },
   ]);
   const [vatRate, setVatRate] = useState(0.23);
-  const [validUntil, setValidUntil] = useState('');
-  const [notes, setNotes] = useState('');
+  const [validUntil, setValidUntil] = useState("");
+  const [notes, setNotes] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ total: number; emailed: boolean; pdfUrl: string } | null>(null);
+  const [result, setResult] = useState<{ total: number; emailed: boolean; pdfUrl: string } | null>(
+    null,
+  );
 
-  const subtotal = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0), 0);
+  const subtotal = items.reduce(
+    (s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0),
+    0,
+  );
   const vat = subtotal * vatRate;
   const total = subtotal + vat;
 
@@ -31,7 +40,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   }
   function addRow() {
-    setItems((prev) => [...prev, { description: '', qty: 1, unitPrice: 0 }]);
+    setItems((prev) => [...prev, { description: "", qty: 1, unitPrice: 0 }]);
   }
   function removeRow(i: number) {
     setItems((prev) => prev.filter((_, idx) => idx !== i));
@@ -39,22 +48,32 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
 
   async function send() {
     if (sending) return;
+    // Outward-facing action: this emails the proposal (with pricing) to the
+    // client. Confirm first so a stray click never sends an unfinished quote.
+    if (!window.confirm(`Enviar a proposta de ${eur(total)} por e-mail para ${quote.email}?`)) {
+      return;
+    }
     setSending(true);
     setError(null);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineItems: items, vatRate, validUntil: validUntil || undefined, notes: notes || undefined }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lineItems: items,
+          vatRate,
+          validUntil: validUntil || undefined,
+          notes: notes || undefined,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro');
+      if (!res.ok) throw new Error(data.error || "Erro");
 
       const pdfUrl = `data:application/pdf;base64,${data.pdfBase64}`;
       setResult({ total: data.total, emailed: data.emailed, pdfUrl });
       onSent?.(data.total);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao enviar a proposta.');
+      setError(e instanceof Error ? e.message : "Erro ao enviar a proposta.");
     } finally {
       setSending(false);
     }
@@ -65,11 +84,13 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       <div className="border-t border-foreground/10 pt-5">
         <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">Proposta</p>
         <div className="rounded-sm border border-moss/30 bg-moss/8 p-4">
-          <p className="text-moss text-sm font-medium mb-1">✓ Proposta criada — {eur(result.total)}</p>
+          <p className="text-moss text-sm font-medium mb-1">
+            ✓ Proposta criada — {eur(result.total)}
+          </p>
           <p className="text-foreground/45 text-xs mb-4">
             {result.emailed
               ? `Enviada por e-mail para ${quote.email}.`
-              : 'Gerada (e-mail não configurado — descarregue e envie manualmente).'}
+              : "Gerada (e-mail não configurado — descarregue e envie manualmente)."}
           </p>
           <div className="flex flex-wrap gap-2">
             <a
@@ -93,7 +114,9 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">Criar &amp; Enviar Proposta (PDF)</p>
+      <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">
+        Criar &amp; Enviar Proposta (PDF)
+      </p>
 
       {/* Line items */}
       <div className="flex flex-col gap-2 mb-3">
@@ -174,7 +197,9 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       {/* Validity + notes */}
       <div className="flex flex-col gap-3 mb-5">
         <div>
-          <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">Válida até</label>
+          <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+            Válida até
+          </label>
           <input
             type="date"
             value={validUntil}
@@ -183,7 +208,9 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           />
         </div>
         <div>
-          <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">Notas (no PDF)</label>
+          <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+            Notas (no PDF)
+          </label>
           <textarea
             rows={2}
             value={notes}
@@ -201,11 +228,11 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         disabled={sending || subtotal <= 0}
         className={`w-full py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${
           sending || subtotal <= 0
-            ? 'bg-moss/40 text-cream/50 cursor-not-allowed'
-            : 'bg-moss text-cream hover:bg-moss-dark'
+            ? "bg-moss/40 text-cream/50 cursor-not-allowed"
+            : "bg-moss text-cream hover:bg-moss-dark"
         }`}
       >
-        {sending ? 'A gerar e enviar…' : 'Gerar PDF & Enviar ao Cliente →'}
+        {sending ? "A gerar e enviar…" : "Gerar PDF & Enviar ao Cliente →"}
       </button>
     </div>
   );

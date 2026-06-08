@@ -5,11 +5,11 @@ import FaqJsonLd from "./FaqJsonLd";
 import AnimateIn from "@/components/AnimateIn";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
-import Link from "next/link";
 import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
+import { SITE } from "@/lib/site";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
 
@@ -194,12 +194,12 @@ export default async function ContactoPage() {
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {t.common.abrirWhatsApp} →
               </a>
-              <Link
-                href="mailto:liquen.alentejo@gmail.com"
+              <a
+                href={`mailto:${SITE.email}`}
                 className="inline-flex items-center gap-3 px-8 py-4 border border-cream/20 text-cream/60 font-medium rounded-sm hover:border-cream/40 hover:text-cream/85 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
               >
                 {t.common.enviarEmail}
-              </Link>
+              </a>
             </div>
           </AnimateIn>
         </div>

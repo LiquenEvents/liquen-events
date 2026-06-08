@@ -306,6 +306,8 @@ export const en: Dict = {
       enviar: "Send Request",
       enviando: "Sending…",
       resposta24: "Reply within 24h",
+      errNome: "Please enter your name",
+      errEmail: "Invalid email",
       error: "We couldn't send your message. Please try again or contact us on WhatsApp.",
       successEyebrow: "Sent successfully",
       successTitle1: "Message",

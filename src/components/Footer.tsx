@@ -3,6 +3,7 @@ import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
+import { SITE } from "@/lib/site";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 const stripPhotos = [
@@ -74,7 +75,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 {[
                   {
                     label: "Instagram",
-                    href: "https://www.instagram.com/liquen.events",
+                    href: SITE.instagram,
                     icon: (
                       <svg
                         width="18"
@@ -94,7 +95,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   },
                   {
                     label: "Facebook",
-                    href: "https://www.facebook.com/liquen.events",
+                    href: SITE.facebook,
                     icon: (
                       <svg
                         width="18"
@@ -162,16 +163,16 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
               </p>
               <div className="flex flex-col gap-4 text-[13px] text-foreground/60 mb-10">
                 <a
-                  href="mailto:liquen.alentejo@gmail.com"
+                  href={`mailto:${SITE.email}`}
                   className="link-line hover:text-foreground/78 transition-colors duration-300"
                 >
-                  liquen.alentejo@gmail.com
+                  {SITE.email}
                 </a>
                 <a
-                  href="tel:+351919259820"
+                  href={`tel:${SITE.phone}`}
                   className="link-line hover:text-foreground/78 transition-colors duration-300"
                 >
-                  +351 919 259 820
+                  {SITE.phoneDisplay}
                 </a>
                 <span className="text-foreground/78">{t.footer.country}</span>
               </div>

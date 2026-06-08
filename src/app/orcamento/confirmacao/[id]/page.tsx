@@ -1,13 +1,14 @@
-import type { Metadata } from 'next';
-import ConfirmacaoClient from './ConfirmacaoClient';
+import type { Metadata } from "next";
+import ConfirmacaoClient from "./ConfirmacaoClient";
 
-export const metadata: Metadata = { title: 'Pedido Recebido' };
+// Per-quote page (carries a reference + the client's event details) — keep it
+// out of search indexes.
+export const metadata: Metadata = {
+  title: "Pedido Recebido",
+  robots: { index: false, follow: false },
+};
 
-export default async function ConfirmacaoPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function ConfirmacaoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return <ConfirmacaoClient id={id} />;
 }

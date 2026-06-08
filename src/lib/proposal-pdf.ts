@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { Proposal } from "@/app/orcamento/types";
+import { SITE } from "@/lib/site";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
 const INK = rgb(0.1, 0.1, 0.1);
@@ -207,6 +208,6 @@ function drawFooter(page: PDFPage, font: PDFFont) {
     thickness: 0.7,
     color: LINE,
   });
-  const parts = "liquen.alentejo@gmail.com   ·   +351 919 259 820   ·   Portugal";
+  const parts = `${SITE.email}   ·   ${SITE.phoneDisplay}   ·   Portugal`;
   page.drawText(parts, { x: MARGIN, y, font, size: 8, color: MUTED });
 }

@@ -6,6 +6,7 @@ import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderProposalPdf } from "@/lib/proposal-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { SITE } from "@/lib/site";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.
       </p>
       <p style="font-size:13px;color:#777;margin-top:20px">
-        Líquen Events · ${esc(MAIL_TO)} · +351 919 259 820
+        Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}
       </p>
     </div>`;
 

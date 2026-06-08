@@ -475,6 +475,12 @@ function catFromSlug(slug: string): Cat {
 const STRIP = 7;
 const SLIDE_MS = 5000; // ritmo do slideshow cinematográfico
 
+// Keyboard focus ring that survives `overflow-hidden`. The global :focus-visible
+// outline is a box-shadow, which these image cells clip; an *inset* ring renders
+// inside the box, so it stays visible for keyboard users tabbing the grid.
+const FOCUS_RING =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80";
+
 // Hover overlay — reused in hero cells and masonry cells
 function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   return (
@@ -695,7 +701,7 @@ export default function GaleriaClient() {
             {/* Foto grande — 2×2 */}
             <button
               onClick={() => setLb(0)}
-              className="relative col-span-2 row-span-2 h-full w-full overflow-hidden group focus:outline-none"
+              className={`relative col-span-2 row-span-2 h-full w-full overflow-hidden group ${FOCUS_RING}`}
             >
               <Image
                 src={visible[0].src}
@@ -715,7 +721,7 @@ export default function GaleriaClient() {
                 <button
                   key={idx}
                   onClick={() => setLb(idx)}
-                  className="relative hidden sm:block h-full w-full overflow-hidden group focus:outline-none"
+                  className={`relative hidden sm:block h-full w-full overflow-hidden group ${FOCUS_RING}`}
                 >
                   <Image
                     src={visible[idx].src}
@@ -745,7 +751,7 @@ export default function GaleriaClient() {
                 >
                   <button
                     onClick={() => setLb(idx)}
-                    className="relative w-full overflow-hidden group focus:outline-none"
+                    className={`relative w-full overflow-hidden group ${FOCUS_RING}`}
                     style={{ aspectRatio: aspectFor(p.src) }}
                   >
                     <Image
@@ -962,7 +968,7 @@ export default function GaleriaClient() {
                 <button
                   key={idx}
                   onClick={() => setLb(idx)}
-                  className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${
+                  className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
                     idx === lb
                       ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
                       : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"

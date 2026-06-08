@@ -116,7 +116,7 @@ export default async function ClientesPage() {
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="mt-10 border-l-2 border-moss/50 pl-6 max-w-md">
-              <p className="text-white/45 text-base leading-[1.8]">{t.clientes.heroLead}</p>
+              <p className="text-white/60 text-base leading-[1.8]">{t.clientes.heroLead}</p>
             </div>
           </AnimateIn>
         </div>
@@ -359,7 +359,7 @@ export default async function ClientesPage() {
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/38 text-base leading-relaxed max-w-sm mb-14">
+            <p className="text-white/60 text-base leading-relaxed max-w-sm mb-14">
               {t.clientes.ctaText}
             </p>
           </AnimateIn>

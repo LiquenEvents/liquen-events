@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
+import { SITE } from "@/lib/site";
 import { useTranslations } from "@/components/LocaleProvider";
 
 // ── Data ─────────────────────────────────────────────────────────
@@ -169,12 +170,7 @@ function NavBtn({
       ? `${base} px-9 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3`
       : `${base} text-foreground/72 hover:text-moss`;
   return (
-    <button
-      type={variant === "primary" ? "button" : "button"}
-      onClick={onClick}
-      disabled={disabled}
-      className={styles}
-    >
+    <button type="button" onClick={onClick} disabled={disabled} className={styles}>
       {children}
     </button>
   );
@@ -229,6 +225,14 @@ export default function ContactForm() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY);
   const [website, setWebsite] = useState(""); // honeypot — must stay empty
+  const [touched, setTouched] = useState<{ nome?: boolean; email?: boolean }>({});
+
+  // Mirror the (server-side) email check on the client so the user gets
+  // feedback on step 2 instead of only after submitting the whole form.
+  const emailValid = /\S+@\S+\.\S+/.test(form.email);
+  const nomeValid = form.nome.trim().length >= 2;
+  const nomeErr = touched.nome && !nomeValid ? tf.errNome : "";
+  const emailErr = touched.email && !emailValid ? tf.errEmail : "";
 
   function set(key: keyof FormData, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -257,6 +261,8 @@ export default function ContactForm() {
     "w-full bg-transparent border-b border-foreground/15 pb-4 text-sm text-foreground placeholder-foreground/18 focus:outline-none focus:border-moss/55 transition-colors duration-300";
 
   const labelCls = "block text-[10px] text-foreground/68 tracking-[0.45em] uppercase mb-4";
+
+  const hintCls = "mt-2 text-[11px] tracking-wide text-gold/80";
 
   return (
     <>
@@ -307,14 +313,14 @@ export default function ContactForm() {
                 {[
                   {
                     label: tf.emailLabel,
-                    value: "liquen.alentejo@gmail.com",
-                    href: "mailto:liquen.alentejo@gmail.com",
+                    value: SITE.email,
+                    href: `mailto:${SITE.email}`,
                     sub: tf.emailSub,
                   },
                   {
                     label: tf.phoneLabel,
-                    value: "+351 919 259 820",
-                    href: "tel:+351919259820",
+                    value: SITE.phoneDisplay,
+                    href: `tel:${SITE.phone}`,
                     sub: tf.phoneSub,
                   },
                   {
@@ -378,8 +384,8 @@ export default function ContactForm() {
               {/* Redes */}
               <div className="flex gap-7 mb-14">
                 {[
-                  { label: "Instagram", href: "https://www.instagram.com/liquen.events" },
-                  { label: "Facebook", href: "https://www.facebook.com/liquen.events" },
+                  { label: "Instagram", href: SITE.instagram },
+                  { label: "Facebook", href: SITE.facebook },
                 ].map((s) => (
                   <a
                     key={s.label}
@@ -569,9 +575,12 @@ export default function ContactForm() {
                                 autoComplete="name"
                                 value={form.nome}
                                 onChange={(e) => set("nome", e.target.value)}
-                                className={inputCls}
+                                onBlur={() => setTouched((p) => ({ ...p, nome: true }))}
+                                aria-invalid={!!nomeErr}
+                                className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
                                 placeholder={tf.phName}
                               />
+                              {nomeErr && <p className={hintCls}>{nomeErr}</p>}
                             </div>
                             <div>
                               <label htmlFor="cf-email" className={labelCls}>
@@ -583,9 +592,12 @@ export default function ContactForm() {
                                 autoComplete="email"
                                 value={form.email}
                                 onChange={(e) => set("email", e.target.value)}
-                                className={inputCls}
+                                onBlur={() => setTouched((p) => ({ ...p, email: true }))}
+                                aria-invalid={!!emailErr}
+                                className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
                                 placeholder={tf.phEmail}
                               />
+                              {emailErr && <p className={hintCls}>{emailErr}</p>}
                             </div>
                           </div>
                           <div>
@@ -607,7 +619,13 @@ export default function ContactForm() {
                           <NavBtn variant="ghost" onClick={() => setStep(1)}>
                             ← {tf.voltar}
                           </NavBtn>
-                          <NavBtn onClick={() => setStep(3)} disabled={!form.nome || !form.email}>
+                          <NavBtn
+                            onClick={() => {
+                              setTouched({ nome: true, email: true });
+                              if (nomeValid && emailValid) setStep(3);
+                            }}
+                            disabled={!nomeValid || !emailValid}
+                          >
                             {tf.continuar} →
                           </NavBtn>
                         </div>

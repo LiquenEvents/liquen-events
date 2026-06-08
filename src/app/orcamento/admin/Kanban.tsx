@@ -46,17 +46,13 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
     return map;
   }, [quotes]);
 
-  async function drop(status: QuoteStatus) {
-    setOverCol(null);
-    const id = dragId;
-    setDragId(null);
-    if (!id) return;
-    const q = quotes.find((x) => x.id === id);
-    if (!q || q.status === status) return;
-
-    onStatusChange(id, status); // optimistic
+  // Shared by drag-and-drop and keyboard moves: optimistic update + PATCH,
+  // reverting (and toasting) on failure.
+  async function changeStatus(q: Quote, status: QuoteStatus) {
+    if (q.status === status) return;
+    onStatusChange(q.id, status); // optimistic
     try {
-      const res = await fetch(`/api/orcamento/${id}`, {
+      const res = await fetch(`/api/orcamento/${q.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -64,9 +60,25 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
       if (!res.ok) throw new Error();
       toast(`${q.name} → ${COLUMNS.find((c) => c.id === status)?.label}`, "success");
     } catch {
-      onStatusChange(id, q.status); // revert
+      onStatusChange(q.id, q.status); // revert
       toast("Não foi possível atualizar", "error");
     }
+  }
+
+  async function drop(status: QuoteStatus) {
+    setOverCol(null);
+    const id = dragId;
+    setDragId(null);
+    if (!id) return;
+    const q = quotes.find((x) => x.id === id);
+    if (q) changeStatus(q, status);
+  }
+
+  // Keyboard equivalent of dragging: move a focused card to the adjacent column.
+  function moveByKeyboard(q: Quote, dir: -1 | 1) {
+    const idx = COLUMNS.findIndex((c) => c.id === q.status);
+    const next = COLUMNS[idx + dir];
+    if (next) changeStatus(q, next.id);
   }
 
   return (
@@ -104,18 +116,33 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
                 <div
                   key={q.id}
                   draggable
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${q.name}, ${eventTypeLabel(q)}, ${q.guests} pessoas. Coluna ${col.label}. Enter para abrir; setas esquerda/direita para mover de coluna.`}
                   onDragStart={() => setDragId(q.id)}
                   onDragEnd={() => {
                     setDragId(null);
                     setOverCol(null);
                   }}
                   onClick={() => onOpen(q)}
-                  className={`group cursor-grab active:cursor-grabbing rounded-lg border border-foreground/10 bg-surface p-3 transition-all hover:border-foreground/25 ${
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onOpen(q);
+                    } else if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      moveByKeyboard(q, -1);
+                    } else if (e.key === "ArrowRight") {
+                      e.preventDefault();
+                      moveByKeyboard(q, 1);
+                    }
+                  }}
+                  className={`group cursor-grab active:cursor-grabbing rounded-lg border border-foreground/10 bg-surface p-3 transition-all hover:border-foreground/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/60 ${
                     dragId === q.id ? "opacity-40" : ""
                   }`}
                 >
                   <p className="text-foreground/75 text-sm font-medium truncate">{q.name}</p>
-                  <p className="text-foreground/30 text-[11px] truncate mt-0.5">
+                  <p className="text-foreground/45 text-[11px] truncate mt-0.5">
                     {eventTypeLabel(q)} · {q.guests} pax
                   </p>
                   <div className="flex items-center justify-between mt-2.5">

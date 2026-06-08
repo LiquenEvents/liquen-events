@@ -16,10 +16,17 @@ interface EnvCheck {
 
 const CHECKS: EnvCheck[] = [
   { name: "SESSION_SECRET", critical: true, enables: "tamper-proof admin sessions" },
-  { name: "ADMIN_PASSWORD_HASH", enables: "the shared admin password (else a dev default is used)" },
+  {
+    name: "ADMIN_PASSWORD_HASH",
+    enables: "the shared admin password (else a dev default is used)",
+  },
   { name: "SUPABASE_URL", enables: "persistent storage (else local file in dev)" },
   { name: "SUPABASE_SERVICE_ROLE_KEY", enables: "persistent storage writes" },
-  { name: "RESEND_API_KEY", enables: "outbound email notifications" },
+  // Email is sent via SMTP/Nodemailer (see lib/mail.ts) — validate the vars the
+  // app actually reads, not a Resend key that isn't used anywhere.
+  { name: "SMTP_HOST", enables: "outbound email (contact + quote notifications)" },
+  { name: "SMTP_USER", enables: "outbound email (SMTP authentication)" },
+  { name: "SMTP_PASS", enables: "outbound email (SMTP authentication)" },
   { name: "VAPID_PUBLIC_KEY", enables: "web push notifications" },
   { name: "VAPID_PRIVATE_KEY", enables: "web push notifications" },
 ];

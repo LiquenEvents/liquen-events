@@ -30,7 +30,7 @@ export default async function NotFound() {
         >
           {t.errors.notFoundTitle}
         </h1>
-        <p className="text-foreground/40 text-sm leading-[1.8] max-w-md mx-auto mb-12">
+        <p className="text-foreground/68 text-sm leading-[1.8] max-w-md mx-auto mb-12">
           {t.errors.notFoundText}
         </p>
         <div className="flex flex-wrap gap-4 justify-center">

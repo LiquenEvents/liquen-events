@@ -14,6 +14,22 @@ export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
 }
 
+// Highlight brand/location keywords without dangerouslySetInnerHTML: split the
+// text on the keywords and render the matches as <strong>. Safe by construction
+// (no HTML is ever injected), even if the source copy changes.
+const EMPHASIS = /(Líquen Events|Alentejo|Lisboa|Portugal)/g;
+function emphasize(text: string) {
+  return text.split(EMPHASIS).map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i} className="text-foreground/75 font-medium">
+        {part}
+      </strong>
+    ) : (
+      part
+    ),
+  );
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -94,15 +110,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
           <AnimateIn>
             <div className="flex flex-col gap-6 text-foreground/68 text-[16px] leading-[1.9]">
               {svc.intro.map((p, i) => (
-                <p
-                  key={i}
-                  dangerouslySetInnerHTML={{
-                    __html: p.replace(
-                      /(Líquen Events|Alentejo|Lisboa|Portugal)/g,
-                      '<strong class="text-foreground/75 font-medium">$1</strong>',
-                    ),
-                  }}
-                />
+                <p key={i}>{emphasize(p)}</p>
               ))}
               <Link
                 href="/orcamento"
@@ -186,7 +194,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                 <Link
                   key={r.slug}
                   href={`/servicos/${r.slug}`}
-                  className="group relative overflow-hidden rounded-xl aspect-[16/9]"
+                  className="group relative overflow-hidden rounded-xl aspect-[16/9] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
                 >
                   <Image
                     src={r.hero}

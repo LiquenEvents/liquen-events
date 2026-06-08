@@ -225,7 +225,7 @@ export default function Fornecedores() {
                 </div>
                 <button
                   onClick={() => remove(s.id)}
-                  className="text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                  className="text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all shrink-0"
                   aria-label="Remover"
                 >
                   ×

@@ -7,9 +7,12 @@ import ClientMarquee from "@/components/ClientMarquee";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
 
+// Each tile links to a distinct destination that matches its label
+// (Corporativos / Casamentos / Privados) — the first two deep-link to their
+// dedicated service pages, the third to the celebrations category.
 const serviceLinks = [
-  { image: "/imagens/EW1_1408.jpg", href: "/servicos#empresas" },
-  { image: "/imagens/DaniGui_Preview20.jpg", href: "/servicos#celebracoes" },
+  { image: "/imagens/EW1_1408.jpg", href: "/servicos/eventos-corporativos" },
+  { image: "/imagens/DaniGui_Preview20.jpg", href: "/servicos/casamentos" },
   { image: "/imagens/DaniGui_JantarFesta_27.jpg", href: "/servicos#celebracoes" },
 ];
 
@@ -132,7 +135,7 @@ export default async function Home() {
               <AnimateIn key={s.title} delay={i * 60}>
                 <Link
                   href={s.href}
-                  className="group relative block rounded-xl overflow-hidden"
+                  className="group relative block rounded-xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
                   style={{ aspectRatio: "3/4" }}
                 >
                   <Image
@@ -164,7 +167,10 @@ export default async function Home() {
 
       {/* ── Gallery ribbon ── */}
       <section className="relative bg-surface border-y border-foreground/8 overflow-hidden py-2 sm:py-3">
-        <Link href="/galeria" className="group block">
+        <Link
+          href="/galeria"
+          className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-moss/70"
+        >
           <div className="absolute inset-y-0 left-0 w-20 sm:w-32 bg-gradient-to-r from-surface to-transparent z-20 pointer-events-none" />
           <div className="absolute inset-y-0 right-0 w-20 sm:w-32 bg-gradient-to-l from-surface to-transparent z-20 pointer-events-none" />
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
@@ -279,7 +285,7 @@ export default async function Home() {
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/45 text-base leading-relaxed max-w-md mb-12">
+            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">
               {t.home.ctaText}
             </p>
           </AnimateIn>

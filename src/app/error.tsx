@@ -31,7 +31,7 @@ export default function Error({
         >
           {t.errors.errorTitle}
         </h1>
-        <p className="text-foreground/40 text-sm leading-[1.8] max-w-md mx-auto mb-12">
+        <p className="text-foreground/68 text-sm leading-[1.8] max-w-md mx-auto mb-12">
           {t.errors.errorText}
         </p>
         <div className="flex flex-wrap gap-4 justify-center">

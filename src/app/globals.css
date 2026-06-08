@@ -24,7 +24,7 @@
    Stays full-screen/focused (footer, WhatsApp & scroll-progress hidden below),
    but the form itself is light. The left image panel keeps its own cream-on-
    photo styling, so --color-cream is left at the default light value. */
-body.orcamento-mode {
+body:has([data-orcamento-mode]) {
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
   --color-surface-elevated: #ffffff;
@@ -331,9 +331,9 @@ body::before {
 }
 
 /* ── Orçamento / Back-office full-screen mode ── */
-body.orcamento-mode footer,
-body.orcamento-mode .whatsapp-fixed,
-body.orcamento-mode .scroll-progress {
+body:has([data-orcamento-mode]) footer,
+body:has([data-orcamento-mode]) .whatsapp-fixed,
+body:has([data-orcamento-mode]) .scroll-progress {
   display: none !important;
 }
 
@@ -523,7 +523,7 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 }
 
 /* On orcamento (dark) mode the eyebrow reverts to its original light tint */
-body.orcamento-mode .eyebrow {
+body:has([data-orcamento-mode]) .eyebrow {
   color: rgba(222, 218, 212, 0.28);
 }
 

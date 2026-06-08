@@ -99,6 +99,7 @@ export default function NewQuoteModal({ open, onClose, onCreated }: Props) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Fechar"
             className="text-foreground/30 hover:text-foreground/60 text-xl leading-none"
           >
             ×
