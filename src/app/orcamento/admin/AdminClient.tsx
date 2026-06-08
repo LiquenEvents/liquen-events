@@ -5,26 +5,46 @@ import Image from "next/image";
 import type { Quote, QuoteStatus } from "../types";
 import { formatPrice } from "../pricing";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../data";
-import ProposalBuilder from "./ProposalBuilder";
-import ClientMessenger from "./ClientMessenger";
-import StatsDashboard from "./StatsDashboard";
-import Inbox from "./Inbox";
-import Overview from "./Overview";
-import Clientes from "./Clientes";
-import Calendario from "./Calendario";
-import Propostas from "./Propostas";
-import Tarefas from "./Tarefas";
-import Fornecedores from "./Fornecedores";
-import EventChecklist from "./EventChecklist";
-import EventTimeline from "./EventTimeline";
-import PaymentsPanel from "./PaymentsPanel";
+import dynamic from "next/dynamic";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
 import NewQuoteModal from "./NewQuoteModal";
-import Kanban from "./Kanban";
 import NotificationBell from "./NotificationBell";
 import { downloadCsv, quotesToCsvRows, dateStamp, printRunSheet } from "./export";
+
+// Each top-level view is a separate, mutually-exclusive surface — code-split
+// them so only the view the user actually opens ships its JS. This keeps the
+// back-office's initial load lean (8 of 9 views are deferred on first paint).
+function ViewLoading() {
+  return (
+    <div
+      className="flex items-center justify-center py-24"
+      aria-busy="true"
+      aria-label="A carregar"
+    >
+      <span className="w-5 h-5 rounded-full border-2 border-foreground/15 border-t-moss animate-spin" />
+    </div>
+  );
+}
+const Overview = dynamic(() => import("./Overview"), { loading: ViewLoading });
+const Kanban = dynamic(() => import("./Kanban"), { loading: ViewLoading });
+const Clientes = dynamic(() => import("./Clientes"), { loading: ViewLoading });
+const Calendario = dynamic(() => import("./Calendario"), { loading: ViewLoading });
+const Propostas = dynamic(() => import("./Propostas"), { loading: ViewLoading });
+const Tarefas = dynamic(() => import("./Tarefas"), { loading: ViewLoading });
+const Fornecedores = dynamic(() => import("./Fornecedores"), { loading: ViewLoading });
+const StatsDashboard = dynamic(() => import("./StatsDashboard"), { loading: ViewLoading });
+const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
+
+// Detail-panel tools — only needed once a quote is opened, so defer their JS
+// too (a thin spacer holds layout while the chunk arrives).
+const PanelLoading = () => <div className="border-t border-foreground/10 pt-5 h-10" />;
+const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), { loading: PanelLoading });
+const ClientMessenger = dynamic(() => import("./ClientMessenger"), { loading: PanelLoading });
+const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
+const EventTimeline = dynamic(() => import("./EventTimeline"), { loading: PanelLoading });
+const PaymentsPanel = dynamic(() => import("./PaymentsPanel"), { loading: PanelLoading });
 
 type View =
   | "overview"
