@@ -49,3 +49,52 @@ describe("log", () => {
     expect(out).toContain("route");
   });
 });
+
+describe("log — error webhook alerting", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock = vi.fn(() => Promise.resolve({ ok: true } as Response));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    delete process.env.ERROR_WEBHOOK_URL;
+  });
+
+  it("does nothing when ERROR_WEBHOOK_URL is unset", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    log.error("unset-webhook-case");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("posts error-level logs to the webhook in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.ERROR_WEBHOOK_URL = "https://hooks.example.com/abc";
+    log.error("alert-me-please", new Error("kaboom"), { route: "/api/x" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, opts] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://hooks.example.com/abc");
+    expect(String(opts.body)).toContain("alert-me-please");
+    expect(String(opts.body)).toContain("kaboom");
+  });
+
+  it("throttles repeated identical errors", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.ERROR_WEBHOOK_URL = "https://hooks.example.com/abc";
+    log.error("repeated-identical-error");
+    log.error("repeated-identical-error");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("never alerts outside production", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    process.env.ERROR_WEBHOOK_URL = "https://hooks.example.com/abc";
+    log.error("dev-no-alert");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

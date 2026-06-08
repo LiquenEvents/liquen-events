@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/orcamento/admin", "/api/"],
+      disallow: ["/orcamento/admin", "/en/orcamento/admin", "/api/"],
     },
     sitemap: `${SITE.url}/sitemap.xml`,
     host: SITE.url,

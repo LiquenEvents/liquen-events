@@ -1,24 +1,28 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { LANG_COOKIE, type Locale } from "@/lib/i18n";
 import { useTranslations } from "./LocaleProvider";
 
 /**
- * PT | EN switch. Writes the language cookie and refreshes the server tree so
- * the new locale is rendered (correct <html lang>, no flash). `light` mirrors
- * the navbar's dark-hero treatment so it stays legible over imagery.
+ * PT | EN switch. Navigates to the chosen language's URL space — English lives
+ * under /en/* (shareable & crawlable), Portuguese at the un-prefixed path — and
+ * writes the cookie so the choice sticks. `light` mirrors the navbar's dark-hero
+ * treatment so it stays legible over imagery.
  */
 export default function LanguageToggle({ light = false }: { light?: boolean }) {
-  const router = useRouter();
   const { locale, t } = useTranslations();
   const [pending, startTransition] = useTransition();
 
   function choose(next: Locale) {
     if (next === locale) return;
     document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-    startTransition(() => router.refresh());
+    // Move to the language's URL space (EN at /en/* for sharing + crawling). A
+    // full navigation — not router.push — so the root layout re-renders with the
+    // right <html lang>, which client-side navigation would leave stale.
+    const bare = window.location.pathname.replace(/^\/en(?=\/|$)/, "") || "/";
+    const dest = next === "en" ? (bare === "/" ? "/en" : `/en${bare}`) : bare;
+    startTransition(() => window.location.assign(dest + window.location.search));
   }
 
   const base = "text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";

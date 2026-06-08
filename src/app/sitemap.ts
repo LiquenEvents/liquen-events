@@ -66,5 +66,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     images: [s.hero.startsWith("http") ? s.hero : `${base}${s.hero}`],
   }));
 
-  return [...core, ...services];
+  // Declare the reciprocal PT/EN hreflang pair for every URL so search engines
+  // discover and index the English mirror (/en/*).
+  return [...core, ...services].map((entry) => {
+    const path = entry.url.replace(base, "") || "/";
+    const en = path === "/" ? `${base}/en` : `${base}/en${path}`;
+    return { ...entry, alternates: { languages: { "pt-PT": entry.url, en } } };
+  });
 }

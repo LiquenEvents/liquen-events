@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -27,9 +28,14 @@ const playfair = Playfair_Display({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = getDictionary(await getLocale());
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   const title = t.meta.homeTitle;
   const description = t.meta.homeDescription;
+  // The /en mirror self-canonicalises (the proxy sets x-liquen-locale); the
+  // Portuguese home stays canonical at "/".
+  const isEnUrl = (await headers()).get("x-liquen-locale") === "en";
+  const canonical = isEnUrl ? "/en" : "/";
   return {
     metadataBase: new URL(SITE.url),
     title: {
@@ -55,14 +61,14 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     alternates: {
-      canonical: "/",
-      languages: { "pt-PT": "/" },
+      canonical,
+      languages: { "pt-PT": "/", en: "/en", "x-default": "/" },
     },
     openGraph: {
       type: "website",
       locale: t.meta.ogLocale,
       siteName: SITE.name,
-      url: SITE.url,
+      url: `${SITE.url}${canonical === "/" ? "" : canonical}`,
       title,
       description,
       images: [
