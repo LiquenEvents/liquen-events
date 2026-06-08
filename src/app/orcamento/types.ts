@@ -202,4 +202,6 @@ export interface Proposal {
   status: ProposalStatus;
   createdAt: string;
   sentAt?: string;
+  /** When the client accepted/declined via the public link. */
+  respondedAt?: string;
 }

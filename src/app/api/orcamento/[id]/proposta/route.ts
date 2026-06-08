@@ -7,6 +7,7 @@ import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderProposalPdf } from "@/lib/proposal-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
+import { createProposalToken } from "@/lib/proposal-token";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 
@@ -107,6 +108,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     const pdfBuffer = Buffer.from(pdfBytes);
 
+    // Signed link so the client can accept/decline the proposal online.
+    const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
+
     // Email the client with the PDF attached.
     const clientHtml = `
     <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
@@ -117,6 +121,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         no valor total de <strong style="color:#7c854b">${eur(total)}</strong> (IVA incluído).
       </p>
       ${proposal.validUntil ? `<p style="font-size:13px;color:#777">Válida até ${esc(new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT"))}.</p>` : ""}
+      <p style="margin:24px 0">
+        <a href="${acceptUrl}" style="display:inline-block;background:#7c854b;color:#f5f3ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">Ver e responder à proposta online →</a>
+      </p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.
       </p>

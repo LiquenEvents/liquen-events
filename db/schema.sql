@@ -39,8 +39,12 @@ create table if not exists public.proposals (
   total       numeric not null default 0,
   valid_until date,
   notes       text,
-  sent_at     timestamptz
+  sent_at     timestamptz,
+  responded_at timestamptz  -- quando o cliente aceitou/recusou pelo link público
 );
+
+-- Migração para instalações existentes (a tabela acima só é criada se não existir).
+alter table public.proposals add column if not exists responded_at timestamptz;
 
 create index if not exists proposals_quote_id_idx on public.proposals (quote_id);
 create index if not exists proposals_created_at_idx on public.proposals (created_at desc);

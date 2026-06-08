@@ -20,6 +20,7 @@ export const mapper: Mapper<Proposal> = {
     notes: p.notes || null,
     status: p.status,
     sent_at: p.sentAt || null,
+    responded_at: p.respondedAt || null,
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -37,6 +38,7 @@ export const mapper: Mapper<Proposal> = {
     status: (r.status as Proposal["status"]) ?? "rascunho",
     createdAt: String(r.created_at ?? new Date().toISOString()),
     sentAt: (r.sent_at as string) ?? undefined,
+    respondedAt: (r.responded_at as string) ?? undefined,
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
@@ -46,5 +48,8 @@ const repo = createRepository(mapper);
 
 export const createProposal = (p: Proposal): Promise<void> => repo.create(p);
 export const listAllProposals = (): Promise<Proposal[]> => repo.list();
+export const getProposal = (id: string): Promise<Proposal | null> => repo.get(id);
+export const updateProposal = (id: string, patch: Partial<Proposal>): Promise<Proposal | null> =>
+  repo.update(id, patch);
 export const listProposalsForQuote = (quoteId: string): Promise<Proposal[]> =>
   repo.where("quote_id", quoteId, (p) => p.quoteId === quoteId);

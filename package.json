@@ -21,6 +21,7 @@
     "gen:totp": "node scripts/gen-totp.mjs",
     "analyze": "ANALYZE=true next build",
     "compress:images": "node scripts/compress-sources.mjs",
+    "upload:images": "node scripts/upload-images-to-supabase.mjs",
     "warm:cache": "node scripts/warm-image-cache.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
