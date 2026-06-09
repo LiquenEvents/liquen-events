@@ -290,30 +290,33 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         </div>
       </div>
 
-      {/* KPI row */}
+      {/* KPI row — each card is a shortcut to the relevant view */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { v: String(data.total), l: "Pedidos totais", dark: true },
+          { v: String(data.total), l: "Pedidos totais", dark: true, go: () => onGo("pedidos") },
           {
             v: String(data.thisMonth),
             l: "Este mês",
             delta: { now: data.thisMonth, prev: data.lastMonth },
+            go: () => onGo("pedidos"),
           },
-          { v: eur(data.pipeline), l: "Em proposta" },
-          { v: eur(data.outstanding), l: "A receber" },
+          { v: eur(data.pipeline), l: "Em proposta", go: () => onGo("kanban") },
+          { v: eur(data.outstanding), l: "A receber", go: onGoStats },
           {
             v: eur(data.won),
             l: "Ganho",
             dark: true,
             delta: { now: data.wonThisMonth, prev: data.wonLastMonth },
+            go: onGoStats,
           },
         ].map((k) => (
-          <div
+          <button
             key={k.l}
-            className={`relative overflow-hidden rounded-xl p-5 border ${
+            onClick={k.go}
+            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-all ${
               k.dark
-                ? "bg-[#1b2119] border-[#2d3829]"
-                : "bg-white border-foreground/[0.08] shadow-sm"
+                ? "bg-[#1b2119] border-[#2d3829] hover:border-[#3d4a37]"
+                : "bg-white border-foreground/[0.08] shadow-sm hover:shadow-md hover:border-foreground/15"
             }`}
           >
             {k.dark && (
@@ -339,7 +342,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             >
               {k.l}
             </p>
-          </div>
+          </button>
         ))}
       </div>
 

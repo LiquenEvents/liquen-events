@@ -12,6 +12,7 @@ import ShortcutsModal from "./ShortcutsModal";
 import NewQuoteModal from "./NewQuoteModal";
 import NotificationBell from "./NotificationBell";
 import { downloadCsv, quotesToCsvRows, dateStamp, printRunSheet } from "./export";
+import { eventCountdown } from "./util";
 import { ViewSkeleton } from "./Skeleton";
 import EmptyState from "./EmptyState";
 
@@ -349,6 +350,27 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }, [view]);
 
+  // Restore the Pedidos status filter + sort the team last used (per device).
+  useEffect(() => {
+    try {
+      const f = localStorage.getItem("liquen-admin-filter");
+      if (f === "all" || STATUS_OPTIONS.some((s) => s.id === f))
+        setFilterStatus(f as QuoteStatus | "all");
+      const so = localStorage.getItem("liquen-admin-sort");
+      if (so === "recent" || so === "old" || so === "value" || so === "followup") setSort(so);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("liquen-admin-filter", filterStatus);
+      localStorage.setItem("liquen-admin-sort", sort);
+    } catch {
+      /* ignore */
+    }
+  }, [filterStatus, sort]);
+
   // Jump straight to Pedidos and focus the search box.
   const focusSearch = useCallback(() => {
     setView("pedidos");
@@ -445,6 +467,26 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         group: "Ações",
         run: () => setNewQuoteOpen(true),
       },
+      {
+        id: "action-export",
+        label: "Exportar pedidos (CSV)",
+        group: "Ações",
+        run: () => {
+          downloadCsv(`pedidos-${dateStamp()}`, quotesToCsvRows(quotes));
+          toast(
+            `${quotes.length} pedido${quotes.length !== 1 ? "s" : ""} exportado${quotes.length !== 1 ? "s" : ""}`,
+            "success",
+          );
+        },
+      },
+      {
+        id: "action-backup",
+        label: "Descarregar backup",
+        group: "Ações",
+        run: () => {
+          window.location.href = "/api/backup";
+        },
+      },
       ...NAV.map((item) => ({
         id: `nav-${item.id}`,
         label: item.label,
@@ -452,7 +494,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         run: () => setView(item.id),
       })),
     ],
-    [],
+    [quotes, toast],
   );
 
   // Returns true to proceed; if there are unsaved edits, asks for confirmation.
@@ -472,6 +514,43 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditNotes(q.adminNotes ?? "");
     setEditStatus(q.status);
     setDetailTab("resumo");
+  }
+
+  // Clone an event's details into a fresh quote (e.g. a returning client).
+  // The date is intentionally left blank — it's a new event to schedule.
+  async function duplicateQuote(q: Quote) {
+    if (!discardGuard()) return;
+    try {
+      const res = await fetch("/api/orcamento/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: q.name,
+          email: q.email,
+          phone: q.phone,
+          company: q.company,
+          category: q.category,
+          eventType: q.eventType,
+          eventName: q.eventName,
+          location: q.location,
+          guests: q.guests,
+          notes: q.notes,
+          referralSource: q.referralSource || "Cliente recorrente",
+          status: "em_revisao",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.quote) throw new Error();
+      setQuotes((prev) => [data.quote, ...prev]);
+      setSelected(data.quote);
+      setEditPrice("");
+      setEditNotes("");
+      setEditStatus(data.quote.status);
+      setDetailTab("resumo");
+      toast("Pedido duplicado — defina a nova data", "success");
+    } catch {
+      toast("Não foi possível duplicar o pedido", "error");
+    }
   }
 
   async function refresh() {
@@ -1358,6 +1437,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           )}
                           <span className="w-px h-2.5 bg-foreground/12" />
                           <span>{q.guests} pax</span>
+                          {(() => {
+                            const cd = eventCountdown(q.date);
+                            if (!cd || cd.tone === "past") return null;
+                            return (
+                              <>
+                                <span className="w-px h-2.5 bg-foreground/12" />
+                                <span
+                                  className={
+                                    cd.tone === "today" || cd.tone === "soon"
+                                      ? "text-[#b5654a] font-medium"
+                                      : "text-foreground/40"
+                                  }
+                                >
+                                  {cd.label}
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
                         {q.tags && q.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2.5">
@@ -1421,6 +1518,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => duplicateQuote(selected)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
+                            title="Duplicar este pedido (cliente recorrente)"
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                            >
+                              <rect x="9" y="9" width="11" height="11" rx="2" />
+                              <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                            </svg>
+                            <span className="hidden sm:inline">Duplicar</span>
+                          </button>
                           <button
                             onClick={() => printRunSheet(selected)}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
@@ -1504,22 +1619,117 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <div className="p-5 flex flex-col gap-6">
                       {detailTab === "resumo" && (
                         <>
+                          {/* Snapshot — key facts at a glance */}
+                          {(() => {
+                            const revenue =
+                              selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
+                            const costs = (selected.eventSuppliers ?? []).reduce(
+                              (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
+                              0,
+                            );
+                            const margin = revenue - costs;
+                            const cd = eventCountdown(selected.date);
+                            const cells: { l: string; v: string; tone?: string }[] = [
+                              { l: "Valor", v: revenue ? formatPrice(revenue) : "—" },
+                            ];
+                            if (costs > 0)
+                              cells.push({
+                                l: "Margem",
+                                v: formatPrice(margin),
+                                tone: margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]",
+                              });
+                            if (cd)
+                              cells.push({
+                                l: "Evento",
+                                v: cd.label,
+                                tone:
+                                  cd.tone === "soon" || cd.tone === "today"
+                                    ? "text-[#b5654a]"
+                                    : undefined,
+                              });
+                            return (
+                              <div
+                                className={`grid gap-2 ${cells.length === 3 ? "grid-cols-3" : cells.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}
+                              >
+                                {cells.map((c) => (
+                                  <div
+                                    key={c.l}
+                                    className="bg-foreground/[0.04] rounded-lg p-2.5 text-center"
+                                  >
+                                    <p
+                                      className={`text-sm font-semibold ${c.tone ?? "text-foreground/72"}`}
+                                    >
+                                      {c.v}
+                                    </p>
+                                    <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+                                      {c.l}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+
                           {/* Contact */}
                           <div>
                             <p className="bo-eyebrow mb-3">Contacto</p>
                             <div className="flex flex-col gap-1.5">
-                              <a
-                                href={`mailto:${selected.email}`}
-                                className="text-[#4d6350] text-xs hover:underline"
-                              >
-                                {selected.email}
-                              </a>
-                              <a
-                                href={`tel:${selected.phone}`}
-                                className="text-foreground/50 text-xs hover:text-foreground/70"
-                              >
-                                {selected.phone}
-                              </a>
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={`mailto:${selected.email}`}
+                                  className="text-[#4d6350] text-xs hover:underline truncate"
+                                >
+                                  {selected.email}
+                                </a>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard?.writeText(selected.email);
+                                    toast("Email copiado", "success");
+                                  }}
+                                  className="text-foreground/25 hover:text-foreground/55 transition-colors shrink-0"
+                                  title="Copiar email"
+                                  aria-label="Copiar email"
+                                >
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                  >
+                                    <rect x="9" y="9" width="11" height="11" rx="2" />
+                                    <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                                  </svg>
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={`tel:${selected.phone}`}
+                                  className="text-foreground/50 text-xs hover:text-foreground/70"
+                                >
+                                  {selected.phone}
+                                </a>
+                                {selected.phone && (
+                                  <a
+                                    href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-80 transition-opacity shrink-0"
+                                    title="Abrir conversa no WhatsApp"
+                                  >
+                                    <svg
+                                      width="12"
+                                      height="12"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                    >
+                                      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
+                                    </svg>
+                                    WhatsApp
+                                  </a>
+                                )}
+                              </div>
                               {selected.company && (
                                 <p className="text-foreground/35 text-xs">{selected.company}</p>
                               )}
@@ -1555,9 +1765,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 {
                                   l: "Data",
                                   v: selected.date
-                                    ? new Date(selected.date + "T12:00:00").toLocaleDateString(
+                                    ? `${new Date(selected.date + "T12:00:00").toLocaleDateString(
                                         "pt-PT",
-                                      )
+                                      )}${
+                                        eventCountdown(selected.date)
+                                          ? ` · ${eventCountdown(selected.date)!.label}`
+                                          : ""
+                                      }`
                                     : "—",
                                 },
                                 { l: "Local", v: selected.location || "—" },

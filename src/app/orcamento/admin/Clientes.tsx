@@ -38,6 +38,7 @@ interface Props {
 
 export default function Clientes({ quotes, onOpen }: Props) {
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"recent" | "value">("recent");
 
   const clients = useMemo(() => {
     const map = new Map<string, Client>();
@@ -64,7 +65,12 @@ export default function Clientes({ quotes, onOpen }: Props) {
         c.company = q.company;
       }
     }
-    let list = Array.from(map.values()).sort((a, b) => +new Date(b.lastAt) - +new Date(a.lastAt));
+    let list = Array.from(map.values());
+    list.sort(
+      sort === "value"
+        ? (a, b) => b.totalWon - a.totalWon || +new Date(b.lastAt) - +new Date(a.lastAt)
+        : (a, b) => +new Date(b.lastAt) - +new Date(a.lastAt),
+    );
     const s = search.trim().toLowerCase();
     if (s)
       list = list.filter((c) =>
@@ -73,7 +79,11 @@ export default function Clientes({ quotes, onOpen }: Props) {
           .some((v) => v.toLowerCase().includes(s)),
       );
     return list;
-  }, [quotes, search]);
+  }, [quotes, search, sort]);
+
+  // A client is "VIP" once they've won 2+ events or €10k+ in accepted business.
+  const isVip = (c: Client) =>
+    c.totalWon >= 10000 || c.quotes.filter((q) => q.status === "aceite").length >= 2;
 
   const [open, setOpen] = useState<string | null>(null);
 
@@ -101,7 +111,15 @@ export default function Clientes({ quotes, onOpen }: Props) {
           />
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="text-foreground/30 text-xs">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            className="bo-input px-3 py-2.5 text-xs text-foreground/55"
+          >
+            <option value="recent">Mais recentes</option>
+            <option value="value">Maior valor</option>
+          </select>
+          <span className="hidden sm:inline text-foreground/30 text-xs">
             {clients.length} cliente{clients.length !== 1 ? "s" : ""}
           </span>
           <button
@@ -163,10 +181,17 @@ export default function Clientes({ quotes, onOpen }: Props) {
                   {c.name.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground/78 text-sm font-semibold truncate">
-                    {c.name}
+                  <p className="text-foreground/78 text-sm font-semibold truncate flex items-center gap-2">
+                    <span className="truncate">{c.name}</span>
+                    {isVip(c) && (
+                      <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#d6ab3a]/15 text-[#b88f28] text-[8px] tracking-[0.12em] uppercase font-bold">
+                        ★ VIP
+                      </span>
+                    )}
                     {c.company && (
-                      <span className="text-foreground/30 font-normal"> · {c.company}</span>
+                      <span className="text-foreground/30 font-normal truncate hidden sm:inline">
+                        · {c.company}
+                      </span>
                     )}
                   </p>
                   <p className="text-foreground/30 text-xs truncate">{c.email}</p>
