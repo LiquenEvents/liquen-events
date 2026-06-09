@@ -147,7 +147,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   <li key={href}>
                     <Link
                       href={href}
-                      className="link-line text-[13px] text-foreground/60 hover:text-moss transition-colors duration-300"
+                      className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
                     >
                       {label}
                     </Link>
@@ -161,7 +161,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
               <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-8">
                 {t.footer.contacto}
               </p>
-              <div className="flex flex-col gap-4 text-[13px] text-foreground/60 mb-10">
+              <div className="flex flex-col gap-4 text-[13px] text-foreground/72 mb-10">
                 <a
                   href={`mailto:${SITE.email}`}
                   className="link-line hover:text-foreground/78 transition-colors duration-300"

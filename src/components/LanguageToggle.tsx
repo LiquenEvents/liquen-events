@@ -28,8 +28,8 @@ export default function LanguageToggle({ light = false }: { light?: boolean }) {
   const base = "text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";
   const activeCls = light ? "text-white" : "text-moss";
   const idleCls = light
-    ? "text-white/45 hover:text-white/80"
-    : "text-foreground/40 hover:text-moss";
+    ? "text-white/60 hover:text-white/90"
+    : "text-foreground/55 hover:text-moss";
 
   return (
     <div
