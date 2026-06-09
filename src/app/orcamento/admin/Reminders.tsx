@@ -165,22 +165,24 @@ export default function Reminders({ quotes, onOpen }: Props) {
   };
 
   return (
-    <div className="border border-foreground/10 rounded-md bg-surface-raised/30">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/8">
-        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">Lembretes</p>
-        <span className="text-moss text-[10px] tabular-nums">{reminders.length}</span>
+    <div className="bo-card overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+        <p className="bo-eyebrow">Lembretes</p>
+        <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
+          {reminders.length}
+        </span>
       </div>
-      <div className="divide-y divide-foreground/6 max-h-[340px] overflow-y-auto">
+      <div className="divide-y divide-foreground/[0.06] max-h-[340px] overflow-y-auto">
         {reminders.map((r, i) => (
           <button
             key={i}
             onClick={() => r.quote && onOpen(r.quote)}
             disabled={!r.quote}
-            className={`w-full text-left px-5 py-3 flex items-center gap-3 transition-colors ${r.quote ? "hover:bg-moss/5 cursor-pointer" : "cursor-default"}`}
+            className={`w-full text-left px-5 py-3 flex items-center gap-3 transition-colors ${r.quote ? "hover:bg-foreground/[0.02] cursor-pointer" : "cursor-default"}`}
           >
             <span style={{ color: r.urgent ? "#b5654a" : "#9aa36a" }}>{icon(r.kind)}</span>
             <div className="min-w-0 flex-1">
-              <p className="text-foreground/65 text-xs truncate">{r.text}</p>
+              <p className="text-foreground/68 text-xs truncate font-medium">{r.text}</p>
               <p
                 className={`text-[10px] truncate ${r.urgent ? "text-[#b5654a]" : "text-foreground/30"}`}
               >

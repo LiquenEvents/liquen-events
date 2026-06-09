@@ -12,20 +12,16 @@ import ShortcutsModal from "./ShortcutsModal";
 import NewQuoteModal from "./NewQuoteModal";
 import NotificationBell from "./NotificationBell";
 import { downloadCsv, quotesToCsvRows, dateStamp, printRunSheet } from "./export";
+import { ViewSkeleton } from "./Skeleton";
+import EmptyState from "./EmptyState";
 
 // Each top-level view is a separate, mutually-exclusive surface — code-split
 // them so only the view the user actually opens ships its JS. This keeps the
 // back-office's initial load lean (8 of 9 views are deferred on first paint).
+// While the chunk arrives, a layout-shaped skeleton stands in so the page
+// settles instead of flashing a spinner.
 function ViewLoading() {
-  return (
-    <div
-      className="flex items-center justify-center py-24"
-      aria-busy="true"
-      aria-label="A carregar"
-    >
-      <span className="w-5 h-5 rounded-full border-2 border-foreground/15 border-t-moss animate-spin" />
-    </div>
-  );
+  return <ViewSkeleton />;
 }
 const Overview = dynamic(() => import("./Overview"), { loading: ViewLoading });
 const Kanban = dynamic(() => import("./Kanban"), { loading: ViewLoading });
@@ -38,8 +34,13 @@ const StatsDashboard = dynamic(() => import("./StatsDashboard"), { loading: View
 const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
 
 // Detail-panel tools — only needed once a quote is opened, so defer their JS
-// too (a thin spacer holds layout while the chunk arrives).
-const PanelLoading = () => <div className="border-t border-foreground/10 pt-5 h-10" />;
+// too. A shimmering eyebrow+bar holds the layout while the chunk arrives.
+const PanelLoading = () => (
+  <div className="border-t border-foreground/10 pt-5">
+    <div className="bo-skeleton h-2.5 w-40 mb-4" aria-hidden />
+    <div className="bo-skeleton h-9 w-full" aria-hidden />
+  </div>
+);
 const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), { loading: PanelLoading });
 const ClientMessenger = dynamic(() => import("./ClientMessenger"), { loading: PanelLoading });
 const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
@@ -627,26 +628,52 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         />
         {/* ── Sidebar ── */}
         <aside
-          className={`fixed lg:sticky top-0 z-40 h-screen w-60 shrink-0 bg-surface-raised/60 border-r border-foreground/8 flex flex-col transition-transform duration-300 ${
+          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#1b2119] flex flex-col transition-transform duration-300 shadow-2xl lg:shadow-none ${
             navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
         >
+          {/* Mobile close */}
+          <button
+            className="lg:hidden absolute top-5 right-4 w-8 h-8 flex items-center justify-center text-white/35 hover:text-white/70 rounded-lg hover:bg-white/8 transition-colors"
+            onClick={() => setNavOpen(false)}
+            aria-label="Fechar menu"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+            </svg>
+          </button>
+
           {/* Brand */}
-          <div className="px-6 py-6 border-b border-foreground/8">
-            <Image
-              src="/logo-liquen.png"
-              alt="Líquen Events"
-              width={67}
-              height={40}
-              className="object-contain opacity-85"
-            />
-            <p className="text-foreground/22 text-[9px] tracking-[0.4em] uppercase mt-3">
-              Back Office
-            </p>
+          <div className="px-5 pt-6 pb-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+              <Image
+                src="/logo-liquen.png"
+                alt="Líquen Events"
+                width={22}
+                height={14}
+                className="object-contain brightness-0 invert opacity-90"
+              />
+            </div>
+            <div>
+              <p className="text-white/90 text-[13px] font-semibold leading-tight tracking-tight">
+                Líquen Events
+              </p>
+              <p className="text-white/25 text-[9px] tracking-[0.3em] uppercase mt-0.5">
+                Back Office
+              </p>
+            </div>
           </div>
+          <div className="mx-4 h-px bg-white/[0.07] mb-1" />
 
           {/* Nav */}
-          <nav className="flex-1 px-3 py-6 flex flex-col gap-0.5 overflow-y-auto">
+          <nav className="flex-1 px-2.5 py-3 flex flex-col gap-0.5 overflow-y-auto">
             {NAV.map((item) => (
               <button
                 key={item.id}
@@ -655,29 +682,22 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   setNavOpen(false);
                 }}
                 aria-current={view === item.id ? "page" : undefined}
-                className={`group relative flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-md text-[11px] tracking-[0.18em] uppercase transition-all duration-200 ${
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[11px] tracking-[0.08em] uppercase font-medium transition-all duration-150 ${
                   view === item.id
-                    ? "bg-moss/12 text-moss"
-                    : "text-foreground/40 hover:text-foreground/75 hover:bg-foreground/[0.04]"
+                    ? "bg-white/12 text-white"
+                    : "text-white/38 hover:text-white/80 hover:bg-white/[0.06]"
                 }`}
               >
                 <span
-                  className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full bg-moss transition-all duration-300 ${
-                    view === item.id ? "h-5 opacity-100" : "h-0 opacity-0"
+                  className={`shrink-0 transition-colors duration-150 ${
+                    view === item.id ? "text-[#8aad85]" : "text-white/28 group-hover:text-white/60"
                   }`}
-                />
-                <span
-                  className={
-                    view === item.id
-                      ? "text-moss"
-                      : "text-foreground/30 group-hover:text-foreground/60 transition-colors"
-                  }
                 >
                   {item.icon}
                 </span>
-                {item.label}
+                <span className="truncate">{item.label}</span>
                 {item.id === "pedidos" && pendingCount > 0 && (
-                  <span className="ml-auto text-[9px] bg-moss text-cream rounded-full px-1.5 py-0.5 tabular-nums">
+                  <span className="ml-auto min-w-[18px] text-center text-[9px] bg-[#4d6350] text-white/90 rounded-full px-1.5 py-0.5 tabular-nums leading-none">
                     {pendingCount}
                   </span>
                 )}
@@ -686,125 +706,176 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           </nav>
 
           {/* User */}
-          <div className="px-3 py-4 border-t border-foreground/8">
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-moss/20 text-moss flex items-center justify-center text-xs font-bold shrink-0">
+          <div className="px-2.5 pb-5 pt-3 border-t border-white/[0.07]">
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.06] mb-2">
+              <div className="w-8 h-8 rounded-full bg-[#4d6350] flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-white/10">
                 {userName.slice(0, 1).toUpperCase()}
               </div>
-              <div className="min-w-0">
-                <p className="text-foreground/65 text-xs font-medium truncate">{userName}</p>
-                <p className="text-foreground/25 text-[10px] truncate">Administração</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-white/80 text-xs font-medium truncate">{userName}</p>
+                <p className="text-white/30 text-[10px] truncate">Administração</p>
               </div>
             </div>
-            <button
-              onClick={() => setShortcutsOpen(true)}
-              className="w-full mt-1 flex items-center gap-2 px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
+            <div className="flex gap-1">
+              <button
+                onClick={() => setShortcutsOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                title="Atalhos de teclado"
               >
-                <rect x="2" y="6" width="20" height="12" rx="2" />
-                <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12" strokeLinecap="round" />
-              </svg>
-              Atalhos
-              <kbd className="ml-auto text-[9px] border border-foreground/15 rounded px-1 py-0.5">
-                ?
-              </kbd>
-            </button>
-            <a
-              href="/api/backup"
-              className="w-full mt-0.5 flex items-center gap-2 px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <rect x="2" y="6" width="20" height="12" rx="2" />
+                  <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12" strokeLinecap="round" />
+                </svg>
+                Atalhos
+              </button>
+              <a
+                href="/api/backup"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                title="Exportar backup"
               >
-                <path
-                  d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Backup
-            </a>
-            <button
-              onClick={logout}
-              className="w-full mt-0.5 text-left px-3 py-2 text-foreground/30 text-[10px] tracking-[0.2em] uppercase rounded-md hover:text-foreground/60 hover:bg-foreground/4 transition-colors"
-            >
-              Sair
-            </button>
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path
+                    d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Backup
+              </a>
+              <button
+                onClick={logout}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                title="Terminar sessão"
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path
+                    d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Sair
+              </button>
+            </div>
           </div>
         </aside>
 
-        {/* Backdrop (mobile) */}
+        {/* Backdrop (mobile nav drawer) */}
         {navOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-[2px]"
             onClick={() => setNavOpen(false)}
           />
         )}
 
-        {/* ── Main ── */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-surface/85 backdrop-blur-xl border-b border-foreground/8 px-4 sm:px-6 lg:px-12 py-4 lg:py-6 flex items-center gap-3 sm:gap-4">
+        {/* ── Mobile bottom navigation ──
+            Hidden while a quote detail drawer is open: it's a focused, modal
+            surface, so the tab bar would only overlap its footer and distract. */}
+        <nav
+          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1b2119] border-t border-white/[0.07] transition-transform duration-300 ${
+            selected ? "translate-y-full" : "translate-y-0"
+          }`}
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="flex items-stretch">
+            {(
+              [
+                { id: "overview", label: "Início" },
+                { id: "pedidos", label: "Pedidos" },
+                { id: "kanban", label: "Pipeline" },
+                { id: "calendario", label: "Agenda" },
+              ] as const
+            ).map((item) => {
+              const navItem = NAV.find((n) => n.id === item.id)!;
+              const isActive = view === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setView(item.id)}
+                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-3 px-1 transition-colors ${
+                    isActive ? "text-[#8aad85]" : "text-white/32"
+                  }`}
+                >
+                  {item.id === "pedidos" && pendingCount > 0 && (
+                    <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[#637a5f]" />
+                  )}
+                  <span
+                    className={`transition-transform duration-150 ${isActive ? "scale-110" : ""}`}
+                  >
+                    {navItem.icon}
+                  </span>
+                  <span className="text-[8px] tracking-wide uppercase font-medium">
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
             <button
-              className="lg:hidden text-foreground/50 -ml-1"
               onClick={() => setNavOpen(true)}
-              aria-label="Menu"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 px-1 transition-colors ${
+                !["overview", "pedidos", "kanban", "calendario"].includes(view)
+                  ? "text-[#8aad85]"
+                  : "text-white/32"
+              }`}
             >
               <svg
-                width="20"
-                height="20"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
               >
-                <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+                <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
               </svg>
+              <span className="text-[8px] tracking-wide uppercase font-medium">Mais</span>
             </button>
+          </div>
+        </nav>
+
+        {/* ── Main ── */}
+        <div className="flex-1 min-w-0 flex flex-col pb-16 lg:pb-0">
+          {/* Top bar */}
+          <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
             <div className="min-w-0">
-              <p className="eyebrow mb-1.5">{VIEW_SUB[view]}</p>
+              <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
+                {VIEW_SUB[view]}
+              </p>
               <h1
-                className="text-foreground/90 font-bold leading-none"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3vw, 32px)" }}
+                className="text-foreground/88 font-bold leading-none"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.6vw, 30px)" }}
               >
                 {VIEW_TITLES[view]}
               </h1>
             </div>
-            <div className="ml-auto flex items-center gap-3 shrink-0">
+            <div className="ml-auto flex items-center gap-2 shrink-0">
               <NotificationBell />
               <button
-                onClick={() => setNewQuoteOpen(true)}
-                aria-label="Novo pedido"
-                className="flex items-center gap-2 px-4 py-2 bg-moss text-cream text-[10px] tracking-[0.18em] uppercase rounded-md hover:bg-moss-dark transition-colors"
-                title="Criar pedido manualmente"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                >
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                </svg>
-                <span className="hidden sm:inline">Novo</span>
-              </button>
-              <button
                 onClick={() => setPaletteOpen(true)}
-                className="hidden sm:flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-md hover:border-foreground/25 hover:text-foreground/55 transition-colors"
+                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-foreground/60 transition-colors"
                 title="Pesquisar (Ctrl K)"
               >
                 <svg
@@ -818,8 +889,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   <circle cx="11" cy="11" r="7" />
                   <path d="m21 21-4.3-4.3" strokeLinecap="round" />
                 </svg>
-                Pesquisar
-                <kbd className="text-[8px] border border-foreground/15 rounded px-1 py-0.5 ml-1">
+                <span className="hidden md:inline">Pesquisar</span>
+                <kbd className="text-[8px] border border-foreground/12 rounded px-1 py-0.5 ml-0.5">
                   ⌘K
                 </kbd>
               </button>
@@ -827,11 +898,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 onClick={refresh}
                 disabled={refreshing}
                 aria-label="Actualizar pedidos"
-                className="group flex items-center gap-2 px-4 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.22em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors"
+                className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
               >
                 <svg
-                  width="12"
-                  height="12"
+                  width="13"
+                  height="13"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -851,6 +922,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <span className="hidden sm:inline">
                   {refreshing ? "A actualizar" : "Actualizar"}
                 </span>
+              </button>
+              <button
+                onClick={() => setNewQuoteOpen(true)}
+                aria-label="Novo pedido"
+                className="flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
+                title="Criar pedido manualmente"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                >
+                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                </svg>
+                <span className="hidden sm:inline">Novo</span>
               </button>
             </div>
           </header>
@@ -938,7 +1027,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
               <div className="relative flex-1 max-w-md">
                 <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground/28"
                   width="14"
                   height="14"
                   viewBox="0 0 24 24"
@@ -954,14 +1043,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Procurar por nome, email, local, ID…  ( / )"
-                  className="w-full bg-surface-raised/50 border border-foreground/12 rounded-md pl-9 pr-3 py-2 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+                  className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 shadow-sm transition-colors"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as typeof sort)}
-                  className="flex-1 lg:flex-none bg-surface-raised/50 border border-foreground/12 rounded-md px-3 py-2 text-xs text-foreground/55 focus:outline-none focus:border-moss/45"
+                  className="flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/55 focus:outline-none focus:border-foreground/25 shadow-sm"
                 >
                   <option value="recent">Mais recentes</option>
                   <option value="old">Mais antigos</option>
@@ -975,7 +1064,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       "success",
                     );
                   }}
-                  className="flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.18em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors whitespace-nowrap"
+                  className="flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm whitespace-nowrap"
                   title="Exportar a lista atual para CSV (Excel)"
                 >
                   <svg
@@ -998,16 +1087,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </div>
 
             {/* Status filter */}
-            <div className="flex flex-wrap gap-2 mb-8">
+            <div className="flex flex-wrap gap-1.5 mb-8">
               <button
                 onClick={() => setFilterStatus("all")}
-                className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${
+                className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${
                   filterStatus === "all"
-                    ? "bg-moss border-moss text-cream"
-                    : "border-foreground/15 text-foreground/35 hover:border-foreground/30"
+                    ? "bg-[#1b2119] text-white shadow-sm"
+                    : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
                 }`}
               >
-                Todos ({quotes.length})
+                Todos · {quotes.length}
               </button>
               {STATUS_OPTIONS.map((s) => {
                 const count = quotes.filter((q) => q.status === s.id).length;
@@ -1015,13 +1104,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   <button
                     key={s.id}
                     onClick={() => setFilterStatus(s.id)}
-                    className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${
+                    className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${
                       filterStatus === s.id
-                        ? "bg-moss border-moss text-cream"
-                        : "border-foreground/15 text-foreground/35 hover:border-foreground/30"
+                        ? "bg-[#1b2119] text-white shadow-sm"
+                        : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
                     }`}
                   >
-                    {s.label} ({count})
+                    {s.label} · {count}
                   </button>
                 );
               })}
@@ -1029,14 +1118,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
             {/* Bulk actions */}
             {selectedIds.size > 0 && (
-              <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-md border border-moss/30 bg-moss/8">
-                <span className="text-moss text-xs font-medium">
+              <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06]">
+                <span className="text-[#4d6350] text-xs font-semibold">
                   {selectedIds.size} selecionado{selectedIds.size !== 1 ? "s" : ""}
                 </span>
                 {selectedIds.size < filtered.length && (
                   <button
                     onClick={() => setSelectedIds(new Set(filtered.map((q) => q.id)))}
-                    className="text-foreground/40 text-xs hover:text-moss transition-colors"
+                    className="text-foreground/40 text-xs hover:text-[#4d6350] transition-colors"
                   >
                     Selecionar todos ({filtered.length})
                   </button>
@@ -1052,7 +1141,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       const v = e.target.value as QuoteStatus;
                       if (v) applyBulkStatus(v);
                     }}
-                    className="bg-surface border border-foreground/15 rounded-md px-2 py-1.5 text-xs text-foreground/70 focus:outline-none focus:border-moss/50 disabled:opacity-50"
+                    className="bo-input px-2 py-1.5 text-xs text-foreground/70 disabled:opacity-50"
                   >
                     <option value="">{bulkBusy ? "A aplicar…" : "—"}</option>
                     {STATUS_OPTIONS.map((s) => (
@@ -1069,7 +1158,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
                     )
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors shadow-sm"
                 >
                   Exportar seleção
                 </button>
@@ -1081,7 +1170,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   return (
                     <a
                       href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors shadow-sm"
                       title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
                     >
                       Email ({emails.length})
@@ -1101,8 +1190,38 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {/* List */}
               <div className="flex flex-col gap-3">
                 {filtered.length === 0 && (
-                  <div className="text-center py-16 text-foreground/25">
-                    <p className="text-sm">Nenhum pedido encontrado.</p>
+                  <div className="bo-card">
+                    <EmptyState
+                      icon={
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                        >
+                          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                          <rect x="9" y="3" width="6" height="4" rx="1" />
+                          <path d="M9 12h6M9 16h4" strokeLinecap="round" />
+                        </svg>
+                      }
+                      title={
+                        search.trim() || filterStatus !== "all"
+                          ? "Nenhum pedido corresponde"
+                          : "Sem pedidos ainda"
+                      }
+                      hint={
+                        search.trim() || filterStatus !== "all"
+                          ? "Limpe a pesquisa ou o filtro para ver todos os pedidos."
+                          : "Os pedidos de orçamento do site aparecem aqui. Pode também criar um manualmente."
+                      }
+                      action={
+                        search.trim() || filterStatus !== "all"
+                          ? undefined
+                          : { label: "+ Novo pedido", onClick: () => setNewQuoteOpen(true) }
+                      }
+                    />
                   </div>
                 )}
                 {filtered.map((q) => {
@@ -1122,44 +1241,46 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           type="checkbox"
                           checked={isSel}
                           onChange={() => toggleSelect(q.id)}
-                          className="w-4 h-4 accent-[#7c854b] cursor-pointer"
+                          className="w-4 h-4 accent-[#4d6350] cursor-pointer"
                           aria-label={`Selecionar pedido de ${q.name}`}
                         />
                       </label>
                       <button
                         type="button"
                         onClick={() => openQuote(q)}
-                        className={`w-full text-left p-5 pl-12 rounded-md border transition-all duration-200 ${
+                        className={`w-full text-left p-5 pl-12 rounded-xl border transition-all duration-200 ${
                           selected?.id === q.id
-                            ? "border-moss bg-moss/6"
+                            ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
                             : isSel
-                              ? "border-moss/40 bg-moss/[0.04]"
-                              : "border-foreground/10 hover:border-foreground/25 bg-surface-raised/40"
+                              ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
+                              : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div>
-                            <p className="text-foreground/70 text-sm font-medium">{q.name}</p>
-                            <p className="text-foreground/50 text-xs">{q.email}</p>
+                            <p className="text-foreground/75 text-sm font-semibold">{q.name}</p>
+                            <p className="text-foreground/42 text-xs mt-0.5">{q.email}</p>
                           </div>
                           {statusBadge(q.status)}
                         </div>
-                        <div className="flex items-center gap-4 text-foreground/30 text-[10px]">
+                        <div className="flex items-center gap-3 text-foreground/32 text-[10px]">
                           <span>{cat?.label ?? "—"}</span>
                           {et && (
                             <>
-                              <span className="w-px h-3 bg-foreground/12" />
+                              <span className="w-px h-2.5 bg-foreground/12" />
                               <span>{et.label}</span>
                             </>
                           )}
-                          <span className="w-px h-3 bg-foreground/12" />
+                          <span className="w-px h-2.5 bg-foreground/12" />
                           <span>{q.guests} pax</span>
                         </div>
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/8">
-                          <span className="text-foreground/40 text-[10px] font-mono">{q.id}</span>
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
+                          <span className="text-foreground/30 text-[10px] font-mono tracking-tight">
+                            {q.id}
+                          </span>
                           <div className="flex items-center gap-3">
                             {q.quotedPrice ? (
-                              <span className="text-moss text-xs font-medium">
+                              <span className="text-[#4d6350] text-xs font-semibold">
                                 {formatPrice(q.quotedPrice)}
                               </span>
                             ) : q.priceBreakdown?.total ? (
@@ -1168,7 +1289,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 {formatPrice(q.priceBreakdown.rangeMax)}
                               </span>
                             ) : null}
-                            <span className="text-foreground/20 text-[10px]">
+                            <span className="text-foreground/22 text-[10px]">
                               {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
                                 day: "numeric",
                                 month: "short",
@@ -1186,8 +1307,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {selected ? (
                 <>
                   <div className="fixed inset-0 z-40 bg-black/50 xl:hidden" onClick={closeDetail} />
-                  <div className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-surface-raised xl:bg-transparent border-l xl:border border-foreground/10 xl:rounded-md xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-none">
-                    <div className="px-5 py-4 border-b border-foreground/8 flex items-center justify-between sticky top-0 bg-surface-raised/80 backdrop-blur-sm">
+                  <div className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-white xl:bg-white border-l xl:border border-foreground/[0.08] xl:rounded-xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-sm">
+                    <div className="px-5 py-4 border-b border-foreground/[0.07] flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-sm z-10">
                       <div>
                         <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">
                           {selected.id}
@@ -1197,7 +1318,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => printRunSheet(selected)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-md hover:text-moss hover:bg-moss/10 transition-colors"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
                           title="Imprimir run-sheet do evento"
                         >
                           <svg
@@ -1236,7 +1357,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         <div className="flex flex-col gap-1.5">
                           <a
                             href={`mailto:${selected.email}`}
-                            className="text-moss text-xs hover:underline"
+                            className="text-[#4d6350] text-xs hover:underline"
                           >
                             {selected.email}
                           </a>
@@ -1287,7 +1408,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 : "—",
                             },
                             { l: "Local", v: selected.location || "—" },
-                            { l: "Duração", v: `${selected.duration}h` },
+                            { l: "Duração", v: selected.duration ? `${selected.duration}h` : "—" },
                             { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
                           ].map(({ l, v }) => (
                             <div key={l}>
@@ -1341,7 +1462,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             </div>
                             <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
                               <span className="text-foreground/60">Total</span>
-                              <span className="text-moss">
+                              <span className="text-[#4d6350] font-semibold">
                                 {formatPrice(selected.priceBreakdown.total)}
                               </span>
                             </div>
@@ -1362,7 +1483,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             <select
                               value={editStatus}
                               onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                              className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50"
+                              className="bo-input px-3 py-2 text-sm text-foreground/70"
                             >
                               {STATUS_OPTIONS.map((s) => (
                                 <option key={s.id} value={s.id}>
@@ -1380,7 +1501,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               value={editPrice}
                               onChange={(e) => setEditPrice(e.target.value)}
                               placeholder="Ex: 12500"
-                              className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50"
+                              className="bo-input px-3 py-2 text-sm text-foreground/70"
                             />
                           </div>
                           <div>
@@ -1392,7 +1513,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               value={editNotes}
                               onChange={(e) => setEditNotes(e.target.value)}
                               placeholder="Notas internas sobre este pedido…"
-                              className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 resize-none"
+                              className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
                             />
                           </div>
                           {isDirty && !saving && (
@@ -1407,7 +1528,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <button
                             onClick={saveChanges}
                             disabled={saving || !isDirty}
-                            className={`w-full py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${saving || !isDirty ? "bg-moss/40 text-cream/50 cursor-not-allowed" : "bg-moss text-cream hover:bg-moss-dark"}`}
+                            className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
                           >
                             {saving ? "A guardar…" : "Guardar Alterações →"}
                           </button>
@@ -1492,7 +1613,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   </div>
                 </>
               ) : (
-                <div className="hidden xl:flex items-center justify-center border border-foreground/6 rounded-md text-foreground/18 text-sm">
+                <div className="hidden xl:flex flex-col items-center justify-center gap-3 border border-dashed border-foreground/12 rounded-xl text-foreground/22 text-sm bg-foreground/[0.015]">
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    className="text-foreground/15"
+                  >
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                    <rect x="9" y="3" width="6" height="4" rx="1" />
+                    <path d="M9 12h6M9 16h4" strokeLinecap="round" />
+                  </svg>
                   Seleccione um pedido para ver detalhes
                 </div>
               )}

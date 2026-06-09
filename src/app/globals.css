@@ -338,7 +338,7 @@ body:has([data-orcamento-mode]) .scroll-progress {
 }
 
 /* ── Back-office: full-screen tool surface (clean & minimal) ── */
-body.admin-mode nav[class*="fixed"] {
+body.admin-mode nav[data-public-nav] {
   display: none !important;
 }
 body.admin-mode main {
@@ -495,6 +495,75 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
 }
 .view-in {
   animation: view-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Back-office: shared component primitives ──
+   The admin tool standardises on white cards with a hairline border + soft
+   shadow, forest-green (#1b2119) for dark accents and #4d6350 for the green
+   call-outs. These classes keep that language consistent across every view. */
+.bo-card {
+  background: #ffffff;
+  border: 1px solid rgba(42, 38, 32, 0.08);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(42, 38, 32, 0.04);
+}
+.bo-card-interactive {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.bo-card-interactive:hover {
+  border-color: rgba(42, 38, 32, 0.16);
+  box-shadow: 0 4px 14px rgba(42, 38, 32, 0.07);
+}
+/* Input / select fields inside the back office */
+.bo-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid rgba(42, 38, 32, 0.09);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(42, 38, 32, 0.04);
+  transition: border-color 0.2s ease;
+}
+.bo-input:focus {
+  outline: none;
+  border-color: rgba(42, 38, 32, 0.25);
+}
+/* Eyebrow label used atop panels */
+.bo-eyebrow {
+  color: rgba(42, 38, 32, 0.35);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* Skeleton loader — a soft shimmering placeholder block. Used while a view or
+   its data is still loading, so the layout settles instead of flashing text. */
+@keyframes bo-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.bo-skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(
+    90deg,
+    rgba(42, 38, 32, 0.05) 25%,
+    rgba(42, 38, 32, 0.09) 37%,
+    rgba(42, 38, 32, 0.05) 63%
+  );
+  background-size: 200% 100%;
+  animation: bo-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bo-skeleton {
+    animation: none;
+  }
 }
 
 /* ── Back-office: hairline panel + soft hover lift ── */

@@ -70,8 +70,7 @@ export default function NewQuoteModal({ open, onClose, onCreated }: Props) {
     }
   }
 
-  const input =
-    "w-full bg-surface border border-foreground/15 rounded-md px-3 py-2 text-sm text-foreground/75 placeholder-foreground/22 focus:outline-none focus:border-moss/45";
+  const input = "bo-input px-3 py-2 text-sm text-foreground/75 placeholder-foreground/22";
   const label = "block text-[10px] text-foreground/30 tracking-[0.3em] uppercase mb-2";
 
   return (
@@ -84,7 +83,7 @@ export default function NewQuoteModal({ open, onClose, onCreated }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Novo pedido"
-        className="relative w-full max-w-xl bg-surface-elevated/97 backdrop-blur-xl border border-foreground/12 rounded-xl shadow-2xl shadow-black/60 mb-12"
+        className="relative w-full max-w-xl bg-white border border-foreground/10 rounded-2xl shadow-2xl mb-12"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/8">
@@ -234,10 +233,10 @@ export default function NewQuoteModal({ open, onClose, onCreated }: Props) {
           <button
             onClick={submit}
             disabled={saving || !f.name.trim()}
-            className={`px-6 py-2.5 rounded-md text-[11px] tracking-[0.2em] uppercase transition-colors ${
+            className={`px-6 py-2.5 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-colors ${
               saving || !f.name.trim()
-                ? "bg-moss/40 text-cream/50 cursor-not-allowed"
-                : "bg-moss text-cream hover:bg-moss-dark"
+                ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
+                : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
             }`}
           >
             {saving ? "A criar…" : "Criar pedido →"}

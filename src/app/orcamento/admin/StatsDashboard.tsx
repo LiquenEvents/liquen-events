@@ -45,14 +45,31 @@ function eventTypeLabel(q: Quote): string {
 
 function Kpi({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   return (
-    <div className="border border-foreground/10 rounded-sm p-5 bg-surface-raised/40">
+    <div
+      className={`relative overflow-hidden rounded-xl p-5 border ${
+        accent ? "bg-[#1b2119] border-[#2d3829]" : "bg-white border-foreground/[0.08] shadow-sm"
+      }`}
+    >
+      {accent && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 85% 15%, rgba(99,122,95,0.25) 0%, transparent 60%)",
+          }}
+        />
+      )}
       <p
-        className={`font-bold leading-none mb-2 ${accent ? "text-moss" : "text-foreground/80"}`}
+        className={`font-bold leading-none mb-2 relative ${accent ? "text-[#8aad85]" : "text-foreground/82"}`}
         style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 2.6vw, 34px)" }}
       >
         {value}
       </p>
-      <p className="text-foreground/30 text-[9px] tracking-[0.25em] uppercase">{label}</p>
+      <p
+        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-white/30" : "text-foreground/30"}`}
+      >
+        {label}
+      </p>
     </div>
   );
 }
@@ -113,8 +130,10 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border border-foreground/10 rounded-sm p-6 bg-surface-raised/30">
-      <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-6">{title}</p>
+    <div className="border border-foreground/[0.08] rounded-xl p-6 bg-white shadow-sm">
+      <p className="text-foreground/35 text-[10px] tracking-[0.3em] uppercase mb-6 font-medium">
+        {title}
+      </p>
       {children}
     </div>
   );
@@ -278,7 +297,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
             onClick={() =>
               downloadCsv(`liquen-pagamentos-${dateStamp()}`, paymentsToCsvRows(quotes))
             }
-            className="px-4 py-2 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.2em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-colors"
+            className="px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
             title="Exportar todos os pagamentos (tesouraria) para CSV"
           >
             Pagamentos ↓
@@ -286,7 +305,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         )}
         <button
           onClick={() => downloadCsv(`liquen-pedidos-${dateStamp()}`, quotesToCsvRows(quotes))}
-          className="px-4 py-2 border border-foreground/15 text-foreground/45 text-[10px] tracking-[0.2em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-colors"
+          className="px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
         >
           Exportar CSV ↓
         </button>

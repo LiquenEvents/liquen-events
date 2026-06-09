@@ -158,23 +158,40 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { v: String(data.total), l: "Pedidos totais", accent: true },
+          { v: String(data.total), l: "Pedidos totais", dark: true },
           { v: String(data.thisMonth), l: "Este mês" },
           { v: eur(data.pipeline), l: "Em proposta" },
           { v: eur(data.outstanding), l: "A receber" },
-          { v: eur(data.won), l: "Ganho", accent: true },
+          { v: eur(data.won), l: "Ganho", dark: true },
         ].map((k) => (
           <div
             key={k.l}
-            className="border border-foreground/10 rounded-md p-5 bg-surface-raised/40"
+            className={`relative overflow-hidden rounded-xl p-5 border ${
+              k.dark
+                ? "bg-[#1b2119] border-[#2d3829]"
+                : "bg-white border-foreground/[0.08] shadow-sm"
+            }`}
           >
+            {k.dark && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 85% 15%, rgba(99,122,95,0.25) 0%, transparent 60%)",
+                }}
+              />
+            )}
             <p
-              className={`font-bold leading-none mb-2 ${k.accent ? "text-moss" : "text-foreground/80"}`}
+              className={`font-bold leading-none mb-2 relative ${k.dark ? "text-[#8aad85]" : "text-foreground/82"}`}
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.4vw, 30px)" }}
             >
               {k.v}
             </p>
-            <p className="text-foreground/30 text-[9px] tracking-[0.25em] uppercase">{k.l}</p>
+            <p
+              className={`text-[9px] tracking-[0.25em] uppercase relative ${k.dark ? "text-white/30" : "text-foreground/30"}`}
+            >
+              {k.l}
+            </p>
           </div>
         ))}
       </div>
@@ -185,18 +202,20 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
       {/* Agenda — combines events, calendar entries, tasks & payments due */}
       <Agenda quotes={quotes} onOpen={onOpen} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
         {/* Needs attention */}
-        <div className="border border-foreground/10 rounded-md bg-surface-raised/30">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/8">
-            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
+        <div className="border border-foreground/[0.08] rounded-xl bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+            <p className="text-foreground/35 text-[10px] tracking-[0.3em] uppercase font-medium">
               Precisam de atenção
             </p>
             {data.needAction.length > 0 && (
-              <span className="text-moss text-[10px] tabular-nums">{data.needAction.length}</span>
+              <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
+                {data.needAction.length}
+              </span>
             )}
           </div>
-          <div className="divide-y divide-foreground/6 max-h-[360px] overflow-y-auto">
+          <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
             {data.needAction.length === 0 && (
               <p className="text-foreground/25 text-sm text-center py-12">
                 Sem pedidos pendentes. ✓
@@ -206,19 +225,19 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 py-3.5 hover:bg-moss/5 transition-colors flex items-center justify-between gap-3"
+                className="w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors flex items-center justify-between gap-3"
               >
                 <div className="min-w-0">
-                  <p className="text-foreground/70 text-sm truncate">{q.name}</p>
-                  <p className="text-foreground/30 text-xs truncate">
+                  <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
+                  <p className="text-foreground/30 text-xs truncate mt-0.5">
                     {eventTypeLabel(q)} · {q.guests} pax
                   </p>
                 </div>
                 <div className="text-right shrink-0">
                   <span
-                    className="text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm"
+                    className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
                     style={{
-                      background: `${STATUS_META[q.status].color}22`,
+                      background: `${STATUS_META[q.status].color}18`,
                       color: STATUS_META[q.status].color,
                     }}
                   >
@@ -232,38 +251,38 @@ export default function Overview({ quotes, userName, onOpen, onGoStats }: Props)
         </div>
 
         {/* Snapshot */}
-        <div className="flex flex-col gap-6">
-          <div className="border border-foreground/10 rounded-md bg-surface-raised/30 p-5">
+        <div className="flex flex-col gap-4">
+          <div className="border border-foreground/[0.08] rounded-xl bg-white shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
+              <p className="text-foreground/35 text-[10px] tracking-[0.3em] uppercase font-medium">
                 Últimos 6 meses
               </p>
               <button
                 onClick={onGoStats}
-                className="text-moss/70 hover:text-moss text-[10px] tracking-[0.2em] uppercase transition-colors"
+                className="text-[#637a5f]/70 hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors"
               >
                 Ver tudo →
               </button>
             </div>
             <Spark data={data.months} />
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-foreground/8">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-foreground/[0.07]">
               <span className="text-foreground/35 text-xs">Taxa de conversão</span>
-              <span className="text-foreground/70 text-sm font-medium">{data.conversion}%</span>
+              <span className="text-foreground/75 text-sm font-semibold">{data.conversion}%</span>
             </div>
           </div>
 
-          <div className="border border-foreground/10 rounded-md bg-surface-raised/30">
-            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase px-5 py-4 border-b border-foreground/8">
+          <div className="border border-foreground/[0.08] rounded-xl bg-white shadow-sm overflow-hidden">
+            <p className="text-foreground/35 text-[10px] tracking-[0.3em] uppercase font-medium px-5 py-4 border-b border-foreground/[0.07]">
               Atividade recente
             </p>
-            <div className="divide-y divide-foreground/6">
+            <div className="divide-y divide-foreground/[0.06]">
               {data.recent.map((q) => (
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className="w-full text-left px-5 py-3 hover:bg-moss/5 transition-colors flex items-center justify-between gap-3"
+                  className="w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors flex items-center justify-between gap-3"
                 >
-                  <span className="text-foreground/55 text-xs truncate">{q.name}</span>
+                  <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
                   <span className="text-foreground/22 text-[10px] shrink-0">
                     {timeAgo(q.submittedAt)}
                   </span>

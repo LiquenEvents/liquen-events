@@ -64,6 +64,7 @@ export default function Navbar() {
 
   return (
     <nav
+      data-public-nav
       className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
         scrolled
           ? "bg-surface/55 backdrop-blur-md border-b border-foreground/8 shadow-sm shadow-black/5"
@@ -78,7 +79,11 @@ export default function Navbar() {
         />
       )}
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
-        <div className="relative flex items-center justify-between h-[140px]">
+        <div
+          className={`relative flex items-center justify-between transition-all duration-500 ${
+            scrolled ? "h-[72px]" : "h-[140px]"
+          }`}
+        >
           <Link
             href="/"
             className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
@@ -88,7 +93,7 @@ export default function Navbar() {
               alt="Líquen Events"
               width={210}
               height={125}
-              className="object-contain h-[120px] w-auto"
+              className={`object-contain w-auto transition-all duration-500 ${scrolled ? "h-[52px]" : "h-[120px]"}`}
               preload
             />
           </Link>

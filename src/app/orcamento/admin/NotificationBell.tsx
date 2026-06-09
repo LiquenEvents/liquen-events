@@ -101,7 +101,7 @@ export default function NotificationBell() {
             toast("Não foi possível enviar", "error");
           }
         }}
-        className="flex items-center gap-2 px-3 py-2 text-moss text-[10px] tracking-[0.15em] uppercase rounded-md hover:bg-moss/8 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 text-[#4d6350] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#4d6350]/8 transition-colors"
         title="Notificações ativas — clique para enviar o resumo agora"
       >
         <svg
@@ -133,7 +133,7 @@ export default function NotificationBell() {
           ? "Notificações bloqueadas no navegador"
           : "Ativar notificações neste dispositivo"
       }
-      className="flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.15em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      className="flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
       <svg
         width="13"

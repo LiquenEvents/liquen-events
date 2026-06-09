@@ -146,11 +146,9 @@ export default function Agenda({ quotes, onOpen }: Props) {
   }
 
   return (
-    <div className="border border-foreground/10 rounded-md bg-surface-raised/30">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/8">
-        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
-          Agenda · próximos {DAYS_AHEAD} dias
-        </p>
+    <div className="bo-card overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+        <p className="bo-eyebrow">Agenda · próximos {DAYS_AHEAD} dias</p>
         <div className="flex items-center gap-3">
           {(["evento", "agenda", "tarefa", "pagamento"] as ItemKind[]).map((k) => (
             <span
@@ -181,9 +179,9 @@ export default function Agenda({ quotes, onOpen }: Props) {
           </p>
         ) : (
           days.map((key) => (
-            <div key={key} className="border-b border-foreground/6 last:border-0">
+            <div key={key} className="border-b border-foreground/[0.06] last:border-0">
               <p
-                className={`px-5 pt-3 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize ${key === todayKey ? "text-moss" : "text-foreground/35"}`}
+                className={`px-5 pt-3 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayKey ? "text-[#4d6350]" : "text-foreground/35"}`}
               >
                 {dayLabel(key)}
               </p>
@@ -194,7 +192,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                     <Wrap
                       key={i}
                       onClick={it.onClick}
-                      className={`w-full text-left px-5 py-2 flex items-center gap-3 ${it.onClick ? "hover:bg-moss/5 transition-colors cursor-pointer" : ""}`}
+                      className={`w-full text-left px-5 py-2 flex items-center gap-3 ${it.onClick ? "hover:bg-foreground/[0.02] transition-colors cursor-pointer" : ""}`}
                     >
                       <span
                         className="w-1.5 h-1.5 rounded-full shrink-0"

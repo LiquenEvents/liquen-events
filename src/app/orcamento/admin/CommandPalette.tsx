@@ -107,7 +107,7 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
         role="dialog"
         aria-modal="true"
         aria-label="Pesquisar e navegar"
-        className="relative w-full max-w-lg bg-surface-elevated/95 backdrop-blur-xl border border-foreground/12 rounded-xl shadow-2xl shadow-black/60 overflow-hidden"
+        className="relative w-full max-w-lg bg-white border border-foreground/10 rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
@@ -157,11 +157,11 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
                       onClose();
                     }}
                     className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-colors ${
-                      active === idx ? "bg-moss/15" : "hover:bg-foreground/[0.04]"
+                      active === idx ? "bg-[#4d6350]/12" : "hover:bg-foreground/[0.04]"
                     }`}
                   >
                     <span
-                      className={`text-sm ${active === idx ? "text-moss" : "text-foreground/65"}`}
+                      className={`text-sm ${active === idx ? "text-[#4d6350] font-medium" : "text-foreground/65"}`}
                     >
                       {c.label}
                     </span>

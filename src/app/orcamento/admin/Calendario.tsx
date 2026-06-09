@@ -219,7 +219,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
   return (
     <>
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-        <div className="border border-foreground/10 rounded-md bg-surface-raised/30 p-5">
+        <div className="bo-card p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3
@@ -236,7 +236,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               <button
                 onClick={() => exportIcs(quotes)}
                 title="Exportar para calendário (.ics)"
-                className="px-3 h-8 mr-1 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-moss hover:border-moss/40 transition-colors"
+                className="px-3 h-8 mr-1 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-[#4d6350] hover:border-[#4d6350]/40 transition-colors"
               >
                 Exportar
               </button>
@@ -300,15 +300,15 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       openAdd(key);
                     }
                   }}
-                  className={`group min-h-[64px] rounded-md border p-1.5 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/55 ${isToday ? "border-moss/50 bg-moss/5" : "border-foreground/8 bg-surface/30 hover:border-moss/30 hover:bg-moss/[0.03]"}`}
+                  className={`group min-h-[64px] rounded-md border p-1.5 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${isToday ? "border-[#4d6350]/50 bg-[#4d6350]/[0.06]" : "border-foreground/[0.07] bg-white hover:border-[#4d6350]/30 hover:bg-[#4d6350]/[0.025]"}`}
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      className={`text-[10px] tabular-nums ${isToday ? "text-moss font-bold" : "text-foreground/35"}`}
+                      className={`text-[10px] tabular-nums ${isToday ? "text-[#4d6350] font-bold" : "text-foreground/35"}`}
                     >
                       {d}
                     </span>
-                    <span className="text-moss/0 group-hover:text-moss/60 text-[11px] leading-none transition-colors">
+                    <span className="text-[#4d6350]/0 group-hover:text-[#4d6350]/60 text-[11px] leading-none transition-colors">
                       +
                     </span>
                   </div>
@@ -365,21 +365,19 @@ export default function Calendario({ quotes, onOpen }: Props) {
         </div>
 
         {/* Upcoming */}
-        <div className="border border-foreground/10 rounded-md bg-surface-raised/30">
-          <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase px-5 py-4 border-b border-foreground/8">
-            Próximos eventos
-          </p>
-          <div className="divide-y divide-foreground/6">
+        <div className="bo-card">
+          <p className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">Próximos eventos</p>
+          <div className="divide-y divide-foreground/[0.06]">
             {upcoming.map((q) => (
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 py-3.5 hover:bg-moss/5 transition-colors"
+                className="w-full text-left px-5 py-3.5 hover:bg-foreground/[0.02] transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="text-center shrink-0 w-10">
                     <p
-                      className="text-moss text-lg font-bold leading-none"
+                      className="text-[#4d6350] text-lg font-bold leading-none"
                       style={{ fontFamily: "var(--font-playfair)" }}
                     >
                       {new Date(q.date + "T12:00:00").getDate()}
@@ -415,7 +413,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
             role="dialog"
             aria-modal="true"
             aria-label={`Adicionar ao calendário — ${modalDateLabel}`}
-            className="relative w-full max-w-md bg-surface-raised border border-foreground/12 rounded-lg p-6 shadow-2xl"
+            className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-5">
@@ -457,7 +455,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               onKeyDown={(e) => e.key === "Enter" && addEvent()}
               placeholder="Título (ex: Reunião com fornecedor)"
-              className="w-full bg-surface border border-foreground/15 rounded-md px-3 py-2.5 text-sm text-foreground/75 placeholder-foreground/25 focus:outline-none focus:border-moss/50 mb-2"
+              className="bo-input px-3 py-2.5 text-sm text-foreground/75 placeholder-foreground/25 mb-2"
             />
 
             <div className="flex gap-2 mb-2">
@@ -465,20 +463,20 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 type="time"
                 value={form.time}
                 onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                className="bg-surface border border-foreground/15 rounded-md px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 w-32"
+                className="bo-input px-3 py-2 text-sm text-foreground/70 w-32"
               />
               <input
                 value={form.note}
                 onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
                 placeholder="Nota (opcional)"
-                className="flex-1 bg-surface border border-foreground/15 rounded-md px-3 py-2 text-sm text-foreground/70 placeholder-foreground/25 focus:outline-none focus:border-moss/50"
+                className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70 placeholder-foreground/25"
               />
             </div>
 
             <button
               onClick={addEvent}
               disabled={saving || !form.title.trim()}
-              className={`w-full mt-3 py-2.5 rounded-md text-[11px] tracking-[0.2em] uppercase transition-colors ${saving || !form.title.trim() ? "bg-moss/40 text-cream/50 cursor-not-allowed" : "bg-moss text-cream hover:bg-moss-dark"}`}
+              className={`w-full mt-3 py-2.5 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-colors ${saving || !form.title.trim() ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
             >
               {saving ? "A guardar…" : "Adicionar ao calendário"}
             </button>

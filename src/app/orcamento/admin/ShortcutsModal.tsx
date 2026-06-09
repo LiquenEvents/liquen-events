@@ -63,13 +63,11 @@ export default function ShortcutsModal({ open, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Atalhos de teclado"
-        className="relative w-full max-w-2xl bg-surface-elevated/95 backdrop-blur-xl border border-foreground/12 rounded-xl shadow-2xl shadow-black/60 overflow-hidden"
+        className="relative w-full max-w-2xl bg-white border border-foreground/10 rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/8">
-          <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
-            Atalhos de teclado
-          </p>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/[0.07]">
+          <p className="bo-eyebrow">Atalhos de teclado</p>
           <button
             onClick={onClose}
             className="text-foreground/30 hover:text-foreground/60 transition-colors text-lg leading-none"

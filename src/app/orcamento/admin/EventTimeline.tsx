@@ -60,11 +60,9 @@ export default function EventTimeline({ quote, onChange }: Props) {
   return (
     <div className="border-t border-foreground/10 pt-5">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
-          Cronograma do Dia
-        </p>
+        <p className="bo-eyebrow">Cronograma do Dia</p>
         {items.length > 0 && (
-          <span className="text-foreground/35 text-[10px] tabular-nums">
+          <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
             {items.length} momentos
           </span>
         )}
@@ -73,7 +71,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
       {items.length === 0 ? (
         <button
           onClick={seed}
-          className="w-full py-2.5 rounded-md border border-dashed border-foreground/15 text-foreground/40 text-[11px] tracking-[0.2em] uppercase hover:border-moss/40 hover:text-moss transition-colors"
+          className="w-full py-2.5 rounded-xl border border-dashed border-foreground/15 text-foreground/40 text-[11px] tracking-[0.2em] uppercase hover:border-[#4d6350]/40 hover:text-[#4d6350] transition-colors"
         >
           + Gerar cronograma-base
         </button>
@@ -84,10 +82,10 @@ export default function EventTimeline({ quote, onChange }: Props) {
           <div className="flex flex-col">
             {items.map((i) => (
               <div key={i.id} className="group relative flex items-start gap-3 py-2">
-                <span className="w-12 shrink-0 text-right text-moss text-xs font-medium tabular-nums pt-0.5">
+                <span className="w-12 shrink-0 text-right text-[#4d6350] text-xs font-semibold tabular-nums pt-0.5">
                   {i.time}
                 </span>
-                <span className="relative z-10 mt-1.5 w-2 h-2 rounded-full bg-moss shrink-0 ring-4 ring-surface" />
+                <span className="relative z-10 mt-1.5 w-2 h-2 rounded-full bg-[#4d6350] shrink-0 ring-4 ring-white" />
                 <div className="min-w-0 flex-1">
                   <p className="text-foreground/70 text-sm leading-snug">{i.title}</p>
                   {i.owner && <p className="text-foreground/30 text-[10px] mt-0.5">{i.owner}</p>}
@@ -111,26 +109,26 @@ export default function EventTimeline({ quote, onChange }: Props) {
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="bg-surface border border-foreground/15 rounded-md px-2 py-1.5 text-xs text-foreground/70 focus:outline-none focus:border-moss/45 w-[88px]"
+          className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-[88px]"
         />
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Momento…"
-          className="flex-1 bg-surface border border-foreground/15 rounded-md px-3 py-1.5 text-xs text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+          className="bo-input flex-1 px-3 py-1.5 text-xs text-foreground/70 placeholder-foreground/22"
         />
         <input
           value={owner}
           onChange={(e) => setOwner(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Resp."
-          className="w-20 bg-surface border border-foreground/15 rounded-md px-2 py-1.5 text-xs text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+          className="bo-input w-20 px-2 py-1.5 text-xs text-foreground/70 placeholder-foreground/22"
         />
         <button
           onClick={add}
           disabled={!title.trim() || !time}
-          className="px-3 py-1.5 rounded-md border border-foreground/15 text-foreground/45 text-xs hover:border-moss/40 hover:text-moss transition-colors disabled:opacity-40"
+          className="px-3.5 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-xs hover:bg-[#2a3227] transition-colors disabled:opacity-40"
         >
           +
         </button>

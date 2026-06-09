@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { SITE } from "@/lib/site";
+import { SkeletonBar } from "./Skeleton";
 
 interface Item {
   uid: number;
@@ -109,11 +110,11 @@ export default function Inbox() {
 
   if (configured === false) {
     return (
-      <div className="border border-foreground/10 rounded-sm p-8 text-center">
+      <div className="bo-card p-8 text-center">
         <p className="text-foreground/55 text-sm mb-3">Caixa de e-mail por ligar</p>
         <div className="text-foreground/40 text-xs max-w-md mx-auto leading-relaxed text-left space-y-2">
           <p>
-            Para ler aqui os e-mails de <span className="text-moss">{SITE.email}</span>:
+            Para ler aqui os e-mails de <span className="text-[#4d6350]">{SITE.email}</span>:
           </p>
           <p>
             1. No Gmail, ativar <span className="text-foreground/60">IMAP</span> em Definições →
@@ -125,9 +126,9 @@ export default function Inbox() {
           </p>
           <p>
             3. Definir as variáveis de ambiente{" "}
-            <code className="text-moss">SMTP_HOST=smtp.gmail.com</code>,{" "}
-            <code className="text-moss">SMTP_USER</code> e{" "}
-            <code className="text-moss">SMTP_PASS</code> (a palavra-passe de app). A caixa de
+            <code className="text-[#4d6350]">SMTP_HOST=smtp.gmail.com</code>,{" "}
+            <code className="text-[#4d6350]">SMTP_USER</code> e{" "}
+            <code className="text-[#4d6350]">SMTP_PASS</code> (a palavra-passe de app). A caixa de
             entrada liga-se automaticamente — não é preciso configurar o IMAP em separado.
           </p>
         </div>
@@ -143,14 +144,14 @@ export default function Inbox() {
           <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
             Caixa de entrada
             {unreadCount > 0 && (
-              <span className="ml-2 text-moss normal-case tracking-normal">
+              <span className="ml-2 text-[#4d6350] normal-case tracking-normal">
                 {unreadCount} por ler
               </span>
             )}
           </p>
           <button
             onClick={load}
-            className="px-3 py-1.5 border border-foreground/15 text-foreground/40 text-[10px] tracking-[0.2em] uppercase rounded-sm hover:border-foreground/30 transition-colors"
+            className="px-3 py-1.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
           >
             {loading ? "…" : "Actualizar"}
           </button>
@@ -158,7 +159,7 @@ export default function Inbox() {
         <div className="flex items-center gap-2 mb-3">
           <div className="relative flex-1">
             <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground/28"
               width="13"
               height="13"
               viewBox="0 0 24 24"
@@ -173,28 +174,38 @@ export default function Inbox() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Procurar remetente ou assunto…"
-              className="w-full bg-surface-raised/50 border border-foreground/12 rounded-md pl-8 pr-3 py-1.5 text-xs text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+              className="bo-input pl-9 pr-3 py-2 text-xs text-foreground/70 placeholder-foreground/22"
             />
           </div>
           <button
             onClick={() => setUnreadOnly((v) => !v)}
             aria-pressed={unreadOnly}
-            className={`px-3 py-1.5 rounded-md text-[10px] tracking-[0.15em] uppercase border transition-colors whitespace-nowrap ${
+            className={`px-3 py-2 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 whitespace-nowrap ${
               unreadOnly
-                ? "bg-moss border-moss text-cream"
-                : "border-foreground/15 text-foreground/40 hover:border-foreground/30"
+                ? "bg-[#1b2119] text-white shadow-sm"
+                : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
             }`}
           >
             Por ler
           </button>
         </div>
         {error && (
-          <p role="status" className="text-moss/70 text-xs mb-3">
+          <p role="status" className="text-[#4d6350]/70 text-xs mb-3">
             {error}
           </p>
         )}
         {loading && items.length === 0 ? (
-          <p className="text-foreground/25 text-sm py-12 text-center">A carregar…</p>
+          <div className="flex flex-col">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="px-4 py-3 border-b border-foreground/[0.07]">
+                <div className="flex items-center justify-between gap-3 mb-1.5">
+                  <SkeletonBar className="h-3 w-2/5" />
+                  <SkeletonBar className="h-2.5 w-12 shrink-0" />
+                </div>
+                <SkeletonBar className="h-2.5 w-3/4" />
+              </div>
+            ))}
+          </div>
         ) : shown.length === 0 ? (
           <p className="text-foreground/25 text-sm py-12 text-center">
             {items.length === 0 ? "Sem mensagens." : "Nenhuma mensagem corresponde."}
@@ -205,8 +216,8 @@ export default function Inbox() {
               <button
                 key={m.uid}
                 onClick={() => openMsg(m.uid)}
-                className={`text-left px-4 py-3 border-b border-foreground/8 transition-colors ${
-                  open?.uid === m.uid ? "bg-moss/6" : "hover:bg-surface-raised/40"
+                className={`text-left px-4 py-3 border-b border-foreground/[0.07] transition-colors ${
+                  open?.uid === m.uid ? "bg-[#4d6350]/[0.06]" : "hover:bg-foreground/[0.02]"
                 }`}
               >
                 <div className="flex items-center justify-between gap-3 mb-0.5">
@@ -227,11 +238,15 @@ export default function Inbox() {
       {/* Detail */}
       <div>
         {loadingMsg ? (
-          <div className="border border-foreground/10 rounded-sm p-8 text-center text-foreground/25 text-sm">
-            A abrir…
+          <div className="bo-card p-5">
+            <SkeletonBar className="h-3.5 w-3/5 mb-3" />
+            <SkeletonBar className="h-2.5 w-2/5 mb-6" />
+            <SkeletonBar className="h-2.5 w-full mb-2" />
+            <SkeletonBar className="h-2.5 w-full mb-2" />
+            <SkeletonBar className="h-2.5 w-4/5" />
           </div>
         ) : open ? (
-          <div className="border border-foreground/10 rounded-sm sticky top-8 max-h-[85vh] overflow-y-auto">
+          <div className="bo-card sticky top-8 max-h-[85vh] overflow-y-auto">
             <div className="px-5 py-4 border-b border-foreground/8">
               <p className="text-foreground/70 text-sm font-medium mb-0.5">{open.subject}</p>
               <p className="text-foreground/35 text-xs">
@@ -249,7 +264,7 @@ export default function Inbox() {
                 Responder
               </p>
               {sent ? (
-                <p role="status" className="text-moss text-xs">
+                <p role="status" className="text-[#4d6350] text-xs">
                   ✓ Resposta enviada para {open.fromAddress}.
                 </p>
               ) : (
@@ -259,15 +274,15 @@ export default function Inbox() {
                     value={reply}
                     onChange={(e) => setReply(e.target.value)}
                     placeholder="Escreva a resposta…"
-                    className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 resize-none mb-3"
+                    className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none mb-3"
                   />
                   <button
                     onClick={sendReply}
                     disabled={sending || !reply.trim()}
-                    className={`w-full py-2.5 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${
+                    className={`w-full py-2.5 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${
                       sending || !reply.trim()
-                        ? "bg-moss/40 text-cream/50 cursor-not-allowed"
-                        : "bg-moss text-cream hover:bg-moss-dark"
+                        ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
+                        : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
                     }`}
                   >
                     {sending ? "A enviar…" : "Enviar Resposta →"}
@@ -277,7 +292,7 @@ export default function Inbox() {
             </div>
           </div>
         ) : (
-          <div className="hidden lg:flex items-center justify-center border border-foreground/6 rounded-sm text-foreground/18 text-sm h-40">
+          <div className="hidden lg:flex items-center justify-center border border-dashed border-foreground/12 rounded-xl text-foreground/22 text-sm h-40 bg-foreground/[0.015]">
             Seleccione uma mensagem
           </div>
         )}

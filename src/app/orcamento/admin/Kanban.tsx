@@ -95,23 +95,25 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
             }}
             onDragLeave={() => setOverCol((c) => (c === col.id ? null : c))}
             onDrop={() => drop(col.id)}
-            className={`flex-shrink-0 w-[260px] rounded-xl border transition-colors ${
+            className={`flex-shrink-0 w-[270px] rounded-2xl border transition-all duration-200 ${
               overCol === col.id
-                ? "border-moss/50 bg-moss/[0.04]"
-                : "border-foreground/8 bg-surface-raised/30"
+                ? "border-[#637a5f]/50 bg-[#637a5f]/[0.05] ring-2 ring-[#637a5f]/20"
+                : "border-foreground/[0.07] bg-foreground/[0.018]"
             }`}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-foreground/8">
+            <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
-                <span className="text-foreground/65 text-xs tracking-[0.15em] uppercase">
+                <span className="text-foreground/60 text-[11px] tracking-[0.1em] uppercase font-medium">
                   {col.label}
                 </span>
               </div>
-              <span className="text-foreground/30 text-[10px] tabular-nums">{items.length}</span>
+              <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.06] rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                {items.length}
+              </span>
             </div>
 
-            <div className="p-2 flex flex-col gap-2 min-h-[120px] max-h-[calc(100vh-18rem)] overflow-y-auto">
+            <div className="px-2 pb-2 flex flex-col gap-2 min-h-[120px] max-h-[calc(100vh-18rem)] overflow-y-auto">
               {items.map((q) => (
                 <div
                   key={q.id}
@@ -137,22 +139,32 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
                       moveByKeyboard(q, 1);
                     }
                   }}
-                  className={`group cursor-grab active:cursor-grabbing rounded-lg border border-foreground/10 bg-surface p-3 transition-all hover:border-foreground/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/60 ${
-                    dragId === q.id ? "opacity-40" : ""
+                  className={`group cursor-grab active:cursor-grabbing rounded-xl border border-foreground/[0.07] bg-white p-3.5 shadow-sm transition-all hover:shadow-md hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+                    dragId === q.id ? "opacity-40 rotate-1" : ""
                   }`}
                 >
-                  <p className="text-foreground/75 text-sm font-medium truncate">{q.name}</p>
-                  <p className="text-foreground/45 text-[11px] truncate mt-0.5">
-                    {eventTypeLabel(q)} · {q.guests} pax
-                  </p>
-                  <div className="flex items-center justify-between mt-2.5">
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="mt-1 w-1 h-8 rounded-full shrink-0"
+                      style={{ background: col.color }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-foreground/78 text-sm font-semibold truncate">{q.name}</p>
+                      <p className="text-foreground/45 text-[11px] truncate mt-0.5">
+                        {eventTypeLabel(q)} · {q.guests} pax
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-foreground/[0.06]">
                     {q.quotedPrice ? (
-                      <span className="text-moss text-xs font-medium">{eur(q.quotedPrice)}</span>
+                      <span className="text-[#4d6350] text-xs font-semibold">
+                        {eur(q.quotedPrice)}
+                      </span>
                     ) : (
                       <span className="text-foreground/20 text-[10px]">sem valor</span>
                     )}
                     {q.date && (
-                      <span className="text-foreground/25 text-[10px]">
+                      <span className="text-foreground/30 text-[10px]">
                         {new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", {
                           day: "numeric",
                           month: "short",
@@ -163,15 +175,31 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
                 </div>
               ))}
               {items.length === 0 && (
-                <p className="text-foreground/20 text-[11px] text-center py-6">
-                  Arraste pedidos para aqui
-                </p>
+                <div className="flex flex-col items-center justify-center py-8 text-foreground/18">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="mb-1.5"
+                  >
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                  </svg>
+                  <p className="text-[10px] text-center px-2">Arraste para aqui</p>
+                </div>
               )}
             </div>
 
             {value > 0 && (
-              <div className="px-4 py-2.5 border-t border-foreground/8 text-right">
-                <span className="text-foreground/40 text-[11px]">{eur(value)}</span>
+              <div className="px-4 py-2.5 border-t border-foreground/[0.07] flex items-center justify-between">
+                <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase">
+                  Total
+                </span>
+                <span className="text-foreground/55 text-[11px] font-semibold tabular-nums">
+                  {eur(value)}
+                </span>
               </div>
             )}
           </div>

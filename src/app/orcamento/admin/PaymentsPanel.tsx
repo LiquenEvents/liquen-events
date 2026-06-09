@@ -83,23 +83,21 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">
-        Pagamentos &amp; Faturação
-      </p>
+      <p className="bo-eyebrow mb-4">Pagamentos &amp; Faturação</p>
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2 mb-4">
         {[
           { l: "Total", v: eur2(total), c: "text-foreground/70" },
-          { l: "Recebido", v: eur2(paidSum), c: "text-moss" },
+          { l: "Recebido", v: eur2(paidSum), c: "text-[#4d6350]" },
           {
             l: "Em falta",
             v: eur2(outstanding),
             c: outstanding > 0 ? "text-[#b5654a]" : "text-foreground/40",
           },
         ].map((k) => (
-          <div key={k.l} className="bg-foreground/4 rounded-md p-2.5 text-center">
-            <p className={`text-sm font-medium ${k.c}`}>{k.v}</p>
+          <div key={k.l} className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
+            <p className={`text-sm font-semibold ${k.c}`}>{k.v}</p>
             <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">{k.l}</p>
           </div>
         ))}
@@ -111,14 +109,14 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
           {payments.map((p) => (
             <div
               key={p.id}
-              className="group flex items-center gap-2.5 bg-surface/40 border border-foreground/8 rounded-md px-3 py-2"
+              className="group flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-lg px-3 py-2"
             >
               <button
                 onClick={() => togglePaid(p.id)}
                 role="checkbox"
                 aria-checked={p.paid}
                 aria-label={`${KIND_LABEL[p.kind]} ${eur2(p.amount)} — ${p.paid ? "pago" : "por pagar"}`}
-                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/55 ${p.paid ? "bg-moss border-moss" : "border-foreground/25 hover:border-moss/60"}`}
+                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${p.paid ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
                 title={p.paid ? "Pago" : "Marcar como pago"}
               >
                 {p.paid && (
@@ -142,7 +140,7 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
                 </p>
               </div>
               <span
-                className={`text-xs font-medium shrink-0 ${p.paid ? "text-moss" : "text-foreground/50"}`}
+                className={`text-xs font-semibold shrink-0 ${p.paid ? "text-[#4d6350]" : "text-foreground/50"}`}
               >
                 {eur2(p.amount)}
               </span>
@@ -152,7 +150,7 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
                   disabled={busy === p.id}
                   aria-label="Descarregar recibo PDF"
                   title="Descarregar recibo PDF"
-                  className="text-foreground/30 hover:text-moss transition-colors p-1"
+                  className="text-foreground/30 hover:text-[#4d6350] transition-colors p-1"
                 >
                   <svg
                     width="13"
@@ -174,7 +172,7 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
                   disabled={busy === p.id}
                   aria-label="Enviar recibo por e-mail"
                   title="Enviar recibo por e-mail"
-                  className="text-foreground/30 hover:text-moss transition-colors p-1"
+                  className="text-foreground/30 hover:text-[#4d6350] transition-colors p-1"
                 >
                   <svg
                     width="13"
@@ -206,7 +204,7 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as PaymentKind)}
-          className="bg-surface border border-foreground/15 rounded-md px-2 py-1.5 text-xs text-foreground/55 focus:outline-none focus:border-moss/45"
+          className="bo-input px-2 py-1.5 text-xs text-foreground/55"
         >
           <option value="sinal">Sinal</option>
           <option value="pagamento">Pagamento</option>
@@ -217,17 +215,17 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="Valor €"
-          className="w-24 bg-surface border border-foreground/15 rounded-md px-2 py-1.5 text-xs text-foreground/70 focus:outline-none focus:border-moss/45"
+          className="bo-input w-24 px-2 py-1.5 text-xs text-foreground/70"
         />
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="bg-surface border border-foreground/15 rounded-md px-2 py-1.5 text-xs text-foreground/55 focus:outline-none focus:border-moss/45"
+          className="bo-input px-2 py-1.5 text-xs text-foreground/55"
         />
         <button
           onClick={add}
-          className="px-3 py-1.5 rounded-md border border-foreground/15 text-foreground/45 text-xs hover:border-moss/40 hover:text-moss transition-colors"
+          className="px-3 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-xs hover:bg-[#2a3227] transition-colors"
         >
           + Registar
         </button>

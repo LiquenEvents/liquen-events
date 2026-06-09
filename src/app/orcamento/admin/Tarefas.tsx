@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Task, TaskPriority } from "../types";
+import { SkeletonList } from "./Skeleton";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#b5654a" },
@@ -114,11 +115,11 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     return (
       <div
         key={t.id}
-        className="group flex items-center gap-3 px-5 py-3.5 hover:bg-moss/4 transition-colors"
+        className="group flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.02] transition-colors"
       >
         <button
           onClick={() => toggle(t)}
-          className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${t.done ? "bg-moss border-moss" : "border-foreground/25 hover:border-moss/60"}`}
+          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
         >
           {t.done && (
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
@@ -161,7 +162,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
             className="hidden sm:flex items-center gap-1.5 shrink-0"
             title={`Responsável: ${t.assignee}`}
           >
-            <span className="w-5 h-5 rounded-full bg-moss/20 text-moss flex items-center justify-center text-[9px] font-bold">
+            <span className="w-5 h-5 rounded-full bg-[#4d6350] text-white flex items-center justify-center text-[9px] font-bold">
               {t.assignee.slice(0, 1).toUpperCase()}
             </span>
             <span className="text-foreground/35 text-[10px]">{t.assignee}</span>
@@ -202,13 +203,12 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     );
   }
 
-  const inputCls =
-    "bg-surface border border-foreground/15 rounded-md px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45";
+  const inputCls = "bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22";
 
   return (
     <div className="max-w-4xl">
       {/* Add task */}
-      <div className="border border-foreground/10 rounded-md bg-surface-raised/30 p-4 mb-6">
+      <div className="bo-card p-4 mb-6">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -253,7 +253,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
           <button
             onClick={add}
             disabled={adding || !title.trim()}
-            className={`px-5 py-2 rounded-md text-[11px] tracking-[0.2em] uppercase transition-colors shrink-0 ${adding || !title.trim() ? "bg-moss/40 text-cream/50 cursor-not-allowed" : "bg-moss text-cream hover:bg-moss-dark"}`}
+            className={`px-5 py-2 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-colors shrink-0 ${adding || !title.trim() ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
           >
             Adicionar
           </button>
@@ -267,7 +267,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
             <button
               key={p}
               onClick={() => setWho(p)}
-              className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${who === p ? "bg-moss border-moss text-cream" : "border-foreground/15 text-foreground/35 hover:border-foreground/30"}`}
+              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${who === p ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
             >
               {p}
               {p !== "Todos" && (
@@ -281,16 +281,14 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       )}
 
       {loading ? (
-        <p className="text-foreground/25 text-sm py-12 text-center">A carregar…</p>
+        <SkeletonList rows={5} />
       ) : (
         <>
-          <div className="border border-foreground/10 rounded-md bg-surface-raised/30 overflow-hidden">
-            <div className="px-5 py-3 border-b border-foreground/8 flex items-center justify-between">
-              <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
-                A fazer ({open.length})
-              </p>
+          <div className="bo-card overflow-hidden">
+            <div className="px-5 py-3 border-b border-foreground/[0.07] flex items-center justify-between">
+              <p className="bo-eyebrow">A fazer ({open.length})</p>
             </div>
-            <div className="divide-y divide-foreground/6">
+            <div className="divide-y divide-foreground/[0.06]">
               {open.length === 0 ? (
                 <p className="text-foreground/25 text-sm text-center py-12">
                   Sem tarefas pendentes. ✓
@@ -310,7 +308,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 {showDone ? "▾" : "▸"} Concluídas ({done.length})
               </button>
               {showDone && (
-                <div className="border border-foreground/10 rounded-md bg-surface-raised/20 overflow-hidden divide-y divide-foreground/6">
+                <div className="bo-card overflow-hidden divide-y divide-foreground/[0.06]">
                   {done.map(row)}
                 </div>
               )}

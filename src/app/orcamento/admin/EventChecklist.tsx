@@ -51,11 +51,9 @@ export default function EventChecklist({ quote, onChange }: Props) {
   return (
     <div className="border-t border-foreground/10 pt-5">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
-          Checklist de Produção
-        </p>
+        <p className="bo-eyebrow">Checklist de Produção</p>
         {items.length > 0 && (
-          <span className="text-foreground/35 text-[10px] tabular-nums">
+          <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
             {doneCount}/{items.length}
           </span>
         )}
@@ -64,7 +62,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
       {items.length === 0 ? (
         <button
           onClick={seed}
-          className="w-full py-2.5 rounded-md border border-dashed border-foreground/15 text-foreground/40 text-[11px] tracking-[0.2em] uppercase hover:border-moss/40 hover:text-moss transition-colors"
+          className="w-full py-2.5 rounded-xl border border-dashed border-foreground/15 text-foreground/40 text-[11px] tracking-[0.2em] uppercase hover:border-[#4d6350]/40 hover:text-[#4d6350] transition-colors"
         >
           + Gerar checklist do evento
         </button>
@@ -72,7 +70,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
         <>
           <div className="h-1 bg-foreground/6 rounded-full overflow-hidden mb-4">
             <div
-              className="h-full bg-moss rounded-full transition-all duration-500"
+              className="h-full bg-[#4d6350] rounded-full transition-all duration-500"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -84,7 +82,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                   role="checkbox"
                   aria-checked={i.done}
                   aria-label={i.label}
-                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/55 ${i.done ? "bg-moss border-moss" : "border-foreground/25 hover:border-moss/60"}`}
+                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${i.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
                 >
                   {i.done && (
                     <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
@@ -119,11 +117,11 @@ export default function EventChecklist({ quote, onChange }: Props) {
               onChange={(e) => setNewItem(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()}
               placeholder="Adicionar item…"
-              className="flex-1 bg-surface border border-foreground/15 rounded-md px-3 py-1.5 text-xs text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+              className="bo-input flex-1 px-3 py-1.5 text-xs text-foreground/70 placeholder-foreground/22"
             />
             <button
               onClick={add}
-              className="px-3 py-1.5 rounded-md border border-foreground/15 text-foreground/45 text-xs hover:border-moss/40 hover:text-moss transition-colors"
+              className="px-3.5 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-xs hover:bg-[#2a3227] transition-colors"
             >
               +
             </button>

@@ -82,9 +82,9 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
   if (result) {
     return (
       <div className="border-t border-foreground/10 pt-5">
-        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">Proposta</p>
-        <div className="rounded-sm border border-moss/30 bg-moss/8 p-4">
-          <p className="text-moss text-sm font-medium mb-1">
+        <p className="bo-eyebrow mb-4">Proposta</p>
+        <div className="rounded-xl border border-[#4d6350]/30 bg-[#4d6350]/[0.07] p-4">
+          <p className="text-[#4d6350] text-sm font-semibold mb-1">
             ✓ Proposta criada — {eur(result.total)}
           </p>
           <p className="text-foreground/45 text-xs mb-4">
@@ -96,13 +96,13 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
             <a
               href={result.pdfUrl}
               download={`Proposta-Liquen-${quote.id}.pdf`}
-              className="px-4 py-2 bg-moss text-cream text-[10px] tracking-[0.2em] uppercase rounded-sm hover:bg-moss-dark transition-colors"
+              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors"
             >
               Descarregar PDF
             </a>
             <button
               onClick={() => setResult(null)}
-              className="px-4 py-2 border border-foreground/15 text-foreground/40 text-[10px] tracking-[0.2em] uppercase rounded-sm hover:border-foreground/30 transition-colors"
+              className="px-4 py-2 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-foreground/65 transition-colors shadow-sm"
             >
               Nova proposta
             </button>
@@ -114,9 +114,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">
-        Criar &amp; Enviar Proposta (PDF)
-      </p>
+      <p className="bo-eyebrow mb-4">Criar &amp; Enviar Proposta (PDF)</p>
 
       {/* Line items */}
       <div className="flex flex-col gap-2 mb-3">
@@ -132,21 +130,21 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
               value={it.description}
               onChange={(e) => update(i, { description: e.target.value })}
               placeholder="Ex: Decoração floral"
-              className="flex-1 min-w-0 bg-surface border border-foreground/15 rounded-sm px-2.5 py-2 text-xs text-foreground/75 focus:outline-none focus:border-moss/50"
+              className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
             />
             <input
               type="number"
               value={it.qty}
               min={1}
               onChange={(e) => update(i, { qty: Number(e.target.value) })}
-              className="w-10 bg-surface border border-foreground/15 rounded-sm px-1.5 py-2 text-xs text-foreground/75 text-center focus:outline-none focus:border-moss/50"
+              className="bo-input w-10 px-1.5 py-2 text-xs text-foreground/75 text-center"
             />
             <input
               type="number"
               value={it.unitPrice}
               min={0}
               onChange={(e) => update(i, { unitPrice: Number(e.target.value) })}
-              className="w-20 bg-surface border border-foreground/15 rounded-sm px-2 py-2 text-xs text-foreground/75 text-right focus:outline-none focus:border-moss/50"
+              className="bo-input w-20 px-2 py-2 text-xs text-foreground/75 text-right"
             />
             <button
               onClick={() => removeRow(i)}
@@ -161,13 +159,13 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       </div>
       <button
         onClick={addRow}
-        className="text-[10px] tracking-[0.2em] uppercase text-moss/70 hover:text-moss transition-colors mb-5"
+        className="text-[10px] tracking-[0.2em] uppercase text-[#4d6350]/70 hover:text-[#4d6350] transition-colors mb-5"
       >
         + Adicionar linha
       </button>
 
       {/* Totals */}
-      <div className="rounded-sm bg-foreground/4 p-3 flex flex-col gap-1.5 mb-5">
+      <div className="rounded-xl bg-foreground/[0.04] p-3 flex flex-col gap-1.5 mb-5">
         <div className="flex justify-between text-[11px]">
           <span className="text-foreground/35">Subtotal</span>
           <span className="text-foreground/55">{eur(subtotal)}</span>
@@ -178,7 +176,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
             <select
               value={vatRate}
               onChange={(e) => setVatRate(Number(e.target.value))}
-              className="bg-surface border border-foreground/15 rounded-sm px-1 py-0.5 text-[10px] text-foreground/60 focus:outline-none"
+              className="bg-white border border-foreground/[0.12] rounded-md px-1 py-0.5 text-[10px] text-foreground/60 focus:outline-none"
             >
               <option value={0.23}>23%</option>
               <option value={0.13}>13%</option>
@@ -190,7 +188,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         </div>
         <div className="flex justify-between text-sm font-medium pt-1.5 border-t border-foreground/8">
           <span className="text-foreground/65">Total</span>
-          <span className="text-moss">{eur(total)}</span>
+          <span className="text-[#4d6350] font-semibold">{eur(total)}</span>
         </div>
       </div>
 
@@ -204,7 +202,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
             type="date"
             value={validUntil}
             onChange={(e) => setValidUntil(e.target.value)}
-            className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50"
+            className="bo-input px-3 py-2 text-sm text-foreground/70"
           />
         </div>
         <div>
@@ -216,20 +214,20 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Condições, observações, o que está incluído…"
-            className="w-full bg-surface border border-foreground/15 rounded-sm px-3 py-2 text-sm text-foreground/70 focus:outline-none focus:border-moss/50 resize-none"
+            className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
           />
         </div>
       </div>
 
-      {error && <p className="text-moss/80 text-xs mb-4">{error}</p>}
+      {error && <p className="text-[#b5654a] text-xs mb-4">{error}</p>}
 
       <button
         onClick={send}
         disabled={sending || subtotal <= 0}
-        className={`w-full py-3 rounded-sm text-[11px] tracking-[0.2em] uppercase transition-all ${
+        className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${
           sending || subtotal <= 0
-            ? "bg-moss/40 text-cream/50 cursor-not-allowed"
-            : "bg-moss text-cream hover:bg-moss-dark"
+            ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
+            : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
         }`}
       >
         {sending ? "A gerar e enviar…" : "Gerar PDF & Enviar ao Cliente →"}

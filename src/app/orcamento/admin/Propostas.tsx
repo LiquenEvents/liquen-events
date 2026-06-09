@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Proposal, ProposalStatus } from "../types";
+import { SkeletonList } from "./Skeleton";
+import EmptyState from "./EmptyState";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -39,7 +41,7 @@ export default function Propostas() {
     .reduce((s, p) => s + p.total, 0);
   const totalWon = proposals.filter((p) => p.status === "aceite").reduce((s, p) => s + p.total, 0);
 
-  if (loading) return <p className="text-foreground/25 text-sm py-16 text-center">A carregar…</p>;
+  if (loading) return <SkeletonList rows={5} />;
 
   return (
     <div>
@@ -56,26 +58,43 @@ export default function Propostas() {
         ].map((k) => (
           <div
             key={k.l}
-            className="border border-foreground/10 rounded-md p-4 bg-surface-raised/40"
+            className={`relative overflow-hidden rounded-xl p-4 border ${
+              k.accent
+                ? "bg-[#1b2119] border-[#2d3829]"
+                : "bg-white border-foreground/[0.08] shadow-sm"
+            }`}
           >
+            {k.accent && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 85% 15%, rgba(99,122,95,0.25) 0%, transparent 60%)",
+                }}
+              />
+            )}
             <p
-              className={`font-bold leading-none mb-1.5 ${k.accent ? "text-moss" : "text-foreground/80"}`}
+              className={`font-bold leading-none mb-1.5 relative ${k.accent ? "text-[#8aad85]" : "text-foreground/82"}`}
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2.2vw, 26px)" }}
             >
               {k.v}
             </p>
-            <p className="text-foreground/30 text-[9px] tracking-[0.25em] uppercase">{k.l}</p>
+            <p
+              className={`text-[9px] tracking-[0.25em] uppercase relative ${k.accent ? "text-white/30" : "text-foreground/30"}`}
+            >
+              {k.l}
+            </p>
           </div>
         ))}
       </div>
 
       {/* Filter */}
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="flex flex-wrap gap-1.5 mb-5">
         <button
           onClick={() => setFilter("all")}
-          className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${filter === "all" ? "bg-moss border-moss text-cream" : "border-foreground/15 text-foreground/35 hover:border-foreground/30"}`}
+          className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filter === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
         >
-          Todas ({proposals.length})
+          Todas · {proposals.length}
         </button>
         {(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => {
           const count = proposals.filter((p) => p.status === s).length;
@@ -83,29 +102,49 @@ export default function Propostas() {
             <button
               key={s}
               onClick={() => setFilter(s)}
-              className={`px-3.5 py-1.5 rounded-sm text-[10px] tracking-[0.15em] uppercase border transition-colors ${filter === s ? "bg-moss border-moss text-cream" : "border-foreground/15 text-foreground/35 hover:border-foreground/30"}`}
+              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filter === s ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
             >
-              {STATUS_META[s].label} ({count})
+              {STATUS_META[s].label} · {count}
             </button>
           );
         })}
       </div>
 
       {/* List */}
-      <div className="border border-foreground/10 rounded-md bg-surface-raised/30 overflow-hidden">
+      <div className="bo-card overflow-hidden">
         {filtered.length === 0 ? (
-          <p className="text-foreground/25 text-sm text-center py-16">
-            Nenhuma proposta {filter !== "all" ? "neste estado" : "criada ainda"}.
-          </p>
+          <EmptyState
+            icon={
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            }
+            title={filter !== "all" ? "Nenhuma proposta neste estado" : "Sem propostas ainda"}
+            hint={
+              filter !== "all"
+                ? "Mude de filtro para ver outras propostas."
+                : "As propostas que enviar a partir de um pedido aparecem aqui."
+            }
+          />
         ) : (
-          <div className="divide-y divide-foreground/6">
+          <div className="divide-y divide-foreground/[0.06]">
             {filtered.map((p) => (
               <div
                 key={p.id}
-                className="px-5 py-4 flex items-center gap-4 hover:bg-moss/4 transition-colors"
+                className="px-5 py-4 flex items-center gap-4 hover:bg-foreground/[0.02] transition-colors"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground/70 text-sm font-medium truncate">{p.clientName}</p>
+                  <p className="text-foreground/75 text-sm font-semibold truncate">
+                    {p.clientName}
+                  </p>
                   <p className="text-foreground/28 text-xs truncate">
                     {p.clientEmail} · {p.lineItems.length} linha
                     {p.lineItems.length !== 1 ? "s" : ""}
@@ -121,13 +160,13 @@ export default function Propostas() {
                     </p>
                   )}
                 </div>
-                <span className="text-foreground/70 text-sm font-medium w-24 text-right shrink-0">
+                <span className="text-foreground/72 text-sm font-semibold w-24 text-right shrink-0">
                   {eur(p.total)}
                 </span>
                 <span
-                  className="text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm shrink-0 w-20 text-center"
+                  className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md shrink-0 w-20 text-center"
                   style={{
-                    background: `${STATUS_META[p.status].color}22`,
+                    background: `${STATUS_META[p.status].color}18`,
                     color: STATUS_META[p.status].color,
                   }}
                 >

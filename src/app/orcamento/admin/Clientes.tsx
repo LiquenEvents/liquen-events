@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Quote } from "../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
 import { downloadCsv, dateStamp } from "./export";
+import EmptyState from "./EmptyState";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -81,7 +82,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
           <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground/28"
             width="14"
             height="14"
             viewBox="0 0 24 24"
@@ -96,7 +97,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Procurar cliente…"
-            className="w-full bg-surface-raised/50 border border-foreground/12 rounded-md pl-9 pr-3 py-2 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-moss/45"
+            className="bo-input pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22"
           />
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -127,7 +128,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
               ];
               downloadCsv(`clientes-${dateStamp()}`, rows);
             }}
-            className="flex items-center gap-2 px-3 py-2 border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.18em] uppercase rounded-md hover:border-moss/40 hover:text-moss transition-colors whitespace-nowrap"
+            className="flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm whitespace-nowrap"
             title="Exportar clientes para CSV (Excel)"
           >
             <svg
@@ -153,19 +154,16 @@ export default function Clientes({ quotes, onOpen }: Props) {
         {clients.map((c) => {
           const isOpen = open === c.email;
           return (
-            <div
-              key={c.email || c.name}
-              className="border border-foreground/10 rounded-md bg-surface-raised/30 overflow-hidden"
-            >
+            <div key={c.email || c.name} className="bo-card overflow-hidden">
               <button
                 onClick={() => setOpen(isOpen ? null : c.email)}
-                className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-moss/4 transition-colors"
+                className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-foreground/[0.02] transition-colors"
               >
-                <div className="w-9 h-9 rounded-full bg-moss/15 text-moss flex items-center justify-center text-sm font-bold shrink-0">
+                <div className="w-9 h-9 rounded-full bg-[#4d6350] text-white flex items-center justify-center text-sm font-bold shrink-0 ring-2 ring-[#4d6350]/10">
                   {c.name.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground/75 text-sm font-medium truncate">
+                  <p className="text-foreground/78 text-sm font-semibold truncate">
                     {c.name}
                     {c.company && (
                       <span className="text-foreground/30 font-normal"> · {c.company}</span>
@@ -178,7 +176,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
                     {c.quotes.length} pedido{c.quotes.length !== 1 ? "s" : ""}
                   </span>
                   {c.totalWon > 0 && (
-                    <span className="text-moss text-xs font-medium">{eur(c.totalWon)}</span>
+                    <span className="text-[#4d6350] text-xs font-semibold">{eur(c.totalWon)}</span>
                   )}
                 </div>
                 <span
@@ -197,17 +195,23 @@ export default function Clientes({ quotes, onOpen }: Props) {
                 </span>
               </button>
               {isOpen && (
-                <div className="border-t border-foreground/8 divide-y divide-foreground/6">
-                  <div className="px-5 py-3 flex flex-wrap gap-x-8 gap-y-1.5 text-xs bg-surface/40">
+                <div className="border-t border-foreground/[0.07] divide-y divide-foreground/[0.06]">
+                  <div className="px-5 py-3 flex flex-wrap gap-x-8 gap-y-1.5 text-xs bg-foreground/[0.015]">
                     <span className="text-foreground/35">
                       Tel:{" "}
-                      <a href={`tel:${c.phone}`} className="text-foreground/55 hover:text-moss">
+                      <a
+                        href={`tel:${c.phone}`}
+                        className="text-foreground/55 hover:text-[#4d6350]"
+                      >
                         {c.phone || "—"}
                       </a>
                     </span>
                     <span className="text-foreground/35">
                       Email:{" "}
-                      <a href={`mailto:${c.email}`} className="text-moss/80 hover:text-moss">
+                      <a
+                        href={`mailto:${c.email}`}
+                        className="text-[#4d6350]/80 hover:text-[#4d6350]"
+                      >
                         {c.email}
                       </a>
                     </span>
@@ -216,7 +220,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
                     <button
                       key={q.id}
                       onClick={() => onOpen(q)}
-                      className="w-full text-left px-5 py-3 hover:bg-moss/5 transition-colors flex items-center justify-between gap-3"
+                      className="w-full text-left px-5 py-3 hover:bg-foreground/[0.02] transition-colors flex items-center justify-between gap-3"
                     >
                       <div className="min-w-0">
                         <p className="text-foreground/60 text-xs truncate">
@@ -226,7 +230,9 @@ export default function Clientes({ quotes, onOpen }: Props) {
                       </div>
                       <div className="text-right shrink-0">
                         {q.quotedPrice ? (
-                          <span className="text-moss text-xs">{eur(q.quotedPrice)}</span>
+                          <span className="text-[#4d6350] text-xs font-medium">
+                            {eur(q.quotedPrice)}
+                          </span>
                         ) : null}
                         <p className="text-foreground/25 text-[10px]">
                           {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
@@ -244,7 +250,28 @@ export default function Clientes({ quotes, onOpen }: Props) {
           );
         })}
         {clients.length === 0 && (
-          <p className="text-foreground/25 text-sm text-center py-16">Nenhum cliente encontrado.</p>
+          <EmptyState
+            icon={
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              >
+                <circle cx="9" cy="8" r="3" />
+                <path d="M3 20c0-3 2.7-5 6-5s6 2 6 5" />
+                <path d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.5-1.8-4.3-4-4.8" strokeLinecap="round" />
+              </svg>
+            }
+            title={search.trim() ? "Nenhum cliente encontrado" : "Sem clientes ainda"}
+            hint={
+              search.trim()
+                ? "Tente procurar por outro nome, email ou empresa."
+                : "Os clientes formam-se automaticamente a partir dos pedidos recebidos."
+            }
+          />
         )}
       </div>
     </div>
