@@ -21,7 +21,7 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? "Evento";
 }
 
-type ItemKind = "evento" | "agenda" | "tarefa" | "pagamento";
+type ItemKind = "evento" | "agenda" | "tarefa" | "pagamento" | "seguimento";
 
 interface AgendaItem {
   date: string;
@@ -38,6 +38,15 @@ const KIND_LABEL: Record<ItemKind, string> = {
   agenda: "Agenda",
   tarefa: "Tarefa",
   pagamento: "Pagamento",
+  seguimento: "Seguimento",
+};
+
+const KIND_COLOR: Record<ItemKind, string> = {
+  evento: "#7c854b",
+  agenda: "#7a8caa",
+  tarefa: "#b5654a",
+  pagamento: "#b5894a",
+  seguimento: "#637a5f",
 };
 
 interface Props {
@@ -97,6 +106,17 @@ export default function Agenda({ quotes, onOpen }: Props) {
           });
         }
       }
+      // Lead follow-ups scheduled within the window (skip closed deals).
+      if (inRange(q.followUpAt) && q.status !== "aceite" && q.status !== "rejeitado") {
+        items.push({
+          date: q.followUpAt!,
+          title: `Seguir ${q.name}`,
+          sub: eventTypeLabel(q),
+          kind: "seguimento",
+          color: KIND_COLOR.seguimento,
+          onClick: () => onOpen(q),
+        });
+      }
     }
     for (const e of calEvents) {
       if (inRange(e.date)) {
@@ -150,22 +170,12 @@ export default function Agenda({ quotes, onOpen }: Props) {
       <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
         <p className="bo-eyebrow">Agenda · próximos {DAYS_AHEAD} dias</p>
         <div className="flex items-center gap-3">
-          {(["evento", "agenda", "tarefa", "pagamento"] as ItemKind[]).map((k) => (
+          {(["evento", "agenda", "tarefa", "pagamento", "seguimento"] as ItemKind[]).map((k) => (
             <span
               key={k}
               className="hidden sm:flex items-center gap-1.5 text-foreground/30 text-[9px] uppercase tracking-wider"
             >
-              <span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{
-                  background: {
-                    evento: "#7c854b",
-                    agenda: "#7a8caa",
-                    tarefa: "#b5654a",
-                    pagamento: "#b5894a",
-                  }[k],
-                }}
-              />
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: KIND_COLOR[k] }} />
               {KIND_LABEL[k]}
             </span>
           ))}

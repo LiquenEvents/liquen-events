@@ -46,6 +46,14 @@ const ClientMessenger = dynamic(() => import("./ClientMessenger"), { loading: Pa
 const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
 const EventTimeline = dynamic(() => import("./EventTimeline"), { loading: PanelLoading });
 const PaymentsPanel = dynamic(() => import("./PaymentsPanel"), { loading: PanelLoading });
+const EventCosts = dynamic(() => import("./EventCosts"), { loading: PanelLoading });
+const GuestList = dynamic(() => import("./GuestList"), { loading: PanelLoading });
+const TagsField = dynamic(() => import("./TagsField"), {
+  loading: () => <div className="bo-skeleton h-9 w-full" aria-hidden />,
+});
+const FollowUpField = dynamic(() => import("./FollowUpField"), {
+  loading: () => <div className="bo-skeleton h-9 w-full" aria-hidden />,
+});
 
 type View =
   | "overview"
@@ -272,12 +280,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [selected, setSelected] = useState<Quote | null>(null);
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"recent" | "old" | "value">("recent");
+  const [sort, setSort] = useState<"recent" | "old" | "value" | "followup">("recent");
   const [saving, setSaving] = useState(false);
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState<QuoteStatus>("pendente");
+  // Which section of the (long) detail panel is showing.
+  const [detailTab, setDetailTab] = useState<"resumo" | "producao" | "financeiro" | "comunicacao">(
+    "resumo",
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
@@ -458,6 +471,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
     setEditNotes(q.adminNotes ?? "");
     setEditStatus(q.status);
+    setDetailTab("resumo");
   }
 
   async function refresh() {
@@ -545,9 +559,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = filterStatus === "all" ? quotes : quotes.filter((x) => x.status === filterStatus);
+    if (tagFilter) {
+      list = list.filter((x) => (x.tags ?? []).includes(tagFilter));
+    }
     if (q) {
       list = list.filter((x) =>
-        [x.name, x.email, x.phone, x.company, x.location, x.id]
+        [x.name, x.email, x.phone, x.company, x.location, x.id, ...(x.tags ?? [])]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q)),
       );
@@ -557,6 +574,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       sorted.sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
     else if (sort === "old")
       sorted.sort((a, b) => +new Date(a.submittedAt) - +new Date(b.submittedAt));
+    else if (sort === "followup")
+      // Leads needing a follow-up float to the top, soonest/most-overdue first;
+      // those without a follow-up date fall to the bottom (most recent among them).
+      sorted.sort((a, b) => {
+        const av = a.followUpAt ?? "9999-99-99";
+        const bv = b.followUpAt ?? "9999-99-99";
+        if (av !== bv) return av < bv ? -1 : 1;
+        return +new Date(b.submittedAt) - +new Date(a.submittedAt);
+      });
     else
       sorted.sort(
         (a, b) =>
@@ -564,11 +590,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           (a.quotedPrice ?? a.priceBreakdown?.total ?? 0),
       );
     return sorted;
-  }, [quotes, filterStatus, search, sort]);
+  }, [quotes, filterStatus, tagFilter, search, sort]);
 
   const pendingCount = quotes.filter(
     (q) => q.status === "pendente" || q.status === "em_revisao",
   ).length;
+
+  // Every tag in use across all quotes — feeds the tag editor suggestions and
+  // the Pedidos tag filter.
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const q of quotes) for (const t of q.tags ?? []) set.add(t);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [quotes]);
+
+  const todayKey = new Date().toISOString().slice(0, 10);
 
   function statusBadge(status: QuoteStatus) {
     const s = STATUS_OPTIONS.find((o) => o.id === status);
@@ -650,25 +686,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </svg>
           </button>
 
-          {/* Brand */}
-          <div className="px-5 pt-6 pb-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-              <Image
-                src="/logo-liquen.png"
-                alt="Líquen Events"
-                width={22}
-                height={14}
-                className="object-contain brightness-0 invert opacity-90"
-              />
-            </div>
-            <div>
-              <p className="text-white/90 text-[13px] font-semibold leading-tight tracking-tight">
-                Líquen Events
-              </p>
-              <p className="text-white/25 text-[9px] tracking-[0.3em] uppercase mt-0.5">
-                Back Office
-              </p>
-            </div>
+          {/* Brand — official Líquen wordmark (white lockup for the dark sidebar) */}
+          <div className="px-5 pt-8 pb-5 flex flex-col items-center text-center">
+            <Image
+              src="/logo-liquen-branco.png"
+              alt="Líquen Events"
+              width={300}
+              height={179}
+              priority
+              className="h-24 w-auto object-contain"
+            />
+            <p className="text-white/25 text-[9px] tracking-[0.35em] uppercase mt-3">Back Office</p>
           </div>
           <div className="mx-4 h-px bg-white/[0.07] mb-1" />
 
@@ -952,6 +980,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 userName={userName}
                 onOpen={openQuote}
                 onGoStats={() => setView("estatisticas")}
+                onGo={(v) => setView(v)}
+                onNew={() => setNewQuoteOpen(true)}
               />
             </div>
           )}
@@ -1055,6 +1085,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   <option value="recent">Mais recentes</option>
                   <option value="old">Mais antigos</option>
                   <option value="value">Maior valor</option>
+                  <option value="followup">Seguir primeiro</option>
                 </select>
                 <button
                   onClick={() => {
@@ -1115,6 +1146,36 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 );
               })}
             </div>
+
+            {/* Tag filter */}
+            {allTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-8 -mt-4">
+                <span className="text-foreground/30 text-[9px] tracking-[0.2em] uppercase mr-1">
+                  Etiquetas
+                </span>
+                {allTags.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
+                    className={`px-3 py-1 rounded-full text-[10px] font-medium tracking-wide transition-all duration-150 ${
+                      tagFilter === t
+                        ? "bg-[#4d6350] text-white shadow-sm"
+                        : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+                {tagFilter && (
+                  <button
+                    onClick={() => setTagFilter(null)}
+                    className="text-foreground/35 text-[10px] hover:text-foreground/60 transition-colors ml-1"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Bulk actions */}
             {selectedIds.size > 0 && (
@@ -1257,11 +1318,35 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
-                          <div>
-                            <p className="text-foreground/75 text-sm font-semibold">{q.name}</p>
-                            <p className="text-foreground/42 text-xs mt-0.5">{q.email}</p>
+                          <div className="min-w-0">
+                            <p className="text-foreground/75 text-sm font-semibold truncate">
+                              {q.name}
+                            </p>
+                            <p className="text-foreground/42 text-xs mt-0.5 truncate">{q.email}</p>
                           </div>
-                          {statusBadge(q.status)}
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {statusBadge(q.status)}
+                            {q.followUpAt &&
+                              q.followUpAt <= todayKey &&
+                              q.status !== "aceite" &&
+                              q.status !== "rejeitado" && (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
+                                    q.followUpAt < todayKey
+                                      ? "bg-[#b5654a]/15 text-[#b5654a]"
+                                      : "bg-[#637a5f]/15 text-[#4d6350]"
+                                  }`}
+                                  title={
+                                    q.followUpAt < todayKey
+                                      ? "Seguimento em atraso"
+                                      : "Seguimento hoje"
+                                  }
+                                >
+                                  <span className="w-1 h-1 rounded-full bg-current" />
+                                  Seguir
+                                </span>
+                              )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 text-foreground/32 text-[10px]">
                           <span>{cat?.label ?? "—"}</span>
@@ -1274,6 +1359,23 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <span className="w-px h-2.5 bg-foreground/12" />
                           <span>{q.guests} pax</span>
                         </div>
+                        {q.tags && q.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2.5">
+                            {q.tags.slice(0, 4).map((t) => (
+                              <span
+                                key={t}
+                                className="px-2 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[9px] font-medium tracking-wide"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                            {q.tags.length > 4 && (
+                              <span className="text-foreground/30 text-[9px] px-1">
+                                +{q.tags.length - 4}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
                           <span className="text-foreground/30 text-[10px] font-mono tracking-tight">
                             {q.id}
@@ -1308,296 +1410,393 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <>
                   <div className="fixed inset-0 z-40 bg-black/50 xl:hidden" onClick={closeDetail} />
                   <div className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-white xl:bg-white border-l xl:border border-foreground/[0.08] xl:rounded-xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-sm">
-                    <div className="px-5 py-4 border-b border-foreground/[0.07] flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-sm z-10">
-                      <div>
-                        <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">
-                          {selected.id}
-                        </p>
-                        <p className="text-foreground/70 text-sm font-medium">{selected.name}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => printRunSheet(selected)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                          title="Imprimir run-sheet do evento"
-                        >
-                          <svg
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.7"
+                    <div className="px-5 pt-4 border-b border-foreground/[0.07] sticky top-0 bg-white/90 backdrop-blur-sm z-10">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">
+                            {selected.id}
+                          </p>
+                          <p className="text-foreground/70 text-sm font-medium truncate">
+                            {selected.name}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => printRunSheet(selected)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
+                            title="Imprimir run-sheet do evento"
                           >
-                            <path
-                              d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <rect x="6" y="14" width="12" height="7" rx="1" />
-                          </svg>
-                          Run-sheet
-                        </button>
-                        <button
-                          onClick={closeDetail}
-                          className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors px-1"
-                          aria-label="Fechar"
-                        >
-                          ×
-                        </button>
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                            >
+                              <path
+                                d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <rect x="6" y="14" width="12" height="7" rx="1" />
+                            </svg>
+                            <span className="hidden sm:inline">Run-sheet</span>
+                          </button>
+                          <button
+                            onClick={closeDetail}
+                            className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors px-1"
+                            aria-label="Fechar"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                      {/* Section tabs — keep the long panel navigable */}
+                      <div className="flex gap-1 mt-3">
+                        {(
+                          [
+                            ["resumo", "Resumo"],
+                            ["producao", "Produção"],
+                            ["financeiro", "Financeiro"],
+                            ["comunicacao", "Comunicação"],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            onClick={() => setDetailTab(id)}
+                            className={`flex-1 px-1 py-2 text-[10px] tracking-[0.08em] uppercase font-medium border-b-2 transition-colors ${
+                              detailTab === id
+                                ? "border-[#4d6350] text-foreground/80"
+                                : "border-transparent text-foreground/35 hover:text-foreground/60"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
                     <div className="p-5 flex flex-col gap-6">
-                      {/* Contact */}
-                      <div>
-                        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
-                          Contacto
-                        </p>
-                        <div className="flex flex-col gap-1.5">
-                          <a
-                            href={`mailto:${selected.email}`}
-                            className="text-[#4d6350] text-xs hover:underline"
-                          >
-                            {selected.email}
-                          </a>
-                          <a
-                            href={`tel:${selected.phone}`}
-                            className="text-foreground/50 text-xs hover:text-foreground/70"
-                          >
-                            {selected.phone}
-                          </a>
-                          {selected.company && (
-                            <p className="text-foreground/35 text-xs">{selected.company}</p>
-                          )}
-                          {selected.nif && (
-                            <p className="text-foreground/25 text-xs">NIF: {selected.nif}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Event */}
-                      <div>
-                        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
-                          Evento
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            {
-                              l: "Tipo",
-                              v: CATEGORIES.find((c) => c.id === selected.category)?.label,
-                            },
-                            {
-                              l: "Sub-tipo",
-                              v:
-                                selected.category && selected.eventType
-                                  ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
-                                      (e) => e.id === selected.eventType,
-                                    )?.label
-                                  : null,
-                            },
-                            {
-                              l: "Pacote",
-                              v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
-                            },
-                            { l: "Convidados", v: selected.guests },
-                            {
-                              l: "Data",
-                              v: selected.date
-                                ? new Date(selected.date + "T12:00:00").toLocaleDateString("pt-PT")
-                                : "—",
-                            },
-                            { l: "Local", v: selected.location || "—" },
-                            { l: "Duração", v: selected.duration ? `${selected.duration}h` : "—" },
-                            { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
-                          ].map(({ l, v }) => (
-                            <div key={l}>
-                              <p className="text-foreground/20 text-[9px] tracking-wide uppercase mb-0.5">
-                                {l}
-                              </p>
-                              <p className="text-foreground/55 text-xs">{v ?? "—"}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Client notes */}
-                      {selected.notes && (
-                        <div>
-                          <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-2">
-                            Notas do Cliente
-                          </p>
-                          <p className="text-foreground/45 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
-                            {selected.notes}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Estimate */}
-                      {selected.priceBreakdown && (
-                        <div>
-                          <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
-                            Estimativa Calculada
-                          </p>
-                          <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
-                            {selected.priceBreakdown.addonsCost > 0 && (
-                              <div className="flex justify-between text-[10px]">
-                                <span className="text-foreground/35">Extras</span>
-                                <span className="text-foreground/50">
-                                  {formatPrice(selected.priceBreakdown.addonsCost)}
-                                </span>
-                              </div>
-                            )}
-                            <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
-                              <span className="text-foreground/35">Subtotal</span>
-                              <span className="text-foreground/50">
-                                {formatPrice(selected.priceBreakdown.subtotal)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-[10px]">
-                              <span className="text-foreground/35">IVA 23%</span>
-                              <span className="text-foreground/50">
-                                {formatPrice(selected.priceBreakdown.iva)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
-                              <span className="text-foreground/60">Total</span>
-                              <span className="text-[#4d6350] font-semibold">
-                                {formatPrice(selected.priceBreakdown.total)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Admin actions */}
-                      <div className="border-t border-foreground/10 pt-5">
-                        <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">
-                          Gestão do Pedido
-                        </p>
-                        <div className="flex flex-col gap-4">
+                      {detailTab === "resumo" && (
+                        <>
+                          {/* Contact */}
                           <div>
-                            <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-                              Estado
-                            </label>
-                            <select
-                              value={editStatus}
-                              onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                              className="bo-input px-3 py-2 text-sm text-foreground/70"
-                            >
-                              {STATUS_OPTIONS.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-                              Preço Final Cotado (€ s/IVA)
-                            </label>
-                            <input
-                              type="number"
-                              value={editPrice}
-                              onChange={(e) => setEditPrice(e.target.value)}
-                              placeholder="Ex: 12500"
-                              className="bo-input px-3 py-2 text-sm text-foreground/70"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-                              Notas Internas
-                            </label>
-                            <textarea
-                              rows={3}
-                              value={editNotes}
-                              onChange={(e) => setEditNotes(e.target.value)}
-                              placeholder="Notas internas sobre este pedido…"
-                              className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                            />
-                          </div>
-                          {isDirty && !saving && (
-                            <p
-                              role="status"
-                              className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold/80 -mb-1"
-                            >
-                              <span className="w-1 h-1 rounded-full bg-gold/80" />
-                              Alterações por guardar
+                            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
+                              Contacto
                             </p>
+                            <div className="flex flex-col gap-1.5">
+                              <a
+                                href={`mailto:${selected.email}`}
+                                className="text-[#4d6350] text-xs hover:underline"
+                              >
+                                {selected.email}
+                              </a>
+                              <a
+                                href={`tel:${selected.phone}`}
+                                className="text-foreground/50 text-xs hover:text-foreground/70"
+                              >
+                                {selected.phone}
+                              </a>
+                              {selected.company && (
+                                <p className="text-foreground/35 text-xs">{selected.company}</p>
+                              )}
+                              {selected.nif && (
+                                <p className="text-foreground/25 text-xs">NIF: {selected.nif}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Event */}
+                          <div>
+                            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
+                              Evento
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                {
+                                  l: "Tipo",
+                                  v: CATEGORIES.find((c) => c.id === selected.category)?.label,
+                                },
+                                {
+                                  l: "Sub-tipo",
+                                  v:
+                                    selected.category && selected.eventType
+                                      ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
+                                          (e) => e.id === selected.eventType,
+                                        )?.label
+                                      : null,
+                                },
+                                {
+                                  l: "Pacote",
+                                  v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
+                                },
+                                { l: "Convidados", v: selected.guests },
+                                {
+                                  l: "Data",
+                                  v: selected.date
+                                    ? new Date(selected.date + "T12:00:00").toLocaleDateString(
+                                        "pt-PT",
+                                      )
+                                    : "—",
+                                },
+                                { l: "Local", v: selected.location || "—" },
+                                {
+                                  l: "Duração",
+                                  v: selected.duration ? `${selected.duration}h` : "—",
+                                },
+                                { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
+                              ].map(({ l, v }) => (
+                                <div key={l}>
+                                  <p className="text-foreground/20 text-[9px] tracking-wide uppercase mb-0.5">
+                                    {l}
+                                  </p>
+                                  <p className="text-foreground/55 text-xs">{v ?? "—"}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Client notes */}
+                          {selected.notes && (
+                            <div>
+                              <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-2">
+                                Notas do Cliente
+                              </p>
+                              <p className="text-foreground/45 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
+                                {selected.notes}
+                              </p>
+                            </div>
                           )}
-                          <button
-                            onClick={saveChanges}
-                            disabled={saving || !isDirty}
-                            className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
-                          >
-                            {saving ? "A guardar…" : "Guardar Alterações →"}
-                          </button>
-                        </div>
-                      </div>
 
-                      {/* Production checklist */}
-                      <EventChecklist
-                        key={`cl-${selected.id}`}
-                        quote={selected}
-                        onChange={(checklist) => {
-                          setQuotes((prev) =>
-                            prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
-                          );
-                          setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                        }}
-                      />
+                          {/* Estimate */}
+                          {selected.priceBreakdown && (
+                            <div>
+                              <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
+                                Estimativa Calculada
+                              </p>
+                              <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
+                                {selected.priceBreakdown.addonsCost > 0 && (
+                                  <div className="flex justify-between text-[10px]">
+                                    <span className="text-foreground/35">Extras</span>
+                                    <span className="text-foreground/50">
+                                      {formatPrice(selected.priceBreakdown.addonsCost)}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
+                                  <span className="text-foreground/35">Subtotal</span>
+                                  <span className="text-foreground/50">
+                                    {formatPrice(selected.priceBreakdown.subtotal)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-[10px]">
+                                  <span className="text-foreground/35">IVA 23%</span>
+                                  <span className="text-foreground/50">
+                                    {formatPrice(selected.priceBreakdown.iva)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
+                                  <span className="text-foreground/60">Total</span>
+                                  <span className="text-[#4d6350] font-semibold">
+                                    {formatPrice(selected.priceBreakdown.total)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
-                      {/* Day-of run sheet */}
-                      <EventTimeline
-                        key={`tl-${selected.id}`}
-                        quote={selected}
-                        onChange={(timeline) => {
-                          setQuotes((prev) =>
-                            prev.map((q) => (q.id === selected.id ? { ...q, timeline } : q)),
-                          );
-                          setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                        }}
-                      />
+                          {/* Admin actions */}
+                          <div className="border-t border-foreground/10 pt-5">
+                            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">
+                              Gestão do Pedido
+                            </p>
+                            <div className="flex flex-col gap-4">
+                              <TagsField
+                                key={`tags-${selected.id}`}
+                                quote={selected}
+                                suggestions={allTags}
+                                onChange={(tags) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) => (q.id === selected.id ? { ...q, tags } : q)),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, tags } : prev));
+                                }}
+                              />
+                              <FollowUpField
+                                key={`fu-${selected.id}`}
+                                quote={selected}
+                                onChange={(followUpAt) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, followUpAt } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, followUpAt } : prev));
+                                }}
+                              />
+                              <div>
+                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                  Estado
+                                </label>
+                                <select
+                                  value={editStatus}
+                                  onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
+                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                >
+                                  {STATUS_OPTIONS.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                  Preço Final Cotado (€ s/IVA)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={editPrice}
+                                  onChange={(e) => setEditPrice(e.target.value)}
+                                  placeholder="Ex: 12500"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                  Notas Internas
+                                </label>
+                                <textarea
+                                  rows={3}
+                                  value={editNotes}
+                                  onChange={(e) => setEditNotes(e.target.value)}
+                                  placeholder="Notas internas sobre este pedido…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                />
+                              </div>
+                              {isDirty && !saving && (
+                                <p
+                                  role="status"
+                                  className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold/80 -mb-1"
+                                >
+                                  <span className="w-1 h-1 rounded-full bg-gold/80" />
+                                  Alterações por guardar
+                                </p>
+                              )}
+                              <button
+                                onClick={saveChanges}
+                                disabled={saving || !isDirty}
+                                className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
+                              >
+                                {saving ? "A guardar…" : "Guardar Alterações →"}
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
 
-                      {/* Payments & invoicing */}
-                      <PaymentsPanel
-                        key={`pay-${selected.id}`}
-                        quote={selected}
-                        onChange={(payments) => {
-                          setQuotes((prev) =>
-                            prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),
-                          );
-                          setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                        }}
-                      />
+                      {detailTab === "producao" && (
+                        <>
+                          {/* Production checklist */}
+                          <EventChecklist
+                            key={`cl-${selected.id}`}
+                            quote={selected}
+                            onChange={(checklist) => {
+                              setQuotes((prev) =>
+                                prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                            }}
+                          />
 
-                      <ProposalBuilder
-                        quote={selected}
-                        onSent={(total) => {
-                          setQuotes((prev) =>
-                            prev.map((q) =>
-                              q.id === selected.id
-                                ? { ...q, status: "cotado", quotedPrice: total }
-                                : q,
-                            ),
-                          );
-                          setSelected((prev) =>
-                            prev ? { ...prev, status: "cotado", quotedPrice: total } : prev,
-                          );
-                          setEditStatus("cotado");
-                        }}
-                      />
+                          {/* Day-of run sheet */}
+                          <EventTimeline
+                            key={`tl-${selected.id}`}
+                            quote={selected}
+                            onChange={(timeline) => {
+                              setQuotes((prev) =>
+                                prev.map((q) => (q.id === selected.id ? { ...q, timeline } : q)),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                            }}
+                          />
 
-                      <ClientMessenger
-                        key={selected.id}
-                        quote={selected}
-                        onSent={(messages) => {
-                          setQuotes((prev) =>
-                            prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
-                          );
-                          setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                        }}
-                      />
+                          {/* Guest list / RSVP */}
+                          <GuestList
+                            key={`guests-${selected.id}`}
+                            quote={selected}
+                            onChange={(guestList) => {
+                              setQuotes((prev) =>
+                                prev.map((q) => (q.id === selected.id ? { ...q, guestList } : q)),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                            }}
+                          />
+                        </>
+                      )}
+
+                      {detailTab === "financeiro" && (
+                        <>
+                          {/* Payments & invoicing */}
+                          <PaymentsPanel
+                            key={`pay-${selected.id}`}
+                            quote={selected}
+                            onChange={(payments) => {
+                              setQuotes((prev) =>
+                                prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                            }}
+                          />
+
+                          {/* Suppliers booked for this event + budget vs actual cost */}
+                          <EventCosts
+                            key={`costs-${selected.id}`}
+                            quote={selected}
+                            onChange={(eventSuppliers) => {
+                              setQuotes((prev) =>
+                                prev.map((q) =>
+                                  q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                ),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, eventSuppliers } : prev));
+                            }}
+                          />
+                        </>
+                      )}
+
+                      {detailTab === "comunicacao" && (
+                        <>
+                          <ProposalBuilder
+                            quote={selected}
+                            onSent={(total) => {
+                              setQuotes((prev) =>
+                                prev.map((q) =>
+                                  q.id === selected.id
+                                    ? { ...q, status: "cotado", quotedPrice: total }
+                                    : q,
+                                ),
+                              );
+                              setSelected((prev) =>
+                                prev ? { ...prev, status: "cotado", quotedPrice: total } : prev,
+                              );
+                              setEditStatus("cotado");
+                            }}
+                          />
+
+                          <ClientMessenger
+                            key={selected.id}
+                            quote={selected}
+                            onSent={(messages) => {
+                              setQuotes((prev) =>
+                                prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                            }}
+                          />
+                        </>
+                      )}
 
                       <div className="text-foreground/18 text-[10px] text-center">
                         Submetido em{" "}

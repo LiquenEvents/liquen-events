@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Quote, Task } from "../types";
 
 interface Reminder {
-  kind: "evento" | "pagamento" | "pedido" | "tarefa";
+  kind: "evento" | "pagamento" | "pedido" | "tarefa" | "seguimento";
   urgent: boolean;
   text: string;
   sub: string;
@@ -83,6 +83,36 @@ export default function Reminders({ quotes, onOpen }: Props) {
           });
         }
       }
+      // Explicit follow-up date due (or overdue) — the commercial nudge.
+      if (
+        q.followUpAt &&
+        q.followUpAt <= today &&
+        q.status !== "aceite" &&
+        q.status !== "rejeitado"
+      ) {
+        const overdue = q.followUpAt < today;
+        list.push({
+          kind: "seguimento",
+          urgent: overdue,
+          quote: q,
+          text: `Seguir ${q.name}`,
+          sub: overdue ? "Seguimento em atraso" : "Seguimento hoje",
+        });
+      }
+      // Sent proposals going cold: quoted 4+ days ago, no follow-up date set,
+      // still undecided → nudge to chase before the lead loses interest.
+      if (q.status === "cotado" && !q.followUpAt) {
+        const since = (now - new Date(q.lastUpdated ?? q.submittedAt).getTime()) / DAY;
+        if (since >= 4) {
+          list.push({
+            kind: "seguimento",
+            urgent: since >= 8,
+            quote: q,
+            text: `${q.name} — proposta sem resposta`,
+            sub: `Enviada há ${Math.round(since)} dias · fazer seguimento`,
+          });
+        }
+      }
     }
 
     for (const t of tasks) {
@@ -146,6 +176,21 @@ export default function Reminders({ quotes, onOpen }: Props) {
           strokeWidth="1.6"
         >
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      );
+    if (k === "seguimento")
+      return (
+        <svg
+          className={cls}
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        >
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M3 4v4h4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     return (

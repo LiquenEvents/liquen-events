@@ -124,6 +124,33 @@ export interface Payment {
   note?: string;
 }
 
+/** A supplier/vendor booked for a specific event, with budgeted vs actual cost.
+    Powers the per-event cost tracking and profitability (revenue − custos). */
+export type EventSupplierStatus = "contactado" | "confirmado" | "pago";
+
+export interface EventSupplier {
+  id: string;
+  supplierId?: string; // optional link to a Supplier in the directory
+  name: string; // denormalised so the booking survives even if the supplier is removed
+  category: string;
+  estimatedCost: number; // orçamentado, em € (com IVA)
+  actualCost?: number; // custo real/confirmado, em €
+  status: EventSupplierStatus;
+  note?: string;
+}
+
+/** A guest (or party/family) on an event's RSVP list. `party` is how many
+    people this entry represents, so confirmed headcount = sum of confirmed parties. */
+export type RsvpStatus = "pendente" | "confirmado" | "recusado";
+
+export interface Guest {
+  id: string;
+  name: string;
+  party: number;
+  rsvp: RsvpStatus;
+  note?: string;
+}
+
 export type TaskPriority = "baixa" | "normal" | "alta";
 
 export interface Task {
@@ -151,6 +178,14 @@ export interface Quote extends QuoteFormData {
   checklist?: ChecklistItem[];
   payments?: Payment[];
   timeline?: TimelineItem[];
+  eventSuppliers?: EventSupplier[];
+  /** Free-form labels for organising/filtering (ex.: "VIP", "Outono", "Ar livre"). */
+  tags?: string[];
+  /** Date (yyyy-mm-dd) the team should next follow up this lead. Surfaced in
+      Reminders/Agenda when due, to chase proposals and keep deals moving. */
+  followUpAt?: string;
+  /** RSVP / guest list for the event. */
+  guestList?: Guest[];
 }
 
 /** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */

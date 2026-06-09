@@ -64,11 +64,12 @@ export default function AdminLogin() {
         />
         <div className="relative z-10 text-center">
           <Image
-            src="/logo-liquen.png"
+            src="/logo-liquen-branco.png"
             alt="Líquen Events"
-            width={90}
-            height={55}
-            className="h-16 w-auto brightness-0 invert opacity-85 mx-auto mb-8"
+            width={210}
+            height={125}
+            priority
+            className="h-20 w-auto object-contain opacity-95 mx-auto mb-8"
           />
           <p
             className="text-white/70 font-bold leading-tight"
@@ -90,11 +91,12 @@ export default function AdminLogin() {
         {/* Mobile logo */}
         <div className="lg:hidden mb-10">
           <Image
-            src="/logo-liquen.png"
+            src="/logo-liquen-branco.png"
             alt="Líquen Events"
-            width={70}
-            height={42}
-            className="h-12 w-auto brightness-0 invert opacity-85"
+            width={210}
+            height={125}
+            priority
+            className="h-14 w-auto object-contain opacity-95"
           />
         </div>
 

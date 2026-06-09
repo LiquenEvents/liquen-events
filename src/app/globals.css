@@ -494,7 +494,11 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   }
 }
 .view-in {
-  animation: view-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* `backwards` (not `both`): plays the entrance, but leaves NO lingering
+     transform afterwards. A persistent transform creates a containing block
+     and would break the position:fixed detail drawer nested inside (it would
+     anchor to the padded view wrapper instead of the viewport on mobile). */
+  animation: view-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 /* ── Back-office: shared component primitives ──

@@ -41,6 +41,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "checklist",
     "payments",
     "timeline",
+    "eventSuppliers",
+    "tags",
+    "followUpAt",
+    "guestList",
   ];
   const updates: Partial<Quote> = {};
   for (const key of allowed) {

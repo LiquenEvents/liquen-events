@@ -46,6 +46,8 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
     return map;
   }, [quotes]);
 
+  const todayKey = new Date().toISOString().slice(0, 10);
+
   // Shared by drag-and-drop and keyboard moves: optimistic update + PATCH,
   // reverting (and toasting) on failure.
   async function changeStatus(q: Quote, status: QuoteStatus) {
@@ -154,7 +156,32 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
                         {eventTypeLabel(q)} · {q.guests} pax
                       </p>
                     </div>
+                    {q.followUpAt && q.followUpAt <= todayKey && (
+                      <span
+                        className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] tracking-[0.1em] uppercase font-semibold ${
+                          q.followUpAt < todayKey
+                            ? "bg-[#b5654a]/15 text-[#b5654a]"
+                            : "bg-[#637a5f]/15 text-[#4d6350]"
+                        }`}
+                        title={q.followUpAt < todayKey ? "Seguimento em atraso" : "Seguimento hoje"}
+                      >
+                        <span className="w-1 h-1 rounded-full bg-current" />
+                        Seguir
+                      </span>
+                    )}
                   </div>
+                  {q.tags && q.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {q.tags.slice(0, 3).map((t) => (
+                        <span
+                          key={t}
+                          className="px-1.5 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[8px] font-medium tracking-wide"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-foreground/[0.06]">
                     {q.quotedPrice ? (
                       <span className="text-[#4d6350] text-xs font-semibold">

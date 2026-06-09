@@ -1,0 +1,164 @@
+- generic [ref=e1]:
+  - link "Saltar para o conteúdo" [ref=e2] [cursor=pointer]:
+    - /url: "#conteudo"
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - complementary [ref=e6]:
+        - generic [ref=e7]:
+          - img "Líquen Events" [ref=e8]
+          - paragraph [ref=e9]: Back Office
+        - navigation [ref=e11]:
+          - button "Visão Geral" [ref=e12]:
+            - img [ref=e14]
+            - generic [ref=e19]: Visão Geral
+          - button "Pedidos" [ref=e20]:
+            - img [ref=e22]
+            - generic [ref=e26]: Pedidos
+          - button "Pipeline" [ref=e27]:
+            - img [ref=e29]
+            - generic [ref=e33]: Pipeline
+          - button "Clientes" [ref=e34]:
+            - img [ref=e36]
+            - generic [ref=e40]: Clientes
+          - button "Calendário" [ref=e41]:
+            - img [ref=e43]
+            - generic [ref=e46]: Calendário
+          - button "Propostas" [ref=e47]:
+            - img [ref=e49]
+            - generic [ref=e52]: Propostas
+          - button "Tarefas" [ref=e53]:
+            - img [ref=e55]
+            - generic [ref=e58]: Tarefas
+          - button "Fornecedores" [ref=e59]:
+            - img [ref=e61]
+            - generic [ref=e63]: Fornecedores
+          - button "Estatísticas" [ref=e64]:
+            - img [ref=e66]
+            - generic [ref=e69]: Estatísticas
+          - button "Inbox" [ref=e70]:
+            - img [ref=e72]
+            - generic [ref=e75]: Inbox
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - generic [ref=e78]: C
+            - generic [ref=e79]:
+              - paragraph [ref=e80]: Catarina
+              - paragraph [ref=e81]: Administração
+          - generic [ref=e82]:
+            - button "Atalhos" [ref=e83]:
+              - img [ref=e84]
+              - text: Atalhos
+            - link "Backup" [ref=e87] [cursor=pointer]:
+              - /url: /api/backup
+              - img [ref=e88]
+              - text: Backup
+            - button "Sair" [ref=e90]:
+              - img [ref=e91]
+              - text: Sair
+      - generic [ref=e93]:
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - paragraph [ref=e96]: Pedidos de orçamento recebidos
+            - heading "Pedidos" [level=1] [ref=e97]
+          - generic [ref=e98]:
+            - button "Ativar notificações" [ref=e99]:
+              - img [ref=e100]
+              - text: Ativar notificações
+            - button "Pesquisar ⌘K" [ref=e103]:
+              - img [ref=e104]
+              - generic [ref=e107]: Pesquisar
+              - generic [ref=e108]: ⌘K
+            - button "Actualizar pedidos" [ref=e109]:
+              - img [ref=e110]
+              - generic [ref=e112]: Actualizar
+            - button "Novo pedido" [ref=e113]:
+              - img [ref=e114]
+              - generic [ref=e116]: Novo
+        - generic [ref=e117]:
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - img [ref=e120]
+              - textbox "Procurar por nome, email, local, ID… ( / )" [ref=e123]:
+                - /placeholder: Procurar por nome, email, local, ID…  ( / )
+            - generic [ref=e124]:
+              - combobox [ref=e125]:
+                - option "Mais recentes" [selected]
+                - option "Mais antigos"
+                - option "Maior valor"
+                - option "Seguir primeiro"
+              - button "Exportar" [ref=e126]:
+                - img [ref=e127]
+                - text: Exportar
+          - generic [ref=e129]:
+            - button "Todos · 1" [ref=e130]
+            - button "Pendente · 0" [ref=e131]
+            - button "Em Revisão · 0" [ref=e132]
+            - button "Cotado · 0" [ref=e133]
+            - button "Aceite · 0" [ref=e134]
+            - button "Rejeitado · 1" [ref=e135]
+          - generic [ref=e136]:
+            - generic [ref=e138]:
+              - checkbox "Selecionar pedido de Maria Teste" [ref=e140] [cursor=pointer]
+              - button "Maria Teste maria.teste@exemplo.com Rejeitado Eventos Particulares Casamentos 120 pax LIQ-MPXCSMFV-AJ7R 3/06" [ref=e141]:
+                - generic [ref=e142]:
+                  - generic [ref=e143]:
+                    - paragraph [ref=e144]: Maria Teste
+                    - paragraph [ref=e145]: maria.teste@exemplo.com
+                  - generic [ref=e147]: Rejeitado
+                - generic [ref=e148]:
+                  - generic [ref=e149]: Eventos Particulares
+                  - generic [ref=e151]: Casamentos
+                  - generic [ref=e153]: 120 pax
+                - generic [ref=e154]:
+                  - generic [ref=e155]: LIQ-MPXCSMFV-AJ7R
+                  - generic [ref=e157]: 3/06
+            - generic [ref=e158]:
+              - generic [ref=e159]:
+                - generic [ref=e160]:
+                  - generic [ref=e161]:
+                    - paragraph [ref=e162]: LIQ-MPXCSMFV-AJ7R
+                    - paragraph [ref=e163]: Maria Teste
+                  - generic [ref=e164]:
+                    - button "Run-sheet" [ref=e165]:
+                      - img [ref=e166]
+                      - generic [ref=e169]: Run-sheet
+                    - button "Fechar" [ref=e170]: ×
+                - generic [ref=e171]:
+                  - button "Resumo" [ref=e172]
+                  - button "Produção" [active] [ref=e173]
+                  - button "Financeiro" [ref=e174]
+                  - button "Comunicação" [ref=e175]
+              - generic [ref=e176]:
+                - generic [ref=e249]:
+                  - paragraph [ref=e251]: Checklist de Produção
+                  - button "+ Gerar checklist do evento" [ref=e252]
+                - generic [ref=e253]:
+                  - paragraph [ref=e255]: Cronograma do Dia
+                  - button "+ Gerar cronograma-base" [ref=e256]
+                  - generic [ref=e257]:
+                    - textbox [ref=e258]
+                    - textbox "Momento…" [ref=e259]
+                    - textbox "Resp." [ref=e260]
+                    - button "+" [disabled] [ref=e261]
+                - generic [ref=e262]:
+                  - paragraph [ref=e264]: Lista de Convidados
+                  - generic [ref=e265]:
+                    - generic [ref=e266]:
+                      - paragraph [ref=e267]: "0"
+                      - paragraph [ref=e268]: Confirm.
+                    - generic [ref=e269]:
+                      - paragraph [ref=e270]: "0"
+                      - paragraph [ref=e271]: Pendente
+                    - generic [ref=e272]:
+                      - paragraph [ref=e273]:
+                        - text: "0"
+                        - generic [ref=e274]: /120
+                      - paragraph [ref=e275]: Estimativa
+                  - generic [ref=e276]:
+                    - textbox "Nome (convidado ou família)" [ref=e277]: Família Silva
+                    - spinbutton "Número de pessoas" [ref=e278]: "4"
+                    - button "+" [ref=e279]
+                - generic [ref=e238]: Submetido em 3 de junho de 2026 às 01:54
+  - button "Open Next.js Dev Tools" [ref=e244] [cursor=pointer]:
+    - img [ref=e245]
+  - alert [ref=e248]: Pedidos
