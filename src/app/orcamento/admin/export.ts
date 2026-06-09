@@ -122,6 +122,107 @@ export function dateStamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+const RSVP_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  confirmado: "Confirmado",
+  recusado: "Recusado",
+};
+
+/** Export an event's guest list (RSVP) as CSV rows. */
+export function guestsToCsvRows(q: Quote): (string | number)[][] {
+  const header = ["Convidado / Família", "Pessoas", "RSVP", "Nota"];
+  const rows = (q.guestList ?? []).map((g) => [
+    g.name,
+    g.party ?? 1,
+    RSVP_LABEL[g.rsvp] ?? g.rsvp,
+    g.note ?? "",
+  ]);
+  return [header, ...rows];
+}
+
+/**
+ * Open a clean, print-ready guest list for an event (alphabetical, with a
+ * headcount summary). Handy to print or save as PDF for the venue/catering.
+ */
+export function printGuestList(q: Quote): void {
+  const win = window.open("", "_blank", "width=820,height=1000");
+  if (!win) return;
+
+  const guests = (q.guestList ?? []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  let confirmed = 0;
+  let pending = 0;
+  let declined = 0;
+  for (const g of guests) {
+    const n = g.party || 1;
+    if (g.rsvp === "confirmado") confirmed += n;
+    else if (g.rsvp === "pendente") pending += n;
+    else declined += n;
+  }
+
+  const dateStr = q.date
+    ? new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "—";
+
+  const rows = guests.length
+    ? guests
+        .map(
+          (g) =>
+            `<tr><td>${escapeHtml(g.name)}</td><td class="c">${g.party || 1}</td><td class="o">${RSVP_LABEL[g.rsvp] ?? g.rsvp}</td><td>${escapeHtml(g.note ?? "")}</td></tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="4" class="empty">Sem convidados na lista.</td></tr>`;
+
+  win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8" />
+  <title>Convidados — ${escapeHtml(q.name)} — ${q.id}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; margin: 0; padding: 40px; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #525a2f; padding-bottom: 16px; margin-bottom: 24px; }
+    .brand { font-size: 13px; letter-spacing: .25em; text-transform: uppercase; color: #525a2f; font-weight: 700; }
+    h1 { font-size: 26px; margin: 6px 0 2px; }
+    .sub { color: #666; font-size: 13px; }
+    .id { color: #999; font-size: 11px; font-family: monospace; }
+    .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .facts div { border: 1px solid #eee; border-radius: 8px; padding: 12px; text-align: center; }
+    .facts .v { font-size: 22px; font-weight: 700; color: #525a2f; }
+    .facts .k { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #888; padding: 8px 6px; border-bottom: 2px solid #ddd; }
+    td { padding: 8px 6px; border-bottom: 1px solid #eee; font-size: 13px; }
+    td.c { width: 70px; text-align: center; font-weight: 600; }
+    td.o { width: 110px; color: #525a2f; }
+    td.empty { color: #aaa; font-style: italic; text-align: center; }
+    .foot { margin-top: 40px; color: #aaa; font-size: 11px; text-align: center; }
+    @media print { body { padding: 24px; } }
+  </style></head><body>
+    <div class="head">
+      <div>
+        <div class="brand">Líquen Events · Convidados</div>
+        <h1>${escapeHtml(q.name)}</h1>
+        <div class="sub">${dateStr}</div>
+      </div>
+      <div class="id">${q.id}</div>
+    </div>
+    <div class="facts">
+      <div><div class="v">${confirmed}</div><div class="k">Confirmados</div></div>
+      <div><div class="v">${pending}</div><div class="k">Pendentes</div></div>
+      <div><div class="v">${declined}</div><div class="k">Recusados</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Convidado / Família</th><th>Pessoas</th><th>RSVP</th><th>Nota</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="foot">Gerado em ${new Date().toLocaleString("pt-PT")} · Líquen Events</div>
+    <script>window.onload = function () { setTimeout(function () { window.print(); }, 200); };</script>
+  </body></html>`);
+  win.document.close();
+}
+
 /**
  * Open a clean, print-ready run-sheet for a single event in a new window.
  * Designed for the day-of: contacts, key facts, the timeline and the checklist.

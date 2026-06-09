@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { randomId } from "./util";
+import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "../types";
 
 const RSVP_META: Record<RsvpStatus, { label: string; color: string }> = {
@@ -79,11 +80,60 @@ export default function GuestList({ quote, onChange }: Props) {
     <div className="border-t border-foreground/10 pt-5">
       <div className="flex items-center justify-between mb-4">
         <p className="bo-eyebrow">Lista de Convidados</p>
-        {guests.length > 0 && (
-          <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
-            {guests.length} {guests.length === 1 ? "grupo" : "grupos"}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {guests.length > 0 && (
+            <>
+              <button
+                onClick={() =>
+                  downloadCsv(`convidados-${quote.id}-${dateStamp()}`, guestsToCsvRows(quote))
+                }
+                className="text-foreground/35 hover:text-[#4d6350] transition-colors p-1"
+                title="Exportar convidados para CSV"
+                aria-label="Exportar CSV"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                >
+                  <path
+                    d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={() => printGuestList(quote)}
+                className="text-foreground/35 hover:text-[#4d6350] transition-colors p-1"
+                title="Imprimir lista de convidados"
+                aria-label="Imprimir"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                >
+                  <path
+                    d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <rect x="6" y="14" width="12" height="7" rx="1" />
+                </svg>
+              </button>
+              <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5 ml-0.5">
+                {guests.length} {guests.length === 1 ? "grupo" : "grupos"}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Headcount summary */}

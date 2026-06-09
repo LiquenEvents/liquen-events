@@ -119,7 +119,7 @@ export default function NotificationBell() {
           />
           <path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" />
         </svg>
-        Ativas
+        <span className="hidden sm:inline">Ativas</span>
       </button>
     );
   }
@@ -150,7 +150,9 @@ export default function NotificationBell() {
         />
         <path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" />
       </svg>
-      {state === "denied" ? "Bloqueadas" : "Ativar notificações"}
+      <span className="hidden sm:inline">
+        {state === "denied" ? "Bloqueadas" : "Ativar notificações"}
+      </span>
     </button>
   );
 }

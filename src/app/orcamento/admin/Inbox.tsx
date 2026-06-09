@@ -141,7 +141,7 @@ export default function Inbox() {
       {/* List */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase">
+          <p className="bo-eyebrow">
             Caixa de entrada
             {unreadCount > 0 && (
               <span className="ml-2 text-[#4d6350] normal-case tracking-normal">
@@ -260,9 +260,7 @@ export default function Inbox() {
               </p>
             </div>
             <div className="p-5">
-              <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
-                Responder
-              </p>
+              <p className="bo-eyebrow mb-3">Responder</p>
               {sent ? (
                 <p role="status" className="text-[#4d6350] text-xs">
                   ✓ Resposta enviada para {open.fromAddress}.

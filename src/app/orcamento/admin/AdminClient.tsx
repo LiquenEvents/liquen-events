@@ -1452,8 +1452,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </button>
                         </div>
                       </div>
-                      {/* Section tabs — keep the long panel navigable */}
-                      <div className="flex gap-1 mt-3">
+                      {/* Section tabs — keep the long panel navigable.
+                          Arrow keys move between tabs (WAI-ARIA tablist pattern). */}
+                      <div
+                        role="tablist"
+                        aria-label="Secções do pedido"
+                        className="flex gap-1 mt-3"
+                      >
                         {(
                           [
                             ["resumo", "Resumo"],
@@ -1461,19 +1466,38 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             ["financeiro", "Financeiro"],
                             ["comunicacao", "Comunicação"],
                           ] as const
-                        ).map(([id, label]) => (
-                          <button
-                            key={id}
-                            onClick={() => setDetailTab(id)}
-                            className={`flex-1 px-1 py-2 text-[10px] tracking-[0.08em] uppercase font-medium border-b-2 transition-colors ${
-                              detailTab === id
-                                ? "border-[#4d6350] text-foreground/80"
-                                : "border-transparent text-foreground/35 hover:text-foreground/60"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
+                        ).map(([id, label], i, arr) => {
+                          const active = detailTab === id;
+                          return (
+                            <button
+                              key={id}
+                              role="tab"
+                              aria-selected={active}
+                              tabIndex={active ? 0 : -1}
+                              onClick={() => setDetailTab(id)}
+                              onKeyDown={(e) => {
+                                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                                e.preventDefault();
+                                const dir = e.key === "ArrowRight" ? 1 : -1;
+                                const next = arr[(i + dir + arr.length) % arr.length][0];
+                                setDetailTab(next);
+                                // Move focus to the newly-selected tab (roving tabindex).
+                                const tabs =
+                                  e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                                    '[role="tab"]',
+                                  );
+                                tabs?.[(i + dir + arr.length) % arr.length]?.focus();
+                              }}
+                              className={`flex-1 px-1 py-2 text-[10px] tracking-[0.08em] uppercase font-medium border-b-2 transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] rounded-t ${
+                                active
+                                  ? "border-[#4d6350] text-foreground/80"
+                                  : "border-transparent text-foreground/35 hover:text-foreground/60"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1482,9 +1506,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         <>
                           {/* Contact */}
                           <div>
-                            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
-                              Contacto
-                            </p>
+                            <p className="bo-eyebrow mb-3">Contacto</p>
                             <div className="flex flex-col gap-1.5">
                               <a
                                 href={`mailto:${selected.email}`}
@@ -1509,9 +1531,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                           {/* Event */}
                           <div>
-                            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
-                              Evento
-                            </p>
+                            <p className="bo-eyebrow mb-3">Evento</p>
                             <div className="grid grid-cols-2 gap-2">
                               {[
                                 {
@@ -1560,9 +1580,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           {/* Client notes */}
                           {selected.notes && (
                             <div>
-                              <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-2">
-                                Notas do Cliente
-                              </p>
+                              <p className="bo-eyebrow mb-2">Notas do Cliente</p>
                               <p className="text-foreground/45 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
                                 {selected.notes}
                               </p>
@@ -1572,9 +1590,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           {/* Estimate */}
                           {selected.priceBreakdown && (
                             <div>
-                              <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-3">
-                                Estimativa Calculada
-                              </p>
+                              <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
                               <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
                                 {selected.priceBreakdown.addonsCost > 0 && (
                                   <div className="flex justify-between text-[10px]">
@@ -1608,9 +1624,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                           {/* Admin actions */}
                           <div className="border-t border-foreground/10 pt-5">
-                            <p className="text-foreground/22 text-[10px] tracking-[0.35em] uppercase mb-4">
-                              Gestão do Pedido
-                            </p>
+                            <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
                             <div className="flex flex-col gap-4">
                               <TagsField
                                 key={`tags-${selected.id}`}
