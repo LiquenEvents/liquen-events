@@ -12,7 +12,7 @@ export const runtime = "nodejs";
  */
 export async function POST(req: NextRequest) {
   sweep();
-  if (!rateLimit(`csp:${clientIp(req)}`, 30, 60_000).ok) {
+  if (!(await rateLimit(`csp:${clientIp(req)}`, 30, 60_000)).ok) {
     return new NextResponse(null, { status: 429 });
   }
   try {

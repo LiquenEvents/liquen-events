@@ -26,7 +26,7 @@ const eur = (n: number) =>
 export async function POST(request: NextRequest) {
   try {
     sweep();
-    const limited = rateLimit(`proposta:${clientIp(request)}`, 10, 60_000);
+    const limited = await rateLimit(`proposta:${clientIp(request)}`, 10, 60_000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: "Demasiados pedidos. Tente novamente dentro de momentos." },

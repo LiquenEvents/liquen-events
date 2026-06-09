@@ -19,5 +19,16 @@ export default function Analytics() {
   const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
   if (!domain) return null;
   const src = process.env.NEXT_PUBLIC_PLAUSIBLE_SRC || "https://plausible.io/js/script.js";
-  return <Script defer data-domain={domain} src={src} strategy="afterInteractive" />;
+  let origin = "";
+  try {
+    origin = new URL(src).origin;
+  } catch {
+    /* malformed src — skip the hint, still load the script */
+  }
+  return (
+    <>
+      {origin && <link rel="preconnect" href={origin} />}
+      <Script defer data-domain={domain} src={src} strategy="afterInteractive" />
+    </>
+  );
 }

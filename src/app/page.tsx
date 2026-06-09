@@ -201,7 +201,7 @@ export default async function Home() {
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
 
-      {/* ── SEO content — organização de eventos no Alentejo, Lisboa e Portugal ── */}
+      {/* ── Reach — events anywhere (no place-name on the visible page) ── */}
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
           {/* Image */}
@@ -211,7 +211,7 @@ export default async function Home() {
           >
             <Image
               src="/imagens/DaniGui_Adois_61.jpg"
-              alt="Organização de eventos no Alentejo — Líquen Events"
+              alt="Evento organizado pela Líquen Events"
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"

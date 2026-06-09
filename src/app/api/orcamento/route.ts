@@ -72,7 +72,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
 export async function POST(request: NextRequest) {
   try {
     sweep();
-    const limited = rateLimit(`orcamento:${clientIp(request)}`, 5, 60_000);
+    const limited = await rateLimit(`orcamento:${clientIp(request)}`, 5, 60_000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: "Demasiados pedidos. Tente novamente dentro de momentos." },

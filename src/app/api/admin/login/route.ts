@@ -16,12 +16,12 @@ export async function POST(request: NextRequest) {
   const ip = clientIp(request);
   // Throttle brute-force attempts on the login endpoint.
   sweep();
-  const limited = rateLimit(`login:${ip}`, 8, 60_000);
+  const limited = await rateLimit(`login:${ip}`, 8, 60_000);
   if (!limited.ok) {
     log.warn("admin login rate-limited", { ip });
     return NextResponse.json(
       { error: "Demasiadas tentativas. Aguarde um momento." },
-      { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } }
+      { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } },
     );
   }
 
@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     password = String(body.password ?? "");
-    name = String(body.name ?? "").trim().slice(0, 40);
+    name = String(body.name ?? "")
+      .trim()
+      .slice(0, 40);
     code = String(body.code ?? "").trim();
   } catch {
     return NextResponse.json({ error: "Pedido inválido" }, { status: 400 });

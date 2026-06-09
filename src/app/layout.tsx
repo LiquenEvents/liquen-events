@@ -105,6 +105,16 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await getLocale();
   const t = getDictionary(locale);
+  // Warm the connection to the image CDN (when enabled) so the LCP image isn't
+  // delayed by the TLS handshake. No-op until NEXT_PUBLIC_IMAGE_CDN is set.
+  let imageCdnOrigin = "";
+  try {
+    if (process.env.NEXT_PUBLIC_IMAGE_CDN) {
+      imageCdnOrigin = new URL(process.env.NEXT_PUBLIC_IMAGE_CDN).origin;
+    }
+  } catch {
+    /* malformed value — skip the hint */
+  }
   return (
     <html
       lang={htmlLang(locale)}
@@ -113,6 +123,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     >
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale}>
+          {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
           <StructuredData />
           <Analytics />
           <a
