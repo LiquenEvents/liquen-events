@@ -29,11 +29,17 @@ export function proxy(req: NextRequest) {
     const headers = new Headers(req.headers);
     headers.set("x-liquen-locale", "en");
     const res = NextResponse.rewrite(url, { request: { headers } });
-    res.cookies.set("liquen-lang", "en", {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax",
-    });
+    // Only (re)write the sticky cookie when it isn't already "en". Re-setting
+    // it on every /en response made late-arriving prefetch responses clobber a
+    // freshly chosen "pt" cookie (LanguageToggle writes it just before leaving
+    // the mirror), bouncing the user back to English.
+    if (req.cookies.get("liquen-lang")?.value !== "en") {
+      res.cookies.set("liquen-lang", "en", {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+      });
+    }
     return res;
   }
 
