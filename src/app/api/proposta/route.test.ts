@@ -16,6 +16,7 @@ vi.mock("@/lib/proposals-store", () => ({
   }),
 }));
 vi.mock("@/lib/quotes-store", () => ({
+  getQuote: vi.fn(async (id: string) => quotesDb.store.get(id) ?? null),
   updateQuote: vi.fn(async (id: string, patch: Record<string, unknown>) => {
     const next = { ...(quotesDb.store.get(id) ?? { id }), ...patch };
     quotesDb.store.set(id, next);
@@ -94,7 +95,14 @@ describe("POST /api/proposta", () => {
     expect(json).toMatchObject({ ok: true, status: "aceite" });
     expect(proposalsDb.store.get("p3")?.status).toBe("aceite");
     expect(proposalsDb.store.get("p3")?.respondedAt).toBeTruthy();
-    expect(updateQuote).toHaveBeenCalledWith("q-p3", { status: "aceite" });
+    // Quote advances AND the client's decision lands in the activity log.
+    expect(updateQuote).toHaveBeenCalledWith(
+      "q-p3",
+      expect.objectContaining({
+        status: "aceite",
+        activityLog: [expect.objectContaining({ kind: "status_change", actor: "Cliente Teste" })],
+      }),
+    );
   });
 
   it("declines a proposal: marks it rejeitada and the quote rejeitado", async () => {
@@ -103,7 +111,10 @@ describe("POST /api/proposta", () => {
     const json = await res.json();
     expect(json.status).toBe("rejeitada");
     expect(proposalsDb.store.get("p4")?.status).toBe("rejeitada");
-    expect(updateQuote).toHaveBeenCalledWith("q-p4", { status: "rejeitado" });
+    expect(updateQuote).toHaveBeenCalledWith(
+      "q-p4",
+      expect.objectContaining({ status: "rejeitado" }),
+    );
   });
 
   it("is idempotent: a second response returns the recorded one without re-updating", async () => {

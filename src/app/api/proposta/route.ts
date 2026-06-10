@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal, updateProposal } from "@/lib/proposals-store";
-import { updateQuote } from "@/lib/quotes-store";
+import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
@@ -60,10 +60,26 @@ export async function POST(request: NextRequest) {
     const newStatus = accepted ? "aceite" : "rejeitada";
     const respondedAt = new Date().toISOString();
     await updateProposal(proposal.id, { status: newStatus, respondedAt });
-    // Advance the linked quote in the pipeline.
-    await updateQuote(proposal.quoteId, { status: accepted ? "aceite" : "rejeitado" }).catch((e) =>
-      log.error("proposta: atualizar pedido falhou", e, { id: proposal.quoteId }),
-    );
+    // Advance the linked quote in the pipeline, recording the client's
+    // decision in its activity log (the team's audit trail).
+    try {
+      const quote = await getQuote(proposal.quoteId);
+      const entry = {
+        id: Math.random().toString(36).slice(2, 10),
+        at: respondedAt,
+        kind: "status_change" as const,
+        actor: proposal.clientName,
+        summary: accepted
+          ? `Proposta aceite pelo cliente (${eur(proposal.total)})`
+          : "Proposta recusada pelo cliente",
+      };
+      await updateQuote(proposal.quoteId, {
+        status: accepted ? "aceite" : "rejeitado",
+        activityLog: [...(quote?.activityLog ?? []), entry],
+      });
+    } catch (e) {
+      log.error("proposta: atualizar pedido falhou", e, { id: proposal.quoteId });
+    }
 
     // Notify the team (best-effort — never block the client's confirmation).
     const verb = accepted ? "ACEITE ✓" : "recusada";
