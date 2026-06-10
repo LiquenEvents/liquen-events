@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toCsv, quotesToCsvRows, paymentsToCsvRows } from "./export";
+import { toCsv, quotesToCsvRows, paymentsToCsvRows, buildEventIcs } from "./export";
 import type { Quote } from "../types";
 
 describe("toCsv", () => {
@@ -72,6 +72,55 @@ describe("quotesToCsvRows", () => {
     expect(rows).toHaveLength(2);
     // Should not throw and should still produce a valid CSV string.
     expect(typeof toCsv(rows)).toBe("string");
+  });
+});
+
+describe("buildEventIcs", () => {
+  const NOW = new Date("2026-06-10T10:00:00.000Z");
+  const quote = {
+    id: "LIQ-TEST-0001",
+    name: "Ana; Silva, Lda",
+    email: "ana@example.com",
+    phone: "910000000",
+    guests: 80,
+    date: "2026-09-12",
+    location: "Herdade, Évora",
+    category: "particulares",
+    eventType: "casamentos",
+  } as unknown as Quote;
+
+  it("gera um VEVENT de dia inteiro com DTEND exclusivo (dia seguinte)", () => {
+    const ics = buildEventIcs(quote, NOW)!;
+    expect(ics).toContain("UID:LIQ-TEST-0001@liquen-events.com");
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260912");
+    expect(ics).toContain("DTEND;VALUE=DATE:20260913");
+    expect(ics).toContain("DTSTAMP:20260610T100000Z");
+    // CRLF line endings per RFC 5545; well-formed envelope.
+    expect(ics.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);
+    expect(ics.endsWith("END:VCALENDAR")).toBe(true);
+  });
+
+  it("eventos multi-dia usam endDate (+1 dia, exclusivo)", () => {
+    const ics = buildEventIcs({ ...quote, endDate: "2026-09-14" } as Quote, NOW)!;
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260912");
+    expect(ics).toContain("DTEND;VALUE=DATE:20260915");
+  });
+
+  it("ignora um endDate anterior à data de início", () => {
+    const ics = buildEventIcs({ ...quote, endDate: "2026-09-01" } as Quote, NOW)!;
+    expect(ics).toContain("DTEND;VALUE=DATE:20260913");
+  });
+
+  it("escapa vírgulas e ponto-e-vírgula nos campos de texto (RFC 5545)", () => {
+    const ics = buildEventIcs(quote, NOW)!;
+    expect(ics).toContain("SUMMARY:Casamentos — Ana\\; Silva\\, Lda");
+    expect(ics).toContain("LOCATION:Herdade\\, Évora");
+    // Newlines in the description become literal \n sequences.
+    expect(ics).toContain("DESCRIPTION:Cliente: Ana\\; Silva\\, Lda\\nTel: 910000000");
+  });
+
+  it("devolve null sem data de evento", () => {
+    expect(buildEventIcs({ ...quote, date: "" } as Quote, NOW)).toBeNull();
   });
 });
 

@@ -142,12 +142,12 @@ function icsText(s: string): string {
 }
 
 /**
- * Download the event as a .ics file so anyone on the team can drop it into
- * their personal calendar (Google/Apple/Outlook). All-day event on the quote's
- * date — multi-day when an endDate is set — with client contact in the notes.
+ * Build the iCalendar document for an event (pure — unit-tested). All-day
+ * event on the quote's date — multi-day when an endDate is set — with the
+ * client's contact in the notes. Returns null when the quote has no date.
  */
-export function downloadEventIcs(q: Quote): void {
-  if (!q.date) return;
+export function buildEventIcs(q: Quote, now: Date = new Date()): string | null {
+  if (!q.date) return null;
 
   const day = (iso: string) => iso.replace(/-/g, "");
   // DTEND is exclusive for all-day events: day after the last event day.
@@ -155,7 +155,7 @@ export function downloadEventIcs(q: Quote): void {
   const end = new Date(lastDay + "T12:00:00");
   end.setDate(end.getDate() + 1);
   const dtEnd = end.toISOString().slice(0, 10).replace(/-/g, "");
-  const stamp = new Date()
+  const stamp = now
     .toISOString()
     .replace(/[-:]/g, "")
     .replace(/\.\d{3}/, "");
@@ -171,7 +171,7 @@ export function downloadEventIcs(q: Quote): void {
     .filter(Boolean)
     .join("\n");
 
-  const ics = [
+  return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Liquen Events//Back Office//PT",
@@ -190,6 +190,15 @@ export function downloadEventIcs(q: Quote): void {
   ]
     .filter(Boolean)
     .join("\r\n");
+}
+
+/**
+ * Download the event as a .ics file so anyone on the team can drop it into
+ * their personal calendar (Google/Apple/Outlook).
+ */
+export function downloadEventIcs(q: Quote): void {
+  const ics = buildEventIcs(q);
+  if (!ics) return;
 
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
