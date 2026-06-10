@@ -1286,7 +1286,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {/* ── Propostas ── */}
           {view === "propostas" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
-              <Propostas quotes={quotes} onOpenQuote={openQuote} />
+              <Propostas
+                quotes={quotes}
+                onOpenQuote={openQuote}
+                onQuoteUpdated={(q) => {
+                  setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+                  setSelected((prev) => (prev?.id === q.id ? q : prev));
+                }}
+              />
             </div>
           )}
 

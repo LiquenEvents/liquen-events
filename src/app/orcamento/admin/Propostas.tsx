@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Proposal, ProposalStatus, Quote } from "../types";
 import { SkeletonList } from "./Skeleton";
 import EmptyState from "./EmptyState";
+import { randomId } from "./util";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -33,9 +34,11 @@ function expiryInfo(
 interface Props {
   quotes?: Quote[];
   onOpenQuote?: (q: Quote) => void;
+  /** Lets the parent sync its quote state when accepting a proposal also moves the pedido. */
+  onQuoteUpdated?: (q: Quote) => void;
 }
 
-export default function Propostas({ quotes, onOpenQuote }: Props) {
+export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<ProposalStatus | "all">("all");
@@ -61,8 +64,35 @@ export default function Propostas({ quotes, onOpenQuote }: Props) {
         body: JSON.stringify({ status, respondedAt: new Date().toISOString() }),
       });
       if (res.ok) {
-        const updated = await res.json();
+        const updated: Proposal = await res.json();
         setProposals((prev) => prev.map((p) => (p.id === id ? updated : p)));
+
+        // Aceitar a proposta fecha o negócio: o pedido associado passa também
+        // a "aceite" no pipeline (com entrada no histórico). Recusar não toca
+        // no pedido — a equipa pode querer renegociar antes de o dar por perdido.
+        if (status === "aceite") {
+          const lq = quotes?.find((q) => q.id === updated.quoteId);
+          if (lq && lq.status !== "aceite") {
+            const entry = {
+              id: randomId(),
+              at: new Date().toISOString(),
+              kind: "status_change" as const,
+              summary: `Proposta aceite — pedido movido para Aceite (${eur(updated.total)})`,
+            };
+            const qRes = await fetch(`/api/orcamento/${lq.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                status: "aceite",
+                activityLog: [...(lq.activityLog ?? []), entry],
+              }),
+            }).catch(() => null);
+            if (qRes?.ok) {
+              const updatedQuote: Quote = await qRes.json();
+              onQuoteUpdated?.(updatedQuote);
+            }
+          }
+        }
       }
     } finally {
       setActionBusy(null);

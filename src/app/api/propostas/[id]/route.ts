@@ -10,6 +10,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params;
   try {
     const body = await request.json();
+    const VALID_STATUS = ["rascunho", "enviada", "aceite", "rejeitada"];
+    if ("status" in body && !VALID_STATUS.includes(body.status)) {
+      return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
+    }
     const allowed = ["status", "respondedAt"] as const;
     const patch: Record<string, unknown> = {};
     for (const k of allowed) {
