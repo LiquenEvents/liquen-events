@@ -18,6 +18,7 @@ import {
   dateStamp,
   printRunSheet,
   printEventDossier,
+  downloadEventIcs,
 } from "./export";
 import { eventCountdown, randomId, eur } from "./util";
 import { ViewSkeleton } from "./Skeleton";
@@ -293,8 +294,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
+  const [mineOnly, setMineOnly] = useState(false);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"recent" | "old" | "value" | "followup">("recent");
+  const [sort, setSort] = useState<"recent" | "old" | "value" | "followup" | "eventdate">("recent");
   const [saving, setSaving] = useState(false);
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
@@ -388,7 +390,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       if (f === "all" || STATUS_OPTIONS.some((s) => s.id === f))
         setFilterStatus(f as QuoteStatus | "all");
       const so = localStorage.getItem("liquen-admin-sort");
-      if (so === "recent" || so === "old" || so === "value" || so === "followup") setSort(so);
+      if (
+        so === "recent" ||
+        so === "old" ||
+        so === "value" ||
+        so === "followup" ||
+        so === "eventdate"
+      )
+        setSort(so);
     } catch {
       /* ignore */
     }
@@ -815,6 +824,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     if (filterCategory !== "all") {
       list = list.filter((x) => x.category === filterCategory);
     }
+    if (mineOnly) {
+      list = list.filter((x) => x.assignedTo === userName);
+    }
     if (tagFilter) {
       list = list.filter((x) => (x.tags ?? []).includes(tagFilter));
     }
@@ -849,6 +861,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         if (av !== bv) return av < bv ? -1 : 1;
         return +new Date(b.submittedAt) - +new Date(a.submittedAt);
       });
+    else if (sort === "eventdate")
+      // Upcoming events first (soonest at the top); undated quotes sink to the
+      // bottom, most recent among them.
+      sorted.sort((a, b) => {
+        const av = a.date || "9999-99-99";
+        const bv = b.date || "9999-99-99";
+        if (av !== bv) return av < bv ? -1 : 1;
+        return +new Date(b.submittedAt) - +new Date(a.submittedAt);
+      });
     else
       sorted.sort(
         (a, b) =>
@@ -856,7 +877,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           (a.quotedPrice ?? a.priceBreakdown?.total ?? 0),
       );
     return sorted;
-  }, [quotes, filterStatus, filterCategory, tagFilter, search, sort, showArchived]);
+  }, [
+    quotes,
+    filterStatus,
+    filterCategory,
+    tagFilter,
+    search,
+    sort,
+    showArchived,
+    mineOnly,
+    userName,
+  ]);
 
   const pendingCount = activeQuotes.filter(
     (q) => q.status === "pendente" || q.status === "em_revisao",
@@ -1353,6 +1384,29 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 />
               </div>
               <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setMineOnly((v) => !v)}
+                  title={`Mostrar apenas pedidos atribuídos a ${userName}`}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border shadow-sm transition-all ${
+                    mineOnly
+                      ? "bg-[#4d6350] border-[#4d6350] text-white"
+                      : "bg-white border-foreground/[0.09] text-foreground/45 hover:text-foreground/65"
+                  }`}
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                  >
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                  </svg>
+                  Meus
+                </button>
                 <select
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
@@ -1374,6 +1428,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   <option value="old">Mais antigos</option>
                   <option value="value">Maior valor</option>
                   <option value="followup">Seguir primeiro</option>
+                  <option value="eventdate">Data do evento</option>
                 </select>
                 <button
                   onClick={() => {
@@ -1864,6 +1919,28 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             </svg>
                             <span className="hidden sm:inline">Dossier</span>
                           </button>
+                          {selected.date && (
+                            <button
+                              onClick={() => downloadEventIcs(selected)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
+                              title="Descarregar .ics para adicionar ao seu calendário (Google/Apple/Outlook)"
+                            >
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.7"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                                <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
+                              </svg>
+                              <span className="hidden sm:inline">.ics</span>
+                            </button>
+                          )}
                           <button
                             onClick={closeDetail}
                             className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors px-1"

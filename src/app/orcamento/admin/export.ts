@@ -130,6 +130,78 @@ export function dateStamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ── iCalendar (.ics) export ────────────────────────────────────────────────
+
+/** Escape a text value per RFC 5545 (backslash, separators, newlines). */
+function icsText(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
+}
+
+/**
+ * Download the event as a .ics file so anyone on the team can drop it into
+ * their personal calendar (Google/Apple/Outlook). All-day event on the quote's
+ * date — multi-day when an endDate is set — with client contact in the notes.
+ */
+export function downloadEventIcs(q: Quote): void {
+  if (!q.date) return;
+
+  const day = (iso: string) => iso.replace(/-/g, "");
+  // DTEND is exclusive for all-day events: day after the last event day.
+  const lastDay = q.endDate && q.endDate >= q.date ? q.endDate : q.date;
+  const end = new Date(lastDay + "T12:00:00");
+  end.setDate(end.getDate() + 1);
+  const dtEnd = end.toISOString().slice(0, 10).replace(/-/g, "");
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
+
+  const summary = `${eventTypeLabel(q) || "Evento"} — ${q.name}`;
+  const description = [
+    `Cliente: ${q.name}`,
+    q.phone ? `Tel: ${q.phone}` : "",
+    q.email ? `Email: ${q.email}` : "",
+    q.guests ? `Convidados: ${q.guests}` : "",
+    `Ref: ${q.id}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Liquen Events//Back Office//PT",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${q.id}@liquen-events.com`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${day(q.date)}`,
+    `DTEND;VALUE=DATE:${dtEnd}`,
+    `SUMMARY:${icsText(summary)}`,
+    q.location ? `LOCATION:${icsText(q.location)}` : "",
+    `DESCRIPTION:${icsText(description)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ]
+    .filter(Boolean)
+    .join("\r\n");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `evento-${q.id}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 const RSVP_LABEL: Record<string, string> = {
   pendente: "Pendente",
   confirmado: "Confirmado",
