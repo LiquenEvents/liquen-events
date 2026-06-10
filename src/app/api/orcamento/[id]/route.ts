@@ -12,13 +12,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     }
     // Public endpoint (confirmation page loads by reference id). Authenticated
-    // staff get the full record; anyone else gets a redacted view with no
-    // personal data, so an enumerated id can never leak PII.
+    // staff get the full record; anyone else gets an explicit allowlist of the
+    // event facts the confirmation page renders — never the client's personal
+    // data nor internal CRM fields (adminNotes, activityLog, payments, guest
+    // list, lost reason…), so an enumerated id can't leak anything sensitive.
     if (isAuthed(request)) {
       return NextResponse.json(quote);
     }
-    const { name, email, phone, company, nif, notes, ...safe } = quote;
-    void [name, email, phone, company, nif, notes];
+    const safe = {
+      id: quote.id,
+      submittedAt: quote.submittedAt,
+      status: quote.status,
+      category: quote.category,
+      eventType: quote.eventType,
+      eventName: quote.eventName,
+      packageTier: quote.packageTier,
+      guests: quote.guests,
+      date: quote.date,
+      location: quote.location,
+      addons: (quote.addons ?? []).map(({ id, name, tier }) => ({ id, name, tier })),
+    };
     return NextResponse.json(safe);
   } catch (err) {
     log.error("orcamento GET id falhou", err);
