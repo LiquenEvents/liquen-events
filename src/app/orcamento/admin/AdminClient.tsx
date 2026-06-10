@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import type { Quote, QuoteStatus } from "../types";
+import type { Quote, QuoteStatus, ActivityEntry } from "../types";
+import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "../pricing";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../data";
 import dynamic from "next/dynamic";
@@ -11,8 +12,14 @@ import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
 import NewQuoteModal from "./NewQuoteModal";
 import NotificationBell from "./NotificationBell";
-import { downloadCsv, quotesToCsvRows, dateStamp, printRunSheet } from "./export";
-import { eventCountdown } from "./util";
+import {
+  downloadCsv,
+  quotesToCsvRows,
+  dateStamp,
+  printRunSheet,
+  printEventDossier,
+} from "./export";
+import { eventCountdown, randomId, eur } from "./util";
 import { ViewSkeleton } from "./Skeleton";
 import EmptyState from "./EmptyState";
 
@@ -55,6 +62,8 @@ const TagsField = dynamic(() => import("./TagsField"), {
 const FollowUpField = dynamic(() => import("./FollowUpField"), {
   loading: () => <div className="bo-skeleton h-9 w-full" aria-hidden />,
 });
+const ActivityLog = dynamic(() => import("./ActivityLog"), { loading: PanelLoading });
+const EventTasks = dynamic(() => import("./EventTasks"), { loading: PanelLoading });
 
 type View =
   | "overview"
@@ -282,12 +291,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [selected, setSelected] = useState<Quote | null>(null);
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"recent" | "old" | "value" | "followup">("recent");
   const [saving, setSaving] = useState(false);
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState<QuoteStatus>("pendente");
+  const [editAssigned, setEditAssigned] = useState("");
+  const [editLostReason, setEditLostReason] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editGuests, setEditGuests] = useState("");
+  const [editLocation, setEditLocation] = useState("");
   // Which section of the (long) detail panel is showing.
   const [detailTab, setDetailTab] = useState<"resumo" | "producao" | "financeiro" | "comunicacao">(
     "resumo",
@@ -300,6 +316,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [recentQuotes, setRecentQuotes] = useState<RecentQuote[]>([]);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -309,7 +326,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     !!selected &&
     (editStatus !== selected.status ||
       editNotes !== (selected.adminNotes ?? "") ||
-      editPrice !== (selected.quotedPrice ? String(selected.quotedPrice) : ""));
+      editPrice !== (selected.quotedPrice ? String(selected.quotedPrice) : "") ||
+      editAssigned !== (selected.assignedTo ?? "") ||
+      editLostReason !== (selected.lostReason ?? "") ||
+      editDate !== (selected.date ?? "") ||
+      editGuests !== String(selected.guests ?? "") ||
+      editLocation !== (selected.location ?? ""));
   // Latest value mirrored into a ref for listeners bound earlier (e.g. Escape).
   const dirtyRef = useRef(false);
   useEffect(() => {
@@ -339,6 +361,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       if (saved && NAV.some((n) => n.id === saved)) setView(saved);
     } catch {
       /* localStorage unavailable — keep default */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("liquen-recent-quotes");
+      if (raw) setRecentQuotes(JSON.parse(raw));
+    } catch {
+      /* ignore */
     }
   }, []);
 
@@ -510,9 +541,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     if (!discardGuard()) return;
     setView("pedidos");
     setSelected(q);
+    // Track in recently-viewed list (localStorage)
+    try {
+      const entry: RecentQuote = { id: q.id, name: q.name, email: q.email, status: q.status };
+      const prev: RecentQuote[] = JSON.parse(localStorage.getItem("liquen-recent-quotes") ?? "[]");
+      const next = [entry, ...prev.filter((r) => r.id !== q.id)].slice(0, 6);
+      localStorage.setItem("liquen-recent-quotes", JSON.stringify(next));
+      setRecentQuotes(next);
+    } catch {
+      /* ignore */
+    }
     setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
     setEditNotes(q.adminNotes ?? "");
     setEditStatus(q.status);
+    setEditAssigned(q.assignedTo ?? "");
+    setEditLostReason(q.lostReason ?? "");
+    setEditDate(q.date ?? "");
+    setEditGuests(String(q.guests ?? ""));
+    setEditLocation(q.location ?? "");
     setDetailTab("resumo");
   }
 
@@ -546,6 +592,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditPrice("");
       setEditNotes("");
       setEditStatus(data.quote.status);
+      setEditAssigned(data.quote.assignedTo ?? "");
+      setEditLostReason("");
+      setEditDate(data.quote.date ?? "");
+      setEditGuests(String(data.quote.guests ?? ""));
+      setEditLocation(data.quote.location ?? "");
       setDetailTab("resumo");
       toast("Pedido duplicado — defina a nova data", "success");
     } catch {
@@ -574,23 +625,135 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     window.location.href = "/orcamento/admin";
   }
 
+  async function appendActivity(quoteId: string, entries: ActivityEntry[]) {
+    if (entries.length === 0) return;
+    const q = quotes.find((x) => x.id === quoteId);
+    if (!q) return;
+    const activityLog = [...(q.activityLog ?? []), ...entries];
+    try {
+      const res = await fetch(`/api/orcamento/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityLog }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setQuotes((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+        setSelected((prev) => (prev?.id === updated.id ? updated : prev));
+      }
+    } catch {
+      /* best-effort */
+    }
+  }
+
   async function saveChanges() {
     if (!selected) return;
     setSaving(true);
     try {
+      const newEntries: ActivityEntry[] = [];
+      const now = new Date().toISOString();
+
+      if (editStatus !== selected.status) {
+        const from = STATUS_OPTIONS.find((s) => s.id === selected.status)?.label ?? selected.status;
+        const to = STATUS_OPTIONS.find((s) => s.id === editStatus)?.label ?? editStatus;
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "status_change",
+          actor: userName,
+          summary: `${from} → ${to}`,
+        });
+      }
+      const newPrice = editPrice ? parseFloat(editPrice) : undefined;
+      if (newPrice !== undefined && newPrice !== (selected.quotedPrice ?? 0)) {
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "price_set",
+          actor: userName,
+          summary: `Preço: ${eur(newPrice)}`,
+        });
+      }
+      if (editNotes.trim() !== (selected.adminNotes ?? "").trim() && editNotes.trim()) {
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "note_added",
+          actor: userName,
+          summary: "Notas internas atualizadas",
+        });
+      }
+      if (editAssigned.trim() !== (selected.assignedTo ?? "").trim()) {
+        const to = editAssigned.trim();
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "assigned",
+          actor: userName,
+          summary: to ? `Atribuído a ${to}` : "Responsável removido",
+        });
+      }
+
+      const newDate = editDate || undefined;
+      const newGuests = editGuests ? parseInt(editGuests, 10) : selected.guests;
+      const newLocation = editLocation.trim() || selected.location;
+
+      if (newDate !== (selected.date ?? undefined) && newDate) {
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "note_added",
+          actor: userName,
+          summary: `Data do evento alterada para ${new Date(newDate + "T12:00:00").toLocaleDateString("pt-PT")}`,
+        });
+      }
+      if (newGuests !== selected.guests) {
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "note_added",
+          actor: userName,
+          summary: `Convidados: ${selected.guests} → ${newGuests}`,
+        });
+      }
+      if ((editLocation.trim() || "") !== (selected.location ?? "") && editLocation.trim()) {
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "note_added",
+          actor: userName,
+          summary: `Local: ${editLocation.trim()}`,
+        });
+      }
+
+      const body: Record<string, unknown> = {
+        status: editStatus,
+        quotedPrice: editPrice ? parseFloat(editPrice) : undefined,
+        adminNotes: editNotes,
+        assignedTo: editAssigned.trim() || undefined,
+        lostReason: editLostReason.trim() || undefined,
+        date: newDate,
+        guests: newGuests,
+        location: newLocation,
+      };
+      if (newEntries.length > 0) {
+        body.activityLog = [...(selected.activityLog ?? []), ...newEntries];
+      }
+
       const res = await fetch(`/api/orcamento/${selected.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: editStatus,
-          quotedPrice: editPrice ? parseFloat(editPrice) : undefined,
-          adminNotes: editNotes,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("save failed");
       const updated = await res.json();
       setQuotes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
       setSelected(updated);
+      setEditAssigned(updated.assignedTo ?? "");
+      setEditLostReason(updated.lostReason ?? "");
+      setEditDate(updated.date ?? "");
+      setEditGuests(String(updated.guests ?? ""));
+      setEditLocation(updated.location ?? "");
       toast("Pedido atualizado", "success");
     } catch {
       toast("Não foi possível guardar as alterações", "error");
@@ -635,15 +798,39 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }
 
+  const archivedCount = useMemo(() => quotes.filter((q) => q.archived).length, [quotes]);
+
+  // Archived quotes are soft-deleted: keep them out of the analytical surfaces
+  // (overview, pipeline, clientes, calendário, estatísticas) so a junk or
+  // duplicate lead never pollutes the numbers. They stay reachable via the
+  // "Arquivados" toggle on Pedidos and the command palette.
+  const activeQuotes = useMemo(() => quotes.filter((q) => !q.archived), [quotes]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = filterStatus === "all" ? quotes : quotes.filter((x) => x.status === filterStatus);
+    let list = quotes.filter((x) => (showArchived ? x.archived : !x.archived));
+    if (!showArchived && filterStatus !== "all") {
+      list = list.filter((x) => x.status === filterStatus);
+    }
+    if (filterCategory !== "all") {
+      list = list.filter((x) => x.category === filterCategory);
+    }
     if (tagFilter) {
       list = list.filter((x) => (x.tags ?? []).includes(tagFilter));
     }
     if (q) {
       list = list.filter((x) =>
-        [x.name, x.email, x.phone, x.company, x.location, x.id, ...(x.tags ?? [])]
+        [
+          x.name,
+          x.email,
+          x.phone,
+          x.company,
+          x.location,
+          x.id,
+          x.assignedTo,
+          x.contractRef,
+          ...(x.tags ?? []),
+        ]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q)),
       );
@@ -669,9 +856,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           (a.quotedPrice ?? a.priceBreakdown?.total ?? 0),
       );
     return sorted;
-  }, [quotes, filterStatus, tagFilter, search, sort]);
+  }, [quotes, filterStatus, filterCategory, tagFilter, search, sort, showArchived]);
 
-  const pendingCount = quotes.filter(
+  const pendingCount = activeQuotes.filter(
     (q) => q.status === "pendente" || q.status === "em_revisao",
   ).length;
 
@@ -732,10 +919,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           navCommands={paletteCommands}
           quotes={quotes}
           onOpenQuote={openQuote}
+          recentQuotes={recentQuotes}
         />
         <NewQuoteModal
           open={newQuoteOpen}
           onClose={() => setNewQuoteOpen(false)}
+          existingQuotes={quotes}
           onCreated={(q) => {
             setQuotes((prev) => [q, ...prev]);
             openQuote(q);
@@ -1055,7 +1244,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "overview" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Overview
-                quotes={quotes}
+                quotes={activeQuotes}
                 userName={userName}
                 onOpen={openQuote}
                 onGoStats={() => setView("estatisticas")}
@@ -1069,8 +1258,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "kanban" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Kanban
-                quotes={quotes}
+                quotes={activeQuotes}
                 onOpen={openQuote}
+                userName={userName}
                 onStatusChange={(id, status) => {
                   setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
                   setSelected((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
@@ -1082,21 +1272,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {/* ── Clientes ── */}
           {view === "clientes" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
-              <Clientes quotes={quotes} onOpen={openQuote} />
+              <Clientes quotes={activeQuotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Calendário ── */}
           {view === "calendario" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
-              <Calendario quotes={quotes} onOpen={openQuote} />
+              <Calendario quotes={activeQuotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Propostas ── */}
           {view === "propostas" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
-              <Propostas />
+              <Propostas quotes={quotes} onOpenQuote={openQuote} />
             </div>
           )}
 
@@ -1117,7 +1307,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {/* ── Estatísticas ── */}
           {view === "estatisticas" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
-              <StatsDashboard quotes={quotes} />
+              <StatsDashboard quotes={activeQuotes} />
             </div>
           )}
 
@@ -1155,7 +1345,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 shadow-sm transition-colors"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/55 focus:outline-none focus:border-foreground/25 shadow-sm"
+                >
+                  <option value="all">Todas as categorias</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as typeof sort)}
@@ -1198,32 +1400,39 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
             {/* Status filter */}
             <div className="flex flex-wrap gap-1.5 mb-8">
-              <button
-                onClick={() => setFilterStatus("all")}
-                className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${
-                  filterStatus === "all"
-                    ? "bg-[#1b2119] text-white shadow-sm"
-                    : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
-                }`}
-              >
-                Todos · {quotes.length}
-              </button>
-              {STATUS_OPTIONS.map((s) => {
-                const count = quotes.filter((q) => q.status === s.id).length;
-                return (
+              {!showArchived && (
+                <>
                   <button
-                    key={s.id}
-                    onClick={() => setFilterStatus(s.id)}
-                    className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${
-                      filterStatus === s.id
-                        ? "bg-[#1b2119] text-white shadow-sm"
-                        : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
-                    }`}
+                    onClick={() => setFilterStatus("all")}
+                    className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
-                    {s.label} · {count}
+                    Todos · {quotes.filter((q) => !q.archived).length}
                   </button>
-                );
-              })}
+                  {STATUS_OPTIONS.map((s) => {
+                    const count = quotes.filter((q) => !q.archived && q.status === s.id).length;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => setFilterStatus(s.id)}
+                        className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                      >
+                        {s.label} · {count}
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+              {archivedCount > 0 && (
+                <button
+                  onClick={() => {
+                    setShowArchived((v) => !v);
+                    setFilterStatus("all");
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
+                >
+                  Arquivados · {archivedCount}
+                </button>
+              )}
             </div>
 
             {/* Tag filter */}
@@ -1371,6 +1580,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType)
                       : null;
                   const isSel = selectedIds.has(q.id);
+                  // Lead parado: status ativo sem atividade há 14+ dias
+                  const lastActivity = q.lastUpdated ?? q.submittedAt;
+                  const daysSince = Math.floor(
+                    (Date.now() - new Date(lastActivity).getTime()) / 86400000,
+                  );
+                  const isStale =
+                    (q.status === "pendente" ||
+                      q.status === "em_revisao" ||
+                      q.status === "cotado") &&
+                    daysSince >= 14;
                   return (
                     <div key={q.id} className="relative">
                       <label
@@ -1401,10 +1620,26 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             <p className="text-foreground/75 text-sm font-semibold truncate">
                               {q.name}
                             </p>
-                            <p className="text-foreground/42 text-xs mt-0.5 truncate">{q.email}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              <p className="text-foreground/42 text-xs truncate">{q.email}</p>
+                              {q.assignedTo && (
+                                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
+                                  {q.assignedTo}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
                             {statusBadge(q.status)}
+                            {isStale && (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold bg-amber-500/10 text-amber-600"
+                                title={`Sem atividade há ${daysSince} dias`}
+                              >
+                                <span className="w-1 h-1 rounded-full bg-current" />
+                                {daysSince}d parado
+                              </span>
+                            )}
                             {q.followUpAt &&
                               q.followUpAt <= todayKey &&
                               q.status !== "aceite" &&
@@ -1519,6 +1754,48 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button
+                            onClick={async () => {
+                              const next = !selected.archived;
+                              const confirm_ =
+                                !next ||
+                                window.confirm(
+                                  `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
+                                );
+                              if (!confirm_) return;
+                              const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ archived: next }),
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setQuotes((prev) =>
+                                  prev.map((q) => (q.id === updated.id ? updated : q)),
+                                );
+                                setSelected(updated);
+                                toast(next ? "Pedido arquivado" : "Pedido restaurado", "success");
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] tracking-[0.15em] uppercase rounded-lg transition-colors ${selected.archived ? "text-[#4d6350] bg-[#4d6350]/10" : "text-foreground/35 hover:text-foreground/55 hover:bg-foreground/[0.06]"}`}
+                            title={selected.archived ? "Restaurar pedido" : "Arquivar pedido"}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
+                            </svg>
+                            <span className="hidden sm:inline">
+                              {selected.archived ? "Restaurar" : "Arquivar"}
+                            </span>
+                          </button>
+                          <button
                             onClick={() => duplicateQuote(selected)}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
                             title="Duplicar este pedido (cliente recorrente)"
@@ -1557,6 +1834,28 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               <rect x="6" y="14" width="12" height="7" rx="1" />
                             </svg>
                             <span className="hidden sm:inline">Run-sheet</span>
+                          </button>
+                          <button
+                            onClick={() => printEventDossier(selected)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
+                            title="Imprimir dossier completo do evento (contacto, financeiro, cronograma, convidados)"
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                            >
+                              <path
+                                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
+                            </svg>
+                            <span className="hidden sm:inline">Dossier</span>
                           </button>
                           <button
                             onClick={closeDetail}
@@ -1742,7 +2041,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           {/* Event */}
                           <div>
                             <p className="bo-eyebrow mb-3">Evento</p>
-                            <div className="grid grid-cols-2 gap-2">
+                            {/* Read-only facts */}
+                            <div className="grid grid-cols-2 gap-2 mb-3">
                               {[
                                 {
                                   l: "Tipo",
@@ -1761,20 +2061,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   l: "Pacote",
                                   v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
                                 },
-                                { l: "Convidados", v: selected.guests },
-                                {
-                                  l: "Data",
-                                  v: selected.date
-                                    ? `${new Date(selected.date + "T12:00:00").toLocaleDateString(
-                                        "pt-PT",
-                                      )}${
-                                        eventCountdown(selected.date)
-                                          ? ` · ${eventCountdown(selected.date)!.label}`
-                                          : ""
-                                      }`
-                                    : "—",
-                                },
-                                { l: "Local", v: selected.location || "—" },
                                 {
                                   l: "Duração",
                                   v: selected.duration ? `${selected.duration}h` : "—",
@@ -1788,6 +2074,54 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   <p className="text-foreground/55 text-xs">{v ?? "—"}</p>
                                 </div>
                               ))}
+                            </div>
+                            {/* Editable logistics */}
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-foreground/[0.06]">
+                              <div>
+                                <label className="text-foreground/20 text-[9px] tracking-wide uppercase block mb-1">
+                                  Data
+                                </label>
+                                <input
+                                  type="date"
+                                  value={editDate}
+                                  onChange={(e) => setEditDate(e.target.value)}
+                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                />
+                                {editDate &&
+                                  (() => {
+                                    const cd = eventCountdown(editDate);
+                                    return cd ? (
+                                      <p
+                                        className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
+                                      >
+                                        {cd.label}
+                                      </p>
+                                    ) : null;
+                                  })()}
+                              </div>
+                              <div>
+                                <label className="text-foreground/20 text-[9px] tracking-wide uppercase block mb-1">
+                                  Convidados
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={editGuests}
+                                  onChange={(e) => setEditGuests(e.target.value)}
+                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <label className="text-foreground/20 text-[9px] tracking-wide uppercase block mb-1">
+                                  Local
+                                </label>
+                                <input
+                                  value={editLocation}
+                                  onChange={(e) => setEditLocation(e.target.value)}
+                                  placeholder="Local do evento…"
+                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -1865,6 +2199,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               />
                               <div>
                                 <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                  Responsável
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editAssigned}
+                                  onChange={(e) => setEditAssigned(e.target.value)}
+                                  placeholder="Nome do membro da equipa…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
                                   Estado
                                 </label>
                                 <select
@@ -1879,6 +2225,32 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   ))}
                                 </select>
                               </div>
+                              {editStatus === "rejeitado" && (
+                                <div>
+                                  <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                    Motivo de perda
+                                  </label>
+                                  <textarea
+                                    rows={2}
+                                    value={editLostReason}
+                                    onChange={(e) => setEditLostReason(e.target.value)}
+                                    placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                  />
+                                </div>
+                              )}
+                              {selected.status === "rejeitado" &&
+                                selected.lostReason &&
+                                editStatus !== "rejeitado" && (
+                                  <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
+                                    <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/28 mb-1">
+                                      Motivo de perda anterior
+                                    </p>
+                                    <p className="text-xs text-foreground/50">
+                                      {selected.lostReason}
+                                    </p>
+                                  </div>
+                                )}
                               <div>
                                 <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
                                   Preço Final Cotado (€ s/IVA)
@@ -1926,6 +2298,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                       {detailTab === "producao" && (
                         <>
+                          {/* Tasks linked to this event */}
+                          <EventTasks
+                            key={`tasks-${selected.id}`}
+                            quote={selected}
+                            userName={userName}
+                          />
+
                           {/* Production checklist */}
                           <EventChecklist
                             key={`cl-${selected.id}`}
@@ -2010,6 +2389,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 prev ? { ...prev, status: "cotado", quotedPrice: total } : prev,
                               );
                               setEditStatus("cotado");
+                              appendActivity(selected.id, [
+                                {
+                                  id: randomId(),
+                                  at: new Date().toISOString(),
+                                  kind: "proposal_sent",
+                                  actor: userName,
+                                  summary: `Proposta enviada — ${eur(total)}`,
+                                },
+                              ]);
                             }}
                           />
 
@@ -2017,11 +2405,29 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             key={selected.id}
                             quote={selected}
                             onSent={(messages) => {
+                              const prev_count = selected.messages?.length ?? 0;
                               setQuotes((prev) =>
                                 prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
                               );
                               setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                              if (messages.length > prev_count) {
+                                appendActivity(selected.id, [
+                                  {
+                                    id: randomId(),
+                                    at: new Date().toISOString(),
+                                    kind: "message_sent",
+                                    actor: userName,
+                                    summary: "Mensagem enviada ao cliente",
+                                  },
+                                ]);
+                              }
                             }}
+                          />
+
+                          <ActivityLog
+                            quote={selected}
+                            actor={userName}
+                            onAddEntry={(entry) => appendActivity(selected.id, [entry])}
                           />
                         </>
                       )}

@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
 import { useToast } from "./Toast";
-import { eventCountdown } from "./util";
+import { eventCountdown, randomId } from "./util";
+import type { ActivityEntry } from "../types";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Novos", color: "#8a8a82" },
@@ -33,9 +34,10 @@ interface Props {
   quotes: Quote[];
   onOpen: (q: Quote) => void;
   onStatusChange: (id: string, status: QuoteStatus) => void;
+  userName?: string;
 }
 
-export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
+export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Props) {
   const { toast } = useToast();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<QuoteStatus | null>(null);
@@ -55,13 +57,28 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
     if (q.status === status) return;
     onStatusChange(q.id, status); // optimistic
     try {
+      const fromLabel = COLUMNS.find((c) => c.id === q.status)?.label ?? q.status;
+      const toLabel = COLUMNS.find((c) => c.id === status)?.label ?? status;
+      const entry: ActivityEntry = {
+        id: randomId(),
+        at: new Date().toISOString(),
+        kind: "status_change",
+        actor: userName,
+        summary: `${fromLabel} → ${toLabel}`,
+      };
+      const activityLog = [...(q.activityLog ?? []), entry];
       const res = await fetch(`/api/orcamento/${q.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, activityLog }),
       });
       if (!res.ok) throw new Error();
-      toast(`${q.name} → ${COLUMNS.find((c) => c.id === status)?.label}`, "success");
+      const updated = await res.json();
+      // Propagate the updated activityLog back via onStatusChange-like mechanism.
+      // We reuse onStatusChange only for status; for the full updated quote we
+      // call it once and the parent syncs state (activityLog will be on next open).
+      onStatusChange(q.id, updated.status ?? status);
+      toast(`${q.name} → ${toLabel}`, "success");
     } catch {
       onStatusChange(q.id, q.status); // revert
       toast("Não foi possível atualizar", "error");
@@ -173,103 +190,120 @@ export default function Kanban({ quotes, onOpen, onStatusChange }: Props) {
               </div>
 
               <div className="px-2 pb-2 flex flex-col gap-2 min-h-[120px] max-h-[calc(100vh-18rem)] overflow-y-auto">
-                {items.map((q) => (
-                  <div
-                    key={q.id}
-                    draggable
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`${q.name}, ${eventTypeLabel(q)}, ${q.guests} pessoas. Coluna ${col.label}. Enter para abrir; setas esquerda/direita para mover de coluna.`}
-                    onDragStart={() => setDragId(q.id)}
-                    onDragEnd={() => {
-                      setDragId(null);
-                      setOverCol(null);
-                    }}
-                    onClick={() => onOpen(q)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onOpen(q);
-                      } else if (e.key === "ArrowLeft") {
-                        e.preventDefault();
-                        moveByKeyboard(q, -1);
-                      } else if (e.key === "ArrowRight") {
-                        e.preventDefault();
-                        moveByKeyboard(q, 1);
-                      }
-                    }}
-                    className={`group cursor-grab active:cursor-grabbing rounded-xl border border-foreground/[0.07] bg-white p-3.5 shadow-sm transition-all hover:shadow-md hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
-                      dragId === q.id ? "opacity-40 rotate-1" : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span
-                        className="mt-1 w-1 h-8 rounded-full shrink-0"
-                        style={{ background: col.color }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-foreground/78 text-sm font-semibold truncate">
-                          {q.name}
-                        </p>
-                        <p className="text-foreground/45 text-[11px] truncate mt-0.5">
-                          {eventTypeLabel(q)} · {q.guests} pax
-                        </p>
-                      </div>
-                      {q.followUpAt && q.followUpAt <= todayKey && (
+                {items.map((q) => {
+                  const daysSinceUpdate = Math.floor(
+                    (Date.now() - new Date(q.lastUpdated ?? q.submittedAt).getTime()) / 86400000,
+                  );
+                  const staleProposal = q.status === "cotado" && daysSinceUpdate >= 7;
+                  return (
+                    <div
+                      key={q.id}
+                      draggable
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${q.name}, ${eventTypeLabel(q)}, ${q.guests} pessoas. Coluna ${col.label}. Enter para abrir; setas esquerda/direita para mover de coluna.`}
+                      onDragStart={() => setDragId(q.id)}
+                      onDragEnd={() => {
+                        setDragId(null);
+                        setOverCol(null);
+                      }}
+                      onClick={() => onOpen(q)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onOpen(q);
+                        } else if (e.key === "ArrowLeft") {
+                          e.preventDefault();
+                          moveByKeyboard(q, -1);
+                        } else if (e.key === "ArrowRight") {
+                          e.preventDefault();
+                          moveByKeyboard(q, 1);
+                        }
+                      }}
+                      className={`group cursor-grab active:cursor-grabbing rounded-xl border border-foreground/[0.07] bg-white p-3.5 shadow-sm transition-all hover:shadow-md hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+                        dragId === q.id ? "opacity-40 rotate-1" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
                         <span
-                          className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] tracking-[0.1em] uppercase font-semibold ${
-                            q.followUpAt < todayKey
-                              ? "bg-[#b5654a]/15 text-[#b5654a]"
-                              : "bg-[#637a5f]/15 text-[#4d6350]"
-                          }`}
-                          title={
-                            q.followUpAt < todayKey ? "Seguimento em atraso" : "Seguimento hoje"
-                          }
-                        >
-                          <span className="w-1 h-1 rounded-full bg-current" />
-                          Seguir
-                        </span>
-                      )}
-                    </div>
-                    {q.tags && q.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {q.tags.slice(0, 3).map((t) => (
+                          className="mt-1 w-1 h-8 rounded-full shrink-0"
+                          style={{ background: col.color }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-foreground/78 text-sm font-semibold truncate">
+                            {q.name}
+                          </p>
+                          <p className="text-foreground/45 text-[11px] truncate mt-0.5">
+                            {eventTypeLabel(q)} · {q.guests} pax
+                          </p>
+                        </div>
+                        {q.followUpAt && q.followUpAt <= todayKey && (
                           <span
-                            key={t}
-                            className="px-1.5 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[8px] font-medium tracking-wide"
+                            className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] tracking-[0.1em] uppercase font-semibold ${
+                              q.followUpAt < todayKey
+                                ? "bg-[#b5654a]/15 text-[#b5654a]"
+                                : "bg-[#637a5f]/15 text-[#4d6350]"
+                            }`}
+                            title={
+                              q.followUpAt < todayKey ? "Seguimento em atraso" : "Seguimento hoje"
+                            }
                           >
-                            {t}
+                            <span className="w-1 h-1 rounded-full bg-current" />
+                            Seguir
                           </span>
-                        ))}
+                        )}
                       </div>
-                    )}
-                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-foreground/[0.06]">
-                      {q.quotedPrice ? (
-                        <span className="text-[#4d6350] text-xs font-semibold">
-                          {eur(q.quotedPrice)}
-                        </span>
-                      ) : (
-                        <span className="text-foreground/20 text-[10px]">sem valor</span>
-                      )}
-                      {q.date &&
-                        (() => {
-                          const cd = eventCountdown(q.date);
-                          const soon = cd && (cd.tone === "soon" || cd.tone === "today");
-                          return (
+                      {q.tags && q.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {q.tags.slice(0, 3).map((t) => (
                             <span
-                              className={`text-[10px] ${soon ? "text-[#b5654a] font-medium" : "text-foreground/30"}`}
-                              title={cd ? cd.label : undefined}
+                              key={t}
+                              className="px-1.5 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[8px] font-medium tracking-wide"
                             >
-                              {new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", {
-                                day: "numeric",
-                                month: "short",
-                              })}
+                              {t}
                             </span>
-                          );
-                        })()}
+                          ))}
+                        </div>
+                      )}
+                      {staleProposal && (
+                        <div className="mt-2">
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] tracking-[0.1em] uppercase font-semibold bg-amber-500/10 text-amber-600"
+                            title={`Proposta enviada há ${daysSinceUpdate} dias sem resposta`}
+                          >
+                            <span className="w-1 h-1 rounded-full bg-current" />
+                            {daysSinceUpdate}d sem resposta
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-foreground/[0.06]">
+                        {q.quotedPrice ? (
+                          <span className="text-[#4d6350] text-xs font-semibold">
+                            {eur(q.quotedPrice)}
+                          </span>
+                        ) : (
+                          <span className="text-foreground/20 text-[10px]">sem valor</span>
+                        )}
+                        {q.date &&
+                          (() => {
+                            const cd = eventCountdown(q.date);
+                            const soon = cd && (cd.tone === "soon" || cd.tone === "today");
+                            return (
+                              <span
+                                className={`text-[10px] ${soon ? "text-[#b5654a] font-medium" : "text-foreground/30"}`}
+                                title={cd ? cd.label : undefined}
+                              >
+                                {new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", {
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                              </span>
+                            );
+                          })()}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {items.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-8 text-foreground/18">
                     <svg

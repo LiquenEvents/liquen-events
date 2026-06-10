@@ -23,6 +23,22 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState<string | null>(null);
+  const [contractRef, setContractRef] = useState(quote.contractRef ?? "");
+  const [savingRef, setSavingRef] = useState(false);
+
+  async function saveContractRef() {
+    if (contractRef.trim() === (quote.contractRef ?? "")) return;
+    setSavingRef(true);
+    try {
+      await fetch(`/api/orcamento/${quote.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractRef: contractRef.trim() || undefined }),
+      });
+    } finally {
+      setSavingRef(false);
+    }
+  }
 
   const total = quote.quotedPrice ?? quote.priceBreakdown?.total ?? 0;
   const paidSum = payments.filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);
@@ -83,7 +99,24 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <p className="bo-eyebrow mb-4">Pagamentos &amp; Faturação</p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="bo-eyebrow">Pagamentos &amp; Faturação</p>
+        {/* Contract reference */}
+        <div className="flex items-center gap-2">
+          <span className="text-foreground/25 text-[10px] tracking-[0.15em] uppercase">Ref.</span>
+          <input
+            value={contractRef}
+            onChange={(e) => setContractRef(e.target.value)}
+            onBlur={saveContractRef}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveContractRef();
+            }}
+            placeholder="2026-001"
+            className={`bo-input w-24 px-2 py-1 text-xs text-foreground/65 ${savingRef ? "opacity-50" : ""}`}
+            title="Número de referência do contrato/fatura"
+          />
+        </div>
+      </div>
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2 mb-4">

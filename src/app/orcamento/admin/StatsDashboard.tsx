@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
 import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
@@ -139,10 +139,33 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
+type Period = "all" | "6m" | "3m" | "1y";
+
+const PERIOD_LABELS: Record<Period, string> = {
+  all: "Todo o período",
+  "1y": "Último ano",
+  "6m": "Últimos 6 meses",
+  "3m": "Últimos 3 meses",
+};
+
 export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
+  const [period, setPeriod] = useState<Period>("all");
+
+  const filteredQuotes = useMemo(() => {
+    if (period === "all") return quotes;
+    const now = new Date();
+    const months = period === "3m" ? 3 : period === "6m" ? 6 : 12;
+    const cutoff = new Date(
+      now.getFullYear(),
+      now.getMonth() - months,
+      now.getDate(),
+    ).toISOString();
+    return quotes.filter((q) => q.submittedAt >= cutoff);
+  }, [quotes, period]);
+
   const stats = useMemo(() => {
     const now = new Date();
-    const total = quotes.length;
+    const total = filteredQuotes.length;
 
     const byStatus: Record<string, number> = {};
     const byCategory: Record<string, number> = {};
@@ -168,7 +191,13 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     }
     const monthIndex = new Map(months.map((m, i) => [m.key, i]));
 
-    for (const q of quotes) {
+    // Days-to-close tracking (submittedAt → lastUpdated for accepted quotes)
+    let closeSum = 0,
+      closeCount = 0;
+    // Referral source conversion
+    const byReferralConv: Record<string, { total: number; accepted: number }> = {};
+
+    for (const q of filteredQuotes) {
       byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
       byCategory[CATEGORIES.find((c) => c.id === q.category)?.label ?? "Outro"] =
         (byCategory[CATEGORIES.find((c) => c.id === q.category)?.label ?? "Outro"] ?? 0) + 1;
@@ -176,6 +205,11 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       byEventType[et] = (byEventType[et] ?? 0) + 1;
       const ref = q.referralSource?.trim() || "Não indicado";
       byReferral[ref] = (byReferral[ref] ?? 0) + 1;
+
+      // Referral conversion tracking
+      if (!byReferralConv[ref]) byReferralConv[ref] = { total: 0, accepted: 0 };
+      byReferralConv[ref].total++;
+      if (q.status === "aceite") byReferralConv[ref].accepted++;
 
       if (q.guests > 0) {
         guestsSum += q.guests;
@@ -203,6 +237,15 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
           respCount++;
         }
       }
+
+      // Days to close: submitted → last updated (only for accepted, < 2 years)
+      if (q.status === "aceite" && q.lastUpdated) {
+        const days = (new Date(q.lastUpdated).getTime() - sd.getTime()) / 86400000;
+        if (days >= 0 && days < 730) {
+          closeSum += days;
+          closeCount++;
+        }
+      }
     }
 
     // ── Finanças reais (a partir dos pagamentos registados) ──
@@ -213,7 +256,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     let received = 0,
       outstanding = 0;
     const upcoming: { id: string; name: string; amount: number; date: string; kind: string }[] = [];
-    for (const q of quotes) {
+    for (const q of filteredQuotes) {
       for (const p of q.payments ?? []) {
         if (p.paid) received += p.amount;
         else {
@@ -251,10 +294,25 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         .map(([label, value]) => ({ label, value }))
         .sort((a, b) => b.value - a.value);
 
+    const avgDaysClose = closeCount > 0 ? Math.round(closeSum / closeCount) : 0;
+    const forecastRevenue = conversion > 0 ? Math.round(pipelineSum * (conversion / 100)) : 0;
+
+    const referralConvRows = Object.entries(byReferralConv)
+      .map(([label, { total, accepted }]) => ({
+        label,
+        total,
+        accepted,
+        rate: total > 0 ? Math.round((accepted / total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8);
+
     return {
       total,
       thisMonth,
       conversion,
+      avgDaysClose,
+      forecastRevenue,
       avgRespLabel,
       avgGuests: guestsCount ? Math.round(guestsSum / guestsCount) : 0,
       pipelineSum,
@@ -276,8 +334,21 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       categoryBars: toSorted(byCategory),
       eventTypeBars: toSorted(byEventType).slice(0, 6),
       referralBars: toSorted(byReferral).slice(0, 6),
+      referralConvRows,
+      lostReasonRows: Object.entries(
+        filteredQuotes.reduce<Record<string, number>>((acc, q) => {
+          if (q.status === "rejeitado" && q.lostReason?.trim()) {
+            const key = q.lostReason.trim();
+            acc[key] = (acc[key] ?? 0) + 1;
+          }
+          return acc;
+        }, {}),
+      )
+        .map(([label, value]) => ({ label, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8),
     };
-  }, [quotes]);
+  }, [filteredQuotes]);
 
   if (quotes.length === 0) {
     return (
@@ -290,34 +361,61 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Export */}
-      <div className="flex justify-end gap-2">
-        {stats.hasPayments && (
+      {/* Toolbar: period filter + export */}
+      <div className="flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex items-center gap-1.5">
+          {(["all", "1y", "6m", "3m"] as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${
+                period === p
+                  ? "bg-[#1b2119] text-white shadow-sm"
+                  : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
+              }`}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {stats.hasPayments && (
+            <button
+              onClick={() =>
+                downloadCsv(`liquen-pagamentos-${dateStamp()}`, paymentsToCsvRows(filteredQuotes))
+              }
+              className="px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
+              title="Exportar todos os pagamentos (tesouraria) para CSV"
+            >
+              Pagamentos ↓
+            </button>
+          )}
           <button
             onClick={() =>
-              downloadCsv(`liquen-pagamentos-${dateStamp()}`, paymentsToCsvRows(quotes))
+              downloadCsv(`liquen-pedidos-${dateStamp()}`, quotesToCsvRows(filteredQuotes))
             }
             className="px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
-            title="Exportar todos os pagamentos (tesouraria) para CSV"
           >
-            Pagamentos ↓
+            Exportar CSV ↓
           </button>
-        )}
-        <button
-          onClick={() => downloadCsv(`liquen-pedidos-${dateStamp()}`, quotesToCsvRows(quotes))}
-          className="px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
-        >
-          Exportar CSV ↓
-        </button>
+        </div>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         <Kpi value={String(stats.total)} label="Pedidos totais" accent />
         <Kpi value={String(stats.thisMonth)} label="Este mês" />
         <Kpi value={`${stats.conversion}%`} label="Conversão" />
         <Kpi value={stats.avgRespLabel} label="Resposta média" />
+        <Kpi
+          value={stats.avgDaysClose > 0 ? `${stats.avgDaysClose}d` : "—"}
+          label="Tempo de fecho"
+        />
         <Kpi value={eur(stats.pipelineSum)} label="Em proposta" />
+        <Kpi
+          value={stats.forecastRevenue > 0 ? eur(stats.forecastRevenue) : "—"}
+          label="Previsão pipeline"
+        />
         <Kpi value={eur(stats.wonSum)} label="Ganho (aceite)" accent />
       </div>
 
@@ -422,6 +520,75 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
           <HBars data={stats.referralBars} />
         </Panel>
       </div>
+
+      {/* Lost reasons */}
+      {stats.lostReasonRows.length > 0 && (
+        <Panel title="Motivos de perda">
+          <div className="flex flex-col gap-3">
+            {stats.lostReasonRows.map((row) => {
+              const total = stats.lostReasonRows.reduce((s, r) => s + r.value, 0);
+              return (
+                <div key={row.label}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-foreground/55 text-xs truncate max-w-[70%]">
+                      {row.label}
+                    </span>
+                    <span className="text-foreground/35 text-[10px] tabular-nums shrink-0">
+                      {row.value}× · {Math.round((row.value / total) * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#8a8a82]/60 transition-all duration-700"
+                      style={{ width: `${(row.value / stats.lostReasonRows[0].value) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+      )}
+
+      {/* Referral conversion */}
+      {stats.referralConvRows.length > 0 && (
+        <Panel title="Conversão por fonte (leads → aceite)">
+          <div className="flex flex-col gap-3">
+            {stats.referralConvRows.map((row) => (
+              <div key={row.label}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-foreground/55 text-xs truncate max-w-[55%]">
+                    {row.label}
+                  </span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-foreground/30 text-[10px] tabular-nums">
+                      {row.accepted}/{row.total} leads
+                    </span>
+                    <span
+                      className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
+                      style={{
+                        color: row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
+                      }}
+                    >
+                      {row.rate}%
+                    </span>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${row.rate}%`,
+                      background:
+                        row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
     </div>
   );
 }

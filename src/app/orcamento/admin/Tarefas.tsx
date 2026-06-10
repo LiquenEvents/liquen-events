@@ -30,6 +30,43 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   // filter
   const [who, setWho] = useState<string>("Todos");
 
+  // inline edit
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTaskFields, setEditTaskFields] = useState({
+    title: "",
+    priority: "normal" as TaskPriority,
+    dueDate: "",
+    assignee: "",
+    area: "",
+  });
+
+  function startEditTask(t: Task) {
+    setEditingTaskId(t.id);
+    setEditTaskFields({
+      title: t.title,
+      priority: t.priority,
+      dueDate: t.dueDate ?? "",
+      assignee: t.assignee ?? "",
+      area: t.area ?? "",
+    });
+  }
+
+  async function saveEditTask(id: string) {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, ...editTaskFields, title: editTaskFields.title.trim() || t.title }
+          : t,
+      ),
+    );
+    setEditingTaskId(null);
+    await fetch(`/api/tarefas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...editTaskFields, title: editTaskFields.title.trim() || undefined }),
+    });
+  }
+
   useEffect(() => {
     (async () => {
       try {
@@ -112,6 +149,80 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
 
   function row(t: Task) {
     const overdue = t.dueDate && !t.done && t.dueDate < todayKey;
+
+    if (editingTaskId === t.id) {
+      return (
+        <div
+          key={t.id}
+          className="px-4 py-3 border-b border-foreground/[0.06] bg-foreground/[0.015]"
+        >
+          <div className="flex flex-col gap-2">
+            <input
+              autoFocus
+              value={editTaskFields.title}
+              onChange={(e) => setEditTaskFields({ ...editTaskFields, title: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveEditTask(t.id);
+                if (e.key === "Escape") setEditingTaskId(null);
+              }}
+              className="bo-input px-3 py-2 text-sm text-foreground/70 w-full"
+            />
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={editTaskFields.priority}
+                onChange={(e) =>
+                  setEditTaskFields({ ...editTaskFields, priority: e.target.value as TaskPriority })
+                }
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
+              >
+                <option value="alta">Alta</option>
+                <option value="normal">Normal</option>
+                <option value="baixa">Baixa</option>
+              </select>
+              <input
+                type="date"
+                value={editTaskFields.dueDate}
+                onChange={(e) => setEditTaskFields({ ...editTaskFields, dueDate: e.target.value })}
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1"
+              />
+              <input
+                value={editTaskFields.assignee}
+                onChange={(e) => setEditTaskFields({ ...editTaskFields, assignee: e.target.value })}
+                placeholder="Responsável"
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1 min-w-[100px]"
+              />
+              <select
+                value={editTaskFields.area}
+                onChange={(e) => setEditTaskFields({ ...editTaskFields, area: e.target.value })}
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
+              >
+                <option value="">Área…</option>
+                {AREAS.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => saveEditTask(t.id)}
+                className="flex-1 py-1.5 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={() => setEditingTaskId(null)}
+                className="px-4 text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         key={t.id}
@@ -178,6 +289,26 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
           >
             {PRIORITY_META[t.priority].label}
           </span>
+        )}
+        {!t.done && (
+          <button
+            onClick={() => startEditTask(t)}
+            className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+            aria-label="Editar tarefa"
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+            </svg>
+          </button>
         )}
         <button
           onClick={() => remove(t.id)}
@@ -263,6 +394,26 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       {/* Filter by person */}
       {people.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-5">
+          {defaultAssignee && people.includes(defaultAssignee) && (
+            <button
+              onClick={() => setWho(who === defaultAssignee ? "Todos" : defaultAssignee)}
+              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 flex items-center gap-1.5 ${who === defaultAssignee ? "bg-[#4d6350] text-white shadow-sm" : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"}`}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              >
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+              </svg>
+              Minhas tarefas
+            </button>
+          )}
           {people.map((p) => (
             <button
               key={p}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Quote, ProposalLineItem } from "../types";
 
 const eur = (n: number) =>
@@ -9,6 +9,81 @@ const eur = (n: number) =>
     currency: "EUR",
     maximumFractionDigits: 2,
   }).format(n || 0);
+
+const LS_KEY = "liquen-last-proposal-items";
+
+function loadLastItems(): ProposalLineItem[] | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastItems(items: ProposalLineItem[]) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(items));
+  } catch {
+    /* ignore */
+  }
+}
+
+function buildFromBreakdown(q: Quote): ProposalLineItem[] {
+  const pb = q.priceBreakdown;
+  if (!pb)
+    return [
+      {
+        description: "Organização e produção do evento",
+        qty: 1,
+        unitPrice: Math.round(q.quotedPrice || 0),
+      },
+    ];
+  const items: ProposalLineItem[] = [];
+  // Base do serviço já com o multiplicador do pacote aplicado, para que a
+  // soma das linhas reproduza o subtotal do breakdown.
+  const packaged = Math.round((pb.basePrice + pb.guestCost) * (pb.packageMultiplier || 1));
+  if (packaged > 0) {
+    items.push({ description: "Produção e coordenação do evento", qty: 1, unitPrice: packaged });
+  }
+  if (pb.locationSurcharge > 0)
+    items.push({
+      description: "Suplemento deslocação",
+      qty: 1,
+      unitPrice: Math.round(pb.locationSurcharge),
+    });
+  if (pb.weekendSurcharge > 0)
+    items.push({
+      description: "Suplemento fim de semana",
+      qty: 1,
+      unitPrice: Math.round(pb.weekendSurcharge),
+    });
+  if (pb.seasonSurcharge > 0)
+    items.push({
+      description: "Suplemento época alta",
+      qty: 1,
+      unitPrice: Math.round(pb.seasonSurcharge),
+    });
+  if (pb.urgencySurcharge > 0)
+    items.push({
+      description: "Suplemento urgência",
+      qty: 1,
+      unitPrice: Math.round(pb.urgencySurcharge),
+    });
+  if (pb.addonsCost > 0)
+    items.push({
+      description: "Serviços adicionais",
+      qty: 1,
+      unitPrice: Math.round(pb.addonsCost),
+    });
+  if (items.length === 0)
+    items.push({
+      description: "Organização e produção do evento",
+      qty: 1,
+      unitPrice: Math.round(q.quotedPrice || pb.subtotal || 0),
+    });
+  return items;
+}
 
 interface Props {
   quote: Quote;
@@ -28,6 +103,11 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
   const [result, setResult] = useState<{ total: number; emailed: boolean; pdfUrl: string } | null>(
     null,
   );
+  const [hasLastItems, setHasLastItems] = useState(false);
+
+  useEffect(() => {
+    setHasLastItems(!!loadLastItems());
+  }, []);
 
   const subtotal = items.reduce(
     (s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0),
@@ -43,16 +123,31 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
     setItems((prev) => [...prev, { description: "", qty: 1, unitPrice: 0 }]);
   }
   function removeRow(i: number) {
+    if (items.length === 1) return;
     setItems((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function applyTemplate(tpl: "single" | "breakdown" | "last") {
+    if (tpl === "single") {
+      setItems([
+        {
+          description: "Organização e produção do evento",
+          qty: 1,
+          unitPrice: Math.round(seedPrice),
+        },
+      ]);
+    } else if (tpl === "breakdown") {
+      setItems(buildFromBreakdown(quote));
+    } else {
+      const last = loadLastItems();
+      if (last) setItems(last);
+    }
   }
 
   async function send() {
     if (sending) return;
-    // Outward-facing action: this emails the proposal (with pricing) to the
-    // client. Confirm first so a stray click never sends an unfinished quote.
-    if (!window.confirm(`Enviar a proposta de ${eur(total)} por e-mail para ${quote.email}?`)) {
+    if (!window.confirm(`Enviar a proposta de ${eur(total)} por e-mail para ${quote.email}?`))
       return;
-    }
     setSending(true);
     setError(null);
     try {
@@ -68,7 +163,8 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
-
+      saveLastItems(items);
+      setHasLastItems(true);
       const pdfUrl = `data:application/pdf;base64,${data.pdfBase64}`;
       setResult({ total: data.total, emailed: data.emailed, pdfUrl });
       onSent?.(data.total);
@@ -114,7 +210,35 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <p className="bo-eyebrow mb-4">Criar &amp; Enviar Proposta (PDF)</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="bo-eyebrow">Criar &amp; Enviar Proposta (PDF)</p>
+      </div>
+
+      {/* Template shortcuts */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        <button
+          onClick={() => applyTemplate("single")}
+          className="px-2.5 py-1 rounded-lg text-[9px] tracking-[0.1em] uppercase font-medium bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65 transition-colors"
+        >
+          Pacote único
+        </button>
+        {quote.priceBreakdown && (
+          <button
+            onClick={() => applyTemplate("breakdown")}
+            className="px-2.5 py-1 rounded-lg text-[9px] tracking-[0.1em] uppercase font-medium bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65 transition-colors"
+          >
+            Por componentes
+          </button>
+        )}
+        {hasLastItems && (
+          <button
+            onClick={() => applyTemplate("last")}
+            className="px-2.5 py-1 rounded-lg text-[9px] tracking-[0.1em] uppercase font-medium bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18 transition-colors"
+          >
+            ↺ Última proposta
+          </button>
+        )}
+      </div>
 
       {/* Line items */}
       <div className="flex flex-col gap-2 mb-3">

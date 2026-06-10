@@ -67,6 +67,10 @@ export function quotesToCsvRows(quotes: Quote[]): (string | number)[][] {
     "Duração (h)",
     "Estimativa (€)",
     "Cotado (€)",
+    "Responsável",
+    "Ref. contrato",
+    "Motivo de perda",
+    "Arquivado",
   ];
   const rows = quotes.map((q) => [
     q.id,
@@ -86,6 +90,10 @@ export function quotesToCsvRows(quotes: Quote[]): (string | number)[][] {
     q.duration ?? "",
     q.priceBreakdown?.total ?? "",
     q.quotedPrice ?? "",
+    q.assignedTo ?? "",
+    q.contractRef ?? "",
+    q.lostReason ?? "",
+    q.archived ? "Sim" : "",
   ]);
   return [header, ...rows];
 }
@@ -358,6 +366,238 @@ export function printRunSheet(q: Quote): void {
     <div class="foot">Gerado em ${new Date().toLocaleString("pt-PT")} · Líquen Events</div>
     <script>window.onload = function () { setTimeout(function () { window.print(); }, 200); };</script>
   </body></html>`);
+  win.document.close();
+}
+
+const RSVP_LABEL_PRINT: Record<string, string> = {
+  pendente: "Pendente",
+  confirmado: "Confirmado",
+  recusado: "Recusado",
+};
+
+/**
+ * Open a comprehensive, print-ready event dossier covering all aspects of the
+ * event: contact, logistics, financial, timeline, checklist, suppliers and
+ * guest list. Designed to be saved as PDF and distributed to the team.
+ */
+export function printEventDossier(q: Quote): void {
+  const win = window.open("", "_blank", "width=900,height=1100");
+  if (!win) return;
+
+  const cat = CATEGORIES.find((c) => c.id === q.category)?.label ?? "";
+  const et = eventTypeLabel(q);
+  const pkg = PACKAGES.find((p) => p.id === q.packageTier)?.label ?? "";
+  const dateStr = q.date
+    ? new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "Data a definir";
+
+  const STATUS_LABEL_PT: Record<string, string> = {
+    pendente: "Pendente",
+    em_revisao: "Em Revisão",
+    cotado: "Cotado",
+    aceite: "Aceite",
+    rejeitado: "Rejeitado",
+  };
+
+  const eur0 = (n: number) =>
+    new Intl.NumberFormat("pt-PT", {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 0,
+    }).format(n || 0);
+
+  // ── Financial ──
+  const contracted = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;
+  const payments = (q.payments ?? [])
+    .slice()
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const paidSum = payments.filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);
+  const dueSum = payments.filter((p) => !p.paid).reduce((s, p) => s + p.amount, 0);
+  const supplierCosts = (q.eventSuppliers ?? []).reduce(
+    (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
+    0,
+  );
+  const margin = contracted - supplierCosts;
+
+  // ── Sections ──
+  const sectionFinancial = `
+    <section>
+      <h2>Financeiro</h2>
+      <div class="facts3">
+        <div><span class="k">Valor contratado</span><span class="v">${contracted ? eur0(contracted) : "—"}</span></div>
+        <div><span class="k">Recebido</span><span class="v green">${eur0(paidSum)}</span></div>
+        <div><span class="k">Por receber</span><span class="v">${eur0(dueSum)}</span></div>
+        ${supplierCosts > 0 ? `<div><span class="k">Custos fornecedores</span><span class="v">${eur0(supplierCosts)}</span></div>` : ""}
+        ${supplierCosts > 0 ? `<div><span class="k">Margem estimada</span><span class="v ${margin >= 0 ? "green" : "red"}">${eur0(margin)}</span></div>` : ""}
+      </div>
+      ${
+        payments.length
+          ? `<table><thead><tr><th></th><th>Tipo</th><th>Data</th><th>Valor</th><th>Nota</th></tr></thead><tbody>
+            ${payments
+              .map(
+                (p) =>
+                  `<tr><td class="t">${p.paid ? '<span class="tick">✓</span>' : "○"}</td><td>${PAYMENT_KIND_LABEL[p.kind] ?? p.kind}</td><td>${p.date ? new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT") : "—"}</td><td class="num">${eur0(p.amount)}</td><td class="grey">${escapeHtml(p.note ?? "")}</td></tr>`,
+              )
+              .join("")}</tbody></table>`
+          : ""
+      }
+    </section>`;
+
+  const suppliers = q.eventSuppliers ?? [];
+  const sectionSuppliers = suppliers.length
+    ? `<section>
+        <h2>Fornecedores</h2>
+        <table><thead><tr><th>Nome</th><th>Categoria</th><th>Orçado</th><th>Real</th><th>Estado</th></tr></thead>
+        <tbody>
+        ${suppliers
+          .map(
+            (s) =>
+              `<tr><td>${escapeHtml(s.name)}</td><td class="grey">${escapeHtml(s.category)}</td><td class="num">${eur0(s.estimatedCost)}</td><td class="num">${s.actualCost != null ? eur0(s.actualCost) : "—"}</td><td class="grey">${s.status}</td></tr>`,
+          )
+          .join("")}
+        </tbody></table>
+      </section>`
+    : "";
+
+  const timeline = (q.timeline ?? [])
+    .slice()
+    .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const sectionTimeline = `<section>
+    <h2>Cronograma do dia</h2>
+    ${
+      timeline.length
+        ? `<table><tbody>${timeline
+            .map(
+              (t) =>
+                `<tr><td class="t">${escapeHtml(t.time || "—")}</td><td>${escapeHtml(t.title)}</td><td class="grey">${escapeHtml(t.owner ?? "")}</td></tr>`,
+            )
+            .join("")}</tbody></table>`
+        : "<p class='empty'>Cronograma não definido.</p>"
+    }
+  </section>`;
+
+  const checklist = q.checklist ?? [];
+  const sectionChecklist = `<section>
+    <h2>Checklist de produção ${checklist.length ? `(${checklist.filter((c) => c.done).length}/${checklist.length})` : ""}</h2>
+    ${
+      checklist.length
+        ? `<ul>${checklist
+            .map(
+              (c) =>
+                `<li class="${c.done ? "done" : ""}"><span class="box">${c.done ? "✓" : ""}</span>${escapeHtml(c.label)}</li>`,
+            )
+            .join("")}</ul>`
+        : "<p class='empty'>Sem checklist.</p>"
+    }
+  </section>`;
+
+  const guests = (q.guestList ?? []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const gConfirmed = guests
+    .filter((g) => g.rsvp === "confirmado")
+    .reduce((s, g) => s + (g.party || 1), 0);
+  const gPending = guests
+    .filter((g) => g.rsvp === "pendente")
+    .reduce((s, g) => s + (g.party || 1), 0);
+  const sectionGuests = guests.length
+    ? `<section>
+      <h2>Convidados (${guests.length} ${guests.length === 1 ? "entrada" : "entradas"} · ${gConfirmed} confirmados · ${gPending} pendentes)</h2>
+      <table><thead><tr><th>Nome</th><th>Pax</th><th>RSVP</th><th>Nota</th></tr></thead><tbody>
+      ${guests
+        .map(
+          (g) =>
+            `<tr><td>${escapeHtml(g.name)}</td><td class="num">${g.party || 1}</td><td class="${g.rsvp === "confirmado" ? "green" : g.rsvp === "recusado" ? "red" : "grey"}">${RSVP_LABEL_PRINT[g.rsvp] ?? g.rsvp}</td><td class="grey">${escapeHtml(g.note ?? "")}</td></tr>`,
+        )
+        .join("")}
+      </tbody></table>
+    </section>`
+    : "";
+
+  win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8" />
+  <title>Dossier — ${escapeHtml(q.name)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; margin: 0; padding: 40px; max-width: 860px; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #525a2f; padding-bottom: 16px; margin-bottom: 28px; }
+    .brand { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: #525a2f; font-weight: 700; margin-bottom: 6px; }
+    h1 { font-size: 28px; margin: 4px 0; }
+    .sub { color: #555; font-size: 14px; margin-top: 3px; }
+    .badge { display: inline-block; padding: 3px 10px; background: #f0f5ee; color: #525a2f; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; border-radius: 4px; margin-top: 8px; }
+    .id { color: #999; font-size: 10px; font-family: monospace; text-align: right; }
+    .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+    .meta > div { border: 1px solid #e8e8e8; border-radius: 8px; padding: 10px 12px; }
+    .meta .k { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #999; display: block; margin-bottom: 4px; }
+    .meta .v { font-size: 14px; font-weight: 600; color: #111; }
+    .contact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 24px; padding: 14px; background: #fafafa; border-radius: 8px; margin-bottom: 24px; }
+    .contact > div {}
+    .contact .k { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #aaa; margin-bottom: 2px; }
+    .contact .v { font-size: 13px; color: #333; }
+    section { margin-bottom: 32px; page-break-inside: avoid; }
+    h2 { font-size: 11px; letter-spacing: .25em; text-transform: uppercase; color: #525a2f; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e5ede4; }
+    .facts3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 20px; margin-bottom: 14px; }
+    .facts3 > div { padding: 8px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; gap: 8px; }
+    .facts3 .k { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #888; }
+    .facts3 .v { font-size: 13px; font-weight: 600; }
+    .green { color: #3a5c39; }
+    .red { color: #a03a1a; }
+    .grey { color: #777; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #999; padding: 7px 6px; border-bottom: 2px solid #ddd; }
+    td { padding: 7px 6px; border-bottom: 1px solid #f0f0f0; font-size: 13px; vertical-align: top; }
+    td.t { width: 70px; font-weight: 700; color: #525a2f; white-space: nowrap; }
+    td.num { text-align: right; font-weight: 600; white-space: nowrap; }
+    .tick { color: #3a5c39; font-weight: 700; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { padding: 6px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; display: flex; gap: 10px; align-items: center; }
+    li.done { color: #aaa; text-decoration: line-through; }
+    .box { width: 15px; height: 15px; border: 1.5px solid #bbb; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: #525a2f; flex: 0 0 auto; }
+    .notes { padding: 12px 14px; background: #f7f6f3; border-radius: 6px; font-size: 13px; color: #333; white-space: pre-wrap; margin-bottom: 10px; }
+    p.empty { color: #bbb; font-style: italic; font-size: 13px; }
+    .foot { margin-top: 48px; color: #bbb; font-size: 10px; text-align: center; border-top: 1px solid #eee; padding-top: 12px; }
+    @media print { body { padding: 24px; } section { page-break-inside: avoid; } }
+  </style></head><body>
+  <div class="head">
+    <div>
+      <div class="brand">Líquen Events · Dossier do Evento</div>
+      <h1>${escapeHtml(q.name)}</h1>
+      <div class="sub">${dateStr}</div>
+      <div class="badge">${STATUS_LABEL_PT[q.status] ?? q.status}</div>
+    </div>
+    <div class="id">${q.id}<br/>Gerado: ${new Date().toLocaleDateString("pt-PT")}</div>
+  </div>
+
+  <div class="meta">
+    <div><span class="k">Tipo de evento</span><span class="v">${escapeHtml([cat, et].filter(Boolean).join(" · ") || "—")}</span></div>
+    <div><span class="k">Pacote</span><span class="v">${escapeHtml(pkg || "—")}</span></div>
+    <div><span class="k">Convidados</span><span class="v">${q.guests ?? "—"}</span></div>
+    <div><span class="k">Local</span><span class="v">${escapeHtml(q.location || "—")}</span></div>
+  </div>
+
+  <div class="contact">
+    <div><div class="k">Cliente</div><div class="v">${escapeHtml(q.name)}</div></div>
+    <div><div class="k">Email</div><div class="v">${escapeHtml(q.email || "—")}</div></div>
+    <div><div class="k">Telefone</div><div class="v">${escapeHtml(q.phone || "—")}</div></div>
+    ${q.company ? `<div><div class="k">Empresa</div><div class="v">${escapeHtml(q.company)}</div></div>` : ""}
+    ${q.nif ? `<div><div class="k">NIF</div><div class="v">${escapeHtml(q.nif)}</div></div>` : ""}
+    ${q.duration ? `<div><div class="k">Duração</div><div class="v">${q.duration}h</div></div>` : ""}
+  </div>
+
+  ${sectionFinancial}
+  ${sectionSuppliers}
+  ${sectionTimeline}
+  ${sectionChecklist}
+  ${sectionGuests}
+
+  ${q.notes ? `<section><h2>Notas do cliente</h2><div class="notes">${escapeHtml(q.notes)}</div></section>` : ""}
+  ${q.adminNotes ? `<section><h2>Notas internas</h2><div class="notes">${escapeHtml(q.adminNotes)}</div></section>` : ""}
+
+  <div class="foot">Dossier gerado em ${new Date().toLocaleString("pt-PT")} · Líquen Events</div>
+  <script>window.onload = function () { setTimeout(function () { window.print(); }, 200); };</script>
+</body></html>`);
   win.document.close();
 }
 

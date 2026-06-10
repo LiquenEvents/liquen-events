@@ -11,19 +11,34 @@ export interface Command {
   run: () => void;
 }
 
+export interface RecentQuote {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   navCommands: Command[];
   quotes: Quote[];
   onOpenQuote: (q: Quote) => void;
+  recentQuotes?: RecentQuote[];
 }
 
 /**
  * ⌘K / Ctrl+K command palette: jump to any view or search a quote by name,
  * email or id. Keyboard-first, on-brand, minimal.
  */
-export default function CommandPalette({ open, onClose, navCommands, quotes, onOpenQuote }: Props) {
+export default function CommandPalette({
+  open,
+  onClose,
+  navCommands,
+  quotes,
+  onOpenQuote,
+  recentQuotes,
+}: Props) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,8 +72,25 @@ export default function CommandPalette({ open, onClose, navCommands, quotes, onO
           }))
       : [];
 
-    return [...navMatches, ...quoteMatches];
-  }, [query, navCommands, quotes, onOpenQuote]);
+    const recentMatches: Command[] =
+      !q && recentQuotes?.length
+        ? (recentQuotes
+            .map((r) => {
+              const full = quotes.find((x) => x.id === r.id);
+              if (!full) return null;
+              return {
+                id: `recent-${r.id}`,
+                label: r.name,
+                hint: r.email,
+                group: "Recentes",
+                run: () => onOpenQuote(full),
+              };
+            })
+            .filter(Boolean) as Command[])
+        : [];
+
+    return [...recentMatches, ...navMatches, ...quoteMatches];
+  }, [query, navCommands, quotes, onOpenQuote, recentQuotes]);
 
   useEffect(() => {
     if (active >= results.length) setActive(0);

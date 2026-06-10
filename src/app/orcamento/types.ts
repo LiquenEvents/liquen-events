@@ -151,6 +151,29 @@ export interface Guest {
   note?: string;
 }
 
+export type ActivityKind =
+  | "created"
+  | "status_change"
+  | "price_set"
+  | "note_added"
+  | "message_sent"
+  | "proposal_sent"
+  | "follow_up_set"
+  | "tags_updated"
+  | "payment_added"
+  | "supplier_added"
+  | "manual_note"
+  | "call_logged"
+  | "assigned";
+
+export interface ActivityEntry {
+  id: string;
+  at: string;
+  kind: ActivityKind;
+  actor?: string;
+  summary: string;
+}
+
 export type TaskPriority = "baixa" | "normal" | "alta";
 
 export interface Task {
@@ -186,6 +209,16 @@ export interface Quote extends QuoteFormData {
   followUpAt?: string;
   /** RSVP / guest list for the event. */
   guestList?: Guest[];
+  /** Chronological log of significant actions taken on this quote. */
+  activityLog?: ActivityEntry[];
+  /** Internal contract/invoice reference number (e.g. "2026-042"). */
+  contractRef?: string;
+  /** When true, the quote is hidden from the default list view (soft-delete). */
+  archived?: boolean;
+  /** Team member responsible for this lead (prevents double-work). */
+  assignedTo?: string;
+  /** Reason the deal was lost — filled when status → rejeitado. */
+  lostReason?: string;
 }
 
 /** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */
@@ -210,6 +243,10 @@ export interface Supplier {
   location?: string;
   notes?: string;
   createdAt: string;
+  /** 1–5 star quality rating. */
+  rating?: number;
+  /** Marks this supplier as a preferred/go-to partner. */
+  preferred?: boolean;
 }
 
 // ── Propostas (criadas internamente, enviadas em PDF ao cliente) ──

@@ -9,6 +9,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: (q: Quote) => void;
+  existingQuotes?: Quote[];
 }
 
 const EMPTY = {
@@ -25,7 +26,7 @@ const EMPTY = {
   referralSource: "Contacto direto",
 };
 
-export default function NewQuoteModal({ open, onClose, onCreated }: Props) {
+export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes }: Props) {
   const { toast } = useToast();
   const [f, setF] = useState({ ...EMPTY });
   const [saving, setSaving] = useState(false);
@@ -70,6 +71,10 @@ export default function NewQuoteModal({ open, onClose, onCreated }: Props) {
     }
   }
 
+  const duplicates = f.email.trim()
+    ? (existingQuotes ?? []).filter((q) => q.email.toLowerCase() === f.email.trim().toLowerCase())
+    : [];
+
   const input = "bo-input px-3 py-2 text-sm text-foreground/75 placeholder-foreground/22";
   const label = "block text-[10px] text-foreground/30 tracking-[0.3em] uppercase mb-2";
 
@@ -106,6 +111,38 @@ export default function NewQuoteModal({ open, onClose, onCreated }: Props) {
         </div>
 
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {duplicates.length > 0 && (
+            <div className="sm:col-span-2 flex items-start gap-3 p-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.06]">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#b5894a"
+                strokeWidth="2"
+                strokeLinecap="round"
+                className="shrink-0 mt-0.5"
+              >
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <path d="M12 9v4M12 17h.01" />
+              </svg>
+              <div className="min-w-0">
+                <p className="text-[#b5894a] text-xs font-semibold mb-0.5">
+                  Este e-mail já tem {duplicates.length} pedido{duplicates.length !== 1 ? "s" : ""}{" "}
+                  registado{duplicates.length !== 1 ? "s" : ""}
+                </p>
+                <p className="text-foreground/45 text-[10px]">
+                  {duplicates
+                    .slice(0, 3)
+                    .map((q) => q.id.slice(-8))
+                    .join(", ")}
+                  {duplicates.length > 3 ? ` +${duplicates.length - 3}` : ""}
+                  {" · "}
+                  Pode continuar se for um evento diferente.
+                </p>
+              </div>
+            </div>
+          )}
           <div className="sm:col-span-2">
             <label className={label}>Nome *</label>
             <input

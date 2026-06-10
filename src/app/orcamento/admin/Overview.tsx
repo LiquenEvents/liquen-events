@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { Quote, QuoteStatus } from "../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
 import Reminders from "./Reminders";
@@ -146,9 +146,36 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       }
     }
 
+    const todayMs = Date.now();
+    // Next upcoming confirmed event (accepted within next 90 days)
+    const nextEvent =
+      quotes
+        .filter(
+          (q) => q.date && q.date >= todayKey && (q.status === "aceite" || q.status === "cotado"),
+        )
+        .sort((a, b) => a.date!.localeCompare(b.date!))[0] ?? null;
+    const nextEventDays = nextEvent?.date
+      ? Math.round((new Date(nextEvent.date + "T12:00:00").getTime() - Date.now()) / 86400000)
+      : null;
+
     const needAction = quotes
-      .filter((q) => q.status === "pendente" || q.status === "em_revisao")
-      .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
+      .filter((q) => {
+        if (q.status !== "pendente" && q.status !== "em_revisao" && q.status !== "cotado")
+          return false;
+        return true;
+      })
+      .map((q) => {
+        const lastMs = new Date(q.lastUpdated ?? q.submittedAt).getTime();
+        const daysSince = Math.floor((todayMs - lastMs) / 86400000);
+        return { q, daysSince, isStale: daysSince >= 14 };
+      })
+      .sort((a, b) => {
+        // Stale leads first, then by date
+        if (a.isStale && !b.isStale) return -1;
+        if (!a.isStale && b.isStale) return 1;
+        return +new Date(b.q.submittedAt) - +new Date(a.q.submittedAt);
+      });
+    const staleCount = needAction.filter((x) => x.isStale).length;
 
     const recent = [...quotes]
       .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt))
@@ -174,6 +201,9 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       eventsThisWeek,
       months,
       needAction,
+      staleCount,
+      nextEvent,
+      nextEventDays,
       recent,
       conversion,
       avgTicket,
@@ -182,6 +212,50 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       funnelMax: Math.max(1, ...FUNNEL.map((f) => byStatus[f.id] ?? 0)),
     };
   }, [quotes]);
+
+  const [goal, setGoal] = useState(0);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+  const [teamNotes, setTeamNotes] = useState("");
+  const [editingNotes, setEditingNotes] = useState(false);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("liquen-team-notes");
+      if (v !== null) setTeamNotes(v);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function persistNotes(v: string) {
+    setTeamNotes(v);
+    try {
+      localStorage.setItem("liquen-team-notes", v);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("liquen-meta-receita");
+      if (v) setGoal(Number(v));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function saveGoal() {
+    const v = parseFloat(goalInput.replace(/[^\d.]/g, "")) || 0;
+    setGoal(v);
+    setEditingGoal(false);
+    try {
+      localStorage.setItem("liquen-meta-receita", String(v));
+    } catch {
+      /* ignore */
+    }
+  }
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 20 ? "Boa tarde" : "Boa noite";
@@ -290,6 +364,76 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         </div>
       </div>
 
+      {/* Próximo evento em destaque */}
+      {data.nextEvent && data.nextEventDays !== null && data.nextEventDays <= 30 && (
+        <button
+          onClick={() => onOpen(data.nextEvent!)}
+          className={`w-full text-left rounded-2xl p-5 border transition-all hover:shadow-md ${
+            data.nextEventDays <= 3
+              ? "bg-[#b5654a]/[0.07] border-[#b5654a]/25 hover:border-[#b5654a]/40"
+              : data.nextEventDays <= 7
+                ? "bg-amber-500/[0.05] border-amber-500/20 hover:border-amber-500/35"
+                : "bg-[#4d6350]/[0.05] border-[#4d6350]/20 hover:border-[#4d6350]/35"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p
+                className="text-[10px] tracking-[0.25em] uppercase font-medium mb-1.5"
+                style={{
+                  color:
+                    data.nextEventDays <= 3
+                      ? "#b5654a"
+                      : data.nextEventDays <= 7
+                        ? "#b5894a"
+                        : "#4d6350",
+                }}
+              >
+                {data.nextEventDays === 0
+                  ? "Evento hoje"
+                  : data.nextEventDays === 1
+                    ? "Evento amanhã"
+                    : `Próximo evento · faltam ${data.nextEventDays} dias`}
+              </p>
+              <h3
+                className="text-foreground/80 font-bold text-lg leading-tight truncate"
+                style={{ fontFamily: "var(--font-playfair)" }}
+              >
+                {data.nextEvent.name}
+              </h3>
+              <p className="text-foreground/40 text-sm mt-1">
+                {new Date(data.nextEvent.date! + "T12:00:00").toLocaleDateString("pt-PT", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+                {data.nextEvent.location ? ` · ${data.nextEvent.location}` : ""}
+                {data.nextEvent.guests ? ` · ${data.nextEvent.guests} pax` : ""}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p
+                className="text-3xl font-bold tabular-nums"
+                style={{
+                  fontFamily: "var(--font-playfair)",
+                  color:
+                    data.nextEventDays <= 3
+                      ? "#b5654a"
+                      : data.nextEventDays <= 7
+                        ? "#b5894a"
+                        : "#4d6350",
+                }}
+              >
+                {data.nextEventDays === 0 ? "hoje" : `${data.nextEventDays}d`}
+              </p>
+              <p className="text-foreground/25 text-[10px] tracking-[0.15em] uppercase mt-0.5">
+                {data.nextEvent.status === "aceite" ? "confirmado" : "cotado"}
+              </p>
+            </div>
+          </div>
+        </button>
+      )}
+
       {/* KPI row — each card is a shortcut to the relevant view */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
@@ -344,6 +488,147 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             </p>
           </button>
         ))}
+      </div>
+
+      {/* Meta mensal de receita */}
+      <div className="bo-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="bo-eyebrow">Meta de receita — este mês</p>
+          {!editingGoal && (
+            <button
+              onClick={() => {
+                setGoalInput(goal > 0 ? String(goal) : "");
+                setEditingGoal(true);
+              }}
+              className="text-foreground/30 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors"
+            >
+              {goal > 0 ? "Editar meta" : "Definir meta"}
+            </button>
+          )}
+        </div>
+
+        {editingGoal ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              type="number"
+              value={goalInput}
+              onChange={(e) => setGoalInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveGoal();
+                if (e.key === "Escape") setEditingGoal(false);
+              }}
+              placeholder="Ex: 15000"
+              className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
+            />
+            <button
+              onClick={saveGoal}
+              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors whitespace-nowrap"
+            >
+              Guardar
+            </button>
+            <button
+              onClick={() => setEditingGoal(false)}
+              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
+            >
+              ×
+            </button>
+          </div>
+        ) : goal > 0 ? (
+          <>
+            <div className="flex items-end justify-between mb-2">
+              <div>
+                <span
+                  className="font-bold"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(18px, 2vw, 24px)",
+                    color: data.wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
+                  }}
+                >
+                  {eur(data.wonThisMonth)}
+                </span>
+                <span className="text-foreground/30 text-xs ml-2">de {eur(goal)}</span>
+              </div>
+              <span
+                className="text-sm font-semibold tabular-nums"
+                style={{ color: data.wonThisMonth >= goal ? "#3a5c39" : "#4d6350" }}
+              >
+                {Math.min(100, Math.round((data.wonThisMonth / goal) * 100))}%
+              </span>
+            </div>
+            <div className="h-2.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${Math.min(100, (data.wonThisMonth / goal) * 100)}%`,
+                  background: data.wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
+                }}
+              />
+            </div>
+            {data.wonThisMonth >= goal && (
+              <p className="text-[#3a5c39] text-[10px] tracking-[0.12em] uppercase font-semibold mt-2">
+                Meta atingida ✓
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-foreground/25 text-xs py-1">
+            Defina uma meta mensal para acompanhar o progresso de receita.
+          </p>
+        )}
+      </div>
+
+      {/* Notas da equipa */}
+      <div className="bo-card p-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="bo-eyebrow">Notas da equipa</p>
+          {!editingNotes && (
+            <button
+              onClick={() => setEditingNotes(true)}
+              className="text-foreground/30 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors"
+            >
+              {teamNotes ? "Editar" : "Adicionar nota"}
+            </button>
+          )}
+        </div>
+        {editingNotes ? (
+          <div>
+            <textarea
+              autoFocus
+              rows={4}
+              value={teamNotes}
+              onChange={(e) => persistNotes(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditingNotes(false);
+              }}
+              placeholder="Notas partilhadas com a equipa — lembretes, contexto, próximos passos…"
+              className="bo-input w-full px-3 py-2 text-sm text-foreground/70 resize-none"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-foreground/22 text-[10px]">
+                Guardado automaticamente · Esc para fechar
+              </span>
+              <button
+                onClick={() => setEditingNotes(false)}
+                className="text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 transition-opacity"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        ) : teamNotes ? (
+          <p
+            className="text-foreground/55 text-sm leading-relaxed whitespace-pre-wrap cursor-text"
+            onClick={() => setEditingNotes(true)}
+          >
+            {teamNotes}
+          </p>
+        ) : (
+          <p className="text-foreground/22 text-xs">
+            Sem notas. Clique em &ldquo;Adicionar nota&rdquo; para começar.
+          </p>
+        )}
       </div>
 
       {/* Reminders — derived urgent items */}
@@ -470,11 +755,18 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         <div className="bo-card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
             <p className="bo-eyebrow">Precisam de atenção</p>
-            {data.needAction.length > 0 && (
-              <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
-                {data.needAction.length}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {data.staleCount > 0 && (
+                <span className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-semibold">
+                  {data.staleCount} parado{data.staleCount !== 1 ? "s" : ""}
+                </span>
+              )}
+              {data.needAction.length > 0 && (
+                <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
+                  {data.needAction.length}
+                </span>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
             {data.needAction.length === 0 && (
@@ -482,7 +774,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 Sem pedidos pendentes. ✓
               </p>
             )}
-            {data.needAction.slice(0, 8).map((q) => (
+            {data.needAction.slice(0, 8).map(({ q, daysSince, isStale }) => (
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
@@ -495,15 +787,21 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <span
-                    className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
-                    style={{
-                      background: `${STATUS_META[q.status].color}18`,
-                      color: STATUS_META[q.status].color,
-                    }}
-                  >
-                    {STATUS_META[q.status].label}
-                  </span>
+                  {isStale ? (
+                    <span className="inline-flex items-center gap-1 text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 font-semibold">
+                      {daysSince}d parado
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
+                      style={{
+                        background: `${STATUS_META[q.status].color}18`,
+                        color: STATUS_META[q.status].color,
+                      }}
+                    >
+                      {STATUS_META[q.status].label}
+                    </span>
+                  )}
                   <p className="text-foreground/22 text-[10px] mt-1">{timeAgo(q.submittedAt)}</p>
                 </div>
               </button>

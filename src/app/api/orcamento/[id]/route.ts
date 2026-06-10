@@ -45,6 +45,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "tags",
     "followUpAt",
     "guestList",
+    "activityLog",
+    "assignedTo",
+    "lostReason",
+    "date",
+    "guests",
+    "location",
+    "contractRef",
+    "archived",
   ];
   const updates: Partial<Quote> = {};
   for (const key of allowed) {
