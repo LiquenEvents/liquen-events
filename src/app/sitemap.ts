@@ -31,6 +31,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       images: [img("EW1_1408.jpg"), img("EW1_1330.jpg"), img("EW1_0697.jpg")],
     },
     { url: `${base}/contacto`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    // Conversion page — the quote request form.
+    { url: `${base}/orcamento`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     {
       url: `${base}/sobre`,
       lastModified: now,

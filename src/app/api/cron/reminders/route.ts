@@ -16,6 +16,7 @@ export const maxDuration = 60;
  *   · events happening in the next 3 days
  *   · payments due (or overdue) within 7 days
  *   · quotes still awaiting a first reply for 2+ days
+ *   · follow-ups due today or overdue
  *
  * Protected by CRON_SECRET: the caller must send it as a Bearer token (never a
  * query param — those leak into access logs). When CRON_SECRET is unset (dev),
@@ -42,10 +43,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [quotes, calEvents] = await Promise.all([
+    const [allQuotes, calEvents] = await Promise.all([
       listQuotes().catch(() => []),
       listCalendarEvents().catch(() => []),
     ]);
+    // Archived quotes are soft-deleted — never worth a notification.
+    const quotes = allQuotes.filter((q) => !q.archived);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -90,6 +93,15 @@ export async function GET(request: NextRequest) {
         new Date(q.submittedAt).getTime() < twoDaysAgo,
     ).length;
 
+    // 4. Follow-ups due today or overdue (active deals only)
+    const followUpsDue = quotes.filter(
+      (q) =>
+        q.followUpAt &&
+        q.followUpAt <= todayKey &&
+        q.status !== "aceite" &&
+        q.status !== "rejeitado",
+    ).length;
+
     const lines: string[] = [];
     if (upcomingEvents.length > 0) {
       lines.push(
@@ -101,6 +113,9 @@ export async function GET(request: NextRequest) {
     }
     if (awaiting > 0) {
       lines.push(`${awaiting} pedido${awaiting !== 1 ? "s" : ""} por responder`);
+    }
+    if (followUpsDue > 0) {
+      lines.push(`${followUpsDue} seguimento${followUpsDue !== 1 ? "s" : ""} para hoje`);
     }
 
     if (lines.length === 0) {
