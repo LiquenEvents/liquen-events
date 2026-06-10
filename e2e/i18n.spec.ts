@@ -25,11 +25,14 @@ test.describe("i18n — espelho inglês (/en)", () => {
 
     await page.goto("/sobre");
     await toggle().getByText("EN", { exact: true }).click();
-    await expect(page).toHaveURL(/\/en\/sobre$/);
-    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await page.waitForURL((url) => url.pathname === "/en/sobre", { timeout: 15_000 });
+    await expect(page.locator("html")).toHaveAttribute("lang", "en", { timeout: 15_000 });
 
     await toggle().getByText("PT", { exact: true }).click();
-    await expect(page).toHaveURL(/\/sobre$/);
-    await expect(page.locator("html")).toHaveAttribute("lang", "pt-PT");
+    // NB: an "ends with /sobre" regex would also match /en/sobre and pass while
+    // still on the mirror — match the exact pathname and wait out slow dev
+    // compiles before asserting the language.
+    await page.waitForURL((url) => url.pathname === "/sobre", { timeout: 15_000 });
+    await expect(page.locator("html")).toHaveAttribute("lang", "pt-PT", { timeout: 15_000 });
   });
 });

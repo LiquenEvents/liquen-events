@@ -29,11 +29,16 @@ export function proxy(req: NextRequest) {
     const headers = new Headers(req.headers);
     headers.set("x-liquen-locale", "en");
     const res = NextResponse.rewrite(url, { request: { headers } });
-    // Only (re)write the sticky cookie when it isn't already "en". Re-setting
-    // it on every /en response made late-arriving prefetch responses clobber a
-    // freshly chosen "pt" cookie (LanguageToggle writes it just before leaving
-    // the mirror), bouncing the user back to English.
-    if (req.cookies.get("liquen-lang")?.value !== "en") {
+    // Stick the language choice — but only on real document navigations that
+    // don't carry it yet. Prefetches and the router's background RSC fetches
+    // must stay side-effect free: their responses can land right as the user
+    // switches to PT (LanguageToggle writes the cookie just before leaving the
+    // mirror) and would clobber the fresh "pt" back to "en". Chromium/Firefox
+    // (and Safari ≥16.4) send `sec-fetch-dest: document` on navigations; for
+    // anything older, fall back to "not an RSC subrequest".
+    const dest = req.headers.get("sec-fetch-dest");
+    const isDocument = dest ? dest === "document" : !req.headers.get("rsc");
+    if (isDocument && req.cookies.get("liquen-lang")?.value !== "en") {
       res.cookies.set("liquen-lang", "en", {
         path: "/",
         maxAge: 60 * 60 * 24 * 365,

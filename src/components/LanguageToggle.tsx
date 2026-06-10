@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState } from "react";
 import { LANG_COOKIE, type Locale } from "@/lib/i18n";
 import { useTranslations } from "./LocaleProvider";
 
@@ -12,17 +12,20 @@ import { useTranslations } from "./LocaleProvider";
  */
 export default function LanguageToggle({ light = false }: { light?: boolean }) {
   const { locale, t } = useTranslations();
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
   function choose(next: Locale) {
     if (next === locale) return;
     document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
     // Move to the language's URL space (EN at /en/* for sharing + crawling). A
     // full navigation — not router.push — so the root layout re-renders with the
-    // right <html lang>, which client-side navigation would leave stale.
+    // right <html lang>, which client-side navigation would leave stale. Assign
+    // synchronously (no transition) so nothing can race the cookie between the
+    // write above and the document request.
     const bare = window.location.pathname.replace(/^\/en(?=\/|$)/, "") || "/";
     const dest = next === "en" ? (bare === "/" ? "/en" : `/en${bare}`) : bare;
-    startTransition(() => window.location.assign(dest + window.location.search));
+    setPending(true);
+    window.location.assign(dest + window.location.search);
   }
 
   const base = "text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";
