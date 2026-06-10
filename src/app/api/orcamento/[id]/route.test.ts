@@ -7,6 +7,7 @@ const store = vi.hoisted(() => ({
     id === "LIQ-1"
       ? {
           id: "LIQ-1",
+          submittedAt: "2026-06-01T10:00:00.000Z",
           name: "Ana Silva",
           email: "ana@example.com",
           phone: "910000000",
@@ -16,6 +17,27 @@ const store = vi.hoisted(() => ({
           status: "pendente",
           guests: 50,
           date: "2026-09-01",
+          addons: [
+            {
+              id: "dj",
+              name: "DJ",
+              tier: "completo",
+              price: 900,
+              quantity: 1,
+              pricingType: "fixed",
+            },
+          ],
+          // Internal CRM data — must never appear in the public response.
+          adminNotes: "nota interna",
+          quotedPrice: 12500,
+          activityLog: [{ id: "a1", at: "2026-06-02", kind: "manual_note", summary: "interno" }],
+          messages: [{ at: "2026-06-02", body: "privado" }],
+          payments: [{ id: "p1", kind: "sinal", amount: 3000, date: "2026-06-05", paid: true }],
+          guestList: [{ id: "g1", name: "Convidado Secreto", party: 2, rsvp: "confirmado" }],
+          lostReason: "—",
+          assignedTo: "Catarina",
+          contractRef: "2026-042",
+          tags: ["VIP"],
         }
       : null,
   ),
@@ -45,15 +67,16 @@ describe("GET /api/orcamento/[id] — PII protection", () => {
     const res = await GET(req("GET"), ctx("LIQ-1"));
     expect(res.status).toBe(200);
     const json = await res.json();
-    // No personal data leaks…
-    expect(json.email).toBeUndefined();
-    expect(json.name).toBeUndefined();
-    expect(json.phone).toBeUndefined();
-    expect(json.nif).toBeUndefined();
-    expect(json.notes).toBeUndefined();
-    // …but non-personal status fields are fine.
+    // The public view is an explicit allowlist of event facts — exactly these
+    // keys, so a new Quote field can never leak by accident. (JSON drops the
+    // allowlisted-but-undefined ones, e.g. packageTier/eventName here.)
+    expect(Object.keys(json).sort()).toEqual(
+      ["id", "submittedAt", "status", "guests", "date", "addons"].sort(),
+    );
     expect(json.status).toBe("pendente");
     expect(json.guests).toBe(50);
+    // Addons are trimmed to id/name/tier — no pricing internals.
+    expect(json.addons).toEqual([{ id: "dj", name: "DJ", tier: "completo" }]);
   });
 
   it("returns the full record to an authenticated admin", async () => {
