@@ -177,9 +177,18 @@ export default function Calendario({ quotes, onOpen }: Props) {
     const map = new Map<string, Quote[]>();
     for (const q of quotes) {
       if (!q.date) continue;
-      const key = q.date; // yyyy-mm-dd
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(q);
+      // Multi-day events (endDate set) occupy every day of the range, so a
+      // 3-day wedding blocks all three days on the grid — not just day one.
+      // Capped at 31 days as a guard against bad data.
+      const last = q.endDate && q.endDate >= q.date ? q.endDate : q.date;
+      const d = new Date(q.date + "T12:00:00");
+      for (let i = 0; i < 31; i++) {
+        const key = d.toISOString().slice(0, 10);
+        if (key > last) break;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(q);
+        d.setDate(d.getDate() + 1);
+      }
     }
     return map;
   }, [quotes]);
