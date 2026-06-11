@@ -1,0 +1,13 @@
+node_modules/
+out/
+dist/
+.thumbs/
+public/screenshots/*.png
+public/screenshots/*.jpg
+public/screenshots/*.jpeg
+public/screenshots/*.webp
+reference/*.mp4
+reference/*.mov
+reference/*.avi
+reference/*.webm
+reference/*.mkv

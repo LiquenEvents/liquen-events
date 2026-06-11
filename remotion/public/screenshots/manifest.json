@@ -1,0 +1,42 @@
+{
+  "home": {
+    "height": 5160,
+    "capturedAt": "2026-06-11T15:12:02.782Z"
+  },
+  "sobre": {
+    "height": 5765,
+    "capturedAt": "2026-06-11T15:12:20.115Z"
+  },
+  "servicos": {
+    "height": 8548,
+    "capturedAt": "2026-06-11T15:12:40.063Z"
+  },
+  "galeria": {
+    "height": 6510,
+    "capturedAt": "2026-06-11T15:13:00.856Z"
+  },
+  "orcamento": {
+    "height": 1176,
+    "capturedAt": "2026-06-11T15:13:07.942Z"
+  },
+  "home-mobile": {
+    "height": 4854,
+    "capturedAt": "2026-06-11T15:13:24.659Z"
+  },
+  "sobre-mobile": {
+    "height": 6059,
+    "capturedAt": "2026-06-11T15:13:34.861Z"
+  },
+  "servicos-mobile": {
+    "height": 6917,
+    "capturedAt": "2026-06-11T15:13:53.384Z"
+  },
+  "galeria-mobile": {
+    "height": 12618,
+    "capturedAt": "2026-06-11T15:14:15.879Z"
+  },
+  "orcamento-mobile": {
+    "height": 1514,
+    "capturedAt": "2026-06-11T15:14:29.732Z"
+  }
+}
