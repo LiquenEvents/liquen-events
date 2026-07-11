@@ -17,11 +17,13 @@ vi.mock("@/lib/proposals-store", () => ({
 }));
 vi.mock("@/lib/quotes-store", () => ({
   getQuote: vi.fn(async (id: string) => quotesDb.store.get(id) ?? null),
-  updateQuote: vi.fn(async (id: string, patch: Record<string, unknown>) => {
-    const next = { ...(quotesDb.store.get(id) ?? { id }), ...patch };
-    quotesDb.store.set(id, next);
-    return next;
-  }),
+  updateQuoteWith: vi.fn(
+    async (id: string, mutate: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      const next = mutate(quotesDb.store.get(id) ?? { id });
+      quotesDb.store.set(id, next);
+      return next;
+    },
+  ),
 }));
 vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(async () => ({ sent: true })),
@@ -38,7 +40,7 @@ vi.mock("@/lib/rate-limit", () => ({
 
 import { POST } from "./route";
 import { createProposalToken } from "@/lib/proposal-token";
-import { updateQuote } from "@/lib/quotes-store";
+import { updateQuoteWith } from "@/lib/quotes-store";
 
 function postReq(body: unknown): NextRequest {
   return new Request("https://liquen.test/api/proposta", {
@@ -73,7 +75,7 @@ describe("POST /api/proposta", () => {
     const res = await POST(postReq({ token: "not-a-valid-token", action: "aceitar" }));
     expect(res.status).toBe(401);
     expect(proposalsDb.store.get("p1")?.status).toBe("enviada");
-    expect(updateQuote).not.toHaveBeenCalled();
+    expect(updateQuoteWith).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed request (missing action) with 400", async () => {
@@ -95,14 +97,13 @@ describe("POST /api/proposta", () => {
     expect(json).toMatchObject({ ok: true, status: "aceite" });
     expect(proposalsDb.store.get("p3")?.status).toBe("aceite");
     expect(proposalsDb.store.get("p3")?.respondedAt).toBeTruthy();
-    // Quote advances AND the client's decision lands in the activity log.
-    expect(updateQuote).toHaveBeenCalledWith(
-      "q-p3",
-      expect.objectContaining({
-        status: "aceite",
-        activityLog: [expect.objectContaining({ kind: "status_change", actor: "Cliente Teste" })],
-      }),
-    );
+    // Quote advances AND the client's decision lands in the activity log
+    // (via updateQuoteWith, so a concurrent back-office edit can't drop it).
+    expect(updateQuoteWith).toHaveBeenCalledWith("q-p3", expect.any(Function));
+    expect(quotesDb.store.get("q-p3")).toMatchObject({
+      status: "aceite",
+      activityLog: [expect.objectContaining({ kind: "status_change", actor: "Cliente Teste" })],
+    });
   });
 
   it("declines a proposal: marks it rejeitada and the quote rejeitado", async () => {
@@ -111,10 +112,7 @@ describe("POST /api/proposta", () => {
     const json = await res.json();
     expect(json.status).toBe("rejeitada");
     expect(proposalsDb.store.get("p4")?.status).toBe("rejeitada");
-    expect(updateQuote).toHaveBeenCalledWith(
-      "q-p4",
-      expect.objectContaining({ status: "rejeitado" }),
-    );
+    expect(quotesDb.store.get("q-p4")).toMatchObject({ status: "rejeitado" });
   });
 
   it("is idempotent: a second response returns the recorded one without re-updating", async () => {
@@ -122,6 +120,6 @@ describe("POST /api/proposta", () => {
     const res = await POST(postReq({ token: createProposalToken("p5"), action: "recusar" }));
     const json = await res.json();
     expect(json).toMatchObject({ ok: true, status: "aceite", already: true });
-    expect(updateQuote).not.toHaveBeenCalled();
+    expect(updateQuoteWith).not.toHaveBeenCalled();
   });
 });

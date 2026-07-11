@@ -41,6 +41,8 @@ export const pt = {
   },
 
   nav: {
+    inicio: "Início",
+    menuLabel: "Menu",
     sobre: "Sobre",
     servicos: "Serviços",
     galeria: "Galeria",
@@ -175,6 +177,10 @@ export const pt = {
     lbClose: "Fechar",
     lbPrev: "Foto anterior",
     lbNext: "Foto seguinte",
+    viewWedding: "Ver este casamento",
+    backToGallery: "Toda a galeria",
+    photosLabel: "fotos",
+    backToTop: "Voltar ao topo",
   },
 
   clientes: {

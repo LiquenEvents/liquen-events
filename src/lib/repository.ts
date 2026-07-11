@@ -48,8 +48,22 @@ export interface Backend<T> {
   get(id: string): Promise<T | null>;
   query(column: string, value: unknown, predicate: (e: T) => boolean): Promise<T[]>;
   insert(entity: T): Promise<void>;
-  persist(id: string, merged: T): Promise<void>;
+  /**
+   * Write `merged` over the stored entity. When `cas` (the entity previously
+   * returned by `get` on this same backend instance) is provided and the
+   * backend can tell the row changed since that read, it throws ConflictError
+   * instead of clobbering the concurrent write (optimistic locking).
+   */
+  persist(id: string, merged: T, cas?: T): Promise<void>;
   remove(id: string): Promise<void>;
+}
+
+/** A concurrent write happened between read and write; the caller should re-read and retry. */
+export class ConflictError extends Error {
+  constructor(id: string) {
+    super(`Concurrent update on "${id}" — stale read`);
+    this.name = "ConflictError";
+  }
 }
 
 // ── Supabase backend ──────────────────────────────────────────────────────
@@ -62,6 +76,16 @@ export class SupabaseBackend<T> implements Backend<T> {
   private get cols() {
     return this.m.selectColumns ?? "*";
   }
+
+  /** For `touch` tables, `get` also selects updated_at so persist can CAS on it. */
+  private get colsWithStamp() {
+    if (!this.m.touch || this.cols === "*") return this.cols;
+    return `${this.cols}, updated_at`;
+  }
+
+  // updated_at as of the read, keyed by the entity object `get` returned.
+  // WeakMap: entries vanish with the entities, nothing to clean up.
+  private stamps = new WeakMap<object, string | null>();
 
   private map = (r: unknown) => this.m.fromRow(r as Record<string, unknown>);
 
@@ -78,11 +102,17 @@ export class SupabaseBackend<T> implements Backend<T> {
   async get(id: string): Promise<T | null> {
     const { data, error } = await this.sb
       .from(this.m.table)
-      .select(this.cols)
+      .select(this.colsWithStamp)
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
-    return data ? this.map(data) : null;
+    if (!data) return null;
+    const entity = this.map(data);
+    if (this.m.touch && entity && typeof entity === "object") {
+      const stamp = (data as unknown as Record<string, unknown>).updated_at;
+      this.stamps.set(entity as object, typeof stamp === "string" ? stamp : null);
+    }
+    return entity;
   }
 
   async query(column: string, value: unknown): Promise<T[]> {
@@ -100,9 +130,22 @@ export class SupabaseBackend<T> implements Backend<T> {
     if (error) throw error;
   }
 
-  async persist(id: string, merged: T): Promise<void> {
+  async persist(id: string, merged: T, cas?: T): Promise<void> {
     const row = this.m.toRow(merged);
     if (this.m.touch) row.updated_at = new Date().toISOString();
+
+    // Optimistic locking: only write if the row still carries the updated_at
+    // we read. Zero rows updated ⇒ someone else wrote in between ⇒ conflict.
+    const stamp = cas && typeof cas === "object" ? this.stamps.get(cas as object) : undefined;
+    if (stamp !== undefined) {
+      const base = this.sb.from(this.m.table).update(row).eq("id", id);
+      const guarded = stamp === null ? base.is("updated_at", null) : base.eq("updated_at", stamp);
+      const { data, error } = await guarded.select("id");
+      if (error) throw error;
+      if (!data?.length) throw new ConflictError(id);
+      return;
+    }
+
     const { error } = await this.sb.from(this.m.table).update(row).eq("id", id);
     if (error) throw error;
   }
@@ -197,14 +240,32 @@ export class Repository<T> {
   }
 
   /** Read-merge-write update. Returns the merged entity, or null if not found. */
-  async update(id: string, updates: Partial<T>): Promise<T | null> {
+  update(id: string, updates: Partial<T>): Promise<T | null> {
+    return this.updateWith(id, (current) => ({ ...current, ...updates }) as T);
+  }
+
+  /**
+   * Read-mutate-write update with optimistic locking. `mutate` derives the new
+   * entity from the freshly-read current one (the right tool for appends —
+   * activity log, payments — where spreading a stale copy would drop a
+   * concurrent write). On conflict the read+mutate is retried, so the change
+   * is always applied on top of the latest state.
+   */
+  async updateWith(id: string, mutate: (current: T) => T): Promise<T | null> {
     const backend = this.getBackend();
-    const current = await backend.get(id);
-    if (!current) return null;
-    let merged = { ...current, ...updates } as T;
-    if (this.mapper.beforeUpdate) merged = this.mapper.beforeUpdate(merged);
-    await backend.persist(id, merged);
-    return merged;
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; ; attempt++) {
+      const current = await backend.get(id);
+      if (!current) return null;
+      let merged = mutate(current);
+      if (this.mapper.beforeUpdate) merged = this.mapper.beforeUpdate(merged);
+      try {
+        await backend.persist(id, merged, current);
+        return merged;
+      } catch (err) {
+        if (!(err instanceof ConflictError) || attempt >= MAX_ATTEMPTS) throw err;
+      }
+    }
   }
 
   remove(id: string): Promise<void> {

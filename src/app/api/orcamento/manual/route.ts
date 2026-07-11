@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import type { Quote } from "../../../orcamento/types";
 import { createQuote } from "@/lib/quotes-store";
@@ -8,7 +9,10 @@ export const runtime = "nodejs";
 
 function generateId(): string {
   const now = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  // crypto-sourced randomness — Math.random is guessable and collision-prone.
+  const rand = Array.from(randomBytes(4), (b) => (b % 36).toString(36))
+    .join("")
+    .toUpperCase();
   return `LIQ-${now}-${rand}`;
 }
 

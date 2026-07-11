@@ -16,9 +16,16 @@ interface Bucket {
 const buckets = new Map<string, Bucket>();
 
 export function clientIp(req: NextRequest): string {
+  // Prefer headers the hosting platform sets itself (Vercel overwrites these
+  // per request); a client-supplied x-forwarded-for is trivially forged and
+  // would let a bot rotate "IPs" past the rate limit, so it comes last.
+  const vercel = req.headers.get("x-vercel-forwarded-for");
+  if (vercel) return vercel.split(",")[0].trim();
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  return "unknown";
 }
 
 interface RateResult {

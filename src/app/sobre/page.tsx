@@ -3,6 +3,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import Parallax from "@/components/Parallax";
+import TitleReveal from "@/components/TitleReveal";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getLocale } from "@/lib/i18n/server";
@@ -39,19 +41,21 @@ export default async function SobrePage() {
   const t = getDictionary(locale);
   return (
     <>
-      <BreadcrumbJsonLd items={[{ name: "Sobre", path: "/sobre" }]} />
+      <BreadcrumbJsonLd homeName={t.nav.inicio} items={[{ name: t.nav.sobre, path: "/sobre" }]} />
 
       {/* ── HERO ── */}
       <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
-        <Image
-          src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
-          alt="Líquen Events — celebração"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover object-center"
-          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3204.jpg")}
-        />
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
+            alt="Líquen Events — celebração"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover object-center hero-settle"
+            {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3204.jpg")}
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-transparent" />
 
@@ -142,27 +146,33 @@ export default async function SobrePage() {
         className="relative overflow-hidden border-t border-foreground/8"
         style={{ minHeight: "clamp(360px, 65vh, 760px)" }}
       >
-        <Image
-          src="/imagens/M&F0497.jpg"
-          alt="Líquen Events — celebração"
-          fill
-          sizes="100vw"
-          className="object-cover object-center"
-          {...blurFor("/imagens/M&F0497.jpg")}
-        />
+        <Parallax speed={0.1} className="absolute inset-0">
+          <Image
+            src="/imagens/M&F0497.jpg"
+            alt="Líquen Events — celebração"
+            fill
+            sizes="100vw"
+            className="object-cover object-center scale-110"
+            {...blurFor("/imagens/M&F0497.jpg")}
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-black/60" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
         <div className="relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
-            <AnimateIn>
-              <p
-                className="text-cream font-bold leading-[1.12] max-w-4xl"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 4.5vw, 64px)" }}
-              >
-                {t.sobre.statementLead}
-                <span className="text-cream/40">{t.sobre.statementRest}</span>
-              </p>
-            </AnimateIn>
+            <p
+              className="text-cream font-bold leading-[1.12] max-w-4xl"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 4.5vw, 64px)" }}
+            >
+              <TitleReveal text={t.sobre.statementLead} as="span" step={50} />{" "}
+              <TitleReveal
+                text={t.sobre.statementRest}
+                as="span"
+                className="text-cream/40"
+                step={50}
+                delay={t.sobre.statementLead.split(/\s+/).length * 50 + 80}
+              />
+            </p>
           </div>
         </div>
       </section>

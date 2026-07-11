@@ -1,5 +1,6 @@
 import { SITE, AREAS_SERVED, abs } from "@/lib/site";
 import { jsonLd } from "@/lib/jsonld";
+import { pt } from "@/lib/i18n/pt";
 
 /**
  * Rich schema.org structured data (JSON-LD).
@@ -68,6 +69,17 @@ export default function StructuredData() {
       // rating on an Organization/LocalBusiness is ignored and risks a manual
       // action. Add it back via real `Review` items (e.g. Google Business
       // Profile) when those are available.
+      // These reviews mirror the testimonials VISIBLE on the site (home,
+      // /clientes, /contacto) — same source (the pt dictionary, the canonical
+      // language). No reviewRating: the site shows quotes, not star scores,
+      // and markup must never claim more than the page displays.
+      review: pt.testimonials.map((item) => ({
+        "@type": "Review",
+        author: { "@type": "Person", name: item.name },
+        name: item.role,
+        reviewBody: item.quote,
+        itemReviewed: { "@id": orgId },
+      })),
       hasOfferCatalog: {
         "@type": "OfferCatalog",
         name: "Serviços de organização de eventos",

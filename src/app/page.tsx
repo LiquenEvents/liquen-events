@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import AnimateIn from "@/components/AnimateIn";
+import Parallax from "@/components/Parallax";
+import TitleReveal from "@/components/TitleReveal";
 import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
@@ -43,14 +45,17 @@ export default async function Home() {
       {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed
           behind the transparent fixed navbar. */}
       <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
-        <Image
-          src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
-          alt="Líquen Events — evento aéreo no Alentejo"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover object-center scale-105"
-        />
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
+            {...blurFor("/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg")}
+            alt="Líquen Events — evento aéreo no Alentejo"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover object-center hero-settle"
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-black/15" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/75 via-[#080808]/10 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
@@ -210,12 +215,12 @@ export default async function Home() {
             className="relative min-h-[300px] lg:min-h-[640px] overflow-hidden"
           >
             <Image
-              src="/imagens/DaniGui_Adois_61.jpg"
-              alt="Evento organizado pela Líquen Events"
+              src="/imagens/DJI_20250913190640_0121_D.jpg"
+              alt="Evento organizado pela Líquen Events — vista aérea"
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
-              {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
+              {...blurFor("/imagens/DJI_20250913190640_0121_D.jpg")}
             />
             <div className="absolute inset-0 bg-black/20" />
           </AnimateIn>
@@ -257,14 +262,16 @@ export default async function Home() {
 
       {/* ── CTA ── */}
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
-        <Image
-          src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
-          alt="Evento Líquen Events"
-          fill
-          sizes="100vw"
-          className="object-cover object-center"
-          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
-        />
+        <Parallax speed={0.1} className="absolute inset-0">
+          <Image
+            src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
+            alt="Evento Líquen Events"
+            fill
+            sizes="100vw"
+            className="object-cover object-center scale-110"
+            {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-black/60" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
@@ -275,15 +282,19 @@ export default async function Home() {
               {t.home.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />
             </p>
-            <h2
-              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 116px)" }}
-            >
-              {t.home.ctaTitleLine1}
-              <br />
-              <span className="text-moss">{t.home.ctaTitleLine2}</span>
-            </h2>
           </AnimateIn>
+          <h2
+            className="text-white font-bold leading-[0.9] tracking-tight mb-6"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 116px)" }}
+          >
+            <TitleReveal text={t.home.ctaTitleLine1} as="span" className="block" />
+            <TitleReveal
+              text={t.home.ctaTitleLine2}
+              as="span"
+              className="block text-moss"
+              delay={220}
+            />
+          </h2>
           <AnimateIn delay={110}>
             <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">
               {t.home.ctaText}

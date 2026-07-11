@@ -54,6 +54,15 @@ export type SceneDef =
       startFromSeconds: number;
       durationSeconds: number;
       zoom: "in" | "out";
+    }
+  | {
+      kind: "title";
+      id: string;
+      /** Small line above the accent, e.g. "A nossa" */
+      heading: string;
+      /** Large italic accent word, brand moss colour */
+      accent: string;
+      durationSeconds: number;
     };
 
 /**
@@ -77,6 +86,13 @@ export const SCENES: SceneDef[] = [
     startFromSeconds: 10,
     durationSeconds: 6,
     zoom: "in",
+  },
+  {
+    kind: "title",
+    id: "chapter-historia",
+    heading: "A nossa",
+    accent: "história",
+    durationSeconds: 4,
   },
   {
     kind: "page",
@@ -103,6 +119,13 @@ export const SCENES: SceneDef[] = [
     zoom: "out",
   },
   {
+    kind: "title",
+    id: "chapter-momentos",
+    heading: "Os nossos",
+    accent: "momentos",
+    durationSeconds: 3.5,
+  },
+  {
     kind: "page",
     id: "galeria",
     label: "Galeria",
@@ -121,8 +144,8 @@ export const SCENES: SceneDef[] = [
   },
 ];
 
-export const INTRO_SECONDS = 4.5;
-export const OUTRO_SECONDS = 6;
+export const INTRO_SECONDS = 5;
+export const OUTRO_SECONDS = 7;
 
 export const PAGE_SCENES = SCENES.filter((s) => s.kind === "page");
 

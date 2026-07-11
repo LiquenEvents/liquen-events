@@ -138,7 +138,7 @@ export const SERVICES: ServiceDetail[] = [
       "/imagens/DaniGui_JantarFesta_11.jpg",
       "/imagens/DaniGui_JantarFesta_27.jpg",
       "/imagens/DaniGui_JantarFesta_17.jpg",
-      "/imagens/DaniGui_Adois_57.jpg",
+      "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
     ],
     faqs: [
       {
@@ -161,7 +161,7 @@ export const SERVICES: ServiceDetail[] = [
       "gala awards",
       "evento de prestígio Alentejo",
     ],
-    hero: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg",
+    hero: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
     intro: [
       "Para os momentos que pedem sofisticação, organizamos jantares de gala e eventos sociais de prestígio em Lisboa e por todo o Portugal.",
       "Mesa posta premium, chef convidado, wine pairing e animação ao vivo — uma experiência cuidada ao pormenor, com a coordenação impecável que um evento de gala exige.",
@@ -178,7 +178,7 @@ export const SERVICES: ServiceDetail[] = [
       "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg",
       "/imagens/EW1_1404.jpg",
       "/imagens/M&F0512.jpg",
-      "/imagens/DaniGui_JantarFesta_18.jpg",
+      "/imagens/EW1_1393.jpg",
     ],
     faqs: [],
     related: ["eventos-corporativos", "casamentos"],

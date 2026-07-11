@@ -31,12 +31,15 @@ beforeEach(() => {
 });
 
 describe("POST /api/contacto", () => {
-  it("sends the enquiry (email + push) for a valid submission", async () => {
+  it("sends the enquiry (email + push) and a confirmation to the client", async () => {
     const res = await POST(postReq(valid));
     expect(res.status).toBe(200);
-    expect(mail.send).toHaveBeenCalledTimes(1);
-    const sent = (mail.send.mock.calls as unknown as Array<[Record<string, unknown>]>)[0][0];
-    expect(sent).toMatchObject({ replyTo: "ana@example.com" });
+    expect(mail.send).toHaveBeenCalledTimes(2);
+    const calls = mail.send.mock.calls as unknown as Array<[Record<string, unknown>]>;
+    // 1st: team notification (reply goes to the client)…
+    expect(calls[0][0]).toMatchObject({ replyTo: "ana@example.com" });
+    // …2nd: confirmation TO the client.
+    expect(calls[1][0]).toMatchObject({ to: "ana@example.com" });
     expect(push.send).toHaveBeenCalledTimes(1);
   });
 

@@ -102,6 +102,13 @@ create table if not exists public.push_subscriptions (
   created_at  timestamptz not null default now()
 );
 
+-- ── Estado operacional (marcadores pequenos, ex.: último email notificado) ──
+create table if not exists public.app_state (
+  key         text primary key,
+  value       jsonb,
+  updated_at  timestamptz not null default now()
+);
+
 -- ── Segurança ───────────────────────────────────────────────────
 -- Ativamos RLS sem políticas públicas: só o servidor (service_role key,
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.
@@ -111,3 +118,4 @@ alter table public.tasks     enable row level security;
 alter table public.suppliers enable row level security;
 alter table public.calendar_events enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.app_state enable row level security;

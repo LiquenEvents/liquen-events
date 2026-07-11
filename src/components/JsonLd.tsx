@@ -6,12 +6,19 @@ export function JsonLd({ data }: { data: Record<string, unknown> }) {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />;
 }
 
-/** Breadcrumb trail structured data. Pass [{name, path}] from home onward. */
-export function BreadcrumbJsonLd({ items }: { items: { name: string; path: string }[] }) {
+/** Breadcrumb trail structured data. Pass [{name, path}] from home onward.
+    `homeName` lets pages localize the root crumb (defaults to Portuguese). */
+export function BreadcrumbJsonLd({
+  items,
+  homeName = "Início",
+}: {
+  items: { name: string; path: string }[];
+  homeName?: string;
+}) {
   const data = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [{ name: "Início", path: "/" }, ...items].map((item, i) => ({
+    itemListElement: [{ name: homeName, path: "/" }, ...items].map((item, i) => ({
       "@type": "ListItem",
       position: i + 1,
       name: item.name,

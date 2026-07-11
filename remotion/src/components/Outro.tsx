@@ -74,6 +74,14 @@ export const Outro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
   const glowPulse = 0.5 + 0.5 * Math.sin(frame * 0.045);
   const sceneScale = 1 + frame * 0.0005;
 
+  // CTA rhythmic pulse
+  const ctaScalePulse = 1 + 0.009 * Math.sin(frame * 0.15);
+  const ctaGlowPulse = 0.35 + 0.16 * Math.abs(Math.sin(frame * 0.15));
+
+  // Continuous slow shimmer on logo after it fades in
+  const logoShimmerX = logoIn > 0.9 ? ((frame * 0.65) % 170) - 25 : -100;
+  const logoShimmerOpacity = logoIn > 0.9 ? 0.1 : 0;
+
   const fadeOut = interpolate(frame, [totalFrames - 22, totalFrames - 2], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -148,7 +156,11 @@ export const Outro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
             filter: `blur(${logoBlur}px) drop-shadow(0 0 50px rgba(99,122,95,0.3))`,
           }}
         >
-          <LogoLockup width={360 * k * (portrait ? 1.2 : 1)} />
+          <LogoLockup
+            width={360 * k * (portrait ? 1.2 : 1)}
+            shimmerX={logoShimmerX}
+            shimmerOpacity={logoShimmerOpacity}
+          />
         </div>
 
         {/* Gold line */}
@@ -167,13 +179,13 @@ export const Outro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
           style={{
             marginTop: 36,
             opacity: ctaIn,
-            transform: `translateY(${(1 - ctaIn) * 16}px) scale(${0.94 + ctaIn * 0.06})`,
+            transform: `translateY(${(1 - ctaIn) * 16}px) scale(${(0.94 + ctaIn * 0.06) * ctaScalePulse})`,
             position: "relative",
             overflow: "hidden",
             background: COLORS.moss,
             borderRadius: 2,
             padding: "20px 52px",
-            boxShadow: "0 18px 50px rgba(99,122,95,0.35), 0 4px 18px rgba(0,0,0,0.4)",
+            boxShadow: `0 18px 50px rgba(99,122,95,${ctaGlowPulse}), 0 4px 18px rgba(0,0,0,0.4)`,
           }}
         >
           <span
@@ -199,37 +211,51 @@ export const Outro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
           />
         </div>
 
-        {/* Domain + Instagram */}
+        {/* Domain + Instagram + Location */}
         <div
           style={{
             marginTop: 34,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
-            gap: 22,
+            gap: 10,
             opacity: metaIn,
           }}
         >
+          <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
+            <span
+              style={{
+                color: "rgba(247,244,238,0.5)",
+                fontSize: 14,
+                letterSpacing: "0.4em",
+                textTransform: "uppercase",
+                fontFamily: SANS,
+              }}
+            >
+              {SITE_DOMAIN}
+            </span>
+            <span style={{ color: "rgba(247,244,238,0.18)" }}>·</span>
+            <span
+              style={{
+                color: "rgba(247,244,238,0.5)",
+                fontSize: 14,
+                letterSpacing: "0.18em",
+                fontFamily: SANS,
+              }}
+            >
+              @liquen.events
+            </span>
+          </div>
           <span
             style={{
-              color: "rgba(247,244,238,0.5)",
-              fontSize: 14,
-              letterSpacing: "0.4em",
+              color: "rgba(247,244,238,0.28)",
+              fontSize: 11,
+              letterSpacing: "0.48em",
               textTransform: "uppercase",
               fontFamily: SANS,
             }}
           >
-            {SITE_DOMAIN}
-          </span>
-          <span style={{ color: "rgba(247,244,238,0.18)" }}>·</span>
-          <span
-            style={{
-              color: "rgba(247,244,238,0.5)",
-              fontSize: 14,
-              letterSpacing: "0.18em",
-              fontFamily: SANS,
-            }}
-          >
-            @liquen.events
+            Évora · Portugal · 2026
           </span>
         </div>
       </AbsoluteFill>

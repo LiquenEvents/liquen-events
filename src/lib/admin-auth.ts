@@ -32,6 +32,15 @@ export const ADMIN_NAME_COOKIE = "liquen_user";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
+// Global session revocation. Tokens embed the version they were minted with;
+// bumping SESSION_VERSION (any new string) invalidates EVERY outstanding
+// session at once — the recovery lever for a leaked cookie or a departure,
+// without having to rotate SESSION_SECRET. Tokens minted before this claim
+// existed count as version "1".
+function sessionVersion(): string {
+  return process.env.SESSION_VERSION || "1";
+}
+
 // bcrypt hash of "liquen2026" — the dev/default shared password. Override in
 // production with ADMIN_PASSWORD_HASH (or switch to per-user ADMIN_USERS).
 const DEV_SHARED_HASH = "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u";
@@ -165,7 +174,7 @@ function sign(body: string): string {
 
 /** Mint a signed, expiring session token for the given user name. */
 export function createSession(name: string): string {
-  const payload = { sub: name.slice(0, 40), exp: Date.now() + SESSION_TTL_MS };
+  const payload = { sub: name.slice(0, 40), exp: Date.now() + SESSION_TTL_MS, v: sessionVersion() };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(body)}`;
 }
@@ -184,6 +193,8 @@ export function readSession(token: string | undefined | null): { name: string } 
   try {
     const payload = JSON.parse(Buffer.from(body, "base64url").toString());
     if (typeof payload.exp !== "number" || Date.now() > payload.exp) return null;
+    // Revoked generation? Tokens minted before the claim existed are "1".
+    if (String(payload.v ?? "1") !== sessionVersion()) return null;
     return { name: String(payload.sub ?? "") };
   } catch {
     return null;

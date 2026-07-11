@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
+import { blurFor } from "@/lib/blur";
 import { useTranslations } from "@/components/LocaleProvider";
 
 /**
@@ -121,7 +122,9 @@ export default function OrcamentoForm() {
       const res = await fetch("/api/orcamento", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form }),
+        // O honeypot segue no payload para o servidor também poder descartar
+        // bots que preencham o campo (a guarda no cliente é contornável).
+        body: JSON.stringify({ form, website }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.id) throw new Error(json?.error || "falha");
@@ -157,14 +160,15 @@ export default function OrcamentoForm() {
     "w-full bg-transparent border-b border-foreground/15 pb-3.5 text-base text-foreground placeholder-foreground/20 focus:outline-none focus:border-moss/55 transition-colors duration-300";
   const labelCls =
     "block text-[10px] text-foreground/55 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
-  const hintCls = "mt-2 text-[11px] tracking-wide text-gold/80";
+  const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr]">
       {/* ── Painel imagem (esquerda) ── */}
       <aside className="relative hidden lg:block overflow-hidden">
         <Image
-          src="/imagens/DaniGui_Adois_61.jpg"
+          src="/imagens/DaniGui_JantarFesta_1.jpg"
+          {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
           alt="Evento Líquen Events"
           fill
           preload

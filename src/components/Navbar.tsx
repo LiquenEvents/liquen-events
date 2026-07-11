@@ -6,10 +6,22 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
+import { SITE } from "@/lib/site";
+
+// Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
+// item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
+// para a direita. Ver PageTransition + .vt-page-fwd/bwd em globals.css.
+const NAV_ORDER = ["/", "/sobre", "/servicos", "/galeria", "/clientes", "/contacto"];
+function orderIdx(path: string): number {
+  if (path === "/") return 0;
+  const i = NAV_ORDER.findIndex((o) => o !== "/" && (path === o || path.startsWith(`${o}/`)));
+  return i === -1 ? 0 : i;
+}
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const pathname = usePathname();
   const { t } = useTranslations();
 
@@ -30,15 +42,30 @@ export default function Navbar() {
     pathname === "/clientes" ||
     pathname === "/contacto" ||
     pathname.startsWith("/servicos/");
-  const light = !scrolled && overDarkHero;
+  // O overlay do menu mobile é escuro — com ele aberto o traço do botão e os
+  // textos da barra precisam do tratamento claro, seja qual for a página.
+  const light = (!scrolled && overDarkHero) || isOpen;
+
+  const navTypes = (href: string) => [
+    orderIdx(href) >= orderIdx(pathname) ? "nav-forward" : "nav-back",
+  ];
 
   useEffect(() => {
     let frame = 0;
+    let lastY = window.scrollY;
     const onScroll = () => {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        setScrolled(window.scrollY > 30);
+        const y = window.scrollY;
+        setScrolled(y > 30);
+        // Hide when scrolling down past the hero, reveal on the first upward
+        // intent — content gets the full stage, navigation is always one
+        // gesture away. Small deltas are ignored so it never flickers.
+        const delta = y - lastY;
+        if (y < 200 || delta < -6) setHidden(false);
+        else if (delta > 6) setHidden(true);
+        lastY = y;
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -52,22 +79,32 @@ export default function Navbar() {
     setIsOpen(false);
   }, [pathname]);
 
-  // Lock background scroll while the mobile menu is open.
+  // Lock background scroll while the mobile menu is open. The body attribute
+  // also hides floating UI (WhatsApp) via CSS so nada flutua sobre o menu.
   useEffect(() => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.body.dataset.menuOpen = "true";
     return () => {
       document.body.style.overflow = prev;
+      delete document.body.dataset.menuOpen;
     };
   }, [isOpen]);
 
   return (
     <nav
       data-public-nav
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-all duration-500 ${
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ${
+        // NB: nada de "translate-y-0" no estado visível — QUALQUER transform no
+        // nav cria um containing block e prenderia o overlay fixed inset-0 do
+        // menu mobile à altura da barra em vez do viewport inteiro.
+        hidden && !isOpen ? "-translate-y-full" : ""
+      } ${
+        // blur de 6px (não 12) + fundo mais opaco: visual igual, metade do
+        // custo de repintar o backdrop a cada frame de scroll.
         scrolled
-          ? "bg-surface/55 backdrop-blur-md border-b border-foreground/8 shadow-sm shadow-black/5"
+          ? "bg-surface/75 backdrop-blur-[6px] border-b border-foreground/8 shadow-sm shadow-black/5"
           : "bg-transparent border-b border-transparent"
       }`}
     >
@@ -80,7 +117,7 @@ export default function Navbar() {
       )}
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
         <div
-          className={`relative flex items-center justify-between transition-all duration-500 ${
+          className={`relative flex items-center justify-between transition-[height] duration-500 ${
             scrolled ? "h-[72px]" : "h-[140px]"
           }`}
         >
@@ -93,7 +130,7 @@ export default function Navbar() {
               alt="Líquen Events"
               width={210}
               height={125}
-              className={`object-contain w-auto transition-all duration-500 ${scrolled ? "h-[52px]" : "h-[120px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${scrolled ? "h-[52px]" : "h-[120px]"}`}
               preload
             />
           </Link>
@@ -103,6 +140,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                transitionTypes={navTypes(link.href)}
                 aria-current={pathname === link.href ? "page" : undefined}
                 className={`link-line text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                   light
@@ -127,6 +165,7 @@ export default function Navbar() {
             />
             <Link
               href="/contacto"
+              transitionTypes={navTypes("/contacto")}
               className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
                 light
                   ? "border-white/35 text-white/90 hover:border-white/70 hover:bg-white/10"
@@ -146,7 +185,7 @@ export default function Navbar() {
           <button
             className="lg:hidden p-3 -mr-2 ml-auto"
             onClick={() => setIsOpen(!isOpen)}
-            aria-label="Menu"
+            aria-label={t.nav.menuLabel}
             aria-expanded={isOpen}
           >
             <span
@@ -162,65 +201,95 @@ export default function Navbar() {
         </div>
       </div>
 
+      {/* ── Menu mobile — overlay a ecrã inteiro, tipografia display em cascata ── */}
       <div
-        className={`lg:hidden overflow-y-auto overscroll-contain transition-all duration-400 bg-surface/96 backdrop-blur-md border-t border-foreground/6 ${
-          isOpen ? "max-h-[80vh] pb-8" : "max-h-0"
+        aria-hidden={!isOpen}
+        className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#10140f] transition-[opacity,visibility] duration-500 ${
+          isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
         }`}
       >
-        <div className="px-6 pt-6 flex flex-col">
-          <Link
-            href="/orcamento"
-            className="mb-5 inline-block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-cream px-5 py-3.5 rounded-sm"
+        {/* Vinheta subtil — profundidade sem sujar o fundo */}
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[radial-gradient(90%_55%_at_50%_0%,rgba(99,122,95,0.10),transparent_70%)]"
+        />
+
+        <nav className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain">
+          <p
+            className="text-cream/30 text-[10px] tracking-[0.45em] uppercase flex items-center gap-3 mb-6"
             style={{
               opacity: isOpen ? 1 : 0,
-              transform: isOpen ? "none" : "translateY(6px)",
-              transition: isOpen
-                ? "opacity 0.3s ease 50ms, transform 0.3s ease 50ms"
-                : "opacity 0.1s ease, transform 0.1s ease",
+              transition: isOpen ? "opacity 0.5s ease 100ms" : "opacity 0.15s ease",
             }}
+          >
+            <span className="w-6 h-px bg-gold/60 flex-shrink-0" />
+            {t.nav.menuLabel}
+          </p>
+          {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
+            const active = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                transitionTypes={navTypes(link.href)}
+                aria-current={active ? "page" : undefined}
+                className="group flex items-center justify-between gap-4 py-[18px] border-b border-white/[0.07]"
+                style={{
+                  opacity: isOpen ? 1 : 0,
+                  transform: isOpen ? "none" : "translateY(22px)",
+                  transition: isOpen
+                    ? `opacity 0.5s cubic-bezier(0.16,1,0.3,1) ${150 + i * 55}ms, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${150 + i * 55}ms`
+                    : "opacity 0.15s ease, transform 0.15s ease",
+                }}
+              >
+                <span
+                  className={`text-[clamp(24px,6vw,32px)] leading-none transition-colors duration-300 ${
+                    active ? "text-moss-light" : "text-cream group-hover:text-moss-light"
+                  }`}
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {link.label}
+                </span>
+                <span className="text-cream/22 text-[10px] tracking-[0.3em] tabular-nums">
+                  0{i + 1}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div
+          className="relative px-8 pb-10 flex flex-col gap-7"
+          style={{
+            opacity: isOpen ? 1 : 0,
+            transform: isOpen ? "none" : "translateY(16px)",
+            transition: isOpen
+              ? "opacity 0.5s cubic-bezier(0.16,1,0.3,1) 460ms, transform 0.5s cubic-bezier(0.16,1,0.3,1) 460ms"
+              : "opacity 0.15s ease, transform 0.15s ease",
+          }}
+        >
+          <Link
+            href="/orcamento"
+            className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-cream px-5 py-4 rounded-sm"
           >
             {t.nav.pedirOrcamento} →
           </Link>
-          {links.map((link, i) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={pathname === link.href ? "page" : undefined}
-              className={`py-4 text-[11px] tracking-[0.22em] uppercase border-b border-foreground/6 ${
-                pathname === link.href ? "text-moss font-medium" : "text-moss/85 hover:text-moss"
-              }`}
-              style={{
-                opacity: isOpen ? 1 : 0,
-                transform: isOpen ? "none" : "translateY(6px)",
-                transition: isOpen
-                  ? `opacity 0.3s ease ${100 + i * 45}ms, transform 0.3s ease ${100 + i * 45}ms, color 0.3s`
-                  : "opacity 0.1s ease, transform 0.1s ease, color 0.3s",
-              }}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <Link
-            href="/contacto"
-            className="mt-4 inline-block text-center text-[11px] tracking-[0.22em] uppercase border border-foreground/15 text-foreground/60 px-5 py-3.5 rounded-sm hover:border-foreground/30 hover:text-foreground/78 transition-colors"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transform: isOpen ? "none" : "translateY(6px)",
-              transition: isOpen
-                ? `opacity 0.3s ease ${100 + links.length * 45}ms, transform 0.3s ease ${100 + links.length * 45}ms`
-                : "opacity 0.1s ease, transform 0.1s ease",
-            }}
-          >
-            {t.nav.contacto}
-          </Link>
-          <div
-            className="mt-6 flex justify-center"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen ? "opacity 0.3s ease 250ms" : "opacity 0.1s ease",
-            }}
-          >
-            <LanguageToggle />
+          <div className="flex items-end justify-between gap-4 border-t border-white/[0.07] pt-6">
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <a
+                href={`mailto:${SITE.email}`}
+                className="text-cream/40 hover:text-cream/75 text-[11px] tracking-wide transition-colors truncate"
+              >
+                {SITE.email}
+              </a>
+              <a
+                href={`tel:${SITE.phone}`}
+                className="text-cream/40 hover:text-cream/75 text-[11px] tracking-wide transition-colors"
+              >
+                {SITE.phoneDisplay}
+              </a>
+            </div>
+            <LanguageToggle light />
           </div>
         </div>
       </div>

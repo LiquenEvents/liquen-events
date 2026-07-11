@@ -20,8 +20,20 @@ const CHECKS: EnvCheck[] = [
     name: "ADMIN_PASSWORD_HASH",
     enables: "the shared admin password (else a dev default is used)",
   },
-  { name: "SUPABASE_URL", enables: "persistent storage (else local file in dev)" },
-  { name: "SUPABASE_SERVICE_ROLE_KEY", enables: "persistent storage writes" },
+  // Without Supabase in production the app silently falls back to local JSON
+  // files, which are EPHEMERAL on serverless — submissions would be lost on the
+  // next deploy/instance swap. That's data loss, not degradation: critical.
+  {
+    name: "SUPABASE_URL",
+    critical: true,
+    enables: "persistent storage (without it, prod data is written to ephemeral files and LOST)",
+  },
+  {
+    name: "SUPABASE_SERVICE_ROLE_KEY",
+    critical: true,
+    enables:
+      "persistent storage writes (without it, prod data is written to ephemeral files and LOST)",
+  },
   // Email is sent via SMTP/Nodemailer (see lib/mail.ts) — validate the vars the
   // app actually reads, not a Resend key that isn't used anywhere.
   { name: "SMTP_HOST", enables: "outbound email (contact + quote notifications)" },
@@ -29,6 +41,7 @@ const CHECKS: EnvCheck[] = [
   { name: "SMTP_PASS", enables: "outbound email (SMTP authentication)" },
   { name: "VAPID_PUBLIC_KEY", enables: "web push notifications" },
   { name: "VAPID_PRIVATE_KEY", enables: "web push notifications" },
+  { name: "SENTRY_DSN", enables: "error monitoring (Sentry, via lib/logger)" },
 ];
 
 let validated = false;

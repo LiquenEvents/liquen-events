@@ -24,6 +24,9 @@ import { eventCountdown, randomId, eur } from "./util";
 import { ViewSkeleton } from "./Skeleton";
 import EmptyState from "./EmptyState";
 
+// Quantos pedidos a lista renderiza de cada vez ("Mostrar mais" carrega o resto).
+const LIST_PAGE_SIZE = 50;
+
 // Each top-level view is a separate, mutually-exclusive surface — code-split
 // them so only the view the user actually opens ships its JS. This keeps the
 // back-office's initial load lean (8 of 9 views are deferred on first paint).
@@ -889,6 +892,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     userName,
   ]);
 
+  // Paginação incremental da lista: com centenas de pedidos, renderizar tudo
+  // degrada a página. Só o RENDER é paginado — exportar CSV, "selecionar
+  // todos" e contagens continuam a operar sobre a lista filtrada completa.
+  const [visibleCount, setVisibleCount] = useState(LIST_PAGE_SIZE);
+  useEffect(() => {
+    setVisibleCount(LIST_PAGE_SIZE);
+  }, [search, filterStatus, filterCategory, tagFilter, sort, showArchived, mineOnly]);
+  const visibleQuotes = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
   const pendingCount = activeQuotes.filter(
     (q) => q.status === "pendente" || q.status === "em_revisao",
   ).length;
@@ -1635,7 +1647,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     />
                   </div>
                 )}
-                {filtered.map((q) => {
+                {visibleQuotes.map((q) => {
                   const cat = CATEGORIES.find((c) => c.id === q.category);
                   const et =
                     q.category && q.eventType
@@ -1797,6 +1809,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     </div>
                   );
                 })}
+                {filtered.length > visibleCount && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((c) => c + LIST_PAGE_SIZE)}
+                    className="w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-foreground/70 bg-white border border-foreground/[0.08] rounded-xl hover:border-foreground/20 transition-colors"
+                  >
+                    Mostrar mais ({filtered.length - visibleCount} restante
+                    {filtered.length - visibleCount !== 1 ? "s" : ""})
+                  </button>
+                )}
               </div>
 
               {/* Detail — in-grid sticky panel on desktop, slide-over drawer on mobile */}
@@ -2362,7 +2384,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               {isDirty && !saving && (
                                 <p
                                   role="status"
-                                  className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold/80 -mb-1"
+                                  className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
                                 >
                                   <span className="w-1 h-1 rounded-full bg-gold/80" />
                                   Alterações por guardar

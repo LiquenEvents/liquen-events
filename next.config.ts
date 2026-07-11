@@ -18,6 +18,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
 
+  experimental: {
+    // React <ViewTransition> (View Transitions API): página-a-página com
+    // deslize direcional e morph thumbnail→lightbox na galeria. Browsers sem
+    // suporte navegam normalmente, apenas sem animação.
+    viewTransition: true,
+  },
+
   async headers() {
     const isDev = process.env.NODE_ENV !== "production";
 

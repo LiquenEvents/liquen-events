@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
+import Parallax from "@/components/Parallax";
 import { blurFor } from "@/lib/blur";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -25,19 +26,24 @@ export default async function GaleriaPage() {
   const t = getDictionary(locale);
   return (
     <>
-      <BreadcrumbJsonLd items={[{ name: "Galeria", path: "/galeria" }]} />
+      <BreadcrumbJsonLd
+        homeName={t.nav.inicio}
+        items={[{ name: t.nav.galeria, path: "/galeria" }]}
+      />
 
       {/* ── Immersive hero ── */}
       <section className="relative min-h-[68svh] lg:min-h-[80svh] flex flex-col justify-end overflow-hidden">
-        <Image
-          src="/imagens/DaniGui_Preview20.jpg"
-          alt="Galeria de eventos Líquen Events"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover object-center"
-          {...blurFor("/imagens/DaniGui_Preview20.jpg")}
-        />
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src="/imagens/DaniGui_Preview20.jpg"
+            alt="Galeria de eventos Líquen Events"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover object-center hero-settle"
+            {...blurFor("/imagens/DaniGui_Preview20.jpg")}
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-black/20" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-[#0b0b0b]/15 to-transparent" />
         {/* Extra readability gradient only behind the bottom-left text block */}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Quote } from "../../../orcamento/types";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
+import { quoteUpdateSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -67,12 +68,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "contractRef",
     "archived",
   ];
-  const updates: Partial<Quote> = {};
+  const picked: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) {
-      (updates as Record<string, unknown>)[key] = body[key];
+      picked[key] = body[key];
     }
   }
+
+  // Allowlist says WHICH fields may change; the schema validates the VALUES
+  // (status enum, numeric price, well-formed arrays) so nothing malformed is
+  // ever persisted and later breaks exports or revenue calculations.
+  const parsed = quoteUpdateSchema.safeParse(picked);
+  if (!parsed.success) {
+    return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
+  }
+  const updates = parsed.data as Partial<Quote>;
 
   try {
     const updated = await updateQuote(id, updates);

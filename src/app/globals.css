@@ -9,6 +9,10 @@
   --color-moss-dark: #4c6150;
   --color-gold: #d6ab3a;
   --color-gold-dark: #b88f28;
+  /* Gold as TEXT on white/cream. gold (~2:1) and gold-dark (~3:1) fail WCAG AA
+     for body text (4.5:1); this darker shade passes. Keep gold/gold-dark for
+     borders, icons and text on dark backgrounds. */
+  --color-gold-text: #8a6a1d;
   /* Public site paper surfaces — clean white.
      cream/cream-dark stay off-white: they're light text/accents on dark
      sections, not page backgrounds. */
@@ -408,6 +412,28 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   display: none;
 }
 
+/* Com o menu mobile aberto, os botões flutuantes cedem o palco ao menu. */
+body[data-menu-open] .whatsapp-fixed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. Pair with
+      Parallax (translate on the wrapper) — separate elements, so the two
+      transforms never fight. `both` keeps the final scale as the resting
+      state, preserving drift headroom for the parallax. ── */
+@keyframes hero-settle {
+  from {
+    transform: scale(1.14);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+.hero-settle {
+  animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ── Word-rise hero animation ── */
 @keyframes word-rise {
   from {
@@ -439,6 +465,100 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
      does NOT leave a lingering transform afterwards — a persistent transform
      would create a containing block and break position:fixed overlays inside. */
   animation: route-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* ── View Transitions (rotas + morph da galeria) ──
+   .vt-page       navegação sem direção: o conteúdo antigo sobe/desvanece,
+                  o novo chega de baixo (assimétrico: sair rápido, chegar calmo)
+   .vt-page-fwd/bwd  deslize direcional conforme a ordem do menu
+   .gallery-morph  par thumbnail→lightbox (blur a meio esconde interpolação) */
+::view-transition-old(.vt-page) {
+  animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both vt-depart;
+}
+::view-transition-new(.vt-page) {
+  animation: 480ms cubic-bezier(0.16, 1, 0.3, 1) 90ms both vt-arrive;
+}
+@keyframes vt-depart {
+  to {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+@keyframes vt-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
+::view-transition-old(.vt-page-fwd) {
+  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-left;
+}
+::view-transition-new(.vt-page-fwd) {
+  animation: 500ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both vt-in-right;
+}
+::view-transition-old(.vt-page-bwd) {
+  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-right;
+}
+::view-transition-new(.vt-page-bwd) {
+  animation: 500ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both vt-in-left;
+}
+@keyframes vt-out-left {
+  to {
+    opacity: 0;
+    transform: translateX(-56px);
+  }
+}
+@keyframes vt-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(56px);
+  }
+}
+@keyframes vt-out-right {
+  to {
+    opacity: 0;
+    transform: translateX(56px);
+  }
+}
+@keyframes vt-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-56px);
+  }
+}
+
+/* Saída do lightbox sem par (a miniatura destino não está renderizada):
+   desvanece em vez de desaparecer de repente. */
+::view-transition-old(.vt-lb) {
+  animation: 200ms ease-out both vt-fade-out;
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+::view-transition-group(.gallery-morph) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+::view-transition-image-pair(.gallery-morph) {
+  animation-name: vt-morph-blur;
+}
+@keyframes vt-morph-blur {
+  30% {
+    filter: blur(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }
 
 /* ── Magnetic / hover lift used across CTAs ── */
@@ -630,6 +750,10 @@ body:has([data-orcamento-mode]) .eyebrow {
     animation: none;
     opacity: 1;
   }
+  .hero-settle {
+    animation: none;
+    transform: scale(1.06);
+  }
   .lb-photo-in {
     animation: none;
   }
@@ -639,6 +763,153 @@ body:has([data-orcamento-mode]) .eyebrow {
   }
   .lb-progress {
     animation: none;
+  }
+}
+
+/* ── Galeria — revelação em cascata ao scroll ──
+   Os tiles do masonry sobem e desvanecem ao entrar no ecrã. Transform-only
+   (trabalho de compositor, não bloqueia o scroll). Termina em `transform: none`
+   — não deixa containing-block que interfira com o morph <ViewTransition> da
+   foto. Um IntersectionObserver partilhado (ver GaleriaClient) só acrescenta a
+   classe `.in`; a animação é toda CSS. */
+.g-reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  will-change: opacity, transform;
+}
+.g-reveal.in {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+/* Após revelar, larga o will-change (poupa memória de composição). */
+.g-reveal.done {
+  will-change: auto;
+}
+
+/* Fundo neutro (moss muito escuro) por baixo de cada foto da galeria, para que
+   um tile ainda sem imagem/blur nunca pisque a preto puro. */
+.g-tile {
+  background-color: #12160f;
+}
+
+/* Entrada escalonada do mosaico-herói. Acima da dobra → animação CSS pura (sem
+   IntersectionObserver, como as .anim-*). Termina em transform:none para não
+   deixar containing-block que afete o morph <ViewTransition> — mesmo cuidado
+   que a .g-reveal do masonry. */
+@keyframes g-hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.g-hero {
+  animation: g-hero-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) var(--hero-delay, 0ms) both;
+}
+
+/* Lightbox: o fundo escurece suavemente à entrada. A foto faz morph por cima,
+   por isso o preto é uma camada própria que só anima opacidade (nunca briga
+   com o <ViewTransition> da foto). */
+@keyframes lb-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.lb-backdrop {
+  animation: lb-backdrop-in 0.4s ease both;
+}
+
+/* A cromagem (barra, tira de miniaturas) entra com um leve atraso — deixa a
+   foto ser a primeira coisa a aparecer. */
+@keyframes lb-chrome-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.lb-chrome {
+  animation: lb-chrome-in 0.5s ease 0.12s both;
+}
+
+/* Camada da foto do lightbox — mola de volta ao largar o arrasto (fechar em
+   telemóvel). Enquanto o dedo arrasta, o JS põe .lb-dragging para seguir o
+   toque sem lag; ao largar, a transição trata do resto. */
+.lb-photo-layer {
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lb-photo-layer.lb-dragging {
+  transition: none;
+}
+
+/* Indicador de "a carregar mais" do scroll infinito — três pontos que pulsam
+   em sequência (só opacidade/transform → compositor). */
+@keyframes g-loading-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.g-loading-dot {
+  animation: g-loading-pulse 1.2s ease-in-out infinite;
+}
+.g-loading-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.g-loading-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Scrim suave por trás da barra superior do lightbox — legibilidade dos
+   controlos sobre fotos claras, sem escurecer a foto em si. */
+.lb-scrim {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
+}
+
+/* Fade da fila de filtros, só aplicada quando ela realmente transborda
+   (ver ResizeObserver em GaleriaClient) — sugere "há mais categorias, arrasta"
+   sem cortar o último pill em ecrãs onde tudo já cabe. */
+.g-filter-fade {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g-reveal {
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
+  /* Sem animação: os elementos ficam no seu estado natural (opacidade 1,
+     transform nenhum) porque a opacidade-0 vive só no keyframe. */
+  .g-hero,
+  .lb-backdrop,
+  .lb-chrome {
+    animation: none;
+  }
+  .lb-photo-layer {
+    transition: none;
+  }
+  .g-loading-dot {
+    animation: none;
+    opacity: 0.6;
   }
 }
 

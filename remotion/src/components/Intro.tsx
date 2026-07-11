@@ -54,6 +54,24 @@ export const Intro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
     extrapolateRight: "clamp",
   });
 
+  /* ── Second shimmer pass ── */
+  const shimmer2X = interpolate(frame, [110, 142], [-30, 140], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const shimmer2Opacity = interpolate(frame, [110, 116, 136, 142], [0, 0.65, 0.65, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const activeShimmerX = shimmerOpacity > 0.02 ? shimmerX : shimmer2X;
+  const activeShimmerOpacity = Math.max(shimmerOpacity, shimmer2Opacity);
+
+  /* ── Location text ── */
+  const locationIn = interpolate(frame, [72, 94], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
   /* ── Gold line + tagline ── */
   const lineWidth = interpolate(frame, [44, 72], [0, 340 * k], {
     extrapolateLeft: "clamp",
@@ -95,8 +113,8 @@ export const Intro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
       </AbsoluteFill>
 
       <GoldParticles
-        count={20}
-        maxOpacity={0.45}
+        count={30}
+        maxOpacity={0.55}
         opacity={interpolate(frame, [18, 50], [0, 1], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
@@ -120,7 +138,11 @@ export const Intro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
             filter: "drop-shadow(0 6px 30px rgba(0,0,0,0.55))",
           }}
         >
-          <LogoLockup width={logoW} shimmerX={shimmerX} shimmerOpacity={shimmerOpacity} />
+          <LogoLockup
+            width={logoW}
+            shimmerX={activeShimmerX}
+            shimmerOpacity={activeShimmerOpacity}
+          />
         </div>
 
         {/* Gold line */}
@@ -149,6 +171,23 @@ export const Intro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
           }}
         >
           Organização de Eventos
+        </p>
+
+        {/* Location */}
+        <p
+          style={{
+            color: "rgba(247,244,238,0.36)",
+            fontSize: (portrait ? 11 : 12) * (portrait ? 1 : k),
+            letterSpacing: "0.55em",
+            textTransform: "uppercase",
+            marginTop: 14,
+            fontFamily: SANS,
+            opacity: locationIn,
+            whiteSpace: "nowrap",
+            textShadow: "0 1px 8px rgba(0,0,0,0.8)",
+          }}
+        >
+          Évora · Portugal
         </p>
       </AbsoluteFill>
     </AbsoluteFill>

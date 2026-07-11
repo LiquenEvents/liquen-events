@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import Parallax from "@/components/Parallax";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "../services-data";
@@ -63,8 +64,9 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
   return (
     <>
       <BreadcrumbJsonLd
+        homeName={t.nav.inicio}
         items={[
-          { name: "Serviços", path: "/servicos" },
+          { name: t.nav.servicos, path: "/servicos" },
           { name: svc.title, path: `/servicos/${svc.slug}` },
         ]}
       />
@@ -77,15 +79,17 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
 
       {/* ── Hero ── */}
       <section className="relative min-h-[70vh] flex items-end overflow-hidden">
-        <Image
-          src={svc.hero}
-          {...blurFor(svc.hero)}
-          alt={svc.title}
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover"
-        />
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src={svc.hero}
+            {...blurFor(svc.hero)}
+            alt={svc.title}
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover hero-settle"
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
           <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/45 mb-8">

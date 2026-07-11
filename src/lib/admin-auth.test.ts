@@ -3,7 +3,12 @@ import bcrypt from "bcryptjs";
 import { verifyCredentials, createSession, readSession } from "./admin-auth";
 
 // Keep each test hermetic: auth reads env lazily, so reset what we touch.
-const ENV_KEYS = ["ADMIN_USERS", "ADMIN_PASSWORD_HASH", "SESSION_SECRET"] as const;
+const ENV_KEYS = [
+  "ADMIN_USERS",
+  "ADMIN_PASSWORD_HASH",
+  "SESSION_SECRET",
+  "SESSION_VERSION",
+] as const;
 let saved: Record<string, string | undefined>;
 
 beforeEach(() => {
@@ -84,7 +89,9 @@ describe("sessions — signed and expiring", () => {
   it("rejects a tampered payload", () => {
     const token = createSession("Catarina");
     const [, sig] = token.split(".");
-    const forged = Buffer.from(JSON.stringify({ sub: "Hacker", exp: Date.now() + 1e9 })).toString("base64url");
+    const forged = Buffer.from(JSON.stringify({ sub: "Hacker", exp: Date.now() + 1e9 })).toString(
+      "base64url",
+    );
     expect(readSession(`${forged}.${sig}`)).toBeNull();
   });
 
@@ -106,5 +113,21 @@ describe("sessions — signed and expiring", () => {
     const token = createSession("Catarina");
     vi.setSystemTime(new Date("2026-03-01T00:00:00Z")); // > 30 days later
     expect(readSession(token)).toBeNull();
+  });
+
+  it("revokes every outstanding session when SESSION_VERSION is bumped", () => {
+    const token = createSession("Catarina");
+    expect(readSession(token)).toEqual({ name: "Catarina" });
+    process.env.SESSION_VERSION = "2";
+    expect(readSession(token)).toBeNull();
+    // New sessions minted under the new version are valid again.
+    expect(readSession(createSession("Catarina"))).toEqual({ name: "Catarina" });
+  });
+
+  it("treats tokens without a version claim as version 1", () => {
+    // Pre-versioning token: payload has no `v`.
+    delete process.env.SESSION_VERSION;
+    const legacy = createSession("Catarina");
+    expect(readSession(legacy)).toEqual({ name: "Catarina" });
   });
 });

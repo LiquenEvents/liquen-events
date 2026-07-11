@@ -6,6 +6,8 @@ import Link from "next/link";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
+import { blurFor } from "@/lib/blur";
+import Parallax from "@/components/Parallax";
 import { useTranslations } from "@/components/LocaleProvider";
 
 // ── Data ─────────────────────────────────────────────────────────
@@ -262,20 +264,23 @@ export default function ContactForm() {
 
   const labelCls = "block text-[10px] text-foreground/68 tracking-[0.45em] uppercase mb-4";
 
-  const hintCls = "mt-2 text-[11px] tracking-wide text-gold/80";
+  const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
   return (
     <>
       {/* ── Hero ── */}
       <section className="relative overflow-hidden" style={{ height: "65svh", minHeight: "420px" }}>
-        <Image
-          src="/imagens/DJI_20250913190635_0120_D.jpg"
-          alt="Evento Líquen Events"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover"
-        />
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src="/imagens/DJI_20250913190635_0120_D.jpg"
+            {...blurFor("/imagens/DJI_20250913190635_0120_D.jpg")}
+            alt="Evento Líquen Events"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover hero-settle"
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
         <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
           <div className="max-w-7xl mx-auto w-full">

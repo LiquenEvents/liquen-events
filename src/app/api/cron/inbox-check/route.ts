@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
 import { imapConfigured, listInbox } from "@/lib/inbox";
 import { sendPushToAll } from "@/lib/push";
 import { isAuthed } from "@/lib/admin-auth";
+import { getState, setState } from "@/lib/app-state";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -15,30 +14,22 @@ export const maxDuration = 30;
  * proposal/lead that comes in by email (not the site form) still reaches the
  * phone/PC. Meant to be hit by a frequent cron (e.g. every few minutes).
  *
- * Dedupe: a marker file remembers the highest UID already notified. On the very
- * first run it just records the current top UID (no flood of historical mail);
- * thereafter it only notifies about messages newer than the marker.
+ * Dedupe: a persistent marker (lib/app-state — Supabase when configured, so it
+ * survives serverless deploys/instances) remembers the highest UID already
+ * notified. On the very first run it just records the current top UID (no
+ * flood of historical mail); thereafter it only notifies about newer messages.
  *
  * Requires IMAP to be configured (the IMAP_ / SMTP_ env vars). No-ops otherwise.
  * Protected by CRON_SECRET (Bearer); a logged-in admin may trigger it manually.
  */
-const MARKER_FILE = path.join(process.cwd(), "data", "inbox-marker.json");
+const MARKER_KEY = "inbox-last-uid";
 
 async function readMarker(): Promise<number | null> {
-  try {
-    const raw = JSON.parse(await fs.readFile(MARKER_FILE, "utf-8"));
-    return typeof raw?.lastUid === "number" ? raw.lastUid : null;
-  } catch {
-    return null;
-  }
+  const value = await getState<number>(MARKER_KEY);
+  return typeof value === "number" ? value : null;
 }
 async function writeMarker(lastUid: number): Promise<void> {
-  try {
-    await fs.mkdir(path.dirname(MARKER_FILE), { recursive: true });
-    await fs.writeFile(MARKER_FILE, JSON.stringify({ lastUid }, null, 2));
-  } catch (err) {
-    log.error("inbox-check: não foi possível gravar o marcador", err);
-  }
+  await setState(MARKER_KEY, lastUid);
 }
 
 function authorized(req: NextRequest): boolean {

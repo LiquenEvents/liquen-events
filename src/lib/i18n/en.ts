@@ -42,6 +42,8 @@ export const en: Dict = {
   },
 
   nav: {
+    inicio: "Home",
+    menuLabel: "Menu",
     sobre: "About",
     servicos: "Services",
     galeria: "Gallery",
@@ -171,6 +173,10 @@ export const en: Dict = {
     lbClose: "Close",
     lbPrev: "Previous photo",
     lbNext: "Next photo",
+    viewWedding: "View this wedding",
+    backToGallery: "All photos",
+    photosLabel: "photos",
+    backToTop: "Back to top",
   },
 
   clientes: {

@@ -10,6 +10,7 @@ const VARS = [
   "SMTP_PASS",
   "VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
+  "SENTRY_DSN",
 ] as const;
 
 /** validateEnv() is idempotent via a module-level flag, so each test needs a
@@ -64,6 +65,16 @@ describe("validateEnv", () => {
     const out = joined(errSpy);
     expect(out).toContain("Missing critical environment variables");
     expect(out).toContain("SESSION_SECRET");
+  });
+
+  it("treats missing Supabase as critical in production (data would be ephemeral)", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    for (const k of VARS) if (!k.startsWith("SUPABASE")) process.env[k] = "x";
+    (await freshValidate())();
+    const out = joined(errSpy);
+    expect(out).toContain("Missing critical environment variables");
+    expect(out).toContain("SUPABASE_URL");
+    expect(out).toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 
   it("is idempotent — repeated calls validate only once", async () => {

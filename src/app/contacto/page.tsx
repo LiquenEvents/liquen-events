@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import ContactForm from "./ContactForm";
 import FAQ from "./FAQ";
-import FaqJsonLd from "./FaqJsonLd";
 import AnimateIn from "@/components/AnimateIn";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import { pageMetadata } from "@/lib/page-metadata";
-import { BreadcrumbJsonLd } from "@/components/JsonLd";
+import { BreadcrumbJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
@@ -30,8 +29,13 @@ export default async function ContactoPage() {
   const steps = t.contacto.steps.map((s, i) => ({ step: `0${i + 1}`, ...s }));
   return (
     <>
-      <BreadcrumbJsonLd items={[{ name: "Contacto", path: "/contacto" }]} />
-      <FaqJsonLd />
+      <BreadcrumbJsonLd
+        homeName={t.nav.inicio}
+        items={[{ name: t.nav.contacto, path: "/contacto" }]}
+      />
+      {/* Same source as the visible <FAQ /> — Google requires the FAQPage
+          markup to match the on-page content, in the language being served. */}
+      <FaqJsonLd faqs={t.contacto.faqs} />
       <ContactForm />
 
       {/* ── Depoimentos ── */}

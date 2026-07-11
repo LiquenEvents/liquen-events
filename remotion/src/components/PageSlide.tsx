@@ -118,23 +118,47 @@ export const PageSlide: React.FC<Props> = ({
           justifyContent: "center",
         }}
       >
-        {/* Ghost word */}
+        {/* Ghost word — larger and slightly rotated for depth */}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
             top: "50%",
-            transform: `translateY(-50%) translateX(${wordDrift}px)`,
+            transform: `translateY(-50%) translateX(${wordDrift}px) rotate(-2deg)`,
             textAlign: "center",
             fontFamily: SERIF,
             fontStyle: "italic",
             fontWeight: 700,
-            fontSize: 290,
+            fontSize: 320,
             lineHeight: 1,
             color: "transparent",
-            WebkitTextStroke: "1.5px rgba(247,244,238,0.11)",
+            WebkitTextStroke: "1.5px rgba(247,244,238,0.13)",
             opacity: wordOpacity,
+            whiteSpace: "nowrap",
+            userSelect: "none",
+          }}
+        >
+          {word}
+        </div>
+
+        {/* Secondary ghost echo — smaller, opposite drift */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: "50%",
+            transform: `translateY(-15%) translateX(${-wordDrift * 0.4}px) rotate(1.5deg)`,
+            textAlign: "center",
+            fontFamily: SERIF,
+            fontStyle: "italic",
+            fontWeight: 700,
+            fontSize: 180,
+            lineHeight: 1,
+            color: "transparent",
+            WebkitTextStroke: "1px rgba(247,244,238,0.05)",
+            opacity: wordOpacity * 0.6,
             whiteSpace: "nowrap",
             userSelect: "none",
           }}

@@ -1,7 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal, updateProposal } from "@/lib/proposals-store";
-import { getQuote, updateQuote } from "@/lib/quotes-store";
+import { updateQuoteWith } from "@/lib/quotes-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
@@ -63,9 +64,8 @@ export async function POST(request: NextRequest) {
     // Advance the linked quote in the pipeline, recording the client's
     // decision in its activity log (the team's audit trail).
     try {
-      const quote = await getQuote(proposal.quoteId);
       const entry = {
-        id: Math.random().toString(36).slice(2, 10),
+        id: randomBytes(4).toString("hex"),
         at: respondedAt,
         kind: "status_change" as const,
         actor: proposal.clientName,
@@ -73,10 +73,13 @@ export async function POST(request: NextRequest) {
           ? `Proposta aceite pelo cliente (${eur(proposal.total)})`
           : "Proposta recusada pelo cliente",
       };
-      await updateQuote(proposal.quoteId, {
+      // Append on top of the freshly-read quote (with optimistic-locking retry)
+      // so a simultaneous edit in the back office can't drop this log entry.
+      await updateQuoteWith(proposal.quoteId, (quote) => ({
+        ...quote,
         status: accepted ? "aceite" : "rejeitado",
-        activityLog: [...(quote?.activityLog ?? []), entry],
-      });
+        activityLog: [...(quote.activityLog ?? []), entry],
+      }));
     } catch (e) {
       log.error("proposta: atualizar pedido falhou", e, { id: proposal.quoteId });
     }

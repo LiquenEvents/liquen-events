@@ -26,3 +26,9 @@ export const listQuotes = (): Promise<Quote[]> => repo.list();
 export const getQuote = (id: string): Promise<Quote | null> => repo.get(id);
 export const updateQuote = (id: string, updates: Partial<Quote>): Promise<Quote | null> =>
   repo.update(id, updates);
+/** Update derived from the freshly-read quote — use for appends (activity log,
+    payments…) so concurrent writers can't drop each other's entries. */
+export const updateQuoteWith = (
+  id: string,
+  mutate: (current: Quote) => Quote,
+): Promise<Quote | null> => repo.updateWith(id, mutate);

@@ -8,6 +8,11 @@ import {
 } from "remotion";
 import { COLORS, SANS, TRANSITION_FRAMES } from "../constants";
 
+function pr(seed: number) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 interface Props {
   /** File inside remotion/public, e.g. "footage.mp4" */
   src: string;
@@ -98,7 +103,7 @@ export const FootageInterlude: React.FC<Props> = ({
             height: "100%",
             objectFit: "cover",
             transform: `scale(${scale})`,
-            filter: "saturate(1.08) contrast(1.05)",
+            filter: "saturate(1.16) contrast(1.08)",
           }}
         />
       </AbsoluteFill>
@@ -107,18 +112,45 @@ export const FootageInterlude: React.FC<Props> = ({
       <AbsoluteFill
         style={{
           background:
-            "linear-gradient(to top, rgba(10,13,9,0.4) 0%, transparent 28%, transparent 72%, rgba(10,13,9,0.32) 100%)",
+            "linear-gradient(to top, rgba(10,13,9,0.48) 0%, transparent 28%, transparent 72%, rgba(10,13,9,0.38) 100%)",
           pointerEvents: "none",
         }}
       />
       <AbsoluteFill
         style={{
           background:
-            "radial-gradient(ellipse 120% 100% at 50% 50%, transparent 60%, rgba(76,97,80,0.18) 100%)",
+            "radial-gradient(ellipse 120% 100% at 50% 50%, transparent 58%, rgba(76,97,80,0.24) 100%)",
           mixBlendMode: "soft-light",
           pointerEvents: "none",
         }}
       />
+
+      {/* Cinematic bokeh — large, blurred, drifting light orbs */}
+      <AbsoluteFill style={{ pointerEvents: "none", overflow: "hidden", opacity: wipeT * 0.9 }}>
+        {Array.from({ length: 7 }).map((_, i) => {
+          const size = 100 + pr(i + 30) * 200;
+          const baseX = pr(i + 10) * width;
+          const baseY = pr(i + 20) * height;
+          const drift = frame * (0.05 + pr(i + 40) * 0.09);
+          const y =
+            ((((baseY - drift) % (height + size)) + (height + size)) % (height + size)) - size / 2;
+          return (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                left: baseX - size / 2,
+                top: y,
+                width: size,
+                height: size,
+                borderRadius: "50%",
+                background: `radial-gradient(circle, rgba(99,122,95,0.13) 0%, transparent 70%)`,
+                filter: `blur(${Math.round(size * 0.38)}px)`,
+              }}
+            />
+          );
+        })}
+      </AbsoluteFill>
 
       {/* Letterbox bars */}
       {BAR > 0 ? (
@@ -182,17 +214,17 @@ export const FootageInterlude: React.FC<Props> = ({
         </div>
       ) : null}
 
-      {/* Gold leading edge of the wipe */}
+      {/* Gold leading edge of the wipe — thicker, more glow */}
       <div
         style={{
           position: "absolute",
           top: 0,
           bottom: 0,
           left: `${wipeT * 100}%`,
-          width: 3,
-          marginLeft: -3,
+          width: 5,
+          marginLeft: -5,
           background: COLORS.gold,
-          boxShadow: "0 0 26px 4px rgba(214,171,58,0.55)",
+          boxShadow: "0 0 36px 8px rgba(214,171,58,0.70)",
           opacity: edgeOpacity,
         }}
       />

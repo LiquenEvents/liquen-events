@@ -54,3 +54,9 @@ next-env.d.ts
 /*.png
 /*.jpg
 /*.jpeg
+
+# Claude Code worktree artefacts (internos, não versionar)
+.claude/worktrees/
+
+# Remotion footage/render — vídeos pesados que excedem o limite do GitHub (>100MB)
+remotion/public/*.mp4

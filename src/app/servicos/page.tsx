@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import Parallax from "@/components/Parallax";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
@@ -78,7 +79,7 @@ const categoryMeta = [
       { slug: "casamentos", image: "/imagens/DaniGui_Preview18.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_11.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_1.jpg" },
-      { slug: "jantares-de-gala", image: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg" },
+      { slug: "jantares-de-gala", image: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg" },
     ],
   },
 ];
@@ -309,7 +310,10 @@ export default async function ServicosPage() {
   });
   return (
     <>
-      <BreadcrumbJsonLd items={[{ name: "Serviços", path: "/servicos" }]} />
+      <BreadcrumbJsonLd
+        homeName={t.nav.inicio}
+        items={[{ name: t.nav.servicos, path: "/servicos" }]}
+      />
       <ServiceJsonLd
         name="Organização de eventos, casamentos e eventos corporativos"
         description="Organização de casamentos, eventos corporativos, conferências e celebrações em Lisboa e todo o Portugal — da decoração à coordenação."
@@ -318,15 +322,17 @@ export default async function ServicosPage() {
 
       {/* ── HERO — full-bleed immersive ── */}
       <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
-        <Image
-          src="/imagens/EW1_1330.jpg"
-          alt="Evento organizado pela Líquen Events ao final do dia"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover object-center"
-          {...blurFor("/imagens/EW1_1330.jpg")}
-        />
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src="/imagens/EW1_1330.jpg"
+            alt="Evento organizado pela Líquen Events ao final do dia"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover object-center hero-settle"
+            {...blurFor("/imagens/EW1_1330.jpg")}
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />

@@ -7,6 +7,10 @@
     "render": "remotion render Walkthrough out/walkthrough.mp4",
     "render:vertical": "remotion render WalkthroughVertical out/walkthrough-vertical.mp4",
     "render:preview": "remotion render Walkthrough out/walkthrough.mp4 --codec=h264 --crf=23",
+    "render:h265": "remotion render Walkthrough out/walkthrough-h265.mp4 --codec=h265 --crf=16",
+    "render:prores": "remotion render Walkthrough out/walkthrough-prores.mov --codec=prores --prores-profile=3",
+    "render:vertical:h265": "remotion render WalkthroughVertical out/walkthrough-vertical-h265.mp4 --codec=h265 --crf=16",
+    "render:vertical:prores": "remotion render WalkthroughVertical out/walkthrough-vertical-prores.mov --codec=prores --prores-profile=3",
     "capture": "tsx scripts/capture.ts",
     "thumbs": "node scripts/thumbs.mjs"
   },

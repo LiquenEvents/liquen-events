@@ -4,8 +4,11 @@
  * Emits one JSON line per event in production (easy to grep/ingest in Vercel
  * logs or any log drain) and a readable line in development. Zero dependencies.
  *
- * Sentry-ready: if you later add the Sentry SDK, forward from `error()` — the
- * call sites already pass structured context, so no app changes are needed.
+ * Error monitoring: set SENTRY_DSN and every error-level log is also captured
+ * in Sentry (grouping, alert rules, history) via the plain envelope HTTP API —
+ * no SDK dependency. ERROR_WEBHOOK_URL additionally posts errors to a
+ * Slack/Discord webhook for real-time pings. Both are fire-and-forget:
+ * observability must never become a failure mode.
  */
 type Level = "debug" | "info" | "warn" | "error";
 type Context = Record<string, unknown>;
@@ -43,6 +46,60 @@ function alertWebhook(message: string, context: Context | undefined, err: unknow
   }).catch(() => {});
 }
 
+// Sentry via the envelope HTTP API. DSN format: https://KEY@HOST/PROJECT_ID.
+// Same per-message throttle spirit as the webhook: a hot error loop shouldn't
+// hammer the ingest endpoint (Sentry also rate-limits server-side).
+const recentSentry = new Map<string, number>();
+
+function sentryCapture(message: string, context: Context | undefined, err: unknown) {
+  const dsn = process.env.SENTRY_DSN;
+  if (!dsn) return;
+  const m = dsn.match(/^https:\/\/([^@:]+)@([^/]+)\/(\d+)$/);
+  if (!m) return;
+  const [, key, host, projectId] = m;
+
+  const now = Date.now();
+  const last = recentSentry.get(message);
+  if (last && now - last < 30_000) return;
+  if (recentSentry.size > 200) recentSentry.clear();
+  recentSentry.set(message, now);
+
+  const eventId = globalThis.crypto.randomUUID().replace(/-/g, "");
+  const sentAt = new Date().toISOString();
+  const event = {
+    event_id: eventId,
+    timestamp: sentAt,
+    platform: "javascript",
+    level: "error",
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development",
+    logger: "liquen",
+    message: { formatted: message },
+    extra: {
+      ...context,
+      ...(err instanceof Error ? { stack: err.stack } : {}),
+    },
+    exception:
+      err instanceof Error
+        ? { values: [{ type: err.name, value: err.message }] }
+        : err !== undefined
+          ? { values: [{ type: "Error", value: String(err) }] }
+          : undefined,
+  };
+
+  // Envelope = 3 newline-separated JSON lines: headers, item header, payload.
+  const envelope = `${JSON.stringify({ event_id: eventId, sent_at: sentAt })}\n${JSON.stringify({ type: "event" })}\n${JSON.stringify(event)}`;
+
+  void fetch(`https://${host}/api/${projectId}/envelope/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-sentry-envelope",
+      "X-Sentry-Auth": `Sentry sentry_version=7, sentry_key=${key}, sentry_client=liquen-logger/1.0`,
+    },
+    body: envelope,
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => {});
+}
+
 function emit(level: Level, message: string, context?: Context, err?: unknown) {
   const entry: Record<string, unknown> = {
     level,
@@ -67,7 +124,10 @@ function emit(level: Level, message: string, context?: Context, err?: unknown) {
     if (err) sink(err);
   }
 
-  if (level === "error") alertWebhook(message, context, err);
+  if (level === "error") {
+    alertWebhook(message, context, err);
+    sentryCapture(message, context, err);
+  }
 }
 
 export const log = {

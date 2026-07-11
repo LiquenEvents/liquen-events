@@ -1,7 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import type { Quote, QuoteFormData, PriceBreakdown } from "../../orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../../orcamento/data";
 import { sendMail, esc } from "@/lib/mail";
+import { buildClientConfirmation } from "@/lib/client-confirmation";
+import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
 import { createQuote, listQuotes } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { sendPushToAll } from "@/lib/push";
@@ -13,7 +16,10 @@ export const maxDuration = 30;
 
 function generateId(): string {
   const now = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  // crypto-sourced randomness — Math.random is guessable and collision-prone.
+  const rand = Array.from(randomBytes(4), (b) => (b % 36).toString(36))
+    .join("")
+    .toUpperCase();
   return `LIQ-${now}-${rand}`;
 }
 
@@ -81,6 +87,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null);
+    // Honeypot: a real visitor never fills the hidden "website" field. If it's
+    // set, this is a bot — pretend success and drop it silently. (Mirrors the
+    // same server-side check in /api/contacto; client-side alone is bypassable.)
+    if (body && typeof body === "object" && (body as Record<string, unknown>).website) {
+      return NextResponse.json({ id: generateId(), status: "ok" });
+    }
     const parsed = quotePayloadSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
@@ -109,6 +121,15 @@ export async function POST(request: NextRequest) {
       });
     } catch (mailErr) {
       log.error("orcamento: email falhou", mailErr, { id });
+    }
+
+    // Confirmation to the client, in the language they were browsing in.
+    try {
+      const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
+      const confirmation = buildClientConfirmation({ locale, name: form.name, referenceId: id });
+      await sendMail({ to: form.email, ...confirmation });
+    } catch (mailErr) {
+      log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
     }
 
     // Persist (Supabase when configured; local file in dev).

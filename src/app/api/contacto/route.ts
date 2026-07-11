@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendMail, esc } from "@/lib/mail";
+import { buildClientConfirmation } from "@/lib/client-confirmation";
+import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { contactSchema, firstError } from "@/lib/validation";
@@ -60,6 +62,15 @@ export async function POST(request: NextRequest) {
       });
     } catch (mailErr) {
       log.error("contacto: email falhou", mailErr);
+    }
+
+    // Confirmation to the client, in the language they were browsing in.
+    try {
+      const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
+      const confirmation = buildClientConfirmation({ locale, name: form.nome });
+      await sendMail({ to: form.email, ...confirmation });
+    } catch (mailErr) {
+      log.error("contacto: email de confirmação ao cliente falhou", mailErr);
     }
 
     try {

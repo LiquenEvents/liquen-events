@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import Parallax from "@/components/Parallax";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
@@ -40,7 +41,7 @@ const mosaicItems = [
     cls: "col-span-4 row-span-1",
   },
   {
-    src: "/imagens/JOAO_E_PEDRO_IMGL2180.jpg",
+    src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
     alt: "Jantar de gala",
     label: "Gala",
     cls: "col-span-3 row-span-1",
@@ -52,7 +53,7 @@ const mosaicItems = [
     cls: "col-span-4 row-span-1",
   },
   {
-    src: "/imagens/DaniGui_Adois_57.jpg",
+    src: "/imagens/M&F0512.jpg",
     alt: "Jantar de gala",
     label: "Jantar",
     cls: "col-span-3 row-span-1",
@@ -77,19 +78,24 @@ export default async function ClientesPage() {
   const testimonials = t.clientes.testimonials;
   return (
     <>
-      <BreadcrumbJsonLd items={[{ name: "Clientes", path: "/clientes" }]} />
+      <BreadcrumbJsonLd
+        homeName={t.nav.inicio}
+        items={[{ name: t.nav.clientes, path: "/clientes" }]}
+      />
 
       {/* ── HERO ── */}
       <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
-        <Image
-          src="/imagens/EW1_1393.jpg"
-          alt="Evento corporativo Líquen Events"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover object-center"
-          {...blurFor("/imagens/EW1_1393.jpg")}
-        />
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src="/imagens/EW1_1393.jpg"
+            alt="Evento corporativo Líquen Events"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover object-center hero-settle"
+            {...blurFor("/imagens/EW1_1393.jpg")}
+          />
+        </Parallax>
         <div className="absolute inset-0 bg-black/50" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />

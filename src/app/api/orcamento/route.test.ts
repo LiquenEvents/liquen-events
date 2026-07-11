@@ -22,6 +22,9 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 import { POST, GET } from "./route";
+import { sendMail } from "@/lib/mail";
+
+const sendMailMock = vi.mocked(sendMail);
 
 function req(method: "POST" | "GET", body?: unknown): NextRequest {
   return new Request("https://liquen.test/api/orcamento", {
@@ -47,6 +50,23 @@ describe("POST /api/orcamento", () => {
     expect(json.status).toBe("ok");
     expect(json.id).toMatch(/^LIQ-/);
     expect(store.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a confirmation email to the client, after the team notification", async () => {
+    const res = await POST(req("POST", { form: validForm }));
+    expect(res.status).toBe(200);
+    expect(sendMailMock).toHaveBeenCalledTimes(2);
+    expect(sendMailMock.mock.calls[0][0]).toMatchObject({ replyTo: validForm.email });
+    expect(sendMailMock.mock.calls[1][0]).toMatchObject({ to: validForm.email });
+  });
+
+  it("silently drops a honeypot hit without persisting or emailing", async () => {
+    const res = await POST(req("POST", { form: validForm, website: "i-am-a-bot" }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.status).toBe("ok"); // indistinguishable from success, to the bot
+    expect(store.create).not.toHaveBeenCalled();
+    expect(sendMailMock).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid payload (name too short) with 400", async () => {
