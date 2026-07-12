@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import Image from "next/image";
 import type { PhotoSrc, Label } from "./photos-data";
 import { useTranslations } from "@/components/LocaleProvider";
@@ -259,10 +259,8 @@ export default function GaleriaClient({
   // Acabou de abrir via morph? Suprime o lb-photo-in dessa primeira foto para
   // a entrada ser SÓ o morph (voltam a coexistir ao navegar com ←/→).
   const [justOpened, setJustOpened] = useState(false);
-  // As fotos 1-4 existem duas vezes no DOM (mosaico em sm+, masonry em mobile;
-  // o CSS esconde uma). O React NÃO permite dois <ViewTransition> montados com
-  // o mesmo nome, por isso só a instância do breakpoint ativo recebe o nome —
-  // decidido pós-hidratação (null = ainda sem nomes, nunca há duplicados).
+  // Breakpoint sm (as fotos 1-4 vivem no mosaico em sm+ e no masonry em mobile;
+  // o CSS esconde uma). `isSm` diz qual é a instância VISÍVEL de cada foto.
   const [isSm, setIsSm] = useState<boolean | null>(null);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 640px)");
@@ -271,15 +269,23 @@ export default function GaleriaClient({
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
-  /** Nome VT estável por FOTO (derivado do src, tal como as keys da grelha).
-      Um nome por índice mudaria de foto quando o filtro reordena a lista e o
-      React acusaria duplicados transitórios durante a remontagem. */
+  // O `<ViewTransition name>` serve UMA coisa: o morph miniatura↔lightbox. Fora
+  // desse morph, nenhuma tile da grelha precisa de nome — e tê-los sempre era o
+  // que gerava os avisos "dois <ViewTransition> com o mesmo nome": ao filtrar ou
+  // cruzar o breakpoint, o nome de uma foto migrava entre a instância do
+  // mosaico e a do masonry (ou entre posições da lista), coexistindo por um
+  // commit. Fix estrutural: a grelha só nomeia a foto que está ATIVAMENTE em
+  // morph (`morphSrc`) e só na sua instância visível (gate `isSm`). Em repouso
+  // — a navegar, filtrar, redimensionar — não há nomes nenhuns, portanto a
+  // colisão é impossível; no morph existe exatamente um par miniatura↔lightbox.
+  const [morphSrc, setMorphSrc] = useState<string | null>(null);
   const vtId = (src: string) => `g-${src.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  /** Nome VT da instância do mosaico (só a foto 0 é exclusiva do mosaico). */
-  const mosaicName = (idx: number) => (idx === 0 || isSm ? vtId(visible[idx].src) : undefined);
-  /** Nome VT da instância do masonry (índices 1-4 só contam em mobile). */
-  const masonryName = (idx: number, src: string) =>
-    idx < 5 ? (isSm === false ? vtId(src) : undefined) : vtId(src);
+  /** Nome VT de uma tile: só quando é a foto em morph E é a sua instância
+      visível (mosaico em sm+, masonry em mobile — codificado em `active`). */
+  const tileName = (src: string, active: boolean) =>
+    active && morphSrc === src ? vtId(src) : undefined;
+  const mosaicName = (idx: number) => tileName(visible[idx].src, idx === 0 || isSm === true);
+  const masonryName = (idx: number, src: string) => tileName(src, idx < 5 ? isSm === false : true);
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   // Drag-to-dismiss / swipe gesture on the lightbox (touch). The photo layer
@@ -449,11 +455,20 @@ export default function GaleriaClient({
   // Lightbox navigation (through entire pool, not just shown)
   // Abrir/fechar dentro de startTransition ativa o morph <ViewTransition>;
   // navegar (←/→) fica fora — usa o lb-photo-in clássico entre fotos.
-  const openAt = useCallback((idx: number) => {
-    setJustOpened(true);
-    startTransition(() => setLb(idx));
-  }, []);
+  const openAt = useCallback(
+    (idx: number) => {
+      // Nomear a miniatura ANTES de capturar o snapshot "antes" do morph.
+      // flushSync força esse commit já; sem isto o setMorphSrc seria agrupado
+      // com o setLb e o snapshot "antes" ainda não teria o nome → sem morph.
+      flushSync(() => setMorphSrc(pool[idx].src));
+      setJustOpened(true);
+      startTransition(() => setLb(idx));
+    },
+    [pool],
+  );
   const close = useCallback(() => {
+    // Mantém `morphSrc` para o morph de volta à miniatura; é limpo pelo efeito
+    // abaixo assim que a transição captura.
     startTransition(() => {
       setLb(null);
       setPlaying(false);
@@ -462,17 +477,33 @@ export default function GaleriaClient({
   // Fecho sem morph — para o gesto de arrastar-para-baixo, onde a própria foto
   // já saiu do ecrã com o dedo (o morph de volta à miniatura ficaria estranho).
   const dismiss = useCallback(() => {
+    setMorphSrc(null);
     setLb(null);
     setPlaying(false);
   }, []);
+  // Navegar (←/→): sem morph entre fotos, mas `morphSrc` acompanha a foto
+  // atual para que o FECHO faça o morph de volta à miniatura certa.
   const prev = useCallback(() => {
+    if (lb === null) return;
     setJustOpened(false);
-    setLb((i) => (i !== null ? (i - 1 + pool.length) % pool.length : null));
-  }, [pool.length]);
+    const n = (lb - 1 + pool.length) % pool.length;
+    setLb(n);
+    setMorphSrc(pool[n].src);
+  }, [lb, pool]);
   const next = useCallback(() => {
+    if (lb === null) return;
     setJustOpened(false);
-    setLb((i) => (i !== null ? (i + 1) % pool.length : null));
-  }, [pool.length]);
+    const n = (lb + 1) % pool.length;
+    setLb(n);
+    setMorphSrc(pool[n].src);
+  }, [lb, pool]);
+  // Depois de fechar, largar o nome assim que o morph de volta captura — em
+  // repouso a grelha fica sem nomes nenhuns (colisão impossível).
+  useEffect(() => {
+    if (lb !== null || morphSrc === null) return;
+    const id = setTimeout(() => setMorphSrc(null), 400);
+    return () => clearTimeout(id);
+  }, [lb, morphSrc]);
 
   useEffect(() => {
     if (lb === null) return;
@@ -799,7 +830,9 @@ export default function GaleriaClient({
                     style={{ aspectRatio: p.aspectRatio }}
                   >
                     {lb !== idx && (
-                      <VTWrap name={collectionFilter ? vtId(p.src) : masonryName(idx, p.src)}>
+                      <VTWrap
+                        name={collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)}
+                      >
                         <Image
                           src={p.src}
                           alt={altText(p.label)}
