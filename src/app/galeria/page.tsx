@@ -4,10 +4,21 @@ import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import { blurFor } from "@/lib/blur";
+import { aspectFor } from "@/lib/image-meta";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n";
+import { PHOTOS, DECOR_SRCS } from "./photos-data";
+
+// Resolved server-side (from blur-map.json / image-dims.json) so those
+// site-wide JSON maps never reach the gallery's client bundle — GaleriaClient
+// only receives the handful of fields each photo actually needs.
+const galleryPhotos = PHOTOS.map((p) => ({
+  ...p,
+  blurDataURL: blurFor(p.src).blurDataURL,
+  aspectRatio: aspectFor(p.src),
+}));
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = getDictionary(await getLocale());
@@ -75,7 +86,7 @@ export default async function GaleriaPage() {
       {/* ── Gallery (dark, immersive) ── */}
       <section className="py-12 lg:py-16 bg-[#0b0b0b]">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-          <GaleriaClient />
+          <GaleriaClient photos={galleryPhotos} decorSrcs={DECOR_SRCS} />
         </div>
       </section>
 
