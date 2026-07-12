@@ -1,6 +1,6 @@
 import { SITE, AREAS_SERVED, abs } from "@/lib/site";
 import { jsonLd } from "@/lib/jsonld";
-import { pt } from "@/lib/i18n/pt";
+import { getDictionary, htmlLang, type Locale } from "@/lib/i18n";
 
 /**
  * Rich schema.org structured data (JSON-LD).
@@ -12,8 +12,15 @@ import { pt } from "@/lib/i18n/pt";
  *
  * This is what helps the site surface for "empresa de eventos Alentejo",
  * "wedding planner Alentejo", etc., and earn rich results.
+ *
+ * Locale-aware: the /en mirror shows English testimonials/copy, so the
+ * markup must describe that same content in English too — otherwise the
+ * `review` entries here wouldn't match what's actually rendered on the page,
+ * which risks losing rich-result eligibility (Google requires structured
+ * data to reflect real, visible page content).
  */
-export default function StructuredData() {
+export default function StructuredData({ locale }: { locale: Locale }) {
+  const t = getDictionary(locale);
   const orgId = `${SITE.url}/#organization`;
   const siteId = `${SITE.url}/#website`;
 
@@ -28,8 +35,7 @@ export default function StructuredData() {
       telephone: SITE.phone,
       image: abs(SITE.ogImage),
       logo: abs("/logo-liquen.png"),
-      description:
-        "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal.",
+      description: t.meta.homeDescription,
       slogan: SITE.slogan,
       foundingDate: SITE.founded,
       priceRange: "€€€",
@@ -70,10 +76,11 @@ export default function StructuredData() {
       // action. Add it back via real `Review` items (e.g. Google Business
       // Profile) when those are available.
       // These reviews mirror the testimonials VISIBLE on the site (home,
-      // /clientes, /contacto) — same source (the pt dictionary, the canonical
-      // language). No reviewRating: the site shows quotes, not star scores,
-      // and markup must never claim more than the page displays.
-      review: pt.testimonials.map((item) => ({
+      // /clientes, /contacto) — same source (the active locale's dictionary)
+      // so the markup always matches what's actually rendered. No
+      // reviewRating: the site shows quotes, not star scores, and markup must
+      // never claim more than the page displays.
+      review: t.testimonials.map((item) => ({
         "@type": "Review",
         author: { "@type": "Person", name: item.name },
         name: item.role,
@@ -82,13 +89,8 @@ export default function StructuredData() {
       })),
       hasOfferCatalog: {
         "@type": "OfferCatalog",
-        name: "Serviços de organização de eventos",
-        itemListElement: [
-          "Organização de casamentos",
-          "Eventos corporativos e conferências",
-          "Festas e celebrações privadas",
-          "Jantares de gala e eventos sociais",
-        ].map((service) => ({
+        name: t.jsonld.hasOfferCatalogName,
+        itemListElement: t.jsonld.services.map((service) => ({
           "@type": "Offer",
           itemOffered: { "@type": "Service", name: service, areaServed: "PT" },
         })),
@@ -99,7 +101,7 @@ export default function StructuredData() {
       "@id": siteId,
       url: SITE.url,
       name: SITE.name,
-      inLanguage: "pt-PT",
+      inLanguage: htmlLang(locale),
       publisher: { "@id": orgId },
     },
   ];

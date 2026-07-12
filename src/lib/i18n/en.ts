@@ -93,6 +93,18 @@ export const en: Dict = {
       "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 hours.",
   },
 
+  // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
+  // the markup's language always matches the visible page's.
+  jsonld: {
+    hasOfferCatalogName: "Event planning services",
+    services: [
+      "Wedding planning",
+      "Corporate events and conferences",
+      "Private parties and celebrations",
+      "Gala dinners and social events",
+    ],
+  },
+
   home: {
     eyebrow: "Event planning",
     heroLines: [

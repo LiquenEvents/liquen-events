@@ -92,6 +92,18 @@ export const pt = {
       "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas.",
   },
 
+  // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
+  // the markup's language always matches the visible page's.
+  jsonld: {
+    hasOfferCatalogName: "Serviços de organização de eventos",
+    services: [
+      "Organização de casamentos",
+      "Eventos corporativos e conferências",
+      "Festas e celebrações privadas",
+      "Jantares de gala e eventos sociais",
+    ],
+  },
+
   home: {
     eyebrow: "Organização de eventos",
     heroLines: [

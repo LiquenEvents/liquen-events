@@ -124,7 +124,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale} dict={t}>
           {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
-          <StructuredData />
+          <StructuredData locale={locale} />
           <Analytics />
           <a
             href="#conteudo"
