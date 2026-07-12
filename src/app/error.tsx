@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { log } from "@/lib/logger";
 import { useTranslations } from "@/components/LocaleProvider";
+import { localizeHref } from "@/lib/i18n";
 
 export default function Error({
   error,
@@ -12,7 +13,7 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const { t } = useTranslations();
+  const { locale, t } = useTranslations();
 
   useEffect(() => {
     log.error("erro renderizado no boundary de página", error);
@@ -42,7 +43,7 @@ export default function Error({
             {t.errors.retry} →
           </button>
           <Link
-            href="/"
+            href={localizeHref("/", locale)}
             className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/12 text-foreground/45 font-medium rounded-sm hover:border-foreground/25 hover:text-foreground/75 transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.voltarInicio}

@@ -4,7 +4,7 @@ import { blurFor } from "@/lib/blur";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 import { SITE } from "@/lib/site";
-import { getDictionary, type Locale } from "@/lib/i18n";
+import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
 
 const stripPhotos = [
   { src: "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg", span: "col-span-2" },
@@ -146,7 +146,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 {pages.map(([label, href]) => (
                   <li key={href}>
                     <Link
-                      href={href}
+                      href={localizeHref(href, locale)}
                       className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
                     >
                       {label}
@@ -177,7 +177,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 <span className="text-foreground/78">{t.footer.country}</span>
               </div>
               <Link
-                href="/orcamento"
+                href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/12 text-foreground/38 text-[11px] tracking-[0.25em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-all duration-300"
               >
                 {t.footer.pedirOrcamento} →

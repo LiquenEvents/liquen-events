@@ -3,12 +3,13 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "./LocaleProvider";
+import { localizeHref } from "@/lib/i18n";
 
 export default function StickyCTA() {
   const [visible, setVisible] = useState(false);
   const [atFooter, setAtFooter] = useState(false);
   const pathname = usePathname();
-  const { t } = useTranslations();
+  const { locale, t } = useTranslations();
 
   const hidden = pathname.startsWith("/orcamento") || pathname.startsWith("/contacto");
 
@@ -51,7 +52,7 @@ export default function StickyCTA() {
       }`}
     >
       <Link
-        href="/orcamento"
+        href={localizeHref("/orcamento", locale)}
         className="group flex items-center gap-3 px-5 py-3 bg-surface-elevated/90 backdrop-blur-md border border-foreground/12 hover:border-moss/40 transition-all duration-300 shadow-2xl shadow-black/70 rounded-sm"
       >
         <span className="relative flex h-1.5 w-1.5 flex-shrink-0">

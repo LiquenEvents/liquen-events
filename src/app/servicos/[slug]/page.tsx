@@ -9,7 +9,7 @@ import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd"
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "../services-data";
 import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, localizeHref } from "@/lib/i18n";
 
 export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
@@ -93,7 +93,10 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
           <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/45 mb-8">
-            <Link href="/servicos" className="hover:text-cream transition-colors">
+            <Link
+              href={localizeHref("/servicos", locale)}
+              className="hover:text-cream transition-colors"
+            >
               {t.nav.servicos}
             </Link>
             <span>/</span>
@@ -117,7 +120,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                 <p key={i}>{emphasize(p)}</p>
               ))}
               <Link
-                href="/orcamento"
+                href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 mt-4 text-sm text-moss hover:gap-5 transition-all duration-300 tracking-widest uppercase"
               >
                 {t.common.pedirOrcamento} →
@@ -197,7 +200,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
               {related.map((r) => (
                 <Link
                   key={r.slug}
-                  href={`/servicos/${r.slug}`}
+                  href={localizeHref(`/servicos/${r.slug}`, locale)}
                   className="group relative overflow-hidden rounded-xl aspect-[16/9] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
                 >
                   <Image
@@ -244,7 +247,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
             {t.servicoDetalhe.ctaTitle}
           </h2>
           <Link
-            href="/orcamento"
+            href={localizeHref("/orcamento", locale)}
             className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
           >
             {t.common.pedirOrcamento} →

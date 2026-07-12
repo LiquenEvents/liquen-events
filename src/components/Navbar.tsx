@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
 import { SITE } from "@/lib/site";
+import { localizeHref } from "@/lib/i18n";
 
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
@@ -23,7 +24,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const pathname = usePathname();
-  const { t } = useTranslations();
+  const { locale, t } = useTranslations();
 
   const links = [
     { href: "/sobre", label: t.nav.sobre },
@@ -122,7 +123,7 @@ export default function Navbar() {
           }`}
         >
           <Link
-            href="/"
+            href={localizeHref("/", locale)}
             className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
           >
             <Image
@@ -139,7 +140,7 @@ export default function Navbar() {
             {links.map((link) => (
               <Link
                 key={link.href}
-                href={link.href}
+                href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={pathname === link.href ? "page" : undefined}
                 className={`link-line text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
@@ -164,7 +165,7 @@ export default function Navbar() {
               aria-hidden
             />
             <Link
-              href="/contacto"
+              href={localizeHref("/contacto", locale)}
               transitionTypes={navTypes("/contacto")}
               className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
                 light
@@ -175,7 +176,7 @@ export default function Navbar() {
               {t.nav.contacto}
             </Link>
             <Link
-              href="/orcamento"
+              href={localizeHref("/orcamento", locale)}
               className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
             >
               {t.nav.orcamento} →
@@ -230,7 +231,7 @@ export default function Navbar() {
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
                 className="group flex items-center justify-between gap-4 py-[18px] border-b border-white/[0.07]"
@@ -269,7 +270,7 @@ export default function Navbar() {
           }}
         >
           <Link
-            href="/orcamento"
+            href={localizeHref("/orcamento", locale)}
             className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-cream px-5 py-4 rounded-sm"
           >
             {t.nav.pedirOrcamento} →

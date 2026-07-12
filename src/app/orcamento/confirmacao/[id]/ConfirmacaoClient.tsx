@@ -6,6 +6,7 @@ import type { Quote } from "../../types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../../data";
 import { SITE } from "@/lib/site";
 import { useTranslations } from "@/components/LocaleProvider";
+import { localizeHref } from "@/lib/i18n";
 
 const STATUS_COLORS: Record<string, string> = {
   pendente: "text-foreground/60",
@@ -16,7 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ConfirmacaoClient({ id }: { id: string }) {
-  const { t } = useTranslations();
+  const { locale, t } = useTranslations();
   const tc = t.confirmacao;
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -236,13 +237,13 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
         {/* CTA */}
         <div className="mt-12 flex flex-wrap gap-4">
           <Link
-            href="/"
+            href={localizeHref("/", locale)}
             className="inline-flex items-center gap-2 px-8 py-3.5 btn-shine bg-moss text-cream text-[11px] tracking-[0.2em] uppercase rounded-sm hover:bg-moss-dark transition-colors shadow-lg shadow-moss/15"
           >
             {tc.voltarInicio} →
           </Link>
           <Link
-            href="/orcamento"
+            href={localizeHref("/orcamento", locale)}
             className="inline-flex items-center gap-2 px-8 py-3.5 border border-foreground/20 text-foreground/50 text-[11px] tracking-[0.2em] uppercase rounded-sm hover:border-foreground/40 hover:text-foreground/70 transition-colors"
           >
             {tc.novoPedido}

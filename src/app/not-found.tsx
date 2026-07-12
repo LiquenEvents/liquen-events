@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, localizeHref } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Página não encontrada",
@@ -35,13 +35,13 @@ export default async function NotFound() {
         </p>
         <div className="flex flex-wrap gap-4 justify-center">
           <Link
-            href="/"
+            href={localizeHref("/", locale)}
             className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.voltarInicio} →
           </Link>
           <Link
-            href="/contacto"
+            href={localizeHref("/contacto", locale)}
             className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/12 text-foreground/45 font-medium rounded-sm hover:border-foreground/25 hover:text-foreground/75 transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.falarConnosco}
@@ -58,7 +58,7 @@ export default async function NotFound() {
           ].map(([label, href]) => (
             <Link
               key={href}
-              href={href}
+              href={localizeHref(href, locale)}
               className="text-foreground/30 hover:text-moss text-xs tracking-[0.2em] uppercase transition-colors"
             >
               {label}

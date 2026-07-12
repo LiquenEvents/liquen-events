@@ -8,6 +8,7 @@ import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { blurFor } from "@/lib/blur";
 import { useTranslations } from "@/components/LocaleProvider";
+import { localizeHref } from "@/lib/i18n";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -42,7 +43,7 @@ const EVENT_TYPES: EventOption[] = [
 ];
 
 export default function OrcamentoForm() {
-  const { t } = useTranslations();
+  const { locale, t } = useTranslations();
   const to = t.orcamento;
   const router = useRouter();
   const [eventType, setEventType] = useState("");
@@ -149,7 +150,7 @@ export default function OrcamentoForm() {
       } catch {
         /* ignora */
       }
-      router.push(`/orcamento/confirmacao/${json.id}`);
+      router.push(localizeHref(`/orcamento/confirmacao/${json.id}`, locale));
     } catch {
       setError(to.error);
       setSending(false);
@@ -178,7 +179,7 @@ export default function OrcamentoForm() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/35 to-[#080808]/55" />
         <div className="absolute inset-0 flex flex-col justify-between p-12 xl:p-16">
           <Link
-            href="/"
+            href={localizeHref("/", locale)}
             className="text-cream/70 text-[11px] tracking-[0.3em] uppercase hover:text-cream transition-colors inline-flex items-center gap-2 w-fit"
           >
             ← {to.back}
@@ -209,7 +210,7 @@ export default function OrcamentoForm() {
           {/* Cabeçalho mobile */}
           <div className="lg:hidden mb-12">
             <Link
-              href="/"
+              href={localizeHref("/", locale)}
               className="text-foreground/55 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
             >
               ← {to.back}

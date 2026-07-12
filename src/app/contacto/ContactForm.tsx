@@ -9,6 +9,7 @@ import { SITE } from "@/lib/site";
 import { blurFor } from "@/lib/blur";
 import Parallax from "@/components/Parallax";
 import { useTranslations } from "@/components/LocaleProvider";
+import { localizeHref } from "@/lib/i18n";
 
 // ── Data ─────────────────────────────────────────────────────────
 
@@ -219,7 +220,7 @@ function ProgressBar({ step, labels }: { step: number; labels: string[] }) {
 // ── Main ──────────────────────────────────────────────────────────
 
 export default function ContactForm() {
-  const { t } = useTranslations();
+  const { locale, t } = useTranslations();
   const tf = t.contacto.form;
   const [step, setStep] = useState(1);
   const [sent, setSent] = useState(false);
@@ -356,7 +357,7 @@ export default function ContactForm() {
 
               {/* Detailed quote simulator — complements the quick message form */}
               <Link
-                href="/orcamento"
+                href={localizeHref("/orcamento", locale)}
                 className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
               >
                 <span className="text-moss flex-shrink-0 text-sm">✦</span>

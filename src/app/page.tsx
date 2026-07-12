@@ -7,7 +7,7 @@ import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
 import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, localizeHref } from "@/lib/i18n";
 
 // Each tile links to a distinct destination that matches its label
 // (Corporativos / Casamentos / Privados) — the first two deep-link to their
@@ -88,13 +88,13 @@ export default async function Home() {
           </h1>
           <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-x-6 gap-y-4 anim-2">
             <Link
-              href="/orcamento"
+              href={localizeHref("/orcamento", locale)}
               className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-cream text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
             >
               {t.common.pedirOrcamento} →
             </Link>
             <Link
-              href="/galeria"
+              href={localizeHref("/galeria", locale)}
               className="link-line text-xs text-white/55 hover:text-white/85 transition-colors tracking-[0.2em] uppercase"
             >
               {t.common.verGaleria}
@@ -125,7 +125,7 @@ export default async function Home() {
                 {t.home.servicesEyebrow}
               </p>
               <Link
-                href="/servicos"
+                href={localizeHref("/servicos", locale)}
                 className="group text-xs text-foreground/72 hover:text-moss transition-colors flex items-center gap-1.5"
               >
                 {t.common.verServicos}
@@ -139,7 +139,7 @@ export default async function Home() {
             {services.map((s, i) => (
               <AnimateIn key={s.title} delay={i * 60}>
                 <Link
-                  href={s.href}
+                  href={localizeHref(s.href, locale)}
                   className="group relative block rounded-xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
                   style={{ aspectRatio: "3/4" }}
                 >
@@ -173,7 +173,7 @@ export default async function Home() {
       {/* ── Gallery ribbon ── */}
       <section className="relative bg-surface border-y border-foreground/8 overflow-hidden py-2 sm:py-3">
         <Link
-          href="/galeria"
+          href={localizeHref("/galeria", locale)}
           className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-moss/70"
         >
           <div className="absolute inset-y-0 left-0 w-20 sm:w-32 bg-gradient-to-r from-surface to-transparent z-20 pointer-events-none" />
@@ -303,13 +303,13 @@ export default async function Home() {
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
               <Link
-                href="/orcamento"
+                href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 {t.common.pedirOrcamento} →
               </Link>
               <Link
-                href="/galeria"
+                href={localizeHref("/galeria", locale)}
                 className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
               >
                 {t.common.verGaleria}

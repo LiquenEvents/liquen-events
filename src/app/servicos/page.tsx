@@ -8,7 +8,7 @@ import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = getDictionary(await getLocale());
@@ -100,17 +100,19 @@ function ServiceCard({
   index,
   catNum,
   cta,
+  locale,
   sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw",
 }: {
   service: ServiceCard;
   index: number;
   catNum: string;
   cta: string;
+  locale: Locale;
   sizes?: string;
 }) {
   return (
     <Link
-      href={`/servicos/${service.slug}`}
+      href={localizeHref(`/servicos/${service.slug}`, locale)}
       className="group relative block overflow-hidden bg-surface-raised h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
     >
       <Image
@@ -171,7 +173,7 @@ function ServiceCard({
 }
 
 /* ── Mosaic grid — 4 services ── */
-function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
+function MosaicGrid({ cat, cta, locale }: { cat: Category; cta: string; locale: Locale }) {
   const [s0, s1, s2, s3] = cat.services;
   const isRight = cat.layout === "mosaic-right";
 
@@ -192,6 +194,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={0}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 65vw"
             />
           </div>
@@ -202,6 +205,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={1}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 35vw"
             />
           </div>
@@ -212,6 +216,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={2}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -222,6 +227,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={3}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -235,6 +241,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={0}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 35vw"
             />
           </div>
@@ -245,6 +252,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={1}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 65vw"
             />
           </div>
@@ -255,6 +263,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={2}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -265,6 +274,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               index={3}
               catNum={cat.num}
               cta={cta}
+              locale={locale}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
           </div>
@@ -275,11 +285,19 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
 }
 
 /* ── Mobile card list ── */
-function MobileCardStack({ cat, cta }: { cat: Category; cta: string }) {
+function MobileCardStack({ cat, cta, locale }: { cat: Category; cta: string; locale: Locale }) {
   return (
     <div className="grid grid-cols-2 gap-1.5" style={{ gridAutoRows: "clamp(210px, 50vw, 340px)" }}>
       {cat.services.map((s, i) => (
-        <ServiceCard key={s.title} service={s} index={i} catNum={cat.num} cta={cta} sizes="50vw" />
+        <ServiceCard
+          key={s.title}
+          service={s}
+          index={i}
+          catNum={cat.num}
+          cta={cta}
+          locale={locale}
+          sizes="50vw"
+        />
       ))}
     </div>
   );
@@ -358,7 +376,7 @@ export default async function ServicosPage() {
             <div className="mt-9 flex flex-col sm:flex-row sm:items-end gap-7 sm:gap-12">
               <p className="text-white/60 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
               <Link
-                href="/orcamento"
+                href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors duration-300 group flex-shrink-0"
               >
                 <span className="w-8 h-px bg-white/30 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
@@ -434,7 +452,7 @@ export default async function ServicosPage() {
                   <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
                     <p className="text-white/60 text-base leading-[1.8] max-w-md">{cat.desc}</p>
                     <Link
-                      href={`/servicos/${cat.services[0].slug}`}
+                      href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
                       className="group inline-flex items-center gap-3 text-xs text-white/65 hover:text-white transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
                     >
                       <span>{ts.verDetalhes}</span>
@@ -450,10 +468,10 @@ export default async function ServicosPage() {
           <section className="bg-surface">
             <AnimateIn from="fade">
               <div className="hidden lg:block p-1.5">
-                <MosaicGrid cat={cat} cta={ts.verMais} />
+                <MosaicGrid cat={cat} cta={ts.verMais} locale={locale} />
               </div>
               <div className="lg:hidden p-1.5">
-                <MobileCardStack cat={cat} cta={ts.verMais} />
+                <MobileCardStack cat={cat} cta={ts.verMais} locale={locale} />
               </div>
             </AnimateIn>
           </section>
@@ -555,13 +573,13 @@ export default async function ServicosPage() {
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
               <Link
-                href="/orcamento"
+                href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 {t.common.pedirOrcamento} →
               </Link>
               <Link
-                href="/galeria"
+                href={localizeHref("/galeria", locale)}
                 className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
               >
                 {ts.ctaGaleria}
