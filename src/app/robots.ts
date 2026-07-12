@@ -6,7 +6,12 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/orcamento/admin", "/en/orcamento/admin", "/api/"],
+      // /orcamento/admin is intentionally NOT disallowed here: it carries its
+      // own `noindex` meta tag (like /orcamento/confirmacao and /proposta),
+      // and disallowing it would block crawlers from ever fetching the page
+      // to see that tag — the classic disallow-prevents-noindex-from-working
+      // anti-pattern. Login-gated either way, so there's nothing to expose.
+      disallow: ["/api/"],
     },
     sitemap: `${SITE.url}/sitemap.xml`,
     host: SITE.url,

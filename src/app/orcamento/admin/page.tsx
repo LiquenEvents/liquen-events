@@ -7,7 +7,13 @@ import { ToastProvider } from "./Toast";
 import { ADMIN_COOKIE, ADMIN_NAME_COOKIE, readSession } from "@/lib/admin-auth";
 import { listQuotes } from "@/lib/quotes-store";
 
-export const metadata: Metadata = { title: "Admin — Líquen Events" };
+// Kept out of robots.txt (crawling) *and* given noindex here (indexing) —
+// disallow alone only stops crawling; a stray external link could still get
+// the bare URL indexed with no way for Google to see this tag.
+export const metadata: Metadata = {
+  title: "Admin — Líquen Events",
+  robots: { index: false, follow: false },
+};
 
 async function getQuotes(): Promise<Quote[]> {
   try {
