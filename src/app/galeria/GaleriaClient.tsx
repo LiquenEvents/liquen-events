@@ -1039,6 +1039,8 @@ export default function GaleriaClient({
                     setJustOpened(false);
                     setLb(idx);
                   }}
+                  aria-label={`${t.galeria.lbPhoto} ${idx + 1} ${t.galeria.lbOf} ${pool.length}`}
+                  aria-current={idx === lb ? "true" : undefined}
                   className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
                     idx === lb
                       ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"

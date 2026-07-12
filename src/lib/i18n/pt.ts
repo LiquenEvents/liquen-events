@@ -63,6 +63,7 @@ export const pt = {
     enviarEmail: "Enviar e-mail",
     contactWhatsApp: "Contactar pelo WhatsApp",
     clientsSay: "O que dizem os clientes",
+    testemunhoLabel: "Testemunho",
     whatsappPrefill: "Olá, gostaria de saber mais sobre a organização de eventos.",
   },
 

@@ -107,7 +107,7 @@ export default function TestimonialsCarousel() {
               <button
                 key={i}
                 onClick={() => goTo(i)}
-                aria-label={`Testemunho ${i + 1}`}
+                aria-label={`${dict.common.testemunhoLabel} ${i + 1}`}
                 aria-current={i === active ? "true" : undefined}
                 className="group py-4 px-2 flex-shrink-0"
               >

@@ -10,6 +10,7 @@ import { blurFor } from "@/lib/blur";
 import Parallax from "@/components/Parallax";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
+import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 
 // ── Data ─────────────────────────────────────────────────────────
 
@@ -160,20 +161,20 @@ function NavBtn({
   disabled = false,
   children,
   variant = "primary",
+  type = "button",
 }: {
   onClick?: () => void;
   disabled?: boolean;
   children: React.ReactNode;
   variant?: "primary" | "ghost";
+  type?: "button" | "submit";
 }) {
-  const base =
-    "inline-flex items-center gap-3 text-[11px] tracking-[0.28em] uppercase transition-all duration-300";
   const styles =
     variant === "primary"
-      ? `${base} px-9 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3`
-      : `${base} text-foreground/72 hover:text-moss`;
+      ? PRIMARY_BUTTON_CLASS
+      : "inline-flex items-center gap-3 text-[11px] tracking-[0.28em] uppercase transition-all duration-300 text-foreground/72 hover:text-moss";
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={styles}>
+    <button type={type} onClick={onClick} disabled={disabled} className={styles}>
       {children}
     </button>
   );
@@ -772,13 +773,9 @@ export default function ContactForm() {
                           <NavBtn variant="ghost" onClick={() => setStep(3)}>
                             ← {tf.voltar}
                           </NavBtn>
-                          <button
-                            type="submit"
-                            disabled={!form.mensagem || sending}
-                            className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3"
-                          >
+                          <NavBtn type="submit" disabled={!form.mensagem || sending}>
                             {sending ? tf.enviando : `${tf.enviar} →`}
-                          </button>
+                          </NavBtn>
                           <p className="text-foreground/78 text-xs tracking-wide">
                             {tf.resposta24}
                           </p>

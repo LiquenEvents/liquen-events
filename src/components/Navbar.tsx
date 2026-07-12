@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -90,6 +90,59 @@ export default function Navbar() {
     return () => {
       document.body.style.overflow = prev;
       delete document.body.dataset.menuOpen;
+    };
+  }, [isOpen]);
+
+  // Escape closes the overlay + traps Tab inside it (WAI-ARIA dialog pattern)
+  // — the one full-screen menu in the codebase that didn't already follow the
+  // gallery lightbox's focus-management. Focus moves to the first link on
+  // open and back to the toggle button on close, so keyboard users never
+  // land on a hidden/invisible element.
+  const menuRef = useRef<HTMLDivElement>(null);
+  const toggleBtnRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const menu = menuRef.current;
+    const focusables = () =>
+      Array.from(
+        menu?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    // Double rAF: the click that opened the menu is still asserting its own
+    // (browser-default) focus on the toggle button through the first painted
+    // frame — a single rAF loses that race and focus silently snaps back to
+    // the button. Waiting a second frame reliably lands on the menu instead.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => focusables()[0]?.focus());
+    });
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsOpen(false);
+        toggleBtnRef.current?.focus();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [isOpen]);
 
@@ -184,6 +237,7 @@ export default function Navbar() {
           </div>
 
           <button
+            ref={toggleBtnRef}
             className="lg:hidden p-3 -mr-2 ml-auto"
             onClick={() => setIsOpen(!isOpen)}
             aria-label={t.nav.menuLabel}
@@ -204,6 +258,10 @@ export default function Navbar() {
 
       {/* ── Menu mobile — overlay a ecrã inteiro, tipografia display em cascata ── */}
       <div
+        ref={menuRef}
+        role="dialog"
+        aria-modal={isOpen}
+        aria-label={t.nav.menuLabel}
         aria-hidden={!isOpen}
         className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#10140f] transition-[opacity,visibility] duration-500 ${
           isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"

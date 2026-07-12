@@ -9,6 +9,7 @@ import { waHref } from "@/data";
 import { blurFor } from "@/lib/blur";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
+import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -375,11 +376,7 @@ export default function OrcamentoForm() {
 
             {/* Ações */}
             <div className="flex flex-wrap items-center gap-x-7 gap-y-4 pt-1">
-              <button
-                type="submit"
-                disabled={!ready || sending}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase shadow-lg shadow-moss/15 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3"
-              >
+              <button type="submit" disabled={!ready || sending} className={PRIMARY_BUTTON_CLASS}>
                 {sending ? (
                   <>
                     <span
