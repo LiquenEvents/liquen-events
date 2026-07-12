@@ -80,6 +80,20 @@ export default function Navbar() {
     setIsOpen(false);
   }, [pathname]);
 
+  // Fechar o menu se o viewport crescer até ao breakpoint de desktop (lg,
+  // 1024px). Caso contrário `isOpen` fica preso a true: o overlay é escondido
+  // por CSS (`lg:hidden`), mas o scroll-lock (body overflow:hidden +
+  // data-menuOpen) mantém-se e o utilizador fica sem forma visível de o
+  // fechar — o próprio botão hambúrguer é `lg:hidden`.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => {
+      if (mq.matches) setIsOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   // Lock background scroll while the mobile menu is open. The body attribute
   // also hides floating UI (WhatsApp) via CSS so nada flutua sobre o menu.
   useEffect(() => {

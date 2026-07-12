@@ -47,6 +47,12 @@ export default function StickyCTA() {
 
   return (
     <div
+      // `inert` enquanto invisível: sem isto o link continuava focável por
+      // teclado apesar de opacity-0/pointer-events-none — tornava-se a 2.ª
+      // paragem de Tab (um elemento no fundo do ecrã, à frente da navbar) com
+      // um anel de foco a 0% de opacidade. inert remove-o da ordem de Tab e da
+      // árvore de acessibilidade até ficar visível.
+      inert={!show}
       className={`hidden lg:block fixed bottom-7 left-7 z-40 transition-all duration-500 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}

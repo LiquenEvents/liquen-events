@@ -120,10 +120,14 @@ export default async function Home() {
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-16">
           <AnimateIn>
             <div className="flex items-end justify-between mb-8 lg:mb-12">
-              <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase flex items-center gap-3">
+              {/* Cabeçalho de secção (h2): dá à grelha de serviços um heading
+                  de nível 2, para os títulos dos cartões (h3) deixarem de
+                  saltar de h1 → h3. Estilo idêntico ao antigo <p> (o reset do
+                  Tailwind zera tamanho/margem dos headings). */}
+              <h2 className="text-foreground/72 text-xs tracking-[0.3em] uppercase flex items-center gap-3 font-normal">
                 <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
                 {t.home.servicesEyebrow}
-              </p>
+              </h2>
               <Link
                 href={localizeHref("/servicos", locale)}
                 className="group text-xs text-foreground/72 hover:text-moss transition-colors flex items-center gap-1.5"
