@@ -59,7 +59,7 @@ export default function StickyCTA() {
           <span className="footer-ping absolute inline-flex h-full w-full rounded-full bg-moss opacity-55" />
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-moss" />
         </span>
-        <span className="text-[10px] tracking-[0.28em] uppercase text-foreground/38 group-hover:text-moss transition-colors duration-300">
+        <span className="text-[10px] tracking-[0.28em] uppercase text-foreground/68 group-hover:text-moss transition-colors duration-300">
           {t.footer.pedirOrcamento}
         </span>
         <span className="text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">

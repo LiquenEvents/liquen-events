@@ -308,10 +308,15 @@ export default function OrcamentoForm() {
                   onChange={(e) => setNome(e.target.value)}
                   onBlur={() => setTouched((prev) => ({ ...prev, nome: true }))}
                   aria-invalid={!!nomeErr}
+                  aria-describedby={nomeErr ? "of-nome-err" : undefined}
                   className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
                   placeholder={to.phNome}
                 />
-                {nomeErr && <p className={hintCls}>{nomeErr}</p>}
+                {nomeErr && (
+                  <p id="of-nome-err" role="alert" className={hintCls}>
+                    {nomeErr}
+                  </p>
+                )}
               </div>
               <div className="group">
                 <label htmlFor="of-email" className={labelCls}>
@@ -325,10 +330,15 @@ export default function OrcamentoForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                   aria-invalid={!!emailErr}
+                  aria-describedby={emailErr ? "of-email-err" : undefined}
                   className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
                   placeholder={to.phEmail}
                 />
-                {emailErr && <p className={hintCls}>{emailErr}</p>}
+                {emailErr && (
+                  <p id="of-email-err" role="alert" className={hintCls}>
+                    {emailErr}
+                  </p>
+                )}
               </div>
             </div>
 

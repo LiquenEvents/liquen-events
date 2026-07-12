@@ -515,6 +515,46 @@ export const pt = {
     ctaTitle: "Vamos planear o seu evento?",
   },
 
+  proposta: {
+    linkInvalidTitle: "Link inválido ou expirado",
+    linkInvalidBody:
+      "Este link de proposta já não é válido. Contacte-nos e enviamos-lhe um novo com todo o gosto.",
+    notFoundTitle: "Proposta não encontrada",
+    notFoundBody:
+      "Não conseguimos encontrar esta proposta. Se acha que é um engano, fale connosco.",
+    eyebrow: "Proposta para o seu evento",
+    greeting: "Olá",
+    intro:
+      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo — será um prazer avançar consigo.",
+    tableDescricao: "Descrição",
+    tableQt: "Qt",
+    tableValor: "Valor",
+    subtotal: "Subtotal",
+    iva: "IVA",
+    total: "Total",
+    validoAte: "Válida até",
+    footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos —",
+    dateLocale: "pt-PT",
+    response: {
+      confirmRecusar: "Tem a certeza que pretende recusar a proposta?",
+      aceiteTitle: "Proposta aceite — obrigado!",
+      aceiteBody:
+        "Que alegria avançar consigo. A nossa equipa entra em contacto em breve com os próximos passos.",
+      rejeitadaTitle: "Resposta registada.",
+      rejeitadaBody:
+        "Obrigado por nos dizer. Se mudar de ideias ou quiser ajustar algo, estamos sempre ao dispor.",
+      jaRegistado: "Já tínhamos registado a sua resposta a esta proposta.",
+      aceitar: "Aceitar proposta →",
+      aceitarSending: "A registar…",
+      recusar: "Recusar",
+      recusarSending: "…",
+      errorFallback: "Não foi possível registar a sua resposta.",
+      errorGeneric: "Erro. Tente novamente.",
+      errorSuffix: "Em alternativa,",
+      errorLink: "escreva-nos",
+    },
+  },
+
   errors: {
     notFoundEyebrow: "Página não encontrada",
     notFoundTitle: "Este caminho não existe.",

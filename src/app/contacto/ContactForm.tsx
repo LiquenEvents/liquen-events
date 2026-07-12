@@ -147,7 +147,7 @@ function Pill({
       className={`px-4 py-3 sm:py-2.5 rounded-sm text-xs tracking-[0.18em] uppercase border transition-all duration-200 ${
         selected
           ? "bg-moss border-moss text-cream"
-          : "border-foreground/15 text-foreground/38 hover:border-foreground/30 hover:text-foreground/78"
+          : "border-foreground/15 text-foreground/68 hover:border-foreground/30 hover:text-foreground/78"
       }`}
     >
       {label}
@@ -583,10 +583,15 @@ export default function ContactForm() {
                                 onChange={(e) => set("nome", e.target.value)}
                                 onBlur={() => setTouched((p) => ({ ...p, nome: true }))}
                                 aria-invalid={!!nomeErr}
+                                aria-describedby={nomeErr ? "cf-nome-err" : undefined}
                                 className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
                                 placeholder={tf.phName}
                               />
-                              {nomeErr && <p className={hintCls}>{nomeErr}</p>}
+                              {nomeErr && (
+                                <p id="cf-nome-err" role="alert" className={hintCls}>
+                                  {nomeErr}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <label htmlFor="cf-email" className={labelCls}>
@@ -600,10 +605,15 @@ export default function ContactForm() {
                                 onChange={(e) => set("email", e.target.value)}
                                 onBlur={() => setTouched((p) => ({ ...p, email: true }))}
                                 aria-invalid={!!emailErr}
+                                aria-describedby={emailErr ? "cf-email-err" : undefined}
                                 className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
                                 placeholder={tf.phEmail}
                               />
-                              {emailErr && <p className={hintCls}>{emailErr}</p>}
+                              {emailErr && (
+                                <p id="cf-email-err" role="alert" className={hintCls}>
+                                  {emailErr}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div>

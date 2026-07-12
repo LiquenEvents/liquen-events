@@ -501,6 +501,45 @@ export const en: Dict = {
     ctaTitle: "Shall we plan your event?",
   },
 
+  proposta: {
+    linkInvalidTitle: "Invalid or expired link",
+    linkInvalidBody:
+      "This proposal link is no longer valid. Get in touch and we'll gladly send you a new one.",
+    notFoundTitle: "Proposal not found",
+    notFoundBody: "We couldn't find this proposal. If you think this is a mistake, get in touch.",
+    eyebrow: "Proposal for your event",
+    greeting: "Hello",
+    intro:
+      "We've carefully prepared this proposal for your event. Review the details and respond right here — we'd be delighted to move forward with you.",
+    tableDescricao: "Description",
+    tableQt: "Qty",
+    tableValor: "Amount",
+    subtotal: "Subtotal",
+    iva: "VAT",
+    total: "Total",
+    validoAte: "Valid until",
+    footerNote: "Any questions or changes? Reply to this email or contact us —",
+    dateLocale: "en-GB",
+    response: {
+      confirmRecusar: "Are you sure you want to decline the proposal?",
+      aceiteTitle: "Proposal accepted — thank you!",
+      aceiteBody:
+        "We're delighted to move forward with you. Our team will be in touch shortly with next steps.",
+      rejeitadaTitle: "Response recorded.",
+      rejeitadaBody:
+        "Thank you for letting us know. If you change your mind or want to adjust anything, we're always here.",
+      jaRegistado: "We had already recorded your response to this proposal.",
+      aceitar: "Accept proposal →",
+      aceitarSending: "Recording…",
+      recusar: "Decline",
+      recusarSending: "…",
+      errorFallback: "We couldn't record your response.",
+      errorGeneric: "Error. Please try again.",
+      errorSuffix: "Alternatively,",
+      errorLink: "email us",
+    },
+  },
+
   errors: {
     notFoundEyebrow: "Page not found",
     notFoundTitle: "This path doesn't exist.",
