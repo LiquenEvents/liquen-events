@@ -32,7 +32,7 @@ export default function LanguageToggle({ light = false }: { light?: boolean }) {
   const activeCls = light ? "text-white" : "text-moss";
   const idleCls = light
     ? "text-white/60 hover:text-white/90"
-    : "text-foreground/55 hover:text-moss";
+    : "text-foreground/68 hover:text-moss";
 
   return (
     <div

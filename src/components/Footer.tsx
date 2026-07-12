@@ -193,7 +193,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
           <p className="text-[11px] text-foreground/78 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — {t.footer.rights}
           </p>
-          <p className="text-[11px] text-foreground/14 tracking-[0.28em] uppercase">
+          <p className="text-[11px] text-foreground/68 tracking-[0.28em] uppercase">
             {t.footer.country}
           </p>
         </div>

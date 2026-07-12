@@ -161,7 +161,7 @@ export default function OrcamentoForm() {
   const inputCls =
     "w-full bg-transparent border-b border-foreground/15 pb-3.5 text-base text-foreground placeholder-foreground/20 focus:outline-none focus:border-moss/55 transition-colors duration-300";
   const labelCls =
-    "block text-[10px] text-foreground/55 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
+    "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
   return (
@@ -212,7 +212,7 @@ export default function OrcamentoForm() {
           <div className="lg:hidden mb-12">
             <Link
               href={localizeHref("/", locale)}
-              className="text-foreground/55 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
+              className="text-foreground/68 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
             >
               ← {to.back}
             </Link>
@@ -252,7 +252,7 @@ export default function OrcamentoForm() {
                       className={`px-4 py-2.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
                           ? "bg-moss border-moss text-cream shadow-lg shadow-moss/20"
-                          : "border-foreground/15 text-foreground/50 hover:border-foreground/35 hover:text-foreground/80"
+                          : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
                       }`}
                     >
                       {to.eventTypeLabels[i] ?? o.label}
@@ -393,7 +393,7 @@ export default function OrcamentoForm() {
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/45 hover:text-moss transition-colors"
+                className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/68 hover:text-moss transition-colors"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {to.ouWhatsApp}
@@ -406,7 +406,7 @@ export default function OrcamentoForm() {
               </div>
             )}
 
-            <p className="text-foreground/25 text-[11px] leading-relaxed">{to.requiredNote}</p>
+            <p className="text-foreground/68 text-[11px] leading-relaxed">{to.requiredNote}</p>
           </form>
         </div>
       </main>

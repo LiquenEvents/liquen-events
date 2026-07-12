@@ -197,11 +197,11 @@ function ProgressBar({ step, labels }: { step: number; labels: string[] }) {
             >
               {i + 1 < step ? "✓" : i + 1}
             </div>
-            <span
-              className={`hidden sm:block text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 whitespace-nowrap ${
-                i + 1 <= step ? "text-foreground/68" : "text-foreground/18"
-              }`}
-            >
+            {/* Rótulo do passo sempre a /68 (AA). A distinção passo
+                atual/futuro é dada pelo círculo numerado (preenchido/borda
+                moss), não pelo contraste do texto — dimmá-lo abaixo de /63
+                falhava o WCAG AA. */}
+            <span className="hidden sm:block text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 whitespace-nowrap text-foreground/68">
               {label}
             </span>
           </div>
@@ -362,10 +362,13 @@ export default function ContactForm() {
                 className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
               >
                 <span className="text-moss flex-shrink-0 text-sm">✦</span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/60 group-hover:text-foreground/78 transition-colors">
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
                   {tf.quoteLink}
                 </span>
-                <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
+                <span
+                  aria-hidden
+                  className="ml-auto text-foreground/40 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                >
                   →
                 </span>
               </Link>
@@ -380,10 +383,13 @@ export default function ContactForm() {
                 <span className="text-moss flex-shrink-0">
                   <WhatsAppIcon className="w-4 h-4" />
                 </span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/60 group-hover:text-foreground/78 transition-colors">
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
                   {tf.whatsappLink}
                 </span>
-                <span className="ml-auto text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
+                <span
+                  aria-hidden
+                  className="ml-auto text-foreground/40 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                >
                   →
                 </span>
               </a>
@@ -454,7 +460,7 @@ export default function ContactForm() {
                     <br />
                     {tf.successTitle2}
                   </h3>
-                  <p className="text-foreground/60 text-sm leading-[1.85] max-w-sm mb-14">
+                  <p className="text-foreground/68 text-sm leading-[1.85] max-w-sm mb-14">
                     {tf.successThanks}
                     {form.nome ? `, ${form.nome}` : ""}
                     {tf.successText}
@@ -520,7 +526,7 @@ export default function ContactForm() {
                           <br />
                           {tf.step1Title2}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">{tf.step1Sub}</p>
+                        <p className="text-foreground/68 text-sm mb-10">{tf.step1Sub}</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-12">
                           {eventCards.map((ec, i) => {
                             const card = tf.eventCards[i] ?? { value: ec.value, desc: ec.desc };
@@ -569,7 +575,7 @@ export default function ContactForm() {
                         >
                           {tf.step2Title}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">{tf.step2Sub}</p>
+                        <p className="text-foreground/68 text-sm mb-10">{tf.step2Sub}</p>
                         <div className="flex flex-col gap-7 sm:gap-10 mb-12">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-7 sm:gap-10">
                             <div>
@@ -658,7 +664,7 @@ export default function ContactForm() {
                         >
                           {tf.step3Title}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">{tf.step3Sub}</p>
+                        <p className="text-foreground/68 text-sm mb-10">{tf.step3Sub}</p>
                         <div className="flex flex-col gap-7 sm:gap-10 mb-12">
                           <div>
                             <label htmlFor="cf-data" className={labelCls}>
@@ -717,7 +723,7 @@ export default function ContactForm() {
                         >
                           {tf.step4Title}
                         </h2>
-                        <p className="text-foreground/60 text-sm mb-10">{tf.step4Sub}</p>
+                        <p className="text-foreground/68 text-sm mb-10">{tf.step4Sub}</p>
                         <div className="flex flex-col gap-10 mb-10">
                           <div>
                             <label htmlFor="cf-mensagem" className={labelCls}>

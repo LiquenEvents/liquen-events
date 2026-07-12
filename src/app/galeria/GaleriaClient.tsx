@@ -196,7 +196,7 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
             {caption}
           </span>
           {sub && (
-            <span className="block text-white/45 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+            <span className="block text-white/55 text-[9px] tracking-[0.2em] uppercase mt-0.5">
               {sub}
             </span>
           )}
@@ -681,7 +681,7 @@ export default function GaleriaClient({
             >
               {collectionFilter}
             </p>
-            <p className="text-white/40 text-[10px] tracking-[0.15em] uppercase mt-0.5">
+            <p className="text-white/55 text-[10px] tracking-[0.15em] uppercase mt-0.5">
               {pool.length} {t.galeria.photosLabel}
             </p>
           </div>
@@ -698,13 +698,13 @@ export default function GaleriaClient({
               onClick={() => switchCat(c)}
               className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
                 cat === c
-                  ? "bg-moss text-cream shadow-lg shadow-moss/20"
+                  ? "bg-moss-dark text-cream shadow-lg shadow-moss/20"
                   : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
               }`}
             >
               {t.galeria.labels[c]}
               <span
-                className={`text-[10px] tabular-nums ${cat === c ? "text-cream/50" : "text-white/35"}`}
+                className={`text-[10px] tabular-nums ${cat === c ? "text-cream/90" : "text-white/50"}`}
               >
                 {counts[c]}
               </span>
@@ -840,7 +840,7 @@ export default function GaleriaClient({
               className="group flex items-center gap-3 rounded-full border border-white/15 px-10 py-3.5 text-xs uppercase tracking-[0.2em] text-white/60 transition-all duration-300 hover:border-white/40 hover:text-white/90"
             >
               {t.galeria.verMais}
-              <span className="text-white/45 transition-colors group-hover:text-moss-light">
+              <span className="text-white/55 transition-colors group-hover:text-moss-light">
                 +{Math.min(PAGE, pool.length - shown)}
               </span>
             </button>
@@ -851,7 +851,7 @@ export default function GaleriaClient({
               style={{ width: `${(shown / pool.length) * 100}%` }}
             />
           </div>
-          <p className="text-[10px] tracking-widest text-white/40">
+          <p className="text-[10px] tracking-widest text-white/55">
             {shown} {t.galeria.de} {pool.length}
           </p>
         </div>

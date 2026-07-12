@@ -223,7 +223,7 @@ export default function Navbar() {
                       : "text-white/80 hover:text-white"
                     : pathname === link.href
                       ? "text-moss nav-active"
-                      : "text-moss/80 hover:text-moss"
+                      : "text-moss hover:text-moss-dark"
                 }`}
               >
                 {link.label}
