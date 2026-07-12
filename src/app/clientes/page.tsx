@@ -19,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: t.meta.clientesTitle,
     description: t.meta.clientesDescription,
     path: "/clientes",
+    image: "/imagens/EW1_1393.jpg",
     keywords: ["clientes Líquen Events", "empresas de eventos Alentejo"],
     ogLocale: t.meta.ogLocale,
   });

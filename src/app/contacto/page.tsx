@@ -18,6 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: t.meta.contactoTitle,
     description: t.meta.contactoDescription,
     path: "/contacto",
+    image: "/imagens/DJI_20250913190635_0120_D.jpg",
     keywords: ["contacto Líquen Events", "organização de eventos Alentejo"],
     ogLocale: t.meta.ogLocale,
   });

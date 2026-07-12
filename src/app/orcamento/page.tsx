@@ -10,6 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: t.meta.orcamentoTitle,
     description: t.meta.orcamentoDescription,
     path: "/orcamento",
+    image: "/imagens/EW1_1404.jpg",
     ogLocale: t.meta.ogLocale,
   });
 }
