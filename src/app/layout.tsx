@@ -11,6 +11,8 @@ import StructuredData from "@/components/StructuredData";
 import Analytics from "@/components/Analytics";
 import PageTransition from "@/components/PageTransition";
 import { LocaleProvider } from "@/components/LocaleProvider";
+import SmoothScroll from "@/components/motion/SmoothScroll";
+import FilmGrain from "@/components/motion/FilmGrain";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary, htmlLang } from "@/lib/i18n";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
@@ -123,23 +125,26 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     >
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale} dict={t}>
-          {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
-          <StructuredData locale={locale} />
-          <Analytics />
-          <a
-            href="#conteudo"
-            className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-cream focus:rounded-md focus:text-sm"
-          >
-            {t.skipLink}
-          </a>
-          <ScrollProgress />
-          <StickyCTA />
-          <Navbar />
-          <main id="conteudo" className="flex-1 pt-24">
-            <PageTransition>{children}</PageTransition>
-          </main>
-          <Footer locale={locale} />
-          <WhatsAppButton />
+          <SmoothScroll>
+            {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
+            <StructuredData locale={locale} />
+            <Analytics />
+            <a
+              href="#conteudo"
+              className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-cream focus:rounded-md focus:text-sm"
+            >
+              {t.skipLink}
+            </a>
+            <ScrollProgress />
+            <StickyCTA />
+            <Navbar />
+            <main id="conteudo" className="flex-1 pt-24">
+              <PageTransition>{children}</PageTransition>
+            </main>
+            <Footer locale={locale} />
+            <WhatsAppButton />
+            <FilmGrain />
+          </SmoothScroll>
         </LocaleProvider>
       </body>
     </html>

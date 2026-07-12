@@ -6,6 +6,7 @@ import TitleReveal from "@/components/TitleReveal";
 import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
+import HeroWebGL from "@/components/motion/HeroWebGL";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary, localizeHref } from "@/lib/i18n";
 
@@ -56,6 +57,12 @@ export default async function Home() {
             className="object-cover object-center hero-settle"
           />
         </Parallax>
+        {/* WebGL layer over the static hero image (fades in when ready; absent
+            under reduced motion / no-WebGL). */}
+        <HeroWebGL
+          src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
+          className="absolute inset-0 h-full w-full"
+        />
         <div className="absolute inset-0 bg-black/15" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/75 via-[#080808]/10 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
