@@ -186,7 +186,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
       {isRight ? (
         <>
           {/* Wide top-left */}
-          <div className="col-span-2 row-span-1">
+          <AnimateIn className="col-span-2 row-span-1" delay={0}>
             <ServiceCard
               service={s0}
               index={0}
@@ -194,9 +194,9 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 65vw"
             />
-          </div>
+          </AnimateIn>
           {/* Tall right */}
-          <div className="col-span-1 row-span-2">
+          <AnimateIn className="col-span-1 row-span-2" delay={60}>
             <ServiceCard
               service={s1}
               index={1}
@@ -204,9 +204,9 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 35vw"
             />
-          </div>
+          </AnimateIn>
           {/* Bottom left small */}
-          <div className="col-span-1 row-span-1">
+          <AnimateIn className="col-span-1 row-span-1" delay={120}>
             <ServiceCard
               service={s2}
               index={2}
@@ -214,9 +214,9 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
-          </div>
+          </AnimateIn>
           {/* Bottom mid */}
-          <div className="col-span-1 row-span-1">
+          <AnimateIn className="col-span-1 row-span-1" delay={180}>
             <ServiceCard
               service={s3}
               index={3}
@@ -224,12 +224,12 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
-          </div>
+          </AnimateIn>
         </>
       ) : (
         <>
           {/* Tall left */}
-          <div className="col-span-1 row-span-2">
+          <AnimateIn className="col-span-1 row-span-2" delay={0}>
             <ServiceCard
               service={s0}
               index={0}
@@ -237,9 +237,9 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 35vw"
             />
-          </div>
+          </AnimateIn>
           {/* Wide top-right */}
-          <div className="col-span-2 row-span-1">
+          <AnimateIn className="col-span-2 row-span-1" delay={60}>
             <ServiceCard
               service={s1}
               index={1}
@@ -247,9 +247,9 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 65vw"
             />
-          </div>
+          </AnimateIn>
           {/* Bottom mid */}
-          <div className="col-span-1 row-span-1">
+          <AnimateIn className="col-span-1 row-span-1" delay={120}>
             <ServiceCard
               service={s2}
               index={2}
@@ -257,9 +257,9 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
-          </div>
+          </AnimateIn>
           {/* Bottom right */}
-          <div className="col-span-1 row-span-1">
+          <AnimateIn className="col-span-1 row-span-1" delay={180}>
             <ServiceCard
               service={s3}
               index={3}
@@ -267,7 +267,7 @@ function MosaicGrid({ cat, cta }: { cat: Category; cta: string }) {
               cta={cta}
               sizes="(max-width: 640px) 100vw, 33vw"
             />
-          </div>
+          </AnimateIn>
         </>
       )}
     </div>
@@ -279,7 +279,9 @@ function MobileCardStack({ cat, cta }: { cat: Category; cta: string }) {
   return (
     <div className="grid grid-cols-2 gap-1.5" style={{ gridAutoRows: "clamp(210px, 50vw, 340px)" }}>
       {cat.services.map((s, i) => (
-        <ServiceCard key={s.title} service={s} index={i} catNum={cat.num} cta={cta} sizes="50vw" />
+        <AnimateIn key={s.title} delay={i * 60}>
+          <ServiceCard service={s} index={i} catNum={cat.num} cta={cta} sizes="50vw" />
+        </AnimateIn>
       ))}
     </div>
   );
@@ -448,14 +450,12 @@ export default async function ServicosPage() {
 
           {/* Service mosaic — full-bleed, image-forward */}
           <section className="bg-surface">
-            <AnimateIn from="fade">
-              <div className="hidden lg:block p-1.5">
-                <MosaicGrid cat={cat} cta={ts.verMais} />
-              </div>
-              <div className="lg:hidden p-1.5">
-                <MobileCardStack cat={cat} cta={ts.verMais} />
-              </div>
-            </AnimateIn>
+            <div className="hidden lg:block p-1.5">
+              <MosaicGrid cat={cat} cta={ts.verMais} />
+            </div>
+            <div className="lg:hidden p-1.5">
+              <MobileCardStack cat={cat} cta={ts.verMais} />
+            </div>
           </section>
         </div>
       ))}

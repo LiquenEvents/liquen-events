@@ -20,6 +20,12 @@ export default function CountUp({ to, suffix = "", duration = 1800 }: Props) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Respect users who prefer reduced motion: land on the final value
+    // immediately, skip the rAF tween entirely (matches AnimateIn/TitleReveal).
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setValue(to);
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !fired.current) {
@@ -34,11 +40,16 @@ export default function CountUp({ to, suffix = "", duration = 1800 }: Props) {
           requestAnimationFrame(tick);
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.5 },
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [to, duration]);
 
-  return <span ref={ref}>{value}{suffix}</span>;
+  return (
+    <span ref={ref}>
+      {value}
+      {suffix}
+    </span>
+  );
 }
