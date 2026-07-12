@@ -393,6 +393,47 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   animation: step-back 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ── Orçamento form: field-by-field entrance ──
+   The form is always fully in the initial viewport (no scroll needed), so —
+   same reasoning as the hero's .anim-0..3 — it animates on paint via a plain
+   CSS keyframe instead of waiting on an IntersectionObserver. `--field-delay`
+   mirrors .word-rise's pattern: one class, per-instance timing via inline style. */
+.field-in {
+  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) var(--field-delay, 0ms) both;
+}
+
+/* Validation hint appearing under a field — short and quick since it can
+   pop in/out repeatedly as the visitor types, unlike a one-shot entrance. */
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hint-in {
+  animation: hint-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Confirmation checkmark — the one deliberately celebratory moment on the
+   site, so it gets a slight overshoot instead of the usual restrained ease. */
+@keyframes check-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.check-pop {
+  animation: check-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 /* ── Offscreen rendering skip ──
    Lets the browser skip layout/paint of far-offscreen blocks (huge win on the
    245-photo gallery masonry, where laying out every item caused long tasks).
@@ -739,6 +780,18 @@ body:has([data-orcamento-mode]) .eyebrow {
   .animate-step-forward,
   .animate-step-back {
     animation: none;
+  }
+  .field-in {
+    animation: none;
+    opacity: 1;
+  }
+  .hint-in {
+    animation: none;
+  }
+  .check-pop {
+    animation: none;
+    opacity: 1;
+    transform: scale(1);
   }
   .view-in {
     animation: none;

@@ -176,7 +176,10 @@ export default function OrcamentoForm() {
           className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/35 to-[#080808]/55" />
-        <div className="absolute inset-0 flex flex-col justify-between p-12 xl:p-16">
+        <div
+          className="absolute inset-0 flex flex-col justify-between p-12 xl:p-16 field-in"
+          style={{ "--field-delay": "0ms" } as React.CSSProperties}
+        >
           <Link
             href="/"
             className="text-cream/70 text-[11px] tracking-[0.3em] uppercase hover:text-cream transition-colors inline-flex items-center gap-2 w-fit"
@@ -207,7 +210,10 @@ export default function OrcamentoForm() {
       <main className="flex flex-col justify-center px-6 sm:px-10 lg:px-16 xl:px-24 py-16 lg:py-20">
         <div className="w-full max-w-xl mx-auto">
           {/* Cabeçalho mobile */}
-          <div className="lg:hidden mb-12">
+          <div
+            className="lg:hidden mb-12 field-in"
+            style={{ "--field-delay": "0ms" } as React.CSSProperties}
+          >
             <Link
               href="/"
               className="text-foreground/55 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
@@ -236,7 +242,10 @@ export default function OrcamentoForm() {
             />
 
             {/* Tipo de evento */}
-            <fieldset className="group">
+            <fieldset
+              className="group field-in"
+              style={{ "--field-delay": "70ms" } as React.CSSProperties}
+            >
               <legend className={labelCls}>{to.labelTipo}</legend>
               <div className="flex flex-wrap gap-2.5">
                 {EVENT_TYPES.map((o, i) => {
@@ -261,7 +270,10 @@ export default function OrcamentoForm() {
             </fieldset>
 
             {/* Data + Nº de pessoas */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-9 field-in"
+              style={{ "--field-delay": "140ms" } as React.CSSProperties}
+            >
               <div className="group">
                 <label htmlFor="of-data" className={labelCls}>
                   {to.labelData}
@@ -294,7 +306,10 @@ export default function OrcamentoForm() {
             </div>
 
             {/* Nome + Email */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-9 field-in"
+              style={{ "--field-delay": "210ms" } as React.CSSProperties}
+            >
               <div className="group">
                 <label htmlFor="of-nome" className={labelCls}>
                   {to.labelNome}
@@ -310,7 +325,7 @@ export default function OrcamentoForm() {
                   className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
                   placeholder={to.phNome}
                 />
-                {nomeErr && <p className={hintCls}>{nomeErr}</p>}
+                {nomeErr && <p className={`${hintCls} hint-in`}>{nomeErr}</p>}
               </div>
               <div className="group">
                 <label htmlFor="of-email" className={labelCls}>
@@ -327,12 +342,15 @@ export default function OrcamentoForm() {
                   className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
                   placeholder={to.phEmail}
                 />
-                {emailErr && <p className={hintCls}>{emailErr}</p>}
+                {emailErr && <p className={`${hintCls} hint-in`}>{emailErr}</p>}
               </div>
             </div>
 
             {/* Telefone */}
-            <div className="group">
+            <div
+              className="group field-in"
+              style={{ "--field-delay": "280ms" } as React.CSSProperties}
+            >
               <label htmlFor="of-telefone" className={labelCls}>
                 {to.labelTelefone}
               </label>
@@ -348,7 +366,10 @@ export default function OrcamentoForm() {
             </div>
 
             {/* Mensagem */}
-            <div className="group">
+            <div
+              className="group field-in"
+              style={{ "--field-delay": "350ms" } as React.CSSProperties}
+            >
               <label htmlFor="of-mensagem" className={labelCls}>
                 {to.labelMensagem}
               </label>
@@ -363,7 +384,10 @@ export default function OrcamentoForm() {
             </div>
 
             {/* Ações */}
-            <div className="flex flex-wrap items-center gap-x-7 gap-y-4 pt-1">
+            <div
+              className="flex flex-wrap items-center gap-x-7 gap-y-4 pt-1 field-in"
+              style={{ "--field-delay": "420ms" } as React.CSSProperties}
+            >
               <button
                 type="submit"
                 disabled={!ready || sending}
