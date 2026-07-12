@@ -157,8 +157,14 @@ export default function Navbar() {
       } ${
         // blur de 6px (não 12) + fundo mais opaco: visual igual, metade do
         // custo de repintar o backdrop a cada frame de scroll.
+        // backdrop-filter, tal como transform, cria um containing block para
+        // descendentes fixed — com o menu aberto isso prendia o overlay
+        // fixed inset-0 à altura da própria barra (~72px) em vez do viewport
+        // inteiro. Suprimido apenas enquanto isOpen: nesse estado o overlay
+        // opaco do menu já cobre este fundo por completo, pelo que o blur
+        // nunca chega a ser visível.
         scrolled
-          ? "bg-surface/75 backdrop-blur-[6px] border-b border-foreground/8 shadow-sm shadow-black/5"
+          ? `bg-surface/75 border-b border-foreground/8 shadow-sm shadow-black/5 ${isOpen ? "" : "backdrop-blur-[6px]"}`
           : "bg-transparent border-b border-transparent"
       }`}
     >
