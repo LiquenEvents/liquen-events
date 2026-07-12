@@ -7,6 +7,8 @@ import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
+import Magnetic from "@/components/motion/Magnetic";
+import Reveal from "@/components/motion/Reveal";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary, localizeHref } from "@/lib/i18n";
 
@@ -94,12 +96,14 @@ export default async function Home() {
             })}
           </h1>
           <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-x-6 gap-y-4 anim-2">
-            <Link
-              href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-cream text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
-            >
-              {t.common.pedirOrcamento} →
-            </Link>
+            <Magnetic strength={0.4}>
+              <Link
+                href={localizeHref("/orcamento", locale)}
+                className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-cream text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
+              >
+                {t.common.pedirOrcamento} →
+              </Link>
+            </Magnetic>
             <Link
               href={localizeHref("/galeria", locale)}
               className="link-line text-xs text-white/55 hover:text-white/85 transition-colors tracking-[0.2em] uppercase"
@@ -148,7 +152,7 @@ export default async function Home() {
           </AnimateIn>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {services.map((s, i) => (
-              <AnimateIn key={s.title} delay={i * 60}>
+              <Reveal key={s.title} variant="mask" delay={i * 0.08} className="rounded-xl">
                 <Link
                   href={localizeHref(s.href, locale)}
                   className="group relative block rounded-xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
@@ -175,7 +179,7 @@ export default async function Home() {
                     </h3>
                   </div>
                 </Link>
-              </AnimateIn>
+              </Reveal>
             ))}
           </div>
         </div>

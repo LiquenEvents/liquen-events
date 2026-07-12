@@ -13,6 +13,7 @@ import PageTransition from "@/components/PageTransition";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import SmoothScroll from "@/components/motion/SmoothScroll";
 import FilmGrain from "@/components/motion/FilmGrain";
+import Cursor from "@/components/motion/Cursor";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary, htmlLang } from "@/lib/i18n";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
@@ -144,6 +145,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <Footer locale={locale} />
             <WhatsAppButton />
             <FilmGrain />
+            <Cursor />
           </SmoothScroll>
         </LocaleProvider>
       </body>
