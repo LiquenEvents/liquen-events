@@ -1,5 +1,19 @@
+import { randomBytes } from "node:crypto";
 import type { Quote } from "@/app/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
+
+/**
+ * Generates a quote reference id (e.g. LIQ-M1A2B3-9F3C7A1B2D4E5F60). The
+ * random suffix is hex (each nibble uniform, no modulo bias) and wide enough
+ * (16 hex chars = 64 bits) that brute-forcing/enumerating other clients'
+ * references is infeasible even without the rate limit the GET route also
+ * applies.
+ */
+export function generateQuoteId(): string {
+  const now = Date.now().toString(36).toUpperCase();
+  const rand = randomBytes(8).toString("hex").toUpperCase();
+  return `LIQ-${now}-${rand}`;
+}
 
 /**
  * Storage layer for quote requests. The full quote is kept in a `data` jsonb

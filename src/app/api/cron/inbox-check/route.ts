@@ -21,6 +21,9 @@ export const maxDuration = 30;
  *
  * Requires IMAP to be configured (the IMAP_ / SMTP_ env vars). No-ops otherwise.
  * Protected by CRON_SECRET (Bearer); a logged-in admin may trigger it manually.
+ * When CRON_SECRET is unset it only runs freely outside production
+ * (local/preview convenience) — in production a missing secret fails closed
+ * instead of leaving the endpoint wide open (see lib/env.ts).
  */
 const MARKER_KEY = "inbox-last-uid";
 
@@ -35,7 +38,7 @@ async function writeMarker(lastUid: number): Promise<void> {
 function authorized(req: NextRequest): boolean {
   if (isAuthed(req)) return true;
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) return process.env.NODE_ENV !== "production";
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 

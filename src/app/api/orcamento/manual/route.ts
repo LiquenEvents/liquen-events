@@ -1,20 +1,10 @@
-import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import type { Quote } from "../../../orcamento/types";
-import { createQuote } from "@/lib/quotes-store";
+import { createQuote, generateQuoteId } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
-
-function generateId(): string {
-  const now = Date.now().toString(36).toUpperCase();
-  // crypto-sourced randomness — Math.random is guessable and collision-prone.
-  const rand = Array.from(randomBytes(4), (b) => (b % 36).toString(36))
-    .join("")
-    .toUpperCase();
-  return `LIQ-${now}-${rand}`;
-}
 
 /**
  * Create a quote/event manually from the back-office (e.g. a client who
@@ -32,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "O nome é obrigatório." }, { status: 400 });
     }
 
-    const id = generateId();
+    const id = generateQuoteId();
     const quote: Quote = {
       // QuoteFormData defaults
       category: b.category ?? null,
