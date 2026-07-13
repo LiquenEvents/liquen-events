@@ -64,20 +64,31 @@ function bucketKey(p: Photo): string {
   return collectionFor(p.src) ?? `cat:${p.label}`;
 }
 
+// Stable per-string hash → [0,1). Deterministic (same on server + client, so
+// no hydration mismatch) and independent of array position, so it seeds a
+// reproducible "shuffle" without any global RNG state. FNV-1a.
+function hashUnit(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
 /**
- * Spread photos so the same event never clusters — no two consecutive photos
- * from the same collection (when mathematically possible) AND each collection
- * appears at its natural frequency throughout the grid, not bunched at the end.
+ * Spread photos so the grid feels genuinely shuffled — no two consecutive
+ * photos from the same event, every collection appearing throughout (not
+ * bunched), AND no rigid repeating pattern.
  *
- * Method: give every photo a fractional rank `(j + 0.5) / size` — its position
- * within its own bucket, normalised to [0,1). A 100-photo shoot lands its
- * frames at 0.005, 0.015, 0.025 … so they're ~1/frequency apart across the
- * whole list; a 5-photo shoot lands at 0.1, 0.3, 0.5 … Sorting everything by
- * rank interleaves them proportionally. Deterministic (stable across
- * renders/SSR): equal-size buckets tie-break by first-appearance order, and
- * since a bucket's own ranks are all distinct it can never place itself twice
- * in a row unless it exceeds half the list (only possible inside a
- * single-collection category, where clustering is unavoidable anyway).
+ * Method: each photo gets a fractional rank `(j + 0.5) / size` — its position
+ * within its own bucket, normalised to [0,1) — so a big shoot's frames land
+ * ~1/frequency apart across the whole list. We then add a stable per-photo
+ * jitter (±~0.11 of the range, hashed from the filename) so photos hop out of
+ * the mechanical A,B,C,A,B,C rotation and categories genuinely intermix, while
+ * the base rank still keeps each shoot roughly evenly spread. Fully
+ * deterministic (stable across renders/SSR). A final de-adjacency pass removes
+ * the rare same-event neighbour the jitter can create.
  */
 function interleaveByCollection(list: Photo[]): Photo[] {
   const buckets = new Map<string, Photo[]>();
@@ -92,16 +103,16 @@ function interleaveByCollection(list: Photo[]): Photo[] {
     }
     arr.push(p);
   }
-  const ordOf = new Map(order.map((k, i) => [k, i] as const));
-  const ranked: { p: Photo; rank: number; ord: number }[] = [];
+  const ranked: { p: Photo; rank: number }[] = [];
   for (const key of order) {
     const arr = buckets.get(key)!;
-    const ord = ordOf.get(key)!;
     for (let j = 0; j < arr.length; j++) {
-      ranked.push({ p: arr[j], rank: (j + 0.5) / arr.length, ord });
+      const base = (j + 0.5) / arr.length;
+      const jitter = (hashUnit(arr[j].src) - 0.5) * 0.22;
+      ranked.push({ p: arr[j], rank: base + jitter });
     }
   }
-  ranked.sort((a, b) => a.rank - b.rank || a.ord - b.ord);
+  ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src) - hashUnit(b.p.src));
   return deAdjacent(ranked.map((r) => r.p));
 }
 
