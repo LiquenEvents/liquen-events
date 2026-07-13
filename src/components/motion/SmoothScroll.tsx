@@ -43,13 +43,19 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
     lenisRef.current = instance;
     setLenis(instance);
 
-    // Drive Lenis from GSAP's ticker (single rAF, no double-loop) and keep
-    // ScrollTrigger in lockstep so pinned/scrubbed effects track the smoothed
-    // scroll exactly.
+    // Keep ScrollTrigger in lockstep with the smoothed scroll, and drive Lenis
+    // from its own rAF loop. NB: we deliberately do NOT pump Lenis from
+    // gsap.ticker with lagSmoothing(0) — that forces a callback every frame and
+    // starves React's low-priority `startTransition` work, which the gallery's
+    // ViewTransition lightbox close relies on (Escape would fire but the close
+    // transition never committed). A plain rAF interleaves cleanly.
     instance.on("scroll", ScrollTrigger.update);
-    const onTick = (time: number) => instance.raf(time * 1000);
-    gsap.ticker.add(onTick);
-    gsap.ticker.lagSmoothing(0);
+    let rafId = 0;
+    const raf = (time: number) => {
+      instance.raf(time);
+      rafId = requestAnimationFrame(raf);
+    };
+    rafId = requestAnimationFrame(raf);
 
     // While the mobile menu is open the body is scroll-locked
     // (data-menu-open). Pause Lenis so its virtual wheel scroll can't leak
@@ -65,7 +71,7 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
     });
 
     return () => {
-      gsap.ticker.remove(onTick);
+      cancelAnimationFrame(rafId);
       menuObserver.disconnect();
       instance.destroy();
       lenisRef.current = null;

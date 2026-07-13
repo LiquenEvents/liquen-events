@@ -467,12 +467,14 @@ export default function GaleriaClient({
     [pool],
   );
   const close = useCallback(() => {
-    // Mantém `morphSrc` para o morph de volta à miniatura; é limpo pelo efeito
-    // abaixo assim que a transição captura.
-    startTransition(() => {
-      setLb(null);
-      setPlaying(false);
-    });
+    // Fecho FIÁVEL — deliberadamente fora de startTransition. Com a camada de
+    // motion do site ativa (cursor/overlays fixos + rAF contínuo), o
+    // ViewTransition de FECHO do React (experimental) revelou-se instável: o
+    // Escape disparava mas a transição não fazia commit e o lightbox ficava
+    // preso aberto. O morph de ABERTURA (openAt) continua; o fecho é imediato.
+    setMorphSrc(null);
+    setPlaying(false);
+    setLb(null);
   }, []);
   // Fecho sem morph — para o gesto de arrastar-para-baixo, onde a própria foto
   // já saiu do ecrã com o dedo (o morph de volta à miniatura ficaria estranho).

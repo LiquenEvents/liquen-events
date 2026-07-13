@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import { gsap } from "gsap";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 
@@ -10,6 +9,13 @@ import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffec
  * a premium accent that keeps the NATIVE cursor (safer for a conversion site
  * than hiding it). Fine-pointer only; absent under reduced motion. `mix-blend`
  * keeps it legible over both the dark hero and the light sections.
+ *
+ * Deliberately NOT driven by GSAP: GSAP's global ticker runs a rAF every frame
+ * for as long as it has work, and that continuous loop starves React's
+ * experimental View Transitions (the gallery lightbox close would fire but the
+ * transition never committed). This self-terminating rAF only spins while the
+ * ring is catching up to the pointer, then idles — leaving the main thread free
+ * for the browser's transition frames.
  */
 export default function Cursor() {
   const ringRef = useRef<HTMLDivElement | null>(null);
@@ -19,37 +25,52 @@ export default function Cursor() {
     if (!ring || prefersReducedMotion()) return;
     if (!window.matchMedia("(pointer: fine)").matches) return;
 
-    gsap.set(ring, { xPercent: -50, yPercent: -50, opacity: 0, scale: 1 });
-    const xTo = gsap.quickTo(ring, "x", { duration: 0.45, ease: "power3.out" });
-    const yTo = gsap.quickTo(ring, "y", { duration: 0.45, ease: "power3.out" });
-
+    let tx = 0;
+    let ty = 0;
+    let cx = 0;
+    let cy = 0;
+    let scale = 1;
+    let targetScale = 1;
+    let raf = 0;
     let shown = false;
+
+    const render = () => {
+      cx += (tx - cx) * 0.2;
+      cy += (ty - cy) * 0.2;
+      scale += (targetScale - scale) * 0.2;
+      ring.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -50%) scale(${scale})`;
+      const settled =
+        Math.abs(tx - cx) < 0.1 && Math.abs(ty - cy) < 0.1 && Math.abs(targetScale - scale) < 0.01;
+      raf = settled ? 0 : requestAnimationFrame(render);
+    };
+    const kick = () => {
+      if (!raf) raf = requestAnimationFrame(render);
+    };
+
     const onMove = (e: PointerEvent) => {
-      xTo(e.clientX);
-      yTo(e.clientY);
+      tx = e.clientX;
+      ty = e.clientY;
       if (!shown) {
         shown = true;
-        gsap.to(ring, { opacity: 1, duration: 0.3 });
+        ring.style.opacity = "1";
       }
-      // grow + tint when hovering something interactive
       const interactive = !!(e.target as Element)?.closest?.(
         "a, button, [role='button'], input, textarea, select, [data-cursor]",
       );
-      gsap.to(ring, {
-        scale: interactive ? 1.8 : 1,
-        borderColor: interactive ? "rgba(99,122,95,0.9)" : "rgba(255,255,255,0.55)",
-        duration: 0.3,
-        overwrite: "auto",
-      });
+      targetScale = interactive ? 1.8 : 1;
+      ring.style.borderColor = interactive ? "rgba(99,122,95,0.9)" : "rgba(255,255,255,0.55)";
+      kick();
     };
-    const onLeave = () => gsap.to(ring, { opacity: 0, duration: 0.3 });
+    const onLeave = () => {
+      ring.style.opacity = "0";
+    };
 
     window.addEventListener("pointermove", onMove, { passive: true });
     document.addEventListener("pointerleave", onLeave);
     return () => {
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerleave", onLeave);
-      gsap.killTweensOf(ring);
+      if (raf) cancelAnimationFrame(raf);
     };
   }, []);
 
@@ -58,10 +79,12 @@ export default function Cursor() {
       ref={ringRef}
       aria-hidden
       className="pointer-events-none fixed left-0 top-0 z-[70] hidden h-8 w-8 rounded-full border mix-blend-difference lg:block"
-      // opacity:0 by default so it stays hidden unless JS activates it (i.e. it
-      // never shows under reduced motion, where the effect early-returns before
-      // wiring the follow/fade-in).
-      style={{ opacity: 0, borderColor: "rgba(255,255,255,0.55)", willChange: "transform" }}
+      style={{
+        opacity: 0,
+        borderColor: "rgba(255,255,255,0.55)",
+        willChange: "transform",
+        transition: "opacity 0.3s ease",
+      }}
     />
   );
 }
