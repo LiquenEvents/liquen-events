@@ -22,7 +22,8 @@ export const pt = {
     {
       name: "Stephanie & Mizio",
       role: "Evento Privado",
-      quote: "Everything was exactly how we'd envisioned and you created a beautiful space for us!",
+      quote:
+        "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
     },
     {
       name: "Teresinha Malta",
@@ -226,7 +227,7 @@ export const pt = {
       },
       {
         name: "Stephanie & Mizio",
-        text: "Everything was exactly how we'd envisioned and you created a beautiful space for us!",
+        text: "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
         event: "Evento Privado",
       },
       {
