@@ -23,21 +23,23 @@ const serviceLinks = [
   { image: "/imagens/DaniGui_JantarFesta_27.jpg", href: "/servicos#celebracoes" },
 ];
 
+// Curated set for the 3D photo wall + its flat-ribbon fallback. EVERY photo is
+// landscape (~1.5:1) to match the carousel's frames — the old set was half
+// portraits, which the 1.5:1 plane cropped into thin slices (looked cheap).
+// Wedding-led with two aerials interleaved for scale/drama.
 const ribbon = [
+  "/imagens/DaniGui_Preview12.jpg",
+  "/imagens/J&P-DJI_20250628174247_0187_D.jpg",
+  "/imagens/ines-goncalo-282.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
   "/imagens/Natalia e Jonathan-167.jpg",
-  "/imagens/EW1_0697.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-  "/imagens/DaniGui_Adois_61.jpg",
-  "/imagens/20_10_2025_0220.jpg",
-  "/imagens/ines-goncalo-252.jpg",
-  "/imagens/M&F0497.jpg",
-  "/imagens/EW1_1330.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
-  "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
+  "/imagens/J&P-4B6A1405.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/DaniGui_Preview79.jpg",
   "/imagens/stephanie-mizio-715.jpg",
-  "/imagens/image6.jpeg",
-  "/imagens/mom-0961.jpg",
+  "/imagens/J&P-IMGL4767.jpg",
+  "/imagens/DaniGui_JantarFesta_48.jpg",
+  "/imagens/ines-goncalo-421.jpg",
 ];
 
 export default async function Home({ params }: { params: Promise<{ lang: string }> }) {

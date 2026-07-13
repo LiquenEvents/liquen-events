@@ -40,10 +40,10 @@ const FRAG = /* glsl */ `
   void main() {
     vec2 uv = (vUv - 0.5) * uCover + 0.5;
     vec3 col = texture2D(tMap, uv).rgb;
-    // soft per-photo vignette for depth
+    // soft per-photo vignette for depth (light touch — keep the photo bright)
     float d = distance(vUv, vec2(0.5));
     float vig = smoothstep(1.15, 0.35, d);
-    col *= 0.84 + 0.16 * vig;
+    col *= 0.92 + 0.08 * vig;
     col *= uDim;
     gl_FragColor = vec4(col, 1.0);
   }
@@ -250,10 +250,12 @@ export default function PhotoWallCanvas({
       tilt += (tiltTarget - tilt) * 0.06;
       group.rotation.x = tilt;
 
-      // Per-card facing brightness: photos rotating to the edge recede.
+      // Per-card facing brightness: photos rotating to the edge recede — but
+      // only gently. A higher floor (0.34, not 0.18) keeps the side photos
+      // clearly visible and premium instead of murky/near-black.
       for (const c of cards) {
         const facing = Math.cos(c.base + rot); // 1 = front, -1 = back
-        c.program.uniforms.uDim.value = 0.18 + 0.82 * Math.max(0, facing);
+        c.program.uniforms.uDim.value = 0.34 + 0.66 * Math.max(0, facing);
       }
 
       renderer.render({ scene: group, camera });
