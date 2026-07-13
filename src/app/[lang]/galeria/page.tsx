@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
-import ShaderImageLazy from "@/components/motion/ShaderImageLazy";
 import Parallax from "@/components/Parallax";
 import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
-import { PHOTOS, DECOR_SRCS } from "./photos-data";
+import { PHOTOS } from "./photos-data";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
 // site-wide JSON maps never reach the gallery's client bundle — GaleriaClient
@@ -62,12 +61,6 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             {...blurFor("/imagens/DaniGui_Preview20.jpg")}
           />
         </Parallax>
-        {/* WebGL: ondulação líquida a seguir o cursor sobre a foto do herói
-            (por cima do <Image>, que continua a ser LCP + fallback). */}
-        <ShaderImageLazy
-          src="/imagens/DaniGui_Preview20.jpg"
-          className="absolute inset-0 h-full w-full"
-        />
         <div className="absolute inset-0 bg-black/20" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-[#0b0b0b]/15 to-transparent" />
         {/* Extra readability gradient only behind the bottom-left text block */}
@@ -99,7 +92,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       {/* ── Gallery (dark, immersive) ── */}
       <section className="py-12 lg:py-16 bg-[#0b0b0b]">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-          <GaleriaClient photos={galleryPhotos} decorSrcs={DECOR_SRCS} />
+          <GaleriaClient photos={galleryPhotos} />
         </div>
       </section>
 

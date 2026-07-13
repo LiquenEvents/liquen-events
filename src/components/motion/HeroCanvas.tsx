@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
-import { webglAvailable } from "@/lib/motion/webgl";
+import { webglAvailable, glDpr } from "@/lib/motion/webgl";
 import { sizedImageSrc } from "@/lib/image-src";
 
 /**
@@ -101,7 +101,7 @@ export default function HeroCanvas({ src, className }: { src: string; className?
         canvas,
         alpha: true,
         antialias: false,
-        dpr: Math.min(window.devicePixelRatio || 1, 2),
+        dpr: glDpr(),
       });
     } catch {
       canvas.remove();
@@ -141,7 +141,7 @@ export default function HeroCanvas({ src, className }: { src: string; className?
 
     // Reuse the hero <Image>'s already-decoded bitmap as the GL texture instead
     // of fetching a second copy: it's the exact photo the browser just loaded
-    // for the LCP (GridRipple/PhotoWall use the same trick), so this WebGL layer
+    // for the LCP (PhotoWall uses the same trick), so this WebGL layer
     // costs zero extra network. Only if the hero <img> can't be found (markup
     // changed) do we fall back to our own right-sized fetch.
     let hasTexture = false;
@@ -188,21 +188,42 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     const start = performance.now();
     let raf = 0;
     let firstFrame = true;
+    let lastPaint = 0;
+    let driftT = 0; // ambient-drift clock — only advances on frames we draw
+    let lastScrollY = -1;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       const hidden = document.hidden || !visible;
       if (hidden && !firstFrame) return;
 
       const elapsed = (now - start) / 1000;
+      const intro = elapsed < 2.6; // the load reveal — always draw (full 60fps)
+      const scrollY = window.scrollY || 0;
+      if (!intro && !firstFrame) {
+        // After the reveal the hero is idle unless the user is doing something.
+        // Draw only while scrolling or easing the pointer, and even then cap to
+        // ~30fps. At true rest we leave the settled frame on screen and burn
+        // ZERO GPU — which is what keeps the page fluid while you're reading.
+        const easing =
+          Math.abs(target.x - current.x) > 0.001 || Math.abs(target.y - current.y) > 0.001;
+        const scrolled = scrollY !== lastScrollY;
+        if ((!easing && !scrolled) || now - lastPaint < 32) return;
+      }
+      // Advance the drift by real (clamped) time only on drawn frames, so
+      // pausing at rest never makes it jump when it resumes.
+      driftT += Math.min((now - lastPaint) / 1000, 0.05);
+      lastPaint = now;
+      lastScrollY = scrollY;
+
       const u = program.uniforms;
-      u.uTime.value = elapsed;
+      u.uTime.value = driftT;
       // settle over ~2.6s with an ease-out
       u.uIntro.value = Math.min(1, 1 - Math.pow(1 - Math.min(elapsed / 2.6, 1), 3));
       current.x += (target.x - current.x) * 0.05;
       current.y += (target.y - current.y) * 0.05;
       u.uMouse.value = [current.x, current.y];
       const heroH = host.clientHeight || window.innerHeight;
-      u.uScroll.value = Math.min(1, (window.scrollY || 0) / heroH);
+      u.uScroll.value = Math.min(1, scrollY / heroH);
 
       renderer.render({ scene: mesh });
       if (firstFrame && hasTexture) {

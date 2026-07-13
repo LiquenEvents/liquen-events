@@ -26,7 +26,7 @@ export async function generateMetadata({
     title: t.meta.servicosTitle,
     description: t.meta.servicosDescription,
     path: "/servicos",
-    image: "/imagens/EW1_1408.jpg",
+    image: "/imagens/EW1_1330.jpg",
     keywords: [
       "wedding planner Alentejo",
       "eventos corporativos Lisboa",
@@ -68,15 +68,15 @@ const categoryMeta = [
     id: "empresas",
     num: "01",
     layout: "mosaic-right" as const,
-    band: "/imagens/EW1_1408.jpg",
+    band: "/imagens/EW1_1333.jpg",
     services: [
       // Conferências — sala ampla montada (banquete/plenário)
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1408.jpg" },
-      // Teambuilding — pessoas reunidas no pátio ao final do dia
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1330.jpg" },
-      // Lançamentos — cenografia e detalhe
-      { slug: "eventos-corporativos", image: "/imagens/EW1_0697.jpg" },
-      // Jantares de empresa — mesa posta
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1332.jpg" },
+      // Teambuilding — receção no pátio ao final do dia
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1398.jpg" },
+      // Lançamentos — cenografia e sala montada
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1428.jpg" },
+      // Jantares de empresa — mesa posta premium
       { slug: "eventos-corporativos", image: "/imagens/EW1_1404.jpg" },
     ],
   },
@@ -84,12 +84,12 @@ const categoryMeta = [
     id: "celebracoes",
     num: "02",
     layout: "mosaic-left" as const,
-    band: "/imagens/Natalia e Jonathan-167.jpg",
+    band: "/imagens/teresinhaeze-909.jpg",
     services: [
-      { slug: "casamentos", image: "/imagens/DaniGui_Preview18.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_11.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_1.jpg" },
-      { slug: "jantares-de-gala", image: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg" },
+      { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
+      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
     ],
   },
 ];
@@ -97,7 +97,7 @@ const categoryMeta = [
 // Full-bleed editorial photo grid (mirrors the Sobre page rhythm).
 const editorial = [
   { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2 row-span-2" },
-  { src: "/imagens/428658838-339551135742978-7904331374079927456-n.jpg", cls: "col-span-2" },
+  { src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg", cls: "col-span-2" },
   { src: "/imagens/DJI_20250913190635_0120_D.jpg", cls: "col-span-1" },
   { src: "/imagens/20_10_2025_0407.jpg", cls: "col-span-1" },
   { src: "/imagens/stephanie-mizio-715.jpg", cls: "col-span-2" },
@@ -348,7 +348,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       <ServiceJsonLd
         locale={locale}
         name="Organização de eventos, casamentos e eventos corporativos"
-        description="Organização de casamentos, eventos corporativos, conferências e celebrações em Lisboa e todo o Portugal — da decoração à coordenação."
+        description="Organização de casamentos, eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal — da decoração à coordenação."
         path="/servicos"
       />
 
@@ -493,6 +493,74 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </div>
       ))}
 
+      {/* ── Método — como trabalhamos (how we work) ── */}
+      <section className="relative bg-surface border-t border-foreground/8 py-24 lg:py-36 overflow-hidden">
+        {/* subtle moss glow, echoing the detail-page CTA */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 70% at 100% 0%, rgba(124,133,75,0.08) 0%, transparent 55%)",
+          }}
+        />
+        <div className="relative max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase mb-7 flex items-center gap-3">
+              <span className="w-8 h-px bg-gold flex-shrink-0" />
+              {ts.metodoEyebrow}
+            </p>
+          </AnimateIn>
+          <div className="grid lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-16 lg:items-end mb-16 lg:mb-24">
+            <AnimateIn delay={80}>
+              <h2
+                className="text-foreground font-bold leading-[1.02] tracking-tight"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 4.6vw, 68px)" }}
+              >
+                {ts.metodoTitle}
+              </h2>
+            </AnimateIn>
+            <AnimateIn delay={150}>
+              <p className="text-foreground/55 text-[15px] lg:text-base leading-[1.85] lg:pb-3 lg:border-l lg:border-foreground/12 lg:pl-8">
+                {ts.metodoLead}
+              </p>
+            </AnimateIn>
+          </div>
+
+          <Reveal
+            as="ol"
+            stagger={0.12}
+            y={54}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/8 border border-foreground/8"
+          >
+            {ts.metodo.map((step) => (
+              <li
+                key={step.num}
+                className="group relative bg-surface p-8 lg:p-9 lg:pt-11 flex flex-col min-h-[248px] lg:min-h-[336px] transition-colors duration-500 hover:bg-surface-raised/50"
+              >
+                <span
+                  className="text-foreground/10 font-bold leading-none mb-8 lg:mb-10 tabular-nums transition-colors duration-500 group-hover:text-moss/30"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(52px, 6vw, 84px)",
+                  }}
+                  aria-hidden
+                >
+                  {step.num}
+                </span>
+                <span className="w-9 h-px bg-gold/60 mb-6" />
+                <h3
+                  className="text-foreground/85 font-bold text-lg lg:text-xl mb-3.5"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {step.title}
+                </h3>
+                <p className="text-foreground/55 text-sm leading-[1.8]">{step.desc}</p>
+              </li>
+            ))}
+          </Reveal>
+        </div>
+      </section>
+
       {/* ── Editorial photo grid (full-bleed) ── */}
       <section className="bg-surface border-t border-foreground/8">
         <Reveal
@@ -507,7 +575,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 src={g.src}
                 alt="Evento organizado pela Líquen Events"
                 fill
-                sizes="(max-width: 768px) 50vw, 50vw"
+                sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                 {...blurFor(g.src)}
               />
@@ -523,12 +591,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         style={{ minHeight: "clamp(420px, 70vh, 800px)" }}
       >
         <Image
-          src="/imagens/JOAO_E_PEDRO_1Y1A3439.jpg"
-          alt="Evento Líquen Events em Portugal"
+          src="/imagens/J&A-68.jpg"
+          alt="Cerimónia ao ar livre organizada pela Líquen Events no Alentejo"
           fill
           sizes="100vw"
           className="object-cover object-center"
-          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3439.jpg")}
+          {...blurFor("/imagens/J&A-68.jpg")}
         />
         <div className="absolute inset-0 bg-black/60" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />

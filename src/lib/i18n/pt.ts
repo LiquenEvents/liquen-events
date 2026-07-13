@@ -114,6 +114,8 @@ export const pt = {
       { words: ["memória."], moss: true },
     ] as { words: string[]; moss?: boolean }[],
     scroll: "Scroll",
+    wallEyebrow: "O nosso trabalho",
+    wallTitle: "Momentos inesquecíveis",
     servicesEyebrow: "O que fazemos",
     services: [
       { tag: "Empresas", title: "Corporativos" },
@@ -427,13 +429,9 @@ export const pt = {
     heroTitle: ["Cada evento,", "uma história", "por contar."],
     heroLead:
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
-    imgCorporativos: "Corporativos",
-    imgCelebracoes: "Celebrações",
     nav: ["Empresas", "Celebrações"],
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
-    band1: ["Eventos Corporativos", "Casamentos", "Celebrações"],
-    band2: ["Corporativo", "Casamentos", "Celebrações"],
     categories: [
       {
         label: "Empresas",
@@ -482,10 +480,36 @@ export const pt = {
         ],
       },
     ],
+    metodoEyebrow: "Como trabalhamos",
+    metodoTitle: "Do primeiro esboço ao último brinde",
+    metodoLead:
+      "Um método pensado ao pormenor, para que cada evento decorra sem falhas — e para que só tenham de viver o momento.",
+    metodo: [
+      {
+        num: "01",
+        title: "Conceito & Visão",
+        desc: "Ouvimos a vossa história e desenhamos um conceito único — a estética, a atmosfera e a narrativa do evento.",
+      },
+      {
+        num: "02",
+        title: "Planeamento & Curadoria",
+        desc: "Selecionamos o espaço, os fornecedores e cada detalhe, com uma rede de confiança em todo o Portugal.",
+      },
+      {
+        num: "03",
+        title: "Produção & Coordenação",
+        desc: "Tratamos de tudo, do orçamento ao cronograma, com o rigor que um evento profissional exige.",
+      },
+      {
+        num: "04",
+        title: "O Grande Dia",
+        desc: "No dia, a nossa equipa coordena tudo nos bastidores. A vocês, resta apenas viver o momento.",
+      },
+    ],
     seoEyebrow: "Onde atuamos",
-    seoTitle: "Lisboa e todo o Portugal",
+    seoTitle: "De Évora para todo o Portugal",
     seoText:
-      "Casamentos, eventos corporativos e celebrações — do conceito à execução, com a sensibilidade do Alentejo e a exigência de uma equipa profissional.",
+      "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Tem um evento",
     ctaTitleMoss: "em mente?",
@@ -533,6 +557,8 @@ export const pt = {
 
   servicoDetalhe: {
     includesTitle: "O que inclui",
+    galleryEyebrow: "Portefólio",
+    galleryTitle: "Momentos que criámos",
     faqTitle: "Perguntas frequentes",
     relatedTitle: "Outros serviços",
     ctaTitle: "Vamos planear o seu evento?",

@@ -6,7 +6,6 @@ import Image from "next/image";
 import type { PhotoSrc, Label } from "./photos-data";
 import { useTranslations } from "@/components/LocaleProvider";
 import { ViewTransition } from "@/components/vt";
-import GridRipple from "@/components/motion/GridRipple";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -65,20 +64,31 @@ function bucketKey(p: Photo): string {
   return collectionFor(p.src) ?? `cat:${p.label}`;
 }
 
+// Stable per-string hash → [0,1). Deterministic (same on server + client, so
+// no hydration mismatch) and independent of array position, so it seeds a
+// reproducible "shuffle" without any global RNG state. FNV-1a.
+function hashUnit(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
 /**
- * Spread photos so the same event never clusters — no two consecutive photos
- * from the same collection (when mathematically possible) AND each collection
- * appears at its natural frequency throughout the grid, not bunched at the end.
+ * Spread photos so the grid feels genuinely shuffled — no two consecutive
+ * photos from the same event, every collection appearing throughout (not
+ * bunched), AND no rigid repeating pattern.
  *
- * Method: give every photo a fractional rank `(j + 0.5) / size` — its position
- * within its own bucket, normalised to [0,1). A 100-photo shoot lands its
- * frames at 0.005, 0.015, 0.025 … so they're ~1/frequency apart across the
- * whole list; a 5-photo shoot lands at 0.1, 0.3, 0.5 … Sorting everything by
- * rank interleaves them proportionally. Deterministic (stable across
- * renders/SSR): equal-size buckets tie-break by first-appearance order, and
- * since a bucket's own ranks are all distinct it can never place itself twice
- * in a row unless it exceeds half the list (only possible inside a
- * single-collection category, where clustering is unavoidable anyway).
+ * Method: each photo gets a fractional rank `(j + 0.5) / size` — its position
+ * within its own bucket, normalised to [0,1) — so a big shoot's frames land
+ * ~1/frequency apart across the whole list. We then add a stable per-photo
+ * jitter (±~0.11 of the range, hashed from the filename) so photos hop out of
+ * the mechanical A,B,C,A,B,C rotation and categories genuinely intermix, while
+ * the base rank still keeps each shoot roughly evenly spread. Fully
+ * deterministic (stable across renders/SSR). A final de-adjacency pass removes
+ * the rare same-event neighbour the jitter can create.
  */
 function interleaveByCollection(list: Photo[]): Photo[] {
   const buckets = new Map<string, Photo[]>();
@@ -93,16 +103,16 @@ function interleaveByCollection(list: Photo[]): Photo[] {
     }
     arr.push(p);
   }
-  const ordOf = new Map(order.map((k, i) => [k, i] as const));
-  const ranked: { p: Photo; rank: number; ord: number }[] = [];
+  const ranked: { p: Photo; rank: number }[] = [];
   for (const key of order) {
     const arr = buckets.get(key)!;
-    const ord = ordOf.get(key)!;
     for (let j = 0; j < arr.length; j++) {
-      ranked.push({ p: arr[j], rank: (j + 0.5) / arr.length, ord });
+      const base = (j + 0.5) / arr.length;
+      const jitter = (hashUnit(arr[j].src) - 0.5) * 0.22;
+      ranked.push({ p: arr[j], rank: base + jitter });
     }
   }
-  ranked.sort((a, b) => a.rank - b.rank || a.ord - b.ord);
+  ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src) - hashUnit(b.p.src));
   return deAdjacent(ranked.map((r) => r.p));
 }
 
@@ -139,8 +149,6 @@ function deAdjacent(list: Photo[]): Photo[] {
 const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
-
-// DECOR (fotos de decoração puxadas para a frente) chega via prop decorSrcs.
 
 // URL-hash slugs for each category, so a filtered view is shareable &
 // bookmarkable (e.g. /galeria#casamentos) and survives the back button.
@@ -222,14 +230,7 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   );
 }
 
-export default function GaleriaClient({
-  photos,
-  decorSrcs,
-}: {
-  photos: Photo[];
-  decorSrcs: readonly string[];
-}) {
-  const DECOR = useMemo(() => new Set(decorSrcs), [decorSrcs]);
+export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   const collectionNames = useMemo(
     () =>
       Array.from(new Set(photos.map((p) => collectionFor(p.src)).filter((c): c is string => !!c))),
@@ -415,20 +416,17 @@ export default function GaleriaClient({
   // A collection view is the opposite intent — it's ONE event told in shoot
   // order — so it skips interleaving entirely.
   //
-  // DECORAÇÃO PRIMEIRO: em qualquer vista de categoria, as fotos de decoração
-  // (ver `DECOR`) sobem para a frente — a galeria abre com arranjos, mesas e
-  // detalhes. Cada bloco (decor / resto) é intercalado por coleção à parte, para
-  // não amontoar o mesmo evento. A vista de uma coleção específica ignora isto
-  // (é a história de um casamento por ordem).
+  // TUDO MISTURADO: sem blocos temáticos (a antiga regra "decoração primeiro"
+  // empilhava bouquets/arranjos no topo). O interleave por coleção espalha
+  // cada evento uniformemente, por isso o grid abre já com uma mistura real —
+  // casais, mesas, decoração, aéreas — sem aglomerados.
   const pool = useMemo(() => {
     if (collectionFilter) {
       return photos.filter((p) => collectionFor(p.src) === collectionFilter);
     }
     const filtered = cat === "Todos" ? photos : photos.filter((p) => p.label === cat);
-    const decor = interleaveByCollection(filtered.filter((p) => DECOR.has(p.src)));
-    const rest = interleaveByCollection(filtered.filter((p) => !DECOR.has(p.src)));
-    return [...decor, ...rest];
-  }, [cat, collectionFilter, photos, DECOR]);
+    return interleaveByCollection(filtered);
+  }, [cat, collectionFilter, photos]);
   const visible = pool.slice(0, shown);
 
   // Infinite scroll — a sentinel below the grid loads the next page as it nears
@@ -698,10 +696,6 @@ export default function GaleriaClient({
 
   return (
     <>
-      {/* Ripple líquido que segue o cursor pela grelha — um único contexto WebGL
-          reposicionado sobre a tile em hover (ver GridRipple). */}
-      <GridRipple />
-
       {/* ── Filtros / vista de casamento ── */}
       {collectionFilter ? (
         <div className="flex items-center gap-4 mb-8">
