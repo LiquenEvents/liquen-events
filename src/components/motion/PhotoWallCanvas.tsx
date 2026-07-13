@@ -49,10 +49,11 @@ const FRAG = /* glsl */ `
 `;
 
 function sizedSrc(src: string): string {
-  // Carousel thumbnails — a 640px copy keeps the GPU upload light. Quality must
-  // be 75: Next 16 only serves the qualities in images.qualities (default [75]),
-  // and anything else 400s — which would leave the textures blank.
-  return `/_next/image?url=${encodeURIComponent(src)}&w=640&q=75`;
+  // Match the flat ribbon's own request EXACTLY (next/image `sizes="450px"` → the
+  // 480px device width, q=75) so the browser serves the carousel texture from
+  // cache instead of downloading a second copy. Quality must be 75: Next 16 only
+  // serves the qualities in images.qualities (default [75]); anything else 400s.
+  return `/_next/image?url=${encodeURIComponent(src)}&w=480&q=75`;
 }
 
 const PLANE_W = 1.5;

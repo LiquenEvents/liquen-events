@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,7 +26,17 @@ export default function PhotoWall({
 }) {
   const reduced = useReducedMotion();
   const [ready, setReady] = useState(false);
+  const [hideRibbon, setHideRibbon] = useState(false);
   const enhance = !reduced;
+
+  // Once the WebGL carousel has crossfaded in, drop the ribbon from the DOM
+  // (frees its ~28 <img> nodes). Wait out the fade first so there's no flash;
+  // never fires under reduced motion (ready stays false → ribbon is the view).
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(() => setHideRibbon(true), 800);
+    return () => clearTimeout(t);
+  }, [ready]);
 
   return (
     <section
@@ -34,33 +44,35 @@ export default function PhotoWall({
       className="relative bg-[#10140f] border-y border-white/8 overflow-hidden h-[300px] sm:h-[380px] lg:h-[460px]"
     >
       {/* Flat ribbon — SSR / LCP / reduced-motion / no-WebGL fallback. Fades out
-          once the WebGL carousel has painted its first frame. */}
-      <div
-        aria-hidden={ready}
-        className="absolute inset-0 flex items-center transition-opacity duration-700"
-        style={{ opacity: ready ? 0 : 1 }}
-      >
-        <div className="absolute inset-y-0 left-0 w-20 sm:w-32 bg-gradient-to-r from-[#10140f] to-transparent z-20 pointer-events-none" />
-        <div className="absolute inset-y-0 right-0 w-20 sm:w-32 bg-gradient-to-l from-[#10140f] to-transparent z-20 pointer-events-none" />
-        <div className="flex gap-2 animate-marquee w-max">
-          {[...images, ...images].map((img, i) => (
-            <div
-              key={i}
-              className="relative h-[180px] sm:h-[240px] lg:h-[300px] w-[270px] sm:w-[360px] lg:w-[450px] flex-shrink-0 overflow-hidden rounded-lg"
-            >
-              <Image
-                src={img.src}
-                alt=""
-                fill
-                sizes="450px"
-                className="object-cover"
-                placeholder={img.blurDataURL ? "blur" : undefined}
-                blurDataURL={img.blurDataURL}
-              />
-            </div>
-          ))}
+          once the WebGL carousel has painted its first frame, then unmounts. */}
+      {!hideRibbon && (
+        <div
+          aria-hidden={ready}
+          className="absolute inset-0 flex items-center transition-opacity duration-700"
+          style={{ opacity: ready ? 0 : 1 }}
+        >
+          <div className="absolute inset-y-0 left-0 w-20 sm:w-32 bg-gradient-to-r from-[#10140f] to-transparent z-20 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-20 sm:w-32 bg-gradient-to-l from-[#10140f] to-transparent z-20 pointer-events-none" />
+          <div className="flex gap-2 animate-marquee w-max">
+            {[...images, ...images].map((img, i) => (
+              <div
+                key={i}
+                className="relative h-[180px] sm:h-[240px] lg:h-[300px] w-[270px] sm:w-[360px] lg:w-[450px] flex-shrink-0 overflow-hidden rounded-lg"
+              >
+                <Image
+                  src={img.src}
+                  alt=""
+                  fill
+                  sizes="450px"
+                  className="object-cover"
+                  placeholder={img.blurDataURL ? "blur" : undefined}
+                  blurDataURL={img.blurDataURL}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* WebGL curved carousel (fades in over the ribbon) */}
       {enhance && (
