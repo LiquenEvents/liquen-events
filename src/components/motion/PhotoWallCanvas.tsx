@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Renderer, Camera, Transform, Plane, Program, Mesh, Texture } from "ogl";
+import { webglAvailable } from "@/lib/motion/webgl";
 
 /**
  * A 3D curved photo carousel (WebGL / OGL). The gallery photos are arranged on a
@@ -82,6 +83,8 @@ export default function PhotoWallCanvas({
   useEffect(() => {
     const host = hostRef.current;
     if (!host || images.length === 0) return;
+    // No WebGL → keep the flat ribbon fallback, and don't let OGL log an error.
+    if (!webglAvailable()) return;
 
     // Imperative canvas (StrictMode-safe — a lost WebGL context can't be
     // re-acquired from the same <canvas>; a fresh one per effect run keeps dev

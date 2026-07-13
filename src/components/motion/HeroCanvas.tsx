@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
+import { webglAvailable } from "@/lib/motion/webgl";
 
 /**
  * WebGL hero layer. Renders the SAME photo as the static <Image> underneath it,
@@ -84,6 +85,9 @@ export default function HeroCanvas({ src, className }: { src: string; className?
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    // Bail before touching OGL if the platform can't do WebGL — OGL logs a
+    // console error otherwise (headless/no-GPU); the static <Image> stays.
+    if (!webglAvailable()) return;
 
     // Create the canvas imperatively (not via JSX): under React StrictMode the
     // effect mounts→unmounts→mounts, and a WebGL context, once lost on cleanup,

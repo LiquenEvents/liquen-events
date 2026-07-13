@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
+import { webglAvailable } from "@/lib/motion/webgl";
 
 /**
  * A WebGL image plane with a cursor-following liquid ripple: concentric waves
@@ -65,6 +66,7 @@ export default function ShaderImage({ src, className }: { src: string; className
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    if (!webglAvailable()) return; // no WebGL → keep the still, no OGL error
 
     const canvas = document.createElement("canvas");
     canvas.setAttribute("aria-hidden", "true");

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
+import { webglAvailable } from "@/lib/motion/webgl";
 
 /**
  * Cursor-following liquid ripple for the gallery grid — the "ripple na grelha".
@@ -66,6 +67,7 @@ function GridRippleCanvas() {
     const root = rootRef.current;
     const host = hostRef.current;
     if (!root || !host) return;
+    if (!webglAvailable()) return; // no WebGL → grid keeps its CSS hover, no OGL error
 
     const canvas = document.createElement("canvas");
     canvas.setAttribute("aria-hidden", "true");
