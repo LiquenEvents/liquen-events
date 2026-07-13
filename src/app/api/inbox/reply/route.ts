@@ -1,27 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { isAuthed } from "@/lib/admin-auth";
+import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
+// `to` is validated (bounded, no header-injection newlines, must contain a real
+// address — tolerating a "Name <addr>" form) and the body sizes are capped, so
+// a borrowed/compromised admin session can't turn this into an open relay for
+// arbitrary bulk mail. It's also rate-limited below.
+const replySchema = z.object({
+  to: z
+    .string()
+    .trim()
+    .min(3)
+    .max(320)
+    .refine(
+      (v) => !/[\r\n]/.test(v) && /[^\s@]+@[^\s@]+\.[^\s@]+/.test(v),
+      "Destinatário inválido",
+    ),
+  subject: z.string().trim().max(200).optional(),
+  message: z.string().trim().min(1, "Mensagem obrigatória").max(10_000),
+});
+
 export async function POST(request: NextRequest) {
   if (!isAuthed(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
-  try {
-    const body = await request.json();
-    const to = String(body.to ?? "").trim();
-    const subject = String(body.subject ?? "").trim() || "Re: o seu e-mail";
-    const message = String(body.message ?? "").trim();
 
-    if (!to || !message) {
+  // Cap send volume even for an authenticated admin.
+  sweep();
+  const limited = await rateLimit(`inbox-reply:${clientIp(request)}`, 20, 60_000);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "Demasiadas respostas. Tente novamente dentro de momentos." },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } },
+    );
+  }
+
+  try {
+    const parsed = replySchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
         { error: "Destinatário e mensagem são obrigatórios." },
         { status: 400 },
       );
     }
+    const { to, message } = parsed.data;
+    const subject = parsed.data.subject?.trim() || "Re: o seu e-mail";
 
     const html = `
     <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
