@@ -113,17 +113,29 @@ export default function ShaderImage({ src, className }: { src: string; className
     };
     setCover();
 
-    const img = new Image();
-    img.decoding = "async";
-    const onImg = () => {
-      if (!img.naturalWidth) return;
-      texture.image = img;
-      imgAspect = img.naturalWidth / img.naturalHeight || 1;
+    // Reuse the hero <Image>'s already-decoded bitmap (same photo the browser
+    // loaded for the LCP) instead of fetching a second copy — zero extra network.
+    let hasTexture = false;
+    const applyTexture = (im: HTMLImageElement) => {
+      if (!im.naturalWidth) return;
+      texture.image = im;
+      imgAspect = im.naturalWidth / im.naturalHeight || 1;
+      hasTexture = true;
       setCover();
     };
-    img.onload = onImg;
-    img.src = sizedSrc(src);
-    if (img.complete) onImg();
+    const heroImg = (host.closest("section")?.querySelector("img") ??
+      null) as HTMLImageElement | null;
+    const onHeroLoad = () => heroImg && applyTexture(heroImg);
+    if (heroImg) {
+      if (heroImg.complete && heroImg.naturalWidth) applyTexture(heroImg);
+      else heroImg.addEventListener("load", onHeroLoad);
+    } else {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => applyTexture(img);
+      img.src = sizedSrc(src);
+      if (img.complete) applyTexture(img);
+    }
 
     // pointer: target uv (0..1, y-flipped for uv space) + hover presence.
     // Listen on window and hit-test the host rect — the gradient overlays that
@@ -167,7 +179,7 @@ export default function ShaderImage({ src, className }: { src: string; className
       u.uMouse.value = [curMouse.x, curMouse.y];
       u.uHover.value = curHover;
       renderer.render({ scene: mesh });
-      if (firstFrame && img.complete && img.naturalWidth) {
+      if (firstFrame && hasTexture) {
         firstFrame = false;
         canvas.style.opacity = "1";
       }
@@ -177,6 +189,7 @@ export default function ShaderImage({ src, className }: { src: string; className
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onMove);
+      heroImg?.removeEventListener("load", onHeroLoad);
       ro.disconnect();
       io.disconnect();
       gl.getExtension("WEBGL_lose_context")?.loseContext();

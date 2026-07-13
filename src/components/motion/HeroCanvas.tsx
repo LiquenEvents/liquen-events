@@ -48,7 +48,7 @@ const FRAG = /* glsl */ `
     vec2 develop = vec2(
       sin(uv.y * 11.0 - t * 1.8),
       cos(uv.x * 9.5 + t * 1.6)
-    ) * 0.05 * rest;
+    ) * 0.03 * rest;
 
     // whisper of pointer parallax + a touch of scroll-driven push
     uv += uMouse * 0.014 * (0.4 + 0.6 * (1.0 - uScroll));
@@ -57,8 +57,9 @@ const FRAG = /* glsl */ `
     // slow ken-burns-ish zoom as you scroll past
     uv = (uv - 0.5) * (1.0 - uScroll * 0.06) + 0.5;
 
-    // filmic RGB split — barely there once settled, blooms during the intro
-    float sep = 0.0012 + 0.012 * rest;
+    // filmic RGB split — barely there once settled, a gentle bloom during the
+    // intro (kept low so the "develop" reads as filmic, not like a broken frame)
+    float sep = 0.0012 + 0.006 * rest;
     float r = texture2D(tMap, uv + vec2(sep, 0.0)).r;
     float g = texture2D(tMap, uv).g;
     float b = texture2D(tMap, uv - vec2(sep, 0.0)).b;
@@ -143,20 +144,32 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     };
     setCover(); // fill the host immediately, before the texture resolves
 
-    const img = new Image();
-    img.decoding = "async";
-    const onImg = () => {
-      if (!img.naturalWidth) return;
-      texture.image = img;
-      imgAspect = img.naturalWidth / img.naturalHeight || 1;
+    // Reuse the hero <Image>'s already-decoded bitmap as the GL texture instead
+    // of fetching a second copy: it's the exact photo the browser just loaded
+    // for the LCP (GridRipple/PhotoWall use the same trick), so this WebGL layer
+    // costs zero extra network. Only if the hero <img> can't be found (markup
+    // changed) do we fall back to our own right-sized fetch.
+    let hasTexture = false;
+    const applyTexture = (im: HTMLImageElement) => {
+      if (!im.naturalWidth) return;
+      texture.image = im;
+      imgAspect = im.naturalWidth / im.naturalHeight || 1;
+      hasTexture = true;
       setCover();
     };
-    // Attach the handler BEFORE `src`: the hero <Image> already warmed this into
-    // cache, so setting src can complete synchronously and a handler attached
-    // afterwards would never fire. Guard the already-complete case too.
-    img.onload = onImg;
-    img.src = sizedSrc(src);
-    if (img.complete) onImg();
+    const heroImg = (host.closest("section")?.querySelector("img") ??
+      null) as HTMLImageElement | null;
+    const onHeroLoad = () => heroImg && applyTexture(heroImg);
+    if (heroImg) {
+      if (heroImg.complete && heroImg.naturalWidth) applyTexture(heroImg);
+      else heroImg.addEventListener("load", onHeroLoad);
+    } else {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => applyTexture(img);
+      img.src = sizedSrc(src);
+      if (img.complete) applyTexture(img);
+    }
 
     // eased pointer
     const target = { x: 0, y: 0 };
@@ -197,7 +210,7 @@ export default function HeroCanvas({ src, className }: { src: string; className?
       u.uScroll.value = Math.min(1, (window.scrollY || 0) / heroH);
 
       renderer.render({ scene: mesh });
-      if (firstFrame && img.complete && img.naturalWidth) {
+      if (firstFrame && hasTexture) {
         firstFrame = false;
         canvas.style.opacity = "1"; // fade the WebGL layer in over the still
       }
@@ -207,6 +220,7 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onPointer);
+      heroImg?.removeEventListener("load", onHeroLoad);
       ro.disconnect();
       io.disconnect();
       const ext = gl.getExtension("WEBGL_lose_context");
