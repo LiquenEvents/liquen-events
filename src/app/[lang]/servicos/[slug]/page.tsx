@@ -6,6 +6,8 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
+import KineticHeading from "@/components/KineticHeading";
+import HeroWebGL from "@/components/motion/HeroWebGL";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "@/lib/services-data";
@@ -95,6 +97,9 @@ export default async function ServiceDetailPage({
             className="object-cover hero-settle"
           />
         </Parallax>
+        {/* WebGL layer over the static hero (fades in when ready; absent under
+            reduced motion / no-WebGL). */}
+        <HeroWebGL src={svc.hero} className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
           <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/45 mb-8">
@@ -107,12 +112,11 @@ export default async function ServiceDetailPage({
             <span>/</span>
             <span className="text-cream/70">{svc.eyebrow}</span>
           </nav>
-          <h1
+          <KineticHeading
             className="text-cream font-bold leading-[0.95] max-w-4xl"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 6vw, 84px)" }}
-          >
-            {svc.title}
-          </h1>
+            lines={[[{ text: svc.title }]]}
+          />
         </div>
       </section>
 

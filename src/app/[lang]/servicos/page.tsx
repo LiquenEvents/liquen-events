@@ -5,6 +5,8 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
+import KineticHeading from "@/components/KineticHeading";
+import HeroWebGL from "@/components/motion/HeroWebGL";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
@@ -357,6 +359,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             {...blurFor("/imagens/EW1_1330.jpg")}
           />
         </Parallax>
+        {/* WebGL layer over the static hero (fades in when ready; absent under
+            reduced motion / no-WebGL). */}
+        <HeroWebGL src="/imagens/EW1_1330.jpg" className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
@@ -368,16 +373,14 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               {ts.heroEyebrow}
             </p>
           </AnimateIn>
-          <AnimateIn delay={80}>
-            <h1
-              className="text-white font-bold leading-[0.9] tracking-tight"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(52px, 9vw, 132px)" }}
-            >
-              {ts.heroTitle[0]}
-              <br />
-              {ts.heroTitle[1]} <span className="text-moss">{ts.heroTitle[2]}</span>
-            </h1>
-          </AnimateIn>
+          <KineticHeading
+            className="text-white font-bold leading-[0.9] tracking-tight"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(52px, 9vw, 132px)" }}
+            lines={[
+              [{ text: ts.heroTitle[0] }],
+              [{ text: ts.heroTitle[1] }, { text: ts.heroTitle[2], moss: true }],
+            ]}
+          />
           <AnimateIn delay={150}>
             <div className="mt-9 flex flex-col sm:flex-row sm:items-end gap-7 sm:gap-12">
               <p className="text-white/60 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>

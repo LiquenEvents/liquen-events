@@ -8,6 +8,8 @@ import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
 import { blurFor } from "@/lib/blur";
 import Parallax from "@/components/Parallax";
+import KineticHeading from "@/components/KineticHeading";
+import HeroWebGL from "@/components/motion/HeroWebGL";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
@@ -283,6 +285,12 @@ export default function ContactForm() {
             className="object-cover hero-settle"
           />
         </Parallax>
+        {/* WebGL layer over the static hero (fades in when ready; absent under
+            reduced motion / no-WebGL). */}
+        <HeroWebGL
+          src="/imagens/DJI_20250913190635_0120_D.jpg"
+          className="absolute inset-0 h-full w-full"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
         <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
           <div className="max-w-7xl mx-auto w-full">
@@ -290,17 +298,11 @@ export default function ContactForm() {
               <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
               {tf.heroEyebrow}
             </p>
-            <h1
+            <KineticHeading
               className="text-cream font-bold leading-[0.88] tracking-tight"
-              style={{
-                fontFamily: "var(--font-playfair)",
-                fontSize: "clamp(44px, 7.5vw, 100px)",
-              }}
-            >
-              {tf.heroTitleLine1}
-              <br />
-              <span className="text-moss">{tf.heroTitleMoss}</span>
-            </h1>
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 7.5vw, 100px)" }}
+              lines={[[{ text: tf.heroTitleLine1 }], [{ text: tf.heroTitleMoss, moss: true }]]}
+            />
           </div>
         </div>
       </section>

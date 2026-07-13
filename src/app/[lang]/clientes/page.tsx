@@ -5,6 +5,8 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
+import KineticHeading from "@/components/KineticHeading";
+import HeroWebGL from "@/components/motion/HeroWebGL";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
@@ -103,6 +105,9 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             {...blurFor("/imagens/EW1_1393.jpg")}
           />
         </Parallax>
+        {/* WebGL layer over the static hero (fades in when ready; absent under
+            reduced motion / no-WebGL). */}
+        <HeroWebGL src="/imagens/EW1_1393.jpg" className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-black/50" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
@@ -114,19 +119,14 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.heroEyebrow}
             </p>
           </AnimateIn>
-          <AnimateIn delay={80}>
-            <h1
-              className="text-white font-bold leading-[0.88] tracking-tight"
-              style={{
-                fontFamily: "var(--font-playfair)",
-                fontSize: "clamp(58px, 10.5vw, 148px)",
-              }}
-            >
-              {t.clientes.heroTitleLine1}
-              <br />
-              <em className="not-italic text-moss">{t.clientes.heroTitleMoss}</em>
-            </h1>
-          </AnimateIn>
+          <KineticHeading
+            className="text-white font-bold leading-[0.88] tracking-tight"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(58px, 10.5vw, 148px)" }}
+            lines={[
+              [{ text: t.clientes.heroTitleLine1 }],
+              [{ text: t.clientes.heroTitleMoss, moss: true }],
+            ]}
+          />
           <AnimateIn delay={180}>
             <div className="mt-10 border-l-2 border-moss/50 pl-6 max-w-md">
               <p className="text-white/60 text-base leading-[1.8]">{t.clientes.heroLead}</p>

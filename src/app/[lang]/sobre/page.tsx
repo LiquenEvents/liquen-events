@@ -5,6 +5,8 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
+import KineticHeading from "@/components/KineticHeading";
+import HeroWebGL from "@/components/motion/HeroWebGL";
 import Magnetic from "@/components/motion/Magnetic";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -62,6 +64,12 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3204.jpg")}
           />
         </Parallax>
+        {/* WebGL layer over the static hero (fades in when ready; absent under
+            reduced motion / no-WebGL). */}
+        <HeroWebGL
+          src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
+          className="absolute inset-0 h-full w-full"
+        />
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-transparent" />
 
@@ -72,15 +80,11 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               {t.sobre.heroEyebrow}
             </p>
           </AnimateIn>
-          <AnimateIn delay={80}>
-            <h1
-              className="text-white font-bold leading-[0.88] tracking-tight"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(54px, 10vw, 150px)" }}
-            >
-              {t.sobre.heroTitlePre}
-              <span className="text-moss">{t.sobre.heroTitleMoss}</span>
-            </h1>
-          </AnimateIn>
+          <KineticHeading
+            className="text-white font-bold leading-[0.88] tracking-tight"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(54px, 10vw, 150px)" }}
+            lines={[[{ text: t.sobre.heroTitlePre }, { text: t.sobre.heroTitleMoss, moss: true }]]}
+          />
         </div>
 
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
