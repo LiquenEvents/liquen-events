@@ -49,8 +49,10 @@ const FRAG = /* glsl */ `
 `;
 
 function sizedSrc(src: string): string {
-  // Carousel thumbnails — a 640px copy keeps the GPU upload light.
-  return `/_next/image?url=${encodeURIComponent(src)}&w=640&q=70`;
+  // Carousel thumbnails — a 640px copy keeps the GPU upload light. Quality must
+  // be 75: Next 16 only serves the qualities in images.qualities (default [75]),
+  // and anything else 400s — which would leave the textures blank.
+  return `/_next/image?url=${encodeURIComponent(src)}&w=640&q=75`;
 }
 
 const PLANE_W = 1.5;
