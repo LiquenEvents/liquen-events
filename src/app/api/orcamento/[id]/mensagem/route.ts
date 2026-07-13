@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { QuoteMessage } from "../../../../orcamento/types";
+import type { QuoteMessage } from "@/lib/orcamento/types";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";

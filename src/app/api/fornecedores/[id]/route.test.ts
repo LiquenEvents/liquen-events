@@ -49,4 +49,20 @@ describe("/api/fornecedores/[id]", () => {
     expect(res.status).toBe(200);
     expect(store.del).toHaveBeenCalledWith("s1");
   });
+
+  it("blocks mass-assignment of id/createdAt via PATCH", async () => {
+    authed.ok = true;
+    await PATCH(
+      req("PATCH", { name: "Novo nome", id: "s2-evil", createdAt: "2000-01-01" }),
+      ctx("s1"),
+    );
+    expect(store.update).toHaveBeenCalledWith("s1", { name: "Novo nome" });
+  });
+
+  it("rejects invalid field values with 400", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", { email: "not-an-email" }), ctx("s1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
 });

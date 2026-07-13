@@ -11,6 +11,15 @@ import { z } from "zod";
 const trimmed = (max: number) => z.string().trim().max(max);
 
 // Quote request — the part of QuoteFormData we rely on; rest passes through.
+const selectedAddonSchema = z.object({
+  id: trimmed(100),
+  name: trimmed(200),
+  tier: trimmed(30),
+  price: z.number().finite().min(0).max(10_000_000),
+  quantity: z.number().finite().min(0).max(100_000),
+  pricingType: trimmed(30),
+});
+
 export const quoteFormSchema = z
   .object({
     name: trimmed(120).min(2, "Nome demasiado curto"),
@@ -21,8 +30,33 @@ export const quoteFormSchema = z
     guests: z.coerce.number().int().min(0).max(100000).optional().default(0),
     date: trimmed(20).optional().default(""),
     notes: trimmed(4000).optional().default(""),
+    // Remaining QuoteFormData fields are free-form on the client (category
+    // labels, location text, addon picks…) — bound their size/shape so a
+    // crafted payload can't smuggle a multi-MB string into the confirmation
+    // email/DB record, without hardcoding every UI enum value here (brittle
+    // if the front-end adds an option this schema doesn't know about yet).
+    category: trimmed(40).nullish(),
+    eventType: trimmed(60).nullish(),
+    eventName: trimmed(200).optional().default(""),
+    endDate: trimmed(20).optional().default(""),
+    location: trimmed(300).optional().default(""),
+    locationType: trimmed(30).optional(),
+    duration: z.coerce.number().finite().min(0).max(1000).optional(),
+    isMultiDay: z.boolean().optional(),
+    packageTier: trimmed(30).optional(),
+    addons: z.array(selectedAddonSchema).max(100).optional().default([]),
+    budgetRange: trimmed(30).nullish(),
+    urgency: trimmed(30).optional(),
+    referralSource: trimmed(200).optional().default(""),
+    acceptTerms: z.boolean().optional(),
+    acceptMarketing: z.boolean().optional(),
   })
-  .passthrough();
+  // .strip() (the default) — every QuoteFormData field is declared and bounded
+  // above, so unknown keys are dropped rather than persisted. Previously
+  // .passthrough() let a crafted payload smuggle arbitrary unbounded keys into
+  // the stored quote (data-integrity / storage abuse); a genuinely new field
+  // should be added here explicitly instead.
+  .strip();
 
 // Price breakdown — computed client-side, so validate the shape before it is
 // persisted and reused in emails, exports and admin revenue maths. Values are
@@ -146,16 +180,47 @@ export const quoteUpdateSchema = z
   })
   .partial();
 
-// Contact form.
-export const contactSchema = z
+// Proposal creation (admin, from the quote's line-item builder). Bounds every
+// value so a crafted admin request can't push megabyte descriptions or a
+// huge line-item array into the PDF render / outbound email attachment.
+export const proposalLineItemSchema = z.object({
+  description: trimmed(500),
+  qty: z.number().finite().min(0).max(100_000),
+  unitPrice: z.number().finite().min(0).max(10_000_000),
+});
+
+export const proposalCreateSchema = z.object({
+  lineItems: z.array(proposalLineItemSchema).max(200),
+  vatRate: z.number().finite().min(0).max(1).optional(),
+  validUntil: shortDate.optional(),
+  notes: trimmed(5000).optional(),
+});
+
+export const taskUpdateSchema = z
   .object({
-    nome: trimmed(120).min(2, "Nome demasiado curto"),
-    email: z.email("Email inválido").max(160),
-    telefone: trimmed(40).optional().default(""),
-    eventType: trimmed(80).optional().default(""),
-    mensagem: trimmed(4000).min(1, "Escreva uma mensagem"),
+    title: trimmed(300).min(1),
+    done: z.boolean(),
+    priority: z.enum(["baixa", "normal", "alta"]),
+    dueDate: shortDate.nullish(),
+    quoteId: trimmed(100).nullish(),
+    clientName: trimmed(200).nullish(),
+    assignee: trimmed(120).nullish(),
+    area: trimmed(80).nullish(),
   })
-  .passthrough();
+  .partial();
+
+export const supplierUpdateSchema = z
+  .object({
+    name: trimmed(200).min(1),
+    category: trimmed(100),
+    email: z.union([z.email().max(160), z.literal("")]).nullish(),
+    phone: trimmed(40).nullish(),
+    location: trimmed(300).nullish(),
+    notes: trimmed(5000).nullish(),
+    rating: z.number().int().min(1).max(5).nullish(),
+    preferred: z.boolean().nullish(),
+  })
+  .partial();
 
 // Web Push subscription — sanitise this network-provided object into a strict,
 // known-good shape before it is ever persisted.

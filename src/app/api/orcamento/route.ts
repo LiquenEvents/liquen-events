@@ -1,11 +1,10 @@
-import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import type { Quote, QuoteFormData, PriceBreakdown } from "../../orcamento/types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../../orcamento/data";
+import type { Quote, QuoteFormData, PriceBreakdown } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { sendMail, esc } from "@/lib/mail";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
-import { createQuote, listQuotes } from "@/lib/quotes-store";
+import { createQuote, listQuotes, generateQuoteId } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
@@ -13,15 +12,6 @@ import { quotePayloadSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
 export const maxDuration = 30;
-
-function generateId(): string {
-  const now = Date.now().toString(36).toUpperCase();
-  // crypto-sourced randomness — Math.random is guessable and collision-prone.
-  const rand = Array.from(randomBytes(4), (b) => (b % 36).toString(36))
-    .join("")
-    .toUpperCase();
-  return `LIQ-${now}-${rand}`;
-}
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -88,10 +78,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => null);
     // Honeypot: a real visitor never fills the hidden "website" field. If it's
-    // set, this is a bot — pretend success and drop it silently. (Mirrors the
-    // same server-side check in /api/contacto; client-side alone is bypassable.)
+    // set, this is a bot — pretend success and drop it silently. The client
+    // guards it too, but that alone is bypassable, so re-check server-side.
     if (body && typeof body === "object" && (body as Record<string, unknown>).website) {
-      return NextResponse.json({ id: generateId(), status: "ok" });
+      return NextResponse.json({ id: generateQuoteId(), status: "ok" });
     }
     const parsed = quotePayloadSchema.safeParse(body);
     if (!parsed.success) {
@@ -102,7 +92,7 @@ export async function POST(request: NextRequest) {
       breakdown: PriceBreakdown;
     };
 
-    const id = generateId();
+    const id = generateQuoteId();
 
     const quote: Quote = {
       ...form,

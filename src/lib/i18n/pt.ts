@@ -22,7 +22,8 @@ export const pt = {
     {
       name: "Stephanie & Mizio",
       role: "Evento Privado",
-      quote: "Everything was exactly how we'd envisioned and you created a beautiful space for us!",
+      quote:
+        "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
     },
     {
       name: "Teresinha Malta",
@@ -63,14 +64,16 @@ export const pt = {
     enviarEmail: "Enviar e-mail",
     contactWhatsApp: "Contactar pelo WhatsApp",
     clientsSay: "O que dizem os clientes",
+    reviewsLabel: "avaliações",
+    testemunhoLabel: "Testemunho",
     whatsappPrefill: "Olá, gostaria de saber mais sobre a organização de eventos.",
   },
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Líquen Events — Organização de Eventos no Alentejo e em Portugal",
+    homeTitle: "Líquen Events — Organização de Eventos em Évora, Alentejo e Portugal",
     homeDescription:
-      "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.",
+      "Empresa de organização de eventos com base em Évora. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.",
     sobreTitle: "Sobre Nós — Empresa de Eventos",
     sobreDescription:
       "Conheça a Líquen Events, empresa de organização de eventos. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",
@@ -89,6 +92,18 @@ export const pt = {
     orcamentoTitle: "Pedido de Orçamento",
     orcamentoDescription:
       "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas.",
+  },
+
+  // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
+  // the markup's language always matches the visible page's.
+  jsonld: {
+    hasOfferCatalogName: "Serviços de organização de eventos",
+    services: [
+      "Organização de casamentos",
+      "Eventos corporativos e conferências",
+      "Festas e celebrações privadas",
+      "Jantares de gala e eventos sociais",
+    ],
   },
 
   home: {
@@ -212,7 +227,7 @@ export const pt = {
       },
       {
         name: "Stephanie & Mizio",
-        text: "Everything was exactly how we'd envisioned and you created a beautiful space for us!",
+        text: "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
         event: "Evento Privado",
       },
       {
@@ -244,6 +259,14 @@ export const pt = {
   },
 
   contacto: {
+    direct: {
+      ctaEyebrow: "Pronto para começar?",
+      ctaTitleLine1: "Peça o seu",
+      ctaTitleMoss: "orçamento.",
+      ctaText:
+        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais ao lado.",
+      ctaButton: "Pedir orçamento",
+    },
     testimonialsEyebrow: "O que dizem os nossos clientes",
     nextEyebrow: "O que acontece a seguir",
     steps: [
@@ -515,6 +538,46 @@ export const pt = {
     ctaTitle: "Vamos planear o seu evento?",
   },
 
+  proposta: {
+    linkInvalidTitle: "Link inválido ou expirado",
+    linkInvalidBody:
+      "Este link de proposta já não é válido. Contacte-nos e enviamos-lhe um novo com todo o gosto.",
+    notFoundTitle: "Proposta não encontrada",
+    notFoundBody:
+      "Não conseguimos encontrar esta proposta. Se acha que é um engano, fale connosco.",
+    eyebrow: "Proposta para o seu evento",
+    greeting: "Olá",
+    intro:
+      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo — será um prazer avançar consigo.",
+    tableDescricao: "Descrição",
+    tableQt: "Qt",
+    tableValor: "Valor",
+    subtotal: "Subtotal",
+    iva: "IVA",
+    total: "Total",
+    validoAte: "Válida até",
+    footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos —",
+    dateLocale: "pt-PT",
+    response: {
+      confirmRecusar: "Tem a certeza que pretende recusar a proposta?",
+      aceiteTitle: "Proposta aceite — obrigado!",
+      aceiteBody:
+        "Que alegria avançar consigo. A nossa equipa entra em contacto em breve com os próximos passos.",
+      rejeitadaTitle: "Resposta registada.",
+      rejeitadaBody:
+        "Obrigado por nos dizer. Se mudar de ideias ou quiser ajustar algo, estamos sempre ao dispor.",
+      jaRegistado: "Já tínhamos registado a sua resposta a esta proposta.",
+      aceitar: "Aceitar proposta →",
+      aceitarSending: "A registar…",
+      recusar: "Recusar",
+      recusarSending: "…",
+      errorFallback: "Não foi possível registar a sua resposta.",
+      errorGeneric: "Erro. Tente novamente.",
+      errorSuffix: "Em alternativa,",
+      errorLink: "escreva-nos",
+    },
+  },
+
   errors: {
     notFoundEyebrow: "Página não encontrada",
     notFoundTitle: "Este caminho não existe.",
@@ -537,6 +600,9 @@ export const pt = {
     country: "Portugal",
     pedirOrcamento: "Pedir orçamento",
     rights: "Todos os direitos reservados",
+    legal: "Legal",
+    privacidade: "Privacidade",
+    termos: "Termos",
   },
 };
 

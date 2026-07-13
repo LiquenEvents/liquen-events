@@ -20,7 +20,10 @@ export default function WhatsAppButton() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t.common.contactWhatsApp}
-      className={`whatsapp-fixed fixed z-50 flex items-center gap-2.5 bg-[#25D366] text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-[#25D366]/25 hover:scale-105 transition-all duration-500 ${
+      // bg passa de #25D366 (verde-marca WhatsApp) para #0c7f3a: com texto
+      // branco, #25D366 dá só 1.98:1 (falha AA); #0c7f3a dá 5.11:1. Continua
+      // claramente verde/WhatsApp e o glow do hover mantém o verde-marca.
+      className={`whatsapp-fixed fixed z-50 flex items-center gap-2.5 bg-[#0c7f3a] text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-[#25D366]/25 hover:scale-105 transition-all duration-500 ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
       style={{

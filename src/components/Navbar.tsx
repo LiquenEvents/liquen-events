@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
+import Magnetic from "@/components/motion/Magnetic";
 import { SITE } from "@/lib/site";
+import { localizeHref } from "@/lib/i18n";
 
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
@@ -22,8 +24,8 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const pathname = usePathname();
-  const { t } = useTranslations();
+  const pathname = usePublicPathname();
+  const { locale, t } = useTranslations();
 
   const links = [
     { href: "/sobre", label: t.nav.sobre },
@@ -79,6 +81,20 @@ export default function Navbar() {
     setIsOpen(false);
   }, [pathname]);
 
+  // Fechar o menu se o viewport crescer até ao breakpoint de desktop (lg,
+  // 1024px). Caso contrário `isOpen` fica preso a true: o overlay é escondido
+  // por CSS (`lg:hidden`), mas o scroll-lock (body overflow:hidden +
+  // data-menuOpen) mantém-se e o utilizador fica sem forma visível de o
+  // fechar — o próprio botão hambúrguer é `lg:hidden`.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => {
+      if (mq.matches) setIsOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   // Lock background scroll while the mobile menu is open. The body attribute
   // also hides floating UI (WhatsApp) via CSS so nada flutua sobre o menu.
   useEffect(() => {
@@ -92,9 +108,63 @@ export default function Navbar() {
     };
   }, [isOpen]);
 
+  // Escape closes the overlay + traps Tab inside it (WAI-ARIA dialog pattern)
+  // — the one full-screen menu in the codebase that didn't already follow the
+  // gallery lightbox's focus-management. Focus moves to the first link on
+  // open and back to the toggle button on close, so keyboard users never
+  // land on a hidden/invisible element.
+  const menuRef = useRef<HTMLDivElement>(null);
+  const toggleBtnRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const menu = menuRef.current;
+    const focusables = () =>
+      Array.from(
+        menu?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    // Double rAF: the click that opened the menu is still asserting its own
+    // (browser-default) focus on the toggle button through the first painted
+    // frame — a single rAF loses that race and focus silently snaps back to
+    // the button. Waiting a second frame reliably lands on the menu instead.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => focusables()[0]?.focus());
+    });
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsOpen(false);
+        toggleBtnRef.current?.focus();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen]);
+
   return (
     <nav
       data-public-nav
+      aria-label="Principal"
       className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ${
         // NB: nada de "translate-y-0" no estado visível — QUALQUER transform no
         // nav cria um containing block e prenderia o overlay fixed inset-0 do
@@ -103,8 +173,14 @@ export default function Navbar() {
       } ${
         // blur de 6px (não 12) + fundo mais opaco: visual igual, metade do
         // custo de repintar o backdrop a cada frame de scroll.
+        // backdrop-filter, tal como transform, cria um containing block para
+        // descendentes fixed — com o menu aberto isso prendia o overlay
+        // fixed inset-0 à altura da própria barra (~72px) em vez do viewport
+        // inteiro. Suprimido apenas enquanto isOpen: nesse estado o overlay
+        // opaco do menu já cobre este fundo por completo, pelo que o blur
+        // nunca chega a ser visível.
         scrolled
-          ? "bg-surface/75 backdrop-blur-[6px] border-b border-foreground/8 shadow-sm shadow-black/5"
+          ? `bg-surface/75 border-b border-foreground/8 shadow-sm shadow-black/5 ${isOpen ? "" : "backdrop-blur-[6px]"}`
           : "bg-transparent border-b border-transparent"
       }`}
     >
@@ -115,14 +191,18 @@ export default function Navbar() {
           className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/35 via-black/10 to-transparent"
         />
       )}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
+      {/* px-12 (not px-16) in the lg→xl band: at exactly 1024px the nav links and
+          the right-side actions sat only ~4px apart (nearly touching). The extra
+          32px of inner width opens that gap; alignment with page content
+          (also lg:px-16) is restored at xl, where there's room. */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 xl:px-16">
         <div
           className={`relative flex items-center justify-between transition-[height] duration-500 ${
             scrolled ? "h-[72px]" : "h-[140px]"
           }`}
         >
           <Link
-            href="/"
+            href={localizeHref("/", locale)}
             className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
           >
             <Image
@@ -135,11 +215,11 @@ export default function Navbar() {
             />
           </Link>
 
-          <div className="hidden lg:flex items-center gap-6 xl:gap-9">
+          <div className="hidden lg:flex items-center gap-5 xl:gap-9">
             {links.map((link) => (
               <Link
                 key={link.href}
-                href={link.href}
+                href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={pathname === link.href ? "page" : undefined}
                 className={`link-line text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
@@ -149,7 +229,7 @@ export default function Navbar() {
                       : "text-white/80 hover:text-white"
                     : pathname === link.href
                       ? "text-moss nav-active"
-                      : "text-moss/80 hover:text-moss"
+                      : "text-moss hover:text-moss-dark"
                 }`}
               >
                 {link.label}
@@ -164,7 +244,7 @@ export default function Navbar() {
               aria-hidden
             />
             <Link
-              href="/contacto"
+              href={localizeHref("/contacto", locale)}
               transitionTypes={navTypes("/contacto")}
               className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
                 light
@@ -174,15 +254,18 @@ export default function Navbar() {
             >
               {t.nav.contacto}
             </Link>
-            <Link
-              href="/orcamento"
-              className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
-            >
-              {t.nav.orcamento} →
-            </Link>
+            <Magnetic strength={0.3}>
+              <Link
+                href={localizeHref("/orcamento", locale)}
+                className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
+              >
+                {t.nav.orcamento} →
+              </Link>
+            </Magnetic>
           </div>
 
           <button
+            ref={toggleBtnRef}
             className="lg:hidden p-3 -mr-2 ml-auto"
             onClick={() => setIsOpen(!isOpen)}
             aria-label={t.nav.menuLabel}
@@ -203,6 +286,10 @@ export default function Navbar() {
 
       {/* ── Menu mobile — overlay a ecrã inteiro, tipografia display em cascata ── */}
       <div
+        ref={menuRef}
+        role="dialog"
+        aria-modal={isOpen}
+        aria-label={t.nav.menuLabel}
         aria-hidden={!isOpen}
         className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#10140f] transition-[opacity,visibility] duration-500 ${
           isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
@@ -214,7 +301,10 @@ export default function Navbar() {
           className="absolute inset-0 bg-[radial-gradient(90%_55%_at_50%_0%,rgba(99,122,95,0.10),transparent_70%)]"
         />
 
-        <nav className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain">
+        <nav
+          aria-label="Menu"
+          className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain"
+        >
           <p
             className="text-cream/30 text-[10px] tracking-[0.45em] uppercase flex items-center gap-3 mb-6"
             style={{
@@ -230,7 +320,7 @@ export default function Navbar() {
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
                 className="group flex items-center justify-between gap-4 py-[18px] border-b border-white/[0.07]"
@@ -269,7 +359,7 @@ export default function Navbar() {
           }}
         >
           <Link
-            href="/orcamento"
+            href={localizeHref("/orcamento", locale)}
             className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-cream px-5 py-4 rounded-sm"
           >
             {t.nav.pedirOrcamento} →

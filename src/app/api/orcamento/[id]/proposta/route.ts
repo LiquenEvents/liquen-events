@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import type { Proposal, ProposalLineItem } from "../../../../orcamento/types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../../../../orcamento/data";
+import type { Proposal } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderProposalPdf } from "@/lib/proposal-pdf";
@@ -9,6 +9,7 @@ import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
 import { isAuthed } from "@/lib/admin-auth";
+import { proposalCreateSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -53,15 +54,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
     }
 
-    const body = await request.json();
-    const rawItems: ProposalLineItem[] = Array.isArray(body.lineItems) ? body.lineItems : [];
-    const lineItems = rawItems
-      .map((it) => ({
-        description: String(it.description ?? "").trim(),
-        qty: Math.max(0, Number(it.qty) || 0),
-        unitPrice: Math.max(0, Number(it.unitPrice) || 0),
-      }))
-      .filter((it) => it.description && it.qty > 0);
+    const body = await request.json().catch(() => null);
+    const parsed = proposalCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
+    }
+    const lineItems = parsed.data.lineItems.filter((it) => it.description && it.qty > 0);
 
     if (lineItems.length === 0) {
       return NextResponse.json(
@@ -70,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    const vatRate = typeof body.vatRate === "number" ? body.vatRate : 0.23;
+    const vatRate = parsed.data.vatRate ?? 0.23;
     const subtotal = lineItems.reduce((s, it) => s + it.qty * it.unitPrice, 0);
     const vat = subtotal * vatRate;
     const total = subtotal + vat;
@@ -86,8 +84,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       subtotal,
       vat,
       total,
-      validUntil: body.validUntil || undefined,
-      notes: body.notes || undefined,
+      validUntil: parsed.data.validUntil || undefined,
+      notes: parsed.data.notes || undefined,
       status: "enviada",
       createdAt: new Date().toISOString(),
       sentAt: new Date().toISOString(),

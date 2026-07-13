@@ -1,0 +1,405 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import FAQ from "./FAQ";
+import AnimateIn from "@/components/AnimateIn";
+import Image from "next/image";
+import { blurFor } from "@/lib/blur";
+import { pageMetadata } from "@/lib/page-metadata";
+import { BreadcrumbJsonLd, FaqJsonLd } from "@/components/JsonLd";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
+import Parallax from "@/components/Parallax";
+import KineticHeading from "@/components/KineticHeading";
+import RatingBadge from "@/components/RatingBadge";
+import HeroWebGL from "@/components/motion/HeroWebGL";
+import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
+import { waHref } from "@/data";
+import { SITE } from "@/lib/site";
+import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
+  return pageMetadata({
+    locale,
+    title: t.meta.contactoTitle,
+    description: t.meta.contactoDescription,
+    path: "/contacto",
+    image: "/imagens/DJI_20250913190635_0120_D.jpg",
+    keywords: ["contacto Líquen Events", "organização de eventos Alentejo"],
+    ogLocale: t.meta.ogLocale,
+  });
+}
+
+export default async function ContactoPage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
+  const steps = t.contacto.steps.map((s, i) => ({ step: `0${i + 1}`, ...s }));
+  const tf = t.contacto.form;
+  const td = t.contacto.direct;
+  const heroImg = "/imagens/DJI_20250913190635_0120_D.jpg";
+  return (
+    <>
+      <BreadcrumbJsonLd
+        locale={locale}
+        homeName={t.nav.inicio}
+        items={[{ name: t.nav.contacto, path: "/contacto" }]}
+      />
+      {/* Same source as the visible <FAQ /> — Google requires the FAQPage
+          markup to match the on-page content, in the language being served. */}
+      <FaqJsonLd faqs={t.contacto.faqs} />
+
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden" style={{ height: "65svh", minHeight: "420px" }}>
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src={heroImg}
+            {...blurFor(heroImg)}
+            alt="Evento Líquen Events"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover hero-settle"
+          />
+        </Parallax>
+        {/* WebGL layer over the static hero (fades in when ready; absent under
+            reduced motion / no-WebGL). */}
+        <HeroWebGL src={heroImg} className="absolute inset-0 h-full w-full" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
+        <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
+          <div className="max-w-7xl mx-auto w-full">
+            <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+              <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
+              {tf.heroEyebrow}
+            </p>
+            <KineticHeading
+              className="text-cream font-bold leading-[0.88] tracking-tight"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 7.5vw, 100px)" }}
+              lines={[[{ text: tf.heroTitleLine1 }], [{ text: tf.heroTitleMoss, moss: true }]]}
+            />
+            <div className="mt-7">
+              <RatingBadge
+                label={t.common.reviewsLabel}
+                ptFormat={locale === "pt"}
+                starClassName="text-gold"
+                textClassName="text-cream/75"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Canais diretos + CTA para o formulário único ──
+          O antigo formulário de contacto foi retirado: /orcamento é agora o
+          único formulário (capta o lead para o CRM). Aqui ficam os canais
+          diretos (para perguntas rápidas) e o CTA que encaminha para esse
+          formulário — sem dois funis a competir. */}
+      <section className="bg-surface">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
+            {/* ── Esquerda — canais diretos ── */}
+            <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
+              <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
+                <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
+                {tf.infoEyebrow}
+              </p>
+
+              <div className="flex flex-col divide-y divide-foreground/8 mb-12">
+                {[
+                  {
+                    label: tf.emailLabel,
+                    value: SITE.email,
+                    href: `mailto:${SITE.email}`,
+                    sub: tf.emailSub,
+                  },
+                  {
+                    label: tf.phoneLabel,
+                    value: SITE.phoneDisplay,
+                    href: `tel:${SITE.phone}`,
+                    sub: tf.phoneSub,
+                  },
+                  {
+                    label: tf.locationLabel,
+                    value: tf.locationValue,
+                    href: null,
+                    sub: tf.locationSub,
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="py-7">
+                    <p className="text-foreground/78 text-[10px] tracking-[0.45em] uppercase mb-2">
+                      {item.label}
+                    </p>
+                    {item.href ? (
+                      <a
+                        href={item.href}
+                        className="text-foreground text-sm font-medium hover:text-moss transition-colors block mb-1.5"
+                      >
+                        {item.value}
+                      </a>
+                    ) : (
+                      <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
+                    )}
+                    <p className="text-foreground/68 text-xs">{item.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* WhatsApp — canal mais rápido para uma pergunta */}
+              <a
+                href={waHref(t.common.whatsappPrefill)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-12"
+              >
+                <span className="text-moss flex-shrink-0">
+                  <WhatsAppIcon className="w-4 h-4" />
+                </span>
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
+                  {tf.whatsappLink}
+                </span>
+                <span
+                  aria-hidden
+                  className="ml-auto text-foreground/40 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                >
+                  →
+                </span>
+              </a>
+
+              {/* Redes */}
+              <div className="flex gap-7 mb-14">
+                {[
+                  { label: "Instagram", href: SITE.instagram },
+                  { label: "Facebook", href: SITE.facebook },
+                ].map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/68 hover:text-foreground/78 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
+                  >
+                    {s.label}
+                  </a>
+                ))}
+              </div>
+
+              {/* Promise */}
+              <div className="border-l-2 border-moss/40 pl-7 py-2">
+                <p
+                  className="text-foreground/72 text-base leading-relaxed mb-4"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {tf.promise}
+                </p>
+                <p className="text-foreground/68 text-[10px] tracking-[0.3em] uppercase">
+                  {tf.promiseSign}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Direita — CTA para o formulário único (/orcamento) ── */}
+            <div className="py-12 md:py-20 lg:pl-20 flex flex-col justify-center">
+              <AnimateIn>
+                <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+                  <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
+                  {td.ctaEyebrow}
+                </p>
+                <h2
+                  className="text-foreground font-bold leading-[0.95] tracking-tight mb-8"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(34px, 4.5vw, 60px)",
+                  }}
+                >
+                  {td.ctaTitleLine1}
+                  <br />
+                  <span className="text-moss">{td.ctaTitleMoss}</span>
+                </h2>
+                <p className="text-foreground/68 text-base leading-[1.85] max-w-md mb-12">
+                  {td.ctaText}
+                </p>
+                <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_CLASS}>
+                  {td.ctaButton} →
+                </Link>
+              </AnimateIn>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Depoimentos ── */}
+      <section className="py-16 sm:py-24 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
+              <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+              {t.contacto.testimonialsEyebrow}
+            </p>
+          </AnimateIn>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-foreground/[0.06]">
+            {t.testimonials.slice(1).map((item, i) => (
+              <AnimateIn key={item.name} delay={i * 80}>
+                <div className="bg-surface p-10 lg:p-12 flex flex-col gap-6 h-full">
+                  <span
+                    className="text-moss/30 text-4xl font-bold leading-none"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    &ldquo;
+                  </span>
+                  <p
+                    className="text-foreground/72 text-sm leading-[1.9] flex-1"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {item.quote}
+                  </p>
+                  <div>
+                    <p className="text-foreground text-sm font-semibold">{item.name}</p>
+                    <p className="text-moss text-xs mt-1 tracking-wide">{item.role}</p>
+                  </div>
+                </div>
+              </AnimateIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Image band ── */}
+      <section className="bg-surface border-t border-foreground/8">
+        <AnimateIn from="fade">
+          <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(180px, 38vw, 460px)" }}>
+            {[
+              "/imagens/Natalia e Jonathan-315.jpg",
+              "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
+              "/imagens/M&F0658.jpg",
+            ].map((src) => (
+              <div key={src} className="relative overflow-hidden group">
+                <Image
+                  src={src}
+                  {...blurFor(src)}
+                  alt="Evento organizado pela Líquen Events"
+                  fill
+                  sizes="33vw"
+                  className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-black/25 group-hover:bg-black/10 transition-colors duration-500" />
+              </div>
+            ))}
+          </div>
+        </AnimateIn>
+      </section>
+
+      {/* ── O que acontece a seguir ── */}
+      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
+              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+              {t.contacto.nextEyebrow}
+            </p>
+          </AnimateIn>
+          <div>
+            {steps.map((p, i) => (
+              <AnimateIn key={p.step} delay={i * 70}>
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-foreground/8">
+                  <div className="lg:col-span-1 flex items-start gap-4">
+                    <span className="text-foreground/15 text-xs font-mono mt-1 tabular-nums">
+                      {p.step}
+                    </span>
+                    <h3
+                      className="text-foreground text-lg font-bold"
+                      style={{ fontFamily: "var(--font-playfair)" }}
+                    >
+                      {p.title}
+                    </h3>
+                  </div>
+                  <p className="lg:col-span-4 text-foreground/60 text-sm leading-relaxed max-w-xl">
+                    {p.desc}
+                  </p>
+                </div>
+              </AnimateIn>
+            ))}
+            <div className="border-t border-foreground/8" />
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
+              <div className="lg:sticky" style={{ top: "6rem" }}>
+                <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
+                  <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+                  {t.contacto.faqEyebrow}
+                </p>
+                <h2
+                  className="text-foreground text-4xl lg:text-5xl font-bold leading-tight"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {t.contacto.faqTitleLine1}
+                  <br />
+                  {t.contacto.faqTitleLine2}
+                </h2>
+                <p className="text-foreground/60 text-sm leading-relaxed mt-6 max-w-xs">
+                  {t.contacto.faqSub}
+                </p>
+              </div>
+              <FAQ />
+            </div>
+          </AnimateIn>
+        </div>
+      </section>
+
+      {/* ── WhatsApp CTA ── */}
+      <section className="py-20 sm:py-32 bg-moss-dark relative overflow-hidden border-t border-moss/20">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(124, 133, 75,0.5) 0%, transparent 55%)",
+          }}
+        />
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
+          <AnimateIn>
+            <p className="text-cream/30 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
+              <span className="w-5 h-px bg-cream/30 rounded-full flex-shrink-0" />
+              {t.contacto.whatsappEyebrow}
+            </p>
+            <h2
+              className="text-cream font-bold leading-tight mb-6"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5vw, 72px)" }}
+            >
+              {t.contacto.whatsappTitleLine1}
+              <br />
+              {t.contacto.whatsappTitleLine2}
+            </h2>
+            <p className="text-cream/45 text-base leading-relaxed max-w-md mb-12">
+              {t.contacto.whatsappText}
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <a
+                href={waHref(t.common.whatsappPrefill)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-8 py-4 bg-cream text-ink font-medium rounded-sm hover:bg-cream-dark transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
+              >
+                <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
+                {t.common.abrirWhatsApp} →
+              </a>
+              <a
+                href={`mailto:${SITE.email}`}
+                className="inline-flex items-center gap-3 px-8 py-4 border border-cream/20 text-cream/60 font-medium rounded-sm hover:border-cream/40 hover:text-cream/85 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
+              >
+                {t.common.enviarEmail}
+              </a>
+            </div>
+          </AnimateIn>
+        </div>
+      </section>
+    </>
+  );
+}

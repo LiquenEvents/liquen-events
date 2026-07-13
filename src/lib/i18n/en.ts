@@ -64,14 +64,16 @@ export const en: Dict = {
     enviarEmail: "Send e-mail",
     contactWhatsApp: "Contact us on WhatsApp",
     clientsSay: "What our clients say",
+    reviewsLabel: "reviews",
+    testemunhoLabel: "Testimonial",
     whatsappPrefill: "Hi, I'd like to know more about your event planning services.",
   },
 
   meta: {
     ogLocale: "en_US",
-    homeTitle: "Líquen Events — Event Planning in the Alentejo and Portugal",
+    homeTitle: "Líquen Events — Event Planning in Évora, the Alentejo & Portugal",
     homeDescription:
-      "Event planning company. Weddings, corporate events and celebrations across the Alentejo, Lisbon and Portugal. Bespoke solutions — request a quote.",
+      "Event planning company based in Évora. Weddings, corporate events and celebrations across the Alentejo, Lisbon and Portugal. Bespoke solutions — request a quote.",
     sobreTitle: "About Us — Event Company",
     sobreDescription:
       "Meet Líquen Events, an event planning company. Over 100 events across the Alentejo, Lisbon and Portugal — weddings, corporate events and celebrations.",
@@ -90,6 +92,18 @@ export const en: Dict = {
     orcamentoTitle: "Quote Request",
     orcamentoDescription:
       "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 hours.",
+  },
+
+  // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
+  // the markup's language always matches the visible page's.
+  jsonld: {
+    hasOfferCatalogName: "Event planning services",
+    services: [
+      "Wedding planning",
+      "Corporate events and conferences",
+      "Private parties and celebrations",
+      "Gala dinners and social events",
+    ],
   },
 
   home: {
@@ -231,6 +245,14 @@ export const en: Dict = {
   },
 
   contacto: {
+    direct: {
+      ctaEyebrow: "Ready to begin?",
+      ctaTitleLine1: "Request your",
+      ctaTitleMoss: "quote.",
+      ctaText:
+        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the channels alongside.",
+      ctaButton: "Request a quote",
+    },
     testimonialsEyebrow: "What our clients say",
     nextEyebrow: "What happens next",
     steps: [
@@ -501,6 +523,45 @@ export const en: Dict = {
     ctaTitle: "Shall we plan your event?",
   },
 
+  proposta: {
+    linkInvalidTitle: "Invalid or expired link",
+    linkInvalidBody:
+      "This proposal link is no longer valid. Get in touch and we'll gladly send you a new one.",
+    notFoundTitle: "Proposal not found",
+    notFoundBody: "We couldn't find this proposal. If you think this is a mistake, get in touch.",
+    eyebrow: "Proposal for your event",
+    greeting: "Hello",
+    intro:
+      "We've carefully prepared this proposal for your event. Review the details and respond right here — we'd be delighted to move forward with you.",
+    tableDescricao: "Description",
+    tableQt: "Qty",
+    tableValor: "Amount",
+    subtotal: "Subtotal",
+    iva: "VAT",
+    total: "Total",
+    validoAte: "Valid until",
+    footerNote: "Any questions or changes? Reply to this email or contact us —",
+    dateLocale: "en-GB",
+    response: {
+      confirmRecusar: "Are you sure you want to decline the proposal?",
+      aceiteTitle: "Proposal accepted — thank you!",
+      aceiteBody:
+        "We're delighted to move forward with you. Our team will be in touch shortly with next steps.",
+      rejeitadaTitle: "Response recorded.",
+      rejeitadaBody:
+        "Thank you for letting us know. If you change your mind or want to adjust anything, we're always here.",
+      jaRegistado: "We had already recorded your response to this proposal.",
+      aceitar: "Accept proposal →",
+      aceitarSending: "Recording…",
+      recusar: "Decline",
+      recusarSending: "…",
+      errorFallback: "We couldn't record your response.",
+      errorGeneric: "Error. Please try again.",
+      errorSuffix: "Alternatively,",
+      errorLink: "email us",
+    },
+  },
+
   errors: {
     notFoundEyebrow: "Page not found",
     notFoundTitle: "This path doesn't exist.",
@@ -523,5 +584,8 @@ export const en: Dict = {
     country: "Portugal",
     pedirOrcamento: "Request a quote",
     rights: "All rights reserved",
+    legal: "Legal",
+    privacidade: "Privacy",
+    termos: "Terms",
   },
 };

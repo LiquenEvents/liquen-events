@@ -1,14 +1,15 @@
 "use client";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
+import { localizeHref } from "@/lib/i18n";
 
 export default function StickyCTA() {
   const [visible, setVisible] = useState(false);
   const [atFooter, setAtFooter] = useState(false);
-  const pathname = usePathname();
-  const { t } = useTranslations();
+  const pathname = usePublicPathname();
+  const { locale, t } = useTranslations();
 
   const hidden = pathname.startsWith("/orcamento") || pathname.startsWith("/contacto");
 
@@ -46,19 +47,25 @@ export default function StickyCTA() {
 
   return (
     <div
+      // `inert` enquanto invisível: sem isto o link continuava focável por
+      // teclado apesar de opacity-0/pointer-events-none — tornava-se a 2.ª
+      // paragem de Tab (um elemento no fundo do ecrã, à frente da navbar) com
+      // um anel de foco a 0% de opacidade. inert remove-o da ordem de Tab e da
+      // árvore de acessibilidade até ficar visível.
+      inert={!show}
       className={`hidden lg:block fixed bottom-7 left-7 z-40 transition-all duration-500 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
       <Link
-        href="/orcamento"
+        href={localizeHref("/orcamento", locale)}
         className="group flex items-center gap-3 px-5 py-3 bg-surface-elevated/90 backdrop-blur-md border border-foreground/12 hover:border-moss/40 transition-all duration-300 shadow-2xl shadow-black/70 rounded-sm"
       >
         <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
           <span className="footer-ping absolute inline-flex h-full w-full rounded-full bg-moss opacity-55" />
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-moss" />
         </span>
-        <span className="text-[10px] tracking-[0.28em] uppercase text-foreground/38 group-hover:text-moss transition-colors duration-300">
+        <span className="text-[10px] tracking-[0.28em] uppercase text-foreground/68 group-hover:text-moss transition-colors duration-300">
           {t.footer.pedirOrcamento}
         </span>
         <span className="text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">

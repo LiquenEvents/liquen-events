@@ -1,48 +1,33 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Drives the 4-step contact wizard end to end. The POST to /api/contacto is
- * intercepted so the test is deterministic and sends no real email/push.
+ * /contacto is now a direct-contact page — the single lead-capture form lives
+ * at /orcamento (see orcamento.spec.ts for that flow). This verifies the page
+ * renders its hero, carries NO form, exposes the direct channels, and routes
+ * visitors to the one quote form.
  */
-test.describe("Contact wizard", () => {
-  test("completes all steps and shows the success screen", async ({ page }) => {
-    await page.route("**/api/contacto", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "ok" }) }),
-    );
-
+test.describe("Contacto (direct-contact page)", () => {
+  test("renders the hero and carries no form", async ({ page }) => {
     await page.goto("/contacto");
-
-    // Step 1 — event type
-    await page.getByRole("button", { name: /Corporativo/ }).click();
-    await page.getByRole("button", { name: /Continuar/ }).click();
-
-    // Step 2 — contact details
-    await page.getByPlaceholder("O seu nome completo").fill("Ana Teste");
-    await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
-    await page.getByRole("button", { name: /Continuar/ }).click();
-
-    // Step 3 — details (all optional)
-    await page.getByRole("button", { name: /Continuar/ }).click();
-
-    // Step 4 — message + submit
-    await page.locator("textarea").fill("Gostaríamos de organizar uma conferência para 200 pessoas.");
-    await page.getByRole("button", { name: /Enviar Pedido/ }).click();
-
-    await expect(page.getByText(/Mensagem/i).first()).toBeVisible();
-    await expect(page.getByText(/Enviado com sucesso/i)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.locator("form")).toHaveCount(0);
   });
 
-  test("blocks progress until name and email are provided", async ({ page }) => {
+  test("offers the direct channels (e-mail, phone, WhatsApp)", async ({ page }) => {
     await page.goto("/contacto");
-    await page.getByRole("button", { name: /Corporativo/ }).click();
-    await page.getByRole("button", { name: /Continuar/ }).click();
+    // `:visible` so the assertion targets the on-page channels rail, not the
+    // identical links inside the (closed, hidden) mobile menu.
+    await expect(page.locator('a[href^="mailto:"]:visible').first()).toBeVisible();
+    await expect(page.locator('a[href^="tel:"]:visible').first()).toBeVisible();
+    await expect(page.locator('a[href*="wa.me"]:visible').first()).toBeVisible();
+  });
 
-    // On step 2 the Continuar button is disabled with empty contact fields.
-    const continuar = page.getByRole("button", { name: /Continuar/ });
-    await expect(continuar).toBeDisabled();
-
-    await page.getByPlaceholder("O seu nome completo").fill("Ana");
-    await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
-    await expect(continuar).toBeEnabled();
+  test("routes to the single quote form", async ({ page }) => {
+    await page.goto("/contacto");
+    // Two CTAs carry this label (the page's own panel + the footer); both point
+    // to the one form. Assert on the first (the in-page panel CTA).
+    const cta = page.getByRole("link", { name: /Pedir orçamento/i }).first();
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute("href", /\/orcamento/);
   });
 });

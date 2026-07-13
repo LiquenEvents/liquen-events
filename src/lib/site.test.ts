@@ -23,7 +23,9 @@ describe("SITE identity invariants", () => {
     expect(SITE.locale).toBe("pt_PT");
   });
 
-  it("lists Alentejo first among the areas served (SEO priority)", () => {
-    expect(AREAS_SERVED[0]).toBe("Alentejo");
+  it("leads the areas served with the home city, then the region (SEO priority)", () => {
+    expect(AREAS_SERVED[0]).toBe("Évora");
+    expect(AREAS_SERVED).toContain("Alentejo");
+    expect(AREAS_SERVED[0]).toBe(SITE.city);
   });
 });

@@ -8,7 +8,11 @@ const store = vi.hoisted(() => ({
 const authed = vi.hoisted(() => ({ ok: false }));
 const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
 
-vi.mock("@/lib/quotes-store", () => ({ createQuote: store.create, listQuotes: store.list }));
+vi.mock("@/lib/quotes-store", () => ({
+  createQuote: store.create,
+  listQuotes: store.list,
+  generateQuoteId: () => "LIQ-TEST-0000000000000000",
+}));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(async () => ({ sent: true })),
