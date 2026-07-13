@@ -71,9 +71,9 @@ export const pt = {
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Líquen Events — Organização de Eventos no Alentejo e em Portugal",
+    homeTitle: "Líquen Events — Organização de Eventos em Évora, Alentejo e Portugal",
     homeDescription:
-      "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.",
+      "Empresa de organização de eventos com base em Évora. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.",
     sobreTitle: "Sobre Nós — Empresa de Eventos",
     sobreDescription:
       "Conheça a Líquen Events, empresa de organização de eventos. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",

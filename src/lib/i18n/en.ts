@@ -71,9 +71,9 @@ export const en: Dict = {
 
   meta: {
     ogLocale: "en_US",
-    homeTitle: "Líquen Events — Event Planning in the Alentejo and Portugal",
+    homeTitle: "Líquen Events — Event Planning in Évora, the Alentejo & Portugal",
     homeDescription:
-      "Event planning company. Weddings, corporate events and celebrations across the Alentejo, Lisbon and Portugal. Bespoke solutions — request a quote.",
+      "Event planning company based in Évora. Weddings, corporate events and celebrations across the Alentejo, Lisbon and Portugal. Bespoke solutions — request a quote.",
     sobreTitle: "About Us — Event Company",
     sobreDescription:
       "Meet Líquen Events, an event planning company. Over 100 events across the Alentejo, Lisbon and Portugal — weddings, corporate events and celebrations.",

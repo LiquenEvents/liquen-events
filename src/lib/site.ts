@@ -12,7 +12,10 @@ export const SITE = {
   email: "liquen.alentejo@gmail.com",
   phone: "+351919259820",
   phoneDisplay: "+351 919 259 820",
-  city: "Alentejo",
+  // Physical base — a specific municipality (not just the region) sharpens the
+  // LocalBusiness signal for "… em Évora" searches. Service area stays national
+  // (see AREAS_SERVED + areaServed in StructuredData).
+  city: "Évora",
   region: "Alentejo",
   country: "PT",
   slogan: "Organizamos eventos, eternizamos memórias.",
@@ -26,8 +29,10 @@ export const SITE = {
   ogImage: "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
 } as const;
 
-/** Cities/areas served — ordered by SEO priority (Alentejo first). */
+/** Cities/areas served — ordered by SEO priority (home city Évora first,
+ *  then the region and the rest of the country). */
 export const AREAS_SERVED = [
+  "Évora",
   "Alentejo",
   "Lisboa",
   "Portugal",
@@ -41,6 +46,8 @@ export const AREAS_SERVED = [
 
 /** Default keyword set, location-weighted toward Alentejo. */
 export const SITE_KEYWORDS = [
+  "organização de eventos Évora",
+  "casamentos Évora",
   "wedding planner Alentejo",
   "casamentos Alentejo",
   "organização de casamentos Portugal",
