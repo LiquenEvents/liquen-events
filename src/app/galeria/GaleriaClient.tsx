@@ -6,6 +6,7 @@ import Image from "next/image";
 import type { PhotoSrc, Label } from "./photos-data";
 import { useTranslations } from "@/components/LocaleProvider";
 import { ViewTransition } from "@/components/vt";
+import GridRipple from "@/components/motion/GridRipple";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -697,6 +698,10 @@ export default function GaleriaClient({
 
   return (
     <>
+      {/* Ripple líquido que segue o cursor pela grelha — um único contexto WebGL
+          reposicionado sobre a tile em hover (ver GridRipple). */}
+      <GridRipple />
+
       {/* ── Filtros / vista de casamento ── */}
       {collectionFilter ? (
         <div className="flex items-center gap-4 mb-8">
@@ -765,6 +770,9 @@ export default function GaleriaClient({
             {/* Foto grande — 2×2 */}
             <button
               onClick={() => openAt(0)}
+              data-ripple
+              data-cap={caption(visible[0].src, visible[0].label).caption}
+              data-sub={caption(visible[0].src, visible[0].label).sub}
               className={`g-hero g-tile relative col-span-2 row-span-2 h-full w-full overflow-hidden group ${FOCUS_RING}`}
             >
               {/* Enquanto esta foto está aberta no lightbox, a miniatura
@@ -795,6 +803,9 @@ export default function GaleriaClient({
                 <button
                   key={idx}
                   onClick={() => openAt(idx)}
+                  data-ripple
+                  data-cap={caption(visible[idx].src, visible[idx].label).caption}
+                  data-sub={caption(visible[idx].src, visible[idx].label).sub}
                   className={`g-hero g-tile relative hidden sm:block h-full w-full overflow-hidden group ${FOCUS_RING}`}
                   style={{ "--hero-delay": `${idx * 70}ms` } as React.CSSProperties}
                 >
@@ -835,6 +846,9 @@ export default function GaleriaClient({
                 >
                   <button
                     onClick={() => openAt(idx)}
+                    data-ripple
+                    data-cap={caption(p.src, p.label).caption}
+                    data-sub={caption(p.src, p.label).sub}
                     className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
                     style={{ aspectRatio: p.aspectRatio }}
                   >
