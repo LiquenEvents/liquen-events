@@ -51,7 +51,12 @@ export const quoteFormSchema = z
     acceptTerms: z.boolean().optional(),
     acceptMarketing: z.boolean().optional(),
   })
-  .passthrough();
+  // .strip() (the default) — every QuoteFormData field is declared and bounded
+  // above, so unknown keys are dropped rather than persisted. Previously
+  // .passthrough() let a crafted payload smuggle arbitrary unbounded keys into
+  // the stored quote (data-integrity / storage abuse); a genuinely new field
+  // should be added here explicitly instead.
+  .strip();
 
 // Price breakdown — computed client-side, so validate the shape before it is
 // persisted and reused in emails, exports and admin revenue maths. Values are
@@ -229,7 +234,9 @@ export const contactSchema = z
     convidados: trimmed(30).optional().default(""),
     orcamento: trimmed(30).optional().default(""),
   })
-  .passthrough();
+  // .strip() — all fields are declared/bounded above; drop unknown keys rather
+  // than persisting arbitrary unbounded input (see quoteFormSchema note).
+  .strip();
 
 // Web Push subscription — sanitise this network-provided object into a strict,
 // known-good shape before it is ever persisted.

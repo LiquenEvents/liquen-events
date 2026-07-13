@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { listQuotes } from "@/lib/quotes-store";
 import { listCalendarEvents } from "@/lib/calendar-store";
@@ -29,7 +30,13 @@ function authorized(req: NextRequest): boolean {
   if (isAuthed(req)) return true;
   const secret = process.env.CRON_SECRET;
   if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  // Constant-time Bearer check: hash both sides to fixed-length digests so
+  // neither the length nor the content leaks through comparison timing.
+  const provided = createHash("sha256")
+    .update(req.headers.get("authorization") ?? "")
+    .digest();
+  const expected = createHash("sha256").update(`Bearer ${secret}`).digest();
+  return timingSafeEqual(provided, expected);
 }
 
 const eur = (n: number) =>
