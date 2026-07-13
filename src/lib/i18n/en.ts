@@ -469,10 +469,36 @@ export const en: Dict = {
         ],
       },
     ],
+    metodoEyebrow: "How we work",
+    metodoTitle: "From the first sketch to the final toast",
+    metodoLead:
+      "A method crafted down to the last detail, so every event runs flawlessly — and all you have to do is live the moment.",
+    metodo: [
+      {
+        num: "01",
+        title: "Concept & Vision",
+        desc: "We listen to your story and design a unique concept — the aesthetics, atmosphere and narrative of your event.",
+      },
+      {
+        num: "02",
+        title: "Planning & Curation",
+        desc: "We select the venue, the suppliers and every detail, with a network of trusted partners across Portugal.",
+      },
+      {
+        num: "03",
+        title: "Production & Coordination",
+        desc: "We handle everything, from budget to timeline, with the rigour a professional event demands.",
+      },
+      {
+        num: "04",
+        title: "The Big Day",
+        desc: "On the day, our team coordinates everything behind the scenes. All that's left for you is to live the moment.",
+      },
+    ],
     seoEyebrow: "Where we work",
-    seoTitle: "Lisbon and all of Portugal",
+    seoTitle: "From Évora to all of Portugal",
     seoText:
-      "Weddings, corporate events and celebrations — from concept to execution, with the sensibility of the Alentejo and the standards of a professional team.",
+      "Weddings, corporate events and celebrations — from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Have an event",
     ctaTitleMoss: "in mind?",
