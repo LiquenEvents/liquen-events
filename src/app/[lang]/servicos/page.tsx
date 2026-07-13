@@ -7,6 +7,7 @@ import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
+import TiltCard from "@/components/motion/TiltCard";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
@@ -119,64 +120,66 @@ function ServiceCard({
   sizes?: string;
 }) {
   return (
-    <Link
-      href={localizeHref(`/servicos/${service.slug}`, locale)}
-      className="group relative block overflow-hidden bg-surface-raised h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
-    >
-      <Image
-        src={service.image}
-        {...blurFor(service.image)}
-        alt={service.title}
-        fill
-        sizes={sizes}
-        className="object-cover transition-transform duration-700 group-hover:scale-105"
-      />
-      {/* Base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-      {/* Hover darkening */}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-500" />
+    <TiltCard fill className="h-full w-full">
+      <Link
+        href={localizeHref(`/servicos/${service.slug}`, locale)}
+        className="group relative block overflow-hidden bg-surface-raised h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
+      >
+        <Image
+          src={service.image}
+          {...blurFor(service.image)}
+          alt={service.title}
+          fill
+          sizes={sizes}
+          className="object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+        {/* Base gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+        {/* Hover darkening */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-500" />
 
-      {/* Index label top-right */}
-      <div className="absolute top-4 right-4">
-        <span className="text-cream/15 text-[9px] tracking-[0.3em] font-mono">
-          {catNum}.{String(index + 1).padStart(2, "0")}
-        </span>
-      </div>
+        {/* Index label top-right */}
+        <div className="absolute top-4 right-4">
+          <span className="text-cream/15 text-[9px] tracking-[0.3em] font-mono">
+            {catNum}.{String(index + 1).padStart(2, "0")}
+          </span>
+        </div>
 
-      {/* Persistent clickability affordance (desktop) */}
-      <div className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/45 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500">
-        <span className="text-sm leading-none transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-          ↗
-        </span>
-      </div>
+        {/* Persistent clickability affordance (desktop) */}
+        <div className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/45 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500">
+          <span className="text-sm leading-none transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+            ↗
+          </span>
+        </div>
 
-      {/* Bottom content */}
-      <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 lg:p-7">
-        <p className="text-moss/60 text-[9px] tracking-[0.5em] font-mono uppercase mb-2">
-          {String(index + 1).padStart(2, "0")}
-        </p>
-        <h3
-          className="text-cream font-bold leading-tight mb-2"
-          style={{
-            fontFamily: "var(--font-playfair)",
-            fontSize: "clamp(15px, 1.6vw, 22px)",
-          }}
-        >
-          {service.title}
-        </h3>
-        {/* Mobile: always show desc; desktop: reveal on hover */}
-        <p className="text-cream/40 text-xs leading-relaxed md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
-          {service.desc}
-        </p>
-        {/* Mobile: persistent CTA; desktop: reveal on hover */}
-        <span className="md:hidden inline-flex items-center text-moss text-[10px] tracking-[0.3em] uppercase mt-2.5">
-          {cta} →
-        </span>
-        <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-150">
-          {cta} →
-        </span>
-      </div>
-    </Link>
+        {/* Bottom content */}
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 lg:p-7">
+          <p className="text-moss/60 text-[9px] tracking-[0.5em] font-mono uppercase mb-2">
+            {String(index + 1).padStart(2, "0")}
+          </p>
+          <h3
+            className="text-cream font-bold leading-tight mb-2"
+            style={{
+              fontFamily: "var(--font-playfair)",
+              fontSize: "clamp(15px, 1.6vw, 22px)",
+            }}
+          >
+            {service.title}
+          </h3>
+          {/* Mobile: always show desc; desktop: reveal on hover */}
+          <p className="text-cream/40 text-xs leading-relaxed md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
+            {service.desc}
+          </p>
+          {/* Mobile: persistent CTA; desktop: reveal on hover */}
+          <span className="md:hidden inline-flex items-center text-moss text-[10px] tracking-[0.3em] uppercase mt-2.5">
+            {cta} →
+          </span>
+          <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-150">
+            {cta} →
+          </span>
+        </div>
+      </Link>
+    </TiltCard>
   );
 }
 

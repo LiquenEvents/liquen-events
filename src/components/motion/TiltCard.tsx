@@ -18,11 +18,15 @@ export default function TiltCard({
   children,
   className,
   max = 7,
+  fill = false,
 }: {
   children: ReactNode;
   className?: string;
   /** Maximum tilt in degrees on each axis. */
   max?: number;
+  /** Stretch the wrapper (and its inner) to 100% — for cards that must fill a
+   *  fixed grid cell rather than size to their own aspect ratio. */
+  fill?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const raf = useRef(0);
@@ -61,13 +65,14 @@ export default function TiltCard({
       className={className}
       onPointerMove={onMove}
       onPointerLeave={onLeave}
-      style={{ perspective: "1000px" }}
+      style={{ perspective: "1000px", ...(fill ? { height: "100%", width: "100%" } : null) }}
     >
       <div
         style={{
           transform: "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))",
           transition: "transform 260ms cubic-bezier(0.16, 1, 0.3, 1)",
           willChange: "transform",
+          ...(fill ? { height: "100%", width: "100%" } : null),
         }}
       >
         {children}
