@@ -49,8 +49,10 @@ const FRAG = /* glsl */ `
   }
 `;
 
-const PLANE_W = 1.5;
-const PLANE_H = 1.0;
+// Large 3:2 cards — with the closer camera (see resize) the lead photo reads
+// as the stage's centerpiece instead of a small floating tile.
+const PLANE_W = 1.9;
+const PLANE_H = PLANE_W / 1.5;
 const PLANE_ASPECT = PLANE_W / PLANE_H;
 
 export default function PhotoWallCanvas({
@@ -110,11 +112,12 @@ export default function PhotoWallCanvas({
 
     const N = images.length;
     const angleStep = (Math.PI * 2) / N;
-    // Radius so neighbouring photos sit a comfortable arc apart.
-    const R = (PLANE_W * 1.32 * N) / (Math.PI * 2);
-    // Sit close to the front of the ring so the lead photo reads large and the
-    // neighbours fan back into perspective.
-    camera.position.z = R + 3.2;
+    // Radius so neighbouring photos sit a comfortable arc apart (1.22 keeps
+    // them close enough that the stage reads full, not sparse).
+    const R = (PLANE_W * 1.22 * N) / (Math.PI * 2);
+    // camera.position.z is set per-aspect in resize() below — close on wide
+    // screens so the lead photo dominates the stage, further back on narrow
+    // ones so it still fits.
 
     const group = new Transform();
     const geometry = new Plane(gl, { width: PLANE_W, height: PLANE_H });
@@ -151,10 +154,11 @@ export default function PhotoWallCanvas({
         program.uniforms.uCover.value = s > 1 ? [1 / s, 1] : [1, s];
       };
       img.onload = onImg;
-      // 480px matches the flat ribbon's own next/image request (sizes="450px"
-      // → 480px device width) EXACTLY, so the browser serves this carousel
-      // texture from cache instead of downloading a second copy.
-      img.src = sizedImageSrc(src, 480);
+      // 640px matches the flat ribbon's own next/image request (sizes="615px"
+      // → 640px device width) EXACTLY, so the browser serves this carousel
+      // texture from cache instead of downloading a second copy — and the
+      // larger stage cards stay sharp.
+      img.src = sizedImageSrc(src, 640);
       if (img.complete) onImg();
     });
 
@@ -162,7 +166,12 @@ export default function PhotoWallCanvas({
       const w = host.clientWidth || window.innerWidth;
       const h = host.clientHeight || 400;
       renderer.setSize(w, h);
-      camera.perspective({ aspect: w / h });
+      const a = w / h;
+      camera.perspective({ aspect: a });
+      // Frame the stage like a hero, not a distant diorama: on wide screens the
+      // camera moves in so the lead photo is large with neighbours peeking at
+      // the edges; on narrow/tall screens it backs off so the photo still fits.
+      camera.position.z = R + (a >= 2.4 ? 2.1 : a >= 1.6 ? 2.5 : a >= 1.1 ? 2.9 : 3.4);
     };
     resize();
     const ro = new ResizeObserver(resize);

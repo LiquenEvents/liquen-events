@@ -73,8 +73,8 @@ export default function PhotoWall({
         </h2>
       </div>
 
-      {/* ── Carousel band ── */}
-      <div className="relative mt-9 sm:mt-11 lg:mt-14 h-[300px] sm:h-[380px] lg:h-[440px]">
+      {/* ── Carousel band — tall stage so the photos read big and immersive ── */}
+      <div className="relative mt-8 sm:mt-10 lg:mt-12 h-[340px] sm:h-[460px] lg:h-[560px]">
         {/* Flat ribbon — SSR / LCP / reduced-motion / no-WebGL fallback. Fades
             out once the WebGL carousel has painted its first frame, then unmounts. */}
         {!hideRibbon && (
@@ -89,13 +89,13 @@ export default function PhotoWall({
               {[...images, ...images].map((img, i) => (
                 <div
                   key={i}
-                  className="relative h-[180px] sm:h-[240px] lg:h-[300px] w-[270px] sm:w-[360px] lg:w-[450px] flex-shrink-0 overflow-hidden rounded-lg"
+                  className="relative h-[240px] sm:h-[330px] lg:h-[410px] w-[360px] sm:w-[495px] lg:w-[615px] flex-shrink-0 overflow-hidden rounded-lg"
                 >
                   <Image
                     src={img.src}
                     alt=""
                     fill
-                    sizes="450px"
+                    sizes="615px"
                     className="object-cover"
                     placeholder={img.blurDataURL ? "blur" : undefined}
                     blurDataURL={img.blurDataURL}
@@ -115,28 +115,26 @@ export default function PhotoWall({
             className="absolute inset-0 z-10"
           />
         )}
-
-        {/* Drag/swipe affordance — appears with the WebGL wall so people know
-            it's interactive (that discovery is the "wow"). */}
-        {enhance && (
-          <div
-            aria-hidden
-            className="absolute inset-x-0 bottom-3 z-20 flex justify-center pointer-events-none"
-          >
-            <span
-              className="text-cream/40 text-[9px] tracking-[0.4em] uppercase flex items-center gap-2.5 transition-opacity duration-700"
-              style={{ opacity: ready ? 1 : 0 }}
-            >
-              <span>←</span>
-              {hint}
-              <span>→</span>
-            </span>
-          </div>
-        )}
       </div>
 
+      {/* Drag/swipe affordance — below the stage (never over a photo), appears
+          with the WebGL wall so people know it's interactive (that discovery is
+          the "wow"). */}
+      {enhance && (
+        <div aria-hidden className="relative z-20 flex justify-center pt-7 sm:pt-8">
+          <span
+            className="text-cream/45 text-[9px] tracking-[0.4em] uppercase flex items-center gap-2.5 transition-opacity duration-700"
+            style={{ opacity: ready ? 1 : 0 }}
+          >
+            <span>←</span>
+            {hint}
+            <span>→</span>
+          </span>
+        </div>
+      )}
+
       {/* ── CTA ── */}
-      <div className="relative z-20 flex justify-center pt-9 sm:pt-11 pb-16 sm:pb-20 lg:pb-24">
+      <div className="relative z-20 flex justify-center pt-6 sm:pt-7 pb-16 sm:pb-20 lg:pb-24">
         <Link
           href={href}
           className="group inline-flex items-center gap-3 px-8 py-4 bg-white/6 border border-white/18 rounded-full text-cream/90 hover:text-cream hover:bg-white/12 hover:border-white/35 text-[11px] tracking-[0.3em] uppercase transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/70"
