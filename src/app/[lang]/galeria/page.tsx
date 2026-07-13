@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
-import ShaderImageLazy from "@/components/motion/ShaderImageLazy";
 import Parallax from "@/components/Parallax";
 import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
@@ -62,12 +61,6 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             {...blurFor("/imagens/DaniGui_Preview20.jpg")}
           />
         </Parallax>
-        {/* WebGL: ondulação líquida a seguir o cursor sobre a foto do herói
-            (por cima do <Image>, que continua a ser LCP + fallback). */}
-        <ShaderImageLazy
-          src="/imagens/DaniGui_Preview20.jpg"
-          className="absolute inset-0 h-full w-full"
-        />
         <div className="absolute inset-0 bg-black/20" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-[#0b0b0b]/15 to-transparent" />
         {/* Extra readability gradient only behind the bottom-left text block */}

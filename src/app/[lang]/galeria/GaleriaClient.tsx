@@ -6,7 +6,6 @@ import Image from "next/image";
 import type { PhotoSrc, Label } from "./photos-data";
 import { useTranslations } from "@/components/LocaleProvider";
 import { ViewTransition } from "@/components/vt";
-import GridRipple from "@/components/motion/GridRipple";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -698,10 +697,6 @@ export default function GaleriaClient({
 
   return (
     <>
-      {/* Ripple líquido que segue o cursor pela grelha — um único contexto WebGL
-          reposicionado sobre a tile em hover (ver GridRipple). */}
-      <GridRipple />
-
       {/* ── Filtros / vista de casamento ── */}
       {collectionFilter ? (
         <div className="flex items-center gap-4 mb-8">
