@@ -193,6 +193,20 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
           <p className="text-[11px] text-foreground/78 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — {t.footer.rights}
           </p>
+          <div className="flex items-center gap-5 text-[11px] text-foreground/68 tracking-wide">
+            <Link
+              href={localizeHref("/privacidade", locale)}
+              className="link-line hover:text-moss transition-colors"
+            >
+              {t.footer.privacidade}
+            </Link>
+            <Link
+              href={localizeHref("/termos", locale)}
+              className="link-line hover:text-moss transition-colors"
+            >
+              {t.footer.termos}
+            </Link>
+          </div>
           <p className="text-[11px] text-foreground/68 tracking-[0.28em] uppercase">
             {t.footer.country}
           </p>

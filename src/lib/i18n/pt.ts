@@ -590,6 +590,9 @@ export const pt = {
     country: "Portugal",
     pedirOrcamento: "Pedir orçamento",
     rights: "Todos os direitos reservados",
+    legal: "Legal",
+    privacidade: "Privacidade",
+    termos: "Termos",
   },
 };
 

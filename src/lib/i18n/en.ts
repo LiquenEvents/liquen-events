@@ -575,5 +575,8 @@ export const en: Dict = {
     country: "Portugal",
     pedirOrcamento: "Request a quote",
     rights: "All rights reserved",
+    legal: "Legal",
+    privacidade: "Privacy",
+    termos: "Terms",
   },
 };

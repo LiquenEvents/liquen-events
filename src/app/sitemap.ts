@@ -97,6 +97,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
       images: [img("EW1_1393.jpg")],
     },
+    {
+      path: "/privacidade",
+      sourceFile: "src/app/legal/legal-content.ts",
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
+    {
+      path: "/termos",
+      sourceFile: "src/app/legal/legal-content.ts",
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
   ];
 
   const services: RawEntry[] = SERVICES.map((s) => ({
