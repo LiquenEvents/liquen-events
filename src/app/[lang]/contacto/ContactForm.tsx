@@ -265,7 +265,7 @@ export default function ContactForm() {
   }
 
   const inputCls =
-    "w-full bg-transparent border-b border-foreground/15 pb-4 text-sm text-foreground placeholder-foreground/18 focus:outline-none focus:border-moss/55 transition-colors duration-300";
+    "w-full bg-transparent border-b border-foreground/15 pb-4 text-sm text-foreground placeholder-foreground/45 focus:outline-none focus:border-moss/55 transition-colors duration-300";
 
   const labelCls = "block text-[10px] text-foreground/68 tracking-[0.45em] uppercase mb-4";
 

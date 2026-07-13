@@ -14,6 +14,8 @@ The site is Portuguese-first, with a full English mirror under `/en/`. Visitors 
 - [Serviços](https://www.liquen-events.com/servicos): Weddings, corporate events and private celebrations, with dedicated pages per service.
 - [Casamentos](https://www.liquen-events.com/servicos/casamentos): Wedding planning and coordination in the Alentejo and across Portugal.
 - [Eventos Corporativos](https://www.liquen-events.com/servicos/eventos-corporativos): Corporate events, conferences and company celebrations.
+- [Festas e Aniversários](https://www.liquen-events.com/servicos/festas-e-aniversarios): Private parties, birthdays and celebrations.
+- [Jantares de Gala](https://www.liquen-events.com/servicos/jantares-de-gala): Gala dinners and prestige social events.
 - [Galeria](https://www.liquen-events.com/galeria): Photo gallery of real events organized by Líquen Events.
 - [Sobre](https://www.liquen-events.com/sobre): About the company, its founder and approach.
 - [Clientes](https://www.liquen-events.com/clientes): Clients and testimonials.
@@ -24,8 +26,11 @@ The site is Portuguese-first, with a full English mirror under `/en/`. Visitors 
 
 - [Home (EN)](https://www.liquen-events.com/en): English version of the site.
 - [Services (EN)](https://www.liquen-events.com/en/servicos): Services in English.
+- [About (EN)](https://www.liquen-events.com/en/sobre): About the company in English.
+- [Clients (EN)](https://www.liquen-events.com/en/clientes): Clients and testimonials in English.
 - [Gallery (EN)](https://www.liquen-events.com/en/galeria): Event photo gallery.
 - [Contact (EN)](https://www.liquen-events.com/en/contacto): Contact and enquiry form in English.
+- [Request a Quote (EN)](https://www.liquen-events.com/en/orcamento): Request a personalized quote.
 
 ## Legal
 

@@ -164,6 +164,7 @@ export default function Navbar() {
   return (
     <nav
       data-public-nav
+      aria-label="Principal"
       className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ${
         // NB: nada de "translate-y-0" no estado visível — QUALQUER transform no
         // nav cria um containing block e prenderia o overlay fixed inset-0 do
@@ -296,7 +297,10 @@ export default function Navbar() {
           className="absolute inset-0 bg-[radial-gradient(90%_55%_at_50%_0%,rgba(99,122,95,0.10),transparent_70%)]"
         />
 
-        <nav className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain">
+        <nav
+          aria-label="Menu"
+          className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain"
+        >
           <p
             className="text-cream/30 text-[10px] tracking-[0.45em] uppercase flex items-center gap-3 mb-6"
             style={{

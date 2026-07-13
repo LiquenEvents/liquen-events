@@ -160,7 +160,7 @@ export default function OrcamentoForm() {
   }
 
   const inputCls =
-    "w-full bg-transparent border-b border-foreground/15 pb-3.5 text-base text-foreground placeholder-foreground/20 focus:outline-none focus:border-moss/55 transition-colors duration-300";
+    "w-full bg-transparent border-b border-foreground/15 pb-3.5 text-base text-foreground placeholder-foreground/45 focus:outline-none focus:border-moss/55 transition-colors duration-300";
   const labelCls =
     "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";

@@ -118,7 +118,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="text-foreground/68 hover:text-moss transition-colors duration-300"
+                    className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
                   >
                     {s.icon}
                   </a>

@@ -14,6 +14,7 @@ export default function robots(): MetadataRoute.Robots {
       disallow: ["/api/"],
     },
     sitemap: `${SITE.url}/sitemap.xml`,
-    host: SITE.url,
+    // No `host` directive: it's non-standard (Yandex-only, and expects a bare
+    // hostname, not a URL), and Google ignores it.
   };
 }
