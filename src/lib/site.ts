@@ -17,6 +17,10 @@ export const SITE = {
   country: "PT",
   slogan: "Organizamos eventos, eternizamos memórias.",
   founded: "2018",
+  // Avaliação agregada real (Google). Mostrada visivelmente no site (ver
+  // RatingBadge) e espelhada no aggregateRating do schema — a marcação nunca
+  // afirma mais do que é exibido. Atualizar aqui quando o nº/média mudarem.
+  reviews: { rating: 5, count: 56 },
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",
   ogImage: "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",

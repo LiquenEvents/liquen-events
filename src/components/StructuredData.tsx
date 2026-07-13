@@ -70,11 +70,17 @@ export default function StructuredData({ locale }: { locale: Locale }) {
         areaServed: "PT",
         availableLanguage: ["Portuguese", "English"],
       },
-      // NB: no `aggregateRating` here. Google only honours review snippets that
-      // are backed by genuine, visible reviews on the page; a self-serving
-      // rating on an Organization/LocalBusiness is ignored and risks a manual
-      // action. Add it back via real `Review` items (e.g. Google Business
-      // Profile) when those are available.
+      // Aggregate rating — the REAL Google rating (SITE.reviews), now shown
+      // VISIBLY on the site via <RatingBadge> in the testimonials section, so
+      // the markup mirrors what the page actually displays (not a hidden,
+      // self-serving claim). Update the numbers in SITE.reviews when they move.
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: SITE.reviews.rating,
+        reviewCount: SITE.reviews.count,
+        bestRating: 5,
+        worstRating: 1,
+      },
       // These reviews mirror the testimonials VISIBLE on the site (home,
       // /clientes, /contacto) — same source (the active locale's dictionary)
       // so the markup always matches what's actually rendered. No

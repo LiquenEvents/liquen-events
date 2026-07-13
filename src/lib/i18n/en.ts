@@ -64,6 +64,7 @@ export const en: Dict = {
     enviarEmail: "Send e-mail",
     contactWhatsApp: "Contact us on WhatsApp",
     clientsSay: "What our clients say",
+    reviewsLabel: "reviews",
     testemunhoLabel: "Testimonial",
     whatsappPrefill: "Hi, I'd like to know more about your event planning services.",
   },
