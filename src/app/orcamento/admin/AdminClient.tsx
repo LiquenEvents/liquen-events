@@ -2,10 +2,10 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import type { Quote, QuoteStatus, ActivityEntry } from "../types";
+import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
-import { formatPrice } from "../pricing";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../data";
+import { formatPrice } from "@/lib/orcamento/pricing";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import dynamic from "next/dynamic";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";

@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import type { Quote, QuoteStatus } from "../types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
+import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 

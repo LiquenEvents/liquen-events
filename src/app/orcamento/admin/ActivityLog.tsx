@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Quote, ActivityEntry, ActivityKind } from "../types";
+import type { Quote, ActivityEntry, ActivityKind } from "@/lib/orcamento/types";
 import { randomId } from "./util";
 
 const KIND_META: Record<ActivityKind, { label: string; color: string; d: string }> = {

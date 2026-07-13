@@ -1,4 +1,4 @@
-import type { Proposal } from "@/app/orcamento/types";
+import type { Proposal } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
 export const mapper: Mapper<Proposal> = {

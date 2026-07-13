@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Quote, Task, TaskPriority } from "../types";
+import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   baixa: "#8a8a82",

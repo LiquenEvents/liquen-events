@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { Quote } from "@/app/orcamento/types";
+import type { Quote } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
 /**

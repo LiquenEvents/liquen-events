@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Task } from "@/app/orcamento/types";
+import type { Task } from "@/lib/orcamento/types";
 import { isAuthed } from "@/lib/admin-auth";
 import { updateTask, deleteTask } from "@/lib/tasks-store";
 import { taskUpdateSchema, firstError } from "@/lib/validation";

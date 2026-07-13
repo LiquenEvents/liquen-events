@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Quote, CalendarEvent, Task } from "../types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
+import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 
 const DAYS_AHEAD = 14;
 

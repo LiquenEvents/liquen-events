@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Quote, Task } from "../types";
+import type { Quote, Task } from "@/lib/orcamento/types";
 
 interface Reminder {
   kind: "evento" | "pagamento" | "pedido" | "tarefa" | "seguimento";

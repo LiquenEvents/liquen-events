@@ -8,7 +8,7 @@ import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
-import { SERVICES, getService } from "../services-data";
+import { SERVICES, getService } from "@/lib/services-data";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary, localizeHref } from "@/lib/i18n";
 

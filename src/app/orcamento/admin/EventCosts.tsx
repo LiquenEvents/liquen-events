@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { randomId, eur2 } from "./util";
-import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "../types";
+import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/orcamento/types";
 
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
   contactado: { label: "Contactado", color: "#8a8a82" },

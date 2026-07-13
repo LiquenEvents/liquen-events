@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Quote, QuoteMessage } from "../types";
+import type { Quote, QuoteMessage } from "@/lib/orcamento/types";
 
 interface Props {
   quote: Quote;

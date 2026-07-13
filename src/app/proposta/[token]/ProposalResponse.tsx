@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ProposalStatus } from "@/app/orcamento/types";
+import type { ProposalStatus } from "@/lib/orcamento/types";
 import { useTranslations } from "@/components/LocaleProvider";
 
 interface Props {

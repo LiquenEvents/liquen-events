@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Quote, QuoteFormData, PriceBreakdown } from "../../orcamento/types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../../orcamento/data";
+import type { Quote, QuoteFormData, PriceBreakdown } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { sendMail, esc } from "@/lib/mail";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";

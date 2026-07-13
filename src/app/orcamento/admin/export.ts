@@ -3,8 +3,8 @@
  *  - CSV download (Excel/Numbers/Sheets friendly, UTF-8 BOM + ; separator for PT)
  *  - Printable run-sheet for an event (opens an isolated print window)
  */
-import type { Quote } from "../types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../data";
+import type { Quote } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {

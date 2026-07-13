@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { randomId } from "./util";
-import type { Quote, ChecklistItem } from "../types";
+import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
 import { checklistTemplate } from "@/lib/checklist-templates";
 
 interface Props {

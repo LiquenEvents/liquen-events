@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import type { Quote } from "../types";
+import type { Quote } from "@/lib/orcamento/types";
 import AdminClient from "./AdminClient";
 import AdminLogin from "./AdminLogin";
 import { ToastProvider } from "./Toast";

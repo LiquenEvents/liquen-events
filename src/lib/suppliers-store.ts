@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Supplier } from "@/app/orcamento/types";
+import type { Supplier } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
 export const mapper: Mapper<Supplier> = {
@@ -33,9 +33,7 @@ const repo = createRepository(mapper);
 
 export const listSuppliers = (): Promise<Supplier[]> => repo.list();
 
-export async function createSupplier(
-  input: Omit<Supplier, "id" | "createdAt">,
-): Promise<Supplier> {
+export async function createSupplier(input: Omit<Supplier, "id" | "createdAt">): Promise<Supplier> {
   const supplier: Supplier = { ...input, id: randomUUID(), createdAt: new Date().toISOString() };
   await repo.create(supplier);
   return supplier;

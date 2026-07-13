@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
-import type { Quote, Payment, PaymentKind } from "../types";
+import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
 
 const KIND_LABEL: Record<PaymentKind, string> = {
   sinal: "Sinal",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Quote } from "../../../orcamento/types";
+import type { Quote } from "@/lib/orcamento/types";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";

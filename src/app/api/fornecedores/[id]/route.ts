@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Supplier } from "@/app/orcamento/types";
+import type { Supplier } from "@/lib/orcamento/types";
 import { isAuthed } from "@/lib/admin-auth";
 import { updateSupplier, deleteSupplier } from "@/lib/suppliers-store";
 import { supplierUpdateSchema, firstError } from "@/lib/validation";

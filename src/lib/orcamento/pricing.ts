@@ -1,23 +1,23 @@
-import type { QuoteFormData, PriceBreakdown } from './types';
-import { EVENT_TYPES_BY_CATEGORY, PACKAGES, LOCATION_SURCHARGES } from './data';
+import type { QuoteFormData, PriceBreakdown } from "./types";
+import { EVENT_TYPES_BY_CATEGORY, PACKAGES, LOCATION_SURCHARGES } from "./data";
 
 export function isWeekend(dateStr: string): boolean {
   if (!dateStr) return false;
-  const d = new Date(dateStr + 'T12:00:00');
+  const d = new Date(dateStr + "T12:00:00");
   return d.getDay() === 5 || d.getDay() === 6;
 }
 
 export function isHighSeason(dateStr: string): boolean {
   if (!dateStr) return false;
-  const d = new Date(dateStr + 'T12:00:00');
+  const d = new Date(dateStr + "T12:00:00");
   const m = d.getMonth();
   return (m >= 5 && m <= 8) || m === 11;
 }
 
 export function formatPrice(n: number): string {
-  return new Intl.NumberFormat('pt-PT', {
-    style: 'currency',
-    currency: 'EUR',
+  return new Intl.NumberFormat("pt-PT", {
+    style: "currency",
+    currency: "EUR",
     maximumFractionDigits: 0,
   }).format(n);
 }
@@ -51,14 +51,14 @@ export function calculatePrice(form: Partial<QuoteFormData>): PriceBreakdown {
   const guestCost = et.pricePerPax * guests;
 
   let packageMultiplier = 1.0;
-  if (form.packageTier && form.packageTier !== 'personalizado') {
+  if (form.packageTier && form.packageTier !== "personalizado") {
     const pkg = PACKAGES.find((p) => p.id === form.packageTier);
     packageMultiplier = pkg?.multiplier ?? 1.0;
   }
 
   const packaged = (basePrice + guestCost) * packageMultiplier;
 
-  const locRate = LOCATION_SURCHARGES[form.locationType ?? 'lisboa'];
+  const locRate = LOCATION_SURCHARGES[form.locationType ?? "lisboa"];
   const locationSurcharge = packaged * locRate;
 
   const weekend = form.date ? isWeekend(form.date) : false;
@@ -68,14 +68,14 @@ export function calculatePrice(form: Partial<QuoteFormData>): PriceBreakdown {
   const seasonSurcharge = highSeason ? packaged * 0.1 : 0;
 
   let urgencyRate = 0;
-  if (form.urgency === 'rush') urgencyRate = 0.2;
-  if (form.urgency === 'urgente') urgencyRate = 0.4;
+  if (form.urgency === "rush") urgencyRate = 0.2;
+  if (form.urgency === "urgente") urgencyRate = 0.4;
   const urgencySurcharge = packaged * urgencyRate;
 
   let addonsCost = 0;
   for (const addon of form.addons ?? []) {
     const qty = addon.quantity ?? 1;
-    if (addon.pricingType === 'per_pax') {
+    if (addon.pricingType === "per_pax") {
       addonsCost += addon.price * guests * qty;
     } else {
       addonsCost += addon.price * qty;

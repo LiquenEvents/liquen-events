@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Quote, CalendarEvent, CalendarEventKind } from "../types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
+import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { randomId } from "./util";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
-import type { Quote, Guest, RsvpStatus } from "../types";
+import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
 
 const RSVP_META: Record<RsvpStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },

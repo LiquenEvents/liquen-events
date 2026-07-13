@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listCalendarEvents, createCalendarEvent } from "@/lib/calendar-store";
-import type { CalendarEventKind } from "@/app/orcamento/types";
+import type { CalendarEventKind } from "@/lib/orcamento/types";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { Quote } from "../../types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "../../data";
+import type { Quote } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { SITE } from "@/lib/site";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";

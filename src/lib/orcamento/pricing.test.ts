@@ -108,14 +108,22 @@ describe("calculatePrice — surcharges", () => {
 describe("calculatePrice — add-ons", () => {
   it("prices per-pax add-ons by guest count", () => {
     const r = calculatePrice(
-      form({ addons: [{ id: "a", name: "x", tier: "essencial", price: 10, quantity: 1, pricingType: "per_pax" }] })
+      form({
+        addons: [
+          { id: "a", name: "x", tier: "essencial", price: 10, quantity: 1, pricingType: "per_pax" },
+        ],
+      }),
     );
     expect(r.addonsCost).toBe(1000); // 10 * 100 guests
   });
 
   it("prices fixed add-ons by quantity only", () => {
     const r = calculatePrice(
-      form({ addons: [{ id: "a", name: "x", tier: "essencial", price: 500, quantity: 2, pricingType: "fixed" }] })
+      form({
+        addons: [
+          { id: "a", name: "x", tier: "essencial", price: 500, quantity: 2, pricingType: "fixed" },
+        ],
+      }),
     );
     expect(r.addonsCost).toBe(1000); // 500 * 2
   });

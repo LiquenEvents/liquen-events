@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { randomId } from "./util";
-import type { Quote, TimelineItem } from "../types";
+import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 
 interface Props {
   quote: Quote;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toCsv, quotesToCsvRows, paymentsToCsvRows, buildEventIcs } from "./export";
-import type { Quote } from "../types";
+import type { Quote } from "@/lib/orcamento/types";
 
 describe("toCsv", () => {
   it("joins cells with ; and rows with CRLF, prefixed by a UTF-8 BOM", () => {

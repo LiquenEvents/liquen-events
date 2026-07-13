@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { execFileSync } from "node:child_process";
 import { SITE } from "@/lib/site";
-import { SERVICES } from "./servicos/services-data";
+import { SERVICES } from "@/lib/services-data";
 
 const base = SITE.url;
 

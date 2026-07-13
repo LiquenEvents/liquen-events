@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Quote, ProposalLineItem } from "../types";
+import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {

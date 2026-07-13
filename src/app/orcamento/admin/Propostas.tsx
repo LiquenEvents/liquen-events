@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Proposal, ProposalStatus, Quote } from "../types";
+import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import EmptyState from "./EmptyState";
 import { randomId } from "./util";

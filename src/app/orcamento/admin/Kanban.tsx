@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Quote, QuoteStatus } from "../types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
+import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { eventCountdown, randomId } from "./util";
-import type { ActivityEntry } from "../types";
+import type { ActivityEntry } from "@/lib/orcamento/types";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Novos", color: "#8a8a82" },

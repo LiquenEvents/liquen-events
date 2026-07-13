@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Task, TaskPriority } from "../types";
+import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {

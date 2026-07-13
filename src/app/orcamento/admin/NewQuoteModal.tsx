@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../data";
-import type { Quote, EventCategory } from "../types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
+import type { Quote, EventCategory } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 
 interface Props {

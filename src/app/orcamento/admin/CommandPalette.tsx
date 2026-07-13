@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Quote } from "../types";
+import type { Quote } from "@/lib/orcamento/types";
 
 export interface Command {
   id: string;

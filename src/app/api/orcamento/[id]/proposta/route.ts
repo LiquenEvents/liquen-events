@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import type { Proposal } from "../../../../orcamento/types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "../../../../orcamento/data";
+import type { Proposal } from "@/lib/orcamento/types";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderProposalPdf } from "@/lib/proposal-pdf";
