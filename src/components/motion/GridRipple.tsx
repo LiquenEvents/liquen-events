@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
-import { webglAvailable } from "@/lib/motion/webgl";
+import { webglAvailable, glDpr } from "@/lib/motion/webgl";
 
 /**
  * Cursor-following liquid ripple for the gallery grid — the "ripple na grelha".
@@ -80,7 +80,7 @@ function GridRippleCanvas() {
         canvas,
         alpha: true,
         antialias: false,
-        dpr: Math.min(window.devicePixelRatio || 1, 2),
+        dpr: glDpr(),
       });
     } catch {
       canvas.remove();

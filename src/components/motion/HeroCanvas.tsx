@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
-import { webglAvailable } from "@/lib/motion/webgl";
+import { webglAvailable, glDpr } from "@/lib/motion/webgl";
 import { sizedImageSrc } from "@/lib/image-src";
 
 /**
@@ -101,7 +101,7 @@ export default function HeroCanvas({ src, className }: { src: string; className?
         canvas,
         alpha: true,
         antialias: false,
-        dpr: Math.min(window.devicePixelRatio || 1, 2),
+        dpr: glDpr(),
       });
     } catch {
       canvas.remove();
@@ -188,12 +188,19 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     const start = performance.now();
     let raf = 0;
     let firstFrame = true;
+    let lastPaint = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       const hidden = document.hidden || !visible;
       if (hidden && !firstFrame) return;
 
       const elapsed = (now - start) / 1000;
+      // Once the intro has settled the only motion left is a very slow ambient
+      // drift + a whisper of pointer parallax — cap it to ~30fps (imperceptible
+      // at this speed) to roughly halve the hero's steady-state GPU cost. The
+      // load reveal keeps full 60fps so it stays buttery.
+      if (elapsed > 2.6 && !firstFrame && now - lastPaint < 32) return;
+      lastPaint = now;
       const u = program.uniforms;
       u.uTime.value = elapsed;
       // settle over ~2.6s with an ease-out

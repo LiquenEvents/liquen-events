@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
-import { webglAvailable } from "@/lib/motion/webgl";
+import { webglAvailable, glDpr } from "@/lib/motion/webgl";
 import { sizedImageSrc } from "@/lib/image-src";
 
 /**
@@ -77,7 +77,7 @@ export default function ShaderImage({ src, className }: { src: string; className
         canvas,
         alpha: true,
         antialias: false,
-        dpr: Math.min(window.devicePixelRatio || 1, 2),
+        dpr: glDpr(),
       });
     } catch {
       canvas.remove();
@@ -163,10 +163,17 @@ export default function ShaderImage({ src, className }: { src: string; className
     const start = performance.now();
     let raf = 0;
     let firstFrame = true;
+    let lastPaint = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       if ((document.hidden || !visible) && !firstFrame) return;
       const t = (now - start) / 1000;
+      // Settled + pointer away → only the slow ambient drift is left: cap to
+      // ~30fps to halve the GPU cost. Keep full 60fps during the load reveal
+      // and whenever the pointer ripple is active, so interaction stays crisp.
+      const idle = curHover < 0.01 && targetHover === 0;
+      if (t > 2.2 && idle && !firstFrame && now - lastPaint < 32) return;
+      lastPaint = now;
       const u = program.uniforms;
       u.uTime.value = t;
       u.uIntro.value = Math.min(1, 1 - Math.pow(1 - Math.min(t / 2.2, 1), 3));

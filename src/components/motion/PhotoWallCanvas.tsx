@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Renderer, Camera, Transform, Plane, Program, Mesh, Texture } from "ogl";
-import { webglAvailable } from "@/lib/motion/webgl";
+import { webglAvailable, glDpr } from "@/lib/motion/webgl";
 import { sizedImageSrc } from "@/lib/image-src";
 
 /**
@@ -97,7 +97,7 @@ export default function PhotoWallCanvas({
         canvas,
         alpha: true,
         antialias: true,
-        dpr: Math.min(window.devicePixelRatio || 1, 2),
+        dpr: glDpr(),
       });
     } catch {
       canvas.remove();
