@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 
 interface Props {
   children: React.ReactNode;
@@ -11,17 +12,18 @@ interface Props {
 
 export default function AnimateIn({ children, className = "", delay = 0, from = "bottom" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  // Start VISIBLE so the server HTML — and anyone whose JS fails or is disabled —
+  // always sees the content (previously the SSR markup was opacity:0, leaving it
+  // permanently invisible without JS). The layout effect re-hides it before the
+  // first paint to play the scroll reveal, so there's no flash.
+  const [visible, setVisible] = useState(true);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Respect users who prefer reduced motion: reveal immediately, skip the
-    // observer-driven transition entirely (matches the CSS @media handling).
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setVisible(true);
-      return;
-    }
+    // Reduced motion (and no IntersectionObserver): leave it visible, no reveal.
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    setVisible(false); // hide synchronously, before paint
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
