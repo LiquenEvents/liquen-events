@@ -22,7 +22,7 @@ export interface ServiceDetail {
 export const SERVICES: ServiceDetail[] = [
   {
     slug: "casamentos",
-    eyebrow: "Wedding Planning",
+    eyebrow: "Planeamento de Casamentos",
     title: "Organização de Casamentos no Alentejo e em Portugal",
     metaTitle: "Wedding Planner no Alentejo — Organização de Casamentos",
     metaDescription:
@@ -33,7 +33,7 @@ export const SERVICES: ServiceDetail[] = [
       "casamento herdade Alentejo",
       "wedding planner Portugal",
     ],
-    hero: "/imagens/DaniGui_Preview18.jpg",
+    hero: "/imagens/EW1_1100.jpg",
     intro: [
       "O vosso casamento é único — e merece ser planeado ao pormenor. A Líquen Events é wedding planner e organiza casamentos em todo o Alentejo e Portugal, das herdades e quintas históricas aos espaços mais íntimos.",
       "Acompanhamos o casal do primeiro esboço ao último brinde: conceito e estética, escolha do espaço, decoração floral, catering, música, papelaria e coordenação completa do grande dia. Cada detalhe pensado para que só tenham de viver o momento.",
@@ -48,9 +48,11 @@ export const SERVICES: ServiceDetail[] = [
     ],
     gallery: [
       "/imagens/DaniGui_Preview20.jpg",
-      "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-      "/imagens/M&F0497.jpg",
-      "/imagens/Natalia e Jonathan-167.jpg",
+      "/imagens/matilde-tomas-27.jpg",
+      "/imagens/Sophia&Artur_MAINOVA_capa-482.jpg",
+      "/imagens/ines-goncalo-421.jpg",
+      "/imagens/M&F0678.jpg",
+      "/imagens/stephanie-mizio-760.jpg",
     ],
     faqs: [
       {
@@ -78,7 +80,7 @@ export const SERVICES: ServiceDetail[] = [
       "teambuilding empresas",
       "jantar de empresa",
     ],
-    hero: "/imagens/EW1_1408.jpg",
+    hero: "/imagens/EW1_1427.jpg",
     intro: [
       "Elevamos a imagem da sua marca através de eventos corporativos que transformam equipas e celebram conquistas. A Líquen Events organiza conferências, congressos, teambuildings e jantares de empresa em Lisboa e em todo o Portugal.",
       "Da logística ao audiovisual, da gestão de inscrições à coordenação no local, tratamos de tudo com o rigor que um evento profissional exige — para que a sua empresa se foque apenas nos resultados.",
@@ -93,9 +95,11 @@ export const SERVICES: ServiceDetail[] = [
     ],
     gallery: [
       "/imagens/EW1_1330.jpg",
-      "/imagens/EW1_0697.jpg",
+      "/imagens/EW1_1332.jpg",
+      "/imagens/EW1_1398.jpg",
+      "/imagens/EW1_1428.jpg",
       "/imagens/EW1_1404.jpg",
-      "/imagens/20_10_2025_0295.jpg",
+      "/imagens/hd-edited.jpg",
     ],
     faqs: [
       {
@@ -121,7 +125,7 @@ export const SERVICES: ServiceDetail[] = [
       "festa privada Alentejo",
       "celebrações privadas Portugal",
     ],
-    hero: "/imagens/DaniGui_JantarFesta_1.jpg",
+    hero: "/imagens/DaniGui_JantarFesta_130.jpg",
     intro: [
       "Cada celebração é uma história. Organizamos festas de aniversário, batizados, comunhões e celebrações privadas no Alentejo e em todo o Portugal — temáticas ou clássicas, íntimas ou de grande escala.",
       "Do conceito à decoração, do catering ao entretenimento, criamos momentos memoráveis com a atenção ao detalhe que distingue a Líquen Events.",
@@ -136,9 +140,11 @@ export const SERVICES: ServiceDetail[] = [
     ],
     gallery: [
       "/imagens/DaniGui_JantarFesta_11.jpg",
+      "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg",
+      "/imagens/DaniGui_JantarFesta_26.jpg",
       "/imagens/DaniGui_JantarFesta_27.jpg",
+      "/imagens/DaniGui_JantarFesta_6.jpg",
       "/imagens/DaniGui_JantarFesta_17.jpg",
-      "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
     ],
     faqs: [
       {
@@ -161,7 +167,7 @@ export const SERVICES: ServiceDetail[] = [
       "gala awards",
       "evento de prestígio Alentejo",
     ],
-    hero: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+    hero: "/imagens/J&P-IMGL3188.jpg",
     intro: [
       "Para os momentos que pedem sofisticação, organizamos jantares de gala e eventos sociais de prestígio em Lisboa e por todo o Portugal.",
       "Mesa posta premium, chef convidado, wine pairing e animação ao vivo — uma experiência cuidada ao pormenor, com a coordenação impecável que um evento de gala exige.",
@@ -175,10 +181,12 @@ export const SERVICES: ServiceDetail[] = [
       "Coordenação integral do evento",
     ],
     gallery: [
-      "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg",
-      "/imagens/EW1_1404.jpg",
+      "/imagens/stephanie-mizio-838.jpg",
+      "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg",
+      "/imagens/Natalia e Jonathan-198.jpg",
+      "/imagens/stephanie-mizio-564.jpg",
       "/imagens/M&F0512.jpg",
-      "/imagens/EW1_1393.jpg",
+      "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg",
     ],
     faqs: [],
     related: ["eventos-corporativos", "casamentos"],

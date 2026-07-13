@@ -429,13 +429,9 @@ export const pt = {
     heroTitle: ["Cada evento,", "uma história", "por contar."],
     heroLead:
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
-    imgCorporativos: "Corporativos",
-    imgCelebracoes: "Celebrações",
     nav: ["Empresas", "Celebrações"],
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
-    band1: ["Eventos Corporativos", "Casamentos", "Celebrações"],
-    band2: ["Corporativo", "Casamentos", "Celebrações"],
     categories: [
       {
         label: "Empresas",
@@ -561,6 +557,8 @@ export const pt = {
 
   servicoDetalhe: {
     includesTitle: "O que inclui",
+    galleryEyebrow: "Portefólio",
+    galleryTitle: "Momentos que criámos",
     faqTitle: "Perguntas frequentes",
     relatedTitle: "Outros serviços",
     ctaTitle: "Vamos planear o seu evento?",

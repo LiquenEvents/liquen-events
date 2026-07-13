@@ -26,7 +26,7 @@ export async function generateMetadata({
     title: t.meta.servicosTitle,
     description: t.meta.servicosDescription,
     path: "/servicos",
-    image: "/imagens/EW1_1408.jpg",
+    image: "/imagens/EW1_1330.jpg",
     keywords: [
       "wedding planner Alentejo",
       "eventos corporativos Lisboa",
@@ -68,15 +68,15 @@ const categoryMeta = [
     id: "empresas",
     num: "01",
     layout: "mosaic-right" as const,
-    band: "/imagens/EW1_1408.jpg",
+    band: "/imagens/EW1_1333.jpg",
     services: [
       // Conferências — sala ampla montada (banquete/plenário)
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1408.jpg" },
-      // Teambuilding — pessoas reunidas no pátio ao final do dia
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1330.jpg" },
-      // Lançamentos — cenografia e detalhe
-      { slug: "eventos-corporativos", image: "/imagens/EW1_0697.jpg" },
-      // Jantares de empresa — mesa posta
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1332.jpg" },
+      // Teambuilding — receção no pátio ao final do dia
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1398.jpg" },
+      // Lançamentos — cenografia e sala montada
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1428.jpg" },
+      // Jantares de empresa — mesa posta premium
       { slug: "eventos-corporativos", image: "/imagens/EW1_1404.jpg" },
     ],
   },
@@ -84,12 +84,12 @@ const categoryMeta = [
     id: "celebracoes",
     num: "02",
     layout: "mosaic-left" as const,
-    band: "/imagens/Natalia e Jonathan-167.jpg",
+    band: "/imagens/teresinhaeze-909.jpg",
     services: [
-      { slug: "casamentos", image: "/imagens/DaniGui_Preview18.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_11.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_1.jpg" },
-      { slug: "jantares-de-gala", image: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg" },
+      { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
+      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
     ],
   },
 ];
@@ -97,7 +97,7 @@ const categoryMeta = [
 // Full-bleed editorial photo grid (mirrors the Sobre page rhythm).
 const editorial = [
   { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2 row-span-2" },
-  { src: "/imagens/428658838-339551135742978-7904331374079927456-n.jpg", cls: "col-span-2" },
+  { src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg", cls: "col-span-2" },
   { src: "/imagens/DJI_20250913190635_0120_D.jpg", cls: "col-span-1" },
   { src: "/imagens/20_10_2025_0407.jpg", cls: "col-span-1" },
   { src: "/imagens/stephanie-mizio-715.jpg", cls: "col-span-2" },
@@ -348,7 +348,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       <ServiceJsonLd
         locale={locale}
         name="Organização de eventos, casamentos e eventos corporativos"
-        description="Organização de casamentos, eventos corporativos, conferências e celebrações em Lisboa e todo o Portugal — da decoração à coordenação."
+        description="Organização de casamentos, eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal — da decoração à coordenação."
         path="/servicos"
       />
 
@@ -575,7 +575,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 src={g.src}
                 alt="Evento organizado pela Líquen Events"
                 fill
-                sizes="(max-width: 768px) 50vw, 50vw"
+                sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                 {...blurFor(g.src)}
               />
@@ -591,12 +591,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         style={{ minHeight: "clamp(420px, 70vh, 800px)" }}
       >
         <Image
-          src="/imagens/JOAO_E_PEDRO_1Y1A3439.jpg"
-          alt="Evento Líquen Events em Portugal"
+          src="/imagens/J&A-68.jpg"
+          alt="Cerimónia ao ar livre organizada pela Líquen Events no Alentejo"
           fill
           sizes="100vw"
           className="object-cover object-center"
-          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3439.jpg")}
+          {...blurFor("/imagens/J&A-68.jpg")}
         />
         <div className="absolute inset-0 bg-black/60" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />

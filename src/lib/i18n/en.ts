@@ -414,13 +414,9 @@ export const en: Dict = {
     heroTitle: ["Every event,", "a story", "to tell."],
     heroLead:
       "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
-    imgCorporativos: "Corporate",
-    imgCelebracoes: "Celebrations",
     nav: ["Companies", "Celebrations"],
     verMais: "View more",
     verDetalhes: "View details",
-    band1: ["Corporate Events", "Weddings", "Celebrations"],
-    band2: ["Corporate", "Weddings", "Celebrations"],
     categories: [
       {
         label: "Companies",
@@ -546,6 +542,8 @@ export const en: Dict = {
 
   servicoDetalhe: {
     includesTitle: "What's included",
+    galleryEyebrow: "Portfolio",
+    galleryTitle: "Moments we've created",
     faqTitle: "Frequently asked questions",
     relatedTitle: "Other services",
     ctaTitle: "Shall we plan your event?",
