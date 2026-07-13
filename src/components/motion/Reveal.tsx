@@ -1,20 +1,19 @@
 "use client";
 
 import { useRef, type ElementType, type ReactNode } from "react";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
-
-gsap.registerPlugin(ScrollTrigger);
 
 type Variant = "rise" | "fade" | "mask";
 
 /**
  * Scroll-reveal primitive driven by GSAP ScrollTrigger (which tracks Lenis'
- * smoothed scroll — see SmoothScroll). FOUC-safe: the hidden "from" state is
- * applied in a layout effect, before the first paint, and never on the server —
- * so no-JS / reduced-motion users just see the content, fully visible.
+ * smoothed scroll — see SmoothScroll). GSAP is loaded LAZILY so the ~27KB
+ * runtime stays out of the initial payload; to keep it FOUC-safe despite the
+ * async load, the hidden "from" state is applied SYNCHRONOUSLY with plain inline
+ * styles in a layout effect (before first paint), and GSAP re-applies the
+ * identical from-state when its chunk resolves — a seamless handoff. The effect
+ * never runs on the server, so no-JS / reduced-motion users just see the content.
  *
  * - `rise`  — fade + gentle upward glide (the workhorse).
  * - `fade`  — opacity only.
@@ -49,36 +48,73 @@ export default function Reveal({
     const el = ref.current;
     if (!el || prefersReducedMotion()) return;
 
-    const targets: gsap.TweenTarget = stagger ? Array.from(el.children) : el;
+    const targets: HTMLElement[] = stagger ? (Array.from(el.children) as HTMLElement[]) : [el];
     const step = typeof stagger === "number" ? stagger : 0.09;
-    const ease = "power3.out";
 
-    const ctx = gsap.context(() => {
-      const from =
-        variant === "mask"
-          ? { clipPath: "inset(0 0 100% 0)", y: y * 0.5, opacity: 1 }
-          : variant === "fade"
-            ? { opacity: 0 }
-            : { opacity: 0, y };
-      const to =
-        variant === "mask"
-          ? { clipPath: "inset(0 0 0% 0)", y: 0, opacity: 1 }
-          : variant === "fade"
-            ? { opacity: 1 }
-            : { opacity: 1, y: 0 };
+    // Hide synchronously, before paint — plain inline styles, no GSAP needed —
+    // so above-the-fold reveals never flash before the async runtime lands.
+    const applyHide = (t: HTMLElement) => {
+      if (variant === "mask") {
+        t.style.clipPath = "inset(0 0 100% 0)";
+        t.style.transform = `translateY(${y * 0.5}px)`;
+        t.style.willChange = "clip-path, transform";
+      } else if (variant === "fade") {
+        t.style.opacity = "0";
+      } else {
+        t.style.opacity = "0";
+        t.style.transform = `translateY(${y}px)`;
+        t.style.willChange = "transform";
+      }
+    };
+    const clearHide = (t: HTMLElement) => {
+      t.style.clipPath = "";
+      t.style.transform = "";
+      t.style.opacity = "";
+      t.style.willChange = "";
+    };
+    for (const t of targets) applyHide(t);
 
-      gsap.set(targets, from);
-      gsap.to(targets, {
-        ...to,
-        duration,
-        delay,
-        ease,
-        stagger: stagger ? step : 0,
-        scrollTrigger: { trigger: el, start, once: true },
-      });
-    }, el);
+    let ctx: { revert: () => void } | undefined;
+    let cancelled = false;
 
-    return () => ctx.revert();
+    Promise.all([import("gsap"), import("gsap/ScrollTrigger")]).then(
+      ([{ gsap }, { ScrollTrigger }]) => {
+        if (cancelled || !ref.current) return;
+        gsap.registerPlugin(ScrollTrigger);
+        const ease = "power3.out";
+        ctx = gsap.context(() => {
+          const from =
+            variant === "mask"
+              ? { clipPath: "inset(0 0 100% 0)", y: y * 0.5, opacity: 1 }
+              : variant === "fade"
+                ? { opacity: 0 }
+                : { opacity: 0, y };
+          const to =
+            variant === "mask"
+              ? { clipPath: "inset(0 0 0% 0)", y: 0, opacity: 1 }
+              : variant === "fade"
+                ? { opacity: 1 }
+                : { opacity: 1, y: 0 };
+          gsap.set(targets, from);
+          gsap.to(targets, {
+            ...to,
+            duration,
+            delay,
+            ease,
+            stagger: stagger ? step : 0,
+            scrollTrigger: { trigger: el, start, once: true },
+          });
+        }, el);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+      if (ctx) ctx.revert();
+      // GSAP never loaded (slow chunk / unmounted first) — clear the inline hide
+      // so content is never left stuck invisible.
+      else for (const t of targets) clearHide(t);
+    };
   }, [variant, delay, y, duration, stagger, start]);
 
   return (
