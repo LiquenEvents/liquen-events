@@ -154,11 +154,11 @@ export default function PhotoWallCanvas({
         program.uniforms.uCover.value = s > 1 ? [1 / s, 1] : [1, s];
       };
       img.onload = onImg;
-      // 640px matches the flat ribbon's own next/image request (sizes="615px"
-      // → 640px device width) EXACTLY, so the browser serves this carousel
+      // 768px matches the flat ribbon's own next/image request (sizes="720px"
+      // → 768px device width) EXACTLY, so the browser serves this carousel
       // texture from cache instead of downloading a second copy — and the
       // larger stage cards stay sharp.
-      img.src = sizedImageSrc(src, 640);
+      img.src = sizedImageSrc(src, 768);
       if (img.complete) onImg();
     });
 
@@ -168,10 +168,11 @@ export default function PhotoWallCanvas({
       renderer.setSize(w, h);
       const a = w / h;
       camera.perspective({ aspect: a });
-      // Frame the stage like a hero, not a distant diorama: on wide screens the
-      // camera moves in so the lead photo is large with neighbours peeking at
-      // the edges; on narrow/tall screens it backs off so the photo still fits.
-      camera.position.z = R + (a >= 2.4 ? 2.1 : a >= 1.6 ? 2.5 : a >= 1.1 ? 2.9 : 3.4);
+      // Frame the stage like a hero, not a distant diorama. Continuous framing:
+      // 2.05 fills ~90% of the stage height with the lead photo on wide
+      // screens; 2.9/a is the width constraint that backs the camera off on
+      // narrow/tall stages so the photo always fits with a small margin.
+      camera.position.z = R + Math.max(2.05, 2.9 / a);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -231,7 +232,9 @@ export default function PhotoWallCanvas({
       const vh = window.innerHeight || 1;
       const center = r.top + r.height / 2;
       const p = (center - vh / 2) / vh; // ~ -0.5..0.5 across the viewport
-      tiltTarget = Math.max(-0.16, Math.min(0.16, p * 0.4));
+      // Gentler than before (±0.10, not ±0.16): the lead photo now nearly
+      // fills the stage height, so a strong tilt would clip its corners.
+      tiltTarget = Math.max(-0.1, Math.min(0.1, p * 0.3));
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });

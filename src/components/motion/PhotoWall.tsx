@@ -74,7 +74,7 @@ export default function PhotoWall({
       </div>
 
       {/* ── Carousel band — tall stage so the photos read big and immersive ── */}
-      <div className="relative mt-8 sm:mt-10 lg:mt-12 h-[340px] sm:h-[460px] lg:h-[560px]">
+      <div className="relative mt-8 sm:mt-10 lg:mt-12 h-[380px] sm:h-[520px] lg:h-[640px]">
         {/* Flat ribbon — SSR / LCP / reduced-motion / no-WebGL fallback. Fades
             out once the WebGL carousel has painted its first frame, then unmounts. */}
         {!hideRibbon && (
@@ -89,13 +89,13 @@ export default function PhotoWall({
               {[...images, ...images].map((img, i) => (
                 <div
                   key={i}
-                  className="relative h-[240px] sm:h-[330px] lg:h-[410px] w-[360px] sm:w-[495px] lg:w-[615px] flex-shrink-0 overflow-hidden rounded-lg"
+                  className="relative h-[280px] sm:h-[390px] lg:h-[480px] w-[420px] sm:w-[585px] lg:w-[720px] flex-shrink-0 overflow-hidden rounded-lg"
                 >
                   <Image
                     src={img.src}
                     alt=""
                     fill
-                    sizes="615px"
+                    sizes="720px"
                     className="object-cover"
                     placeholder={img.blurDataURL ? "blur" : undefined}
                     blurDataURL={img.blurDataURL}
