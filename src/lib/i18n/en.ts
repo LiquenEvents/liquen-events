@@ -114,6 +114,9 @@ export const en: Dict = {
       { words: ["you."], moss: true },
     ],
     scroll: "Scroll",
+    wallEyebrow: "Our work",
+    wallTitle: "Unforgettable moments",
+    wallHint: "Drag to explore",
     servicesEyebrow: "What we do",
     services: [
       { tag: "Companies", title: "Corporate" },

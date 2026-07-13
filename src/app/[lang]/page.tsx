@@ -226,6 +226,9 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         images={ribbon.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }))}
         href={localizeHref("/galeria", locale)}
         label={t.common.verGaleria}
+        eyebrow={t.home.wallEyebrow}
+        title={t.home.wallTitle}
+        hint={t.home.wallHint}
       />
 
       {/* ── Testimonials ── */}

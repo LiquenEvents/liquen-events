@@ -114,6 +114,9 @@ export const pt = {
       { words: ["memória."], moss: true },
     ] as { words: string[]; moss?: boolean }[],
     scroll: "Scroll",
+    wallEyebrow: "O nosso trabalho",
+    wallTitle: "Momentos inesquecíveis",
+    wallHint: "Arraste para explorar",
     servicesEyebrow: "O que fazemos",
     services: [
       { tag: "Empresas", title: "Corporativos" },
