@@ -381,7 +381,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           </AnimateIn>
           <KineticHeading
             className="text-white font-bold leading-[0.9] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(52px, 9vw, 132px)" }}
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-section)" }}
             lines={[
               [{ text: ts.heroTitle[0] }],
               [{ text: ts.heroTitle[1] }, { text: ts.heroTitle[2], moss: true }],

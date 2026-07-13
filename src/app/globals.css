@@ -24,6 +24,23 @@
   --font-display: var(--font-playfair);
 }
 
+/* ── Hero type scale — single source of truth for the marketing page heroes.
+   Each page had hardcoded a near-identical but drifting clamp() inline
+   (56/54/58px mins, 10/10.5vw, 150/148/132px maxes), so heroes that were meant
+   to match never quite did. Three deliberate tiers instead:
+     · display — statement pages (home, sobre, clientes)
+     · section — index pages that carry functional content just below the
+                 fold (galeria filters, serviços grid)
+     · detail  — a single service page, whose hero sits over a photo with a
+                 breadcrumb and whose titles run longer
+   Change a tier's weight here, not across the page files. (The /contacto hero
+   keeps its own larger form-landing scale in ContactForm.) */
+:root {
+  --hero-display: clamp(56px, 10vw, 150px);
+  --hero-section: clamp(52px, 9vw, 132px);
+  --hero-detail: clamp(36px, 6vw, 84px);
+}
+
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
    Stays full-screen/focused (footer, WhatsApp & scroll-progress hidden below),
    but the form itself is light. The left image panel keeps its own cream-on-

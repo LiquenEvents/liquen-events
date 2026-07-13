@@ -87,7 +87,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           </AnimateIn>
           <KineticHeading
             className="text-white font-bold leading-[0.88] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(54px, 10vw, 150px)" }}
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
             lines={[[{ text: t.sobre.heroTitlePre }, { text: t.sobre.heroTitleMoss, moss: true }]]}
           />
         </div>

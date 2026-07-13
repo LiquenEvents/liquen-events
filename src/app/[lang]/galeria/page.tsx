@@ -83,7 +83,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           <AnimateIn delay={80}>
             <h1
               className="text-white font-bold leading-[0.88] tracking-tight"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(48px, 9vw, 132px)" }}
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-section)" }}
             >
               {t.galeria.headerTitle}
             </h1>

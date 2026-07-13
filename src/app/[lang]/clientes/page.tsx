@@ -124,7 +124,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           </AnimateIn>
           <KineticHeading
             className="text-white font-bold leading-[0.88] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(58px, 10.5vw, 148px)" }}
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
             lines={[
               [{ text: t.clientes.heroTitleLine1 }],
               [{ text: t.clientes.heroTitleMoss, moss: true }],

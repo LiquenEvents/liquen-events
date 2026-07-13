@@ -116,7 +116,7 @@ export default async function ServiceDetailPage({
           </nav>
           <KineticHeading
             className="text-cream font-bold leading-[0.95] max-w-4xl"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 6vw, 84px)" }}
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-detail)" }}
             lines={[[{ text: svc.title }]]}
           />
         </div>

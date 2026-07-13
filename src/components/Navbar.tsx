@@ -191,7 +191,11 @@ export default function Navbar() {
           className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/35 via-black/10 to-transparent"
         />
       )}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
+      {/* px-12 (not px-16) in the lg→xl band: at exactly 1024px the nav links and
+          the right-side actions sat only ~4px apart (nearly touching). The extra
+          32px of inner width opens that gap; alignment with page content
+          (also lg:px-16) is restored at xl, where there's room. */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 xl:px-16">
         <div
           className={`relative flex items-center justify-between transition-[height] duration-500 ${
             scrolled ? "h-[72px]" : "h-[140px]"
@@ -211,7 +215,7 @@ export default function Navbar() {
             />
           </Link>
 
-          <div className="hidden lg:flex items-center gap-6 xl:gap-9">
+          <div className="hidden lg:flex items-center gap-5 xl:gap-9">
             {links.map((link) => (
               <Link
                 key={link.href}

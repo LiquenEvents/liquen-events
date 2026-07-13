@@ -78,7 +78,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           </p>
           <h1
             className="text-white font-bold leading-[0.86] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(56px, 10vw, 150px)" }}
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
           >
             {/* Readable sentence for SEO / screen readers — the animated words
                 below are laid out with flex gaps (no spaces) and aria-hidden. */}
