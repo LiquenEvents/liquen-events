@@ -1074,6 +1074,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 </svg>
                 Atalhos
               </button>
+              {/* Plain <a> on purpose: this hits an API route that streams a
+                  file download, not a page — next/link would be wrong here. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a
                 href="/api/backup"
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"

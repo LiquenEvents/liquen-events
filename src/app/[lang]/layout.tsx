@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import { Inter, Playfair_Display } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import WhatsAppButton from "@/components/WhatsAppButton";
@@ -14,9 +13,16 @@ import { LocaleProvider } from "@/components/LocaleProvider";
 import SmoothScroll from "@/components/motion/SmoothScroll";
 import FilmGrain from "@/components/motion/FilmGrain";
 import Cursor from "@/components/motion/Cursor";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary, htmlLang } from "@/lib/i18n";
+import { getDictionary, htmlLang, normalizeLocale, LOCALES } from "@/lib/i18n";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
+
+// Prerender both locales at build time. The locale now comes from the route
+// segment (`/pt/*`, `/en/*`) instead of a runtime header/cookie, so every page
+// under this layout can render statically. The proxy maps the public URLs
+// (Portuguese at `/`, English at `/en/*`) onto these internal segments.
+export function generateStaticParams() {
+  return LOCALES.map((lang) => ({ lang }));
+}
 
 const inter = Inter({
   variable: "--font-inter",
@@ -30,15 +36,17 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale();
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const title = t.meta.homeTitle;
   const description = t.meta.homeDescription;
-  // The /en mirror self-canonicalises (the proxy sets x-liquen-locale); the
-  // Portuguese home stays canonical at "/".
-  const isEnUrl = (await headers()).get("x-liquen-locale") === "en";
-  const canonical = isEnUrl ? "/en" : "/";
+  // English mirror canonicalises to "/en"; the Portuguese home stays at "/".
+  const canonical = locale === "en" ? "/en" : "/";
   return {
     metadataBase: new URL(SITE.url),
     title: {
@@ -105,8 +113,11 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const locale = await getLocale();
+export default async function RootLayout({
+  children,
+  params,
+}: Readonly<{ children: React.ReactNode; params: Promise<{ lang: string }> }>) {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   // Warm the connection to the image CDN (when enabled) so the LCP image isn't
   // delayed by the TLS handshake. No-op until NEXT_PUBLIC_IMAGE_CDN is set.

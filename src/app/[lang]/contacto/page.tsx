@@ -9,12 +9,17 @@ import { BreadcrumbJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, normalizeLocale } from "@/lib/i18n";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = getDictionary(await getLocale());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
   return pageMetadata({
+    locale,
     title: t.meta.contactoTitle,
     description: t.meta.contactoDescription,
     path: "/contacto",
@@ -24,8 +29,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default async function ContactoPage() {
-  const locale = await getLocale();
+export default async function ContactoPage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const steps = t.contacto.steps.map((s, i) => ({ step: `0${i + 1}`, ...s }));
   return (

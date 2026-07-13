@@ -8,12 +8,17 @@ import Parallax from "@/components/Parallax";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
+import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = getDictionary(await getLocale());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
   return pageMetadata({
+    locale,
     title: t.meta.servicosTitle,
     description: t.meta.servicosDescription,
     path: "/servicos",
@@ -304,8 +309,8 @@ function MobileCardStack({ cat, cta, locale }: { cat: Category; cta: string; loc
   );
 }
 
-export default async function ServicosPage() {
-  const locale = await getLocale();
+export default async function ServicosPage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const ts = t.servicos;
   const navItems = navMeta.map((m, i) => ({ ...m, label: ts.nav[i] }));

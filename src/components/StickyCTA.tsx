@@ -1,14 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
 
 export default function StickyCTA() {
   const [visible, setVisible] = useState(false);
   const [atFooter, setAtFooter] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const { locale, t } = useTranslations();
 
   const hidden = pathname.startsWith("/orcamento") || pathname.startsWith("/contacto");

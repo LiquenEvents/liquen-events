@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
 import Magnetic from "@/components/motion/Magnetic";
@@ -24,7 +24,7 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const { locale, t } = useTranslations();
 
   const links = [

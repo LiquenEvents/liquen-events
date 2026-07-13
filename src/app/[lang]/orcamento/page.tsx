@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import OrcamentoForm from "./OrcamentoForm";
 import { pageMetadata } from "@/lib/page-metadata";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, normalizeLocale } from "@/lib/i18n";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = getDictionary(await getLocale());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
   return pageMetadata({
+    locale,
     title: t.meta.orcamentoTitle,
     description: t.meta.orcamentoDescription,
     path: "/orcamento",

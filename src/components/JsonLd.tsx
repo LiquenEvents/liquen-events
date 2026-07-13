@@ -3,7 +3,15 @@ import { jsonLd } from "@/lib/jsonld";
 
 /** Renders an arbitrary JSON-LD object as a script tag. */
 export function JsonLd({ data }: { data: Record<string, unknown> }) {
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />;
+  // suppressHydrationWarning: deterministic JSON, but React 19 can flag a
+  // spurious mismatch on inline <script> when hydrating static pages.
+  return (
+    <script
+      type="application/ld+json"
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{ __html: jsonLd(data) }}
+    />
+  );
 }
 
 /** Breadcrumb trail structured data. Pass [{name, path}] from home onward.

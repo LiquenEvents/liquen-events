@@ -8,12 +8,17 @@ import TitleReveal from "@/components/TitleReveal";
 import Magnetic from "@/components/motion/Magnetic";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary, localizeHref } from "@/lib/i18n";
+import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = getDictionary(await getLocale());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
   return pageMetadata({
+    locale,
     title: t.meta.sobreTitle,
     description: t.meta.sobreDescription,
     path: "/sobre",
@@ -37,8 +42,8 @@ const eyebrowLight =
 const eyebrowDark =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
-export default async function SobrePage() {
-  const locale = await getLocale();
+export default async function SobrePage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   return (
     <>

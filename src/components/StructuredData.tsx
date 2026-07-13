@@ -114,5 +114,15 @@ export default function StructuredData({ locale }: { locale: Locale }) {
 
   const data = { "@context": "https://schema.org", "@graph": graph };
 
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />;
+  // suppressHydrationWarning: the JSON is deterministic (same on server and
+  // client), but React 19's handling of inline <script> during hydration of
+  // statically-prerendered pages can otherwise flag a spurious mismatch on the
+  // dangerouslySetInnerHTML payload.
+  return (
+    <script
+      type="application/ld+json"
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{ __html: jsonLd(data) }}
+    />
+  );
 }

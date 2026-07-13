@@ -8,8 +8,7 @@ import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import { PHOTOS, DECOR_SRCS } from "./photos-data";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
@@ -21,9 +20,15 @@ const galleryPhotos = PHOTOS.map((p) => ({
   aspectRatio: aspectFor(p.src),
 }));
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = getDictionary(await getLocale());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
   return pageMetadata({
+    locale,
     title: t.meta.galeriaTitle,
     description: t.meta.galeriaDescription,
     path: "/galeria",
@@ -33,8 +38,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default async function GaleriaPage() {
-  const locale = await getLocale();
+export default async function GaleriaPage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   return (
     <>

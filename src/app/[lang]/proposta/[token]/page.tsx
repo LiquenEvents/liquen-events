@@ -3,8 +3,7 @@ import Image from "next/image";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal } from "@/lib/proposals-store";
 import { SITE } from "@/lib/site";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import ProposalResponse from "./ProposalResponse";
 
 // Private, per-client link — never index it.
@@ -57,9 +56,13 @@ function Message({ title, body }: { title: string; body: string }) {
   );
 }
 
-export default async function ProposalPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const locale = await getLocale();
+export default async function ProposalPage({
+  params,
+}: {
+  params: Promise<{ lang: string; token: string }>;
+}) {
+  const { lang, token } = await params;
+  const locale = normalizeLocale(lang);
   const t = getDictionary(locale).proposta;
   const claim = readProposalToken(token);
   if (!claim) {

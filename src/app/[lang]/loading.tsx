@@ -1,8 +1,12 @@
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary } from "@/lib/i18n";
+"use client";
 
-export default async function Loading() {
-  const t = getDictionary(await getLocale());
+import { useTranslations } from "@/components/LocaleProvider";
+
+// Client component so it reads the locale from the layout's <LocaleProvider>
+// context (special files like loading.tsx don't receive route params). Keeps
+// the pages themselves statically renderable.
+export default function Loading() {
+  const { t } = useTranslations();
   return (
     <div className="min-h-[70vh] flex items-center justify-center bg-surface">
       <div className="flex flex-col items-center gap-5">

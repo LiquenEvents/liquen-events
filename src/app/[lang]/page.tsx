@@ -10,8 +10,7 @@ import HeroWebGL from "@/components/motion/HeroWebGL";
 import Magnetic from "@/components/motion/Magnetic";
 import Reveal from "@/components/motion/Reveal";
 import PhotoWall from "@/components/motion/PhotoWall";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary, localizeHref } from "@/lib/i18n";
+import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 
 // Each tile links to a distinct destination that matches its label
 // (Corporativos / Casamentos / Privados) — the first two deep-link to their
@@ -39,8 +38,8 @@ const ribbon = [
   "/imagens/mom-0961.jpg",
 ];
 
-export default async function Home() {
-  const locale = await getLocale();
+export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const services = serviceLinks.map((s, i) => ({ ...s, ...t.home.services[i] }));
   return (

@@ -9,8 +9,7 @@ import Parallax from "@/components/Parallax";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "@/lib/services-data";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary, localizeHref } from "@/lib/i18n";
+import { getDictionary, localizeHref, normalizeLocale } from "@/lib/i18n";
 
 export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
@@ -35,13 +34,14 @@ function emphasize(text: string) {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ lang: string; slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
-  const locale = await getLocale();
+  const { lang, slug } = await params;
+  const locale = normalizeLocale(lang);
   const svc = getService(slug, locale);
   if (!svc) return { title: locale === "en" ? "Service not found" : "Serviço não encontrado" };
   return pageMetadata({
+    locale,
     title: svc.metaTitle,
     description: svc.metaDescription,
     path: `/servicos/${svc.slug}`,
@@ -51,9 +51,13 @@ export async function generateMetadata({
   });
 }
 
-export default async function ServiceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const locale = await getLocale();
+export default async function ServiceDetailPage({
+  params,
+}: {
+  params: Promise<{ lang: string; slug: string }>;
+}) {
+  const { lang, slug } = await params;
+  const locale = normalizeLocale(lang);
   const t = getDictionary(locale);
   const svc = getService(slug, locale);
   if (!svc) notFound();

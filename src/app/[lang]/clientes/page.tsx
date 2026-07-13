@@ -11,12 +11,17 @@ import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { clientLogos } from "@/data";
 import { SITE } from "@/lib/site";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary, localizeHref } from "@/lib/i18n";
+import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = getDictionary(await getLocale());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
   return pageMetadata({
+    locale,
     title: t.meta.clientesTitle,
     description: t.meta.clientesDescription,
     path: "/clientes",
@@ -74,8 +79,8 @@ const mosaicItems = [
   },
 ];
 
-export default async function ClientesPage() {
-  const locale = await getLocale();
+export default async function ClientesPage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const testimonials = t.clientes.testimonials;
   return (

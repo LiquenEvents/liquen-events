@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useState } from "react";
 import { ViewTransition } from "./vt";
 
@@ -19,7 +19,7 @@ import { ViewTransition } from "./vt";
  * mismatch), every subsequent route animates.
  */
 export default function PageTransition({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const [entryPath] = useState(pathname);
 
   // Admin/orçamento run full-screen; don't animate their heavy surfaces.

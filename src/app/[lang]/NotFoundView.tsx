@@ -1,16 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import type { Metadata } from "next";
-import { getLocale } from "@/lib/i18n/server";
-import { getDictionary, localizeHref } from "@/lib/i18n";
+import { localizeHref } from "@/lib/i18n";
+import { useTranslations } from "@/components/LocaleProvider";
 
-export const metadata: Metadata = {
-  title: "Página não encontrada",
-  robots: { index: false, follow: false },
-};
-
-export default async function NotFound() {
-  const locale = await getLocale();
-  const t = getDictionary(locale);
+export default function NotFoundView() {
+  const { locale, t } = useTranslations();
   return (
     <section className="min-h-[80vh] flex items-center justify-center px-6 bg-surface">
       <div className="max-w-xl text-center">
