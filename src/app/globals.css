@@ -81,6 +81,13 @@ html {
      instead of being hidden under it. */
   scroll-padding-top: 6rem;
 }
+/* Honour reduced-motion for native/programmatic scrolling too (Lenis is already
+   disabled elsewhere) — anchor jumps and scrollTo() snap instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
 
 /* ── Lenis (momentum scroll) — active only when JS mounts it (não em
    reduced-motion). Enquanto ativo, o scroll-behavior nativo tem de ficar auto

@@ -44,6 +44,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
   return (
     <>
       <BreadcrumbJsonLd
+        locale={locale}
         homeName={t.nav.inicio}
         items={[{ name: t.nav.galeria, path: "/galeria" }]}
       />

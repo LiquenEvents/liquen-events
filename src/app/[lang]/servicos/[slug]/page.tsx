@@ -71,6 +71,7 @@ export default async function ServiceDetailPage({
   return (
     <>
       <BreadcrumbJsonLd
+        locale={locale}
         homeName={t.nav.inicio}
         items={[
           { name: t.nav.servicos, path: "/servicos" },
@@ -78,6 +79,7 @@ export default async function ServiceDetailPage({
         ]}
       />
       <ServiceJsonLd
+        locale={locale}
         name={svc.title}
         description={svc.metaDescription}
         path={`/servicos/${svc.slug}`}

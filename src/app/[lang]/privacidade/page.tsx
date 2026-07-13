@@ -32,6 +32,7 @@ export default async function PrivacidadePage({ params }: { params: Promise<{ la
   return (
     <>
       <BreadcrumbJsonLd
+        locale={locale}
         homeName={t.nav.inicio}
         items={[{ name: privacy.title, path: "/privacidade" }]}
       />

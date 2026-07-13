@@ -20,11 +20,18 @@ const img = (file: string) => `${base}/imagens/${file}`;
  */
 function lastModifiedFor(sourceFile: string): Date | undefined {
   try {
-    const iso = execFileSync("git", ["log", "-1", "--format=%aI", "--", sourceFile], {
-      cwd: process.cwd(),
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
+    // `:(literal)` pathspec magic: the source paths contain `[lang]`, which git
+    // would otherwise read as a glob character class (matching l/a/n/g, not the
+    // literal directory) and never resolve — freezing every lastmod.
+    const iso = execFileSync(
+      "git",
+      ["log", "-1", "--format=%aI", "--", `:(literal)${sourceFile}`],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    ).trim();
     return iso ? new Date(iso) : undefined;
   } catch {
     return undefined;
@@ -43,7 +50,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const core: RawEntry[] = [
     {
       path: "/",
-      sourceFile: "src/app/page.tsx",
+      sourceFile: "src/app/[lang]/page.tsx",
       changeFrequency: "weekly",
       priority: 1.0,
       images: [
@@ -54,34 +61,34 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       path: "/servicos",
-      sourceFile: "src/app/servicos/page.tsx",
+      sourceFile: "src/app/[lang]/servicos/page.tsx",
       changeFrequency: "monthly",
       priority: 0.9,
       images: [img("EW1_1408.jpg"), img("EW1_1330.jpg"), img("EW1_0697.jpg")],
     },
     {
       path: "/contacto",
-      sourceFile: "src/app/contacto/page.tsx",
+      sourceFile: "src/app/[lang]/contacto/page.tsx",
       changeFrequency: "monthly",
       priority: 0.8,
     },
     // Conversion page — the quote request form.
     {
       path: "/orcamento",
-      sourceFile: "src/app/orcamento/page.tsx",
+      sourceFile: "src/app/[lang]/orcamento/page.tsx",
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       path: "/sobre",
-      sourceFile: "src/app/sobre/page.tsx",
+      sourceFile: "src/app/[lang]/sobre/page.tsx",
       changeFrequency: "monthly",
       priority: 0.8,
       images: [img("JOAO_E_PEDRO_1Y1A3204.jpg"), img("DaniGui_Preview12.jpg")],
     },
     {
       path: "/galeria",
-      sourceFile: "src/app/galeria/page.tsx",
+      sourceFile: "src/app/[lang]/galeria/page.tsx",
       changeFrequency: "weekly",
       priority: 0.7,
       images: [
@@ -92,20 +99,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       path: "/clientes",
-      sourceFile: "src/app/clientes/page.tsx",
+      sourceFile: "src/app/[lang]/clientes/page.tsx",
       changeFrequency: "monthly",
       priority: 0.7,
       images: [img("EW1_1393.jpg")],
     },
     {
       path: "/privacidade",
-      sourceFile: "src/app/legal/legal-content.ts",
+      sourceFile: "src/app/[lang]/privacidade/page.tsx",
       changeFrequency: "yearly",
       priority: 0.2,
     },
     {
       path: "/termos",
-      sourceFile: "src/app/legal/legal-content.ts",
+      sourceFile: "src/app/[lang]/termos/page.tsx",
       changeFrequency: "yearly",
       priority: 0.2,
     },
@@ -115,7 +122,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     path: `/servicos/${s.slug}`,
     // All service content (copy, hero, gallery, FAQs) lives in this single
     // shared data file — there's no per-slug source file to point at.
-    sourceFile: "src/app/servicos/services-data.ts",
+    sourceFile: "src/lib/services-data.ts",
     changeFrequency: "monthly",
     priority: 0.85,
     images: [s.hero.startsWith("http") ? s.hero : `${base}${s.hero}`],
@@ -126,10 +133,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // with alternate-language pages — with both entries listing the full
   // reciprocal set, including themselves.
   return [...core, ...services].flatMap((entry): MetadataRoute.Sitemap => {
-    const ptUrl = `${base}${entry.path}`;
+    // Home is canonical without a trailing slash (matches the <link rel=canonical>
+    // and OG url), so don't emit `${base}/` for it.
+    const ptUrl = entry.path === "/" ? base : `${base}${entry.path}`;
     const enUrl = entry.path === "/" ? `${base}/en` : `${base}/en${entry.path}`;
     const lastModified = lastModifiedFor(entry.sourceFile);
-    const alternates = { languages: { "pt-PT": ptUrl, en: enUrl } };
+    // PT is the default/canonical language → x-default points at it, mirroring
+    // the hreflang set in the page <head>.
+    const alternates = { languages: { "pt-PT": ptUrl, en: enUrl, "x-default": ptUrl } };
     const shared = {
       lastModified,
       changeFrequency: entry.changeFrequency,

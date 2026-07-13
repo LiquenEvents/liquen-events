@@ -90,6 +90,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
   return (
     <>
       <BreadcrumbJsonLd
+        locale={locale}
         homeName={t.nav.inicio}
         items={[{ name: t.nav.clientes, path: "/clientes" }]}
       />

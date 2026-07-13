@@ -36,6 +36,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
   return (
     <>
       <BreadcrumbJsonLd
+        locale={locale}
         homeName={t.nav.inicio}
         items={[{ name: t.nav.contacto, path: "/contacto" }]}
       />

@@ -8,7 +8,8 @@ import type { Dict, Locale } from "@/lib/i18n";
 // pulls in BOTH pt.ts and en.ts (~43KB combined) at module scope, which would
 // otherwise ship both languages' full dictionary to every page's client
 // bundle even though only one is ever used per request. The layout resolves
-// the dictionary once, server-side, via getServerDictionary().
+// the dictionary once, server-side, from the `[lang]` route param and passes
+// the single resolved dict down.
 const LocaleContext = createContext<{ locale: Locale; dict: Dict } | null>(null);
 
 export function LocaleProvider({

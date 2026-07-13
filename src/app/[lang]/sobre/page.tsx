@@ -50,7 +50,11 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
   const t = getDictionary(locale);
   return (
     <>
-      <BreadcrumbJsonLd homeName={t.nav.inicio} items={[{ name: t.nav.sobre, path: "/sobre" }]} />
+      <BreadcrumbJsonLd
+        locale={locale}
+        homeName={t.nav.inicio}
+        items={[{ name: t.nav.sobre, path: "/sobre" }]}
+      />
 
       {/* ── HERO ── */}
       <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">

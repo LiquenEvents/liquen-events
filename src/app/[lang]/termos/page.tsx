@@ -31,7 +31,11 @@ export default async function TermosPage({ params }: { params: Promise<{ lang: s
   const { terms } = getLegal(locale);
   return (
     <>
-      <BreadcrumbJsonLd homeName={t.nav.inicio} items={[{ name: terms.title, path: "/termos" }]} />
+      <BreadcrumbJsonLd
+        locale={locale}
+        homeName={t.nav.inicio}
+        items={[{ name: terms.title, path: "/termos" }]}
+      />
       <LegalDocView doc={terms} />
     </>
   );

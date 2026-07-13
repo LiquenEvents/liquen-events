@@ -341,10 +341,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
   return (
     <>
       <BreadcrumbJsonLd
+        locale={locale}
         homeName={t.nav.inicio}
         items={[{ name: t.nav.servicos, path: "/servicos" }]}
       />
       <ServiceJsonLd
+        locale={locale}
         name="Organização de eventos, casamentos e eventos corporativos"
         description="Organização de casamentos, eventos corporativos, conferências e celebrações em Lisboa e todo o Portugal — da decoração à coordenação."
         path="/servicos"
