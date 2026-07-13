@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
 import { webglAvailable } from "@/lib/motion/webgl";
+import { sizedImageSrc } from "@/lib/image-src";
 
 /**
  * A WebGL image plane with a cursor-following liquid ripple: concentric waves
@@ -55,10 +56,6 @@ const FRAG = /* glsl */ `
     gl_FragColor = vec4(col, 1.0);
   }
 `;
-
-function sizedSrc(src: string): string {
-  return `/_next/image?url=${encodeURIComponent(src)}&w=1920&q=75`;
-}
 
 export default function ShaderImage({ src, className }: { src: string; className?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -133,7 +130,7 @@ export default function ShaderImage({ src, className }: { src: string; className
       const img = new Image();
       img.decoding = "async";
       img.onload = () => applyTexture(img);
-      img.src = sizedSrc(src);
+      img.src = sizedImageSrc(src, 1920);
       if (img.complete) applyTexture(img);
     }
 

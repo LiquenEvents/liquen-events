@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
 import { webglAvailable } from "@/lib/motion/webgl";
+import { sizedImageSrc } from "@/lib/image-src";
 
 /**
  * WebGL hero layer. Renders the SAME photo as the static <Image> underneath it,
@@ -73,12 +74,6 @@ const FRAG = /* glsl */ `
     gl_FragColor = vec4(col, 1.0);
   }
 `;
-
-function sizedSrc(src: string): string {
-  // Pull an optimised, right-sized copy through Next's image endpoint so the
-  // GPU upload stays light (matches the site's configured device sizes).
-  return `/_next/image?url=${encodeURIComponent(src)}&w=1920&q=75`;
-}
 
 export default function HeroCanvas({ src, className }: { src: string; className?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -167,7 +162,7 @@ export default function HeroCanvas({ src, className }: { src: string; className?
       const img = new Image();
       img.decoding = "async";
       img.onload = () => applyTexture(img);
-      img.src = sizedSrc(src);
+      img.src = sizedImageSrc(src, 1920);
       if (img.complete) applyTexture(img);
     }
 

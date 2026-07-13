@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Renderer, Camera, Transform, Plane, Program, Mesh, Texture } from "ogl";
 import { webglAvailable } from "@/lib/motion/webgl";
+import { sizedImageSrc } from "@/lib/image-src";
 
 /**
  * A 3D curved photo carousel (WebGL / OGL). The gallery photos are arranged on a
@@ -47,14 +48,6 @@ const FRAG = /* glsl */ `
     gl_FragColor = vec4(col, 1.0);
   }
 `;
-
-function sizedSrc(src: string): string {
-  // Match the flat ribbon's own request EXACTLY (next/image `sizes="450px"` → the
-  // 480px device width, q=75) so the browser serves the carousel texture from
-  // cache instead of downloading a second copy. Quality must be 75: Next 16 only
-  // serves the qualities in images.qualities (default [75]); anything else 400s.
-  return `/_next/image?url=${encodeURIComponent(src)}&w=480&q=75`;
-}
 
 const PLANE_W = 1.5;
 const PLANE_H = 1.0;
@@ -158,7 +151,10 @@ export default function PhotoWallCanvas({
         program.uniforms.uCover.value = s > 1 ? [1 / s, 1] : [1, s];
       };
       img.onload = onImg;
-      img.src = sizedSrc(src);
+      // 480px matches the flat ribbon's own next/image request (sizes="450px"
+      // → 480px device width) EXACTLY, so the browser serves this carousel
+      // texture from cache instead of downloading a second copy.
+      img.src = sizedImageSrc(src, 480);
       if (img.complete) onImg();
     });
 
