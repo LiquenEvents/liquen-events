@@ -40,7 +40,7 @@ export async function generateMetadata({
 const navMeta = [{ id: "empresas" }, { id: "celebracoes" }];
 
 const eyebrowLight =
-  "text-white/40 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
+  "text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
 
 /* ── Mosaico editorial para categorias ── */
 type ServiceCard = {
@@ -147,7 +147,7 @@ function ServiceCard({
         </div>
 
         {/* Persistent clickability affordance (desktop) */}
-        <div className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/45 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500">
+        <div className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/70 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500">
           <span className="text-sm leading-none transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
             ↗
           </span>
@@ -569,7 +569,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+            <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {ts.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />

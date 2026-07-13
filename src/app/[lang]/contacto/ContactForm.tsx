@@ -9,6 +9,7 @@ import { SITE } from "@/lib/site";
 import { blurFor } from "@/lib/blur";
 import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
+import RatingBadge from "@/components/RatingBadge";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
@@ -294,7 +295,7 @@ export default function ContactForm() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
         <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
           <div className="max-w-7xl mx-auto w-full">
-            <p className="text-cream/35 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+            <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
               <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
               {tf.heroEyebrow}
             </p>
@@ -303,6 +304,14 @@ export default function ContactForm() {
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 7.5vw, 100px)" }}
               lines={[[{ text: tf.heroTitleLine1 }], [{ text: tf.heroTitleMoss, moss: true }]]}
             />
+            <div className="mt-7">
+              <RatingBadge
+                label={t.common.reviewsLabel}
+                ptFormat={locale === "pt"}
+                starClassName="text-gold"
+                textClassName="text-cream/75"
+              />
+            </div>
           </div>
         </div>
       </section>

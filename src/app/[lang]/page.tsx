@@ -3,6 +3,7 @@ import Image from "next/image";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
+import RatingBadge from "@/components/RatingBadge";
 import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
@@ -71,7 +72,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
-          <p className="text-white/45 text-[10px] sm:text-xs tracking-[0.45em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
+          <p className="text-white/70 text-[10px] sm:text-xs tracking-[0.45em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
             <span className="inline-block w-8 h-px bg-gold flex-shrink-0" />
             {t.home.eyebrow}
           </p>
@@ -112,10 +113,19 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               {t.common.verGaleria}
             </Link>
           </div>
+          {/* Real Google rating, above the fold — the strongest trust cue. */}
+          <div className="mt-8 anim-3">
+            <RatingBadge
+              label={t.common.reviewsLabel}
+              ptFormat={locale === "pt"}
+              starClassName="text-gold"
+              textClassName="text-white/75"
+            />
+          </div>
         </div>
 
         <div className="absolute bottom-8 right-6 lg:right-16 z-10 flex flex-col items-center gap-3 anim-3">
-          <span className="text-white/25 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
+          <span className="text-white/60 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
             {t.home.scroll}
           </span>
           <div className="h-10 w-px overflow-hidden">
@@ -280,7 +290,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+            <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.home.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />

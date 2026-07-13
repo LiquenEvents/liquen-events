@@ -102,7 +102,7 @@ export default async function ServiceDetailPage({
         <HeroWebGL src={svc.hero} className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
-          <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/45 mb-8">
+          <nav className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-cream/70 mb-8">
             <Link
               href={localizeHref("/servicos", locale)}
               className="hover:text-cream transition-colors"

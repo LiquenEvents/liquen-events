@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { blurFor } from "@/lib/blur";
+import RatingBadge from "@/components/RatingBadge";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
@@ -191,8 +192,10 @@ export default function OrcamentoForm() {
               {to.eyebrow}
             </p>
             {/* Decorative panel heading — the page's real <h1> lives in the
-                <main> column (rendered for every viewport, mobile-first). */}
+                form column (present at every breakpoint). aria-hidden so AT
+                doesn't read the title twice on desktop. */}
             <p
+              aria-hidden
               className="text-cream font-bold leading-[0.92] tracking-tight mb-8"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 4vw, 68px)" }}
             >
@@ -201,28 +204,39 @@ export default function OrcamentoForm() {
               <span className="text-moss-light">{to.titleMoss}</span>
             </p>
             <p className="text-cream/45 text-sm leading-[1.8] max-w-xs">{to.lead}</p>
+            <div className="mt-8">
+              <RatingBadge
+                label={t.common.reviewsLabel}
+                ptFormat={locale === "pt"}
+                starClassName="text-gold"
+                textClassName="text-cream/75"
+              />
+            </div>
           </div>
         </div>
       </aside>
 
       {/* ── Formulário (direita) ── */}
-      <main className="flex flex-col justify-center px-6 sm:px-10 lg:px-16 xl:px-24 py-16 lg:py-20">
+      {/* Not a <main>: the root layout already provides the page's single <main>
+          landmark, so this stays a plain <div> to avoid a nested/duplicate one. */}
+      <div className="flex flex-col justify-center px-6 sm:px-10 lg:px-16 xl:px-24 py-16 lg:py-20">
         <div className="w-full max-w-xl mx-auto">
-          {/* Cabeçalho mobile */}
-          <div className="lg:hidden mb-12">
-            <Link
-              href={localizeHref("/", locale)}
-              className="text-foreground/68 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
-            >
-              ← {to.back}
-            </Link>
-            <h1
-              className="text-foreground font-bold leading-[0.95] tracking-tight"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 9vw, 52px)" }}
-            >
-              {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
-            </h1>
-          </div>
+          {/* Back link — mobile only; the desktop panel has its own. */}
+          <Link
+            href={localizeHref("/", locale)}
+            className="lg:hidden text-foreground/68 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
+          >
+            ← {to.back}
+          </Link>
+          {/* The page's single <h1>: visible + styled on mobile, sr-only on
+              desktop (where the left panel shows the display title). Always in
+              the a11y tree, so heading navigation works at every breakpoint. */}
+          <h1
+            className="lg:sr-only text-foreground font-bold leading-[0.95] tracking-tight mb-12"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 9vw, 52px)" }}
+          >
+            {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
+          </h1>
 
           <form onSubmit={submit} className="flex flex-col gap-11">
             {/* Honeypot */}
@@ -409,7 +423,7 @@ export default function OrcamentoForm() {
             <p className="text-foreground/68 text-[11px] leading-relaxed">{to.requiredNote}</p>
           </form>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

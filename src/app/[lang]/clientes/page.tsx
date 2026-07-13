@@ -6,6 +6,7 @@ import AnimateIn from "@/components/AnimateIn";
 import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
+import RatingBadge from "@/components/RatingBadge";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
@@ -115,7 +116,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
           <AnimateIn>
-            <p className="text-white/35 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3 mb-10">
+            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3 mb-10">
               <span className="w-8 h-px bg-gold flex-shrink-0" />
               {t.clientes.heroEyebrow}
             </p>
@@ -133,11 +134,21 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               <p className="text-white/60 text-base leading-[1.8]">{t.clientes.heroLead}</p>
             </div>
           </AnimateIn>
+          <AnimateIn delay={260}>
+            <div className="mt-8">
+              <RatingBadge
+                label={t.common.reviewsLabel}
+                ptFormat={locale === "pt"}
+                starClassName="text-gold"
+                textClassName="text-white/75"
+              />
+            </div>
+          </AnimateIn>
         </div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
-          <span className="text-white/30 text-[8px] tracking-[0.45em] uppercase">
+          <span className="text-white/60 text-[8px] tracking-[0.45em] uppercase">
             {t.clientes.scroll}
           </span>
           <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
@@ -358,7 +369,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-white/35 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+            <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.clientes.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />
