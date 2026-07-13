@@ -13,11 +13,10 @@ import { getDictionary, htmlLang, type Locale } from "@/lib/i18n";
  * This is what helps the site surface for "empresa de eventos Alentejo",
  * "wedding planner Alentejo", etc., and earn rich results.
  *
- * Locale-aware: the /en mirror shows English testimonials/copy, so the
- * markup must describe that same content in English too — otherwise the
- * `review` entries here wouldn't match what's actually rendered on the page,
- * which risks losing rich-result eligibility (Google requires structured
- * data to reflect real, visible page content).
+ * Locale-aware: the /en mirror shows English copy, so the description/service
+ * names are emitted in the active language too. Note we deliberately do NOT
+ * emit self-serving aggregateRating/review on the Organization node (Google
+ * disallows it for these types) — see the note by hasOfferCatalog.
  */
 export default function StructuredData({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
@@ -70,29 +69,13 @@ export default function StructuredData({ locale }: { locale: Locale }) {
         areaServed: "PT",
         availableLanguage: ["Portuguese", "English"],
       },
-      // Aggregate rating — the REAL Google rating (SITE.reviews), now shown
-      // VISIBLY on the site via <RatingBadge> in the testimonials section, so
-      // the markup mirrors what the page actually displays (not a hidden,
-      // self-serving claim). Update the numbers in SITE.reviews when they move.
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: SITE.reviews.rating,
-        reviewCount: SITE.reviews.count,
-        bestRating: 5,
-        worstRating: 1,
-      },
-      // These reviews mirror the testimonials VISIBLE on the site (home,
-      // /clientes, /contacto) — same source (the active locale's dictionary)
-      // so the markup always matches what's actually rendered. No
-      // reviewRating: the site shows quotes, not star scores, and markup must
-      // never claim more than the page displays.
-      review: t.testimonials.map((item) => ({
-        "@type": "Review",
-        author: { "@type": "Person", name: item.name },
-        name: item.role,
-        reviewBody: item.quote,
-        itemReviewed: { "@id": orgId },
-      })),
+      // NB: no aggregateRating / review here. Google disallows *self-serving*
+      // review markup on Organization/LocalBusiness (and subtypes like
+      // ProfessionalService) — it earns no star rich result and risks a
+      // "spammy structured markup" manual action. The real 5.0/56 Google rating
+      // still shows VISIBLY on the site via <RatingBadge>; the trustworthy way
+      // to surface stars in search is the third-party Google Business profile,
+      // not self-declared JSON-LD.
       hasOfferCatalog: {
         "@type": "OfferCatalog",
         name: t.jsonld.hasOfferCatalogName,
