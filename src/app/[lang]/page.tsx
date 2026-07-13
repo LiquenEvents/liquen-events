@@ -9,6 +9,7 @@ import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Magnetic from "@/components/motion/Magnetic";
 import Reveal from "@/components/motion/Reveal";
+import TiltCard from "@/components/motion/TiltCard";
 import PhotoWall from "@/components/motion/PhotoWall";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 
@@ -153,32 +154,45 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {services.map((s, i) => (
               <Reveal key={s.title} variant="mask" delay={i * 0.08} className="rounded-xl">
-                <Link
-                  href={localizeHref(s.href, locale)}
-                  className="group relative block rounded-xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
-                  style={{ aspectRatio: "3/4" }}
-                >
-                  <Image
-                    src={s.image}
-                    alt={s.title}
-                    fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    {...blurFor(s.image)}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent group-hover:from-black/70 transition-all duration-500" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
-                    <p className="text-moss/70 text-[8px] sm:text-[9px] tracking-[0.35em] uppercase mb-1">
-                      {s.tag}
-                    </p>
-                    <h3
-                      className="text-cream text-base sm:text-lg lg:text-2xl font-bold group-hover:text-moss transition-colors duration-200"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
-                      {s.title}
-                    </h3>
-                  </div>
-                </Link>
+                <TiltCard className="rounded-xl">
+                  <Link
+                    href={localizeHref(s.href, locale)}
+                    className="group relative block rounded-xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
+                    style={{ aspectRatio: "3/4" }}
+                  >
+                    <Image
+                      src={s.image}
+                      alt={s.title}
+                      fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      {...blurFor(s.image)}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent group-hover:from-black/70 transition-all duration-500" />
+                    {/* Cursor-tracked specular sheen (reads --mx/--my from TiltCard). */}
+                    <span
+                      aria-hidden
+                      data-sheen
+                      className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                      style={{
+                        background:
+                          "radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.5), transparent 62%)",
+                        mixBlendMode: "soft-light",
+                      }}
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
+                      <p className="text-moss/70 text-[8px] sm:text-[9px] tracking-[0.35em] uppercase mb-1">
+                        {s.tag}
+                      </p>
+                      <h3
+                        className="text-cream text-base sm:text-lg lg:text-2xl font-bold group-hover:text-moss transition-colors duration-200"
+                        style={{ fontFamily: "var(--font-playfair)" }}
+                      >
+                        {s.title}
+                      </h3>
+                    </div>
+                  </Link>
+                </TiltCard>
               </Reveal>
             ))}
           </div>
