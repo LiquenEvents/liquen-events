@@ -139,8 +139,6 @@ const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Ev
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
 
-// DECOR (fotos de decoração puxadas para a frente) chega via prop decorSrcs.
-
 // URL-hash slugs for each category, so a filtered view is shareable &
 // bookmarkable (e.g. /galeria#casamentos) and survives the back button.
 const CAT_SLUGS: Record<Cat, string> = {
@@ -221,14 +219,7 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   );
 }
 
-export default function GaleriaClient({
-  photos,
-  decorSrcs,
-}: {
-  photos: Photo[];
-  decorSrcs: readonly string[];
-}) {
-  const DECOR = useMemo(() => new Set(decorSrcs), [decorSrcs]);
+export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   const collectionNames = useMemo(
     () =>
       Array.from(new Set(photos.map((p) => collectionFor(p.src)).filter((c): c is string => !!c))),
@@ -414,20 +405,17 @@ export default function GaleriaClient({
   // A collection view is the opposite intent — it's ONE event told in shoot
   // order — so it skips interleaving entirely.
   //
-  // DECORAÇÃO PRIMEIRO: em qualquer vista de categoria, as fotos de decoração
-  // (ver `DECOR`) sobem para a frente — a galeria abre com arranjos, mesas e
-  // detalhes. Cada bloco (decor / resto) é intercalado por coleção à parte, para
-  // não amontoar o mesmo evento. A vista de uma coleção específica ignora isto
-  // (é a história de um casamento por ordem).
+  // TUDO MISTURADO: sem blocos temáticos (a antiga regra "decoração primeiro"
+  // empilhava bouquets/arranjos no topo). O interleave por coleção espalha
+  // cada evento uniformemente, por isso o grid abre já com uma mistura real —
+  // casais, mesas, decoração, aéreas — sem aglomerados.
   const pool = useMemo(() => {
     if (collectionFilter) {
       return photos.filter((p) => collectionFor(p.src) === collectionFilter);
     }
     const filtered = cat === "Todos" ? photos : photos.filter((p) => p.label === cat);
-    const decor = interleaveByCollection(filtered.filter((p) => DECOR.has(p.src)));
-    const rest = interleaveByCollection(filtered.filter((p) => !DECOR.has(p.src)));
-    return [...decor, ...rest];
-  }, [cat, collectionFilter, photos, DECOR]);
+    return interleaveByCollection(filtered);
+  }, [cat, collectionFilter, photos]);
   const visible = pool.slice(0, shown);
 
   // Infinite scroll — a sentinel below the grid loads the next page as it nears
