@@ -9,6 +9,7 @@ import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Magnetic from "@/components/motion/Magnetic";
 import Reveal from "@/components/motion/Reveal";
+import PhotoWall from "@/components/motion/PhotoWall";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary, localizeHref } from "@/lib/i18n";
 
@@ -185,38 +186,12 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ── Gallery ribbon ── */}
-      <section className="relative bg-surface border-y border-foreground/8 overflow-hidden py-2 sm:py-3">
-        <Link
-          href={localizeHref("/galeria", locale)}
-          className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-moss/70"
-        >
-          <div className="absolute inset-y-0 left-0 w-20 sm:w-32 bg-gradient-to-r from-surface to-transparent z-20 pointer-events-none" />
-          <div className="absolute inset-y-0 right-0 w-20 sm:w-32 bg-gradient-to-l from-surface to-transparent z-20 pointer-events-none" />
-          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-            <span className="px-5 py-2.5 bg-surface/70 backdrop-blur-sm border border-cream/10 rounded-full text-cream/80 text-[10px] sm:text-[11px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-              {t.common.verGaleria} →
-            </span>
-          </div>
-          <div className="flex gap-2 animate-marquee w-max">
-            {[...ribbon, ...ribbon].map((src, i) => (
-              <div
-                key={i}
-                className="relative h-[120px] sm:h-[180px] lg:h-[240px] w-[180px] sm:w-[270px] lg:w-[360px] flex-shrink-0 overflow-hidden rounded-lg"
-              >
-                <Image
-                  src={src}
-                  alt=""
-                  fill
-                  sizes="360px"
-                  className="object-cover group-hover:brightness-75 transition-all duration-500"
-                  {...blurFor(src)}
-                />
-              </div>
-            ))}
-          </div>
-        </Link>
-      </section>
+      {/* ── Gallery photo wall — 3D curved carousel (flat ribbon fallback) ── */}
+      <PhotoWall
+        images={ribbon.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }))}
+        href={localizeHref("/galeria", locale)}
+        label={t.common.verGaleria}
+      />
 
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
