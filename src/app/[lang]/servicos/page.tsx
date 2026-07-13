@@ -7,6 +7,7 @@ import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
+import Reveal from "@/components/motion/Reveal";
 import TiltCard from "@/components/motion/TiltCard";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -492,23 +493,26 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
       {/* ── Editorial photo grid (full-bleed) ── */}
       <section className="bg-surface border-t border-foreground/8">
-        <AnimateIn from="fade">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]">
-            {editorial.map((g, i) => (
-              <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
-                <Image
-                  src={g.src}
-                  alt="Evento organizado pela Líquen Events"
-                  fill
-                  sizes="(max-width: 768px) 50vw, 50vw"
-                  className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                  {...blurFor(g.src)}
-                />
-                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
-              </div>
-            ))}
-          </div>
-        </AnimateIn>
+        <Reveal
+          as="div"
+          variant="mask"
+          stagger
+          className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
+        >
+          {editorial.map((g, i) => (
+            <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
+              <Image
+                src={g.src}
+                alt="Evento organizado pela Líquen Events"
+                fill
+                sizes="(max-width: 768px) 50vw, 50vw"
+                className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+                {...blurFor(g.src)}
+              />
+              <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
+            </div>
+          ))}
+        </Reveal>
       </section>
 
       {/* ── Cinematic statement (where we work) ── */}

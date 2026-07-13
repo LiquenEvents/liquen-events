@@ -7,6 +7,7 @@ import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
+import Reveal from "@/components/motion/Reveal";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
@@ -315,30 +316,30 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.mosaicEyebrow}
             </p>
           </AnimateIn>
-          <AnimateIn from="fade" delay={80}>
-            <div
-              className="grid grid-cols-12 gap-2"
-              style={{ gridTemplateRows: "210px 210px 230px" }}
-            >
-              {mosaicItems.map((item, i) => (
-                <div key={i} className={`${item.cls} relative overflow-hidden group`}>
-                  <Image
-                    src={item.src}
-                    alt={item.alt}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 40vw"
-                    className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                    {...blurFor(item.src)}
-                  />
-                  <div className="absolute inset-0 bg-black/25 group-hover:bg-black/5 transition-colors duration-700" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  <span className="absolute bottom-4 left-4 text-white/0 group-hover:text-white/65 transition-all duration-500 text-[9px] tracking-[0.42em] uppercase font-medium">
-                    {t.clientes.mosaicLabels[i] ?? item.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </AnimateIn>
+          <Reveal
+            as="div"
+            variant="mask"
+            stagger
+            className="grid grid-cols-12 gap-2 grid-rows-[210px_210px_230px]"
+          >
+            {mosaicItems.map((item, i) => (
+              <div key={i} className={`${item.cls} relative overflow-hidden group`}>
+                <Image
+                  src={item.src}
+                  alt={item.alt}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 40vw"
+                  className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+                  {...blurFor(item.src)}
+                />
+                <div className="absolute inset-0 bg-black/25 group-hover:bg-black/5 transition-colors duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <span className="absolute bottom-4 left-4 text-white/0 group-hover:text-white/65 transition-all duration-500 text-[9px] tracking-[0.42em] uppercase font-medium">
+                  {t.clientes.mosaicLabels[i] ?? item.label}
+                </span>
+              </div>
+            ))}
+          </Reveal>
         </div>
       </section>
 
