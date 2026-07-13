@@ -34,7 +34,7 @@
      · detail  — a single service page, whose hero sits over a photo with a
                  breadcrumb and whose titles run longer
    Change a tier's weight here, not across the page files. (The /contacto hero
-   keeps its own larger form-landing scale in ContactForm.) */
+   keeps its own larger scale, inline on that page.) */
 :root {
   --hero-display: clamp(56px, 10vw, 150px);
   --hero-section: clamp(52px, 9vw, 132px);

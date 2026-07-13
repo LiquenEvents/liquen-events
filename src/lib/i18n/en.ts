@@ -245,6 +245,14 @@ export const en: Dict = {
   },
 
   contacto: {
+    direct: {
+      ctaEyebrow: "Ready to begin?",
+      ctaTitleLine1: "Request your",
+      ctaTitleMoss: "quote.",
+      ctaText:
+        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the channels alongside.",
+      ctaButton: "Request a quote",
+    },
     testimonialsEyebrow: "What our clients say",
     nextEyebrow: "What happens next",
     steps: [

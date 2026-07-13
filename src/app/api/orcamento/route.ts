@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => null);
     // Honeypot: a real visitor never fills the hidden "website" field. If it's
-    // set, this is a bot — pretend success and drop it silently. (Mirrors the
-    // same server-side check in /api/contacto; client-side alone is bypassable.)
+    // set, this is a bot — pretend success and drop it silently. The client
+    // guards it too, but that alone is bypassable, so re-check server-side.
     if (body && typeof body === "object" && (body as Record<string, unknown>).website) {
       return NextResponse.json({ id: generateQuoteId(), status: "ok" });
     }

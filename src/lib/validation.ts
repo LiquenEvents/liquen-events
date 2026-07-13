@@ -222,22 +222,6 @@ export const supplierUpdateSchema = z
   })
   .partial();
 
-// Contact form.
-export const contactSchema = z
-  .object({
-    nome: trimmed(120).min(2, "Nome demasiado curto"),
-    email: z.email("Email inválido").max(160),
-    telefone: trimmed(40).optional().default(""),
-    eventType: trimmed(80).optional().default(""),
-    mensagem: trimmed(4000).min(1, "Escreva uma mensagem"),
-    data: trimmed(20).optional().default(""),
-    convidados: trimmed(30).optional().default(""),
-    orcamento: trimmed(30).optional().default(""),
-  })
-  // .strip() — all fields are declared/bounded above; drop unknown keys rather
-  // than persisting arbitrary unbounded input (see quoteFormSchema note).
-  .strip();
-
 // Web Push subscription — sanitise this network-provided object into a strict,
 // known-good shape before it is ever persisted.
 export const pushSubscriptionSchema = z.object({

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import ContactForm from "./ContactForm";
+import Link from "next/link";
 import FAQ from "./FAQ";
 import AnimateIn from "@/components/AnimateIn";
 import Image from "next/image";
@@ -7,9 +7,14 @@ import { blurFor } from "@/lib/blur";
 import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
+import Parallax from "@/components/Parallax";
+import KineticHeading from "@/components/KineticHeading";
+import RatingBadge from "@/components/RatingBadge";
+import HeroWebGL from "@/components/motion/HeroWebGL";
+import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
-import { getDictionary, normalizeLocale } from "@/lib/i18n";
+import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 
 export async function generateMetadata({
   params,
@@ -33,6 +38,9 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const steps = t.contacto.steps.map((s, i) => ({ step: `0${i + 1}`, ...s }));
+  const tf = t.contacto.form;
+  const td = t.contacto.direct;
+  const heroImg = "/imagens/DJI_20250913190635_0120_D.jpg";
   return (
     <>
       <BreadcrumbJsonLd
@@ -43,7 +51,184 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
       {/* Same source as the visible <FAQ /> — Google requires the FAQPage
           markup to match the on-page content, in the language being served. */}
       <FaqJsonLd faqs={t.contacto.faqs} />
-      <ContactForm />
+
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden" style={{ height: "65svh", minHeight: "420px" }}>
+        <Parallax speed={0.14} className="absolute inset-0">
+          <Image
+            src={heroImg}
+            {...blurFor(heroImg)}
+            alt="Evento Líquen Events"
+            fill
+            preload
+            sizes="100vw"
+            className="object-cover hero-settle"
+          />
+        </Parallax>
+        {/* WebGL layer over the static hero (fades in when ready; absent under
+            reduced motion / no-WebGL). */}
+        <HeroWebGL src={heroImg} className="absolute inset-0 h-full w-full" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
+        <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
+          <div className="max-w-7xl mx-auto w-full">
+            <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+              <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
+              {tf.heroEyebrow}
+            </p>
+            <KineticHeading
+              className="text-cream font-bold leading-[0.88] tracking-tight"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 7.5vw, 100px)" }}
+              lines={[[{ text: tf.heroTitleLine1 }], [{ text: tf.heroTitleMoss, moss: true }]]}
+            />
+            <div className="mt-7">
+              <RatingBadge
+                label={t.common.reviewsLabel}
+                ptFormat={locale === "pt"}
+                starClassName="text-gold"
+                textClassName="text-cream/75"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Canais diretos + CTA para o formulário único ──
+          O antigo formulário de contacto foi retirado: /orcamento é agora o
+          único formulário (capta o lead para o CRM). Aqui ficam os canais
+          diretos (para perguntas rápidas) e o CTA que encaminha para esse
+          formulário — sem dois funis a competir. */}
+      <section className="bg-surface">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
+            {/* ── Esquerda — canais diretos ── */}
+            <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
+              <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
+                <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
+                {tf.infoEyebrow}
+              </p>
+
+              <div className="flex flex-col divide-y divide-foreground/8 mb-12">
+                {[
+                  {
+                    label: tf.emailLabel,
+                    value: SITE.email,
+                    href: `mailto:${SITE.email}`,
+                    sub: tf.emailSub,
+                  },
+                  {
+                    label: tf.phoneLabel,
+                    value: SITE.phoneDisplay,
+                    href: `tel:${SITE.phone}`,
+                    sub: tf.phoneSub,
+                  },
+                  {
+                    label: tf.locationLabel,
+                    value: tf.locationValue,
+                    href: null,
+                    sub: tf.locationSub,
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="py-7">
+                    <p className="text-foreground/78 text-[10px] tracking-[0.45em] uppercase mb-2">
+                      {item.label}
+                    </p>
+                    {item.href ? (
+                      <a
+                        href={item.href}
+                        className="text-foreground text-sm font-medium hover:text-moss transition-colors block mb-1.5"
+                      >
+                        {item.value}
+                      </a>
+                    ) : (
+                      <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
+                    )}
+                    <p className="text-foreground/68 text-xs">{item.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* WhatsApp — canal mais rápido para uma pergunta */}
+              <a
+                href={waHref(t.common.whatsappPrefill)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-12"
+              >
+                <span className="text-moss flex-shrink-0">
+                  <WhatsAppIcon className="w-4 h-4" />
+                </span>
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
+                  {tf.whatsappLink}
+                </span>
+                <span
+                  aria-hidden
+                  className="ml-auto text-foreground/40 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                >
+                  →
+                </span>
+              </a>
+
+              {/* Redes */}
+              <div className="flex gap-7 mb-14">
+                {[
+                  { label: "Instagram", href: SITE.instagram },
+                  { label: "Facebook", href: SITE.facebook },
+                ].map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/68 hover:text-foreground/78 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
+                  >
+                    {s.label}
+                  </a>
+                ))}
+              </div>
+
+              {/* Promise */}
+              <div className="border-l-2 border-moss/40 pl-7 py-2">
+                <p
+                  className="text-foreground/72 text-base leading-relaxed mb-4"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {tf.promise}
+                </p>
+                <p className="text-foreground/68 text-[10px] tracking-[0.3em] uppercase">
+                  {tf.promiseSign}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Direita — CTA para o formulário único (/orcamento) ── */}
+            <div className="py-12 md:py-20 lg:pl-20 flex flex-col justify-center">
+              <AnimateIn>
+                <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+                  <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
+                  {td.ctaEyebrow}
+                </p>
+                <h2
+                  className="text-foreground font-bold leading-[0.95] tracking-tight mb-8"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(34px, 4.5vw, 60px)",
+                  }}
+                >
+                  {td.ctaTitleLine1}
+                  <br />
+                  <span className="text-moss">{td.ctaTitleMoss}</span>
+                </h2>
+                <p className="text-foreground/68 text-base leading-[1.85] max-w-md mb-12">
+                  {td.ctaText}
+                </p>
+                <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_CLASS}>
+                  {td.ctaButton} →
+                </Link>
+              </AnimateIn>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ── Depoimentos ── */}
       <section className="py-16 sm:py-24 bg-surface border-t border-foreground/8">

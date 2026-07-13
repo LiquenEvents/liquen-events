@@ -259,6 +259,14 @@ export const pt = {
   },
 
   contacto: {
+    direct: {
+      ctaEyebrow: "Pronto para começar?",
+      ctaTitleLine1: "Peça o seu",
+      ctaTitleMoss: "orçamento.",
+      ctaText:
+        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais ao lado.",
+      ctaButton: "Pedir orçamento",
+    },
     testimonialsEyebrow: "O que dizem os nossos clientes",
     nextEyebrow: "O que acontece a seguir",
     steps: [
