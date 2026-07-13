@@ -60,3 +60,8 @@ next-env.d.ts
 
 # Remotion footage/render — vídeos pesados que excedem o limite do GitHub (>100MB)
 remotion/public/*.mp4
+
+# Ad-hoc scratch / audit / verification scripts at the repo root — not versioned
+/*.mjs
+!/eslint.config.mjs
+!/postcss.config.mjs
