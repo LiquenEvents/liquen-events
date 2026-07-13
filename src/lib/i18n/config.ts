@@ -31,6 +31,9 @@ export function htmlLang(locale: Locale): string {
  * through unchanged. Mirrors the destination logic in LanguageToggle.
  */
 export function localizeHref(href: string, locale: Locale): string {
-  if (locale !== "en" || !href.startsWith("/") || href.startsWith("/en")) return href;
+  if (locale !== "en" || !href.startsWith("/")) return href;
+  // Already localized — don't double-prefix. (Guard against `startsWith("/en")`
+  // alone, which would wrongly skip real paths like `/enigma`.)
+  if (href === "/en" || href.startsWith("/en/")) return href;
   return href === "/" ? "/en" : `/en${href}`;
 }
