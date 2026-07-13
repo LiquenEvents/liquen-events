@@ -911,6 +911,27 @@ body:has([data-orcamento-mode]) .eyebrow {
   animation: lb-chrome-in 0.5s ease 0.12s both;
 }
 
+/* Fecho gracioso do lightbox. O morph de ABERTURA usa <ViewTransition>, mas o
+   de fecho revelou-se instável com a camada de motion ativa (o Escape disparava
+   e a transição não fazia commit). Aqui o fecho é 100% CSS e fiável: enquanto
+   `closing` está ativo (260ms, ver close()), o diálogo inteiro faz fade + um
+   ligeiro scale-down antes de desmontar. Overshoot subtil para dar peso. */
+@keyframes lb-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.965);
+  }
+}
+.lb-closing {
+  animation: lb-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform-origin: center;
+  pointer-events: none;
+}
+
 /* Camada da foto do lightbox — mola de volta ao largar o arrasto (fechar em
    telemóvel). Enquanto o dedo arrasta, o JS põe .lb-dragging para seguir o
    toque sem lag; ao largar, a transição trata do resto. */
@@ -971,6 +992,11 @@ body:has([data-orcamento-mode]) .eyebrow {
   .lb-backdrop,
   .lb-chrome {
     animation: none;
+  }
+  /* Sem fade de saída: fica visível até o setTimeout desmontar (fecho instantâneo). */
+  .lb-closing {
+    animation: none;
+    opacity: 1;
   }
   .lb-photo-layer {
     transition: none;

@@ -256,6 +256,9 @@ export default function GaleriaClient({
   }, []);
   const [lb, setLb] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
+  // A fechar? Enquanto true o lightbox corre o fade+scale de saída (lb-closing)
+  // e só depois desmonta. Fecho fiável por CSS — ver comentário em close().
+  const [closing, setClosing] = useState(false);
   // Acabou de abrir via morph? Suprime o lb-photo-in dessa primeira foto para
   // a entrada ser SÓ o morph (voltam a coexistir ao navegar com ←/→).
   const [justOpened, setJustOpened] = useState(false);
@@ -467,14 +470,18 @@ export default function GaleriaClient({
     [pool],
   );
   const close = useCallback(() => {
-    // Fecho FIÁVEL — deliberadamente fora de startTransition. Com a camada de
-    // motion do site ativa (cursor/overlays fixos + rAF contínuo), o
-    // ViewTransition de FECHO do React (experimental) revelou-se instável: o
-    // Escape disparava mas a transição não fazia commit e o lightbox ficava
-    // preso aberto. O morph de ABERTURA (openAt) continua; o fecho é imediato.
-    setMorphSrc(null);
+    // Fecho FIÁVEL com animação de saída via CSS (não ViewTransition). Com a
+    // camada de motion ativa, o ViewTransition de fecho do React revelou-se
+    // instável (o Escape disparava mas a transição não fazia commit). Aqui
+    // marcamos `closing` → o lightbox faz um fade+scale de saída (classe
+    // lb-closing) e só depois desmonta. O morph de ABERTURA (openAt) mantém-se.
     setPlaying(false);
-    setLb(null);
+    setClosing(true);
+    window.setTimeout(() => {
+      setMorphSrc(null);
+      setLb(null);
+      setClosing(false);
+    }, 260);
   }, []);
   // Fecho sem morph — para o gesto de arrastar-para-baixo, onde a própria foto
   // já saiu do ecrã com o dedo (o morph de volta à miniatura ficaria estranho).
@@ -902,7 +909,7 @@ export default function GaleriaClient({
             aria-modal="true"
             aria-label={`${t.galeria.lbGallery} — ${labelText(pool[lb].label)}, ${t.galeria.lbPhoto} ${lb + 1} ${t.galeria.lbOf} ${pool.length}`}
             tabIndex={-1}
-            className="fixed inset-0 z-[60] flex flex-col select-none focus:outline-none"
+            className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
             onClick={close}
           >
             {/* Fundo preto — camada própria que só anima opacidade, para o morph
