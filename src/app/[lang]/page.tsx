@@ -80,10 +80,20 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             className="text-white font-bold leading-[0.86] tracking-tight"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(56px, 10vw, 150px)" }}
           >
+            {/* Readable sentence for SEO / screen readers — the animated words
+                below are laid out with flex gaps (no spaces) and aria-hidden. */}
+            <span className="sr-only">
+              {t.home.heroLines.map((l) => l.words.join(" ")).join(" ")}
+            </span>
             {t.home.heroLines.map(({ words, moss }, lineIndex) => {
               const delay = [180, 360, 520][lineIndex] ?? 520;
               return (
-                <span key={words.join("")} className="flex flex-wrap" style={{ gap: "0.26em" }}>
+                <span
+                  key={words.join("")}
+                  aria-hidden
+                  className="flex flex-wrap"
+                  style={{ gap: "0.26em" }}
+                >
                   {words.map((word, i) => (
                     <span
                       key={word + i}

@@ -31,10 +31,20 @@ export default function KineticHeading({
   delay?: number;
 }) {
   let word = 0;
+  // The visible words are laid out with flex gaps (no whitespace text nodes), so
+  // textContent / SEO snippets and non-Chromium screen readers would otherwise
+  // see them run-together ("SobreaLíquen"). A visually-hidden real sentence
+  // carries the readable heading; the animated words are marked aria-hidden.
+  const fullText = lines
+    .map((line) => line.map((seg) => seg.text).join(" "))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
   return (
     <h1 className={className} style={style}>
+      <span className="sr-only">{fullText}</span>
       {lines.map((segments, li) => (
-        <span key={li} className="flex flex-wrap" style={{ gap: "0.26em" }}>
+        <span key={li} aria-hidden className="flex flex-wrap" style={{ gap: "0.26em" }}>
           {segments.flatMap((seg, si) =>
             seg.text
               .split(/\s+/)
