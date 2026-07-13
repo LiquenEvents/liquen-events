@@ -5,6 +5,7 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
+import Magnetic from "@/components/motion/Magnetic";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getLocale } from "@/lib/i18n/server";
@@ -257,12 +258,14 @@ export default async function SobrePage() {
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <Link
-              href={localizeHref("/contacto", locale)}
-              className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
-            >
-              {t.common.entrarContacto} →
-            </Link>
+            <Magnetic strength={0.4}>
+              <Link
+                href={localizeHref("/contacto", locale)}
+                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+              >
+                {t.common.entrarContacto} →
+              </Link>
+            </Magnetic>
           </AnimateIn>
         </div>
       </section>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
@@ -371,12 +372,14 @@ export default async function ClientesPage() {
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <Link
-              href={localizeHref("/contacto", locale)}
-              className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
-            >
-              {t.common.falarConnosco} →
-            </Link>
+            <Magnetic strength={0.4}>
+              <Link
+                href={localizeHref("/contacto", locale)}
+                className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+              >
+                {t.common.falarConnosco} →
+              </Link>
+            </Magnetic>
           </AnimateIn>
         </div>
       </section>

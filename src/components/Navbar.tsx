@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
+import Magnetic from "@/components/motion/Magnetic";
 import { SITE } from "@/lib/site";
 import { localizeHref } from "@/lib/i18n";
 
@@ -248,12 +249,14 @@ export default function Navbar() {
             >
               {t.nav.contacto}
             </Link>
-            <Link
-              href={localizeHref("/orcamento", locale)}
-              className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
-            >
-              {t.nav.orcamento} →
-            </Link>
+            <Magnetic strength={0.3}>
+              <Link
+                href={localizeHref("/orcamento", locale)}
+                className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
+              >
+                {t.nav.orcamento} →
+              </Link>
+            </Magnetic>
           </div>
 
           <button

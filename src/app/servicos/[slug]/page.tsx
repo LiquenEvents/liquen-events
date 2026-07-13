@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -246,12 +247,14 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
           >
             {t.servicoDetalhe.ctaTitle}
           </h2>
-          <Link
-            href={localizeHref("/orcamento", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
-          >
-            {t.common.pedirOrcamento} →
-          </Link>
+          <Magnetic strength={0.4}>
+            <Link
+              href={localizeHref("/orcamento", locale)}
+              className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
+            >
+              {t.common.pedirOrcamento} →
+            </Link>
+          </Magnetic>
         </div>
       </section>
     </>

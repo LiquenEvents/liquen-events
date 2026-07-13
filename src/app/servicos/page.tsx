@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -572,12 +573,14 @@ export default async function ServicosPage() {
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Link
-                href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
-              >
-                {t.common.pedirOrcamento} →
-              </Link>
+              <Magnetic strength={0.4}>
+                <Link
+                  href={localizeHref("/orcamento", locale)}
+                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                >
+                  {t.common.pedirOrcamento} →
+                </Link>
+              </Magnetic>
               <Link
                 href={localizeHref("/galeria", locale)}
                 className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
