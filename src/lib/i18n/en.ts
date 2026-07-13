@@ -116,7 +116,6 @@ export const en: Dict = {
     scroll: "Scroll",
     wallEyebrow: "Our work",
     wallTitle: "Unforgettable moments",
-    wallHint: "Drag to explore",
     servicesEyebrow: "What we do",
     services: [
       { tag: "Companies", title: "Corporate" },

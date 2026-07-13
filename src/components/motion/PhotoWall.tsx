@@ -1,18 +1,15 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
-import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 
-// The WebGL carousel is client-only (ssr:false) and split into its own chunk, so
-// the OGL runtime never ships in the initial payload. The flat ribbon below it
-// is server-rendered — it's the LCP content, the reduced-motion experience and
-// the no-WebGL fallback — and only fades out once the carousel's first frame is
-// on screen.
-const PhotoWallCanvas = dynamic(() => import("./PhotoWallCanvas"), { ssr: false });
-
+/**
+ * Editorial photo strip — a large, continuously gliding film-strip of curated
+ * event photos under a display heading, closing with a CTA to the gallery.
+ *
+ * Deliberately NOT WebGL (the 3D carousel was retired on request): the strip
+ * is a pure-CSS marquee (see .animate-marquee — 50s linear, pauses on hover,
+ * stands still under prefers-reduced-motion), server-rendered so it's also the
+ * LCP content and costs no client JS at all.
+ */
 export type WallImage = { src: string; blurDataURL?: string };
 
 export default function PhotoWall({
@@ -21,35 +18,19 @@ export default function PhotoWall({
   label,
   eyebrow,
   title,
-  hint,
 }: {
   images: WallImage[];
   href: string;
   label: string;
   eyebrow: string;
   title: string;
-  hint: string;
 }) {
-  const reduced = useReducedMotion();
-  const [ready, setReady] = useState(false);
-  const [hideRibbon, setHideRibbon] = useState(false);
-  const enhance = !reduced;
-
-  // Once the WebGL carousel has crossfaded in, drop the ribbon from the DOM
-  // (frees its <img> nodes). Wait out the fade first so there's no flash; never
-  // fires under reduced motion (ready stays false → ribbon is the view).
-  useEffect(() => {
-    if (!ready) return;
-    const t = setTimeout(() => setHideRibbon(true), 800);
-    return () => clearTimeout(t);
-  }, [ready]);
-
   return (
     <section
       aria-label={label}
       className="relative bg-[#10140f] border-y border-white/8 overflow-hidden"
     >
-      {/* Soft depth glow behind the wall — gives the dark band presence. */}
+      {/* Soft depth glow — gives the dark band presence. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -73,68 +54,33 @@ export default function PhotoWall({
         </h2>
       </div>
 
-      {/* ── Carousel band — tall stage so the photos read big and immersive ── */}
-      <div className="relative mt-8 sm:mt-10 lg:mt-12 h-[380px] sm:h-[520px] lg:h-[640px]">
-        {/* Flat ribbon — SSR / LCP / reduced-motion / no-WebGL fallback. Fades
-            out once the WebGL carousel has painted its first frame, then unmounts. */}
-        {!hideRibbon && (
-          <div
-            aria-hidden={ready}
-            className="absolute inset-0 flex items-center transition-opacity duration-700"
-            style={{ opacity: ready ? 0 : 1 }}
-          >
-            <div className="absolute inset-y-0 left-0 w-20 sm:w-32 bg-gradient-to-r from-[#10140f] to-transparent z-20 pointer-events-none" />
-            <div className="absolute inset-y-0 right-0 w-20 sm:w-32 bg-gradient-to-l from-[#10140f] to-transparent z-20 pointer-events-none" />
-            <div className="flex gap-2 animate-marquee w-max">
-              {[...images, ...images].map((img, i) => (
-                <div
-                  key={i}
-                  className="relative h-[280px] sm:h-[390px] lg:h-[480px] w-[420px] sm:w-[585px] lg:w-[720px] flex-shrink-0 overflow-hidden rounded-lg"
-                >
-                  <Image
-                    src={img.src}
-                    alt=""
-                    fill
-                    sizes="720px"
-                    className="object-cover"
-                    placeholder={img.blurDataURL ? "blur" : undefined}
-                    blurDataURL={img.blurDataURL}
-                  />
-                </div>
-              ))}
+      {/* ── Film strip — big photos gliding edge to edge (duplicated list for a
+          seamless -50% loop; pauses on hover) ── */}
+      <div className="relative mt-10 sm:mt-12 lg:mt-16">
+        <div className="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-[#10140f] to-transparent z-20 pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-[#10140f] to-transparent z-20 pointer-events-none" />
+        <div className="flex gap-2.5 animate-marquee w-max">
+          {[...images, ...images].map((img, i) => (
+            <div
+              key={i}
+              className="relative h-[280px] sm:h-[390px] lg:h-[480px] w-[420px] sm:w-[585px] lg:w-[720px] flex-shrink-0 overflow-hidden rounded-lg"
+            >
+              <Image
+                src={img.src}
+                alt=""
+                fill
+                sizes="720px"
+                className="object-cover"
+                placeholder={img.blurDataURL ? "blur" : undefined}
+                blurDataURL={img.blurDataURL}
+              />
             </div>
-          </div>
-        )}
-
-        {/* WebGL curved carousel (fades in over the ribbon) */}
-        {enhance && (
-          <PhotoWallCanvas
-            images={images.map((i) => i.src)}
-            href={href}
-            onReady={() => setReady(true)}
-            className="absolute inset-0 z-10"
-          />
-        )}
+          ))}
+        </div>
       </div>
 
-      {/* Drag/swipe affordance — below the stage (never over a photo), appears
-          with the WebGL wall so people know it's interactive (that discovery is
-          the "wow"). */}
-      {enhance && (
-        <div aria-hidden className="relative z-20 flex justify-center pt-7 sm:pt-8">
-          <span
-            className="text-cream/45 text-[9px] tracking-[0.4em] uppercase flex items-center gap-2.5 transition-opacity duration-700"
-            style={{ opacity: ready ? 1 : 0 }}
-          >
-            <span>←</span>
-            {hint}
-            <span>→</span>
-          </span>
-        </div>
-      )}
-
       {/* ── CTA ── */}
-      <div className="relative z-20 flex justify-center pt-6 sm:pt-7 pb-16 sm:pb-20 lg:pb-24">
+      <div className="relative z-20 flex justify-center pt-10 sm:pt-12 pb-16 sm:pb-20 lg:pb-24">
         <Link
           href={href}
           className="group inline-flex items-center gap-3 px-8 py-4 bg-white/6 border border-white/18 rounded-full text-cream/90 hover:text-cream hover:bg-white/12 hover:border-white/35 text-[11px] tracking-[0.3em] uppercase transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/70"

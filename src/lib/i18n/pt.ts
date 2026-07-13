@@ -116,7 +116,6 @@ export const pt = {
     scroll: "Scroll",
     wallEyebrow: "O nosso trabalho",
     wallTitle: "Momentos inesquecíveis",
-    wallHint: "Arraste para explorar",
     servicesEyebrow: "O que fazemos",
     services: [
       { tag: "Empresas", title: "Corporativos" },

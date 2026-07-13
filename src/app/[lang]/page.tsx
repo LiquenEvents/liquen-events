@@ -228,7 +228,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         label={t.common.verGaleria}
         eyebrow={t.home.wallEyebrow}
         title={t.home.wallTitle}
-        hint={t.home.wallHint}
       />
 
       {/* ── Testimonials ── */}
