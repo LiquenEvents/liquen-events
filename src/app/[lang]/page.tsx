@@ -233,60 +233,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
 
-      {/* ── Reach — events anywhere (no place-name on the visible page) ── */}
-      <section className="bg-surface border-t border-foreground/8">
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          {/* Image */}
-          <AnimateIn
-            from="left"
-            className="relative min-h-[300px] lg:min-h-[640px] overflow-hidden"
-          >
-            <Image
-              src="/imagens/DJI_20250913190640_0121_D.jpg"
-              alt="Evento organizado pela Líquen Events — vista aérea"
-              fill
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover"
-              {...blurFor("/imagens/DJI_20250913190640_0121_D.jpg")}
-            />
-            <div className="absolute inset-0 bg-black/20" />
-          </AnimateIn>
-
-          {/* Text — trimmed */}
-          <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
-            <AnimateIn>
-              <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-6 flex items-center gap-3">
-                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
-                {t.home.areasEyebrow}
-              </p>
-              <h2
-                className="text-foreground font-bold leading-[1.05] mb-8"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4vw, 56px)" }}
-              >
-                {t.home.areasTitleLine1}
-                <br />
-                {t.home.areasTitleLine2}
-              </h2>
-              <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] max-w-lg">
-                {t.home.areasText}
-              </p>
-            </AnimateIn>
-            <AnimateIn delay={120}>
-              <div className="mt-10 flex flex-wrap gap-2.5">
-                {t.home.areasTags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs tracking-wide text-foreground/60 border border-foreground/12 rounded-full px-4 py-2"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </AnimateIn>
-          </div>
-        </div>
-      </section>
-
       {/* ── CTA ── */}
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
         <Parallax speed={0.1} className="absolute inset-0">

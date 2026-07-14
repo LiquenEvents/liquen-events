@@ -122,12 +122,6 @@ export const en: Dict = {
       { tag: "Celebrations", title: "Weddings" },
       { tag: "Celebrations", title: "Private" },
     ],
-    areasEyebrow: "Wherever you are",
-    areasTitleLine1: "Events without",
-    areasTitleLine2: "borders",
-    areasText:
-      "Weddings, corporate events and celebrations — from concept to execution, we handle every detail so all you have to do is live the moment, wherever it takes place.",
-    areasTags: ["Weddings", "Corporate events", "Conferences", "Private parties", "Gala dinners"],
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Have an event",
     ctaTitleLine2: "in mind?",
@@ -463,32 +457,6 @@ export const en: Dict = {
             desc: "Prestige social events with a sophisticated atmosphere and impeccable coordination.",
           },
         ],
-      },
-    ],
-    metodoEyebrow: "How we work",
-    metodoTitle: "From the first sketch to the final toast",
-    metodoLead:
-      "A method crafted down to the last detail, so every event runs flawlessly — and all you have to do is live the moment.",
-    metodo: [
-      {
-        num: "01",
-        title: "Concept & Vision",
-        desc: "We listen to your story and design a unique concept — the aesthetics, atmosphere and narrative of your event.",
-      },
-      {
-        num: "02",
-        title: "Planning & Curation",
-        desc: "We select the venue, the suppliers and every detail, with a network of trusted partners across Portugal.",
-      },
-      {
-        num: "03",
-        title: "Production & Coordination",
-        desc: "We handle everything, from budget to timeline, with the rigour a professional event demands.",
-      },
-      {
-        num: "04",
-        title: "The Big Day",
-        desc: "On the day, our team coordinates everything behind the scenes. All that's left for you is to live the moment.",
       },
     ],
     seoEyebrow: "Where we work",

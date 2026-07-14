@@ -122,18 +122,6 @@ export const pt = {
       { tag: "Celebrações", title: "Casamentos" },
       { tag: "Celebrações", title: "Privados" },
     ],
-    areasEyebrow: "Onde quiser",
-    areasTitleLine1: "Eventos sem",
-    areasTitleLine2: "fronteiras",
-    areasText:
-      "Casamentos, eventos corporativos e celebrações — do conceito à execução, tratamos de cada detalhe para que só tenha de viver o momento, onde quer que seja.",
-    areasTags: [
-      "Casamentos",
-      "Eventos corporativos",
-      "Conferências",
-      "Festas privadas",
-      "Jantares de gala",
-    ],
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Tem um evento",
     ctaTitleLine2: "em mente?",
@@ -478,32 +466,6 @@ export const pt = {
             desc: "Eventos sociais de prestígio com ambiente sofisticado e coordenação impecável.",
           },
         ],
-      },
-    ],
-    metodoEyebrow: "Como trabalhamos",
-    metodoTitle: "Do primeiro esboço ao último brinde",
-    metodoLead:
-      "Um método pensado ao pormenor, para que cada evento decorra sem falhas — e para que só tenham de viver o momento.",
-    metodo: [
-      {
-        num: "01",
-        title: "Conceito & Visão",
-        desc: "Ouvimos a vossa história e desenhamos um conceito único — a estética, a atmosfera e a narrativa do evento.",
-      },
-      {
-        num: "02",
-        title: "Planeamento & Curadoria",
-        desc: "Selecionamos o espaço, os fornecedores e cada detalhe, com uma rede de confiança em todo o Portugal.",
-      },
-      {
-        num: "03",
-        title: "Produção & Coordenação",
-        desc: "Tratamos de tudo, do orçamento ao cronograma, com o rigor que um evento profissional exige.",
-      },
-      {
-        num: "04",
-        title: "O Grande Dia",
-        desc: "No dia, a nossa equipa coordena tudo nos bastidores. A vocês, resta apenas viver o momento.",
       },
     ],
     seoEyebrow: "Onde atuamos",
