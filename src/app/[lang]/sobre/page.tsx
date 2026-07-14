@@ -33,7 +33,7 @@ export async function generateMetadata({
 
 const gallery = [
   {
-    src: "/imagens/Natalia e Jonathan-167.jpg",
+    src: "/imagens/J&A-68.jpg",
     cls: "col-span-2 row-span-2",
     alt: "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
   },

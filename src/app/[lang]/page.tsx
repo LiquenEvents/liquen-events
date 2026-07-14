@@ -32,7 +32,7 @@ const ribbon = [
   "/imagens/J&P-DJI_20250628174247_0187_D.jpg",
   "/imagens/ines-goncalo-282.jpg",
   "/imagens/DaniGui_JantarFesta_26.jpg",
-  "/imagens/Natalia e Jonathan-167.jpg",
+  "/imagens/M&F0678.jpg",
   "/imagens/J&P-4B6A1405.jpg",
   "/imagens/DJI_20250913190635_0120_D.jpg",
   "/imagens/DaniGui_Preview79.jpg",
