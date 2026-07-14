@@ -117,9 +117,9 @@ const editorial = [
     alt: "Receção de evento ao final da tarde no Alentejo",
   },
   {
-    src: "/imagens/stephanie-mizio-715.jpg",
+    src: "/imagens/stephanie-mizio-555.jpg",
     cls: "col-span-2",
-    alt: "Cerimónia de casamento com decoração floral no Alentejo",
+    alt: "Receção de casamento ao ar livre ao pôr do sol no Alentejo",
   },
   {
     src: "/imagens/DaniGui_Adois_61.jpg",

@@ -58,8 +58,8 @@ const mosaicItems = [
     cls: "col-span-3 row-span-1",
   },
   {
-    src: "/imagens/stephanie-mizio-715.jpg",
-    alt: "Casamento ao ar livre com arranjos florais no Alentejo",
+    src: "/imagens/stephanie-mizio-558.jpg",
+    alt: "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
     label: "Casamento",
     cls: "col-span-4 row-span-1",
   },

@@ -93,7 +93,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
       images: [
         img("DaniGui_Preview20.jpg"),
-        img("stephanie-mizio-715.jpg"),
+        img("stephanie-mizio-560.jpg"),
         img("JOAO_E_PEDRO_1Y1A3204.jpg"),
       ],
     },
