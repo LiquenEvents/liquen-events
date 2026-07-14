@@ -71,25 +71,25 @@ export const en: Dict = {
 
   meta: {
     ogLocale: "en_US",
-    homeTitle: "Líquen Events — Event Planning in Évora, the Alentejo & Portugal",
+    homeTitle: "Event & Wedding Planning in Évora, Portugal | Líquen Events",
     homeDescription:
-      "Event planning company based in Évora. Weddings, corporate events and celebrations across the Alentejo, Lisbon and Portugal. Bespoke solutions — request a quote.",
-    sobreTitle: "About Us — Event Company",
+      "Event planning based in Évora: weddings, corporate events and celebrations across the Alentejo and Portugal. Bespoke solutions — request a quote.",
+    sobreTitle: "Event Planning Company in the Alentejo",
     sobreDescription:
-      "Meet Líquen Events, an event planning company. Over 100 events across the Alentejo, Lisbon and Portugal — weddings, corporate events and celebrations.",
-    servicosTitle: "Services — Weddings and Corporate Events in the Alentejo",
+      "Líquen Events, an event planning company in Évora. Over 100 weddings, corporate events and celebrations across the Alentejo and Portugal.",
+    servicosTitle: "Weddings and Corporate Events in the Alentejo",
     servicosDescription:
-      "Planning of weddings, corporate events, conferences and private parties in the Alentejo, Lisbon and across Portugal. Bespoke solutions for your event.",
-    galeriaTitle: "Event Gallery — Alentejo",
+      "Planning of weddings, corporate events, conferences and private parties in Évora, the Alentejo and across Portugal. Bespoke solutions for your event.",
+    galeriaTitle: "Wedding & Event Gallery — Alentejo",
     galeriaDescription:
       "Photo gallery of events organised by Líquen Events in the Alentejo and across Portugal — weddings, corporate events, conferences and celebrations.",
-    clientesTitle: "Clients — Who Trusts Líquen Events",
+    clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
-      "Companies and institutions that trust Líquen Events: José de Mello, Aernnova, Mainova, University of Évora, Évora City Council, Pérez-Llorca and many more.",
+      "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
     contactoTitle: "Contact — Request Your Event Quote",
     contactoDescription:
-      "Contact Líquen Events to plan your event in the Alentejo, Lisbon or anywhere in Portugal. We reply within 24 hours with a tailored proposal.",
-    orcamentoTitle: "Quote Request",
+      "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. We reply within 24 hours with a tailored proposal.",
+    orcamentoTitle: "Request a Quote — Weddings & Events",
     orcamentoDescription:
       "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 hours.",
   },
@@ -107,7 +107,7 @@ export const en: Dict = {
   },
 
   home: {
-    eyebrow: "Event planning",
+    eyebrow: "Event planning · Évora · Alentejo",
     heroLines: [
       { words: ["Events", "that"] },
       { words: ["stay", "with"] },
@@ -278,7 +278,7 @@ export const en: Dict = {
       phoneLabel: "Phone",
       phoneSub: "Mon–Fri, 9am–6pm",
       locationLabel: "Location",
-      locationValue: "Portugal",
+      locationValue: "Évora, Alentejo — across Portugal",
       locationSub: "In-person meetings available",
       quoteLink: "Request a quote for your event",
       whatsappLink: "Chat on WhatsApp",
@@ -574,8 +574,15 @@ export const en: Dict = {
     sloganLine2: "we immortalise memories.",
     disponivel: "Available for new events",
     paginas: "Pages",
+    servicosTitulo: "Services",
+    serviceLinks: [
+      "Wedding Planning",
+      "Corporate Events",
+      "Parties & Celebrations",
+      "Gala Dinners",
+    ],
     contacto: "Contact",
-    country: "Portugal",
+    country: "Évora, Alentejo, Portugal",
     pedirOrcamento: "Request a quote",
     rights: "All rights reserved",
     legal: "Legal",

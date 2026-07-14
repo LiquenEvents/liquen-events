@@ -1,4 +1,4 @@
-import { SITE, AREAS_SERVED, abs } from "@/lib/site";
+import { SITE, areaServedSchema, abs } from "@/lib/site";
 import { jsonLd } from "@/lib/jsonld";
 import { getDictionary, htmlLang, type Locale } from "@/lib/i18n";
 
@@ -25,7 +25,9 @@ export default function StructuredData({ locale }: { locale: Locale }) {
 
   const graph = [
     {
-      "@type": ["Organization", "LocalBusiness", "ProfessionalService"],
+      // EventPlanner is the schema.org LocalBusiness subtype that matches the
+      // business exactly — more specific than the generic ProfessionalService.
+      "@type": ["Organization", "LocalBusiness", "EventPlanner"],
       "@id": orgId,
       name: SITE.name,
       legalName: SITE.legalName,
@@ -37,6 +39,7 @@ export default function StructuredData({ locale }: { locale: Locale }) {
       description: t.meta.homeDescription,
       slogan: SITE.slogan,
       foundingDate: SITE.founded,
+      founder: { "@type": "Person", name: "Catarina Gaspar", jobTitle: "Founder & CEO" },
       priceRange: "€€€",
       address: {
         "@type": "PostalAddress",
@@ -58,7 +61,7 @@ export default function StructuredData({ locale }: { locale: Locale }) {
           closes: "18:00",
         },
       ],
-      areaServed: AREAS_SERVED.map((name) => ({ "@type": "City", name })),
+      areaServed: areaServedSchema(),
       knowsLanguage: ["pt-PT", "en"],
       sameAs: [SITE.instagram, SITE.facebook],
       contactPoint: {

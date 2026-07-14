@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import OrcamentoForm from "./OrcamentoForm";
+import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
 
@@ -20,6 +21,17 @@ export async function generateMetadata({
   });
 }
 
-export default function OrcamentoPage() {
-  return <OrcamentoForm />;
+export default async function OrcamentoPage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = normalizeLocale((await params).lang);
+  const t = getDictionary(locale);
+  return (
+    <>
+      <BreadcrumbJsonLd
+        locale={locale}
+        homeName={t.nav.inicio}
+        items={[{ name: t.nav.orcamento, path: "/orcamento" }]}
+      />
+      <OrcamentoForm />
+    </>
+  );
 }

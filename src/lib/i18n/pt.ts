@@ -71,25 +71,25 @@ export const pt = {
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Líquen Events — Organização de Eventos em Évora, Alentejo e Portugal",
+    homeTitle: "Organização de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Empresa de organização de eventos com base em Évora. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.",
-    sobreTitle: "Sobre Nós — Empresa de Eventos",
+      "Organização de eventos com base em Évora: casamentos, eventos corporativos e celebrações em todo o Alentejo e Portugal. Soluções à medida — peça orçamento.",
+    sobreTitle: "Empresa de Organização de Eventos no Alentejo",
     sobreDescription:
-      "Conheça a Líquen Events, empresa de organização de eventos. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",
-    servicosTitle: "Serviços — Casamentos e Eventos Corporativos no Alentejo",
+      "Líquen Events, empresa de organização de eventos em Évora. Mais de 100 casamentos, eventos corporativos e celebrações no Alentejo e em todo o Portugal.",
+    servicosTitle: "Casamentos e Eventos Corporativos no Alentejo",
     servicosDescription:
-      "Organização de casamentos, eventos corporativos, conferências e festas privadas no Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
-    galeriaTitle: "Galeria de Eventos — Alentejo",
+      "Organização de casamentos, eventos corporativos, conferências e festas privadas em Évora, no Alentejo e em todo o Portugal. Soluções à medida do seu evento.",
+    galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
     galeriaDescription:
       "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
-    clientesTitle: "Clientes — Quem Confia na Líquen Events",
+    clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
-      "Empresas e instituições que confiam na Líquen Events: José de Mello, Aernnova, Mainova, Universidade de Évora, Câmara Municipal de Évora, Pérez-Llorca e muito mais.",
+      "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento no Alentejo, Lisboa ou em qualquer ponto de Portugal. Respondemos em menos de 24 horas com uma proposta à medida.",
-    orcamentoTitle: "Pedido de Orçamento",
+      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas com proposta à medida.",
+    orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
       "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas.",
   },
@@ -107,7 +107,7 @@ export const pt = {
   },
 
   home: {
-    eyebrow: "Organização de eventos",
+    eyebrow: "Organização de eventos · Évora · Alentejo",
     heroLines: [
       { words: ["Eventos", "que"] },
       { words: ["ficam", "na"] },
@@ -287,7 +287,7 @@ export const pt = {
       phoneLabel: "Telefone",
       phoneSub: "Seg–Sex, 9h–18h",
       locationLabel: "Localização",
-      locationValue: "Portugal",
+      locationValue: "Évora, Alentejo — em todo o Portugal",
       locationSub: "Reuniões presenciais disponíveis",
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
@@ -584,8 +584,15 @@ export const pt = {
     sloganLine2: "eternizamos memórias.",
     disponivel: "Disponível para novos eventos",
     paginas: "Páginas",
+    servicosTitulo: "Serviços",
+    serviceLinks: [
+      "Organização de Casamentos",
+      "Eventos Corporativos",
+      "Festas e Aniversários",
+      "Jantares de Gala",
+    ],
     contacto: "Contacto",
-    country: "Portugal",
+    country: "Évora, Alentejo, Portugal",
     pedirOrcamento: "Pedir orçamento",
     rights: "Todos os direitos reservados",
     legal: "Legal",

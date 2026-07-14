@@ -404,7 +404,16 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // Localized display helpers — internal label keys stay PT (used for
   // filtering); only what the user reads is translated.
   const labelText = (l: Label) => t.galeria.labels[l];
-  const altText = (l: Label) => t.galeria.alt[l];
+  // Per-photo alt text. The category template (t.galeria.alt) alone would make
+  // hundreds of photos share one identical string (bad for image SEO + a11y),
+  // so when the shoot/couple is known we append it — every photo then reads
+  // uniquely and descriptively (e.g. "Casamento … no Alentejo — Daniela &
+  // Guilherme") while keeping the localized, keyword-rich base.
+  const altText = (src: string, l: Label) => {
+    const base = t.galeria.alt[l];
+    const c = collectionFor(src);
+    return c ? `${base} — ${c}` : base;
+  };
   const caption = (src: string, label: Label): { caption: string; sub?: string } => {
     const c = collectionFor(src);
     return c ? { caption: c, sub: labelText(label) } : { caption: labelText(label) };
@@ -778,7 +787,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                 <VTWrap name={mosaicName(0)}>
                   <Image
                     src={visible[0].src}
-                    alt={altText(visible[0].label)}
+                    alt={altText(visible[0].src, visible[0].label)}
                     fill
                     sizes="(max-width: 640px) 100vw, 50vw"
                     className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
@@ -807,7 +816,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                     <VTWrap name={mosaicName(idx)}>
                       <Image
                         src={visible[idx].src}
-                        alt={altText(visible[idx].label)}
+                        alt={altText(visible[idx].src, visible[idx].label)}
                         fill
                         sizes="25vw"
                         className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
@@ -852,7 +861,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                       >
                         <Image
                           src={p.src}
-                          alt={altText(p.label)}
+                          alt={altText(p.src, p.label)}
                           fill
                           sizes="(max-width: 768px) 50vw, 33vw"
                           className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
@@ -1032,7 +1041,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                   <Image
                     key={lb}
                     src={pool[lb].src}
-                    alt={altText(pool[lb].label)}
+                    alt={altText(pool[lb].src, pool[lb].label)}
                     fill
                     sizes="90vw"
                     className={`object-contain ${

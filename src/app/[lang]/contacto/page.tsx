@@ -58,7 +58,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           <Image
             src={heroImg}
             {...blurFor(heroImg)}
-            alt="Evento Líquen Events"
+            alt="Vista aérea de uma herdade preparada para um evento no Alentejo"
             fill
             preload
             sizes="100vw"
@@ -271,15 +271,24 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         <AnimateIn from="fade">
           <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(180px, 38vw, 460px)" }}>
             {[
-              "/imagens/Natalia e Jonathan-315.jpg",
-              "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
-              "/imagens/M&F0658.jpg",
-            ].map((src) => (
+              {
+                src: "/imagens/Natalia e Jonathan-315.jpg",
+                alt: "Cerimónia de casamento ao ar livre no Alentejo",
+              },
+              {
+                src: "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
+                alt: "Casamento ao pôr do sol numa herdade alentejana",
+              },
+              {
+                src: "/imagens/M&F0658.jpg",
+                alt: "Mesa posta de jantar de casamento com decoração floral",
+              },
+            ].map(({ src, alt }) => (
               <div key={src} className="relative overflow-hidden group">
                 <Image
                   src={src}
                   {...blurFor(src)}
-                  alt="Evento organizado pela Líquen Events"
+                  alt={alt}
                   fill
                   sizes="33vw"
                   className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"

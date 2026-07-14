@@ -232,19 +232,19 @@ export default async function ServiceDetailPage({
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-3xl mx-auto px-6 lg:px-16">
             <AnimateIn>
-              <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+              <h2 className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/50" /> {t.servicoDetalhe.faqTitle}
-              </p>
+              </h2>
             </AnimateIn>
             <Reveal as="div" stagger={0.08} className="flex flex-col">
               {svc.faqs.map((f) => (
                 <div key={f.q} className="border-t border-foreground/8 py-7">
-                  <h2
+                  <h3
                     className="text-foreground/80 text-base mb-3"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
                     {f.q}
-                  </h2>
+                  </h3>
                   <p className="text-foreground/78 text-sm leading-[1.9]">{f.a}</p>
                 </div>
               ))}
@@ -259,9 +259,9 @@ export default async function ServiceDetailPage({
         <section className="py-24 bg-surface border-t border-foreground/8">
           <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <AnimateIn>
-              <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+              <h2 className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/50" /> {t.servicoDetalhe.relatedTitle}
-              </p>
+              </h2>
             </AnimateIn>
             <Reveal as="div" stagger={0.1} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {related.map((r) => (

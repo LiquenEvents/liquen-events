@@ -96,12 +96,36 @@ const categoryMeta = [
 
 // Full-bleed editorial photo grid (mirrors the Sobre page rhythm).
 const editorial = [
-  { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2 row-span-2" },
-  { src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg", cls: "col-span-2" },
-  { src: "/imagens/DJI_20250913190635_0120_D.jpg", cls: "col-span-1" },
-  { src: "/imagens/20_10_2025_0407.jpg", cls: "col-span-1" },
-  { src: "/imagens/stephanie-mizio-715.jpg", cls: "col-span-2" },
-  { src: "/imagens/DaniGui_Adois_61.jpg", cls: "col-span-2" },
+  {
+    src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+    cls: "col-span-2 row-span-2",
+    alt: "Casamento ao ar livre organizado pela Líquen Events no Alentejo",
+  },
+  {
+    src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+    cls: "col-span-2",
+    alt: "Jantar de celebração com decoração elegante à luz de velas",
+  },
+  {
+    src: "/imagens/DJI_20250913190635_0120_D.jpg",
+    cls: "col-span-1",
+    alt: "Vista aérea de um evento numa herdade do Alentejo",
+  },
+  {
+    src: "/imagens/20_10_2025_0407.jpg",
+    cls: "col-span-1",
+    alt: "Receção de evento ao final da tarde no Alentejo",
+  },
+  {
+    src: "/imagens/stephanie-mizio-715.jpg",
+    cls: "col-span-2",
+    alt: "Cerimónia de casamento com decoração floral no Alentejo",
+  },
+  {
+    src: "/imagens/DaniGui_Adois_61.jpg",
+    cls: "col-span-2",
+    alt: "Retrato dos noivos durante um casamento no Alentejo",
+  },
 ];
 
 /* ── Service card ── */
@@ -505,7 +529,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
               <Image
                 src={g.src}
-                alt="Evento organizado pela Líquen Events"
+                alt={g.alt}
                 fill
                 sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
@@ -560,7 +584,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
         <Image
           src="/imagens/M&F0497.jpg"
-          alt="Evento Líquen Events"
+          alt="Casamento celebrado ao anoitecer numa quinta no Alentejo"
           fill
           sizes="100vw"
           className="object-cover object-center"

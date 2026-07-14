@@ -238,7 +238,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         <Parallax speed={0.1} className="absolute inset-0">
           <Image
             src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
-            alt="Evento Líquen Events"
+            alt="Casamento ao pôr do sol numa herdade no Alentejo"
             fill
             sizes="100vw"
             className="object-cover object-center scale-110"

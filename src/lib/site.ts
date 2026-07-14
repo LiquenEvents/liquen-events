@@ -20,9 +20,11 @@ export const SITE = {
   country: "PT",
   slogan: "Organizamos eventos, eternizamos memórias.",
   founded: "2018",
-  // Avaliação agregada real (Google). Mostrada visivelmente no site (ver
-  // RatingBadge) e espelhada no aggregateRating do schema — a marcação nunca
-  // afirma mais do que é exibido. Atualizar aqui quando o nº/média mudarem.
+  // Avaliação agregada real (Google). Mostrada VISIVELMENTE no site (ver
+  // RatingBadge). NÃO é emitida como aggregateRating no schema — o Google
+  // desaconselha marcação de review auto-declarada em Organization/LocalBusiness
+  // (sem estrela rich result e risco de ação manual); as estrelas em pesquisa
+  // vêm do Perfil de Empresa Google. Atualizar aqui quando o nº/média mudarem.
   reviews: { rating: 5, count: 56 },
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",
@@ -59,6 +61,16 @@ export const SITE_KEYWORDS = [
   "decoração de eventos Alentejo",
   "Líquen Events",
 ] as const;
+
+/** schema.org `areaServed` array with each place correctly typed — Portugal is
+ *  a Country, the Alentejo an AdministrativeArea (region), the rest Cities.
+ *  Shared by the Organization node and per-Service JSON-LD so both stay
+ *  consistent and Évora-first. */
+export function areaServedSchema(): { "@type": string; name: string }[] {
+  const areaType = (name: string) =>
+    name === "Portugal" ? "Country" : name === "Alentejo" ? "AdministrativeArea" : "City";
+  return AREAS_SERVED.map((name) => ({ "@type": areaType(name), name }));
+}
 
 /** Absolute URL helper for canonical/OG links. */
 export function abs(path = ""): string {

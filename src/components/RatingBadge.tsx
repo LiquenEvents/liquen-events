@@ -1,9 +1,10 @@
 import { SITE } from "@/lib/site";
 
 // Visible aggregate-rating badge (★★★★★ 5,0 · 56 avaliações). Shows the REAL
-// Google rating from SITE.reviews — the same numbers mirrored in the schema's
-// aggregateRating, so the markup never claims more than the page displays.
-// Prop-based (no hooks) so it renders in server or client components.
+// Google rating from SITE.reviews. This is displayed VISIBLY only — it is
+// deliberately NOT emitted as schema aggregateRating (Google disallows
+// self-serving review markup on Organization/LocalBusiness). Prop-based (no
+// hooks) so it renders in server or client components.
 export default function RatingBadge({
   label,
   ptFormat = true,

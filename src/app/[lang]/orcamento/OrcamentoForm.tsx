@@ -172,7 +172,7 @@ export default function OrcamentoForm() {
         <Image
           src="/imagens/DaniGui_JantarFesta_1.jpg"
           {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
-          alt="Evento Líquen Events"
+          alt="Jantar de festa com mesa posta e decoração à luz de velas"
           fill
           preload
           sizes="(max-width: 1024px) 0vw, 45vw"
