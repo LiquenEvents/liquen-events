@@ -291,6 +291,7 @@ export const pt = {
       locationSub: "Reuniões presenciais disponíveis",
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
+      googleLink: "Ver no Google · Deixar avaliação",
       promise:
         "Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta personalizada.",
       promiseSign: "— Equipa Líquen Events",

@@ -282,6 +282,7 @@ export const en: Dict = {
       locationSub: "In-person meetings available",
       quoteLink: "Request a quote for your event",
       whatsappLink: "Chat on WhatsApp",
+      googleLink: "See on Google · Leave a review",
       promise: "We reply to every request within 24 business hours, with a personalised proposal.",
       promiseSign: "— The Líquen Events team",
       stepLabels: ["Event", "Details", "Specifics", "Message"],
