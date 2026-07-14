@@ -49,7 +49,7 @@ export const SERVICES: ServiceDetail[] = [
     gallery: [
       "/imagens/DaniGui_Preview20.jpg",
       "/imagens/matilde-tomas-27.jpg",
-      "/imagens/Sophia&Artur_MAINOVA_capa-482.jpg",
+      "/imagens/JOAO_E_PEDRO_IMGL4226.jpg",
       "/imagens/ines-goncalo-421.jpg",
       "/imagens/M&F0678.jpg",
       "/imagens/stephanie-mizio-760.jpg",
