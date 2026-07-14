@@ -53,17 +53,18 @@ export default function StructuredData({ locale }: { locale: Locale }) {
         latitude: 38.5714,
         longitude: -7.9135,
       },
+      hasMap: SITE.googleBusiness,
       openingHoursSpecification: [
         {
           "@type": "OpeningHoursSpecification",
           dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
           opens: "09:00",
-          closes: "18:00",
+          closes: "20:00",
         },
       ],
       areaServed: areaServedSchema(),
       knowsLanguage: ["pt-PT", "en"],
-      sameAs: [SITE.instagram, SITE.facebook],
+      sameAs: [SITE.instagram, SITE.facebook, SITE.googleBusiness],
       contactPoint: {
         "@type": "ContactPoint",
         telephone: SITE.phone,

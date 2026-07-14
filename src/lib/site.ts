@@ -28,6 +28,9 @@ export const SITE = {
   reviews: { rating: 5, count: 56 },
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",
+  // Google Business Profile (share link) — powers local pack/Maps ranking and
+  // lets Google reconcile the site with the profile (sameAs + hasMap).
+  googleBusiness: "https://share.google/4Qcuop16TDkYaowsU",
   ogImage: "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
 } as const;
 
