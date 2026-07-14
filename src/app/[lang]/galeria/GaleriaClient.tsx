@@ -81,14 +81,15 @@ function hashUnit(s: string): number {
  * photos from the same event, every collection appearing throughout (not
  * bunched), AND no rigid repeating pattern.
  *
- * Method: each photo gets a fractional rank `(j + 0.5) / size` — its position
- * within its own bucket, normalised to [0,1) — so a big shoot's frames land
- * ~1/frequency apart across the whole list. We then add a stable per-photo
- * jitter (±~0.11 of the range, hashed from the filename) so photos hop out of
- * the mechanical A,B,C,A,B,C rotation and categories genuinely intermix, while
- * the base rank still keeps each shoot roughly evenly spread. Fully
- * deterministic (stable across renders/SSR). A final de-adjacency pass removes
- * the rare same-event neighbour the jitter can create.
+ * Method: within its own bucket each photo gets an evenly-stepped position
+ * `(j + 0.5) / size`, so a big shoot's frames land ~1/frequency apart across
+ * the whole list (never bunched). Crucially, each bucket is then rotated by its
+ * OWN random phase (`hashUnit(key)`, wrapped into [0,1)) — so the shoots don't
+ * all start at 0 and fall into a mechanical A,B,C,A,B,C rotation; they
+ * interleave at different offsets, reading as a real shuffle. A small per-photo
+ * jitter breaks any residual lock-step. Fully deterministic (same on SSR +
+ * client — no hydration mismatch). A final de-adjacency pass removes the rare
+ * same-event neighbour.
  */
 function interleaveByCollection(list: Photo[]): Photo[] {
   const buckets = new Map<string, Photo[]>();
@@ -106,10 +107,12 @@ function interleaveByCollection(list: Photo[]): Photo[] {
   const ranked: { p: Photo; rank: number }[] = [];
   for (const key of order) {
     const arr = buckets.get(key)!;
+    const phase = hashUnit(key); // per-bucket rotation → staggered interleave
     for (let j = 0; j < arr.length; j++) {
-      const base = (j + 0.5) / arr.length;
-      const jitter = (hashUnit(arr[j].src) - 0.5) * 0.22;
-      ranked.push({ p: arr[j], rank: base + jitter });
+      const jitter = (hashUnit(arr[j].src) - 0.5) * 0.12;
+      let rank = (j + 0.5) / arr.length + phase + jitter;
+      rank -= Math.floor(rank); // wrap into [0,1)
+      ranked.push({ p: arr[j], rank });
     }
   }
   ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src) - hashUnit(b.p.src));
