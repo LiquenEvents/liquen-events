@@ -20,11 +20,13 @@ export const SITE = {
   country: "PT",
   slogan: "Organizamos eventos, eternizamos memórias.",
   founded: "2018",
-  // Avaliação agregada real (Google). Mostrada VISIVELMENTE no site (ver
-  // RatingBadge). NÃO é emitida como aggregateRating no schema — o Google
-  // desaconselha marcação de review auto-declarada em Organization/LocalBusiness
-  // (sem estrela rich result e risco de ação manual); as estrelas em pesquisa
-  // vêm do Perfil de Empresa Google. Atualizar aqui quando o nº/média mudarem.
+  // Avaliação real do Google. Só a MÉDIA (rating) é mostrada visivelmente no
+  // site (ver RatingBadge) — a CONTAGEM (count) NÃO é apresentada, para o site
+  // nunca contradizer o número que aparece no Perfil de Empresa Google. NÃO é
+  // emitida como aggregateRating no schema — o Google desaconselha marcação de
+  // review auto-declarada em Organization/LocalBusiness (sem estrela rich
+  // result e risco de ação manual); as estrelas em pesquisa vêm do Perfil de
+  // Empresa Google. count fica aqui só como referência interna do nº real.
   reviews: { rating: 5, count: 56 },
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",

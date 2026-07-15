@@ -1,10 +1,12 @@
 import { SITE } from "@/lib/site";
 
-// Visible aggregate-rating badge (★★★★★ 5,0 · 56 avaliações). Shows the REAL
-// Google rating from SITE.reviews. This is displayed VISIBLY only — it is
-// deliberately NOT emitted as schema aggregateRating (Google disallows
-// self-serving review markup on Organization/LocalBusiness). Prop-based (no
-// hooks) so it renders in server or client components.
+// Visible aggregate-rating badge (★★★★★ 5,0). Shows the REAL Google rating
+// (average only) from SITE.reviews — the review COUNT is intentionally not
+// rendered so the site never contradicts the live Google Business Profile.
+// Displayed VISIBLY only — it is deliberately NOT emitted as schema
+// aggregateRating (Google disallows self-serving review markup on
+// Organization/LocalBusiness). Prop-based (no hooks) so it renders in server
+// or client components.
 export default function RatingBadge({
   label,
   ptFormat = true,
@@ -18,12 +20,12 @@ export default function RatingBadge({
   starClassName?: string;
   textClassName?: string;
 }) {
-  const { rating, count } = SITE.reviews;
+  const { rating } = SITE.reviews;
   const ratingStr = ptFormat ? rating.toFixed(1).replace(".", ",") : rating.toFixed(1);
   return (
     <span
       className={`inline-flex items-center gap-2 ${className ?? ""}`}
-      aria-label={`${ratingStr}/5 — ${count} ${label}`}
+      aria-label={`${ratingStr}/5 — ${label}`}
     >
       <span className={`flex gap-0.5 ${starClassName}`} aria-hidden>
         {[0, 1, 2, 3, 4].map((i) => (
@@ -32,9 +34,7 @@ export default function RatingBadge({
           </svg>
         ))}
       </span>
-      <span className={`text-xs tracking-wide tabular-nums ${textClassName}`}>
-        {ratingStr} · {count} {label}
-      </span>
+      <span className={`text-xs tracking-wide tabular-nums ${textClassName}`}>{ratingStr}</span>
     </span>
   );
 }
