@@ -860,6 +860,31 @@ body:has([data-orcamento-mode]) .eyebrow {
   background-color: #12160f;
 }
 
+/* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
+   traço do check. Puro CSS (stroke-dashoffset), respeita reduced-motion. */
+@keyframes confirm-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.confirm-ring {
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: confirm-draw 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+}
+.confirm-check {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: confirm-draw 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirm-ring,
+  .confirm-check {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 /* Entrada escalonada do mosaico-herói. Acima da dobra → animação CSS pura (sem
    IntersectionObserver, como as .anim-*). Termina em transform:none para não
    deixar containing-block que afete o morph <ViewTransition> — mesmo cuidado
