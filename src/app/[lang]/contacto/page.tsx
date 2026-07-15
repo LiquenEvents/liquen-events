@@ -58,7 +58,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           <Image
             src={heroImg}
             {...blurFor(heroImg)}
-            alt="Vista aérea de uma herdade preparada para um evento no Alentejo"
+            alt={t.common.imageAlt.contactoHero}
             fill
             preload
             sizes="100vw"

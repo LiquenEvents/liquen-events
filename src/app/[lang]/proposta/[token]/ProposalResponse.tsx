@@ -88,7 +88,7 @@ export default function ProposalResponse({ token, initialStatus, clientEmail }: 
         <button
           onClick={() => respond("aceitar")}
           disabled={!!sending}
-          className="flex-1 py-4 rounded-md bg-moss text-cream text-xs tracking-[0.2em] uppercase font-medium hover:bg-moss-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 py-4 rounded-md bg-moss text-white text-xs tracking-[0.2em] uppercase font-medium hover:bg-moss-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending === "aceitar" ? tp.aceitarSending : tp.aceitar}
         </button>

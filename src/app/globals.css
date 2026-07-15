@@ -87,7 +87,7 @@ body.admin-mode {
   outline: none;
   box-shadow:
     0 0 0 2px var(--color-surface),
-    0 0 0 3px rgba(99, 122, 95, 0.6);
+    0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
 }
 
@@ -774,12 +774,13 @@ body[data-menu-open] .whatsapp-fixed {
   font-size: 10px;
   letter-spacing: 0.35em;
   text-transform: uppercase;
-  color: rgba(42, 38, 32, 0.38);
+  /* ~5:1 on white — a legible micro-heading, not a ghost. */
+  color: rgba(42, 38, 32, 0.66);
 }
 
-/* On orcamento (dark) mode the eyebrow reverts to its original light tint */
+/* On the orçamento dark image panel the eyebrow sits light on a photo. */
 body:has([data-orcamento-mode]) .eyebrow {
-  color: rgba(222, 218, 212, 0.28);
+  color: rgba(222, 218, 212, 0.55);
 }
 
 @media (prefers-reduced-motion: reduce) {

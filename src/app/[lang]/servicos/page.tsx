@@ -371,8 +371,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       />
       <ServiceJsonLd
         locale={locale}
-        name="Organização de eventos, casamentos e eventos corporativos"
-        description="Organização de casamentos, eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal — da decoração à coordenação."
+        name={t.jsonld.servicosServiceName}
+        description={t.jsonld.servicosServiceDescription}
         path="/servicos"
       />
 
@@ -548,7 +548,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       >
         <Image
           src="/imagens/J&A-68.jpg"
-          alt="Cerimónia ao ar livre organizada pela Líquen Events no Alentejo"
+          alt={t.common.imageAlt.servicosCeremony}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -584,7 +584,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
         <Image
           src="/imagens/M&F0497.jpg"
-          alt="Casamento celebrado ao anoitecer numa quinta no Alentejo"
+          alt={t.common.imageAlt.servicosEvening}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -617,7 +617,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <Magnetic strength={0.4}>
                 <Link
                   href={localizeHref("/orcamento", locale)}
-                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
                 >
                   {t.common.pedirOrcamento} →
                 </Link>

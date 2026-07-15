@@ -318,7 +318,7 @@ export default async function ServiceDetailPage({
           <Magnetic strength={0.4}>
             <Link
               href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
+              className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
             >
               {t.common.pedirOrcamento} →
             </Link>

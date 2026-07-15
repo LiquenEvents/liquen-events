@@ -14,7 +14,7 @@ const STATUS_COLORS: Record<string, string> = {
   em_revisao: "text-moss",
   cotado: "text-moss",
   aceite: "text-moss",
-  rejeitado: "text-foreground/35",
+  rejeitado: "text-foreground/70",
 };
 
 // Celebration petals — drift down once on arrival. Fixed config (no RNG) so it's
@@ -300,7 +300,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
               {/* Reference + status */}
               <div className="flex items-start justify-between gap-4 px-7 pt-7 pb-6 border-b border-foreground/8">
                 <div>
-                  <p className="text-foreground/30 text-[10px] tracking-[0.4em] uppercase mb-2">
+                  <p className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-2">
                     {tc.refLabel}
                   </p>
                   <p className="text-foreground/80 font-mono text-[15px] tracking-tight">{id}</p>
@@ -323,7 +323,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                         i < details.length - 1 ? "border-b border-foreground/8" : ""
                       }`}
                     >
-                      <dt className="text-foreground/35 text-[10px] tracking-[0.28em] uppercase shrink-0">
+                      <dt className="text-foreground/60 text-[10px] tracking-[0.28em] uppercase shrink-0">
                         {d.label}
                       </dt>
                       <dd className="text-foreground/85 text-[15px] text-right leading-snug">
@@ -494,7 +494,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
           <div className="mt-14 flex flex-wrap gap-4">
             <Link
               href={localizeHref("/", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 btn-shine bg-moss text-cream text-[11px] tracking-[0.2em] uppercase rounded-full hover:bg-moss-dark transition-colors shadow-lg shadow-moss/15"
+              className="inline-flex items-center gap-2 px-9 py-4 btn-shine bg-moss text-white text-[11px] tracking-[0.2em] uppercase rounded-full hover:bg-moss-dark transition-colors shadow-lg shadow-moss/15"
             >
               {tc.voltarInicio} →
             </Link>

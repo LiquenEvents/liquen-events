@@ -175,7 +175,7 @@ export default function OrcamentoForm() {
         <Image
           src="/imagens/DaniGui_JantarFesta_1.jpg"
           {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
-          alt="Jantar de festa com mesa posta e decoração à luz de velas"
+          alt={t.common.imageAlt.orcamentoPanel}
           fill
           preload
           sizes="(max-width: 1024px) 0vw, 45vw"
@@ -273,7 +273,7 @@ export default function OrcamentoForm() {
                       aria-pressed={active}
                       className={`px-4 py-2.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
-                          ? "bg-moss border-moss text-cream shadow-lg shadow-moss/20"
+                          ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
                           : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
                       }`}
                     >

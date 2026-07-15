@@ -56,7 +56,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           <Image
             src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
             {...blurFor("/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg")}
-            alt="Líquen Events — evento aéreo no Alentejo"
+            alt={t.common.imageAlt.homeHero}
             fill
             preload
             sizes="100vw"
@@ -113,7 +113,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             <Magnetic strength={0.4}>
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-cream text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
+                className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-white text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
               >
                 {t.common.pedirOrcamento} →
               </Link>
@@ -238,7 +238,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         <Parallax speed={0.1} className="absolute inset-0">
           <Image
             src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
-            alt="Casamento ao pôr do sol numa herdade no Alentejo"
+            alt={t.common.imageAlt.homeWedding}
             fill
             sizes="100vw"
             className="object-cover object-center scale-110"
@@ -277,7 +277,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             <div className="flex flex-wrap gap-4 justify-center">
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 {t.common.pedirOrcamento} →
               </Link>

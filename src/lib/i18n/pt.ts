@@ -67,6 +67,20 @@ export const pt = {
     reviewsLabel: "avaliações",
     testemunhoLabel: "Testemunho",
     whatsappPrefill: "Olá, gostaria de saber mais sobre a organização de eventos.",
+    // Localized alt text for the shared marketing imagery (served on both
+    // languages — a hardcoded PT alt would leave EN pages untranslated).
+    imageAlt: {
+      homeHero: "Líquen Events — evento aéreo no Alentejo",
+      homeWedding: "Casamento ao pôr do sol numa herdade no Alentejo",
+      contactoHero: "Vista aérea de uma herdade preparada para um evento no Alentejo",
+      sobrePortrait: "Momento de casamento organizado pela Líquen Events no Alentejo",
+      sobreGolden: "Celebração de casamento à luz dourada no Alentejo",
+      sobreOutdoor: "Casamento ao ar livre organizado pela Líquen Events no Alentejo",
+      clientesAerial: "Vista aérea de evento Líquen Events",
+      servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events no Alentejo",
+      servicosEvening: "Casamento celebrado ao anoitecer numa quinta no Alentejo",
+      orcamentoPanel: "Jantar de festa com mesa posta e decoração à luz de velas",
+    },
   },
 
   meta: {
@@ -104,6 +118,9 @@ export const pt = {
       "Festas e celebrações privadas",
       "Jantares de gala e eventos sociais",
     ],
+    servicosServiceName: "Organização de eventos, casamentos e eventos corporativos",
+    servicosServiceDescription:
+      "Organização de casamentos, eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal — da decoração à coordenação.",
   },
 
   home: {

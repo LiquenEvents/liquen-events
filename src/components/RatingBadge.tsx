@@ -11,7 +11,9 @@ export default function RatingBadge({
   label,
   ptFormat = true,
   className,
-  starClassName = "text-gold",
+  // Default targets LIGHT surfaces: gold-dark (#b88f28) clears the 3:1 graphics
+  // floor for the star glyphs. Hero usages over dark photos pass text-gold.
+  starClassName = "text-gold-dark",
   textClassName = "text-foreground/72",
 }: {
   label: string;

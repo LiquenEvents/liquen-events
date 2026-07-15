@@ -359,7 +359,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       <section className="relative py-36 lg:py-52 overflow-hidden">
         <Image
           src="/imagens/DJI_20250913190635_0120_D.jpg"
-          alt="Vista aérea de evento Líquen Events"
+          alt={t.common.imageAlt.clientesAerial}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -393,7 +393,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             <Magnetic strength={0.4}>
               <Link
                 href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 {t.common.falarConnosco} →
               </Link>

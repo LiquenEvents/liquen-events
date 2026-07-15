@@ -805,9 +805,10 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
             <button
               key={c}
               onClick={() => switchCat(c)}
+              aria-pressed={cat === c}
               className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
                 cat === c
-                  ? "bg-moss-dark text-cream shadow-lg shadow-moss/20"
+                  ? "bg-moss-dark text-white shadow-lg shadow-moss/20"
                   : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
               }`}
             >

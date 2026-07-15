@@ -67,6 +67,20 @@ export const en: Dict = {
     reviewsLabel: "reviews",
     testemunhoLabel: "Testimonial",
     whatsappPrefill: "Hi, I'd like to know more about your event planning services.",
+    // Localized alt text for the shared marketing imagery (served on both
+    // languages — a hardcoded PT alt would leave EN pages untranslated).
+    imageAlt: {
+      homeHero: "Líquen Events — aerial view of an event in the Alentejo",
+      homeWedding: "Wedding at sunset on an estate in the Alentejo",
+      contactoHero: "Aerial view of an estate set up for an event in the Alentejo",
+      sobrePortrait: "A wedding moment planned by Líquen Events in the Alentejo",
+      sobreGolden: "Wedding celebration in golden light in the Alentejo",
+      sobreOutdoor: "Outdoor wedding planned by Líquen Events in the Alentejo",
+      clientesAerial: "Aerial view of a Líquen Events event",
+      servicosCeremony: "Outdoor ceremony planned by Líquen Events in the Alentejo",
+      servicosEvening: "Wedding celebrated at dusk on an estate in the Alentejo",
+      orcamentoPanel: "Celebration dinner with a set table and candlelit décor",
+    },
   },
 
   meta: {
@@ -104,6 +118,9 @@ export const en: Dict = {
       "Private parties and celebrations",
       "Gala dinners and social events",
     ],
+    servicosServiceName: "Event, wedding and corporate event planning",
+    servicosServiceDescription:
+      "Planning of weddings, corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal — from décor to coordination.",
   },
 
   home: {

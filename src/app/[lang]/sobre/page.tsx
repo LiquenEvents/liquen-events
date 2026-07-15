@@ -148,7 +148,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl">
               <Image
                 src="/imagens/DaniGui_Preview12.jpg"
-                alt="Momento de casamento organizado pela Líquen Events no Alentejo"
+                alt={t.common.imageAlt.sobrePortrait}
                 fill
                 sizes="(max-width: 1024px) 100vw, 45vw"
                 className="object-cover"
@@ -191,7 +191,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         <Parallax speed={0.1} className="absolute inset-0">
           <Image
             src="/imagens/M&F0497.jpg"
-            alt="Celebração de casamento à luz dourada no Alentejo"
+            alt={t.common.imageAlt.sobreGolden}
             fill
             sizes="100vw"
             className="object-cover object-center scale-110"
@@ -268,7 +268,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
         <Image
           src="/imagens/DaniGui_Adois_61.jpg"
-          alt="Casamento ao ar livre organizado pela Líquen Events no Alentejo"
+          alt={t.common.imageAlt.sobreOutdoor}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -302,7 +302,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <Magnetic strength={0.4}>
               <Link
                 href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 {t.common.entrarContacto} →
               </Link>
