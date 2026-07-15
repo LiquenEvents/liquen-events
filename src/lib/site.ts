@@ -33,7 +33,11 @@ export const SITE = {
   // Google Business Profile (share link) — powers local pack/Maps ranking and
   // lets Google reconcile the site with the profile (sameAs + hasMap).
   googleBusiness: "https://share.google/4Qcuop16TDkYaowsU",
-  ogImage: "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
+  // Branded 1200×630 social-share card (public/og-liquen.jpg) — the white
+  // wordmark on a darkened signature venue photo. Regenerate via
+  // `node scripts/gen-og.mjs`. Not in image-dims.json, so page-metadata falls
+  // back to the correct OG-standard 1200×630.
+  ogImage: "/og-liquen.jpg",
 } as const;
 
 /** Cities/areas served — ordered by SEO priority (home city Évora first,
