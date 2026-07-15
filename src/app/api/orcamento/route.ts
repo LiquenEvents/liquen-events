@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Quote, QuoteFormData, PriceBreakdown } from "@/lib/orcamento/types";
-import {
-  CATEGORIES,
-  EVENT_TYPES_BY_CATEGORY,
-  PACKAGES,
-  LOCATION_LABELS,
-} from "@/lib/orcamento/data";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, LOCATION_LABELS } from "@/lib/orcamento/data";
 import { sendMail, esc } from "@/lib/mail";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
@@ -72,17 +67,9 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
       : undefined) ??
     form.eventName ??
     "";
-  const pkg = form.packageTier
-    ? (PACKAGES.find((p) => p.id === form.packageTier)?.label ?? form.packageTier)
-    : "";
   const local =
     form.location ||
     (form.locationType ? (LOCATION_LABELS[form.locationType] ?? form.locationType) : "");
-  const addons = form.addons?.length
-    ? form.addons
-        .map((a) => `${a.name}${a.quantity > 1 ? ` ×${a.quantity}` : ""} (${a.tier})`)
-        .join(", ")
-    : "";
   const estimate = breakdown
     ? `${eur(breakdown.rangeMin)} – ${eur(breakdown.rangeMax)}${breakdown.isEstimate ? " (estimativa)" : ""}`
     : "";
@@ -116,9 +103,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     (form.nif ? row("NIF", esc(form.nif)) : "") +
     row("Data", esc(when)) +
     row("Convidados", form.guests ? String(form.guests) : "") +
-    row("Local", esc(local)) +
-    row("Pacote", esc(pkg)) +
-    row("Extras", esc(addons));
+    row("Local", esc(local));
 
   const html = `
   <div style="margin:0;padding:0;background:#f6f5f2">
@@ -188,8 +173,6 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     when ? `Data: ${when}` : "",
     form.guests ? `Convidados: ${form.guests}` : "",
     local ? `Local: ${local}` : "",
-    pkg ? `Pacote: ${pkg}` : "",
-    addons ? `Extras: ${addons}` : "",
     estimate ? `Orçamento estimado: ${estimate}` : "",
     form.notes ? `\nNotas:\n${form.notes}` : "",
     "",
