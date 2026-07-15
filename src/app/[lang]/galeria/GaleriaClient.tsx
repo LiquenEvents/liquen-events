@@ -126,23 +126,23 @@ function interleaveByCollection(list: Photo[], seed = ""): Photo[] {
 }
 
 /**
- * Final safety pass: eliminate the handful of same-event neighbours the
- * fractional spread can still leave (when two ranks happen to sort together
- * with no other bucket between them). For each such spot, pull forward the
- * nearest later photo whose bucket differs from both neighbours. When a
- * category is a single collection (Corporativo, Conferência…) no fix is
- * possible — the whole shoot is one event — so it's left untouched.
+ * Final safety pass: keep same-event photos apart. Beyond the immediate
+ * neighbour, it enforces a WINDOW — no photo may share its event with any of the
+ * `window` photos just before it — so a big shoot never shows two of its frames
+ * a tile or two apart (which in a 2–3 column masonry reads as "fotos do mesmo
+ * evento juntas"). For each violation it pulls forward the nearest later photo
+ * whose event isn't in that window. When no such photo exists (the tail, or a
+ * category that is a single shoot) it's left as-is — best effort.
  */
-function deAdjacent(list: Photo[]): Photo[] {
+function deAdjacent(list: Photo[], window = 3): Photo[] {
   const out = [...list];
   for (let i = 1; i < out.length; i++) {
-    if (bucketKey(out[i]) !== bucketKey(out[i - 1])) continue;
-    const left = bucketKey(out[i - 1]);
-    const right = i + 1 < out.length ? bucketKey(out[i + 1]) : null;
+    const recent = new Set<string>();
+    for (let k = Math.max(0, i - window); k < i; k++) recent.add(bucketKey(out[k]));
+    if (!recent.has(bucketKey(out[i]))) continue;
     let swap = -1;
     for (let j = i + 1; j < out.length; j++) {
-      const kj = bucketKey(out[j]);
-      if (kj !== left && kj !== right) {
+      if (!recent.has(bucketKey(out[j]))) {
         swap = j;
         break;
       }
