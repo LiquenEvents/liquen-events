@@ -97,16 +97,27 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
       next.getDate(),
     ).padStart(2, "0")}`;
     const title = `${et?.label ?? cat?.label ?? "Evento"} — Líquen Events`;
+    // Escape per RFC 5545 §3.3.11 — a stray comma/semicolon in the copy would
+    // otherwise split the value and corrupt the event.
+    const esc = (s: string) =>
+      s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+    // DTSTAMP is REQUIRED in a VEVENT; strict parsers (Outlook) reject its
+    // absence. Client-only render (quote is fetched), so new Date() is safe.
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}Z$/, "Z");
     const ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
       "PRODID:-//Liquen Events//Orcamento//PT",
       "BEGIN:VEVENT",
       `UID:${id}@liquen-events.com`,
+      `DTSTAMP:${stamp}`,
       `DTSTART;VALUE=DATE:${start}`,
       `DTEND;VALUE=DATE:${end}`,
-      `SUMMARY:${title}`,
-      `DESCRIPTION:${tc.footerNote}`,
+      `SUMMARY:${esc(title)}`,
+      `DESCRIPTION:${esc(tc.footerNote)}`,
       "END:VEVENT",
       "END:VCALENDAR",
     ].join("\r\n");

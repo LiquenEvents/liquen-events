@@ -757,12 +757,18 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
       ? Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k)
       : [];
 
-  const counts = Object.fromEntries(
-    CATS.map((c) => [
-      c,
-      c === "Todos" ? photos.length : photos.filter((p) => p.label === c).length,
-    ]),
-  ) as Record<Cat, number>;
+  // One pass over the pool (386 photos), memoized on `photos` — the old form
+  // re-filtered the whole array once per category on every render (scroll,
+  // hover, lightbox open all triggered it).
+  const counts = useMemo(() => {
+    const acc = Object.fromEntries(CATS.map((c) => [c, 0])) as Record<Cat, number>;
+    for (const p of photos) {
+      const label = p.label as Cat;
+      if (label in acc) acc[label] += 1;
+    }
+    acc.Todos = photos.length;
+    return acc;
+  }, [photos]);
 
   return (
     <>
