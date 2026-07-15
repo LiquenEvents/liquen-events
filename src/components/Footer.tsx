@@ -4,12 +4,21 @@ import { blurFor } from "@/lib/blur";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 import { SITE } from "@/lib/site";
-import { getDictionary, type Locale } from "@/lib/i18n";
+import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
 
 const stripPhotos = [
   { src: "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg", span: "col-span-2" },
   { src: "/imagens/M&F0152.jpg", span: "col-span-1" },
   { src: "/imagens/EW1_1428.jpg", span: "col-span-1" },
+];
+
+// Service detail slugs, paired with t.footer.serviceLinks (same order) — gives
+// the money pages keyword-anchored internal links from every page's footer.
+const serviceSlugs = [
+  "casamentos",
+  "eventos-corporativos",
+  "festas-e-aniversarios",
+  "jantares-de-gala",
 ];
 
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {
@@ -118,7 +127,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="text-foreground/68 hover:text-moss transition-colors duration-300"
+                    className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
                   >
                     {s.icon}
                   </a>
@@ -146,10 +155,25 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 {pages.map(([label, href]) => (
                   <li key={href}>
                     <Link
-                      href={href}
+                      href={localizeHref(href, locale)}
                       className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
                     >
                       {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mt-10 mb-8">
+                {t.footer.servicosTitulo}
+              </p>
+              <ul className="flex flex-col gap-4">
+                {serviceSlugs.map((slug, i) => (
+                  <li key={slug}>
+                    <Link
+                      href={localizeHref(`/servicos/${slug}`, locale)}
+                      className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
+                    >
+                      {t.footer.serviceLinks[i]}
                     </Link>
                   </li>
                 ))}
@@ -177,8 +201,8 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 <span className="text-foreground/78">{t.footer.country}</span>
               </div>
               <Link
-                href="/orcamento"
-                className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/12 text-foreground/38 text-[11px] tracking-[0.25em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-all duration-300"
+                href={localizeHref("/orcamento", locale)}
+                className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/12 text-foreground/68 text-[11px] tracking-[0.25em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-all duration-300"
               >
                 {t.footer.pedirOrcamento} →
               </Link>
@@ -193,7 +217,21 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
           <p className="text-[11px] text-foreground/78 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — {t.footer.rights}
           </p>
-          <p className="text-[11px] text-foreground/14 tracking-[0.28em] uppercase">
+          <div className="flex items-center gap-5 text-[11px] text-foreground/68 tracking-wide">
+            <Link
+              href={localizeHref("/privacidade", locale)}
+              className="link-line hover:text-moss transition-colors"
+            >
+              {t.footer.privacidade}
+            </Link>
+            <Link
+              href={localizeHref("/termos", locale)}
+              className="link-line hover:text-moss transition-colors"
+            >
+              {t.footer.termos}
+            </Link>
+          </div>
+          <p className="text-[11px] text-foreground/68 tracking-[0.28em] uppercase">
             {t.footer.country}
           </p>
         </div>

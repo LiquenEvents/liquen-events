@@ -46,4 +46,17 @@ describe("/api/tarefas/[id]", () => {
     expect(res.status).toBe(200);
     expect(store.del).toHaveBeenCalledWith("t1");
   });
+
+  it("blocks mass-assignment of id/createdAt via PATCH", async () => {
+    authed.ok = true;
+    await PATCH(req("PATCH", { done: true, id: "t2-evil", createdAt: "2000-01-01" }), ctx("t1"));
+    expect(store.update).toHaveBeenCalledWith("t1", { done: true });
+  });
+
+  it("rejects invalid field values with 400", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", { priority: "urgente" }), ctx("t1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
 });

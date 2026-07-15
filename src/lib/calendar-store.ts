@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CalendarEvent } from "@/app/orcamento/types";
+import type { CalendarEvent } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
 export const mapper: Mapper<CalendarEvent> = {

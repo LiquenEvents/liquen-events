@@ -22,7 +22,8 @@ export const pt = {
     {
       name: "Stephanie & Mizio",
       role: "Evento Privado",
-      quote: "Everything was exactly how we'd envisioned and you created a beautiful space for us!",
+      quote:
+        "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
     },
     {
       name: "Teresinha Malta",
@@ -63,65 +64,86 @@ export const pt = {
     enviarEmail: "Enviar e-mail",
     contactWhatsApp: "Contactar pelo WhatsApp",
     clientsSay: "O que dizem os clientes",
+    reviewsLabel: "avaliações",
+    testemunhoLabel: "Testemunho",
     whatsappPrefill: "Olá, gostaria de saber mais sobre a organização de eventos.",
+    // Localized alt text for the shared marketing imagery (served on both
+    // languages — a hardcoded PT alt would leave EN pages untranslated).
+    imageAlt: {
+      homeHero: "Líquen Events — evento aéreo no Alentejo",
+      homeWedding: "Casamento ao pôr do sol numa herdade no Alentejo",
+      contactoHero: "Vista aérea de uma herdade preparada para um evento no Alentejo",
+      sobrePortrait: "Momento de casamento organizado pela Líquen Events no Alentejo",
+      sobreGolden: "Celebração de casamento à luz dourada no Alentejo",
+      sobreOutdoor: "Casamento ao ar livre organizado pela Líquen Events no Alentejo",
+      clientesAerial: "Vista aérea de evento Líquen Events",
+      servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events no Alentejo",
+      servicosEvening: "Casamento celebrado ao anoitecer numa quinta no Alentejo",
+      orcamentoPanel: "Jantar de festa com mesa posta e decoração à luz de velas",
+    },
   },
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Líquen Events — Organização de Eventos no Alentejo e em Portugal",
+    homeTitle: "Organização de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Empresa de organização de eventos. Casamentos, eventos corporativos e celebrações em todo o Alentejo, Lisboa e Portugal. Soluções à medida — peça orçamento.",
-    sobreTitle: "Sobre Nós — Empresa de Eventos",
+      "Organização de eventos com base em Évora: casamentos, eventos corporativos e celebrações em todo o Alentejo e Portugal. Soluções à medida — peça orçamento.",
+    sobreTitle: "Empresa de Organização de Eventos no Alentejo",
     sobreDescription:
-      "Conheça a Líquen Events, empresa de organização de eventos. Mais de 100 eventos no Alentejo, Lisboa e em todo o Portugal — casamentos, eventos corporativos e celebrações.",
-    servicosTitle: "Serviços — Casamentos e Eventos Corporativos no Alentejo",
+      "Líquen Events, empresa de organização de eventos em Évora. Mais de 100 casamentos, eventos corporativos e celebrações no Alentejo e em todo o Portugal.",
+    servicosTitle: "Casamentos e Eventos Corporativos no Alentejo",
     servicosDescription:
-      "Organização de casamentos, eventos corporativos, conferências e festas privadas no Alentejo, Lisboa e todo o Portugal. Soluções à medida do seu evento.",
-    galeriaTitle: "Galeria de Eventos — Alentejo",
+      "Organização de casamentos, eventos corporativos, conferências e festas privadas em Évora, no Alentejo e em todo o Portugal. Soluções à medida do seu evento.",
+    galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
     galeriaDescription:
       "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
-    clientesTitle: "Clientes — Quem Confia na Líquen Events",
+    clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
-      "Empresas e instituições que confiam na Líquen Events: José de Mello, Aernnova, Mainova, Universidade de Évora, Câmara Municipal de Évora, Pérez-Llorca e muito mais.",
+      "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento no Alentejo, Lisboa ou em qualquer ponto de Portugal. Respondemos em menos de 24 horas com uma proposta à medida.",
-    orcamentoTitle: "Pedido de Orçamento",
+      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
+    orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas úteis.",
+  },
+
+  // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
+  // the markup's language always matches the visible page's.
+  jsonld: {
+    hasOfferCatalogName: "Serviços de organização de eventos",
+    services: [
+      "Organização de casamentos",
+      "Eventos corporativos e conferências",
+      "Festas e celebrações privadas",
+      "Jantares de gala e eventos sociais",
+    ],
+    servicosServiceName: "Organização de eventos, casamentos e eventos corporativos",
+    servicosServiceDescription:
+      "Organização de casamentos, eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal — da decoração à coordenação.",
   },
 
   home: {
-    eyebrow: "Organização de eventos",
+    eyebrow: "Organização de eventos · Évora · Alentejo",
     heroLines: [
       { words: ["Eventos", "que"] },
       { words: ["ficam", "na"] },
       { words: ["memória."], moss: true },
     ] as { words: string[]; moss?: boolean }[],
     scroll: "Scroll",
+    wallEyebrow: "O nosso trabalho",
+    wallTitle: "Momentos inesquecíveis",
     servicesEyebrow: "O que fazemos",
     services: [
       { tag: "Empresas", title: "Corporativos" },
       { tag: "Celebrações", title: "Casamentos" },
       { tag: "Celebrações", title: "Privados" },
     ],
-    areasEyebrow: "Onde quiser",
-    areasTitleLine1: "Eventos sem",
-    areasTitleLine2: "fronteiras",
-    areasText:
-      "Casamentos, eventos corporativos e celebrações — do conceito à execução, tratamos de cada detalhe para que só tenha de viver o momento, onde quer que seja.",
-    areasTags: [
-      "Casamentos",
-      "Eventos corporativos",
-      "Conferências",
-      "Festas privadas",
-      "Jantares de gala",
-    ],
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Tem um evento",
     ctaTitleLine2: "em mente?",
     ctaText:
-      "Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas.",
+      "Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas úteis.",
   },
 
   sobre: {
@@ -212,7 +234,7 @@ export const pt = {
       },
       {
         name: "Stephanie & Mizio",
-        text: "Everything was exactly how we'd envisioned and you created a beautiful space for us!",
+        text: "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
         event: "Evento Privado",
       },
       {
@@ -244,6 +266,14 @@ export const pt = {
   },
 
   contacto: {
+    direct: {
+      ctaEyebrow: "Pronto para começar?",
+      ctaTitleLine1: "Peça o seu",
+      ctaTitleMoss: "orçamento.",
+      ctaText:
+        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais ao lado.",
+      ctaButton: "Pedir orçamento",
+    },
     testimonialsEyebrow: "O que dizem os nossos clientes",
     nextEyebrow: "O que acontece a seguir",
     steps: [
@@ -251,7 +281,7 @@ export const pt = {
         title: "Recebemos o seu pedido",
         desc: "Analisamos o seu pedido e preparamos uma resposta à medida.",
       },
-      { title: "Entramos em contacto", desc: "Em menos de 24 horas, marcamos uma conversa." },
+      { title: "Entramos em contacto", desc: "Em menos de 24 horas úteis, marcamos uma conversa." },
       { title: "Proposta à medida", desc: "Proposta detalhada, com orçamento transparente." },
       { title: "Começamos a criar", desc: "Tratamos de cada detalhe para um evento inesquecível." },
     ],
@@ -270,14 +300,15 @@ export const pt = {
       heroTitleMoss: "extraordinário.",
       infoEyebrow: "Encontre-nos",
       emailLabel: "E-mail",
-      emailSub: "Respondemos em menos de 24 horas",
+      emailSub: "Respondemos em menos de 24 horas úteis",
       phoneLabel: "Telefone",
       phoneSub: "Seg–Sex, 9h–18h",
       locationLabel: "Localização",
-      locationValue: "Portugal",
+      locationValue: "Évora, Alentejo — em todo o Portugal",
       locationSub: "Reuniões presenciais disponíveis",
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
+      googleLink: "Ver no Google · Deixar avaliação",
       promise:
         "Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta personalizada.",
       promiseSign: "— Equipa Líquen Events",
@@ -331,7 +362,7 @@ export const pt = {
       successText: ". Em breve entraremos em contacto para avançarmos juntos no seu evento.",
       successSteps: [
         { n: "01", t: "Analisamos o seu pedido", d: "Nas próximas horas" },
-        { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas" },
+        { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas úteis" },
         { n: "03", t: "Enviamos proposta à medida", d: "Personalizada para si" },
       ],
       successWhatsApp: "Acompanhar pelo WhatsApp",
@@ -369,7 +400,7 @@ export const pt = {
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
     titleMoss: "a sua ideia.",
-    lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas.",
+    lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
     eventTypeLabels: [
       "Casamento",
       "Corporativo",
@@ -404,13 +435,9 @@ export const pt = {
     heroTitle: ["Cada evento,", "uma história", "por contar."],
     heroLead:
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
-    imgCorporativos: "Corporativos",
-    imgCelebracoes: "Celebrações",
     nav: ["Empresas", "Celebrações"],
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
-    band1: ["Eventos Corporativos", "Casamentos", "Celebrações"],
-    band2: ["Corporativo", "Casamentos", "Celebrações"],
     categories: [
       {
         label: "Empresas",
@@ -423,7 +450,7 @@ export const pt = {
           },
           {
             title: "Teambuilding",
-            desc: "Actividades e experiências que unem equipas e fortalecem a cultura organizacional.",
+            desc: "Atividades e experiências que unem equipas e fortalecem a cultura organizacional.",
           },
           {
             title: "Lançamentos de Produto",
@@ -431,7 +458,7 @@ export const pt = {
           },
           {
             title: "Jantares de Empresa",
-            desc: "Desde jantares de Natal a gala awards, criamos momentos de celebração memoráveis.",
+            desc: "Desde jantares de Natal a galas de entrega de prémios, criamos momentos de celebração memoráveis.",
           },
         ],
       },
@@ -460,9 +487,9 @@ export const pt = {
       },
     ],
     seoEyebrow: "Onde atuamos",
-    seoTitle: "Lisboa e todo o Portugal",
+    seoTitle: "De Évora para todo o Portugal",
     seoText:
-      "Casamentos, eventos corporativos e celebrações — do conceito à execução, com a sensibilidade do Alentejo e a exigência de uma equipa profissional.",
+      "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Tem um evento",
     ctaTitleMoss: "em mente?",
@@ -506,13 +533,67 @@ export const pt = {
     voltarInicio: "Voltar ao Início",
     novoPedido: "Novo Pedido",
     dateLocale: "pt-PT",
+    greetingWarm: "Estamos felizes por fazer parte deste momento.",
+    signOff: "Com carinho,",
+    signName: "Catarina & a equipa Líquen",
+    saveDate: "Guardar a data no calendário",
+    whileTitle: "Enquanto preparamos a vossa proposta",
+    whileLead: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
+    exploreGaleria: "Ver a galeria",
+    exploreGaleriaSub: "Casamentos e eventos que criámos",
+    exploreInsta: "Seguir no Instagram",
+    exploreInstaSub: "Bastidores, ideias e novidades",
+    exploreClientes: "Histórias de clientes",
+    exploreClientesSub: "O que dizem sobre nós",
   },
 
   servicoDetalhe: {
     includesTitle: "O que inclui",
+    galleryEyebrow: "Portefólio",
+    galleryTitle: "Momentos que criámos",
     faqTitle: "Perguntas frequentes",
     relatedTitle: "Outros serviços",
     ctaTitle: "Vamos planear o seu evento?",
+  },
+
+  proposta: {
+    linkInvalidTitle: "Link inválido ou expirado",
+    linkInvalidBody:
+      "Este link de proposta já não é válido. Contacte-nos e enviamos-lhe um novo com todo o gosto.",
+    notFoundTitle: "Proposta não encontrada",
+    notFoundBody:
+      "Não conseguimos encontrar esta proposta. Se acha que é um engano, fale connosco.",
+    eyebrow: "Proposta para o seu evento",
+    greeting: "Olá",
+    intro:
+      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo — será um prazer avançar consigo.",
+    tableDescricao: "Descrição",
+    tableQt: "Qt",
+    tableValor: "Valor",
+    subtotal: "Subtotal",
+    iva: "IVA",
+    total: "Total",
+    validoAte: "Válida até",
+    footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos —",
+    dateLocale: "pt-PT",
+    response: {
+      confirmRecusar: "Tem a certeza que pretende recusar a proposta?",
+      aceiteTitle: "Proposta aceite — obrigado!",
+      aceiteBody:
+        "Que alegria avançar consigo. A nossa equipa entra em contacto em breve com os próximos passos.",
+      rejeitadaTitle: "Resposta registada.",
+      rejeitadaBody:
+        "Obrigado por nos dizer. Se mudar de ideias ou quiser ajustar algo, estamos sempre ao dispor.",
+      jaRegistado: "Já tínhamos registado a sua resposta a esta proposta.",
+      aceitar: "Aceitar proposta →",
+      aceitarSending: "A registar…",
+      recusar: "Recusar",
+      recusarSending: "…",
+      errorFallback: "Não foi possível registar a sua resposta.",
+      errorGeneric: "Erro. Tente novamente.",
+      errorSuffix: "Em alternativa,",
+      errorLink: "escreva-nos",
+    },
   },
 
   errors: {
@@ -533,10 +614,20 @@ export const pt = {
     sloganLine2: "eternizamos memórias.",
     disponivel: "Disponível para novos eventos",
     paginas: "Páginas",
+    servicosTitulo: "Serviços",
+    serviceLinks: [
+      "Organização de Casamentos",
+      "Eventos Corporativos",
+      "Festas e Aniversários",
+      "Jantares de Gala",
+    ],
     contacto: "Contacto",
-    country: "Portugal",
+    country: "Évora, Alentejo, Portugal",
     pedirOrcamento: "Pedir orçamento",
     rights: "Todos os direitos reservados",
+    legal: "Legal",
+    privacidade: "Privacidade",
+    termos: "Termos",
   },
 };
 

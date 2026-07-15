@@ -42,6 +42,14 @@ const CHECKS: EnvCheck[] = [
   { name: "VAPID_PUBLIC_KEY", enables: "web push notifications" },
   { name: "VAPID_PRIVATE_KEY", enables: "web push notifications" },
   { name: "SENTRY_DSN", enables: "error monitoring (Sentry, via lib/logger)" },
+  // Without it the /api/cron/* routes fail closed in production (see their
+  // authorized() checks) — so this isn't silent data loss, but it does mean
+  // the daily digest / inbox-check cron jobs silently stop firing.
+  {
+    name: "CRON_SECRET",
+    critical: true,
+    enables: "authenticated /api/cron/* scheduled jobs (daily digest, inbox check)",
+  },
 ];
 
 let validated = false;

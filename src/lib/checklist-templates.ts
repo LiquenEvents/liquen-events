@@ -1,4 +1,4 @@
-import type { EventCategory } from "@/app/orcamento/types";
+import type { EventCategory } from "@/lib/orcamento/types";
 
 /**
  * Production checklist templates, used to seed a quote's checklist with one

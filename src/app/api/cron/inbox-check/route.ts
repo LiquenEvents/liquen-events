@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { imapConfigured, listInbox } from "@/lib/inbox";
 import { sendPushToAll } from "@/lib/push";
@@ -21,6 +22,9 @@ export const maxDuration = 30;
  *
  * Requires IMAP to be configured (the IMAP_ / SMTP_ env vars). No-ops otherwise.
  * Protected by CRON_SECRET (Bearer); a logged-in admin may trigger it manually.
+ * When CRON_SECRET is unset it only runs freely outside production
+ * (local/preview convenience) — in production a missing secret fails closed
+ * instead of leaving the endpoint wide open (see lib/env.ts).
  */
 const MARKER_KEY = "inbox-last-uid";
 
@@ -35,8 +39,14 @@ async function writeMarker(lastUid: number): Promise<void> {
 function authorized(req: NextRequest): boolean {
   if (isAuthed(req)) return true;
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  if (!secret) return process.env.NODE_ENV !== "production";
+  // Constant-time Bearer check (hash both sides → fixed-length digests, so
+  // neither length nor content leaks through comparison timing).
+  const provided = createHash("sha256")
+    .update(req.headers.get("authorization") ?? "")
+    .digest();
+  const expected = createHash("sha256").update(`Bearer ${secret}`).digest();
+  return timingSafeEqual(provided, expected);
 }
 
 export async function GET(request: NextRequest) {

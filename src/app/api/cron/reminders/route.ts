@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { listQuotes } from "@/lib/quotes-store";
 import { listCalendarEvents } from "@/lib/calendar-store";
@@ -19,15 +20,23 @@ export const maxDuration = 60;
  *   · follow-ups due today or overdue
  *
  * Protected by CRON_SECRET: the caller must send it as a Bearer token (never a
- * query param — those leak into access logs). When CRON_SECRET is unset (dev),
- * it runs freely.
+ * query param — those leak into access logs). When CRON_SECRET is unset it
+ * only runs freely outside production (local/preview convenience) — in
+ * production a missing secret fails closed instead of leaving the endpoint
+ * wide open (see lib/env.ts, which also warns loudly at startup about this).
  */
 function authorized(req: NextRequest): boolean {
   // A logged-in admin can always trigger it manually (e.g. to test).
   if (isAuthed(req)) return true;
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  if (!secret) return process.env.NODE_ENV !== "production";
+  // Constant-time Bearer check: hash both sides to fixed-length digests so
+  // neither the length nor the content leaks through comparison timing.
+  const provided = createHash("sha256")
+    .update(req.headers.get("authorization") ?? "")
+    .digest();
+  const expected = createHash("sha256").update(`Bearer ${secret}`).digest();
+  return timingSafeEqual(provided, expected);
 }
 
 const eur = (n: number) =>

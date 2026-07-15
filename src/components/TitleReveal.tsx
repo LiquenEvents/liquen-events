@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 interface Props {
   text: string;
@@ -59,15 +59,20 @@ export default function TitleReveal({
     <Tag ref={ref} className={className}>
       <span className="sr-only">{text}</span>
       {words.map((word, i) => (
-        <span key={i} aria-hidden className="inline-block overflow-hidden align-bottom">
-          <span
-            className={`inline-block ${visible ? "word-rise" : "opacity-0"}`}
-            style={{ "--word-delay": `${delay + i * step}ms` } as React.CSSProperties}
-          >
-            {word}
-            {i < words.length - 1 ? " " : ""}
+        // The inter-word space lives BETWEEN the clip boxes (a plain text node),
+        // never inside the `overflow-hidden` mask — otherwise it gets clipped and
+        // the words render run-together.
+        <Fragment key={i}>
+          <span aria-hidden className="inline-block overflow-hidden align-bottom">
+            <span
+              className={`inline-block ${visible ? "word-rise" : "opacity-0"}`}
+              style={{ "--word-delay": `${delay + i * step}ms` } as React.CSSProperties}
+            >
+              {word}
+            </span>
           </span>
-        </span>
+          {i < words.length - 1 ? " " : ""}
+        </Fragment>
       ))}
     </Tag>
   );

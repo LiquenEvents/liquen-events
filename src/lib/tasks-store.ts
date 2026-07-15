@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Task } from "@/app/orcamento/types";
+import type { Task } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
 export const mapper: Mapper<Task> = {

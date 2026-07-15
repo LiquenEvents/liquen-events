@@ -10,6 +10,7 @@ export {
   LANG_COOKIE,
   normalizeLocale,
   htmlLang,
+  localizeHref,
 } from "./config";
 
 const dictionaries: Record<Locale, Dict> = { pt, en };

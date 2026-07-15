@@ -1,22 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Quote } from "../../../orcamento/types";
+import type { Quote } from "@/lib/orcamento/types";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
+import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quoteUpdateSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const quote = await getQuote(id);
-    if (!quote) {
-      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
-    }
     // Public endpoint (confirmation page loads by reference id). Authenticated
     // staff get the full record; anyone else gets an explicit allowlist of the
     // event facts the confirmation page renders — never the client's personal
     // data nor internal CRM fields (adminNotes, activityLog, payments, guest
     // list, lost reason…), so an enumerated id can't leak anything sensitive.
+    // The id's random suffix has 64 bits of entropy, but rate limiting still
+    // slows down brute-force scanning to a crawl for the unauthenticated path.
+    if (!isAuthed(request)) {
+      sweep();
+      const limited = await rateLimit(`orcamento-get:${clientIp(request)}`, 20, 60_000);
+      if (!limited.ok) {
+        return NextResponse.json(
+          { error: "Demasiados pedidos. Tente novamente dentro de momentos." },
+          { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } },
+        );
+      }
+    }
+
+    const quote = await getQuote(id);
+    if (!quote) {
+      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+    }
     if (isAuthed(request)) {
       return NextResponse.json(quote);
     }

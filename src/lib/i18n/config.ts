@@ -21,3 +21,19 @@ export function normalizeLocale(value: string | undefined | null): Locale {
 export function htmlLang(locale: Locale): string {
   return locale === "en" ? "en" : "pt-PT";
 }
+
+/**
+ * Prefixes an internal href with /en when browsing the English mirror, so
+ * client-side navigation between pages stays on /en/* URLs (matching the
+ * proxy rewrite in src/proxy.ts) instead of relying solely on the
+ * liquen-lang cookie to keep the chosen language across a click. External
+ * URLs, mailto:/tel:, same-page anchors, and already-prefixed hrefs pass
+ * through unchanged. Mirrors the destination logic in LanguageToggle.
+ */
+export function localizeHref(href: string, locale: Locale): string {
+  if (locale !== "en" || !href.startsWith("/")) return href;
+  // Already localized — don't double-prefix. (Guard against `startsWith("/en")`
+  // alone, which would wrongly skip real paths like `/enigma`.)
+  if (href === "/en" || href.startsWith("/en/")) return href;
+  return href === "/" ? "/en" : `/en${href}`;
+}

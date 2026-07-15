@@ -12,10 +12,12 @@ test.describe("Home", () => {
     await expect(page).toHaveURL(/\/servicos/);
   });
 
-  test("contact page renders the enquiry wizard", async ({ page }) => {
+  test("contact page renders and routes to the quote form", async ({ page }) => {
     await page.goto("/contacto");
-    await expect(
-      page.getByRole("heading", { name: /Que tipo de evento/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Pedir orçamento/i }).first()).toHaveAttribute(
+      "href",
+      /\/orcamento/,
+    );
   });
 });

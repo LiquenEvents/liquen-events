@@ -43,8 +43,14 @@ const store = vi.hoisted(() => ({
   ),
   update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
 }));
+const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: store.get, updateQuote: store.update }));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimit: vi.fn(async () => rl.result),
+  clientIp: () => "test-ip",
+  sweep: () => {},
+}));
 
 import { GET, PATCH } from "./route";
 
@@ -59,6 +65,7 @@ function req(method: "GET" | "PATCH", body?: unknown): NextRequest {
 
 beforeEach(() => {
   authed.ok = false;
+  rl.result = { ok: true };
   vi.clearAllMocks();
 });
 
@@ -87,6 +94,20 @@ describe("GET /api/orcamento/[id] — PII protection", () => {
 
   it("returns 404 for an unknown id", async () => {
     expect((await GET(req("GET"), ctx("nope"))).status).toBe(404);
+  });
+
+  it("rate-limits unauthenticated lookups (anti-enumeration)", async () => {
+    rl.result = { ok: false, retryAfter: 42 };
+    const res = await GET(req("GET"), ctx("LIQ-1"));
+    expect(res.status).toBe(429);
+    expect(store.get).not.toHaveBeenCalled();
+  });
+
+  it("never rate-limits an authenticated admin", async () => {
+    authed.ok = true;
+    rl.result = { ok: false, retryAfter: 42 };
+    const res = await GET(req("GET"), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
   });
 });
 

@@ -11,6 +11,7 @@ const VARS = [
   "VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
   "SENTRY_DSN",
+  "CRON_SECRET",
 ] as const;
 
 /** validateEnv() is idempotent via a module-level flag, so each test needs a

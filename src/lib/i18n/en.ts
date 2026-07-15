@@ -64,59 +64,86 @@ export const en: Dict = {
     enviarEmail: "Send e-mail",
     contactWhatsApp: "Contact us on WhatsApp",
     clientsSay: "What our clients say",
+    reviewsLabel: "reviews",
+    testemunhoLabel: "Testimonial",
     whatsappPrefill: "Hi, I'd like to know more about your event planning services.",
+    // Localized alt text for the shared marketing imagery (served on both
+    // languages — a hardcoded PT alt would leave EN pages untranslated).
+    imageAlt: {
+      homeHero: "Líquen Events — aerial view of an event in the Alentejo",
+      homeWedding: "Wedding at sunset on an estate in the Alentejo",
+      contactoHero: "Aerial view of an estate set up for an event in the Alentejo",
+      sobrePortrait: "A wedding moment planned by Líquen Events in the Alentejo",
+      sobreGolden: "Wedding celebration in golden light in the Alentejo",
+      sobreOutdoor: "Outdoor wedding planned by Líquen Events in the Alentejo",
+      clientesAerial: "Aerial view of a Líquen Events event",
+      servicosCeremony: "Outdoor ceremony planned by Líquen Events in the Alentejo",
+      servicosEvening: "Wedding celebrated at dusk on an estate in the Alentejo",
+      orcamentoPanel: "Celebration dinner with a set table and candlelit décor",
+    },
   },
 
   meta: {
     ogLocale: "en_US",
-    homeTitle: "Líquen Events — Event Planning in the Alentejo and Portugal",
+    homeTitle: "Event & Wedding Planning in Évora, Portugal | Líquen Events",
     homeDescription:
-      "Event planning company. Weddings, corporate events and celebrations across the Alentejo, Lisbon and Portugal. Bespoke solutions — request a quote.",
-    sobreTitle: "About Us — Event Company",
+      "Event planning based in Évora: weddings, corporate events and celebrations across the Alentejo and Portugal. Bespoke solutions — request a quote.",
+    sobreTitle: "Event Planning Company in the Alentejo",
     sobreDescription:
-      "Meet Líquen Events, an event planning company. Over 100 events across the Alentejo, Lisbon and Portugal — weddings, corporate events and celebrations.",
-    servicosTitle: "Services — Weddings and Corporate Events in the Alentejo",
+      "Líquen Events, an event planning company in Évora. Over 100 weddings, corporate events and celebrations across the Alentejo and Portugal.",
+    servicosTitle: "Weddings and Corporate Events in the Alentejo",
     servicosDescription:
-      "Planning of weddings, corporate events, conferences and private parties in the Alentejo, Lisbon and across Portugal. Bespoke solutions for your event.",
-    galeriaTitle: "Event Gallery — Alentejo",
+      "Planning of weddings, corporate events, conferences and private parties in Évora, the Alentejo and across Portugal. Bespoke solutions for your event.",
+    galeriaTitle: "Wedding & Event Gallery — Alentejo",
     galeriaDescription:
       "Photo gallery of events organised by Líquen Events in the Alentejo and across Portugal — weddings, corporate events, conferences and celebrations.",
-    clientesTitle: "Clients — Who Trusts Líquen Events",
+    clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
-      "Companies and institutions that trust Líquen Events: José de Mello, Aernnova, Mainova, University of Évora, Évora City Council, Pérez-Llorca and many more.",
+      "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
     contactoTitle: "Contact — Request Your Event Quote",
     contactoDescription:
-      "Contact Líquen Events to plan your event in the Alentejo, Lisbon or anywhere in Portugal. We reply within 24 hours with a tailored proposal.",
-    orcamentoTitle: "Quote Request",
+      "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. We reply within 24 business hours with a tailored proposal.",
+    orcamentoTitle: "Request a Quote — Weddings & Events",
     orcamentoDescription:
-      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 hours.",
+      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 business hours.",
+  },
+
+  // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
+  // the markup's language always matches the visible page's.
+  jsonld: {
+    hasOfferCatalogName: "Event planning services",
+    services: [
+      "Wedding planning",
+      "Corporate events and conferences",
+      "Private parties and celebrations",
+      "Gala dinners and social events",
+    ],
+    servicosServiceName: "Event, wedding and corporate event planning",
+    servicosServiceDescription:
+      "Planning of weddings, corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal — from décor to coordination.",
   },
 
   home: {
-    eyebrow: "Event planning",
+    eyebrow: "Event planning · Évora · Alentejo",
     heroLines: [
       { words: ["Events", "that"] },
       { words: ["stay", "with"] },
       { words: ["you."], moss: true },
     ],
     scroll: "Scroll",
+    wallEyebrow: "Our work",
+    wallTitle: "Unforgettable moments",
     servicesEyebrow: "What we do",
     services: [
       { tag: "Companies", title: "Corporate" },
       { tag: "Celebrations", title: "Weddings" },
       { tag: "Celebrations", title: "Private" },
     ],
-    areasEyebrow: "Wherever you are",
-    areasTitleLine1: "Events without",
-    areasTitleLine2: "borders",
-    areasText:
-      "Weddings, corporate events and celebrations — from concept to execution, we handle every detail so all you have to do is live the moment, wherever it takes place.",
-    areasTags: ["Weddings", "Corporate events", "Conferences", "Private parties", "Gala dinners"],
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Have an event",
     ctaTitleLine2: "in mind?",
     ctaText:
-      "Tell us your idea. No commitment — we reply with a tailored proposal in under 24 hours.",
+      "Tell us your idea. No commitment — we reply with a tailored proposal in under 24 business hours.",
   },
 
   sobre: {
@@ -231,6 +258,14 @@ export const en: Dict = {
   },
 
   contacto: {
+    direct: {
+      ctaEyebrow: "Ready to begin?",
+      ctaTitleLine1: "Request your",
+      ctaTitleMoss: "quote.",
+      ctaText:
+        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the channels alongside.",
+      ctaButton: "Request a quote",
+    },
     testimonialsEyebrow: "What our clients say",
     nextEyebrow: "What happens next",
     steps: [
@@ -238,7 +273,7 @@ export const en: Dict = {
         title: "We receive your request",
         desc: "We review your request and prepare a tailored response.",
       },
-      { title: "We get in touch", desc: "Within 24 hours, we set up a conversation." },
+      { title: "We get in touch", desc: "Within 24 business hours, we set up a conversation." },
       { title: "Tailored proposal", desc: "A detailed proposal with transparent pricing." },
       { title: "We start creating", desc: "We handle every detail for an unforgettable event." },
     ],
@@ -256,14 +291,15 @@ export const en: Dict = {
       heroTitleMoss: "extraordinary.",
       infoEyebrow: "Find us",
       emailLabel: "E-mail",
-      emailSub: "We reply within 24 hours",
+      emailSub: "We reply within 24 business hours",
       phoneLabel: "Phone",
       phoneSub: "Mon–Fri, 9am–6pm",
       locationLabel: "Location",
-      locationValue: "Portugal",
+      locationValue: "Évora, Alentejo — across Portugal",
       locationSub: "In-person meetings available",
       quoteLink: "Request a quote for your event",
       whatsappLink: "Chat on WhatsApp",
+      googleLink: "See on Google · Leave a review",
       promise: "We reply to every request within 24 business hours, with a personalised proposal.",
       promiseSign: "— The Líquen Events team",
       stepLabels: ["Event", "Details", "Specifics", "Message"],
@@ -316,7 +352,7 @@ export const en: Dict = {
       successText: ". We'll be in touch shortly to move forward with your event together.",
       successSteps: [
         { n: "01", t: "We review your request", d: "In the next few hours" },
-        { n: "02", t: "We get in touch", d: "Within 24 hours" },
+        { n: "02", t: "We get in touch", d: "Within 24 business hours" },
         { n: "03", t: "We send a tailored proposal", d: "Personalised for you" },
       ],
       successWhatsApp: "Follow up on WhatsApp",
@@ -354,7 +390,7 @@ export const en: Dict = {
     eyebrow: "Quote request",
     titleLine1: "Tell us",
     titleMoss: "your idea.",
-    lead: "No commitment. We reply with a tailored proposal in under 24 hours.",
+    lead: "No commitment. We reply with a tailored proposal in under 24 business hours.",
     eventTypeLabels: [
       "Wedding",
       "Corporate",
@@ -390,13 +426,9 @@ export const en: Dict = {
     heroTitle: ["Every event,", "a story", "to tell."],
     heroLead:
       "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
-    imgCorporativos: "Corporate",
-    imgCelebracoes: "Celebrations",
     nav: ["Companies", "Celebrations"],
     verMais: "View more",
     verDetalhes: "View details",
-    band1: ["Corporate Events", "Weddings", "Celebrations"],
-    band2: ["Corporate", "Weddings", "Celebrations"],
     categories: [
       {
         label: "Companies",
@@ -417,7 +449,7 @@ export const en: Dict = {
           },
           {
             title: "Company Dinners",
-            desc: "From Christmas dinners to gala awards, we create memorable moments of celebration.",
+            desc: "From Christmas dinners to awards galas, we create memorable moments of celebration.",
           },
         ],
       },
@@ -446,9 +478,9 @@ export const en: Dict = {
       },
     ],
     seoEyebrow: "Where we work",
-    seoTitle: "Lisbon and all of Portugal",
+    seoTitle: "From Évora to all of Portugal",
     seoText:
-      "Weddings, corporate events and celebrations — from concept to execution, with the sensibility of the Alentejo and the standards of a professional team.",
+      "Weddings, corporate events and celebrations — from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Have an event",
     ctaTitleMoss: "in mind?",
@@ -492,13 +524,66 @@ export const en: Dict = {
     voltarInicio: "Back to Home",
     novoPedido: "New Request",
     dateLocale: "en-GB",
+    greetingWarm: "We're so happy to be part of this moment.",
+    signOff: "With love,",
+    signName: "Catarina & the Líquen team",
+    saveDate: "Add the date to your calendar",
+    whileTitle: "While we prepare your proposal",
+    whileLead: "Feel free to get to know a little of our world.",
+    exploreGaleria: "View the gallery",
+    exploreGaleriaSub: "Weddings and events we've created",
+    exploreInsta: "Follow on Instagram",
+    exploreInstaSub: "Behind the scenes, ideas and news",
+    exploreClientes: "Client stories",
+    exploreClientesSub: "What they say about us",
   },
 
   servicoDetalhe: {
     includesTitle: "What's included",
+    galleryEyebrow: "Portfolio",
+    galleryTitle: "Moments we've created",
     faqTitle: "Frequently asked questions",
     relatedTitle: "Other services",
     ctaTitle: "Shall we plan your event?",
+  },
+
+  proposta: {
+    linkInvalidTitle: "Invalid or expired link",
+    linkInvalidBody:
+      "This proposal link is no longer valid. Get in touch and we'll gladly send you a new one.",
+    notFoundTitle: "Proposal not found",
+    notFoundBody: "We couldn't find this proposal. If you think this is a mistake, get in touch.",
+    eyebrow: "Proposal for your event",
+    greeting: "Hello",
+    intro:
+      "We've carefully prepared this proposal for your event. Review the details and respond right here — we'd be delighted to move forward with you.",
+    tableDescricao: "Description",
+    tableQt: "Qty",
+    tableValor: "Amount",
+    subtotal: "Subtotal",
+    iva: "VAT",
+    total: "Total",
+    validoAte: "Valid until",
+    footerNote: "Any questions or changes? Reply to this email or contact us —",
+    dateLocale: "en-GB",
+    response: {
+      confirmRecusar: "Are you sure you want to decline the proposal?",
+      aceiteTitle: "Proposal accepted — thank you!",
+      aceiteBody:
+        "We're delighted to move forward with you. Our team will be in touch shortly with next steps.",
+      rejeitadaTitle: "Response recorded.",
+      rejeitadaBody:
+        "Thank you for letting us know. If you change your mind or want to adjust anything, we're always here.",
+      jaRegistado: "We had already recorded your response to this proposal.",
+      aceitar: "Accept proposal →",
+      aceitarSending: "Recording…",
+      recusar: "Decline",
+      recusarSending: "…",
+      errorFallback: "We couldn't record your response.",
+      errorGeneric: "Error. Please try again.",
+      errorSuffix: "Alternatively,",
+      errorLink: "email us",
+    },
   },
 
   errors: {
@@ -519,9 +604,19 @@ export const en: Dict = {
     sloganLine2: "we immortalise memories.",
     disponivel: "Available for new events",
     paginas: "Pages",
+    servicosTitulo: "Services",
+    serviceLinks: [
+      "Wedding Planning",
+      "Corporate Events",
+      "Parties & Celebrations",
+      "Gala Dinners",
+    ],
     contacto: "Contact",
-    country: "Portugal",
+    country: "Évora, Alentejo, Portugal",
     pedirOrcamento: "Request a quote",
     rights: "All rights reserved",
+    legal: "Legal",
+    privacidade: "Privacy",
+    termos: "Terms",
   },
 };

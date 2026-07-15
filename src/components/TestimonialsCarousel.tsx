@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import AnimateIn from "./AnimateIn";
+import RatingBadge from "./RatingBadge";
 import { useTranslations } from "./LocaleProvider";
 
 export default function TestimonialsCarousel() {
-  const { t: dict } = useTranslations();
+  const { locale, t: dict } = useTranslations();
   const testimonials = dict.testimonials;
   const [active, setActive] = useState(0);
   const [visible, setVisible] = useState(true);
@@ -68,11 +69,14 @@ export default function TestimonialsCarousel() {
 
       <div className="max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
         <AnimateIn>
-          <div className="flex items-center gap-4 mb-10 lg:mb-16">
-            <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
-            <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase">
-              {dict.common.clientsSay}
-            </p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3 mb-10 lg:mb-16">
+            <div className="flex items-center gap-4">
+              <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
+              <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase">
+                {dict.common.clientsSay}
+              </p>
+            </div>
+            <RatingBadge label={dict.common.reviewsLabel} ptFormat={locale === "pt"} />
           </div>
         </AnimateIn>
 
@@ -107,7 +111,7 @@ export default function TestimonialsCarousel() {
               <button
                 key={i}
                 onClick={() => goTo(i)}
-                aria-label={`Testemunho ${i + 1}`}
+                aria-label={`${dict.common.testemunhoLabel} ${i + 1}`}
                 aria-current={i === active ? "true" : undefined}
                 className="group py-4 px-2 flex-shrink-0"
               >

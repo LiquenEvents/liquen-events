@@ -24,6 +24,23 @@
   --font-display: var(--font-playfair);
 }
 
+/* ── Hero type scale — single source of truth for the marketing page heroes.
+   Each page had hardcoded a near-identical but drifting clamp() inline
+   (56/54/58px mins, 10/10.5vw, 150/148/132px maxes), so heroes that were meant
+   to match never quite did. Three deliberate tiers instead:
+     · display — statement pages (home, sobre, clientes)
+     · section — index pages that carry functional content just below the
+                 fold (galeria filters, serviços grid)
+     · detail  — a single service page, whose hero sits over a photo with a
+                 breadcrumb and whose titles run longer
+   Change a tier's weight here, not across the page files. (The /contacto hero
+   keeps its own larger scale, inline on that page.) */
+:root {
+  --hero-display: clamp(56px, 10vw, 150px);
+  --hero-section: clamp(52px, 9vw, 132px);
+  --hero-detail: clamp(36px, 6vw, 84px);
+}
+
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
    Stays full-screen/focused (footer, WhatsApp & scroll-progress hidden below),
    but the form itself is light. The left image panel keeps its own cream-on-
@@ -70,7 +87,7 @@ body.admin-mode {
   outline: none;
   box-shadow:
     0 0 0 2px var(--color-surface),
-    0 0 0 3px rgba(99, 122, 95, 0.6);
+    0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
 }
 
@@ -80,6 +97,51 @@ html {
   /* Anchored sections (e.g. /servicos#empresas) land below the fixed navbar
      instead of being hidden under it. */
   scroll-padding-top: 6rem;
+}
+/* Honour reduced-motion for native/programmatic scrolling too (Lenis is already
+   disabled elsewhere) — anchor jumps and scrollTo() snap instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ── Lenis (momentum scroll) — active only when JS mounts it (não em
+   reduced-motion). Enquanto ativo, o scroll-behavior nativo tem de ficar auto
+   para não brigar com a interpolação do Lenis. ── */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* ── Film grain — textura cinematográfica global (ver FilmGrain.tsx).
+   ANTES: um overlay fixo com `mix-blend-mode: overlay` que "jittava" ~8×/s para
+   sempre. Um blend-mode num elemento fixo a cobrir o ecrã obriga o browser a
+   recompor+misturar o viewport INTEIRO a cada frame de scroll (o conteúdo por
+   baixo muda), e a animação recompunha-o continuamente mesmo parado — a maior
+   causa de o site parecer "travado".
+   AGORA: estático e sem blend. Mantém a textura de grão a custo ~zero (uma
+   camada composta uma única vez, nunca repintada durante o scroll). ── */
+.film-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
 }
 
 /* ── Base ── */
@@ -712,12 +774,13 @@ body[data-menu-open] .whatsapp-fixed {
   font-size: 10px;
   letter-spacing: 0.35em;
   text-transform: uppercase;
-  color: rgba(42, 38, 32, 0.38);
+  /* ~5:1 on white — a legible micro-heading, not a ghost. */
+  color: rgba(42, 38, 32, 0.66);
 }
 
-/* On orcamento (dark) mode the eyebrow reverts to its original light tint */
+/* On the orçamento dark image panel the eyebrow sits light on a photo. */
 body:has([data-orcamento-mode]) .eyebrow {
-  color: rgba(222, 218, 212, 0.28);
+  color: rgba(222, 218, 212, 0.55);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -772,17 +835,19 @@ body:has([data-orcamento-mode]) .eyebrow {
    — não deixa containing-block que interfira com o morph <ViewTransition> da
    foto. Um IntersectionObserver partilhado (ver GaleriaClient) só acrescenta a
    classe `.in`; a animação é toda CSS. */
+/* Reveal by a gentle RISE only — never opacity. An opacity:0 resting state left
+   un-revealed tiles transparent over the dark page background, which read as
+   "espaços a preto" between photos while scrolling (worse once cv-auto was
+   dropped and the boxes take their full height). Keeping opacity at 1 means each
+   tile always shows its blur placeholder, so there is never a dark gap; the tile
+   just slides up into place. */
 .g-reveal {
-  opacity: 0;
-  transform: translateY(22px);
-  will-change: opacity, transform;
+  transform: translateY(20px);
+  will-change: transform;
 }
 .g-reveal.in {
-  opacity: 1;
   transform: none;
-  transition:
-    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
   transition-delay: var(--reveal-delay, 0ms);
 }
 /* Após revelar, larga o will-change (poupa memória de composição). */
@@ -794,6 +859,69 @@ body:has([data-orcamento-mode]) .eyebrow {
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {
   background-color: #12160f;
+}
+
+/* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
+   traço do check. Puro CSS (stroke-dashoffset), respeita reduced-motion. */
+@keyframes confirm-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.confirm-ring {
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: confirm-draw 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+}
+.confirm-check {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: confirm-draw 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirm-ring,
+  .confirm-check {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Chegada celebrativa da confirmação — pétalas botânicas que caem uma vez, nas
+   cores da marca. Só transform/opacity (compositor). Cada pétala recebe posição,
+   cor, duração e atraso por style inline. Reduced-motion: nada cai. */
+@keyframes petal-fall {
+  0% {
+    transform: translate3d(0, -8vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--petal-op, 0.85);
+  }
+  90% {
+    opacity: var(--petal-op, 0.85);
+  }
+  100% {
+    transform: translate3d(var(--petal-x, 20px), 96vh, 0) rotate(var(--petal-rot, 320deg));
+    opacity: 0;
+  }
+}
+.petal {
+  position: absolute;
+  top: 0;
+  border-radius: 62% 38% 54% 46% / 58% 44% 56% 42%;
+  will-change: transform, opacity;
+  /* Longhands (not the `animation` shorthand): a var() in the shorthand's time
+     slots makes Lightning CSS drop the whole rule. Duration/delay come per-petal
+     via inline style; the keyframe still reads --petal-x/rot/op fine. */
+  animation-name: petal-fall;
+  animation-timing-function: cubic-bezier(0.37, 0.2, 0.63, 0.9);
+  animation-fill-mode: both;
+  animation-iteration-count: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .petal {
+    display: none;
+  }
 }
 
 /* Entrada escalonada do mosaico-herói. Acima da dobra → animação CSS pura (sem
@@ -841,6 +969,27 @@ body:has([data-orcamento-mode]) .eyebrow {
 }
 .lb-chrome {
   animation: lb-chrome-in 0.5s ease 0.12s both;
+}
+
+/* Fecho gracioso do lightbox. O morph de ABERTURA usa <ViewTransition>, mas o
+   de fecho revelou-se instável com a camada de motion ativa (o Escape disparava
+   e a transição não fazia commit). Aqui o fecho é 100% CSS e fiável: enquanto
+   `closing` está ativo (260ms, ver close()), o diálogo inteiro faz fade + um
+   ligeiro scale-down antes de desmontar. Overshoot subtil para dar peso. */
+@keyframes lb-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.965);
+  }
+}
+.lb-closing {
+  animation: lb-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform-origin: center;
+  pointer-events: none;
 }
 
 /* Camada da foto do lightbox — mola de volta ao largar o arrasto (fechar em
@@ -903,6 +1052,11 @@ body:has([data-orcamento-mode]) .eyebrow {
   .lb-backdrop,
   .lb-chrome {
     animation: none;
+  }
+  /* Sem fade de saída: fica visível até o setTimeout desmontar (fecho instantâneo). */
+  .lb-closing {
+    animation: none;
+    opacity: 1;
   }
   .lb-photo-layer {
     transition: none;
