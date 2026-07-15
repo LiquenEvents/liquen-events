@@ -291,6 +291,24 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
+  // Nº de colunas da masonry — medido no cliente para podermos distribuir os
+  // tiles MANUALMENTE por colunas equilibradas (ver `masonryColumns`). Começa em
+  // 1 (mobile-first) para que o SSR e a primeira renderização no cliente
+  // coincidam (sem hydration mismatch); o efeito ajusta para o valor real. Espelha
+  // os breakpoints antigos (columns-1 / sm:columns-2 / md:columns-3).
+  const [cols, setCols] = useState(1);
+  useEffect(() => {
+    const sm = window.matchMedia("(min-width: 640px)");
+    const md = window.matchMedia("(min-width: 768px)");
+    const apply = () => setCols(md.matches ? 3 : sm.matches ? 2 : 1);
+    apply();
+    sm.addEventListener("change", apply);
+    md.addEventListener("change", apply);
+    return () => {
+      sm.removeEventListener("change", apply);
+      md.removeEventListener("change", apply);
+    };
+  }, []);
   // O `<ViewTransition name>` serve UMA coisa: o morph miniatura↔lightbox. Fora
   // desse morph, nenhuma tile da grelha precisa de nome — e tê-los sempre era o
   // que gerava os avisos "dois <ViewTransition> com o mesmo nome": ao filtrar ou
@@ -454,6 +472,32 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
     return interleaveByCollection(filtered, orderSeed);
   }, [cat, collectionFilter, photos, orderSeed]);
   const visible = pool.slice(0, shown);
+
+  // Masonry manual: distribui as fotos por `cols` colunas equilibradas, sempre
+  // para a coluna MAIS CURTA (usando a altura real de cada tile = H/W do
+  // aspectRatio). Porquê não CSS multi-column: o `column-fill: balance`
+  // dimensiona cada bloco de página pela sua coluna MAIS ALTA, por isso as
+  // colunas mais curtas deixavam uma cauda preta até essa altura — o "fundo
+  // preto no meio das fotos". O empacotamento guloso mantém as colunas quase
+  // iguais (só uma pequena cauda no fundo de tudo) e é estável por prefixo:
+  // carregar mais uma página nunca desloca tiles já colocados, portanto a grelha
+  // continua a não re-baralhar a meio do scroll.
+  const masonryColumns = useMemo(() => {
+    // O mosaico-herói fica com a foto 0 (e 1–4 em sm+); a masonry leva o resto.
+    const start = collectionFilter ? 0 : cols === 1 ? 1 : 5;
+    const cells: { p: Photo; idx: number }[][] = Array.from({ length: cols }, () => []);
+    const heights = new Array<number>(cols).fill(0);
+    for (let i = start; i < visible.length; i++) {
+      const p = visible[i];
+      const [w, h] = p.aspectRatio.split("/").map((n) => parseFloat(n));
+      const rel = w > 0 && h > 0 ? h / w : 1; // altura do tile a largura de coluna unitária
+      let c = 0;
+      for (let k = 1; k < cols; k++) if (heights[k] < heights[c]) c = k;
+      cells[c].push({ p, idx: i });
+      heights[c] += rel;
+    }
+    return cells;
+  }, [visible, cols, collectionFilter]);
 
   // Infinite scroll — a sentinel below the grid loads the next page as it nears
   // the viewport (no "Ver mais" click). Recreated whenever `shown`/`pool.length`
@@ -852,71 +896,57 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
 
         {/* Masonry — fotos restantes (satélites 1-4 reaparecem aqui em
             mobile); numa vista de coleção começa em 0, sem hero, cada foto
-            com um único nome VT estável (ver nota acima). */}
-        {(collectionFilter ? visible.length > 0 : visible.length > 1) &&
-          // Masonry rendered as independent PAGE-sized blocks. CSS multi-column
-          // re-balances its WHOLE column set whenever content is added — so with a
-          // single growing container, loading the next page shuffles already-seen
-          // photos into new columns ("no meio do nada atualiza e coloca outras
-          // fotos"). One container per page means an appended page is a NEW block
-          // below; the earlier blocks never re-flow. Heights are exact (each tile
-          // sets aspectRatio, and cv-auto is gone so there's no 320px estimate to
-          // resolve on scroll), so columns are computed once and stay put.
-          Array.from({
-            length: Math.ceil((collectionFilter ? visible.length : visible.length - 1) / PAGE),
-          }).map((_, ci) => {
-            const base = collectionFilter ? 0 : 1;
-            const from = base + ci * PAGE;
-            const block = visible.slice(from, from + PAGE);
-            return (
-              <div
-                key={ci}
-                className={`columns-1 sm:columns-2 md:columns-3 gap-0.5${ci > 0 ? " mt-0.5" : ""}`}
-              >
-                {block.map((p, j) => {
-                  const i = ci * PAGE + j;
-                  const idx = base + i;
-                  return (
-                    <div
-                      key={p.src}
-                      ref={registerTile}
-                      className={`g-reveal break-inside-avoid mb-0.5${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
-                      style={{ "--reveal-delay": `${(j % 3) * 60}ms` } as React.CSSProperties}
+            com um único nome VT estável (ver nota acima).
+
+            Colunas flex distribuídas manualmente (ver `masonryColumns`), NÃO
+            CSS multi-column: cada coluna é uma pilha independente que encolhe
+            até ao seu conteúdo (`items-start`), por isso nunca há uma cauda
+            preta por baixo de uma coluna mais curta. Como o empacotamento é
+            estável por prefixo, carregar mais fotos apenas prolonga as colunas
+            existentes — os tiles já vistos não mudam de sítio. */}
+        {(collectionFilter ? visible.length > 0 : visible.length > 1) && (
+          <div className="flex items-start gap-0.5">
+            {masonryColumns.map((col, ci) => (
+              <div key={ci} className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {col.map(({ p, idx }, j) => (
+                  <div
+                    key={p.src}
+                    ref={registerTile}
+                    className={`g-reveal${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
+                    style={{ "--reveal-delay": `${(j % 3) * 60}ms` } as React.CSSProperties}
+                  >
+                    <button
+                      onClick={() => openAt(idx)}
+                      data-ripple
+                      data-cap={caption(p.src, p.label).caption}
+                      data-sub={caption(p.src, p.label).sub}
+                      className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
+                      style={{ aspectRatio: p.aspectRatio }}
                     >
-                      <button
-                        onClick={() => openAt(idx)}
-                        data-ripple
-                        data-cap={caption(p.src, p.label).caption}
-                        data-sub={caption(p.src, p.label).sub}
-                        className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
-                        style={{ aspectRatio: p.aspectRatio }}
-                      >
-                        {lb !== idx && (
-                          <VTWrap
-                            name={
-                              collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)
-                            }
-                          >
-                            <Image
-                              src={p.src}
-                              alt={altText(p.src, p.label)}
-                              fill
-                              sizes="(max-width: 768px) 50vw, 33vw"
-                              className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                              loading={collectionFilter && i === 0 ? "eager" : "lazy"}
-                              placeholder="blur"
-                              blurDataURL={p.blurDataURL}
-                            />
-                          </VTWrap>
-                        )}
-                        <HoverOverlay {...caption(p.src, p.label)} />
-                      </button>
-                    </div>
-                  );
-                })}
+                      {lb !== idx && (
+                        <VTWrap
+                          name={collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)}
+                        >
+                          <Image
+                            src={p.src}
+                            alt={altText(p.src, p.label)}
+                            fill
+                            sizes="(max-width: 768px) 50vw, 33vw"
+                            className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+                            loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
+                            placeholder="blur"
+                            blurDataURL={p.blurDataURL}
+                          />
+                        </VTWrap>
+                      )}
+                      <HoverOverlay {...caption(p.src, p.label)} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            );
-          })}
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Scroll infinito ── */}
