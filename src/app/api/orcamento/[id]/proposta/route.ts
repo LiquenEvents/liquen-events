@@ -130,6 +130,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       </p>
     </div>`;
 
+    // Persist the proposal BEFORE emailing. The email carries a signed accept
+    // link; sending it before the proposal exists means that link 404s the moment
+    // the client clicks "accept". A persistence failure here is fatal — we do not
+    // send an un-acceptable proposal.
+    try {
+      await createProposal(proposal);
+    } catch (e) {
+      log.error("guardar proposta falhou", e, { id });
+      return NextResponse.json(
+        { error: "Não foi possível guardar a proposta. Tente novamente." },
+        { status: 503 },
+      );
+    }
+
     const mail = await sendMail({
       to: quote.email,
       replyTo: MAIL_TO,
@@ -144,12 +158,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ],
     });
 
-    // Persist the proposal + advance the quote status (best-effort).
-    try {
-      await createProposal(proposal);
-    } catch (e) {
-      log.error("guardar proposta falhou", e);
-    }
+    // Advance the quote status (best-effort — the proposal is already saved & sent).
     try {
       await updateQuote(id, { status: "cotado", quotedPrice: total });
     } catch (e) {

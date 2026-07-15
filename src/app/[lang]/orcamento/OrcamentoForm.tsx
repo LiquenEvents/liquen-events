@@ -153,8 +153,11 @@ export default function OrcamentoForm() {
         /* ignora */
       }
       router.push(localizeHref(`/orcamento/confirmacao/${json.id}`, locale));
-    } catch {
-      setError(to.error);
+    } catch (e) {
+      // Surface the server's specific message (e.g. the "try again / contact us"
+      // text when delivery genuinely failed) instead of the generic fallback.
+      const msg = e instanceof Error ? e.message : "";
+      setError(msg && msg !== "falha" ? msg : to.error);
       setSending(false);
     }
   }
@@ -239,13 +242,18 @@ export default function OrcamentoForm() {
           </h1>
 
           <form onSubmit={submit} className="flex flex-col gap-11">
-            {/* Honeypot */}
+            {/* Honeypot — a bot fills it, a human never sees it. The data-*ignore
+                hints stop password managers (1Password / LastPass) from
+                autofilling it, which was silently dropping real submissions. */}
             <input
               type="text"
               name="website"
               tabIndex={-1}
               autoComplete="off"
               aria-hidden="true"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-form-type="other"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               className="absolute -left-[9999px] h-0 w-0 opacity-0"

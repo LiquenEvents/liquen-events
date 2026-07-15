@@ -221,20 +221,52 @@ export async function POST(request: NextRequest) {
       priceBreakdown: breakdown,
     };
 
-    // Notify the team by email (primary delivery, works on serverless).
+    // ── Durable delivery FIRST ──────────────────────────────────────────────
+    // A lead is the whole point of this endpoint, so it must never be lost.
+    // We persist BEFORE sending any email: (1) the store is the record the admin
+    // dashboard reads, and (2) persisting first means a slow/hanging SMTP call
+    // can't make the function hit maxDuration before the lead is saved.
+    // Persistence: Supabase when configured; local file in dev.
+    let persisted = false;
+    try {
+      await createQuote(quote);
+      persisted = true;
+    } catch (storeErr) {
+      log.error("orcamento: persistência falhou", storeErr, { id });
+    }
+
+    // Notify the team by email (a second, independent delivery path). `sendMail`
+    // never throws — it returns { sent:false } when SMTP isn't configured — so we
+    // read `sent` to know whether the lead actually reached the team's inbox.
+    let emailed = false;
     try {
       const email = buildEmail(id, form, breakdown);
-      await sendMail({
+      const res = await sendMail({
         subject: email.subject,
         html: email.html,
         text: email.text,
         replyTo: form.email,
       });
+      emailed = res.sent;
     } catch (mailErr) {
       log.error("orcamento: email falhou", mailErr, { id });
     }
 
-    // Confirmation to the client, in the language they were browsing in.
+    // If the lead reached NEITHER a durable store NOR the team inbox, it is lost.
+    // Return a real error so the visitor can retry or contact us directly, instead
+    // of a false "success" screen over a dropped enquiry.
+    if (!persisted && !emailed) {
+      log.error("orcamento: lead não registada nem enviada — a devolver erro", undefined, { id });
+      return NextResponse.json(
+        {
+          error:
+            "Não foi possível registar o seu pedido. Tente novamente dentro de momentos ou contacte-nos diretamente.",
+        },
+        { status: 503 },
+      );
+    }
+
+    // Confirmation to the client, in the language they were browsing in (best-effort).
     try {
       const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
       const confirmation = buildClientConfirmation({ locale, name: form.name, referenceId: id });
@@ -243,14 +275,7 @@ export async function POST(request: NextRequest) {
       log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
     }
 
-    // Persist (Supabase when configured; local file in dev).
-    try {
-      await createQuote(quote);
-    } catch (storeErr) {
-      log.error("orcamento: persistência falhou", storeErr, { id });
-    }
-
-    // Push notification to the team's devices.
+    // Push notification to the team's devices (best-effort).
     try {
       await sendPushToAll({
         title: "Novo pedido de orçamento",

@@ -88,10 +88,10 @@ export const en: Dict = {
       "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
     contactoTitle: "Contact — Request Your Event Quote",
     contactoDescription:
-      "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. We reply within 24 hours with a tailored proposal.",
+      "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. We reply within 24 business hours with a tailored proposal.",
     orcamentoTitle: "Request a Quote — Weddings & Events",
     orcamentoDescription:
-      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 hours.",
+      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 business hours.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -126,7 +126,7 @@ export const en: Dict = {
     ctaTitleLine1: "Have an event",
     ctaTitleLine2: "in mind?",
     ctaText:
-      "Tell us your idea. No commitment — we reply with a tailored proposal in under 24 hours.",
+      "Tell us your idea. No commitment — we reply with a tailored proposal in under 24 business hours.",
   },
 
   sobre: {
@@ -256,7 +256,7 @@ export const en: Dict = {
         title: "We receive your request",
         desc: "We review your request and prepare a tailored response.",
       },
-      { title: "We get in touch", desc: "Within 24 hours, we set up a conversation." },
+      { title: "We get in touch", desc: "Within 24 business hours, we set up a conversation." },
       { title: "Tailored proposal", desc: "A detailed proposal with transparent pricing." },
       { title: "We start creating", desc: "We handle every detail for an unforgettable event." },
     ],
@@ -274,7 +274,7 @@ export const en: Dict = {
       heroTitleMoss: "extraordinary.",
       infoEyebrow: "Find us",
       emailLabel: "E-mail",
-      emailSub: "We reply within 24 hours",
+      emailSub: "We reply within 24 business hours",
       phoneLabel: "Phone",
       phoneSub: "Mon–Fri, 9am–6pm",
       locationLabel: "Location",
@@ -335,7 +335,7 @@ export const en: Dict = {
       successText: ". We'll be in touch shortly to move forward with your event together.",
       successSteps: [
         { n: "01", t: "We review your request", d: "In the next few hours" },
-        { n: "02", t: "We get in touch", d: "Within 24 hours" },
+        { n: "02", t: "We get in touch", d: "Within 24 business hours" },
         { n: "03", t: "We send a tailored proposal", d: "Personalised for you" },
       ],
       successWhatsApp: "Follow up on WhatsApp",
@@ -373,7 +373,7 @@ export const en: Dict = {
     eyebrow: "Quote request",
     titleLine1: "Tell us",
     titleMoss: "your idea.",
-    lead: "No commitment. We reply with a tailored proposal in under 24 hours.",
+    lead: "No commitment. We reply with a tailored proposal in under 24 business hours.",
     eventTypeLabels: [
       "Wedding",
       "Corporate",
@@ -432,7 +432,7 @@ export const en: Dict = {
           },
           {
             title: "Company Dinners",
-            desc: "From Christmas dinners to gala awards, we create memorable moments of celebration.",
+            desc: "From Christmas dinners to awards galas, we create memorable moments of celebration.",
           },
         ],
       },

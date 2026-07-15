@@ -88,10 +88,10 @@ export const pt = {
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas com proposta à medida.",
+      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
     orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas úteis.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -126,7 +126,7 @@ export const pt = {
     ctaTitleLine1: "Tem um evento",
     ctaTitleLine2: "em mente?",
     ctaText:
-      "Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas.",
+      "Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas úteis.",
   },
 
   sobre: {
@@ -264,7 +264,7 @@ export const pt = {
         title: "Recebemos o seu pedido",
         desc: "Analisamos o seu pedido e preparamos uma resposta à medida.",
       },
-      { title: "Entramos em contacto", desc: "Em menos de 24 horas, marcamos uma conversa." },
+      { title: "Entramos em contacto", desc: "Em menos de 24 horas úteis, marcamos uma conversa." },
       { title: "Proposta à medida", desc: "Proposta detalhada, com orçamento transparente." },
       { title: "Começamos a criar", desc: "Tratamos de cada detalhe para um evento inesquecível." },
     ],
@@ -283,7 +283,7 @@ export const pt = {
       heroTitleMoss: "extraordinário.",
       infoEyebrow: "Encontre-nos",
       emailLabel: "E-mail",
-      emailSub: "Respondemos em menos de 24 horas",
+      emailSub: "Respondemos em menos de 24 horas úteis",
       phoneLabel: "Telefone",
       phoneSub: "Seg–Sex, 9h–18h",
       locationLabel: "Localização",
@@ -345,7 +345,7 @@ export const pt = {
       successText: ". Em breve entraremos em contacto para avançarmos juntos no seu evento.",
       successSteps: [
         { n: "01", t: "Analisamos o seu pedido", d: "Nas próximas horas" },
-        { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas" },
+        { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas úteis" },
         { n: "03", t: "Enviamos proposta à medida", d: "Personalizada para si" },
       ],
       successWhatsApp: "Acompanhar pelo WhatsApp",
@@ -383,7 +383,7 @@ export const pt = {
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
     titleMoss: "a sua ideia.",
-    lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas.",
+    lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
     eventTypeLabels: [
       "Casamento",
       "Corporativo",
@@ -433,7 +433,7 @@ export const pt = {
           },
           {
             title: "Teambuilding",
-            desc: "Actividades e experiências que unem equipas e fortalecem a cultura organizacional.",
+            desc: "Atividades e experiências que unem equipas e fortalecem a cultura organizacional.",
           },
           {
             title: "Lançamentos de Produto",
@@ -441,7 +441,7 @@ export const pt = {
           },
           {
             title: "Jantares de Empresa",
-            desc: "Desde jantares de Natal a gala awards, criamos momentos de celebração memoráveis.",
+            desc: "Desde jantares de Natal a galas de entrega de prémios, criamos momentos de celebração memoráveis.",
           },
         ],
       },
