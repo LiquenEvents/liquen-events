@@ -80,7 +80,7 @@ export const SERVICES: ServiceDetail[] = [
       "teambuilding empresas",
       "jantar de empresa",
     ],
-    hero: "/imagens/EW1_1427.jpg",
+    hero: "/imagens/EW1_1332.jpg",
     intro: [
       "Elevamos a imagem da sua marca através de eventos corporativos que transformam equipas e celebram conquistas. A Líquen Events organiza conferências, congressos, teambuildings e jantares de empresa em Lisboa e em todo o Portugal.",
       "Da logística ao audiovisual, da gestão de inscrições à coordenação no local, tratamos de tudo com o rigor que um evento profissional exige — para que a sua empresa se foque apenas nos resultados.",
