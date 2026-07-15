@@ -507,6 +507,18 @@ export const en: Dict = {
     voltarInicio: "Back to Home",
     novoPedido: "New Request",
     dateLocale: "en-GB",
+    greetingWarm: "We're so happy to be part of this moment.",
+    signOff: "With love,",
+    signName: "Catarina & the Líquen team",
+    saveDate: "Add the date to your calendar",
+    whileTitle: "While we prepare your proposal",
+    whileLead: "Feel free to get to know a little of our world.",
+    exploreGaleria: "View the gallery",
+    exploreGaleriaSub: "Weddings and events we've created",
+    exploreInsta: "Follow on Instagram",
+    exploreInstaSub: "Behind the scenes, ideas and news",
+    exploreClientes: "Client stories",
+    exploreClientesSub: "What they say about us",
   },
 
   servicoDetalhe: {

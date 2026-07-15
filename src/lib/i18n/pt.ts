@@ -516,6 +516,18 @@ export const pt = {
     voltarInicio: "Voltar ao Início",
     novoPedido: "Novo Pedido",
     dateLocale: "pt-PT",
+    greetingWarm: "Estamos felizes por fazer parte deste momento.",
+    signOff: "Com carinho,",
+    signName: "Catarina & a equipa Líquen",
+    saveDate: "Guardar a data no calendário",
+    whileTitle: "Enquanto preparamos a vossa proposta",
+    whileLead: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
+    exploreGaleria: "Ver a galeria",
+    exploreGaleriaSub: "Casamentos e eventos que criámos",
+    exploreInsta: "Seguir no Instagram",
+    exploreInstaSub: "Bastidores, ideias e novidades",
+    exploreClientes: "Histórias de clientes",
+    exploreClientesSub: "O que dizem sobre nós",
   },
 
   servicoDetalhe: {
