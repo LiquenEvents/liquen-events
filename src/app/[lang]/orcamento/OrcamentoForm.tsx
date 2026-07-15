@@ -327,6 +327,7 @@ export default function OrcamentoForm() {
                   id="of-nome"
                   type="text"
                   autoComplete="name"
+                  aria-required="true"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   onBlur={() => setTouched((prev) => ({ ...prev, nome: true }))}
@@ -349,6 +350,7 @@ export default function OrcamentoForm() {
                   id="of-email"
                   type="email"
                   autoComplete="email"
+                  aria-required="true"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
