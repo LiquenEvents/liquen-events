@@ -32,12 +32,36 @@ export async function generateMetadata({
 }
 
 const gallery = [
-  { src: "/imagens/Natalia e Jonathan-167.jpg", cls: "col-span-2 row-span-2" },
-  { src: "/imagens/matilde-e-tomas0654-1.jpg", cls: "col-span-2" },
-  { src: "/imagens/DaniGui_Adois_61.jpg", cls: "col-span-1" },
-  { src: "/imagens/stephanie-mizio-350.jpg", cls: "col-span-1" },
-  { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2" },
-  { src: "/imagens/ines-goncalo-252.jpg", cls: "col-span-2" },
+  {
+    src: "/imagens/J&A-68.jpg",
+    cls: "col-span-2 row-span-2",
+    alt: "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
+  },
+  {
+    src: "/imagens/matilde-e-tomas0654-1.jpg",
+    cls: "col-span-2",
+    alt: "Festa de casamento sob luzes suspensas ao anoitecer",
+  },
+  {
+    src: "/imagens/DaniGui_Adois_61.jpg",
+    cls: "col-span-1",
+    alt: "Noivos abraçados durante a celebração do casamento",
+  },
+  {
+    src: "/imagens/stephanie-mizio-350.jpg",
+    cls: "col-span-1",
+    alt: "Mesa posta de casamento com flores e velas",
+  },
+  {
+    src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+    cls: "col-span-2",
+    alt: "Casamento ao entardecer ao ar livre no Alentejo",
+  },
+  {
+    src: "/imagens/ines-goncalo-252.jpg",
+    cls: "col-span-2",
+    alt: "Decoração floral de cerimónia de casamento no Alentejo",
+  },
 ];
 
 const eyebrowLight =
@@ -124,7 +148,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl">
               <Image
                 src="/imagens/DaniGui_Preview12.jpg"
-                alt="Evento Líquen Events"
+                alt={t.common.imageAlt.sobrePortrait}
                 fill
                 sizes="(max-width: 1024px) 100vw, 45vw"
                 className="object-cover"
@@ -147,7 +171,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
               <Image
                 src={g.src}
-                alt="Evento Líquen Events"
+                alt={g.alt}
                 fill
                 sizes="(max-width: 768px) 50vw, 50vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
@@ -167,7 +191,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         <Parallax speed={0.1} className="absolute inset-0">
           <Image
             src="/imagens/M&F0497.jpg"
-            alt="Líquen Events — celebração"
+            alt={t.common.imageAlt.sobreGolden}
             fill
             sizes="100vw"
             className="object-cover object-center scale-110"
@@ -244,7 +268,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
         <Image
           src="/imagens/DaniGui_Adois_61.jpg"
-          alt="Evento Líquen Events"
+          alt={t.common.imageAlt.sobreOutdoor}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -278,7 +302,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <Magnetic strength={0.4}>
               <Link
                 href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 {t.common.entrarContacto} →
               </Link>

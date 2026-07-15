@@ -31,7 +31,7 @@ export default function NotFoundView() {
         <div className="flex flex-wrap gap-4 justify-center">
           <Link
             href={localizeHref("/", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-cream font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
+            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.voltarInicio} →
           </Link>

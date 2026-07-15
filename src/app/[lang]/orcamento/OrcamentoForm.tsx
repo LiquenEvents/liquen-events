@@ -153,8 +153,11 @@ export default function OrcamentoForm() {
         /* ignora */
       }
       router.push(localizeHref(`/orcamento/confirmacao/${json.id}`, locale));
-    } catch {
-      setError(to.error);
+    } catch (e) {
+      // Surface the server's specific message (e.g. the "try again / contact us"
+      // text when delivery genuinely failed) instead of the generic fallback.
+      const msg = e instanceof Error ? e.message : "";
+      setError(msg && msg !== "falha" ? msg : to.error);
       setSending(false);
     }
   }
@@ -172,7 +175,7 @@ export default function OrcamentoForm() {
         <Image
           src="/imagens/DaniGui_JantarFesta_1.jpg"
           {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
-          alt="Evento Líquen Events"
+          alt={t.common.imageAlt.orcamentoPanel}
           fill
           preload
           sizes="(max-width: 1024px) 0vw, 45vw"
@@ -239,13 +242,18 @@ export default function OrcamentoForm() {
           </h1>
 
           <form onSubmit={submit} className="flex flex-col gap-11">
-            {/* Honeypot */}
+            {/* Honeypot — a bot fills it, a human never sees it. The data-*ignore
+                hints stop password managers (1Password / LastPass) from
+                autofilling it, which was silently dropping real submissions. */}
             <input
               type="text"
               name="website"
               tabIndex={-1}
               autoComplete="off"
               aria-hidden="true"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-form-type="other"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               className="absolute -left-[9999px] h-0 w-0 opacity-0"
@@ -265,7 +273,7 @@ export default function OrcamentoForm() {
                       aria-pressed={active}
                       className={`px-4 py-2.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
-                          ? "bg-moss border-moss text-cream shadow-lg shadow-moss/20"
+                          ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
                           : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
                       }`}
                     >
@@ -319,6 +327,7 @@ export default function OrcamentoForm() {
                   id="of-nome"
                   type="text"
                   autoComplete="name"
+                  aria-required="true"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   onBlur={() => setTouched((prev) => ({ ...prev, nome: true }))}
@@ -341,6 +350,7 @@ export default function OrcamentoForm() {
                   id="of-email"
                   type="email"
                   autoComplete="email"
+                  aria-required="true"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}

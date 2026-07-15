@@ -159,12 +159,26 @@ export class SupabaseBackend<T> implements Backend<T> {
 // ── File backend (dev fallback) ───────────────────────────────────────────
 export class FileBackend<T> implements Backend<T> {
   private readonly file: string;
+  // Serialize mutating ops: each does read → modify → write with an `await` in the
+  // middle, so two concurrent inserts would both read the pre-write array and the
+  // second write would clobber the first (lost update). Chaining them through this
+  // tail makes read-modify-write atomic within the process.
+  private tail: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly m: Mapper<T>,
     baseDir: string,
   ) {
     this.file = path.join(baseDir, m.fileName);
+  }
+
+  private serialize<R>(fn: () => Promise<R>): Promise<R> {
+    const run = this.tail.then(fn, fn);
+    this.tail = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
   }
 
   private async read(): Promise<T[]> {
@@ -195,22 +209,28 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async insert(entity: T): Promise<void> {
-    const all = await this.read();
-    all.push(entity);
-    await this.write(all);
+    return this.serialize(async () => {
+      const all = await this.read();
+      all.push(entity);
+      await this.write(all);
+    });
   }
 
   async persist(id: string, merged: T): Promise<void> {
-    const all = await this.read();
-    const idx = all.findIndex((e) => this.m.getId(e) === id);
-    if (idx === -1) return;
-    all[idx] = merged;
-    await this.write(all);
+    return this.serialize(async () => {
+      const all = await this.read();
+      const idx = all.findIndex((e) => this.m.getId(e) === id);
+      if (idx === -1) return;
+      all[idx] = merged;
+      await this.write(all);
+    });
   }
 
   async remove(id: string): Promise<void> {
-    const all = await this.read();
-    await this.write(all.filter((e) => this.m.getId(e) !== id));
+    return this.serialize(async () => {
+      const all = await this.read();
+      await this.write(all.filter((e) => this.m.getId(e) !== id));
+    });
   }
 }
 

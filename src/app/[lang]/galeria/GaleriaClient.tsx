@@ -81,16 +81,23 @@ function hashUnit(s: string): number {
  * photos from the same event, every collection appearing throughout (not
  * bunched), AND no rigid repeating pattern.
  *
- * Method: each photo gets a fractional rank `(j + 0.5) / size` — its position
- * within its own bucket, normalised to [0,1) — so a big shoot's frames land
- * ~1/frequency apart across the whole list. We then add a stable per-photo
- * jitter (±~0.11 of the range, hashed from the filename) so photos hop out of
- * the mechanical A,B,C,A,B,C rotation and categories genuinely intermix, while
- * the base rank still keeps each shoot roughly evenly spread. Fully
- * deterministic (stable across renders/SSR). A final de-adjacency pass removes
- * the rare same-event neighbour the jitter can create.
+ * Method: within its own bucket each photo gets an evenly-stepped position
+ * `(j + 0.5) / size`, so a big shoot's frames land ~1/frequency apart across
+ * the whole list (never bunched). Crucially, each bucket is then rotated by its
+ * OWN random phase (`hashUnit(key)`, wrapped into [0,1)) — so the shoots don't
+ * all start at 0 and fall into a mechanical A,B,C,A,B,C rotation; they
+ * interleave at different offsets, reading as a real shuffle. A small per-photo
+ * jitter breaks any residual lock-step. Fully deterministic (same on SSR +
+ * client — no hydration mismatch). A final de-adjacency pass removes the rare
+ * same-event neighbour.
  */
-function interleaveByCollection(list: Photo[]): Photo[] {
+// `seed` re-rolls the arrangement per visit: mixed into every hash input so the
+// per-bucket phase, jitter and tiebreak all shift together — a genuinely
+// different (but still well-spread, no-bunching) order each time. Empty seed on
+// the server + first client render keeps SSR and hydration identical; the client
+// swaps in a random seed once mounted (see `orderSeed`), so each entry differs
+// while the order stays fixed for the whole visit (never reshuffles mid-scroll).
+function interleaveByCollection(list: Photo[], seed = ""): Photo[] {
   const buckets = new Map<string, Photo[]>();
   const order: string[] = [];
   for (const p of list) {
@@ -106,34 +113,36 @@ function interleaveByCollection(list: Photo[]): Photo[] {
   const ranked: { p: Photo; rank: number }[] = [];
   for (const key of order) {
     const arr = buckets.get(key)!;
+    const phase = hashUnit(key + seed); // per-bucket rotation → staggered interleave
     for (let j = 0; j < arr.length; j++) {
-      const base = (j + 0.5) / arr.length;
-      const jitter = (hashUnit(arr[j].src) - 0.5) * 0.22;
-      ranked.push({ p: arr[j], rank: base + jitter });
+      const jitter = (hashUnit(arr[j].src + seed) - 0.5) * 0.12;
+      let rank = (j + 0.5) / arr.length + phase + jitter;
+      rank -= Math.floor(rank); // wrap into [0,1)
+      ranked.push({ p: arr[j], rank });
     }
   }
-  ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src) - hashUnit(b.p.src));
+  ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src + seed) - hashUnit(b.p.src + seed));
   return deAdjacent(ranked.map((r) => r.p));
 }
 
 /**
- * Final safety pass: eliminate the handful of same-event neighbours the
- * fractional spread can still leave (when two ranks happen to sort together
- * with no other bucket between them). For each such spot, pull forward the
- * nearest later photo whose bucket differs from both neighbours. When a
- * category is a single collection (Corporativo, Conferência…) no fix is
- * possible — the whole shoot is one event — so it's left untouched.
+ * Final safety pass: keep same-event photos apart. Beyond the immediate
+ * neighbour, it enforces a WINDOW — no photo may share its event with any of the
+ * `window` photos just before it — so a big shoot never shows two of its frames
+ * a tile or two apart (which in a 2–3 column masonry reads as "fotos do mesmo
+ * evento juntas"). For each violation it pulls forward the nearest later photo
+ * whose event isn't in that window. When no such photo exists (the tail, or a
+ * category that is a single shoot) it's left as-is — best effort.
  */
-function deAdjacent(list: Photo[]): Photo[] {
+function deAdjacent(list: Photo[], window = 3): Photo[] {
   const out = [...list];
   for (let i = 1; i < out.length; i++) {
-    if (bucketKey(out[i]) !== bucketKey(out[i - 1])) continue;
-    const left = bucketKey(out[i - 1]);
-    const right = i + 1 < out.length ? bucketKey(out[i + 1]) : null;
+    const recent = new Set<string>();
+    for (let k = Math.max(0, i - window); k < i; k++) recent.add(bucketKey(out[k]));
+    if (!recent.has(bucketKey(out[i]))) continue;
     let swap = -1;
     for (let j = i + 1; j < out.length; j++) {
-      const kj = bucketKey(out[j]);
-      if (kj !== left && kj !== right) {
+      if (!recent.has(bucketKey(out[j]))) {
         swap = j;
         break;
       }
@@ -241,6 +250,14 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // (in shoot order, no interleaving) instead of a category grid.
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
+  // Per-visit arrangement seed. Empty on SSR + first client render (so hydration
+  // matches); a random value is set once on mount, re-rolling the interleave so
+  // every fresh entry to the gallery lays out differently. It never changes
+  // after mount, so the grid stays put while browsing (no mid-scroll reshuffle).
+  const [orderSeed, setOrderSeed] = useState("");
+  useEffect(() => {
+    setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36));
+  }, []);
   const [fading, setFading] = useState(false);
   // Right-edge fade on the filter pill row, only while it actually
   // overflows — hints "more categories, swipe" without permanently
@@ -273,6 +290,24 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
+  }, []);
+  // Nº de colunas da masonry — medido no cliente para podermos distribuir os
+  // tiles MANUALMENTE por colunas equilibradas (ver `masonryColumns`). Começa em
+  // 1 (mobile-first) para que o SSR e a primeira renderização no cliente
+  // coincidam (sem hydration mismatch); o efeito ajusta para o valor real. Espelha
+  // os breakpoints antigos (columns-1 / sm:columns-2 / md:columns-3).
+  const [cols, setCols] = useState(1);
+  useEffect(() => {
+    const sm = window.matchMedia("(min-width: 640px)");
+    const md = window.matchMedia("(min-width: 768px)");
+    const apply = () => setCols(md.matches ? 3 : sm.matches ? 2 : 1);
+    apply();
+    sm.addEventListener("change", apply);
+    md.addEventListener("change", apply);
+    return () => {
+      sm.removeEventListener("change", apply);
+      md.removeEventListener("change", apply);
+    };
   }, []);
   // O `<ViewTransition name>` serve UMA coisa: o morph miniatura↔lightbox. Fora
   // desse morph, nenhuma tile da grelha precisa de nome — e tê-los sempre era o
@@ -404,7 +439,16 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // Localized display helpers — internal label keys stay PT (used for
   // filtering); only what the user reads is translated.
   const labelText = (l: Label) => t.galeria.labels[l];
-  const altText = (l: Label) => t.galeria.alt[l];
+  // Per-photo alt text. The category template (t.galeria.alt) alone would make
+  // hundreds of photos share one identical string (bad for image SEO + a11y),
+  // so when the shoot/couple is known we append it — every photo then reads
+  // uniquely and descriptively (e.g. "Casamento … no Alentejo — Daniela &
+  // Guilherme") while keeping the localized, keyword-rich base.
+  const altText = (src: string, l: Label) => {
+    const base = t.galeria.alt[l];
+    const c = collectionFor(src);
+    return c ? `${base} — ${c}` : base;
+  };
   const caption = (src: string, label: Label): { caption: string; sub?: string } => {
     const c = collectionFor(src);
     return c ? { caption: c, sub: labelText(label) } : { caption: labelText(label) };
@@ -425,9 +469,35 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
       return photos.filter((p) => collectionFor(p.src) === collectionFilter);
     }
     const filtered = cat === "Todos" ? photos : photos.filter((p) => p.label === cat);
-    return interleaveByCollection(filtered);
-  }, [cat, collectionFilter, photos]);
+    return interleaveByCollection(filtered, orderSeed);
+  }, [cat, collectionFilter, photos, orderSeed]);
   const visible = pool.slice(0, shown);
+
+  // Masonry manual: distribui as fotos por `cols` colunas equilibradas, sempre
+  // para a coluna MAIS CURTA (usando a altura real de cada tile = H/W do
+  // aspectRatio). Porquê não CSS multi-column: o `column-fill: balance`
+  // dimensiona cada bloco de página pela sua coluna MAIS ALTA, por isso as
+  // colunas mais curtas deixavam uma cauda preta até essa altura — o "fundo
+  // preto no meio das fotos". O empacotamento guloso mantém as colunas quase
+  // iguais (só uma pequena cauda no fundo de tudo) e é estável por prefixo:
+  // carregar mais uma página nunca desloca tiles já colocados, portanto a grelha
+  // continua a não re-baralhar a meio do scroll.
+  const masonryColumns = useMemo(() => {
+    // O mosaico-herói fica com a foto 0 (e 1–4 em sm+); a masonry leva o resto.
+    const start = collectionFilter ? 0 : cols === 1 ? 1 : 5;
+    const cells: { p: Photo; idx: number }[][] = Array.from({ length: cols }, () => []);
+    const heights = new Array<number>(cols).fill(0);
+    for (let i = start; i < visible.length; i++) {
+      const p = visible[i];
+      const [w, h] = p.aspectRatio.split("/").map((n) => parseFloat(n));
+      const rel = w > 0 && h > 0 ? h / w : 1; // altura do tile a largura de coluna unitária
+      let c = 0;
+      for (let k = 1; k < cols; k++) if (heights[k] < heights[c]) c = k;
+      cells[c].push({ p, idx: i });
+      heights[c] += rel;
+    }
+    return cells;
+  }, [visible, cols, collectionFilter]);
 
   // Infinite scroll — a sentinel below the grid loads the next page as it nears
   // the viewport (no "Ver mais" click). Recreated whenever `shown`/`pool.length`
@@ -687,12 +757,18 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
       ? Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k)
       : [];
 
-  const counts = Object.fromEntries(
-    CATS.map((c) => [
-      c,
-      c === "Todos" ? photos.length : photos.filter((p) => p.label === c).length,
-    ]),
-  ) as Record<Cat, number>;
+  // One pass over the pool (386 photos), memoized on `photos` — the old form
+  // re-filtered the whole array once per category on every render (scroll,
+  // hover, lightbox open all triggered it).
+  const counts = useMemo(() => {
+    const acc = Object.fromEntries(CATS.map((c) => [c, 0])) as Record<Cat, number>;
+    for (const p of photos) {
+      const label = p.label as Cat;
+      if (label in acc) acc[label] += 1;
+    }
+    acc.Todos = photos.length;
+    return acc;
+  }, [photos]);
 
   return (
     <>
@@ -735,9 +811,10 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
             <button
               key={c}
               onClick={() => switchCat(c)}
+              aria-pressed={cat === c}
               className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
                 cat === c
-                  ? "bg-moss-dark text-cream shadow-lg shadow-moss/20"
+                  ? "bg-moss-dark text-white shadow-lg shadow-moss/20"
                   : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
               }`}
             >
@@ -778,7 +855,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                 <VTWrap name={mosaicName(0)}>
                   <Image
                     src={visible[0].src}
-                    alt={altText(visible[0].label)}
+                    alt={altText(visible[0].src, visible[0].label)}
                     fill
                     sizes="(max-width: 640px) 100vw, 50vw"
                     className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
@@ -807,7 +884,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                     <VTWrap name={mosaicName(idx)}>
                       <Image
                         src={visible[idx].src}
-                        alt={altText(visible[idx].label)}
+                        alt={altText(visible[idx].src, visible[idx].label)}
                         fill
                         sizes="25vw"
                         className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
@@ -826,47 +903,55 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
 
         {/* Masonry — fotos restantes (satélites 1-4 reaparecem aqui em
             mobile); numa vista de coleção começa em 0, sem hero, cada foto
-            com um único nome VT estável (ver nota acima). */}
+            com um único nome VT estável (ver nota acima).
+
+            Colunas flex distribuídas manualmente (ver `masonryColumns`), NÃO
+            CSS multi-column: cada coluna é uma pilha independente que encolhe
+            até ao seu conteúdo (`items-start`), por isso nunca há uma cauda
+            preta por baixo de uma coluna mais curta. Como o empacotamento é
+            estável por prefixo, carregar mais fotos apenas prolonga as colunas
+            existentes — os tiles já vistos não mudam de sítio. */}
         {(collectionFilter ? visible.length > 0 : visible.length > 1) && (
-          <div className="columns-1 sm:columns-2 md:columns-3 gap-0.5">
-            {(collectionFilter ? visible : visible.slice(1)).map((p, i) => {
-              const idx = collectionFilter ? i : i + 1;
-              return (
-                <div
-                  key={p.src}
-                  ref={registerTile}
-                  className={`g-reveal cv-auto break-inside-avoid mb-0.5${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
-                  style={{ "--reveal-delay": `${(i % 3) * 60}ms` } as React.CSSProperties}
-                >
-                  <button
-                    onClick={() => openAt(idx)}
-                    data-ripple
-                    data-cap={caption(p.src, p.label).caption}
-                    data-sub={caption(p.src, p.label).sub}
-                    className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
-                    style={{ aspectRatio: p.aspectRatio }}
+          <div className="flex items-start gap-0.5">
+            {masonryColumns.map((col, ci) => (
+              <div key={ci} className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {col.map(({ p, idx }, j) => (
+                  <div
+                    key={p.src}
+                    ref={registerTile}
+                    className={`g-reveal${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
+                    style={{ "--reveal-delay": `${(j % 3) * 60}ms` } as React.CSSProperties}
                   >
-                    {lb !== idx && (
-                      <VTWrap
-                        name={collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)}
-                      >
-                        <Image
-                          src={p.src}
-                          alt={altText(p.label)}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 33vw"
-                          className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                          loading={collectionFilter && i === 0 ? "eager" : "lazy"}
-                          placeholder="blur"
-                          blurDataURL={p.blurDataURL}
-                        />
-                      </VTWrap>
-                    )}
-                    <HoverOverlay {...caption(p.src, p.label)} />
-                  </button>
-                </div>
-              );
-            })}
+                    <button
+                      onClick={() => openAt(idx)}
+                      data-ripple
+                      data-cap={caption(p.src, p.label).caption}
+                      data-sub={caption(p.src, p.label).sub}
+                      className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
+                      style={{ aspectRatio: p.aspectRatio }}
+                    >
+                      {lb !== idx && (
+                        <VTWrap
+                          name={collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)}
+                        >
+                          <Image
+                            src={p.src}
+                            alt={altText(p.src, p.label)}
+                            fill
+                            sizes="(max-width: 768px) 50vw, 33vw"
+                            className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+                            loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
+                            placeholder="blur"
+                            blurDataURL={p.blurDataURL}
+                          />
+                        </VTWrap>
+                      )}
+                      <HoverOverlay {...caption(p.src, p.label)} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -1032,7 +1117,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                   <Image
                     key={lb}
                     src={pool[lb].src}
-                    alt={altText(pool[lb].label)}
+                    alt={altText(pool[lb].src, pool[lb].label)}
                     fill
                     sizes="90vw"
                     className={`object-contain ${

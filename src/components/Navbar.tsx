@@ -256,7 +256,7 @@ export default function Navbar() {
             <Magnetic strength={0.3}>
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-cream px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
+                className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-white px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
               >
                 {t.nav.orcamento} →
               </Link>
@@ -359,7 +359,7 @@ export default function Navbar() {
         >
           <Link
             href={localizeHref("/orcamento", locale)}
-            className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-cream px-5 py-4 rounded-sm"
+            className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-white px-5 py-4 rounded-sm"
           >
             {t.nav.pedirOrcamento} →
           </Link>

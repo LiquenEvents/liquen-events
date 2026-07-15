@@ -96,12 +96,36 @@ const categoryMeta = [
 
 // Full-bleed editorial photo grid (mirrors the Sobre page rhythm).
 const editorial = [
-  { src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg", cls: "col-span-2 row-span-2" },
-  { src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg", cls: "col-span-2" },
-  { src: "/imagens/DJI_20250913190635_0120_D.jpg", cls: "col-span-1" },
-  { src: "/imagens/20_10_2025_0407.jpg", cls: "col-span-1" },
-  { src: "/imagens/stephanie-mizio-715.jpg", cls: "col-span-2" },
-  { src: "/imagens/DaniGui_Adois_61.jpg", cls: "col-span-2" },
+  {
+    src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+    cls: "col-span-2 row-span-2",
+    alt: "Casamento ao ar livre organizado pela Líquen Events no Alentejo",
+  },
+  {
+    src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+    cls: "col-span-2",
+    alt: "Jantar de celebração com decoração elegante à luz de velas",
+  },
+  {
+    src: "/imagens/DJI_20250913190635_0120_D.jpg",
+    cls: "col-span-1",
+    alt: "Vista aérea de um evento numa herdade do Alentejo",
+  },
+  {
+    src: "/imagens/20_10_2025_0407.jpg",
+    cls: "col-span-1",
+    alt: "Receção de evento ao final da tarde no Alentejo",
+  },
+  {
+    src: "/imagens/stephanie-mizio-555.jpg",
+    cls: "col-span-2",
+    alt: "Receção de casamento ao ar livre ao pôr do sol no Alentejo",
+  },
+  {
+    src: "/imagens/DaniGui_Adois_61.jpg",
+    cls: "col-span-2",
+    alt: "Retrato dos noivos durante um casamento no Alentejo",
+  },
 ];
 
 /* ── Service card ── */
@@ -347,8 +371,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       />
       <ServiceJsonLd
         locale={locale}
-        name="Organização de eventos, casamentos e eventos corporativos"
-        description="Organização de casamentos, eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal — da decoração à coordenação."
+        name={t.jsonld.servicosServiceName}
+        description={t.jsonld.servicosServiceDescription}
         path="/servicos"
       />
 
@@ -493,74 +517,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </div>
       ))}
 
-      {/* ── Método — como trabalhamos (how we work) ── */}
-      <section className="relative bg-surface border-t border-foreground/8 py-24 lg:py-36 overflow-hidden">
-        {/* subtle moss glow, echoing the detail-page CTA */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 70% at 100% 0%, rgba(124,133,75,0.08) 0%, transparent 55%)",
-          }}
-        />
-        <div className="relative max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase mb-7 flex items-center gap-3">
-              <span className="w-8 h-px bg-gold flex-shrink-0" />
-              {ts.metodoEyebrow}
-            </p>
-          </AnimateIn>
-          <div className="grid lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-16 lg:items-end mb-16 lg:mb-24">
-            <AnimateIn delay={80}>
-              <h2
-                className="text-foreground font-bold leading-[1.02] tracking-tight"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 4.6vw, 68px)" }}
-              >
-                {ts.metodoTitle}
-              </h2>
-            </AnimateIn>
-            <AnimateIn delay={150}>
-              <p className="text-foreground/55 text-[15px] lg:text-base leading-[1.85] lg:pb-3 lg:border-l lg:border-foreground/12 lg:pl-8">
-                {ts.metodoLead}
-              </p>
-            </AnimateIn>
-          </div>
-
-          <Reveal
-            as="ol"
-            stagger={0.12}
-            y={54}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/8 border border-foreground/8"
-          >
-            {ts.metodo.map((step) => (
-              <li
-                key={step.num}
-                className="group relative bg-surface p-8 lg:p-9 lg:pt-11 flex flex-col min-h-[248px] lg:min-h-[336px] transition-colors duration-500 hover:bg-surface-raised/50"
-              >
-                <span
-                  className="text-foreground/10 font-bold leading-none mb-8 lg:mb-10 tabular-nums transition-colors duration-500 group-hover:text-moss/30"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(52px, 6vw, 84px)",
-                  }}
-                  aria-hidden
-                >
-                  {step.num}
-                </span>
-                <span className="w-9 h-px bg-gold/60 mb-6" />
-                <h3
-                  className="text-foreground/85 font-bold text-lg lg:text-xl mb-3.5"
-                  style={{ fontFamily: "var(--font-playfair)" }}
-                >
-                  {step.title}
-                </h3>
-                <p className="text-foreground/55 text-sm leading-[1.8]">{step.desc}</p>
-              </li>
-            ))}
-          </Reveal>
-        </div>
-      </section>
-
       {/* ── Editorial photo grid (full-bleed) ── */}
       <section className="bg-surface border-t border-foreground/8">
         <Reveal
@@ -573,7 +529,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
               <Image
                 src={g.src}
-                alt="Evento organizado pela Líquen Events"
+                alt={g.alt}
                 fill
                 sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
@@ -592,7 +548,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       >
         <Image
           src="/imagens/J&A-68.jpg"
-          alt="Cerimónia ao ar livre organizada pela Líquen Events no Alentejo"
+          alt={t.common.imageAlt.servicosCeremony}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -628,7 +584,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
         <Image
           src="/imagens/M&F0497.jpg"
-          alt="Evento Líquen Events"
+          alt={t.common.imageAlt.servicosEvening}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -661,7 +617,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <Magnetic strength={0.4}>
                 <Link
                   href={localizeHref("/orcamento", locale)}
-                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
                 >
                   {t.common.pedirOrcamento} →
                 </Link>

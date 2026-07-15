@@ -46,12 +46,12 @@ describe("pageMetadata", () => {
     expect(og.url).toBe(`${SITE.url}/en/servicos`);
   });
 
-  it("uses the site default OG image with its real dimensions", () => {
+  it("uses the site default OG image at the OG-standard 1200×630", () => {
     const meta = pageMetadata({ title: "T", description: "D", path: "/", locale: "pt" });
     const og = meta.openGraph as Og;
     expect(og.images?.[0].url).toBe(SITE.ogImage);
-    expect(og.images?.[0].width).toBe(2048);
-    expect(og.images?.[0].height).toBe(1152);
+    expect(og.images?.[0].width).toBe(1200);
+    expect(og.images?.[0].height).toBe(630);
   });
 
   it("falls back to 1200×630 when the image dimensions are unknown", () => {

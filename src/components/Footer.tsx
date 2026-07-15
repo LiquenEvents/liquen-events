@@ -12,6 +12,15 @@ const stripPhotos = [
   { src: "/imagens/EW1_1428.jpg", span: "col-span-1" },
 ];
 
+// Service detail slugs, paired with t.footer.serviceLinks (same order) — gives
+// the money pages keyword-anchored internal links from every page's footer.
+const serviceSlugs = [
+  "casamentos",
+  "eventos-corporativos",
+  "festas-e-aniversarios",
+  "jantares-de-gala",
+];
+
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   const t = getDictionary(locale);
   const pages: [string, string][] = [
@@ -150,6 +159,21 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                       className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
                     >
                       {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mt-10 mb-8">
+                {t.footer.servicosTitulo}
+              </p>
+              <ul className="flex flex-col gap-4">
+                {serviceSlugs.map((slug, i) => (
+                  <li key={slug}>
+                    <Link
+                      href={localizeHref(`/servicos/${slug}`, locale)}
+                      className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
+                    >
+                      {t.footer.serviceLinks[i]}
                     </Link>
                   </li>
                 ))}

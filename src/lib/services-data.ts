@@ -24,7 +24,7 @@ export const SERVICES: ServiceDetail[] = [
     slug: "casamentos",
     eyebrow: "Planeamento de Casamentos",
     title: "Organização de Casamentos no Alentejo e em Portugal",
-    metaTitle: "Wedding Planner no Alentejo — Organização de Casamentos",
+    metaTitle: "Wedding Planner no Alentejo — Casamentos",
     metaDescription:
       "Wedding planner no Alentejo. Organizamos casamentos completos — decoração floral, catering, coordenação do dia — em herdades, quintas e espaços únicos de todo o Portugal.",
     keywords: [
@@ -49,7 +49,7 @@ export const SERVICES: ServiceDetail[] = [
     gallery: [
       "/imagens/DaniGui_Preview20.jpg",
       "/imagens/matilde-tomas-27.jpg",
-      "/imagens/Sophia&Artur_MAINOVA_capa-482.jpg",
+      "/imagens/JOAO_E_PEDRO_IMGL4226.jpg",
       "/imagens/ines-goncalo-421.jpg",
       "/imagens/M&F0678.jpg",
       "/imagens/stephanie-mizio-760.jpg",
@@ -64,13 +64,13 @@ export const SERVICES: ServiceDetail[] = [
         a: "Sim. Organizamos casamentos em todo o Portugal continental e ilhas, com uma rede de fornecedores de confiança em várias regiões.",
       },
     ],
-    related: ["jantares-de-gala", "eventos-corporativos"],
+    related: ["jantares-de-gala", "festas-e-aniversarios"],
   },
   {
     slug: "eventos-corporativos",
     eyebrow: "Para Empresas",
     title: "Eventos Corporativos em Lisboa",
-    metaTitle: "Eventos Corporativos em Lisboa — Conferências e Empresas",
+    metaTitle: "Eventos Corporativos em Lisboa e Conferências",
     metaDescription:
       "Organização de eventos corporativos em Lisboa e todo o Portugal: conferências, congressos, teambuilding, lançamentos de produto e jantares de empresa. Produção completa e chave na mão.",
     keywords: [
@@ -80,7 +80,7 @@ export const SERVICES: ServiceDetail[] = [
       "teambuilding empresas",
       "jantar de empresa",
     ],
-    hero: "/imagens/EW1_1427.jpg",
+    hero: "/imagens/EW1_1332.jpg",
     intro: [
       "Elevamos a imagem da sua marca através de eventos corporativos que transformam equipas e celebram conquistas. A Líquen Events organiza conferências, congressos, teambuildings e jantares de empresa em Lisboa e em todo o Portugal.",
       "Da logística ao audiovisual, da gestão de inscrições à coordenação no local, tratamos de tudo com o rigor que um evento profissional exige — para que a sua empresa se foque apenas nos resultados.",
@@ -89,7 +89,7 @@ export const SERVICES: ServiceDetail[] = [
       "Conferências e congressos",
       "Teambuilding e ativações de equipa",
       "Lançamentos de produto",
-      "Jantares de empresa e gala awards",
+      "Jantares de empresa e galas de prémios",
       "Audiovisual, palco e cenografia",
       "Gestão de inscrições e credenciação",
     ],
@@ -117,7 +117,7 @@ export const SERVICES: ServiceDetail[] = [
     slug: "festas-e-aniversarios",
     eyebrow: "Celebrações Privadas",
     title: "Festas de Aniversário e Celebrações Privadas",
-    metaTitle: "Festas de Aniversário e Celebrações Privadas no Alentejo",
+    metaTitle: "Festas de Aniversário e Celebrações Privadas",
     metaDescription:
       "Organização de festas de aniversário, batizados, comunhões e celebrações privadas no Alentejo. Conceito, decoração, catering e entretenimento à medida.",
     keywords: [
@@ -158,13 +158,13 @@ export const SERVICES: ServiceDetail[] = [
     slug: "jantares-de-gala",
     eyebrow: "Eventos Sociais",
     title: "Jantares de Gala e Eventos Sociais de Prestígio",
-    metaTitle: "Jantares de Gala e Eventos Sociais — Portugal",
+    metaTitle: "Jantares de Gala e Eventos Sociais",
     metaDescription:
       "Organização de jantares de gala e eventos sociais de prestígio em Lisboa e Portugal. Ambiente sofisticado, mesa posta premium e coordenação impecável.",
     keywords: [
       "jantar de gala Portugal",
       "eventos sociais de prestígio",
-      "gala awards",
+      "galas de prémios",
       "evento de prestígio Alentejo",
     ],
     hero: "/imagens/J&P-IMGL3188.jpg",
@@ -207,7 +207,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
     eyebrow: "Wedding Planning",
     title: "Wedding Planning in the Alentejo and across Portugal",
-    metaTitle: "Wedding Planner in the Alentejo — Wedding Planning",
+    metaTitle: "Wedding Planner in the Alentejo",
     metaDescription:
       "Wedding planner in the Alentejo. We organise complete weddings — floral décor, catering, day-of coordination — at estates, quintas and unique venues across Portugal.",
     intro: [
@@ -236,7 +236,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   "eventos-corporativos": {
     eyebrow: "For Companies",
     title: "Corporate Events in Lisbon",
-    metaTitle: "Corporate Events in Lisbon — Conferences & Companies",
+    metaTitle: "Corporate Events & Conferences in Lisbon",
     metaDescription:
       "Corporate event planning in Lisbon and across Portugal: conferences, congresses, team-building, product launches and company dinners. Full turnkey production.",
     intro: [
@@ -247,7 +247,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Conferences and congresses",
       "Team building and team activations",
       "Product launches",
-      "Company dinners and gala awards",
+      "Company dinners and awards galas",
       "Audiovisual, stage and scenography",
       "Registration and accreditation management",
     ],
@@ -265,7 +265,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   "festas-e-aniversarios": {
     eyebrow: "Private Celebrations",
     title: "Birthday Parties and Private Celebrations",
-    metaTitle: "Birthday Parties & Private Celebrations in the Alentejo",
+    metaTitle: "Birthday Parties & Private Celebrations",
     metaDescription:
       "Planning of birthday parties, christenings, communions and private celebrations in the Alentejo. Concept, décor, catering and bespoke entertainment.",
     intro: [
@@ -290,7 +290,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   "jantares-de-gala": {
     eyebrow: "Social Events",
     title: "Gala Dinners and Prestige Social Events",
-    metaTitle: "Gala Dinners & Social Events — Portugal",
+    metaTitle: "Gala Dinners & Social Events",
     metaDescription:
       "Planning of gala dinners and prestige social events in Lisbon and Portugal. Sophisticated atmosphere, premium table settings and impeccable coordination.",
     intro: [

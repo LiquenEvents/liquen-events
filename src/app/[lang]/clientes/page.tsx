@@ -41,43 +41,43 @@ const eyebrow =
 const mosaicItems = [
   {
     src: "/imagens/EW1_1408.jpg",
-    alt: "Evento corporativo",
+    alt: "Receção de evento corporativo num pátio em Évora",
     label: "Corporativo",
     cls: "col-span-5 row-span-2",
   },
   {
     src: "/imagens/DaniGui_Preview20.jpg",
-    alt: "Casamento",
+    alt: "Casamento com decoração floral numa herdade do Alentejo",
     label: "Casamento",
     cls: "col-span-4 row-span-1",
   },
   {
     src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-    alt: "Jantar de gala",
+    alt: "Jantar de gala à luz de velas num evento no Alentejo",
     label: "Gala",
     cls: "col-span-3 row-span-1",
   },
   {
-    src: "/imagens/stephanie-mizio-715.jpg",
-    alt: "Casamento",
+    src: "/imagens/stephanie-mizio-558.jpg",
+    alt: "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
     label: "Casamento",
     cls: "col-span-4 row-span-1",
   },
   {
     src: "/imagens/M&F0512.jpg",
-    alt: "Jantar de gala",
+    alt: "Jantar de gala com mesa posta e velas",
     label: "Jantar",
     cls: "col-span-3 row-span-1",
   },
   {
     src: "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
-    alt: "Gala",
+    alt: "Gala corporativa num salão decorado à noite",
     label: "Gala",
     cls: "col-span-7 row-span-1",
   },
   {
     src: "/imagens/hd-edited.jpg",
-    alt: "Evento institucional",
+    alt: "Evento institucional com palco e plateia",
     label: "Institucional",
     cls: "col-span-5 row-span-1",
   },
@@ -359,7 +359,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       <section className="relative py-36 lg:py-52 overflow-hidden">
         <Image
           src="/imagens/DJI_20250913190635_0120_D.jpg"
-          alt="Vista aérea de evento Líquen Events"
+          alt={t.common.imageAlt.clientesAerial}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -393,7 +393,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             <Magnetic strength={0.4}>
               <Link
                 href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-cream font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
                 {t.common.falarConnosco} →
               </Link>

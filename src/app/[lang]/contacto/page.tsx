@@ -58,7 +58,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           <Image
             src={heroImg}
             {...blurFor(heroImg)}
-            alt="Evento Líquen Events"
+            alt={t.common.imageAlt.contactoHero}
             fill
             preload
             sizes="100vw"
@@ -124,7 +124,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   {
                     label: tf.locationLabel,
                     value: tf.locationValue,
-                    href: null,
+                    href: SITE.googleBusiness,
                     sub: tf.locationSub,
                   },
                 ].map((item) => (
@@ -135,6 +135,9 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     {item.href ? (
                       <a
                         href={item.href}
+                        {...(item.href.startsWith("http")
+                          ? { target: "_blank", rel: "noopener noreferrer" }
+                          : {})}
                         className="text-foreground text-sm font-medium hover:text-moss transition-colors block mb-1.5"
                       >
                         {item.value}
@@ -152,7 +155,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-12"
+                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
               >
                 <span className="text-moss flex-shrink-0">
                   <WhatsAppIcon className="w-4 h-4" />
@@ -163,6 +166,45 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 <span
                   aria-hidden
                   className="ml-auto text-foreground/40 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                >
+                  →
+                </span>
+              </a>
+
+              {/* Google — Perfil de Empresa (Maps + avaliações). Reforça o
+                  sinal local e dá aos clientes um caminho direto para avaliar. */}
+              <a
+                href={SITE.googleBusiness}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-gold/50 hover:bg-gold/[0.06] transition-all duration-300 group mb-12"
+              >
+                <span className="flex-shrink-0" aria-hidden>
+                  <svg viewBox="0 0 24 24" className="w-4 h-4">
+                    <path
+                      fill="#4285F4"
+                      d="M23.5 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.47a5.53 5.53 0 0 1-2.4 3.58v3h3.88c2.27-2.09 3.55-5.17 3.55-8.82z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.96-1.08 7.95-2.91l-3.88-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.28v3.09A12 12 0 0 0 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58V6.62H1.28a12 12 0 0 0 0 10.76z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.18 15.24 0 12 0A12 12 0 0 0 1.28 6.62l3.99 3.09C6.22 6.86 8.87 4.75 12 4.75z"
+                    />
+                  </svg>
+                </span>
+                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
+                  {tf.googleLink}
+                </span>
+                <span
+                  aria-hidden
+                  className="ml-auto text-foreground/40 group-hover:text-gold group-hover:translate-x-0.5 transition-all duration-300 text-sm"
                 >
                   →
                 </span>
@@ -271,15 +313,24 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         <AnimateIn from="fade">
           <div className="grid grid-cols-3 gap-px" style={{ height: "clamp(180px, 38vw, 460px)" }}>
             {[
-              "/imagens/Natalia e Jonathan-315.jpg",
-              "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
-              "/imagens/M&F0658.jpg",
-            ].map((src) => (
+              {
+                src: "/imagens/Natalia e Jonathan-315.jpg",
+                alt: "Cerimónia de casamento ao ar livre no Alentejo",
+              },
+              {
+                src: "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
+                alt: "Casamento ao pôr do sol numa herdade alentejana",
+              },
+              {
+                src: "/imagens/M&F0658.jpg",
+                alt: "Mesa posta de jantar de casamento com decoração floral",
+              },
+            ].map(({ src, alt }) => (
               <div key={src} className="relative overflow-hidden group">
                 <Image
                   src={src}
                   {...blurFor(src)}
-                  alt="Evento organizado pela Líquen Events"
+                  alt={alt}
                   fill
                   sizes="33vw"
                   className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"
