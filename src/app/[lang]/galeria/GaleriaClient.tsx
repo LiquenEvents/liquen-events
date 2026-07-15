@@ -91,7 +91,13 @@ function hashUnit(s: string): number {
  * client — no hydration mismatch). A final de-adjacency pass removes the rare
  * same-event neighbour.
  */
-function interleaveByCollection(list: Photo[]): Photo[] {
+// `seed` re-rolls the arrangement per visit: mixed into every hash input so the
+// per-bucket phase, jitter and tiebreak all shift together — a genuinely
+// different (but still well-spread, no-bunching) order each time. Empty seed on
+// the server + first client render keeps SSR and hydration identical; the client
+// swaps in a random seed once mounted (see `orderSeed`), so each entry differs
+// while the order stays fixed for the whole visit (never reshuffles mid-scroll).
+function interleaveByCollection(list: Photo[], seed = ""): Photo[] {
   const buckets = new Map<string, Photo[]>();
   const order: string[] = [];
   for (const p of list) {
@@ -107,15 +113,15 @@ function interleaveByCollection(list: Photo[]): Photo[] {
   const ranked: { p: Photo; rank: number }[] = [];
   for (const key of order) {
     const arr = buckets.get(key)!;
-    const phase = hashUnit(key); // per-bucket rotation → staggered interleave
+    const phase = hashUnit(key + seed); // per-bucket rotation → staggered interleave
     for (let j = 0; j < arr.length; j++) {
-      const jitter = (hashUnit(arr[j].src) - 0.5) * 0.12;
+      const jitter = (hashUnit(arr[j].src + seed) - 0.5) * 0.12;
       let rank = (j + 0.5) / arr.length + phase + jitter;
       rank -= Math.floor(rank); // wrap into [0,1)
       ranked.push({ p: arr[j], rank });
     }
   }
-  ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src) - hashUnit(b.p.src));
+  ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src + seed) - hashUnit(b.p.src + seed));
   return deAdjacent(ranked.map((r) => r.p));
 }
 
@@ -244,6 +250,14 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // (in shoot order, no interleaving) instead of a category grid.
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
+  // Per-visit arrangement seed. Empty on SSR + first client render (so hydration
+  // matches); a random value is set once on mount, re-rolling the interleave so
+  // every fresh entry to the gallery lays out differently. It never changes
+  // after mount, so the grid stays put while browsing (no mid-scroll reshuffle).
+  const [orderSeed, setOrderSeed] = useState("");
+  useEffect(() => {
+    setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36));
+  }, []);
   const [fading, setFading] = useState(false);
   // Right-edge fade on the filter pill row, only while it actually
   // overflows — hints "more categories, swipe" without permanently
@@ -437,8 +451,8 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
       return photos.filter((p) => collectionFor(p.src) === collectionFilter);
     }
     const filtered = cat === "Todos" ? photos : photos.filter((p) => p.label === cat);
-    return interleaveByCollection(filtered);
-  }, [cat, collectionFilter, photos]);
+    return interleaveByCollection(filtered, orderSeed);
+  }, [cat, collectionFilter, photos, orderSeed]);
   const visible = pool.slice(0, shown);
 
   // Infinite scroll — a sentinel below the grid loads the next page as it nears
@@ -839,48 +853,70 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
         {/* Masonry — fotos restantes (satélites 1-4 reaparecem aqui em
             mobile); numa vista de coleção começa em 0, sem hero, cada foto
             com um único nome VT estável (ver nota acima). */}
-        {(collectionFilter ? visible.length > 0 : visible.length > 1) && (
-          <div className="columns-1 sm:columns-2 md:columns-3 gap-0.5">
-            {(collectionFilter ? visible : visible.slice(1)).map((p, i) => {
-              const idx = collectionFilter ? i : i + 1;
-              return (
-                <div
-                  key={p.src}
-                  ref={registerTile}
-                  className={`g-reveal cv-auto break-inside-avoid mb-0.5${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
-                  style={{ "--reveal-delay": `${(i % 3) * 60}ms` } as React.CSSProperties}
-                >
-                  <button
-                    onClick={() => openAt(idx)}
-                    data-ripple
-                    data-cap={caption(p.src, p.label).caption}
-                    data-sub={caption(p.src, p.label).sub}
-                    className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
-                    style={{ aspectRatio: p.aspectRatio }}
-                  >
-                    {lb !== idx && (
-                      <VTWrap
-                        name={collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)}
+        {(collectionFilter ? visible.length > 0 : visible.length > 1) &&
+          // Masonry rendered as independent PAGE-sized blocks. CSS multi-column
+          // re-balances its WHOLE column set whenever content is added — so with a
+          // single growing container, loading the next page shuffles already-seen
+          // photos into new columns ("no meio do nada atualiza e coloca outras
+          // fotos"). One container per page means an appended page is a NEW block
+          // below; the earlier blocks never re-flow. Heights are exact (each tile
+          // sets aspectRatio, and cv-auto is gone so there's no 320px estimate to
+          // resolve on scroll), so columns are computed once and stay put.
+          Array.from({
+            length: Math.ceil((collectionFilter ? visible.length : visible.length - 1) / PAGE),
+          }).map((_, ci) => {
+            const base = collectionFilter ? 0 : 1;
+            const from = base + ci * PAGE;
+            const block = visible.slice(from, from + PAGE);
+            return (
+              <div
+                key={ci}
+                className={`columns-1 sm:columns-2 md:columns-3 gap-0.5${ci > 0 ? " mt-0.5" : ""}`}
+              >
+                {block.map((p, j) => {
+                  const i = ci * PAGE + j;
+                  const idx = base + i;
+                  return (
+                    <div
+                      key={p.src}
+                      ref={registerTile}
+                      className={`g-reveal break-inside-avoid mb-0.5${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
+                      style={{ "--reveal-delay": `${(j % 3) * 60}ms` } as React.CSSProperties}
+                    >
+                      <button
+                        onClick={() => openAt(idx)}
+                        data-ripple
+                        data-cap={caption(p.src, p.label).caption}
+                        data-sub={caption(p.src, p.label).sub}
+                        className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
+                        style={{ aspectRatio: p.aspectRatio }}
                       >
-                        <Image
-                          src={p.src}
-                          alt={altText(p.src, p.label)}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 33vw"
-                          className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                          loading={collectionFilter && i === 0 ? "eager" : "lazy"}
-                          placeholder="blur"
-                          blurDataURL={p.blurDataURL}
-                        />
-                      </VTWrap>
-                    )}
-                    <HoverOverlay {...caption(p.src, p.label)} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                        {lb !== idx && (
+                          <VTWrap
+                            name={
+                              collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)
+                            }
+                          >
+                            <Image
+                              src={p.src}
+                              alt={altText(p.src, p.label)}
+                              fill
+                              sizes="(max-width: 768px) 50vw, 33vw"
+                              className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+                              loading={collectionFilter && i === 0 ? "eager" : "lazy"}
+                              placeholder="blur"
+                              blurDataURL={p.blurDataURL}
+                            />
+                          </VTWrap>
+                        )}
+                        <HoverOverlay {...caption(p.src, p.label)} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
       </div>
 
       {/* ── Scroll infinito ── */}
