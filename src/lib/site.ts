@@ -59,7 +59,7 @@ export const AREAS_SERVED = [
 export const SITE_KEYWORDS = [
   "organização de eventos Évora",
   "casamentos Évora",
-  "wedding coordinator Alentejo",
+  "decoração de casamentos Alentejo",
   "casamentos Alentejo",
   "coordenação de casamentos Alentejo",
   "eventos corporativos Lisboa",

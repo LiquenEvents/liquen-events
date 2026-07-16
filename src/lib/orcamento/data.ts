@@ -124,7 +124,7 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       id: "casamentos",
       label: "Casamentos",
       description:
-        "O dia mais especial da vossa vida, coordenado ao pormenor para o viverem sem preocupações.",
+        "O dia mais especial da vossa vida, com uma decoração à vossa medida e o dia coordenado ao pormenor, para o viverem sem preocupações.",
       icon: "💒",
       minGuests: 30,
       maxGuests: 500,
@@ -132,11 +132,11 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       pricePerPax: 42,
       suggestedDuration: 10,
       features: [
+        "Decoração floral e cenografia",
+        "Conceito e design decorativo",
         "Coordenação do dia do casamento",
-        "Reunião de preparação e revisão do plano",
         "Gestão e articulação de fornecedores",
-        "Cronograma detalhado do dia",
-        "Supervisão da montagem e do espaço",
+        "Montagem e styling do espaço",
         "Ponto de contacto único no dia",
       ],
     },

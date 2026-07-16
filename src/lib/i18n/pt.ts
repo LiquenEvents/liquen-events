@@ -66,16 +66,16 @@ export const pt = {
     clientsSay: "O que dizem os clientes",
     reviewsLabel: "avaliações",
     testemunhoLabel: "Testemunho",
-    whatsappPrefill: "Olá, gostaria de saber mais sobre a organização de eventos.",
+    whatsappPrefill: "Olá, gostaria de saber mais sobre a decoração de eventos.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
       homeHero: "Líquen Events — evento aéreo no Alentejo",
       homeWedding: "Casamento ao pôr do sol numa herdade no Alentejo",
       contactoHero: "Vista aérea de uma herdade preparada para um evento no Alentejo",
-      sobrePortrait: "Momento de casamento coordenado pela Líquen Events no Alentejo",
+      sobrePortrait: "Momento de casamento decorado pela Líquen Events no Alentejo",
       sobreGolden: "Celebração de casamento à luz dourada no Alentejo",
-      sobreOutdoor: "Casamento ao ar livre coordenado pela Líquen Events no Alentejo",
+      sobreOutdoor: "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
       clientesAerial: "Vista aérea de evento Líquen Events",
       servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events no Alentejo",
       servicosEvening: "Casamento celebrado ao anoitecer numa quinta no Alentejo",
@@ -85,15 +85,15 @@ export const pt = {
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Organização de Eventos e Coordenação de Casamentos | Líquen Events",
+    homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Organização de eventos e coordenação de casamentos com base em Évora: casamentos, eventos corporativos e celebrações em todo o Alentejo e Portugal. Soluções à medida — peça orçamento.",
-    sobreTitle: "Empresa de Organização de Eventos no Alentejo",
+      "Empresa de decoração de eventos e casamentos com base em Évora: decoração e coordenação de casamentos, eventos corporativos e celebrações em todo o Alentejo e Portugal. Soluções à medida — peça orçamento.",
+    sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
-      "Líquen Events, empresa de organização de eventos em Évora. Mais de 100 casamentos, eventos corporativos e celebrações no Alentejo e em todo o Portugal.",
-    servicosTitle: "Casamentos e Eventos Corporativos no Alentejo",
+      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos, eventos corporativos e celebrações decorados e coordenados no Alentejo e em todo o Portugal.",
+    servicosTitle: "Decoração de Casamentos e Eventos no Alentejo",
     servicosDescription:
-      "Coordenação de casamentos e organização de eventos corporativos, conferências e festas privadas em Évora, no Alentejo e em todo o Portugal. Soluções à medida do seu evento.",
+      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e festas privadas em Évora, no Alentejo e em todo o Portugal. Soluções à medida do seu evento.",
     galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
     galeriaDescription:
       "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
@@ -111,20 +111,20 @@ export const pt = {
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
   // the markup's language always matches the visible page's.
   jsonld: {
-    hasOfferCatalogName: "Organização de eventos e coordenação de casamentos",
+    hasOfferCatalogName: "Decoração de eventos e casamentos",
     services: [
-      "Coordenação de casamentos",
+      "Decoração e coordenação de casamentos",
       "Eventos corporativos e conferências",
       "Festas e celebrações privadas",
       "Jantares de gala e eventos sociais",
     ],
-    servicosServiceName: "Organização de eventos e coordenação de casamentos",
+    servicosServiceName: "Decoração de eventos e coordenação de casamentos",
     servicosServiceDescription:
-      "Coordenação de casamentos e organização de eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal.",
+      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal.",
   },
 
   home: {
-    eyebrow: "Organização de eventos · Évora · Alentejo",
+    eyebrow: "Decoração de eventos · Évora · Alentejo",
     heroLines: [
       { words: ["Eventos", "que"] },
       { words: ["ficam", "na"] },
@@ -185,7 +185,7 @@ export const pt = {
       Evento: "Evento",
     },
     alt: {
-      Casamento: "Casamento coordenado pela Líquen Events no Alentejo",
+      Casamento: "Casamento decorado pela Líquen Events no Alentejo",
       Corporativo: "Evento corporativo organizado pela Líquen Events",
       Conferência: "Conferência organizada pela Líquen Events",
       Aéreo: "Vista aérea de evento da Líquen Events",
@@ -469,7 +469,7 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial, coordenado ao pormenor — tempos, fornecedores e logística tratados, para só terem de o viver.",
+            desc: "O vosso dia mais especial, com uma decoração à vossa medida e o dia coordenado ao pormenor, para só terem de o viver.",
           },
           {
             title: "Batizados & Comunhões",
@@ -616,7 +616,7 @@ export const pt = {
     paginas: "Páginas",
     servicosTitulo: "Serviços",
     serviceLinks: [
-      "Coordenação de Casamentos",
+      "Decoração de Casamentos",
       "Eventos Corporativos",
       "Festas e Aniversários",
       "Jantares de Gala",

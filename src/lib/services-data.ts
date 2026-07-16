@@ -22,30 +22,30 @@ export interface ServiceDetail {
 export const SERVICES: ServiceDetail[] = [
   {
     slug: "casamentos",
-    eyebrow: "Coordenação de Casamentos",
-    title: "Coordenação de Casamentos no Alentejo e em Portugal",
-    metaTitle: "Coordenação de Casamentos no Alentejo — Wedding Coordinator",
+    eyebrow: "Decoração e Coordenação de Casamentos",
+    title: "Decoração de Casamentos no Alentejo e em Portugal",
+    metaTitle: "Decoração de Casamentos no Alentejo — Líquen Events",
     metaDescription:
-      "Wedding coordinator no Alentejo. Coordenação do dia do casamento — orquestramos tempos, fornecedores e logística para viverem o grande dia sem preocupações, em herdades, quintas e espaços únicos de todo o Portugal.",
+      "Decoração de casamentos no Alentejo — decoração floral e cenografia à medida, com coordenação do dia para viverem o grande dia sem preocupações. Em herdades, quintas e espaços únicos de todo o Portugal.",
     keywords: [
+      "decoração de casamentos Alentejo",
+      "decoração de casamentos",
       "coordenação de casamentos Alentejo",
-      "wedding coordinator Alentejo",
-      "coordenação do dia do casamento",
       "casamento herdade Alentejo",
-      "wedding coordinator Portugal",
+      "wedding decoration Alentejo",
     ],
     hero: "/imagens/EW1_1100.jpg",
     intro: [
-      "O vosso casamento é único — e no grande dia tudo tem de correr na perfeição. A Líquen Events é wedding coordinator: coordenamos o dia do vosso casamento em todo o Alentejo e Portugal, das herdades e quintas históricas aos espaços mais íntimos.",
-      "Entramos na reta final para orquestrar tudo — cronograma do dia, articulação com os fornecedores, montagem, equipa e imprevistos. No dia, somos o vosso ponto de contacto único, para que só tenham de viver o momento.",
+      "O vosso casamento é único — e a decoração é o que lhe dá alma. A Líquen Events cria a decoração do vosso casamento em todo o Alentejo e Portugal, das herdades e quintas históricas aos espaços mais íntimos: conceito, flores e cenografia pensados ao pormenor.",
+      "E no grande dia coordenamos tudo — cronograma, fornecedores, montagem e imprevistos — para que só tenham de viver o momento.",
     ],
     includes: [
+      "Decoração floral e cenografia",
+      "Conceito e design decorativo",
+      "Montagem e styling do espaço",
       "Coordenação do dia do casamento",
-      "Reunião de preparação e revisão do plano",
-      "Cronograma detalhado (timings do dia)",
-      "Articulação e confirmação de fornecedores",
-      "Supervisão da montagem e do espaço",
-      "Gestão de equipa e imprevistos no dia",
+      "Cronograma e articulação de fornecedores",
+      "Supervisão da montagem no dia",
     ],
     gallery: [
       "/imagens/DaniGui_Preview20.jpg",
@@ -57,12 +57,12 @@ export const SERVICES: ServiceDetail[] = [
     ],
     faqs: [
       {
-        q: "Com quanto tempo de antecedência devo contratar a coordenação do casamento?",
-        a: "Idealmente alguns meses antes, para termos tempo de rever o vosso plano e articular com os fornecedores. Mas conseguimos entrar mais perto da data, consoante a disponibilidade.",
+        q: "Com quanto tempo de antecedência devo contratar a decoração e coordenação?",
+        a: "Idealmente alguns meses antes, para desenharmos a decoração e articularmos com os fornecedores. Mas conseguimos entrar mais perto da data, consoante a disponibilidade.",
       },
       {
-        q: "Fazem coordenação de casamentos fora do Alentejo?",
-        a: "Sim. Coordenamos casamentos em todo o Portugal continental e ilhas, em articulação com os fornecedores de cada região.",
+        q: "Fazem casamentos fora do Alentejo?",
+        a: "Sim. Decoramos e coordenamos casamentos em todo o Portugal continental e ilhas, em articulação com os fornecedores de cada região.",
       },
     ],
     related: ["jantares-de-gala", "festas-e-aniversarios"],
@@ -206,31 +206,31 @@ type ServiceCopy = Pick<
 
 const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
-    eyebrow: "Wedding Coordination",
-    title: "Wedding Coordination in the Alentejo and across Portugal",
-    metaTitle: "Wedding Coordinator in the Alentejo",
+    eyebrow: "Wedding Decoration & Coordination",
+    title: "Wedding Decoration in the Alentejo and across Portugal",
+    metaTitle: "Wedding Decoration in the Alentejo — Líquen Events",
     metaDescription:
-      "Wedding coordinator in the Alentejo. Wedding day coordination — we orchestrate timings, suppliers and logistics so you can simply enjoy your day, at estates, quintas and unique venues across Portugal.",
+      "Wedding decoration in the Alentejo — bespoke floral design and scenography, with day-of coordination so you can simply enjoy your day, at estates, quintas and unique venues across Portugal.",
     intro: [
-      "Your wedding is one of a kind — and on the day, everything has to run perfectly. Líquen Events is a wedding coordinator: we coordinate your wedding day throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues.",
-      "We step in for the final stretch to orchestrate it all — the day's timeline, supplier liaison, setup, team and the unexpected. On the day, we're your single point of contact, so all you have to do is live the moment.",
+      "Your wedding is one of a kind — and the decoration is what gives it soul. Líquen Events creates your wedding's decoration throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues: concept, flowers and scenography considered down to the last detail.",
+      "And on the day, we coordinate everything — timeline, suppliers, setup and the unexpected — so all you have to do is live the moment.",
     ],
     includes: [
+      "Floral décor and scenography",
+      "Concept and decorative design",
+      "Setup and venue styling",
       "Wedding day coordination",
-      "Prep meeting and plan review",
-      "Detailed day-of timeline",
-      "Supplier liaison and confirmation",
-      "Setup and venue supervision",
-      "On-the-day team and troubleshooting",
+      "Timeline and supplier liaison",
+      "On-the-day setup supervision",
     ],
     faqs: [
       {
-        q: "How far in advance should I hire wedding coordination?",
-        a: "Ideally a few months before, so we have time to review your plan and liaise with your suppliers. But we can come on board closer to the date, subject to availability.",
+        q: "How far in advance should I hire decoration and coordination?",
+        a: "Ideally a few months before, so we can design the decoration and liaise with your suppliers. But we can come on board closer to the date, subject to availability.",
       },
       {
-        q: "Do you coordinate weddings outside the Alentejo?",
-        a: "Yes. We coordinate weddings throughout mainland Portugal and the islands, working with each region's suppliers.",
+        q: "Do you do weddings outside the Alentejo?",
+        a: "Yes. We decorate and coordinate weddings throughout mainland Portugal and the islands, working with each region's suppliers.",
       },
     ],
   },
