@@ -143,8 +143,6 @@ export const pt = {
   home: {
     eyebrow: "Decoração de eventos · Évora · Alentejo",
     heroLines: [
-      { words: ["Organizamos"] },
-      { words: ["eventos,"] },
       { words: ["eternizamos"], moss: true },
       { words: ["memórias."], moss: true },
     ] as { words: string[]; moss?: boolean }[],
