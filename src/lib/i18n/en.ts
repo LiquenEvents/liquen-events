@@ -284,7 +284,7 @@ export const en: Dict = {
     whatsappEyebrow: "Instant reply",
     whatsappTitleLine1: "Prefer to talk",
     whatsappTitleLine2: "right now?",
-    whatsappText: "Talk to us directly on WhatsApp. We're available Monday to Friday, 9am to 6pm.",
+    whatsappText: "Talk to us directly on WhatsApp. We're available Monday to Friday, 9am to 8pm.",
     form: {
       heroEyebrow: "Get in touch",
       heroTitleLine1: "Let's create something",
@@ -293,7 +293,7 @@ export const en: Dict = {
       emailLabel: "E-mail",
       emailSub: "We reply within 24 business hours",
       phoneLabel: "Phone",
-      phoneSub: "Mon–Fri, 9am–6pm",
+      phoneSub: "Mon–Fri, 9am–8pm",
       locationLabel: "Location",
       locationValue: "Évora, Alentejo — across Portugal",
       locationSub: "In-person meetings available",

@@ -293,7 +293,7 @@ export const pt = {
     whatsappTitleLine1: "Prefere falar",
     whatsappTitleLine2: "agora?",
     whatsappText:
-      "Fale connosco diretamente pelo WhatsApp. Estamos disponíveis de segunda a sexta, das 9h às 18h.",
+      "Fale connosco diretamente pelo WhatsApp. Estamos disponíveis de segunda a sexta, das 9h às 20h.",
     form: {
       heroEyebrow: "Fale connosco",
       heroTitleLine1: "Vamos criar algo",
@@ -302,7 +302,7 @@ export const pt = {
       emailLabel: "E-mail",
       emailSub: "Respondemos em menos de 24 horas úteis",
       phoneLabel: "Telefone",
-      phoneSub: "Seg–Sex, 9h–18h",
+      phoneSub: "Seg–Sex, 9h–20h",
       locationLabel: "Localização",
       locationValue: "Évora, Alentejo — em todo o Portugal",
       locationSub: "Reuniões presenciais disponíveis",
