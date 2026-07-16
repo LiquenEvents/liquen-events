@@ -80,6 +80,18 @@ export const en: Dict = {
       servicosCeremony: "Outdoor ceremony planned by Líquen Events in the Alentejo",
       servicosEvening: "Wedding celebrated at dusk on an estate in the Alentejo",
       orcamentoPanel: "Celebration dinner with a set table and candlelit décor",
+      galeriaHeader: "Gallery of weddings and events decorated by Líquen Events in the Alentejo",
+      galeriaInstagram: "Events decorated by Líquen Events on Instagram",
+      sobreCelebration: "Wedding celebration decorated by Líquen Events in the Alentejo",
+      sobreFounder: "Catarina Gaspar — Founder & CEO of Líquen Events",
+      clientesCorporate: "Corporate event decorated by Líquen Events in Évora",
+      clientesDinner: "Event dinner decorated by Líquen Events",
+      servicosEndOfDay: "Event decorated by Líquen Events at the end of the day",
+      contactoBand: [
+        "Outdoor wedding ceremony in the Alentejo",
+        "Wedding at sunset on an Alentejo estate",
+        "Wedding dinner table setting with floral decoration",
+      ],
     },
   },
 
@@ -166,6 +178,14 @@ export const en: Dict = {
     ctaTitleLine1: "Shall we work",
     ctaTitleMoss: "together?",
     ctaText: "From the first conversation to the last toast, we handle every detail of your event.",
+    galleryAlt: [
+      "Outdoor wedding ceremony on an Alentejo estate",
+      "Wedding party under hanging lights at dusk",
+      "Newlyweds embracing during the wedding celebration",
+      "Wedding table setting with flowers and candles",
+      "Wedding at dusk outdoors in the Alentejo",
+      "Floral decoration of a wedding ceremony in the Alentejo",
+    ],
   },
 
   galeria: {
@@ -255,6 +275,15 @@ export const en: Dict = {
     ctaTitleLine1: "Join our",
     ctaTitleLine2: "clients.",
     ctaText: "Tell us your idea and we'll show you how we can turn it into a memorable event.",
+    galleryAlt: [
+      "Corporate event reception in a courtyard in Évora",
+      "Wedding with floral decoration on an Alentejo estate",
+      "Candlelit gala dinner at an event in the Alentejo",
+      "Outdoor wedding with table setting and floral arrangements in the Alentejo",
+      "Gala dinner with table setting and candles",
+      "Corporate gala in a decorated hall at night",
+      "Institutional event with stage and audience",
+    ],
   },
 
   contacto: {
@@ -503,6 +532,14 @@ export const en: Dict = {
     ctaText:
       "Talk to us. No commitment, no cost. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
+    galleryAlt: [
+      "Outdoor wedding decorated by Líquen Events in the Alentejo",
+      "Celebration dinner with elegant candlelit decoration",
+      "Aerial view of an event on an Alentejo estate",
+      "Event reception in the late afternoon in the Alentejo",
+      "Outdoor wedding reception at sunset in the Alentejo",
+      "Portrait of the newlyweds during a wedding in the Alentejo",
+    ],
   },
 
   confirmacao: {

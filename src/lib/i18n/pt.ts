@@ -80,6 +80,18 @@ export const pt = {
       servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events no Alentejo",
       servicosEvening: "Casamento celebrado ao anoitecer numa quinta no Alentejo",
       orcamentoPanel: "Jantar de festa com mesa posta e decoração à luz de velas",
+      galeriaHeader: "Galeria de casamentos e eventos decorados pela Líquen Events no Alentejo",
+      galeriaInstagram: "Eventos decorados pela Líquen Events no Instagram",
+      sobreCelebration: "Celebração de casamento decorada pela Líquen Events no Alentejo",
+      sobreFounder: "Catarina Gaspar — Fundadora & CEO da Líquen Events",
+      clientesCorporate: "Evento corporativo decorado pela Líquen Events em Évora",
+      clientesDinner: "Jantar de evento decorado pela Líquen Events",
+      servicosEndOfDay: "Evento decorado pela Líquen Events ao final do dia",
+      contactoBand: [
+        "Cerimónia de casamento ao ar livre no Alentejo",
+        "Casamento ao pôr do sol numa herdade alentejana",
+        "Mesa posta de jantar de casamento com decoração floral",
+      ],
     },
   },
 
@@ -165,6 +177,14 @@ export const pt = {
     ctaTitleLine1: "Vamos trabalhar",
     ctaTitleMoss: "juntos?",
     ctaText: "Da primeira conversa ao último brinde, tratamos de cada detalhe do seu evento.",
+    galleryAlt: [
+      "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
+      "Festa de casamento sob luzes suspensas ao anoitecer",
+      "Noivos abraçados durante a celebração do casamento",
+      "Mesa posta de casamento com flores e velas",
+      "Casamento ao entardecer ao ar livre no Alentejo",
+      "Decoração floral de cerimónia de casamento no Alentejo",
+    ],
   },
 
   galeria: {
@@ -263,6 +283,15 @@ export const pt = {
     ctaTitleLine2: "nossos clientes.",
     ctaText:
       "Conte-nos a sua ideia e mostramos-lhe como a podemos transformar num evento memorável.",
+    galleryAlt: [
+      "Receção de evento corporativo num pátio em Évora",
+      "Casamento com decoração floral numa herdade do Alentejo",
+      "Jantar de gala à luz de velas num evento no Alentejo",
+      "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
+      "Jantar de gala com mesa posta e velas",
+      "Gala corporativa num salão decorado à noite",
+      "Evento institucional com palco e plateia",
+    ],
   },
 
   contacto: {
@@ -512,6 +541,14 @@ export const pt = {
     ctaText:
       "Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
     ctaGaleria: "Ver a galeria",
+    galleryAlt: [
+      "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
+      "Jantar de celebração com decoração elegante à luz de velas",
+      "Vista aérea de um evento numa herdade do Alentejo",
+      "Receção de evento ao final da tarde no Alentejo",
+      "Receção de casamento ao ar livre ao pôr do sol no Alentejo",
+      "Retrato dos noivos durante um casamento no Alentejo",
+    ],
   },
 
   confirmacao: {

@@ -100,7 +100,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/EW1_1393.jpg"
-            alt="Evento corporativo Líquen Events"
+            alt={t.common.imageAlt.clientesCorporate}
             fill
             preload
             sizes="100vw"
@@ -258,7 +258,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             <div className="relative min-h-[380px] lg:min-h-0">
               <Image
                 src="/imagens/428708341-339551125742979-6565889301500133407-n.jpg"
-                alt="Jantar de evento Líquen Events"
+                alt={t.common.imageAlt.clientesDinner}
                 fill
                 sizes="(max-width: 1024px) 100vw, 45vw"
                 className="object-cover object-center"
@@ -338,7 +338,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               <div key={i} className={`${item.cls} relative overflow-hidden group`}>
                 <Image
                   src={item.src}
-                  alt={item.alt}
+                  alt={t.clientes.galleryAlt[i] ?? item.alt}
                   fill
                   sizes="(max-width: 768px) 100vw, 40vw"
                   className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"

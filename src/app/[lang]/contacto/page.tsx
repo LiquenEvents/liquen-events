@@ -344,12 +344,12 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 src: "/imagens/M&F0658.jpg",
                 alt: "Mesa posta de jantar de casamento com decoração floral",
               },
-            ].map(({ src, alt }) => (
+            ].map(({ src, alt }, i) => (
               <div key={src} className="relative overflow-hidden group">
                 <Image
                   src={src}
                   {...blurFor(src)}
-                  alt={alt}
+                  alt={t.common.imageAlt.contactoBand[i] ?? alt}
                   fill
                   sizes="33vw"
                   className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"

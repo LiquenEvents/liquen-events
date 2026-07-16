@@ -382,7 +382,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/EW1_1330.jpg"
-            alt="Evento organizado pela Líquen Events ao final do dia"
+            alt={t.common.imageAlt.servicosEndOfDay}
             fill
             preload
             sizes="100vw"
@@ -550,7 +550,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
               <Image
                 src={g.src}
-                alt={g.alt}
+                alt={t.servicos.galleryAlt[i] ?? g.alt}
                 fill
                 sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"

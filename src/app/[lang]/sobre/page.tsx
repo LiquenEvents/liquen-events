@@ -85,7 +85,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
-            alt="Líquen Events — celebração"
+            alt={t.common.imageAlt.sobreCelebration}
             fill
             preload
             sizes="100vw"
@@ -171,7 +171,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
               <Image
                 src={g.src}
-                alt={g.alt}
+                alt={t.sobre.galleryAlt[i] ?? g.alt}
                 fill
                 sizes="(max-width: 768px) 50vw, 50vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
@@ -226,7 +226,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <div className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden rounded-2xl shadow-2xl shadow-black/25 ring-1 ring-foreground/5">
               <Image
                 src="/imagens/catarina-gaspar.jpg"
-                alt="Catarina Gaspar — Fundadora & CEO da Líquen Events"
+                alt={t.common.imageAlt.sobreFounder}
                 fill
                 sizes="(max-width: 1024px) 80vw, 340px"
                 className="object-cover"

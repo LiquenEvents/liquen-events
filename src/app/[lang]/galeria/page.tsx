@@ -53,7 +53,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/DaniGui_Preview20.jpg"
-            alt="Galeria de eventos Líquen Events"
+            alt={t.common.imageAlt.galeriaHeader}
             fill
             preload
             sizes="100vw"
@@ -100,7 +100,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       <section className="relative overflow-hidden border-t border-white/8">
         <Image
           src="/imagens/DaniGui_Adois_61.jpg"
-          alt="Eventos Líquen Events no Instagram"
+          alt={t.common.imageAlt.galeriaInstagram}
           fill
           sizes="100vw"
           className="object-cover object-center"
