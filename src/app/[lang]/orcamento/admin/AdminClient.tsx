@@ -6,7 +6,6 @@ import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
-import dynamic from "next/dynamic";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
@@ -21,54 +20,36 @@ import {
   downloadEventIcs,
 } from "./export";
 import { eventCountdown, randomId, eur } from "./util";
-import { ViewSkeleton } from "./Skeleton";
 import EmptyState from "./EmptyState";
 import { NAV, type View } from "./nav";
+import {
+  Overview,
+  Kanban,
+  Clientes,
+  Calendario,
+  Propostas,
+  Tarefas,
+  Fornecedores,
+  StatsDashboard,
+  Inbox,
+  ProposalBuilder,
+  ClientMessenger,
+  EventChecklist,
+  EventTimeline,
+  PaymentsPanel,
+  EventCosts,
+  GuestList,
+  TagsField,
+  FollowUpField,
+  ActivityLog,
+  EventTasks,
+} from "./lazy";
 
 // Quantos pedidos a lista renderiza de cada vez ("Mostrar mais" carrega o resto).
 const LIST_PAGE_SIZE = 50;
 
-// Each top-level view is a separate, mutually-exclusive surface — code-split
-// them so only the view the user actually opens ships its JS. This keeps the
-// back-office's initial load lean (8 of 9 views are deferred on first paint).
-// While the chunk arrives, a layout-shaped skeleton stands in so the page
-// settles instead of flashing a spinner.
-function ViewLoading() {
-  return <ViewSkeleton />;
-}
-const Overview = dynamic(() => import("./Overview"), { loading: ViewLoading });
-const Kanban = dynamic(() => import("./Kanban"), { loading: ViewLoading });
-const Clientes = dynamic(() => import("./Clientes"), { loading: ViewLoading });
-const Calendario = dynamic(() => import("./Calendario"), { loading: ViewLoading });
-const Propostas = dynamic(() => import("./Propostas"), { loading: ViewLoading });
-const Tarefas = dynamic(() => import("./Tarefas"), { loading: ViewLoading });
-const Fornecedores = dynamic(() => import("./Fornecedores"), { loading: ViewLoading });
-const StatsDashboard = dynamic(() => import("./StatsDashboard"), { loading: ViewLoading });
-const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
-
-// Detail-panel tools — only needed once a quote is opened, so defer their JS
-// too. A shimmering eyebrow+bar holds the layout while the chunk arrives.
-const PanelLoading = () => (
-  <div className="border-t border-foreground/10 pt-5">
-    <div className="bo-skeleton h-2.5 w-40 mb-4" aria-hidden />
-    <div className="bo-skeleton h-9 w-full" aria-hidden />
-  </div>
-);
-const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), { loading: PanelLoading });
-const ClientMessenger = dynamic(() => import("./ClientMessenger"), { loading: PanelLoading });
-const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
-const EventTimeline = dynamic(() => import("./EventTimeline"), { loading: PanelLoading });
-const PaymentsPanel = dynamic(() => import("./PaymentsPanel"), { loading: PanelLoading });
-const EventCosts = dynamic(() => import("./EventCosts"), { loading: PanelLoading });
-const GuestList = dynamic(() => import("./GuestList"), { loading: PanelLoading });
-const TagsField = dynamic(() => import("./TagsField"), {
-  loading: () => <div className="bo-skeleton h-9 w-full" aria-hidden />,
-});
-const FollowUpField = dynamic(() => import("./FollowUpField"), {
-  loading: () => <div className="bo-skeleton h-9 w-full" aria-hidden />,
-});
-const ActivityLog = dynamic(() => import("./ActivityLog"), { loading: PanelLoading });
-const EventTasks = dynamic(() => import("./EventTasks"), { loading: PanelLoading });
+// Code-split views + detail-panel tools live in ./lazy — only the view the
+// user opens ships its JS, keeping the back-office's initial load lean.
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Pendente", color: "bg-foreground/10 text-foreground/50" },
