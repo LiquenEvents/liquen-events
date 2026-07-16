@@ -68,7 +68,7 @@ const categoryMeta = [
     band: "/imagens/teresinhaeze-909.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
+      { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
       { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
     ],
@@ -79,14 +79,10 @@ const categoryMeta = [
     layout: "mosaic-right" as const,
     band: "/imagens/EW1_1333.jpg",
     services: [
-      // Conferências — sala ampla montada (banquete/plenário)
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1332.jpg" },
-      // Teambuilding — receção no pátio ao final do dia
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1398.jpg" },
-      // Lançamentos — cenografia e sala montada
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1428.jpg" },
-      // Jantares de empresa — mesa posta premium
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1404.jpg" },
+      { slug: "conferencias-e-congressos", image: "/imagens/EW1_1332.jpg" },
+      { slug: "teambuilding", image: "/imagens/EW1_1398.jpg" },
+      { slug: "lancamentos-de-produto", image: "/imagens/EW1_1428.jpg" },
+      { slug: "jantares-de-empresa", image: "/imagens/EW1_1404.jpg" },
     ],
   },
 ];
