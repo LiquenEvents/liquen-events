@@ -508,46 +508,53 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       {/* ── Service categories ── */}
       {categories.map((cat) => (
         <div key={cat.id}>
-          {/* Category header — clean, editorial (light); lets the mosaic photos
-              below carry the imagery and breaks the page's dark rhythm. */}
-          <section id={cat.id} className="bg-surface border-t border-foreground/8 scroll-mt-[60px]">
-            <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 pt-16 lg:pt-24 pb-10 lg:pb-14">
+          {/* Category intro — full-screen cinematic panel (SpaceX-style):
+              one image, one message. The light editorial header was dropped so
+              the page reads as a sequence of immersive full-bleed panels. */}
+          <section
+            id={cat.id}
+            className="relative overflow-hidden scroll-mt-[60px] flex items-end"
+            style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+          >
+            <Parallax speed={0.12} className="absolute inset-0">
+              <Image
+                src={cat.band}
+                alt=""
+                fill
+                sizes="100vw"
+                className="object-cover object-center"
+                {...blurFor(cat.band)}
+              />
+            </Parallax>
+            <div className="absolute inset-0 bg-black/55" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/15 to-[#080808]/45" />
+            <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
               <AnimateIn>
-                <div className="flex items-start gap-5 sm:gap-8">
-                  <span
-                    className="hidden sm:block text-foreground/10 font-bold leading-[0.8] select-none flex-shrink-0"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(56px, 8vw, 128px)",
-                    }}
-                    aria-hidden
+                <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
+                  {cat.num}
+                </p>
+                <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-4 flex items-center gap-3">
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
+                  {cat.subtitle}
+                </p>
+                <h2
+                  className="text-white font-bold leading-[0.92] tracking-tight"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(48px, 8vw, 120px)",
+                  }}
+                >
+                  {cat.label}
+                </h2>
+                <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
+                  <p className="text-white/75 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
+                  <Link
+                    href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
+                    className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
                   >
-                    {cat.num}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="eyebrow mb-3">{cat.subtitle}</p>
-                    <h2
-                      className="text-foreground font-bold leading-[0.95]"
-                      style={{
-                        fontFamily: "var(--font-playfair)",
-                        fontSize: "clamp(40px, 5.5vw, 88px)",
-                      }}
-                    >
-                      {cat.label}
-                    </h2>
-                    <div className="mt-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
-                      <p className="text-foreground/68 text-base leading-[1.8] max-w-md">
-                        {cat.desc}
-                      </p>
-                      <Link
-                        href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
-                        className="inline-flex items-center gap-3 px-8 py-3.5 border border-foreground/25 text-foreground text-[11px] tracking-[0.28em] uppercase hover:bg-foreground hover:text-surface hover:border-foreground transition-all duration-300 flex-shrink-0"
-                      >
-                        {ts.verDetalhes}
-                        <span aria-hidden>→</span>
-                      </Link>
-                    </div>
-                  </div>
+                    {ts.verDetalhes}
+                    <span aria-hidden>→</span>
+                  </Link>
                 </div>
               </AnimateIn>
             </div>
