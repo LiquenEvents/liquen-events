@@ -191,8 +191,9 @@ function ServiceCard({
           >
             {service.title}
           </h3>
-          {/* Mobile: always show desc; desktop: reveal on hover */}
-          <p className="text-cream/40 text-xs leading-relaxed md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
+          {/* Mobile: hidden entirely (title + CTA only — the photo breathes);
+              desktop: reveal on hover. */}
+          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
             {service.desc}
           </p>
           {/* Mobile: persistent CTA; desktop: reveal on hover */}
@@ -413,7 +414,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           />
           <AnimateIn delay={150}>
             <div className="mt-9 flex flex-col sm:flex-row sm:items-end gap-7 sm:gap-12">
-              <p className="text-white/60 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
+              <p className="text-white/80 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
               <Link
                 href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors duration-300 group flex-shrink-0"
@@ -466,7 +467,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 py-16 lg:py-24">
                 <AnimateIn>
                   <span
-                    className="block text-white/12 font-bold leading-none mb-6 select-none"
+                    className="hidden sm:block text-white/12 font-bold leading-none mb-6 select-none"
                     style={{
                       fontFamily: "var(--font-playfair)",
                       fontSize: "clamp(64px, 9vw, 150px)",
@@ -489,10 +490,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                     {cat.label}
                   </h2>
                   <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-                    <p className="text-white/60 text-base leading-[1.8] max-w-md">{cat.desc}</p>
+                    <p className="hidden lg:block text-white/80 text-base leading-[1.8] max-w-md">
+                      {cat.desc}
+                    </p>
                     <Link
                       href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
-                      className="group inline-flex items-center gap-3 text-xs text-white/65 hover:text-white transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
+                      className="group inline-flex items-center gap-3 text-xs text-white/75 hover:text-white transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
                     >
                       <span>{ts.verDetalhes}</span>
                       <span className="w-7 h-px bg-white/30 group-hover:w-12 transition-all duration-500" />
@@ -502,6 +505,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               </div>
             </div>
           </section>
+
+          {/* Mobile: the category description lives on a clean surface, off the
+              photo — the band above stays a punchy image + title only. */}
+          <div className="lg:hidden bg-surface px-6 py-9 border-t border-foreground/8">
+            <p className="text-foreground/70 text-[15px] leading-[1.85] max-w-md">{cat.desc}</p>
+          </div>
 
           {/* Service mosaic — full-bleed, image-forward */}
           <section className="bg-surface">
@@ -569,7 +578,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               >
                 {ts.seoTitle}
               </h2>
-              <p className="text-cream/55 text-base lg:text-lg leading-[1.85] max-w-xl">
+              <p className="text-cream/75 text-base lg:text-lg leading-[1.85] max-w-xl">
                 {ts.seoText}
               </p>
             </AnimateIn>
@@ -610,7 +619,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
+            <p className="text-white/75 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
