@@ -227,6 +227,7 @@ export const en: Dict = {
     viewWedding: "View this wedding",
     backToGallery: "All photos",
     photosLabel: "photos",
+    keyboardHint: "← → navigate · esc to close · swipe on mobile",
     backToTop: "Back to top",
   },
 

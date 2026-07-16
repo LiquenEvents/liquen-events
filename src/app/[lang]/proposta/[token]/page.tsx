@@ -44,7 +44,7 @@ function Message({ title, body }: { title: string; body: string }) {
         >
           {title}
         </h1>
-        <p className="text-foreground/55 text-sm leading-relaxed">{body}</p>
+        <p className="text-foreground/72 text-sm leading-relaxed">{body}</p>
         <a
           href={`mailto:${SITE.email}`}
           className="inline-block mt-8 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
@@ -87,7 +87,7 @@ export default async function ProposalPage({
     <Shell>
       <div className="w-full max-w-2xl">
         <header className="text-center mb-10">
-          <p className="text-foreground/35 text-[10px] tracking-[0.45em] uppercase mb-3">
+          <p className="text-foreground/68 text-[10px] tracking-[0.45em] uppercase mb-3">
             {t.eyebrow}
           </p>
           <h1
@@ -96,7 +96,7 @@ export default async function ProposalPage({
           >
             {t.greeting}, {proposal.clientName.split(" ")[0]}.
           </h1>
-          <p className="text-foreground/55 text-sm mt-3 max-w-md mx-auto leading-relaxed">
+          <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
             {t.intro}
           </p>
         </header>
@@ -160,7 +160,7 @@ export default async function ProposalPage({
         )}
 
         {validLabel && (
-          <p className="text-foreground/40 text-xs mt-5 text-center">
+          <p className="text-foreground/68 text-xs mt-5 text-center">
             {t.validoAte} {validLabel}.
           </p>
         )}
@@ -174,7 +174,7 @@ export default async function ProposalPage({
 
         <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">
           {t.footerNote}{" "}
-          <a href={`mailto:${SITE.email}`} className="text-moss/80 hover:underline">
+          <a href={`mailto:${SITE.email}`} className="text-moss hover:underline">
             {SITE.email}
           </a>
         </p>

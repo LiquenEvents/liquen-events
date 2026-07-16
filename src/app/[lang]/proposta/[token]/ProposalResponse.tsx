@@ -64,7 +64,7 @@ export default function ProposalResponse({ token, initialStatus, clientEmail }: 
             >
               {tp.aceiteTitle}
             </p>
-            <p className="text-foreground/55 text-sm leading-relaxed">{tp.aceiteBody}</p>
+            <p className="text-foreground/72 text-sm leading-relaxed">{tp.aceiteBody}</p>
           </>
         ) : (
           <>
@@ -74,7 +74,7 @@ export default function ProposalResponse({ token, initialStatus, clientEmail }: 
             >
               {tp.rejeitadaTitle}
             </p>
-            <p className="text-foreground/55 text-sm leading-relaxed">{tp.rejeitadaBody}</p>
+            <p className="text-foreground/72 text-sm leading-relaxed">{tp.rejeitadaBody}</p>
           </>
         )}
         {decided && <p className="text-foreground/68 text-[11px] mt-4">{tp.jaRegistado}</p>}

@@ -1172,7 +1172,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
 
             {/* Dicas teclado */}
             <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
-              ← → navegar · esc fechar · deslize no telemóvel
+              {t.galeria.keyboardHint}
             </p>
           </div>,
           document.body,

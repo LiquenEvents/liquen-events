@@ -447,7 +447,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
           <AnimateIn>
-            <p className="text-cream/65 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
+            <p className="text-cream/80 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
               <span className="w-5 h-px bg-cream/45 rounded-full flex-shrink-0" />
               {t.contacto.whatsappEyebrow}
             </p>

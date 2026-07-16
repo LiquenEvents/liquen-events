@@ -26,6 +26,7 @@ export default function RatingBadge({
   const ratingStr = ptFormat ? rating.toFixed(1).replace(".", ",") : rating.toFixed(1);
   return (
     <span
+      role="img"
       className={`inline-flex items-center gap-2 ${className ?? ""}`}
       aria-label={`${ratingStr}/5 — ${label}`}
     >

@@ -193,14 +193,14 @@ function ServiceCard({
           </h3>
           {/* Mobile: hidden entirely (title + CTA only — the photo breathes);
               desktop: reveal on hover. */}
-          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
+          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] md:group-focus-within:opacity-100 md:group-focus-within:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
             {service.desc}
           </p>
           {/* Mobile: persistent CTA; desktop: reveal on hover */}
           <span className="md:hidden inline-flex items-center text-moss text-[10px] tracking-[0.3em] uppercase mt-2.5">
             {cta} →
           </span>
-          <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-150">
+          <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 delay-150">
             {cta} →
           </span>
         </div>
