@@ -129,7 +129,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium text-sm tracking-widest uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300"
             >
-              @liquen.events →
+              @liquen.events <span aria-hidden>→</span>
             </a>
           </AnimateIn>
         </div>

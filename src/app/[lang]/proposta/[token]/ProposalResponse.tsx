@@ -22,9 +22,10 @@ export default function ProposalResponse({ token, initialStatus, clientEmail }: 
 
   async function respond(action: "aceitar" | "recusar") {
     if (sending) return;
-    if (action === "recusar" && !window.confirm(tp.confirmRecusar)) {
-      return;
-    }
+    // Both consequential actions confirm — accepting is a commitment, so it
+    // must be at least as guarded as declining (WCAG 3.3.4 Error Prevention).
+    if (action === "recusar" && !window.confirm(tp.confirmRecusar)) return;
+    if (action === "aceitar" && !window.confirm(tp.confirmAceitar)) return;
     setSending(action);
     setError(null);
     try {
@@ -101,7 +102,7 @@ export default function ProposalResponse({ token, initialStatus, clientEmail }: 
         </button>
       </div>
       {error && (
-        <p role="alert" className="text-[#b5654a] text-xs mt-3 text-center">
+        <p role="alert" className="text-[#a04a2f] text-xs mt-3 text-center">
           {error} {tp.errorSuffix}{" "}
           <a href={`mailto:${clientEmail}`} className="underline">
             {tp.errorLink}

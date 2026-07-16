@@ -204,7 +204,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/12 text-foreground/68 text-[11px] tracking-[0.25em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-all duration-300"
               >
-                {t.footer.pedirOrcamento} →
+                {t.footer.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
             </div>
           </div>

@@ -475,9 +475,12 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   display: none;
 }
 
-/* Com o menu mobile aberto, os botões flutuantes cedem o palco ao menu. */
+/* Com o menu mobile aberto, os botões flutuantes cedem o palco ao menu.
+   visibility:hidden (não só opacity) remove-o também da árvore de acessibilidade
+   para o leitor de ecrã não o alcançar por trás do menu. */
 body[data-menu-open] .whatsapp-fixed {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
