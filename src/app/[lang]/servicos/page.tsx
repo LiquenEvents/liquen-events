@@ -36,8 +36,6 @@ export async function generateMetadata({
   });
 }
 
-const navMeta = [{ id: "celebracoes" }, { id: "empresas" }];
-
 const eyebrowLight =
   "text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
 
@@ -189,7 +187,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const ts = t.servicos;
-  const navItems = navMeta.map((m, i) => ({ ...m, label: ts.nav[i] }));
   const categories: Category[] = categoryMeta.map((m, ci) => {
     const ct = ts.categories[ci];
     return {
@@ -266,22 +263,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {t.common.pedirOrcamento}
                 <span aria-hidden>→</span>
               </Link>
-            </div>
-          </AnimateIn>
-
-          {/* Category quick-nav */}
-          <AnimateIn delay={230}>
-            <div className="mt-12 pt-6 border-t border-white/12 flex items-center gap-6 sm:gap-12">
-              {navItems.map((cat, i) => (
-                <a
-                  key={cat.id}
-                  href={`#${cat.id}`}
-                  className="text-white/65 text-[10px] tracking-[0.42em] uppercase hover:text-moss-light transition-colors duration-300"
-                >
-                  <span className="text-moss-light/60 mr-2 font-mono">0{i + 1}</span>
-                  {cat.label}
-                </a>
-              ))}
             </div>
           </AnimateIn>
         </div>
