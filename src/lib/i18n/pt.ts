@@ -430,11 +430,12 @@ export const pt = {
   },
 
   orcamento: {
-    back: "Líquen Events",
+    back: "Início",
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
     titleMoss: "a sua ideia",
     lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
+    processHint: "Pedido → Proposta em 24h → Reunião",
     eventTypeLabels: [
       "Casamento",
       "Corporativo",

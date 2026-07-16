@@ -53,7 +53,10 @@ export default function StickyCTA() {
       // um anel de foco a 0% de opacidade. inert remove-o da ordem de Tab e da
       // árvore de acessibilidade até ficar visível.
       inert={!show}
-      className={`hidden lg:block fixed bottom-7 left-7 z-40 transition-all duration-500 ${
+      // Shown on every breakpoint: on mobile it's the only persistent path to
+      // the quote form (the navbar auto-hides on scroll-down). It sits bottom-
+      // LEFT, so it never collides with the bottom-right WhatsApp pill.
+      className={`fixed bottom-5 left-5 lg:bottom-7 lg:left-7 z-40 transition-all duration-500 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >

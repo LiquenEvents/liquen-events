@@ -299,14 +299,22 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <Magnetic strength={0.4}>
+            <div className="flex flex-wrap items-center gap-4">
+              <Magnetic strength={0.4}>
+                <Link
+                  href={localizeHref("/orcamento", locale)}
+                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                >
+                  {t.common.pedirOrcamento} →
+                </Link>
+              </Magnetic>
               <Link
                 href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/30 text-white/85 text-[11px] tracking-[0.2em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
               >
-                {t.common.entrarContacto} →
+                {t.common.entrarContacto}
               </Link>
-            </Magnetic>
+            </div>
           </AnimateIn>
         </div>
       </section>

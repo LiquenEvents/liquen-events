@@ -246,6 +246,9 @@ export default function OrcamentoForm() {
               <span className="text-moss-light">{to.titleMoss}</span>
             </p>
             <p className="text-cream/75 text-sm leading-[1.8] max-w-xs">{to.lead}</p>
+            <p className="mt-5 text-cream/55 text-[10px] tracking-[0.28em] uppercase">
+              {to.processHint}
+            </p>
             <div className="mt-8">
               <RatingBadge
                 label={t.common.reviewsLabel}
@@ -274,11 +277,29 @@ export default function OrcamentoForm() {
               desktop (where the left panel shows the display title). Always in
               the a11y tree, so heading navigation works at every breakpoint. */}
           <h1
-            className="lg:sr-only text-foreground font-bold leading-[0.95] tracking-tight mb-12"
+            className="lg:sr-only text-foreground font-bold leading-[0.95] tracking-tight mb-6"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 9vw, 52px)" }}
           >
             {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
           </h1>
+
+          {/* Reassurance on mobile: the desktop image panel carries the
+              "no commitment / 24h / reviews" cues, but it's hidden below lg —
+              so mobile users (the majority) would otherwise reach a bare form.
+              Restore the strongest trust + process signals right where hesitation
+              peaks, without breaking the minimal look. */}
+          <div className="lg:hidden mb-12 flex flex-col gap-4">
+            <p className="text-foreground/70 text-sm leading-relaxed">{to.lead}</p>
+            <p className="text-foreground/55 text-[10px] tracking-[0.28em] uppercase">
+              {to.processHint}
+            </p>
+            <RatingBadge
+              label={t.common.reviewsLabel}
+              ptFormat={locale === "pt"}
+              starClassName="text-gold"
+              textClassName="text-foreground/70"
+            />
+          </div>
 
           <form onSubmit={submit} aria-busy={sending} className="flex flex-col gap-11">
             {/* Required-fields key, before the fields so the '*' is explained
@@ -321,7 +342,7 @@ export default function OrcamentoForm() {
                 aria-invalid={!!tipoErr}
                 aria-describedby={tipoErr ? "of-tipo-err" : undefined}
                 onKeyDown={onRadioKey}
-                className="flex flex-wrap gap-2.5"
+                className="flex flex-wrap gap-3"
               >
                 {EVENT_TYPES.map((o, i) => {
                   const active = eventType === o.label;
@@ -337,7 +358,7 @@ export default function OrcamentoForm() {
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-4 py-2.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
+                      className={`px-4 py-3 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
                           ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
                           : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"

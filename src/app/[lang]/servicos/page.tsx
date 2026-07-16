@@ -142,7 +142,7 @@ function ServiceBand({
   return (
     <section
       className="relative overflow-hidden flex items-end"
-      style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+      style={{ minHeight: "clamp(420px, 60vh, 680px)" }}
     >
       <Parallax speed={0.12} className="absolute inset-0">
         <Image

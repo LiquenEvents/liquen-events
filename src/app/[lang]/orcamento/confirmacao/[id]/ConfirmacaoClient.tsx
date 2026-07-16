@@ -517,13 +517,13 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
           <div className="mt-14 flex flex-wrap gap-4">
             <Link
               href={localizeHref("/", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 btn-shine bg-moss text-white text-[11px] tracking-[0.2em] uppercase rounded-full hover:bg-moss-dark transition-colors shadow-lg shadow-moss/15"
+              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/72 text-[11px] tracking-[0.2em] uppercase rounded-sm hover:border-foreground/40 hover:text-foreground/85 transition-colors"
             >
-              {tc.voltarInicio} →
+              {tc.voltarInicio}
             </Link>
             <Link
               href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/72 text-[11px] tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/75 transition-colors"
+              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/72 text-[11px] tracking-[0.2em] uppercase rounded-sm hover:border-foreground/40 hover:text-foreground/85 transition-colors"
             >
               {tc.novoPedido}
             </Link>

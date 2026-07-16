@@ -417,11 +417,12 @@ export const en: Dict = {
   },
 
   orcamento: {
-    back: "Líquen Events",
+    back: "Home",
     eyebrow: "Quote request",
     titleLine1: "Tell us",
     titleMoss: "your idea",
     lead: "No commitment. We reply with a tailored proposal in under 24 business hours.",
+    processHint: "Request → Proposal in 24h → Meeting",
     eventTypeLabels: [
       "Wedding",
       "Corporate",

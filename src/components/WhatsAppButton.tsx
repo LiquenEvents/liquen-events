@@ -4,15 +4,21 @@ import { useEffect, useState } from "react";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 import { useTranslations } from "./LocaleProvider";
+import { usePublicPathname } from "@/lib/use-public-pathname";
 
 export default function WhatsAppButton() {
   const [visible, setVisible] = useState(false);
   const { t } = useTranslations();
+  const pathname = usePublicPathname();
 
   useEffect(() => {
     const id = setTimeout(() => setVisible(true), 1500);
     return () => clearTimeout(id);
   }, []);
+
+  // The quote form and its confirmation already offer WhatsApp/contact inline;
+  // the floating pill there only overlaps the submit / action buttons on mobile.
+  if (pathname.startsWith("/orcamento")) return null;
 
   return (
     <a
