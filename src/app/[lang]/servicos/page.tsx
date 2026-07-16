@@ -598,10 +598,10 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </Reveal>
       </section>
 
-      {/* ── Cinematic statement (where we work) ── */}
+      {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}
       <section
         className="relative overflow-hidden border-t border-foreground/8"
-        style={{ minHeight: "clamp(420px, 70vh, 800px)" }}
+        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
       >
         <Image
           src="/imagens/J&A-68.jpg"
@@ -637,8 +637,11 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
 
-      {/* ── CTA ── */}
-      <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
+      {/* ── CTA — full-screen closing panel ── */}
+      <section
+        className="relative overflow-hidden border-t border-foreground/8 flex items-center py-28 lg:py-40"
+        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+      >
         <Image
           src="/imagens/M&F0497.jpg"
           alt={t.common.imageAlt.servicosEvening}
@@ -650,7 +653,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         <div className="absolute inset-0 bg-black/65" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
@@ -674,14 +677,14 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <Magnetic strength={0.4}>
                 <Link
                   href={localizeHref("/orcamento", locale)}
-                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.28em] uppercase shadow-xl shadow-black/30"
                 >
                   {t.common.pedirOrcamento} →
                 </Link>
               </Magnetic>
               <Link
                 href={localizeHref("/galeria", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
               >
                 {ts.ctaGaleria}
               </Link>
