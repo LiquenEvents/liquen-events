@@ -65,7 +65,7 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       id: "teambuilding",
       label: "Teambuilding",
       description:
-        "Actividades e dinâmicas criativas para fortalecer equipas e aumentar a motivação.",
+        "Atividades e dinâmicas criativas para fortalecer equipas e aumentar a motivação.",
       icon: "🤝",
       minGuests: 10,
       maxGuests: 500,
@@ -73,9 +73,9 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       pricePerPax: 30,
       suggestedDuration: 6,
       features: [
-        "Design de actividades",
+        "Design de atividades",
         "Facilitadores certificados",
-        "Material didáctico",
+        "Material didático",
         "Espaço dedicado",
         "Avaliação de resultados",
       ],
@@ -96,7 +96,7 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
         "Cenografia personalizada",
         "Gestão de imprensa",
         "Produção AV completa",
-        "Experiências interactivas",
+        "Experiências interativas",
       ],
     },
     {
@@ -111,7 +111,7 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       pricePerPax: 38,
       suggestedDuration: 5,
       features: [
-        "Selecção de espaço premium",
+        "Seleção de espaço premium",
         "Coordenação de catering",
         "Decoração temática",
         "Entretenimento",
@@ -124,7 +124,7 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       id: "casamentos",
       label: "Casamentos",
       description:
-        "O dia mais especial da vossa vida, planeado ao pormenor com amor e dedicação total.",
+        "O dia mais especial da vossa vida, com uma decoração à vossa medida e o dia coordenado ao pormenor, para o viverem sem preocupações.",
       icon: "💒",
       minGuests: 30,
       maxGuests: 500,
@@ -132,12 +132,12 @@ export const EVENT_TYPES_BY_CATEGORY: Record<
       pricePerPax: 42,
       suggestedDuration: 10,
       features: [
-        "Planeamento completo (12 meses)",
-        "Coordenação no dia",
-        "Gestão de fornecedores",
-        "Timeline detalhada",
-        "Suporte pré-evento",
-        "Visita ao espaço",
+        "Decoração floral e cenografia",
+        "Conceito e design decorativo",
+        "Coordenação do dia do casamento",
+        "Gestão e articulação de fornecedores",
+        "Montagem e styling do espaço",
+        "Ponto de contacto único no dia",
       ],
     },
     {
@@ -279,7 +279,7 @@ export const PACKAGES: {
     id: "personalizado",
     label: "Personalizado",
     description:
-      "Monte o seu pacote à medida, seleccionando exactamente os serviços de que necessita.",
+      "Monte o seu pacote à medida, selecionando exatamente os serviços de que necessita.",
     multiplier: 1.0,
     highlight: false,
     badge: null,
@@ -337,7 +337,7 @@ export const ADDON_CATALOG: AddonCatalogItem[] = [
   {
     id: "photobooth",
     name: "Photobooth & Experiências",
-    description: "Cabine fotográfica interactiva para entretenimento e memórias dos convidados.",
+    description: "Cabine fotográfica interativa para entretenimento e memórias dos convidados.",
     category: "Fotografia & Vídeo",
     icon: "🤳",
     pricingType: "fixed",
@@ -432,7 +432,7 @@ export const ADDON_CATALOG: AddonCatalogItem[] = [
   {
     id: "musica_ao_vivo",
     name: "Música ao Vivo",
-    description: "Actuações musicais ao vivo seleccionadas para criar a atmosfera ideal.",
+    description: "Atuações musicais ao vivo selecionadas para criar a atmosfera ideal.",
     category: "Entretenimento",
     icon: "🎵",
     pricingType: "fixed",
@@ -470,14 +470,14 @@ export const ADDON_CATALOG: AddonCatalogItem[] = [
   },
   {
     id: "animacao",
-    name: "Animação & Actividades",
-    description: "Actividades lúdicas e experiências de animação para os convidados.",
+    name: "Animação & Atividades",
+    description: "Atividades lúdicas e experiências de animação para os convidados.",
     category: "Entretenimento",
     icon: "🎪",
     pricingType: "fixed",
     tiers: {
-      essencial: { label: "1 actividade + animador (2h)", price: 220 },
-      completo: { label: "3 actividades + equipa de 2 (4h)", price: 480 },
+      essencial: { label: "1 atividade + animador (2h)", price: 220 },
+      completo: { label: "3 atividades + equipa de 2 (4h)", price: 480 },
       premium: { label: "Programa completo + surpresa + experiências imersivas", price: 950 },
     },
   },
@@ -497,7 +497,7 @@ export const ADDON_CATALOG: AddonCatalogItem[] = [
   },
   {
     id: "projecao_led",
-    name: "Vídeo, Projecção & LED",
+    name: "Vídeo, Projeção & LED",
     description: "Ecrãs, projectores e soluções de visualização de alto impacto.",
     category: "Produção Técnica",
     icon: "📽️",
@@ -558,7 +558,7 @@ export const ADDON_CATALOG: AddonCatalogItem[] = [
     tiers: {
       essencial: { label: "1 intérprete + 1 idioma (por sessão)", price: 380 },
       completo: { label: "2 intérpretes + 2 idiomas + cabine", price: 820 },
-      premium: { label: "Equipa multilingue + cabines + equipamento receptor", price: 1600 },
+      premium: { label: "Equipa multilingue + cabines + equipamento recetor", price: 1600 },
     },
     eventTypes: ["conferencias", "lancamentos"],
   },

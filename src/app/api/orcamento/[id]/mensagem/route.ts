@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       <p style="font-size:14px;line-height:1.7;color:#222;white-space:pre-wrap">${esc(message)}</p>
       <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;color:#777;font-size:12px">
         Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}<br>
-        <span style="color:#999">Organizamos eventos, eternizamos memórias.</span>
+        <span style="color:#999">Decoramos eventos, eternizamos memórias.</span>
       </div>
     </div>`;
 

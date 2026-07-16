@@ -72,7 +72,7 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
   text("LÍQUEN EVENTS", MARGIN, y, { font: bold, size: 20, color: MOSS });
   textRight("PROPOSTA", right, y, { font: bold, size: 12, color: MUTED });
   y -= 16;
-  text("Organizamos eventos, eternizamos memórias.", MARGIN, y, { size: 9, color: MUTED });
+  text("Decoramos eventos, eternizamos memórias.", MARGIN, y, { size: 9, color: MUTED });
   textRight(`Ref. ${p.id}`, right, y, { size: 9, color: MUTED });
   y -= 14;
   textRight(new Date(p.createdAt).toLocaleDateString("pt-PT"), right, y, { size: 9, color: MUTED });

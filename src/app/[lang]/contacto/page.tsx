@@ -11,7 +11,6 @@ import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
 import RatingBadge from "@/components/RatingBadge";
 import HeroWebGL from "@/components/motion/HeroWebGL";
-import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
@@ -29,7 +28,7 @@ export async function generateMetadata({
     description: t.meta.contactoDescription,
     path: "/contacto",
     image: "/imagens/DJI_20250913190635_0120_D.jpg",
-    keywords: ["contacto Líquen Events", "organização de eventos Alentejo"],
+    keywords: ["contacto Líquen Events", "decoração de eventos Alentejo"],
     ogLocale: t.meta.ogLocale,
   });
 }
@@ -41,6 +40,9 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
   const tf = t.contacto.form;
   const td = t.contacto.direct;
   const heroImg = "/imagens/DJI_20250913190635_0120_D.jpg";
+  // Fundos de foto para os dois CTA (com véu por cima para manter o contraste).
+  const orcamentoCtaImg = "/imagens/DaniGui_JantarFesta_130.jpg";
+  const whatsappCtaImg = "/imagens/Natalia e Jonathan-198.jpg";
   return (
     <>
       <BreadcrumbJsonLd
@@ -242,30 +244,47 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               </div>
             </div>
 
-            {/* ── Direita — CTA para o formulário único (/orcamento) ── */}
-            <div className="py-12 md:py-20 lg:pl-20 flex flex-col justify-center">
+            {/* ── Direita — CTA para o formulário único (/orcamento) ──
+                Painel com foto de um evento decorado + véu escuro por cima,
+                para o texto (cream) manter contraste AA sobre a imagem. */}
+            <div className="relative overflow-hidden flex flex-col justify-center py-14 px-8 md:py-20 md:px-12 lg:pl-20 lg:pr-12">
+              <Image
+                src={orcamentoCtaImg}
+                {...blurFor(orcamentoCtaImg)}
+                alt=""
+                aria-hidden
+                fill
+                sizes="(max-width: 1024px) 100vw, 60vw"
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-ink/85 via-ink/72 to-moss-dark/70" />
               <AnimateIn>
-                <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-                  <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
-                  {td.ctaEyebrow}
-                </p>
-                <h2
-                  className="text-foreground font-bold leading-[0.95] tracking-tight mb-8"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(34px, 4.5vw, 60px)",
-                  }}
-                >
-                  {td.ctaTitleLine1}
-                  <br />
-                  <span className="text-moss">{td.ctaTitleMoss}</span>
-                </h2>
-                <p className="text-foreground/68 text-base leading-[1.85] max-w-md mb-12">
-                  {td.ctaText}
-                </p>
-                <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_CLASS}>
-                  {td.ctaButton} →
-                </Link>
+                <div className="relative">
+                  <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+                    <span className="w-5 h-px bg-gold rounded-full flex-shrink-0" />
+                    {td.ctaEyebrow}
+                  </p>
+                  <h2
+                    className="text-cream font-bold leading-[0.95] tracking-tight mb-8"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(34px, 4.5vw, 60px)",
+                    }}
+                  >
+                    {td.ctaTitleLine1}
+                    <br />
+                    <span className="text-gold">{td.ctaTitleMoss}</span>
+                  </h2>
+                  <p className="text-cream/85 text-base leading-[1.85] max-w-md mb-12">
+                    {td.ctaText}
+                  </p>
+                  <Link
+                    href={localizeHref("/orcamento", locale)}
+                    className="inline-flex w-fit items-center gap-3 rounded-sm bg-cream px-8 py-4 text-[11px] font-medium uppercase tracking-[0.3em] text-ink transition-all duration-300 hover:bg-cream-dark"
+                  >
+                    {td.ctaButton} →
+                  </Link>
+                </div>
               </AnimateIn>
             </div>
           </div>
@@ -325,12 +344,12 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 src: "/imagens/M&F0658.jpg",
                 alt: "Mesa posta de jantar de casamento com decoração floral",
               },
-            ].map(({ src, alt }) => (
+            ].map(({ src, alt }, i) => (
               <div key={src} className="relative overflow-hidden group">
                 <Image
                   src={src}
                   {...blurFor(src)}
-                  alt={alt}
+                  alt={t.common.imageAlt.contactoBand[i] ?? alt}
                   fill
                   sizes="33vw"
                   className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"
@@ -366,7 +385,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                       {p.title}
                     </h3>
                   </div>
-                  <p className="lg:col-span-4 text-foreground/60 text-sm leading-relaxed max-w-xl">
+                  <p className="lg:col-span-4 text-foreground/72 text-sm leading-relaxed max-w-xl">
                     {p.desc}
                   </p>
                 </div>
@@ -395,7 +414,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   <br />
                   {t.contacto.faqTitleLine2}
                 </h2>
-                <p className="text-foreground/60 text-sm leading-relaxed mt-6 max-w-xs">
+                <p className="text-foreground/72 text-sm leading-relaxed mt-6 max-w-xs">
                   {t.contacto.faqSub}
                 </p>
               </div>
@@ -405,8 +424,20 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
-      {/* ── WhatsApp CTA ── */}
+      {/* ── WhatsApp CTA ──
+          Fundo com foto de evento + tinta verde-escura por cima: mantém a
+          identidade da marca e garante o contraste AA do texto cream. */}
       <section className="py-20 sm:py-32 bg-moss-dark relative overflow-hidden border-t border-moss/20">
+        <Image
+          src={whatsappCtaImg}
+          {...blurFor(whatsappCtaImg)}
+          alt=""
+          aria-hidden
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-moss-dark/88" />
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -416,8 +447,8 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
           <AnimateIn>
-            <p className="text-cream/30 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-cream/30 rounded-full flex-shrink-0" />
+            <p className="text-cream/65 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
+              <span className="w-5 h-px bg-cream/45 rounded-full flex-shrink-0" />
               {t.contacto.whatsappEyebrow}
             </p>
             <h2
@@ -428,7 +459,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               <br />
               {t.contacto.whatsappTitleLine2}
             </h2>
-            <p className="text-cream/45 text-base leading-relaxed max-w-md mb-12">
+            <p className="text-cream/85 text-base leading-relaxed max-w-md mb-12">
               {t.contacto.whatsappText}
             </p>
             <div className="flex flex-wrap gap-4">
@@ -443,7 +474,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               </a>
               <a
                 href={`mailto:${SITE.email}`}
-                className="inline-flex items-center gap-3 px-8 py-4 border border-cream/20 text-cream/60 font-medium rounded-sm hover:border-cream/40 hover:text-cream/85 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
+                className="inline-flex items-center gap-3 px-8 py-4 border border-cream/35 text-cream/85 font-medium rounded-sm hover:border-cream/60 hover:text-cream transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
               >
                 {t.common.enviarEmail}
               </a>

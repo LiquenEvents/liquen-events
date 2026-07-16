@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, startTransition } fr
 import { createPortal, flushSync } from "react-dom";
 import Image from "next/image";
 import type { PhotoSrc, Label } from "./photos-data";
+import { collectionFor } from "./collections";
 import { useTranslations } from "@/components/LocaleProvider";
 import { ViewTransition } from "@/components/vt";
 
@@ -38,24 +39,6 @@ function VTWrap({
 export interface Photo extends PhotoSrc {
   blurDataURL: string;
   aspectRatio: string;
-}
-
-// Human-readable collection (event) inferred from the file name — adds a
-// curated, gallery-grade caption. Only confident matches; otherwise null.
-function collectionFor(src: string): string | null {
-  const f = src.toLowerCase();
-  if (f.includes("danigui")) return "Daniela & Guilherme";
-  if (f.includes("joao_e_pedro") || f.includes("j&p-")) return "João & Pedro";
-  if (f.includes("ines-goncalo")) return "Inês & Gonçalo";
-  if (f.includes("matilde-tomas") || f.includes("matilde-e-tomas")) return "Matilde & Tomás";
-  if (f.includes("teresinhaeze")) return "Teresinha & Zé";
-  if (f.includes("m&f")) return "Matilde & Filipe";
-  if (f.includes("natalia e jonathan")) return "Natália & Jonathan";
-  if (f.includes("stephanie-mizio")) return "Stephanie & Mizio";
-  if (f.includes("miaejoao")) return "Mia & João";
-  if (f.includes("j&a-")) return "J & A";
-  if (f.includes("sophia&artur")) return "Sophia & Artur";
-  return null;
 }
 
 /** The event/collection bucket a photo belongs to (named couple, else its

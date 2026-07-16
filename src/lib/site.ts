@@ -18,7 +18,7 @@ export const SITE = {
   city: "Évora",
   region: "Alentejo",
   country: "PT",
-  slogan: "Organizamos eventos, eternizamos memórias.",
+  slogan: "Decoramos eventos, eternizamos memórias.",
   founded: "2018",
   // Avaliação real do Google. Só a MÉDIA (rating) é mostrada visivelmente no
   // site (ver RatingBadge) — a CONTAGEM (count) NÃO é apresentada, para o site
@@ -57,17 +57,17 @@ export const AREAS_SERVED = [
 
 /** Default keyword set, location-weighted toward Alentejo. */
 export const SITE_KEYWORDS = [
-  "organização de eventos Évora",
-  "casamentos Évora",
-  "wedding planner Alentejo",
-  "casamentos Alentejo",
-  "organização de casamentos Portugal",
-  "eventos corporativos Lisboa",
-  "empresa de eventos Alentejo",
-  "organização de eventos Lisboa",
-  "organização de eventos Portugal",
-  "planeamento de eventos",
+  "decoração de eventos Évora",
   "decoração de eventos Alentejo",
+  "decoração de casamentos Alentejo",
+  "casamentos Évora",
+  "casamentos Alentejo",
+  "coordenação de casamentos Alentejo",
+  "decoração de eventos corporativos",
+  "empresa de decoração de eventos",
+  "decoração de eventos Lisboa",
+  "decoração de eventos Portugal",
+  "empresa de eventos Alentejo",
   "Líquen Events",
 ] as const;
 

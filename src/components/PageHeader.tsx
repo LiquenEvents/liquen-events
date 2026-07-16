@@ -26,7 +26,7 @@ export default function PageHeader({ label, title, description }: PageHeaderProp
         {description && (
           <>
             <div className="border-t border-foreground/8 mt-7 md:mt-12 pt-7 md:pt-10 anim-2">
-              <p className="text-foreground/60 text-[15px] sm:text-base max-w-xl leading-[1.75]">
+              <p className="text-foreground/72 text-[15px] sm:text-base max-w-xl leading-[1.75]">
                 {description}
               </p>
             </div>

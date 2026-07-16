@@ -18,6 +18,8 @@
     "test:e2e:ui": "playwright test --ui",
     "gen:blur": "node scripts/gen-blur.mjs",
     "gen:dims": "node scripts/gen-image-dims.mjs",
+    "gen:og": "node scripts/gen-og.mjs",
+    "gallery:sync": "node scripts/gallery-sync.mjs",
     "gen:totp": "node scripts/gen-totp.mjs",
     "analyze": "ANALYZE=true next build",
     "compress:images": "node scripts/compress-sources.mjs",

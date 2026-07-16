@@ -66,37 +66,49 @@ export const en: Dict = {
     clientsSay: "What our clients say",
     reviewsLabel: "reviews",
     testemunhoLabel: "Testimonial",
-    whatsappPrefill: "Hi, I'd like to know more about your event planning services.",
+    whatsappPrefill: "Hi, I'd like to know more about your event decoration services.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
       homeHero: "Líquen Events — aerial view of an event in the Alentejo",
       homeWedding: "Wedding at sunset on an estate in the Alentejo",
       contactoHero: "Aerial view of an estate set up for an event in the Alentejo",
-      sobrePortrait: "A wedding moment planned by Líquen Events in the Alentejo",
+      sobrePortrait: "A wedding moment decorated by Líquen Events in the Alentejo",
       sobreGolden: "Wedding celebration in golden light in the Alentejo",
-      sobreOutdoor: "Outdoor wedding planned by Líquen Events in the Alentejo",
+      sobreOutdoor: "Outdoor wedding decorated by Líquen Events in the Alentejo",
       clientesAerial: "Aerial view of a Líquen Events event",
       servicosCeremony: "Outdoor ceremony planned by Líquen Events in the Alentejo",
       servicosEvening: "Wedding celebrated at dusk on an estate in the Alentejo",
       orcamentoPanel: "Celebration dinner with a set table and candlelit décor",
+      galeriaHeader: "Gallery of weddings and events decorated by Líquen Events in the Alentejo",
+      galeriaInstagram: "Events decorated by Líquen Events on Instagram",
+      sobreCelebration: "Wedding celebration decorated by Líquen Events in the Alentejo",
+      sobreFounder: "Catarina Gaspar — Founder & CEO of Líquen Events",
+      clientesCorporate: "Corporate event decorated by Líquen Events in Évora",
+      clientesDinner: "Event dinner decorated by Líquen Events",
+      servicosEndOfDay: "Event decorated by Líquen Events at the end of the day",
+      contactoBand: [
+        "Outdoor wedding ceremony in the Alentejo",
+        "Wedding at sunset on an Alentejo estate",
+        "Wedding dinner table setting with floral decoration",
+      ],
     },
   },
 
   meta: {
     ogLocale: "en_US",
-    homeTitle: "Event & Wedding Planning in Évora, Portugal | Líquen Events",
+    homeTitle: "Event & Wedding Decoration in Évora, Portugal | Líquen Events",
     homeDescription:
-      "Event planning based in Évora: weddings, corporate events and celebrations across the Alentejo and Portugal. Bespoke solutions — request a quote.",
-    sobreTitle: "Event Planning Company in the Alentejo",
+      "Event and wedding decoration in Évora: wedding decoration and coordination, corporate events and celebrations across the Alentejo and Portugal. Request a quote.",
+    sobreTitle: "Event Decoration Company in the Alentejo",
     sobreDescription:
-      "Líquen Events, an event planning company in Évora. Over 100 weddings, corporate events and celebrations across the Alentejo and Portugal.",
-    servicosTitle: "Weddings and Corporate Events in the Alentejo",
+      "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
+    servicosTitle: "Wedding & Event Decoration in the Alentejo",
     servicosDescription:
-      "Planning of weddings, corporate events, conferences and private parties in Évora, the Alentejo and across Portugal. Bespoke solutions for your event.",
+      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties in Évora, the Alentejo and Portugal.",
     galeriaTitle: "Wedding & Event Gallery — Alentejo",
     galeriaDescription:
-      "Photo gallery of events organised by Líquen Events in the Alentejo and across Portugal — weddings, corporate events, conferences and celebrations.",
+      "Photo gallery of events decorated by Líquen Events in the Alentejo and Portugal — weddings, corporate events, conferences and celebrations.",
     clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
       "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
@@ -111,20 +123,20 @@ export const en: Dict = {
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
   // the markup's language always matches the visible page's.
   jsonld: {
-    hasOfferCatalogName: "Event planning services",
+    hasOfferCatalogName: "Event & wedding decoration services",
     services: [
-      "Wedding planning",
+      "Wedding decoration and coordination",
       "Corporate events and conferences",
       "Private parties and celebrations",
       "Gala dinners and social events",
     ],
-    servicosServiceName: "Event, wedding and corporate event planning",
+    servicosServiceName: "Event decoration and wedding coordination",
     servicosServiceDescription:
-      "Planning of weddings, corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal — from décor to coordination.",
+      "Wedding decoration and coordination, plus decoration of corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal.",
   },
 
   home: {
-    eyebrow: "Event planning · Évora · Alentejo",
+    eyebrow: "Event decoration · Évora · Alentejo",
     heroLines: [
       { words: ["Events", "that"] },
       { words: ["stay", "with"] },
@@ -152,10 +164,10 @@ export const en: Dict = {
     heroTitleMoss: "Líquen.",
     scroll: "Scroll",
     manifestoEyebrow: "Our essence",
-    manifestoTitleLine1: "We craft events.",
+    manifestoTitleLine1: "We decorate events.",
     manifestoTitleLine2: "We immortalise memories.",
-    manifestoText: "Since 2018 we've turned visions into experiences — across Portugal.",
-    statementLead: "We don't just plan events.",
+    manifestoText: "Since 2018 we've turned spaces into experiences — across Portugal.",
+    statementLead: "We don't just decorate spaces.",
     statementRest: " We design experiences that last forever.",
     founderEyebrow: "The people",
     founderQuote:
@@ -166,11 +178,19 @@ export const en: Dict = {
     ctaTitleLine1: "Shall we work",
     ctaTitleMoss: "together?",
     ctaText: "From the first conversation to the last toast, we handle every detail of your event.",
+    galleryAlt: [
+      "Outdoor wedding ceremony on an Alentejo estate",
+      "Wedding party under hanging lights at dusk",
+      "Newlyweds embracing during the wedding celebration",
+      "Wedding table setting with flowers and candles",
+      "Wedding at dusk outdoors in the Alentejo",
+      "Floral decoration of a wedding ceremony in the Alentejo",
+    ],
   },
 
   galeria: {
     headerLabel: "Our moments",
-    headerTitle: "Gallery",
+    headerTitle: "Wedding & Event Gallery",
     headerDesc: "Weddings, corporate events and celebrations — captured in detail.",
     instaEyebrow: "Social media",
     instaTitle: "Follow us on Instagram",
@@ -186,7 +206,7 @@ export const en: Dict = {
       Evento: "Event",
     },
     alt: {
-      Casamento: "Wedding organised by Líquen Events in the Alentejo",
+      Casamento: "Wedding decorated by Líquen Events in the Alentejo",
       Corporativo: "Corporate event organised by Líquen Events",
       Conferência: "Conference organised by Líquen Events",
       Aéreo: "Aerial view of a Líquen Events event",
@@ -255,6 +275,15 @@ export const en: Dict = {
     ctaTitleLine1: "Join our",
     ctaTitleLine2: "clients.",
     ctaText: "Tell us your idea and we'll show you how we can turn it into a memorable event.",
+    galleryAlt: [
+      "Corporate event reception in a courtyard in Évora",
+      "Wedding with floral decoration on an Alentejo estate",
+      "Candlelit gala dinner at an event in the Alentejo",
+      "Outdoor wedding with table setting and floral arrangements in the Alentejo",
+      "Gala dinner with table setting and candles",
+      "Corporate gala in a decorated hall at night",
+      "Institutional event with stage and audience",
+    ],
   },
 
   contacto: {
@@ -284,7 +313,7 @@ export const en: Dict = {
     whatsappEyebrow: "Instant reply",
     whatsappTitleLine1: "Prefer to talk",
     whatsappTitleLine2: "right now?",
-    whatsappText: "Talk to us directly on WhatsApp. We're available Monday to Friday, 9am to 6pm.",
+    whatsappText: "Talk to us directly on WhatsApp. We're available Monday to Friday, 9am to 8pm.",
     form: {
       heroEyebrow: "Get in touch",
       heroTitleLine1: "Let's create something",
@@ -293,7 +322,7 @@ export const en: Dict = {
       emailLabel: "E-mail",
       emailSub: "We reply within 24 business hours",
       phoneLabel: "Phone",
-      phoneSub: "Mon–Fri, 9am–6pm",
+      phoneSub: "Mon–Fri, 9am–8pm",
       locationLabel: "Location",
       locationValue: "Évora, Alentejo — across Portugal",
       locationSub: "In-person meetings available",
@@ -429,6 +458,22 @@ export const en: Dict = {
     nav: ["Companies", "Celebrations"],
     verMais: "View more",
     verDetalhes: "View details",
+    philoEyebrow: "Our signature",
+    philoTitle: "Decoration that gives soul. Coordination that gives peace of mind.",
+    philoPillars: [
+      {
+        title: "Decoration",
+        text: "Bespoke concept, flowers and scenography — every event with an identity of its own.",
+      },
+      {
+        title: "Coordination",
+        text: "On the day, we orchestrate timings, suppliers and team. No slip-ups, no worries.",
+      },
+      {
+        title: "Production",
+        text: "From setup to the last detail, we handle everything so all you do is live the moment.",
+      },
+    ],
     categories: [
       {
         label: "Companies",
@@ -456,11 +501,11 @@ export const en: Dict = {
       {
         label: "Celebrations",
         subtitle: "For individuals",
-        desc: "The most important moments of your life, planned in detail with care and elegance.",
+        desc: "The most important moments of your life, crafted in detail with care and elegance.",
         services: [
           {
             title: "Weddings",
-            desc: "Your most special day, planned to the last detail. From choosing the venue to the final touch.",
+            desc: "Your most special day, with bespoke decoration and the day coordinated down to the last detail, so you can simply live it.",
           },
           {
             title: "Christenings & Communions",
@@ -487,6 +532,14 @@ export const en: Dict = {
     ctaText:
       "Talk to us. No commitment, no cost. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
+    galleryAlt: [
+      "Outdoor wedding decorated by Líquen Events in the Alentejo",
+      "Celebration dinner with elegant candlelit decoration",
+      "Aerial view of an event on an Alentejo estate",
+      "Event reception in the late afternoon in the Alentejo",
+      "Outdoor wedding reception at sunset in the Alentejo",
+      "Portrait of the newlyweds during a wedding in the Alentejo",
+    ],
   },
 
   confirmacao: {
@@ -544,7 +597,11 @@ export const en: Dict = {
     galleryTitle: "Moments we've created",
     faqTitle: "Frequently asked questions",
     relatedTitle: "Other services",
-    ctaTitle: "Shall we plan your event?",
+    ctaTitle: "Shall we bring your event to life?",
+    viaturasEyebrow: "Exclusive service",
+    viaturasTitle: "Classic Car Rental",
+    viaturasText:
+      "For a dream arrival — from the bride's entrance to transport for the newlyweds and guests. Classic cars with a driver and every care taken.",
   },
 
   proposta: {
@@ -600,13 +657,13 @@ export const en: Dict = {
   },
 
   footer: {
-    sloganLine1: "We craft events,",
+    sloganLine1: "We decorate events,",
     sloganLine2: "we immortalise memories.",
     disponivel: "Available for new events",
     paginas: "Pages",
     servicosTitulo: "Services",
     serviceLinks: [
-      "Wedding Planning",
+      "Wedding Decoration",
       "Corporate Events",
       "Parties & Celebrations",
       "Gala Dinners",

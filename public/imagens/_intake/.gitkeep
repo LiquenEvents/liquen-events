@@ -1,0 +1,2 @@
+# Drop NEW gallery photos here, then run: npm run gallery:sync
+# (this folder is a staging area; it should normally be empty)

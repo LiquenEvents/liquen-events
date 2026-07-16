@@ -28,10 +28,10 @@ export async function generateMetadata({
     path: "/servicos",
     image: "/imagens/EW1_1330.jpg",
     keywords: [
-      "wedding planner Alentejo",
+      "decoração de casamentos Alentejo",
+      "coordenação de casamentos Alentejo",
       "eventos corporativos Lisboa",
-      "conferências e congressos",
-      "organização de festas Alentejo",
+      "decoração de eventos Alentejo",
     ],
     ogLocale: t.meta.ogLocale,
   });
@@ -191,8 +191,9 @@ function ServiceCard({
           >
             {service.title}
           </h3>
-          {/* Mobile: always show desc; desktop: reveal on hover */}
-          <p className="text-cream/40 text-xs leading-relaxed md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
+          {/* Mobile: hidden entirely (title + CTA only — the photo breathes);
+              desktop: reveal on hover. */}
+          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
             {service.desc}
           </p>
           {/* Mobile: persistent CTA; desktop: reveal on hover */}
@@ -381,7 +382,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/EW1_1330.jpg"
-            alt="Evento organizado pela Líquen Events ao final do dia"
+            alt={t.common.imageAlt.servicosEndOfDay}
             fill
             preload
             sizes="100vw"
@@ -413,7 +414,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           />
           <AnimateIn delay={150}>
             <div className="mt-9 flex flex-col sm:flex-row sm:items-end gap-7 sm:gap-12">
-              <p className="text-white/60 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
+              <p className="text-white/80 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
               <Link
                 href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors duration-300 group flex-shrink-0"
@@ -442,64 +443,84 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
+      {/* ── Assinatura / filosofia — luz e respiração, afirma a decoração ── */}
+      <section className="bg-surface py-24 lg:py-32">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className="eyebrow mb-6">{ts.philoEyebrow}</p>
+            <h2
+              className="text-foreground font-bold leading-[1.06] tracking-tight max-w-4xl"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4.6vw, 62px)" }}
+            >
+              {ts.philoTitle}
+            </h2>
+          </AnimateIn>
+          <div className="mt-14 lg:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-12">
+            {ts.philoPillars.map((p, i) => (
+              <AnimateIn key={p.title} delay={i * 90}>
+                <div className="flex flex-col gap-3 border-t border-foreground/15 pt-6">
+                  <span className="text-gold-text font-mono text-[11px] tracking-[0.35em]">
+                    0{i + 1}
+                  </span>
+                  <h3
+                    className="text-foreground font-bold text-xl lg:text-2xl"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {p.title}
+                  </h3>
+                  <p className="text-foreground/68 text-[15px] leading-[1.75]">{p.text}</p>
+                </div>
+              </AnimateIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Service categories ── */}
       {categories.map((cat) => (
         <div key={cat.id}>
-          {/* Cinematic category band */}
-          <section
-            id={cat.id}
-            className="relative overflow-hidden border-t border-foreground/8 scroll-mt-[60px]"
-            style={{ minHeight: "clamp(440px, 76vh, 840px)" }}
-          >
-            <Image
-              src={cat.band}
-              alt={cat.label}
-              fill
-              sizes="100vw"
-              className="object-cover object-center"
-              {...blurFor(cat.band)}
-            />
-            <div className="absolute inset-0 bg-black/55" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/15 to-[#080808]/45" />
-
-            <div className="relative z-10 h-full flex items-end">
-              <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 py-16 lg:py-24">
-                <AnimateIn>
+          {/* Category header — clean, editorial (light); lets the mosaic photos
+              below carry the imagery and breaks the page's dark rhythm. */}
+          <section id={cat.id} className="bg-surface border-t border-foreground/8 scroll-mt-[60px]">
+            <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 pt-16 lg:pt-24 pb-10 lg:pb-14">
+              <AnimateIn>
+                <div className="flex items-start gap-5 sm:gap-8">
                   <span
-                    className="block text-white/12 font-bold leading-none mb-6 select-none"
+                    className="hidden sm:block text-foreground/10 font-bold leading-[0.8] select-none flex-shrink-0"
                     style={{
                       fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(64px, 9vw, 150px)",
+                      fontSize: "clamp(56px, 8vw, 128px)",
                     }}
                     aria-hidden
                   >
                     {cat.num}
                   </span>
-                  <p className={`${eyebrowLight} mb-5`}>
-                    <span className="w-6 h-px bg-gold flex-shrink-0" />
-                    {cat.subtitle}
-                  </p>
-                  <h2
-                    className="text-white font-bold leading-[0.95] mb-6"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(44px, 6vw, 92px)",
-                    }}
-                  >
-                    {cat.label}
-                  </h2>
-                  <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-                    <p className="text-white/60 text-base leading-[1.8] max-w-md">{cat.desc}</p>
-                    <Link
-                      href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
-                      className="group inline-flex items-center gap-3 text-xs text-white/65 hover:text-white transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
+                  <div className="flex-1 min-w-0">
+                    <p className="eyebrow mb-3">{cat.subtitle}</p>
+                    <h2
+                      className="text-foreground font-bold leading-[0.95]"
+                      style={{
+                        fontFamily: "var(--font-playfair)",
+                        fontSize: "clamp(40px, 5.5vw, 88px)",
+                      }}
                     >
-                      <span>{ts.verDetalhes}</span>
-                      <span className="w-7 h-px bg-white/30 group-hover:w-12 transition-all duration-500" />
-                    </Link>
+                      {cat.label}
+                    </h2>
+                    <div className="mt-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+                      <p className="text-foreground/68 text-base leading-[1.8] max-w-md">
+                        {cat.desc}
+                      </p>
+                      <Link
+                        href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
+                        className="group inline-flex items-center gap-3 text-xs text-moss hover:text-moss-dark transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
+                      >
+                        <span>{ts.verDetalhes}</span>
+                        <span className="w-7 h-px bg-moss/40 group-hover:w-12 transition-all duration-500" />
+                      </Link>
+                    </div>
                   </div>
-                </AnimateIn>
-              </div>
+                </div>
+              </AnimateIn>
             </div>
           </section>
 
@@ -529,7 +550,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
               <Image
                 src={g.src}
-                alt={g.alt}
+                alt={t.servicos.galleryAlt[i] ?? g.alt}
                 fill
                 sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
@@ -569,7 +590,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               >
                 {ts.seoTitle}
               </h2>
-              <p className="text-cream/55 text-base lg:text-lg leading-[1.85] max-w-xl">
+              <p className="text-cream/75 text-base lg:text-lg leading-[1.85] max-w-xl">
                 {ts.seoText}
               </p>
             </AnimateIn>
@@ -610,7 +631,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
+            <p className="text-white/75 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">

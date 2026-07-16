@@ -99,7 +99,7 @@ export default function TestimonialsCarousel() {
                 <div className="w-8 h-px bg-gold/50" />
                 <div>
                   <p className="text-foreground text-sm font-medium">{t.name}</p>
-                  <p className="text-foreground/60 text-xs tracking-wide mt-0.5">{t.role}</p>
+                  <p className="text-foreground/72 text-xs tracking-wide mt-0.5">{t.role}</p>
                 </div>
               </div>
             </div>

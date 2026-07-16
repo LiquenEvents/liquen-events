@@ -11,7 +11,7 @@ import { getDictionary, htmlLang, type Locale } from "@/lib/i18n";
  *  - Service catalog (weddings, corporate, social) for service-intent queries
  *
  * This is what helps the site surface for "empresa de eventos Alentejo",
- * "wedding planner Alentejo", etc., and earn rich results.
+ * "wedding coordinator Alentejo", "coordenação de casamentos", etc., and earn rich results.
  *
  * Locale-aware: the /en mirror shows English copy, so the description/service
  * names are emitted in the active language too. Note we deliberately do NOT

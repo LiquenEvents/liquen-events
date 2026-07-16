@@ -203,7 +203,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                       }}
                     />
                     <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
-                      <p className="text-moss/70 text-[8px] sm:text-[9px] tracking-[0.35em] uppercase mb-1">
+                      <p className="text-cream/75 text-[8px] sm:text-[9px] tracking-[0.35em] uppercase mb-1">
                         {s.tag}
                       </p>
                       <h3
