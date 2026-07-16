@@ -31,6 +31,7 @@ export const SERVICES: ServiceDetail[] = [
       "decoração de casamentos Alentejo",
       "decoração de casamentos",
       "coordenação de casamentos Alentejo",
+      "aluguer de viaturas clássicas casamento",
       "casamento herdade Alentejo",
       "wedding decoration Alentejo",
     ],
@@ -38,6 +39,7 @@ export const SERVICES: ServiceDetail[] = [
     intro: [
       "O vosso casamento é único — e a decoração é o que lhe dá alma. A Líquen Events cria a decoração do vosso casamento em todo o Alentejo e Portugal, das herdades e quintas históricas aos espaços mais íntimos: conceito, flores e cenografia pensados ao pormenor.",
       "E no grande dia coordenamos tudo — cronograma, fornecedores, montagem e imprevistos — para que só tenham de viver o momento.",
+      "E para uma chegada de sonho, temos ainda aluguer de viaturas clássicas — da entrada da noiva ao transporte dos noivos e convidados, com motorista e todo o cuidado.",
     ],
     includes: [
       "Decoração floral e cenografia",
@@ -45,7 +47,7 @@ export const SERVICES: ServiceDetail[] = [
       "Montagem e styling do espaço",
       "Coordenação do dia do casamento",
       "Cronograma e articulação de fornecedores",
-      "Supervisão da montagem no dia",
+      "Aluguer de viaturas clássicas (opcional)",
     ],
     gallery: [
       "/imagens/DaniGui_Preview20.jpg",
@@ -214,6 +216,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     intro: [
       "Your wedding is one of a kind — and the decoration is what gives it soul. Líquen Events creates your wedding's decoration throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues: concept, flowers and scenography considered down to the last detail.",
       "And on the day, we coordinate everything — timeline, suppliers, setup and the unexpected — so all you have to do is live the moment.",
+      "And for a dream arrival, we also offer classic car rental — from the bride's entrance to transport for the newlyweds and guests, with a driver and every care taken.",
     ],
     includes: [
       "Floral décor and scenography",
@@ -221,7 +224,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Setup and venue styling",
       "Wedding day coordination",
       "Timeline and supplier liaison",
-      "On-the-day setup supervision",
+      "Classic car rental (optional)",
     ],
     faqs: [
       {
