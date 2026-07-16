@@ -73,9 +73,9 @@ export const en: Dict = {
       homeHero: "Líquen Events — aerial view of an event in the Alentejo",
       homeWedding: "Wedding at sunset on an estate in the Alentejo",
       contactoHero: "Aerial view of an estate set up for an event in the Alentejo",
-      sobrePortrait: "A wedding moment planned by Líquen Events in the Alentejo",
+      sobrePortrait: "A wedding moment coordinated by Líquen Events in the Alentejo",
       sobreGolden: "Wedding celebration in golden light in the Alentejo",
-      sobreOutdoor: "Outdoor wedding planned by Líquen Events in the Alentejo",
+      sobreOutdoor: "Outdoor wedding coordinated by Líquen Events in the Alentejo",
       clientesAerial: "Aerial view of a Líquen Events event",
       servicosCeremony: "Outdoor ceremony planned by Líquen Events in the Alentejo",
       servicosEvening: "Wedding celebrated at dusk on an estate in the Alentejo",
@@ -85,15 +85,15 @@ export const en: Dict = {
 
   meta: {
     ogLocale: "en_US",
-    homeTitle: "Event & Wedding Planning in Évora, Portugal | Líquen Events",
+    homeTitle: "Event Planning & Wedding Coordination in Évora | Líquen Events",
     homeDescription:
-      "Event planning based in Évora: weddings, corporate events and celebrations across the Alentejo and Portugal. Bespoke solutions — request a quote.",
+      "Event planning and wedding coordination based in Évora: weddings, corporate events and celebrations across the Alentejo and Portugal. Bespoke solutions — request a quote.",
     sobreTitle: "Event Planning Company in the Alentejo",
     sobreDescription:
-      "Líquen Events, an event planning company in Évora. Over 100 weddings, corporate events and celebrations across the Alentejo and Portugal.",
+      "Líquen Events, an event planning and wedding coordination company in Évora. Over 100 weddings, corporate events and celebrations across the Alentejo and Portugal.",
     servicosTitle: "Weddings and Corporate Events in the Alentejo",
     servicosDescription:
-      "Planning of weddings, corporate events, conferences and private parties in Évora, the Alentejo and across Portugal. Bespoke solutions for your event.",
+      "Wedding coordination and planning of corporate events, conferences and private parties in Évora, the Alentejo and across Portugal. Bespoke solutions for your event.",
     galeriaTitle: "Wedding & Event Gallery — Alentejo",
     galeriaDescription:
       "Photo gallery of events organised by Líquen Events in the Alentejo and across Portugal — weddings, corporate events, conferences and celebrations.",
@@ -111,16 +111,16 @@ export const en: Dict = {
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
   // the markup's language always matches the visible page's.
   jsonld: {
-    hasOfferCatalogName: "Event planning services",
+    hasOfferCatalogName: "Event planning & wedding coordination services",
     services: [
-      "Wedding planning",
+      "Wedding coordination",
       "Corporate events and conferences",
       "Private parties and celebrations",
       "Gala dinners and social events",
     ],
-    servicosServiceName: "Event, wedding and corporate event planning",
+    servicosServiceName: "Event planning and wedding coordination",
     servicosServiceDescription:
-      "Planning of weddings, corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal — from décor to coordination.",
+      "Wedding coordination and planning of corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal.",
   },
 
   home: {
@@ -186,7 +186,7 @@ export const en: Dict = {
       Evento: "Event",
     },
     alt: {
-      Casamento: "Wedding organised by Líquen Events in the Alentejo",
+      Casamento: "Wedding coordinated by Líquen Events in the Alentejo",
       Corporativo: "Corporate event organised by Líquen Events",
       Conferência: "Conference organised by Líquen Events",
       Aéreo: "Aerial view of a Líquen Events event",
@@ -460,7 +460,7 @@ export const en: Dict = {
         services: [
           {
             title: "Weddings",
-            desc: "Your most special day, planned to the last detail. From choosing the venue to the final touch.",
+            desc: "Your most special day, coordinated down to the last detail — timings, suppliers and logistics handled, so you can simply live it.",
           },
           {
             title: "Christenings & Communions",
@@ -606,7 +606,7 @@ export const en: Dict = {
     paginas: "Pages",
     servicosTitulo: "Services",
     serviceLinks: [
-      "Wedding Planning",
+      "Wedding Coordination",
       "Corporate Events",
       "Parties & Celebrations",
       "Gala Dinners",

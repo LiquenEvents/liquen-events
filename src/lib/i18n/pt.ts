@@ -73,9 +73,9 @@ export const pt = {
       homeHero: "Líquen Events — evento aéreo no Alentejo",
       homeWedding: "Casamento ao pôr do sol numa herdade no Alentejo",
       contactoHero: "Vista aérea de uma herdade preparada para um evento no Alentejo",
-      sobrePortrait: "Momento de casamento organizado pela Líquen Events no Alentejo",
+      sobrePortrait: "Momento de casamento coordenado pela Líquen Events no Alentejo",
       sobreGolden: "Celebração de casamento à luz dourada no Alentejo",
-      sobreOutdoor: "Casamento ao ar livre organizado pela Líquen Events no Alentejo",
+      sobreOutdoor: "Casamento ao ar livre coordenado pela Líquen Events no Alentejo",
       clientesAerial: "Vista aérea de evento Líquen Events",
       servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events no Alentejo",
       servicosEvening: "Casamento celebrado ao anoitecer numa quinta no Alentejo",
@@ -85,15 +85,15 @@ export const pt = {
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Organização de Eventos e Casamentos em Évora | Líquen Events",
+    homeTitle: "Organização de Eventos e Coordenação de Casamentos | Líquen Events",
     homeDescription:
-      "Organização de eventos com base em Évora: casamentos, eventos corporativos e celebrações em todo o Alentejo e Portugal. Soluções à medida — peça orçamento.",
+      "Organização de eventos e coordenação de casamentos com base em Évora: casamentos, eventos corporativos e celebrações em todo o Alentejo e Portugal. Soluções à medida — peça orçamento.",
     sobreTitle: "Empresa de Organização de Eventos no Alentejo",
     sobreDescription:
       "Líquen Events, empresa de organização de eventos em Évora. Mais de 100 casamentos, eventos corporativos e celebrações no Alentejo e em todo o Portugal.",
     servicosTitle: "Casamentos e Eventos Corporativos no Alentejo",
     servicosDescription:
-      "Organização de casamentos, eventos corporativos, conferências e festas privadas em Évora, no Alentejo e em todo o Portugal. Soluções à medida do seu evento.",
+      "Coordenação de casamentos e organização de eventos corporativos, conferências e festas privadas em Évora, no Alentejo e em todo o Portugal. Soluções à medida do seu evento.",
     galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
     galeriaDescription:
       "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
@@ -111,16 +111,16 @@ export const pt = {
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
   // the markup's language always matches the visible page's.
   jsonld: {
-    hasOfferCatalogName: "Serviços de organização de eventos",
+    hasOfferCatalogName: "Organização de eventos e coordenação de casamentos",
     services: [
-      "Organização de casamentos",
+      "Coordenação de casamentos",
       "Eventos corporativos e conferências",
       "Festas e celebrações privadas",
       "Jantares de gala e eventos sociais",
     ],
-    servicosServiceName: "Organização de eventos, casamentos e eventos corporativos",
+    servicosServiceName: "Organização de eventos e coordenação de casamentos",
     servicosServiceDescription:
-      "Organização de casamentos, eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal — da decoração à coordenação.",
+      "Coordenação de casamentos e organização de eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal.",
   },
 
   home: {
@@ -185,7 +185,7 @@ export const pt = {
       Evento: "Evento",
     },
     alt: {
-      Casamento: "Casamento organizado pela Líquen Events no Alentejo",
+      Casamento: "Casamento coordenado pela Líquen Events no Alentejo",
       Corporativo: "Evento corporativo organizado pela Líquen Events",
       Conferência: "Conferência organizada pela Líquen Events",
       Aéreo: "Vista aérea de evento da Líquen Events",
@@ -469,7 +469,7 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial, planeado ao pormenor. Da escolha do espaço ao último detalhe.",
+            desc: "O vosso dia mais especial, coordenado ao pormenor — tempos, fornecedores e logística tratados, para só terem de o viver.",
           },
           {
             title: "Batizados & Comunhões",
@@ -616,7 +616,7 @@ export const pt = {
     paginas: "Páginas",
     servicosTitulo: "Serviços",
     serviceLinks: [
-      "Organização de Casamentos",
+      "Coordenação de Casamentos",
       "Eventos Corporativos",
       "Festas e Aniversários",
       "Jantares de Gala",

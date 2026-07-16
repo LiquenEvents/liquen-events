@@ -59,9 +59,9 @@ export const AREAS_SERVED = [
 export const SITE_KEYWORDS = [
   "organização de eventos Évora",
   "casamentos Évora",
-  "wedding planner Alentejo",
+  "wedding coordinator Alentejo",
   "casamentos Alentejo",
-  "organização de casamentos Portugal",
+  "coordenação de casamentos Alentejo",
   "eventos corporativos Lisboa",
   "empresa de eventos Alentejo",
   "organização de eventos Lisboa",

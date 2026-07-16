@@ -28,9 +28,9 @@ export async function generateMetadata({
     path: "/servicos",
     image: "/imagens/EW1_1330.jpg",
     keywords: [
-      "wedding planner Alentejo",
+      "coordenação de casamentos Alentejo",
+      "wedding coordinator Alentejo",
       "eventos corporativos Lisboa",
-      "conferências e congressos",
       "organização de festas Alentejo",
     ],
     ogLocale: t.meta.ogLocale,

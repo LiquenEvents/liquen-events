@@ -22,29 +22,30 @@ export interface ServiceDetail {
 export const SERVICES: ServiceDetail[] = [
   {
     slug: "casamentos",
-    eyebrow: "Planeamento de Casamentos",
-    title: "Organização de Casamentos no Alentejo e em Portugal",
-    metaTitle: "Wedding Planner no Alentejo — Casamentos",
+    eyebrow: "Coordenação de Casamentos",
+    title: "Coordenação de Casamentos no Alentejo e em Portugal",
+    metaTitle: "Coordenação de Casamentos no Alentejo — Wedding Coordinator",
     metaDescription:
-      "Wedding planner no Alentejo. Organizamos casamentos completos — decoração floral, catering, coordenação do dia — em herdades, quintas e espaços únicos de todo o Portugal.",
+      "Wedding coordinator no Alentejo. Coordenação do dia do casamento — orquestramos tempos, fornecedores e logística para viverem o grande dia sem preocupações, em herdades, quintas e espaços únicos de todo o Portugal.",
     keywords: [
-      "wedding planner Alentejo",
-      "organização de casamentos Alentejo",
+      "coordenação de casamentos Alentejo",
+      "wedding coordinator Alentejo",
+      "coordenação do dia do casamento",
       "casamento herdade Alentejo",
-      "wedding planner Portugal",
+      "wedding coordinator Portugal",
     ],
     hero: "/imagens/EW1_1100.jpg",
     intro: [
-      "O vosso casamento é único — e merece ser planeado ao pormenor. A Líquen Events é wedding planner e organiza casamentos em todo o Alentejo e Portugal, das herdades e quintas históricas aos espaços mais íntimos.",
-      "Acompanhamos o casal do primeiro esboço ao último brinde: conceito e estética, escolha do espaço, decoração floral, catering, música, papelaria e coordenação completa do grande dia. Cada detalhe pensado para que só tenham de viver o momento.",
+      "O vosso casamento é único — e no grande dia tudo tem de correr na perfeição. A Líquen Events é wedding coordinator: coordenamos o dia do vosso casamento em todo o Alentejo e Portugal, das herdades e quintas históricas aos espaços mais íntimos.",
+      "Entramos na reta final para orquestrar tudo — cronograma do dia, articulação com os fornecedores, montagem, equipa e imprevistos. No dia, somos o vosso ponto de contacto único, para que só tenham de viver o momento.",
     ],
     includes: [
-      "Wedding planning completo (full planning)",
-      "Coordenação do dia (day coordination)",
-      "Decoração floral e cenografia",
-      "Seleção de espaço e fornecedores",
-      "Catering e prova de menu",
-      "Plano de mesas e papelaria",
+      "Coordenação do dia do casamento",
+      "Reunião de preparação e revisão do plano",
+      "Cronograma detalhado (timings do dia)",
+      "Articulação e confirmação de fornecedores",
+      "Supervisão da montagem e do espaço",
+      "Gestão de equipa e imprevistos no dia",
     ],
     gallery: [
       "/imagens/DaniGui_Preview20.jpg",
@@ -56,12 +57,12 @@ export const SERVICES: ServiceDetail[] = [
     ],
     faqs: [
       {
-        q: "Com quanto tempo de antecedência devo contratar um wedding planner?",
-        a: "Recomendamos pelo menos 12 meses de antecedência para casamentos, sobretudo se o espaço for muito procurado. Para casamentos mais íntimos, conseguimos organizar em prazos mais curtos.",
+        q: "Com quanto tempo de antecedência devo contratar a coordenação do casamento?",
+        a: "Idealmente alguns meses antes, para termos tempo de rever o vosso plano e articular com os fornecedores. Mas conseguimos entrar mais perto da data, consoante a disponibilidade.",
       },
       {
-        q: "Organizam casamentos fora do Alentejo?",
-        a: "Sim. Organizamos casamentos em todo o Portugal continental e ilhas, com uma rede de fornecedores de confiança em várias regiões.",
+        q: "Fazem coordenação de casamentos fora do Alentejo?",
+        a: "Sim. Coordenamos casamentos em todo o Portugal continental e ilhas, em articulação com os fornecedores de cada região.",
       },
     ],
     related: ["jantares-de-gala", "festas-e-aniversarios"],
@@ -205,31 +206,31 @@ type ServiceCopy = Pick<
 
 const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
-    eyebrow: "Wedding Planning",
-    title: "Wedding Planning in the Alentejo and across Portugal",
-    metaTitle: "Wedding Planner in the Alentejo",
+    eyebrow: "Wedding Coordination",
+    title: "Wedding Coordination in the Alentejo and across Portugal",
+    metaTitle: "Wedding Coordinator in the Alentejo",
     metaDescription:
-      "Wedding planner in the Alentejo. We organise complete weddings — floral décor, catering, day-of coordination — at estates, quintas and unique venues across Portugal.",
+      "Wedding coordinator in the Alentejo. Wedding day coordination — we orchestrate timings, suppliers and logistics so you can simply enjoy your day, at estates, quintas and unique venues across Portugal.",
     intro: [
-      "Your wedding is one of a kind — and it deserves to be planned down to the last detail. Líquen Events is a wedding planner organising weddings throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues.",
-      "We guide the couple from the first sketch to the final toast: concept and aesthetics, venue selection, floral décor, catering, music, stationery and full day-of coordination. Every detail considered, so all you have to do is live the moment.",
+      "Your wedding is one of a kind — and on the day, everything has to run perfectly. Líquen Events is a wedding coordinator: we coordinate your wedding day throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues.",
+      "We step in for the final stretch to orchestrate it all — the day's timeline, supplier liaison, setup, team and the unexpected. On the day, we're your single point of contact, so all you have to do is live the moment.",
     ],
     includes: [
-      "Full wedding planning",
-      "Day-of coordination",
-      "Floral décor and scenography",
-      "Venue and supplier selection",
-      "Catering and menu tasting",
-      "Seating plan and stationery",
+      "Wedding day coordination",
+      "Prep meeting and plan review",
+      "Detailed day-of timeline",
+      "Supplier liaison and confirmation",
+      "Setup and venue supervision",
+      "On-the-day team and troubleshooting",
     ],
     faqs: [
       {
-        q: "How far in advance should I hire a wedding planner?",
-        a: "We recommend at least 12 months in advance, especially if the venue is in high demand. For more intimate weddings, we can organise on shorter timelines.",
+        q: "How far in advance should I hire wedding coordination?",
+        a: "Ideally a few months before, so we have time to review your plan and liaise with your suppliers. But we can come on board closer to the date, subject to availability.",
       },
       {
-        q: "Do you organise weddings outside the Alentejo?",
-        a: "Yes. We organise weddings throughout mainland Portugal and the islands, with a network of trusted suppliers in several regions.",
+        q: "Do you coordinate weddings outside the Alentejo?",
+        a: "Yes. We coordinate weddings throughout mainland Portugal and the islands, working with each region's suppliers.",
       },
     ],
   },
