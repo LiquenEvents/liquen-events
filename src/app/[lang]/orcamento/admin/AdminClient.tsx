@@ -6,7 +6,6 @@ import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
-import dynamic from "next/dynamic";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
@@ -21,65 +20,36 @@ import {
   downloadEventIcs,
 } from "./export";
 import { eventCountdown, randomId, eur } from "./util";
-import { ViewSkeleton } from "./Skeleton";
 import EmptyState from "./EmptyState";
+import { NAV, type View } from "./nav";
+import {
+  Overview,
+  Kanban,
+  Clientes,
+  Calendario,
+  Propostas,
+  Tarefas,
+  Fornecedores,
+  StatsDashboard,
+  Inbox,
+  ProposalBuilder,
+  ClientMessenger,
+  EventChecklist,
+  EventTimeline,
+  PaymentsPanel,
+  EventCosts,
+  GuestList,
+  TagsField,
+  FollowUpField,
+  ActivityLog,
+  EventTasks,
+} from "./lazy";
 
 // Quantos pedidos a lista renderiza de cada vez ("Mostrar mais" carrega o resto).
 const LIST_PAGE_SIZE = 50;
 
-// Each top-level view is a separate, mutually-exclusive surface — code-split
-// them so only the view the user actually opens ships its JS. This keeps the
-// back-office's initial load lean (8 of 9 views are deferred on first paint).
-// While the chunk arrives, a layout-shaped skeleton stands in so the page
-// settles instead of flashing a spinner.
-function ViewLoading() {
-  return <ViewSkeleton />;
-}
-const Overview = dynamic(() => import("./Overview"), { loading: ViewLoading });
-const Kanban = dynamic(() => import("./Kanban"), { loading: ViewLoading });
-const Clientes = dynamic(() => import("./Clientes"), { loading: ViewLoading });
-const Calendario = dynamic(() => import("./Calendario"), { loading: ViewLoading });
-const Propostas = dynamic(() => import("./Propostas"), { loading: ViewLoading });
-const Tarefas = dynamic(() => import("./Tarefas"), { loading: ViewLoading });
-const Fornecedores = dynamic(() => import("./Fornecedores"), { loading: ViewLoading });
-const StatsDashboard = dynamic(() => import("./StatsDashboard"), { loading: ViewLoading });
-const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
-
-// Detail-panel tools — only needed once a quote is opened, so defer their JS
-// too. A shimmering eyebrow+bar holds the layout while the chunk arrives.
-const PanelLoading = () => (
-  <div className="border-t border-foreground/10 pt-5">
-    <div className="bo-skeleton h-2.5 w-40 mb-4" aria-hidden />
-    <div className="bo-skeleton h-9 w-full" aria-hidden />
-  </div>
-);
-const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), { loading: PanelLoading });
-const ClientMessenger = dynamic(() => import("./ClientMessenger"), { loading: PanelLoading });
-const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
-const EventTimeline = dynamic(() => import("./EventTimeline"), { loading: PanelLoading });
-const PaymentsPanel = dynamic(() => import("./PaymentsPanel"), { loading: PanelLoading });
-const EventCosts = dynamic(() => import("./EventCosts"), { loading: PanelLoading });
-const GuestList = dynamic(() => import("./GuestList"), { loading: PanelLoading });
-const TagsField = dynamic(() => import("./TagsField"), {
-  loading: () => <div className="bo-skeleton h-9 w-full" aria-hidden />,
-});
-const FollowUpField = dynamic(() => import("./FollowUpField"), {
-  loading: () => <div className="bo-skeleton h-9 w-full" aria-hidden />,
-});
-const ActivityLog = dynamic(() => import("./ActivityLog"), { loading: PanelLoading });
-const EventTasks = dynamic(() => import("./EventTasks"), { loading: PanelLoading });
-
-type View =
-  | "overview"
-  | "pedidos"
-  | "kanban"
-  | "clientes"
-  | "calendario"
-  | "propostas"
-  | "tarefas"
-  | "fornecedores"
-  | "estatisticas"
-  | "inbox";
+// Code-split views + detail-panel tools live in ./lazy — only the view the
+// user opens ships its JS, keeping the back-office's initial load lean.
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Pendente", color: "bg-foreground/10 text-foreground/50" },
@@ -87,187 +57,6 @@ const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "cotado", label: "Cotado", color: "bg-moss/25 text-moss" },
   { id: "aceite", label: "Aceite", color: "bg-moss/35 text-moss" },
   { id: "rejeitado", label: "Rejeitado", color: "bg-foreground/8 text-foreground/30" },
-];
-
-const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
-  {
-    id: "overview",
-    label: "Visão Geral",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <rect x="3" y="3" width="7" height="9" rx="1" />
-        <rect x="14" y="3" width="7" height="5" rx="1" />
-        <rect x="14" y="12" width="7" height="9" rx="1" />
-        <rect x="3" y="16" width="7" height="5" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    id: "pedidos",
-    label: "Pedidos",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-        <rect x="9" y="3" width="6" height="4" rx="1" />
-        <path d="M9 12h6M9 16h4" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "kanban",
-    label: "Pipeline",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <rect x="3" y="4" width="4" height="16" rx="1" />
-        <rect x="10" y="4" width="4" height="11" rx="1" />
-        <rect x="17" y="4" width="4" height="7" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    id: "clientes",
-    label: "Clientes",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <circle cx="9" cy="8" r="3" />
-        <path d="M3 20c0-3 2.7-5 6-5s6 2 6 5" />
-        <path d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.5-1.8-4.3-4-4.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "calendario",
-    label: "Calendário",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "propostas",
-    label: "Propostas",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "tarefas",
-    label: "Tarefas",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "fornecedores",
-    label: "Fornecedores",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path
-          d="M3 9l1-5h16l1 5M4 9h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9z"
-          strokeLinejoin="round"
-        />
-        <path d="M9 13h6" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "estatisticas",
-    label: "Estatísticas",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M3 3v18h18" strokeLinecap="round" />
-        <path d="M7 14l3-4 3 3 4-6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "inbox",
-    label: "Inbox",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M3 7l9 6 9-6" />
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-      </svg>
-    ),
-  },
 ];
 
 // Single-key destinations for the "g then <key>" navigation chord.

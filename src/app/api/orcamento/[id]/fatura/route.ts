@@ -29,15 +29,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!quote) return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
 
     const body = await request.json();
-    const amount = Number(body.amount) || 0;
+    const amount = Math.min(Number(body.amount) || 0, 100_000_000);
     if (amount <= 0) return NextResponse.json({ error: "Valor inválido" }, { status: 400 });
 
-    const kind = String(body.kind ?? "pagamento");
-    const vatRate = typeof body.vatRate === "number" ? body.vatRate : 0.23;
+    // Bound + strip line breaks: `number` feeds the email subject and the
+    // attachment filename, so keep it single-line and short.
+    const clean = (v: unknown, max: number) =>
+      String(v ?? "")
+        .replace(/[\r\n]+/g, " ")
+        .slice(0, max);
+    const kind = clean(body.kind, 40) || "pagamento";
+    const vatRate =
+      typeof body.vatRate === "number" ? Math.min(Math.max(body.vatRate, 0), 1) : 0.23;
     const number =
-      body.number ||
+      clean(body.number, 60) ||
       `${new Date().getFullYear()}/${id.slice(-4)}-${Math.floor(Math.random() * 900 + 100)}`;
-    const dateStr = body.date || new Date().toISOString().slice(0, 10);
+    const dateStr = clean(body.date, 40) || new Date().toISOString().slice(0, 10);
     const paid = !!body.paid;
     const email = !!body.email;
 
@@ -47,7 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       clientName: quote.name,
       clientEmail: quote.email,
       clientNif: quote.nif,
-      description: body.description || "",
+      description: String(body.description ?? "").slice(0, 2000),
       amount,
       vatRate,
       kindLabel: KIND_LABEL[kind] ?? "Pagamento",

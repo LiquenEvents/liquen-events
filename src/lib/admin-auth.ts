@@ -157,6 +157,9 @@ export function verifyCredentials(name: string, password: string): { name: strin
   if (users) {
     const u = users.find((x) => x.name.toLowerCase() === cleanName.toLowerCase());
     if (u && bcrypt.compareSync(password, u.passwordHash)) return { name: u.name };
+    // Unknown name: still run one bcrypt compare so the response time doesn't
+    // reveal whether the admin display-name exists (username enumeration).
+    if (!u) bcrypt.compareSync(password, DEV_SHARED_HASH);
     return null;
   }
 

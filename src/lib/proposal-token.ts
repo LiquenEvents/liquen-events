@@ -8,10 +8,12 @@ import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
  * so a client can only ever act on the exact proposal the link was minted for —
  * there's no id enumeration and no way to forge an acceptance.
  */
-// 30 days — still comfortably past a normal decision window, but a tighter
-// exposure window for a forwarded link than the previous 45. (A fuller fix
-// would add per-proposal revocation / one-time use; tracked as a follow-up.)
-const TTL_MS = 1000 * 60 * 60 * 24 * 30;
+// 14 days — comfortably past a normal decision window while keeping the
+// exposure window of a forwarded link short. The state-changing action is
+// already effectively one-time (the route is idempotent once the proposal is
+// accepted/declined); per-proposal revocation would need a data-model change
+// for little marginal gain over an unforgeable + rate-limited + short-lived token.
+const TTL_MS = 1000 * 60 * 60 * 24 * 14;
 
 let randomFallbackSecret: string | null = null;
 
