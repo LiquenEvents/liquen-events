@@ -612,6 +612,7 @@ export const pt = {
     includesTitle: "O que inclui",
     galleryEyebrow: "Portefólio",
     galleryTitle: "Momentos que criámos",
+    galleryAlt: "Exemplo de decoração da Líquen Events",
     faqTitle: "Perguntas frequentes",
     relatedTitle: "Outros serviços",
     ctaTitle: "Vamos dar vida ao seu evento?",
