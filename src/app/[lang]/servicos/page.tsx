@@ -36,7 +36,7 @@ export async function generateMetadata({
   });
 }
 
-const navMeta = [{ id: "empresas" }, { id: "celebracoes" }];
+const navMeta = [{ id: "celebracoes" }, { id: "empresas" }];
 
 const eyebrowLight =
   "text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
@@ -64,8 +64,20 @@ type Category = {
 // from the dictionary (t.servicos.categories) and is merged in at render time.
 const categoryMeta = [
   {
-    id: "empresas",
+    id: "celebracoes",
     num: "01",
+    layout: "mosaic-left" as const,
+    band: "/imagens/teresinhaeze-909.jpg",
+    services: [
+      { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
+      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
+    ],
+  },
+  {
+    id: "empresas",
+    num: "02",
     layout: "mosaic-right" as const,
     band: "/imagens/EW1_1333.jpg",
     services: [
@@ -77,18 +89,6 @@ const categoryMeta = [
       { slug: "eventos-corporativos", image: "/imagens/EW1_1428.jpg" },
       // Jantares de empresa — mesa posta premium
       { slug: "eventos-corporativos", image: "/imagens/EW1_1404.jpg" },
-    ],
-  },
-  {
-    id: "celebracoes",
-    num: "02",
-    layout: "mosaic-left" as const,
-    band: "/imagens/teresinhaeze-909.jpg",
-    services: [
-      { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
-      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
     ],
   },
 ];
