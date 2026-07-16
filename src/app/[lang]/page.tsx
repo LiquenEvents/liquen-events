@@ -3,7 +3,6 @@ import Image from "next/image";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
-import RatingBadge from "@/components/RatingBadge";
 import { blurFor } from "@/lib/blur";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
@@ -109,30 +108,21 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               );
             })}
           </h1>
-          <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-x-6 gap-y-4 anim-2">
+          <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-4 anim-2">
             <Magnetic strength={0.4}>
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-white text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
             </Magnetic>
             <Link
               href={localizeHref("/galeria", locale)}
-              className="link-line text-xs text-white/70 hover:text-white/85 transition-colors tracking-[0.2em] uppercase"
+              className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/85 text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
             >
               {t.common.verGaleria}
             </Link>
-          </div>
-          {/* Real Google rating, above the fold — the strongest trust cue. */}
-          <div className="mt-8 anim-3">
-            <RatingBadge
-              label={t.common.reviewsLabel}
-              ptFormat={locale === "pt"}
-              starClassName="text-gold"
-              textClassName="text-white/75"
-            />
           </div>
         </div>
 
