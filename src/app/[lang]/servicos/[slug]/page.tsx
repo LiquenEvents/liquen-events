@@ -227,7 +227,7 @@ export default async function ServiceDetailPage({
       <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 mb-10 lg:mb-14">
           <AnimateIn>
-            <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase flex items-center gap-3">
+            <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase flex items-center gap-3">
               <span className="w-8 h-px bg-gold flex-shrink-0" />
               {t.servicoDetalhe.galleryEyebrow}
             </p>

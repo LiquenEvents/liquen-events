@@ -256,7 +256,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 <span className="w-8 h-px bg-gold/50" />
                 <div>
                   <p className="text-foreground text-sm font-semibold">{t.sobre.founderName}</p>
-                  <p className="text-foreground/60 text-xs mt-0.5">{t.sobre.founderRole}</p>
+                  <p className="text-foreground/72 text-xs mt-0.5">{t.sobre.founderRole}</p>
                 </div>
               </div>
             </AnimateIn>

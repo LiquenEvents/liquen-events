@@ -385,7 +385,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                       {p.title}
                     </h3>
                   </div>
-                  <p className="lg:col-span-4 text-foreground/60 text-sm leading-relaxed max-w-xl">
+                  <p className="lg:col-span-4 text-foreground/72 text-sm leading-relaxed max-w-xl">
                     {p.desc}
                   </p>
                 </div>
@@ -414,7 +414,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   <br />
                   {t.contacto.faqTitleLine2}
                 </h2>
-                <p className="text-foreground/60 text-sm leading-relaxed mt-6 max-w-xs">
+                <p className="text-foreground/72 text-sm leading-relaxed mt-6 max-w-xs">
                   {t.contacto.faqSub}
                 </p>
               </div>

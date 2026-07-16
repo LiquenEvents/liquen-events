@@ -367,13 +367,13 @@ export default function Navbar() {
             <div className="flex flex-col gap-1.5 min-w-0">
               <a
                 href={`mailto:${SITE.email}`}
-                className="text-cream/40 hover:text-cream/75 text-[11px] tracking-wide transition-colors truncate"
+                className="text-cream/70 hover:text-cream text-[11px] tracking-wide transition-colors truncate"
               >
                 {SITE.email}
               </a>
               <a
                 href={`tel:${SITE.phone}`}
-                className="text-cream/40 hover:text-cream/75 text-[11px] tracking-wide transition-colors"
+                className="text-cream/70 hover:text-cream text-[11px] tracking-wide transition-colors"
               >
                 {SITE.phoneDisplay}
               </a>

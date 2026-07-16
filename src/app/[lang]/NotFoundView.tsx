@@ -15,7 +15,7 @@ export default function NotFoundView() {
         >
           404
         </p>
-        <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
+        <p className="text-foreground/66 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
           <span className="w-5 h-px bg-moss/50" />
           {t.errors.notFoundEyebrow}
         </p>
@@ -37,7 +37,7 @@ export default function NotFoundView() {
           </Link>
           <Link
             href={localizeHref("/contacto", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/12 text-foreground/45 font-medium rounded-sm hover:border-foreground/25 hover:text-foreground/75 transition-all duration-300 text-sm tracking-widest uppercase"
+            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/20 text-foreground/72 font-medium rounded-sm hover:border-foreground/40 hover:text-foreground transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.falarConnosco}
           </Link>
@@ -54,7 +54,7 @@ export default function NotFoundView() {
             <Link
               key={href}
               href={localizeHref(href, locale)}
-              className="text-foreground/30 hover:text-moss text-xs tracking-[0.2em] uppercase transition-colors"
+              className="text-foreground/68 hover:text-moss text-xs tracking-[0.2em] uppercase transition-colors"
             >
               {label}
             </Link>
