@@ -10,10 +10,10 @@ import AnimateIn from "@/components/AnimateIn";
 import { localizeHref } from "@/lib/i18n";
 
 const STATUS_COLORS: Record<string, string> = {
-  pendente: "text-moss",
-  em_revisao: "text-moss",
-  cotado: "text-moss",
-  aceite: "text-moss",
+  pendente: "text-moss-dark",
+  em_revisao: "text-moss-dark",
+  cotado: "text-moss-dark",
+  aceite: "text-moss-dark",
   rejeitado: "text-foreground/70",
 };
 
@@ -511,7 +511,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
             </Link>
             <Link
               href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/55 text-[11px] tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/75 transition-colors"
+              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/72 text-[11px] tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/75 transition-colors"
             >
               {tc.novoPedido}
             </Link>

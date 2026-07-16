@@ -62,6 +62,10 @@ export default function OrcamentoForm() {
   // Set once the user tries to submit an incomplete form — drives the visible,
   // announced error identification (WCAG 3.3.1) instead of a silent disabled button.
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  // Refs for focus management on invalid submit + the event-type radiogroup.
+  const nomeRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
   // Data mínima = hoje (não faz sentido pedir orçamento para uma data passada).
   const [minDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -114,6 +118,11 @@ export default function OrcamentoForm() {
     if (!ready) {
       setTouched({ nome: true, email: true });
       setAttemptedSubmit(true);
+      // Move focus to the first invalid control so the reason is discoverable
+      // (WCAG 3.3.1 error identification + 2.4.3 focus order).
+      if (eventType === "") radioRefs.current[0]?.focus();
+      else if (nome.trim().length < 2) nomeRef.current?.focus();
+      else emailRef.current?.focus();
       return;
     }
     setSending(true);
@@ -173,10 +182,27 @@ export default function OrcamentoForm() {
     }
   }
 
+  // Arrow-key navigation for the event-type radiogroup (WAI-ARIA radio pattern).
+  const onRadioKey = (e: React.KeyboardEvent) => {
+    const dir =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const cur = EVENT_TYPES.findIndex((o) => o.label === eventType);
+    const from = cur === -1 ? 0 : cur;
+    const next = (from + dir + EVENT_TYPES.length) % EVENT_TYPES.length;
+    setEventType(EVENT_TYPES[next].label);
+    radioRefs.current[next]?.focus();
+  };
+
   const inputCls =
     // border-b at /55 clears the 3:1 non-text-contrast floor so the field is
     // identifiable (WCAG 1.4.11); focus switches to solid moss.
-    "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/55 focus:outline-none focus:border-moss transition-colors duration-300";
+    "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/65 focus:outline-none focus:border-moss transition-colors duration-300";
   const labelCls =
     "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
@@ -273,22 +299,36 @@ export default function OrcamentoForm() {
             />
 
             {/* Tipo de evento */}
-            <fieldset
-              className="group"
-              aria-required="true"
-              aria-invalid={!!tipoErr}
-              aria-describedby={tipoErr ? "of-tipo-err" : undefined}
-            >
-              <legend className={labelCls}>{to.labelTipo}</legend>
-              <div className="flex flex-wrap gap-2.5">
+            <fieldset className="group">
+              <legend id="of-tipo-legend" className={labelCls}>
+                {to.labelTipo}
+              </legend>
+              {/* A single-select toggle group is semantically a radiogroup —
+                  aria-required/invalid on a <fieldset> aren't exposed by AT, so
+                  the role + roving tabindex + arrow keys live here instead. */}
+              <div
+                role="radiogroup"
+                aria-labelledby="of-tipo-legend"
+                aria-required="true"
+                aria-invalid={!!tipoErr}
+                aria-describedby={tipoErr ? "of-tipo-err" : undefined}
+                onKeyDown={onRadioKey}
+                className="flex flex-wrap gap-2.5"
+              >
                 {EVENT_TYPES.map((o, i) => {
                   const active = eventType === o.label;
+                  const focusable = eventType === "" ? i === 0 : active;
                   return (
                     <button
                       key={o.label}
                       type="button"
+                      ref={(el) => {
+                        radioRefs.current[i] = el;
+                      }}
+                      role="radio"
+                      aria-checked={active}
+                      tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      aria-pressed={active}
                       className={`px-4 py-2.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
                           ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
@@ -348,6 +388,7 @@ export default function OrcamentoForm() {
                 </label>
                 <input
                   id="of-nome"
+                  ref={nomeRef}
                   type="text"
                   autoComplete="name"
                   aria-required="true"
@@ -371,6 +412,7 @@ export default function OrcamentoForm() {
                 </label>
                 <input
                   id="of-email"
+                  ref={emailRef}
                   type="email"
                   autoComplete="email"
                   aria-required="true"

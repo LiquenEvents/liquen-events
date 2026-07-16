@@ -18,7 +18,7 @@ test.describe("Pedido de orçamento", () => {
     await page.goto("/orcamento");
 
     // Required: event type + name + email.
-    await page.getByRole("button", { name: "Casamento", exact: true }).click();
+    await page.getByRole("radio", { name: "Casamento", exact: true }).click();
     await page.getByPlaceholder("O seu nome").fill("Ana Teste");
     await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
 
@@ -42,7 +42,7 @@ test.describe("Pedido de orçamento", () => {
     await expect(page).toHaveURL(/\/orcamento$/);
 
     // Fill the required fields — type, name and a valid email.
-    await page.getByRole("button", { name: "Corporativo", exact: true }).click();
+    await page.getByRole("radio", { name: "Corporativo", exact: true }).click();
     await page.getByPlaceholder("O seu nome").fill("Ana");
     await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
     await expect(enviar).toBeEnabled();
@@ -50,7 +50,7 @@ test.describe("Pedido de orçamento", () => {
 
   test("o rascunho sobrevive a sair e voltar à página", async ({ page }) => {
     await page.goto("/orcamento");
-    await page.getByRole("button", { name: "Aniversário", exact: true }).click();
+    await page.getByRole("radio", { name: "Aniversário", exact: true }).click();
     await page.getByPlaceholder("O seu nome").fill("Maria Rascunho");
 
     // Navigate away and back — the locally saved draft restores the fields.
@@ -58,8 +58,8 @@ test.describe("Pedido de orçamento", () => {
     await page.goto("/orcamento");
 
     await expect(page.getByPlaceholder("O seu nome")).toHaveValue("Maria Rascunho");
-    await expect(page.getByRole("button", { name: "Aniversário", exact: true })).toHaveAttribute(
-      "aria-pressed",
+    await expect(page.getByRole("radio", { name: "Aniversário", exact: true })).toHaveAttribute(
+      "aria-checked",
       "true",
     );
   });

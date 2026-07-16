@@ -211,7 +211,10 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               </h2>
             </AnimateIn>
             <AnimateIn delay={80} className="hidden lg:block">
-              <span className="text-foreground/12 text-[9px] tracking-[0.4em] uppercase">
+              <span
+                aria-hidden="true"
+                className="text-foreground/12 text-[9px] tracking-[0.4em] uppercase"
+              >
                 {clientLogos.length} {t.clientes.clientesCount}
               </span>
             </AnimateIn>
@@ -350,7 +353,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                 />
                 <div className="absolute inset-0 bg-black/25 group-hover:bg-black/5 transition-colors duration-700" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <span className="absolute bottom-4 left-4 text-white/0 group-hover:text-white/65 transition-all duration-500 text-[9px] tracking-[0.42em] uppercase font-medium">
+                <span className="absolute bottom-4 left-4 text-white/0 group-hover:text-white/65 group-focus-within:text-white/65 transition-all duration-500 text-[9px] tracking-[0.42em] uppercase font-medium">
                   {t.clientes.mosaicLabels[i] ?? item.label}
                 </span>
               </div>

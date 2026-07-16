@@ -94,9 +94,10 @@ body.admin-mode {
 /* ── Smooth scroll ── */
 html {
   scroll-behavior: smooth;
-  /* Anchored sections (e.g. /servicos#empresas) land below the fixed navbar
-     instead of being hidden under it. */
-  scroll-padding-top: 6rem;
+  /* Anchored sections (e.g. /servicos#empresas) and keyboard-focused elements
+     land clear of the fixed navbar (≈140px unscrolled) instead of being hidden
+     under it — WCAG 2.4.11 Focus Not Obscured. */
+  scroll-padding-top: 9rem;
 }
 /* Honour reduced-motion for native/programmatic scrolling too (Lenis is already
    disabled elsewhere) — anchor jumps and scrollTo() snap instead of animating. */

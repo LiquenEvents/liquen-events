@@ -226,6 +226,7 @@ export const pt = {
     viewWedding: "Ver este casamento",
     backToGallery: "Toda a galeria",
     photosLabel: "fotos",
+    keyboardHint: "← → navegar · esc fechar · deslize no telemóvel",
     backToTop: "Voltar ao topo",
   },
 

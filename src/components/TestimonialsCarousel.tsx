@@ -19,17 +19,35 @@ export default function TestimonialsCarousel() {
   // Persistent user control (WCAG 2.2.2) — always-available pause, independent of
   // hover/focus. Reduced-motion stops autoplay entirely.
   const [userPaused, setUserPaused] = useState(false);
+  // Only announce (live region) when the user drives the change — not on every
+  // 6s autoplay tick, which would spam screen-reader users.
+  const [manualNav, setManualNav] = useState(false);
   const reduced = useReducedMotion();
 
-  const transitionTo = useCallback((next: (current: number) => number) => {
-    setVisible(false);
-    setTimeout(() => {
-      setActive(next);
-      setVisible(true);
-    }, 380);
-  }, []);
+  const transitionTo = useCallback(
+    (next: (current: number) => number) => {
+      // Reduced motion: swap instantly, no fade.
+      if (reduced) {
+        setActive(next);
+        setVisible(true);
+        return;
+      }
+      setVisible(false);
+      setTimeout(() => {
+        setActive(next);
+        setVisible(true);
+      }, 380);
+    },
+    [reduced],
+  );
 
-  const goTo = useCallback((i: number) => transitionTo(() => i), [transitionTo]);
+  const goTo = useCallback(
+    (i: number) => {
+      setManualNav(true);
+      transitionTo(() => i);
+    },
+    [transitionTo],
+  );
 
   useEffect(() => {
     const onVisibility = () => setDocHidden(document.hidden);
@@ -43,6 +61,8 @@ export default function TestimonialsCarousel() {
   useEffect(() => {
     if (paused) return;
     const id = setInterval(() => {
+      // Autoplay advances silently (live region off); manual nav re-enables it.
+      setManualNav(false);
       // Functional update so autoplay advances from the *current* slide
       // instead of a stale closure value (which would freeze on slide 1).
       transitionTo((current) => (current + 1) % testimonials.length);
@@ -88,12 +108,12 @@ export default function TestimonialsCarousel() {
         <AnimateIn delay={80}>
           <div className="max-w-3xl">
             <div
-              aria-live="polite"
+              aria-live={manualNav ? "polite" : "off"}
               aria-atomic="true"
               style={{
                 opacity: visible ? 1 : 0,
                 transform: visible ? "none" : "translateY(10px)",
-                transition: "opacity 0.38s ease, transform 0.38s ease",
+                transition: reduced ? "none" : "opacity 0.38s ease, transform 0.38s ease",
               }}
             >
               <p
