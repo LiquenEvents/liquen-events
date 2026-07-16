@@ -138,9 +138,9 @@ export const en: Dict = {
   home: {
     eyebrow: "Event decoration · Évora · Alentejo",
     heroLines: [
-      { words: ["Events", "that"] },
-      { words: ["stay", "with"] },
-      { words: ["you."], moss: true },
+      { words: ["We", "craft", "events,"] },
+      { words: ["we", "immortalise"] },
+      { words: ["memories."], moss: true },
     ],
     scroll: "Scroll",
     wallEyebrow: "Our work",
@@ -190,7 +190,7 @@ export const en: Dict = {
 
   galeria: {
     headerLabel: "Our moments",
-    headerTitle: "Wedding & Event Gallery",
+    headerTitle: "Gallery",
     headerDesc: "Weddings, corporate events and celebrations — captured in detail.",
     instaEyebrow: "Social media",
     instaTitle: "Follow us on Instagram",
@@ -273,7 +273,7 @@ export const en: Dict = {
     mosaicLabels: ["Corporate", "Wedding", "Gala", "Wedding", "Dinner", "Gala", "Institutional"],
     ctaEyebrow: "Next event",
     ctaTitleLine1: "Join our",
-    ctaTitleLine2: "clients.",
+    ctaTitleLine2: "clients",
     ctaText: "Tell us your idea and we'll show you how we can turn it into a memorable event.",
     galleryAlt: [
       "Corporate event reception in a courtyard in Évora",
@@ -418,7 +418,7 @@ export const en: Dict = {
     back: "Líquen Events",
     eyebrow: "Quote request",
     titleLine1: "Tell us",
-    titleMoss: "your idea.",
+    titleMoss: "your idea",
     lead: "No commitment. We reply with a tailored proposal in under 24 business hours.",
     eventTypeLabels: [
       "Wedding",
@@ -523,7 +523,7 @@ export const en: Dict = {
       },
     ],
     seoEyebrow: "Where we work",
-    seoTitle: "From Évora to all of Portugal",
+    seoTitle: "From Évora to Portugal",
     seoText:
       "Weddings, corporate events and celebrations — from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
     ctaEyebrow: "Next step",

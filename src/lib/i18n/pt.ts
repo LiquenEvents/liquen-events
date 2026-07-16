@@ -138,9 +138,9 @@ export const pt = {
   home: {
     eyebrow: "Decoração de eventos · Évora · Alentejo",
     heroLines: [
-      { words: ["Eventos", "que"] },
-      { words: ["ficam", "na"] },
-      { words: ["memória."], moss: true },
+      { words: ["Organizamos", "eventos,"] },
+      { words: ["eternizamos"] },
+      { words: ["memórias."], moss: true },
     ] as { words: string[]; moss?: boolean }[],
     scroll: "Scroll",
     wallEyebrow: "O nosso trabalho",
@@ -189,7 +189,7 @@ export const pt = {
 
   galeria: {
     headerLabel: "Os nossos momentos",
-    headerTitle: "Galeria de Casamentos e Eventos",
+    headerTitle: "Galeria",
     headerDesc: "Casamentos, eventos corporativos e celebrações — capturados ao pormenor.",
     instaEyebrow: "Redes sociais",
     instaTitle: "Siga-nos no Instagram",
@@ -280,7 +280,7 @@ export const pt = {
     ],
     ctaEyebrow: "Próximo evento",
     ctaTitleLine1: "Junte-se aos",
-    ctaTitleLine2: "nossos clientes.",
+    ctaTitleLine2: "nossos clientes",
     ctaText:
       "Conte-nos a sua ideia e mostramos-lhe como a podemos transformar num evento memorável.",
     galleryAlt: [
@@ -428,7 +428,7 @@ export const pt = {
     back: "Líquen Events",
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
-    titleMoss: "a sua ideia.",
+    titleMoss: "a sua ideia",
     lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
     eventTypeLabels: [
       "Casamento",
@@ -532,7 +532,7 @@ export const pt = {
       },
     ],
     seoEyebrow: "Onde atuamos",
-    seoTitle: "De Évora para todo o Portugal",
+    seoTitle: "De Évora para Portugal",
     seoText:
       "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
     ctaEyebrow: "Próximo passo",
