@@ -103,7 +103,7 @@ export default async function ProposalPage({
 
         {/* Line items */}
         <div className="border border-foreground/10 rounded-lg overflow-hidden bg-surface-raised/30">
-          <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/30 text-[10px] tracking-[0.2em] uppercase">
+          <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/68 text-[10px] tracking-[0.2em] uppercase">
             <span className="flex-1">{t.tableDescricao}</span>
             <span className="w-12 text-center">{t.tableQt}</span>
             <span className="w-28 text-right">{t.tableValor}</span>
@@ -114,7 +114,7 @@ export default async function ProposalPage({
               className="flex items-center gap-3 px-5 py-3.5 border-b border-foreground/6 last:border-0"
             >
               <span className="flex-1 text-foreground/75 text-sm">{it.description}</span>
-              <span className="w-12 text-center text-foreground/45 text-sm tabular-nums">
+              <span className="w-12 text-center text-foreground/72 text-sm tabular-nums">
                 {it.qty}
               </span>
               <span className="w-28 text-right text-foreground/75 text-sm tabular-nums">
@@ -126,16 +126,16 @@ export default async function ProposalPage({
           {/* Totals */}
           <div className="px-5 py-4 bg-foreground/[0.03] flex flex-col gap-1.5">
             <div className="flex justify-between text-xs">
-              <span className="text-foreground/45">{t.subtotal}</span>
-              <span className="text-foreground/60 tabular-nums">
+              <span className="text-foreground/72">{t.subtotal}</span>
+              <span className="text-foreground/72 tabular-nums">
                 {eur(proposal.subtotal, cur, t.dateLocale)}
               </span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-foreground/45">
+              <span className="text-foreground/72">
                 {t.iva} ({Math.round(proposal.vatRate * 100)}%)
               </span>
-              <span className="text-foreground/60 tabular-nums">
+              <span className="text-foreground/72 tabular-nums">
                 {eur(proposal.vat, cur, t.dateLocale)}
               </span>
             </div>
@@ -153,7 +153,7 @@ export default async function ProposalPage({
 
         {proposal.notes && (
           <div className="mt-5 border-l-2 border-moss/40 pl-5 py-1">
-            <p className="text-foreground/60 text-sm leading-relaxed whitespace-pre-wrap">
+            <p className="text-foreground/72 text-sm leading-relaxed whitespace-pre-wrap">
               {proposal.notes}
             </p>
           </div>
@@ -172,7 +172,7 @@ export default async function ProposalPage({
           clientEmail={proposal.clientEmail}
         />
 
-        <p className="text-foreground/30 text-[11px] text-center mt-10 leading-relaxed">
+        <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">
           {t.footerNote}{" "}
           <a href={`mailto:${SITE.email}`} className="text-moss/80 hover:underline">
             {SITE.email}

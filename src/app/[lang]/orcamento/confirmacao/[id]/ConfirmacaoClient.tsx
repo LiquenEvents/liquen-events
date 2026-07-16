@@ -127,7 +127,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
-        <p className="text-foreground/30 text-[10px] tracking-[0.5em] uppercase animate-pulse">
+        <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase animate-pulse">
           {tc.loading}
         </p>
       </div>
@@ -273,7 +273,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
           </AnimateIn>
 
           <AnimateIn from="bottom" delay={60}>
-            <p className="text-foreground/30 text-[10px] tracking-[0.5em] uppercase mb-6 flex items-center gap-3">
+            <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-6 flex items-center gap-3">
               <span className="w-6 h-px bg-gold/60" />
               {tc.successEyebrow}
             </p>
@@ -291,7 +291,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
           </AnimateIn>
 
           <AnimateIn from="bottom" delay={180}>
-            <p className="text-foreground/60 text-[15px] leading-[1.9] max-w-xl">{lead}</p>
+            <p className="text-foreground/72 text-[15px] leading-[1.9] max-w-xl">{lead}</p>
           </AnimateIn>
 
           <AnimateIn from="bottom" delay={230}>
@@ -311,7 +311,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
               {/* Reference + status */}
               <div className="flex items-start justify-between gap-4 px-7 pt-7 pb-6 border-b border-foreground/8">
                 <div>
-                  <p className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-2">
+                  <p className="text-foreground/72 text-[10px] tracking-[0.4em] uppercase mb-2">
                     {tc.refLabel}
                   </p>
                   <p className="text-foreground/80 font-mono text-[15px] tracking-tight">{id}</p>
@@ -334,7 +334,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                         i < details.length - 1 ? "border-b border-foreground/8" : ""
                       }`}
                     >
-                      <dt className="text-foreground/60 text-[10px] tracking-[0.28em] uppercase shrink-0">
+                      <dt className="text-foreground/72 text-[10px] tracking-[0.28em] uppercase shrink-0">
                         {d.label}
                       </dt>
                       <dd className="text-foreground/85 text-[15px] text-right leading-snug">
@@ -345,7 +345,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                 </dl>
               ) : (
                 <div className="px-7 py-6">
-                  <p className="text-foreground/60 text-sm leading-relaxed">{tc.noDataNote}</p>
+                  <p className="text-foreground/72 text-sm leading-relaxed">{tc.noDataNote}</p>
                 </div>
               )}
 
@@ -375,7 +375,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
               {/* Footer note */}
               <div className="flex items-center gap-3 px-7 py-5 border-t border-foreground/8">
                 <span className="h-1 w-1 rounded-full bg-gold shrink-0" />
-                <p className="text-foreground/50 text-[11px] leading-relaxed">{tc.footerNote}</p>
+                <p className="text-foreground/72 text-[11px] leading-relaxed">{tc.footerNote}</p>
               </div>
             </div>
           </AnimateIn>
@@ -384,7 +384,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
           <div className="flex flex-col gap-6">
             <AnimateIn from="bottom" delay={280}>
               <div className="rounded-2xl border border-foreground/10 bg-white p-7">
-                <p className="text-foreground/30 text-[10px] tracking-[0.4em] uppercase mb-6">
+                <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-6">
                   {tc.proximosPassos}
                 </p>
                 <ol className="relative flex flex-col gap-6">
@@ -402,7 +402,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                         <p className="text-foreground/80 text-[13px] font-medium mb-0.5">
                           {item.label}
                         </p>
-                        <p className="text-foreground/50 text-[11px] leading-relaxed">
+                        <p className="text-foreground/72 text-[11px] leading-relaxed">
                           {item.desc}
                         </p>
                       </div>
@@ -415,7 +415,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
             <AnimateIn from="bottom" delay={340}>
               <div className="rounded-2xl border border-moss/20 bg-moss/[0.06] p-7">
                 <div className="w-6 h-px bg-gold/60 mb-4" />
-                <p className="text-foreground/60 text-[13px] leading-relaxed mb-4">
+                <p className="text-foreground/72 text-[13px] leading-relaxed mb-4">
                   {tc.contactIntro}
                 </p>
                 <div className="flex flex-col gap-2.5">
@@ -449,7 +449,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                 >
                   {tc.whileTitle}
                 </p>
-                <p className="text-foreground/45 text-[13px] mt-0.5">{tc.whileLead}</p>
+                <p className="text-foreground/72 text-[13px] mt-0.5">{tc.whileLead}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -474,7 +474,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                           →
                         </span>
                       </p>
-                      <p className="text-foreground/45 text-[12px] mt-1 leading-relaxed">{c.sub}</p>
+                      <p className="text-foreground/72 text-[12px] mt-1 leading-relaxed">{c.sub}</p>
                     </div>
                   </>
                 );
@@ -521,7 +521,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
         {/* ── Personal sign-off ── */}
         <AnimateIn from="fade" delay={480}>
           <div className="mt-16 pt-8 border-t border-foreground/8">
-            <p className="text-foreground/45 text-[13px]">{tc.signOff}</p>
+            <p className="text-foreground/72 text-[13px]">{tc.signOff}</p>
             <p
               className="text-moss text-2xl mt-1"
               style={{ fontFamily: "var(--font-playfair)", fontStyle: "italic" }}

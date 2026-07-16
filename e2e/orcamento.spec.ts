@@ -29,17 +29,21 @@ test.describe("Pedido de orçamento", () => {
     await expect(page.getByText("LIQ-E2E-TEST")).toBeVisible();
   });
 
-  test("o botão fica desativado até preencher os campos obrigatórios", async ({ page }) => {
+  test("submeter incompleto mostra os erros e não avança", async ({ page }) => {
     await page.goto("/orcamento");
 
+    // The submit stays operable (accessible pattern) — submitting an incomplete
+    // form surfaces an announced error instead of a silently disabled button.
     const enviar = page.getByRole("button", { name: /Enviar pedido/ });
-    await expect(enviar).toBeDisabled();
+    await expect(enviar).toBeEnabled();
 
-    // Type + name alone aren't enough — a valid email is required too.
+    await enviar.click();
+    await expect(page.getByText("Selecione o tipo de evento.")).toBeVisible();
+    await expect(page).toHaveURL(/\/orcamento$/);
+
+    // Fill the required fields — type, name and a valid email.
     await page.getByRole("button", { name: "Corporativo", exact: true }).click();
     await page.getByPlaceholder("O seu nome").fill("Ana");
-    await expect(enviar).toBeDisabled();
-
     await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
     await expect(enviar).toBeEnabled();
   });

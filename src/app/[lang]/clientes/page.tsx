@@ -175,10 +175,14 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             </AnimateIn>
             <AnimateIn delay={100} className="hidden lg:block">
               <div className="flex flex-col items-end gap-1.5 text-right min-w-[120px]">
-                <span className="text-foreground/12 text-[9px] tracking-[0.45em] uppercase block">
+                <span
+                  aria-hidden="true"
+                  className="text-foreground/12 text-[9px] tracking-[0.45em] uppercase block"
+                >
                   {t.clientes.desde}
                 </span>
                 <span
+                  aria-hidden="true"
                   className="text-foreground/10 font-bold leading-none"
                   style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
                 >
@@ -247,7 +251,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                   <p className="text-foreground text-sm font-semibold tracking-wide">
                     {t.clientes.featuredName}
                   </p>
-                  <p className="text-moss/65 text-[10px] mt-1 tracking-[0.2em] uppercase">
+                  <p className="text-moss text-[10px] mt-1 tracking-[0.2em] uppercase">
                     {t.clientes.featuredRole}
                   </p>
                 </div>
@@ -307,7 +311,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                     <div className="w-6 h-px bg-gold flex-shrink-0" />
                     <div>
                       <p className="text-foreground text-sm font-semibold">{item.name}</p>
-                      <p className="text-moss/60 text-[10px] mt-0.5 tracking-[0.18em] uppercase">
+                      <p className="text-moss text-[10px] mt-0.5 tracking-[0.18em] uppercase">
                         {item.event}
                       </p>
                     </div>

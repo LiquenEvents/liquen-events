@@ -1020,7 +1020,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                     <span className="text-white/20 mx-1.5">·</span>
                   </span>
                 )}
-                <span className="text-white/30 text-[10px] tracking-[0.15em] uppercase">
+                <span className="text-white/65 text-[10px] tracking-[0.15em] uppercase">
                   {labelText(pool[lb].label)}
                 </span>
               </div>

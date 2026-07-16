@@ -124,7 +124,7 @@ export default function AdminLogin() {
               <div>
                 <label
                   htmlFor="login-name"
-                  className="block text-white/30 text-[9px] tracking-[0.4em] uppercase mb-2"
+                  className="block text-white/70 text-[9px] tracking-[0.4em] uppercase mb-2"
                 >
                   O teu nome
                 </label>
@@ -136,10 +136,10 @@ export default function AdminLogin() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
-                  className="w-full rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/20 focus:outline-none transition-all duration-200"
+                  className="w-full rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/45 focus:outline-none transition-all duration-200"
                   style={{
                     background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.10)",
+                    border: "1px solid rgba(255,255,255,0.42)",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.background = "rgba(255,255,255,0.09)";
@@ -147,7 +147,7 @@ export default function AdminLogin() {
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.42)";
                   }}
                   placeholder="Ex: Catarina"
                 />
@@ -156,7 +156,7 @@ export default function AdminLogin() {
               <div>
                 <label
                   htmlFor="login-password"
-                  className="block text-white/30 text-[9px] tracking-[0.4em] uppercase mb-2"
+                  className="block text-white/70 text-[9px] tracking-[0.4em] uppercase mb-2"
                 >
                   Palavra-passe
                 </label>
@@ -169,10 +169,10 @@ export default function AdminLogin() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   aria-invalid={error ? true : undefined}
-                  className="w-full rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/20 focus:outline-none transition-all duration-200"
+                  className="w-full rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/45 focus:outline-none transition-all duration-200"
                   style={{
                     background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.10)",
+                    border: "1px solid rgba(255,255,255,0.42)",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.background = "rgba(255,255,255,0.09)";
@@ -180,7 +180,7 @@ export default function AdminLogin() {
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.42)";
                   }}
                   placeholder="••••••••"
                 />
@@ -190,7 +190,7 @@ export default function AdminLogin() {
                 <div>
                   <label
                     htmlFor="login-code"
-                    className="block text-white/30 text-[9px] tracking-[0.4em] uppercase mb-2"
+                    className="block text-white/70 text-[9px] tracking-[0.4em] uppercase mb-2"
                   >
                     Código de verificação (2FA)
                   </label>
@@ -204,10 +204,10 @@ export default function AdminLogin() {
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                     autoFocus
-                    className="w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white/80 placeholder-white/20 focus:outline-none transition-all duration-200"
+                    className="w-full rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-white/80 placeholder-white/45 focus:outline-none transition-all duration-200"
                     style={{
                       background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.10)",
+                      border: "1px solid rgba(255,255,255,0.42)",
                     }}
                     onFocus={(e) => {
                       e.currentTarget.style.background = "rgba(255,255,255,0.09)";
@@ -215,7 +215,7 @@ export default function AdminLogin() {
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
+                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.42)";
                     }}
                     placeholder="000000"
                   />
