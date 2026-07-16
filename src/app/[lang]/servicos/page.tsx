@@ -8,7 +8,6 @@ import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
-import TiltCard from "@/components/motion/TiltCard";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
@@ -128,221 +127,61 @@ const editorial = [
   },
 ];
 
-/* ── Service card ── */
-function ServiceCard({
+/* ── Full-screen service band — one image, one service (SpaceX-style) ── */
+function ServiceBand({
   service,
   index,
   catNum,
   cta,
   locale,
-  sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw",
 }: {
   service: ServiceCard;
   index: number;
   catNum: string;
   cta: string;
   locale: Locale;
-  sizes?: string;
 }) {
   return (
-    <TiltCard fill className="h-full w-full">
-      <Link
-        href={localizeHref(`/servicos/${service.slug}`, locale)}
-        className="group relative block overflow-hidden bg-surface-raised h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
-      >
+    <section
+      className="relative overflow-hidden flex items-end"
+      style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+    >
+      <Parallax speed={0.12} className="absolute inset-0">
         <Image
           src={service.image}
-          {...blurFor(service.image)}
           alt=""
           fill
-          sizes={sizes}
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(service.image)}
         />
-        {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-        {/* Hover darkening */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-500" />
-
-        {/* Index label top-right */}
-        <div aria-hidden className="absolute top-4 right-4">
-          <span className="text-cream/15 text-[9px] tracking-[0.3em] font-mono">
+      </Parallax>
+      <div className="absolute inset-0 bg-black/45" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/10 to-[#080808]/35" />
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-16 lg:pb-24">
+        <AnimateIn>
+          <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
             {catNum}.{String(index + 1).padStart(2, "0")}
-          </span>
-        </div>
-
-        {/* Persistent clickability affordance (desktop) */}
-        <div
-          aria-hidden
-          className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/70 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500"
-        >
-          <span className="text-sm leading-none transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-            ↗
-          </span>
-        </div>
-
-        {/* Bottom content */}
-        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 lg:p-7">
-          <p
-            aria-hidden
-            className="text-moss/60 text-[9px] tracking-[0.5em] font-mono uppercase mb-2"
-          >
-            {String(index + 1).padStart(2, "0")}
           </p>
           <h3
-            className="text-cream font-bold leading-tight mb-2"
-            style={{
-              fontFamily: "var(--font-playfair)",
-              fontSize: "clamp(15px, 1.6vw, 22px)",
-            }}
+            className="text-white font-bold leading-[0.95] tracking-tight max-w-3xl"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 6.5vw, 96px)" }}
           >
             {service.title}
           </h3>
-          {/* Mobile: hidden entirely (title + CTA only — the photo breathes);
-              desktop: reveal on hover. */}
-          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-40 md:group-focus-within:opacity-100 md:group-focus-within:max-h-40 overflow-hidden transition-all duration-500 ease-out">
-            {service.desc}
-          </p>
-          {/* Mobile: persistent CTA; desktop: reveal on hover */}
-          <span className="md:hidden inline-flex items-center text-moss text-[10px] tracking-[0.3em] uppercase mt-2.5">
-            {cta} <span aria-hidden>→</span>
-          </span>
-          <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 delay-150">
-            {cta} <span aria-hidden>→</span>
-          </span>
-        </div>
-      </Link>
-    </TiltCard>
-  );
-}
-
-/* ── Mosaic grid — 4 services ── */
-function MosaicGrid({ cat, cta, locale }: { cat: Category; cta: string; locale: Locale }) {
-  const [s0, s1, s2, s3] = cat.services;
-  const isRight = cat.layout === "mosaic-right";
-
-  return (
-    <div
-      className="grid gap-1.5"
-      style={{
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gridTemplateRows: "clamp(240px,30vw,440px) clamp(240px,30vw,440px)",
-      }}
-    >
-      {isRight ? (
-        <>
-          {/* Wide top-left */}
-          <div className="col-span-2 row-span-1">
-            <ServiceCard
-              service={s0}
-              index={0}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 65vw"
-            />
+          <div className="mt-7 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
+            <p className="text-white/75 text-[15px] leading-[1.7] max-w-md">{service.desc}</p>
+            <Link
+              href={localizeHref(`/servicos/${service.slug}`, locale)}
+              className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
+            >
+              {cta}
+              <span aria-hidden>→</span>
+            </Link>
           </div>
-          {/* Tall right */}
-          <div className="col-span-1 row-span-2">
-            <ServiceCard
-              service={s1}
-              index={1}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 35vw"
-            />
-          </div>
-          {/* Bottom left small */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s2}
-              index={2}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-          {/* Bottom mid */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s3}
-              index={3}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Tall left */}
-          <div className="col-span-1 row-span-2">
-            <ServiceCard
-              service={s0}
-              index={0}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 35vw"
-            />
-          </div>
-          {/* Wide top-right */}
-          <div className="col-span-2 row-span-1">
-            <ServiceCard
-              service={s1}
-              index={1}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 65vw"
-            />
-          </div>
-          {/* Bottom mid */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s2}
-              index={2}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-          {/* Bottom right */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s3}
-              index={3}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ── Mobile card list ── */
-function MobileCardStack({ cat, cta, locale }: { cat: Category; cta: string; locale: Locale }) {
-  return (
-    <div className="grid grid-cols-2 gap-1.5" style={{ gridAutoRows: "clamp(210px, 50vw, 340px)" }}>
-      {cat.services.map((s, i) => (
-        <ServiceCard
-          key={s.title}
-          service={s}
-          index={i}
-          catNum={cat.num}
-          cta={cta}
-          locale={locale}
-          sizes="50vw"
-        />
-      ))}
-    </div>
+        </AnimateIn>
+      </div>
+    </section>
   );
 }
 
@@ -560,17 +399,17 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             </div>
           </section>
 
-          {/* Service mosaic — full-bleed, image-forward */}
-          <section className="bg-surface">
-            <AnimateIn from="fade">
-              <div className="hidden lg:block p-1.5">
-                <MosaicGrid cat={cat} cta={ts.verMais} locale={locale} />
-              </div>
-              <div className="lg:hidden p-1.5">
-                <MobileCardStack cat={cat} cta={ts.verMais} locale={locale} />
-              </div>
-            </AnimateIn>
-          </section>
+          {/* Service bands — one full-screen panel per service */}
+          {cat.services.map((s, i) => (
+            <ServiceBand
+              key={`${cat.id}-${i}`}
+              service={s}
+              index={i}
+              catNum={cat.num}
+              cta={ts.verMais}
+              locale={locale}
+            />
+          ))}
         </div>
       ))}
 
