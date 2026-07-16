@@ -153,7 +153,7 @@ function ServiceCard({
         <Image
           src={service.image}
           {...blurFor(service.image)}
-          alt={service.title}
+          alt=""
           fill
           sizes={sizes}
           className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -164,14 +164,17 @@ function ServiceCard({
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-500" />
 
         {/* Index label top-right */}
-        <div className="absolute top-4 right-4">
+        <div aria-hidden className="absolute top-4 right-4">
           <span className="text-cream/15 text-[9px] tracking-[0.3em] font-mono">
             {catNum}.{String(index + 1).padStart(2, "0")}
           </span>
         </div>
 
         {/* Persistent clickability affordance (desktop) */}
-        <div className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/70 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500">
+        <div
+          aria-hidden
+          className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/70 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500"
+        >
           <span className="text-sm leading-none transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
             ↗
           </span>
@@ -179,7 +182,10 @@ function ServiceCard({
 
         {/* Bottom content */}
         <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 lg:p-7">
-          <p className="text-moss/60 text-[9px] tracking-[0.5em] font-mono uppercase mb-2">
+          <p
+            aria-hidden
+            className="text-moss/60 text-[9px] tracking-[0.5em] font-mono uppercase mb-2"
+          >
             {String(index + 1).padStart(2, "0")}
           </p>
           <h3
@@ -193,15 +199,15 @@ function ServiceCard({
           </h3>
           {/* Mobile: hidden entirely (title + CTA only — the photo breathes);
               desktop: reveal on hover. */}
-          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-[80px] md:group-focus-within:opacity-100 md:group-focus-within:max-h-[80px] overflow-hidden transition-all duration-500 ease-out">
+          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-40 md:group-focus-within:opacity-100 md:group-focus-within:max-h-40 overflow-hidden transition-all duration-500 ease-out">
             {service.desc}
           </p>
           {/* Mobile: persistent CTA; desktop: reveal on hover */}
           <span className="md:hidden inline-flex items-center text-moss text-[10px] tracking-[0.3em] uppercase mt-2.5">
-            {cta} →
+            {cta} <span aria-hidden>→</span>
           </span>
           <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 delay-150">
-            {cta} →
+            {cta} <span aria-hidden>→</span>
           </span>
         </div>
       </Link>

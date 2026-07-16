@@ -280,7 +280,12 @@ export default function OrcamentoForm() {
             {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
           </h1>
 
-          <form onSubmit={submit} className="flex flex-col gap-11">
+          <form onSubmit={submit} aria-busy={sending} className="flex flex-col gap-11">
+            {/* Required-fields key, before the fields so the '*' is explained
+                first (WCAG 3.3.2 Labels or Instructions). */}
+            <p className="text-foreground/68 text-[11px] leading-relaxed -mb-4">
+              {to.requiredNote}
+            </p>
             {/* Honeypot — a bot fills it, a human never sees it. The data-*ignore
                 hints stop password managers (1Password / LastPass) from
                 autofilling it, which was silently dropping real submissions. */}
@@ -302,6 +307,9 @@ export default function OrcamentoForm() {
             <fieldset className="group">
               <legend id="of-tipo-legend" className={labelCls}>
                 {to.labelTipo}
+                <span aria-hidden className="text-gold-text">
+                  &nbsp;*
+                </span>
               </legend>
               {/* A single-select toggle group is semantically a radiogroup —
                   aria-required/invalid on a <fieldset> aren't exposed by AT, so
@@ -385,6 +393,9 @@ export default function OrcamentoForm() {
               <div className="group">
                 <label htmlFor="of-nome" className={labelCls}>
                   {to.labelNome}
+                  <span aria-hidden className="text-gold-text">
+                    &nbsp;*
+                  </span>
                 </label>
                 <input
                   id="of-nome"
@@ -409,6 +420,9 @@ export default function OrcamentoForm() {
               <div className="group">
                 <label htmlFor="of-email" className={labelCls}>
                   {to.labelEmail}
+                  <span aria-hidden className="text-gold-text">
+                    &nbsp;*
+                  </span>
                 </label>
                 <input
                   id="of-email"
@@ -465,7 +479,14 @@ export default function OrcamentoForm() {
 
             {/* Ações */}
             <div className="flex flex-wrap items-center gap-x-7 gap-y-4 pt-1">
-              <button type="submit" disabled={sending} className={PRIMARY_BUTTON_CLASS}>
+              {/* aria-disabled (not `disabled`) so activating it while sending
+                  doesn't yank focus off the button to <body> — the handler
+                  already no-ops on re-entry. */}
+              <button
+                type="submit"
+                aria-disabled={sending}
+                className={`${PRIMARY_BUTTON_CLASS} ${sending ? "opacity-30 cursor-wait" : ""}`}
+              >
                 {sending ? (
                   <>
                     <span
@@ -475,7 +496,9 @@ export default function OrcamentoForm() {
                     {to.enviando}
                   </>
                 ) : (
-                  `${to.enviar} →`
+                  <>
+                    {to.enviar} <span aria-hidden>→</span>
+                  </>
                 )}
               </button>
               <a
@@ -494,8 +517,6 @@ export default function OrcamentoForm() {
                 <p className="text-moss-dark text-sm">{error}</p>
               </div>
             )}
-
-            <p className="text-foreground/68 text-[11px] leading-relaxed">{to.requiredNote}</p>
           </form>
         </div>
       </div>

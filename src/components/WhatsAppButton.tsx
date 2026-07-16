@@ -20,6 +20,9 @@ export default function WhatsAppButton() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t.common.contactWhatsApp}
+      // Invisible during the 1.5s reveal delay — keep it out of the tab order
+      // and a11y tree until it's actually shown (WCAG 2.4.3).
+      inert={!visible}
       // bg passa de #25D366 (verde-marca WhatsApp) para #0c7f3a: com texto
       // branco, #25D366 dá só 1.98:1 (falha AA); #0c7f3a dá 5.11:1. Continua
       // claramente verde/WhatsApp e o glow do hover mantém o verde-marca.

@@ -106,7 +106,7 @@ export default async function ServiceDetailPage({
           <Image
             src={svc.hero}
             {...blurFor(svc.hero)}
-            alt={svc.title}
+            alt=""
             fill
             preload
             sizes="100vw"
@@ -118,7 +118,10 @@ export default async function ServiceDetailPage({
         <HeroWebGL src={svc.hero} className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
-          <nav className="text-[11px] tracking-[0.2em] uppercase text-cream/60 mb-8">
+          <nav
+            aria-label={t.nav.breadcrumb}
+            className="text-[11px] tracking-[0.2em] uppercase text-cream/60 mb-8"
+          >
             <Link
               href={localizeHref("/servicos", locale)}
               className="inline-flex items-center gap-2 hover:text-cream transition-colors"
@@ -159,7 +162,7 @@ export default async function ServiceDetailPage({
                 href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 mt-4 text-sm text-moss hover:gap-5 transition-all duration-300 tracking-widest uppercase"
               >
-                {t.common.pedirOrcamento} →
+                {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
             </div>
           </AnimateIn>
@@ -256,7 +259,7 @@ export default async function ServiceDetailPage({
                 <Image
                   src={src}
                   {...blurFor(src)}
-                  alt={`${svc.title} — ${i + 1}`}
+                  alt=""
                   fill
                   sizes="(max-width: 1024px) 50vw, 33vw"
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -314,7 +317,7 @@ export default async function ServiceDetailPage({
                   <Image
                     src={r.hero}
                     {...blurFor(r.hero)}
-                    alt={r.title}
+                    alt=""
                     fill
                     sizes="50vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -361,7 +364,7 @@ export default async function ServiceDetailPage({
               href={localizeHref("/orcamento", locale)}
               className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
             >
-              {t.common.pedirOrcamento} →
+              {t.common.pedirOrcamento} <span aria-hidden>→</span>
             </Link>
           </Magnetic>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Quote } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
@@ -43,10 +43,17 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
   const tc = t.confirmacao;
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
+  // After the client-side hand-off from the form, move focus to the confirmation
+  // heading so the success is announced and keyboard focus isn't stranded on
+  // <body> (WCAG 2.4.3 Focus Order).
+  const h1Ref = useRef<HTMLHeadingElement>(null);
   // Client-only, so the petals play once on arrival without an SSR/hydration
   // mismatch (the server renders none).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (!loading) h1Ref.current?.focus();
+  }, [loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +134,10 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
-        <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase animate-pulse">
+        <p
+          role="status"
+          className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase animate-pulse"
+        >
           {tc.loading}
         </p>
       </div>
@@ -281,7 +291,9 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
 
           <AnimateIn from="bottom" delay={120}>
             <h1
-              className="text-foreground font-bold leading-[0.92] mb-7"
+              ref={h1Ref}
+              tabIndex={-1}
+              className="text-foreground font-bold leading-[0.92] mb-7 focus:outline-none"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 5.4vw, 72px)" }}
             >
               {tc.titleLine1}

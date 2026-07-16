@@ -946,7 +946,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               página quando ela se aproxima do ecrã. */}
           <div ref={sentinelRef} aria-hidden className="h-px w-full" />
           {ioSupported ? (
-            <div className="g-loading flex items-center gap-2" aria-live="polite">
+            <div className="g-loading flex items-center gap-2" aria-hidden>
               <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
               <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
               <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
@@ -969,7 +969,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               style={{ width: `${(shown / pool.length) * 100}%` }}
             />
           </div>
-          <p className="text-[10px] tracking-widest text-white/55">
+          <p role="status" className="text-[10px] tracking-widest text-white/55">
             {shown} {t.galeria.de} {pool.length}
           </p>
         </div>
@@ -1185,6 +1185,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
         onClick={scrollTop}
         aria-label={t.galeria.backToTop}
         title={t.galeria.backToTop}
+        inert={!(showTop && lb === null)}
         className={`fixed z-40 grid h-11 w-11 place-items-center rounded-full bg-black/50 text-white/80 ring-1 ring-white/15 backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/70 hover:text-white active:scale-95 ${
           showTop && lb === null
             ? "translate-y-0 opacity-100"

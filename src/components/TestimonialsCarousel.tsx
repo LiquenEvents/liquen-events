@@ -97,9 +97,9 @@ export default function TestimonialsCarousel() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3 mb-10 lg:mb-16">
             <div className="flex items-center gap-4">
               <span className="block w-8 h-px bg-gold/50 flex-shrink-0" />
-              <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase">
+              <h2 className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase font-normal">
                 {dict.common.clientsSay}
-              </p>
+              </h2>
             </div>
             <RatingBadge label={dict.common.reviewsLabel} ptFormat={locale === "pt"} />
           </div>

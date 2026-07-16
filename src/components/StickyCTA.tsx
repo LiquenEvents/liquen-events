@@ -68,7 +68,10 @@ export default function StickyCTA() {
         <span className="text-[10px] tracking-[0.28em] uppercase text-foreground/68 group-hover:text-moss transition-colors duration-300">
           {t.footer.pedirOrcamento}
         </span>
-        <span className="text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm">
+        <span
+          className="text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+          aria-hidden
+        >
           →
         </span>
       </Link>

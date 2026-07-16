@@ -102,9 +102,17 @@ export default function Navbar() {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     document.body.dataset.menuOpen = "true";
+    // Hide the rest of the page from AT while the modal menu is open, so the
+    // screen-reader virtual cursor can't wander into the background (WCAG 4.1.2).
+    const main = document.getElementById("conteudo");
+    const footer = document.querySelector("footer");
+    main?.setAttribute("inert", "");
+    footer?.setAttribute("inert", "");
     return () => {
       document.body.style.overflow = prev;
       delete document.body.dataset.menuOpen;
+      main?.removeAttribute("inert");
+      footer?.removeAttribute("inert");
     };
   }, [isOpen]);
 
@@ -258,7 +266,7 @@ export default function Navbar() {
                 href={localizeHref("/orcamento", locale)}
                 className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-white px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
               >
-                {t.nav.orcamento} →
+                {t.nav.orcamento} <span aria-hidden>→</span>
               </Link>
             </Magnetic>
           </div>
@@ -267,7 +275,7 @@ export default function Navbar() {
             ref={toggleBtnRef}
             className="lg:hidden p-3 -mr-2 ml-auto"
             onClick={() => setIsOpen(!isOpen)}
-            aria-label={t.nav.menuLabel}
+            aria-label={isOpen ? t.nav.closeMenu : t.nav.menuLabel}
             aria-expanded={isOpen}
           >
             <span
@@ -361,7 +369,7 @@ export default function Navbar() {
             href={localizeHref("/orcamento", locale)}
             className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-white px-5 py-4 rounded-sm"
           >
-            {t.nav.pedirOrcamento} →
+            {t.nav.pedirOrcamento} <span aria-hidden>→</span>
           </Link>
           <div className="flex items-end justify-between gap-4 border-t border-white/[0.07] pt-6">
             <div className="flex flex-col gap-1.5 min-w-0">

@@ -115,7 +115,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-2 px-8 py-4 btn-shine bg-moss text-white text-xs font-medium rounded-sm hover:bg-moss-dark hover:gap-3 transition-all duration-300 tracking-widest uppercase shadow-lg shadow-moss/20"
               >
-                {t.common.pedirOrcamento} →
+                {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
             </Magnetic>
             <Link
@@ -167,7 +167,10 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 className="group text-xs text-foreground/72 hover:text-moss transition-colors flex items-center gap-1.5"
               >
                 {t.common.verServicos}
-                <span className="group-hover:translate-x-0.5 transition-transform inline-block">
+                <span
+                  className="group-hover:translate-x-0.5 transition-transform inline-block"
+                  aria-hidden
+                >
                   →
                 </span>
               </Link>
@@ -184,7 +187,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                   >
                     <Image
                       src={s.image}
-                      alt={s.title}
+                      alt=""
                       fill
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -279,7 +282,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 href={localizeHref("/orcamento", locale)}
                 className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
               >
-                {t.common.pedirOrcamento} →
+                {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
               <Link
                 href={localizeHref("/galeria", locale)}

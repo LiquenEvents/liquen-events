@@ -27,7 +27,7 @@ export default function PhotoWall({
 }) {
   return (
     <section
-      aria-label={label}
+      aria-labelledby="photowall-heading"
       className="relative bg-[#10140f] border-y border-white/8 overflow-hidden"
     >
       {/* Soft depth glow — gives the dark band presence. */}
@@ -47,6 +47,7 @@ export default function PhotoWall({
           <span className="w-6 h-px bg-gold/50" />
         </p>
         <h2
+          id="photowall-heading"
           className="text-cream font-bold leading-[0.95] tracking-tight"
           style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(32px, 5vw, 68px)" }}
         >
@@ -86,7 +87,10 @@ export default function PhotoWall({
           className="group inline-flex items-center gap-3 px-8 py-4 bg-white/6 border border-white/18 rounded-full text-cream/90 hover:text-cream hover:bg-white/12 hover:border-white/35 text-[11px] tracking-[0.3em] uppercase transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/70"
         >
           {label}
-          <span className="text-cream/50 group-hover:translate-x-0.5 transition-transform duration-300">
+          <span
+            className="text-cream/50 group-hover:translate-x-0.5 transition-transform duration-300"
+            aria-hidden
+          >
             →
           </span>
         </Link>
