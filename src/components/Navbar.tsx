@@ -253,7 +253,7 @@ export default function Navbar() {
             <Link
               href={localizeHref("/contacto", locale)}
               transitionTypes={navTypes("/contacto")}
-              className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 rounded-sm transition-all duration-300 ${
+              className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-all duration-300 ${
                 light
                   ? "border-white/35 text-white/90 hover:border-white/70 hover:bg-white/10"
                   : "border-moss/35 text-moss hover:border-moss/60 hover:bg-moss/10"
@@ -264,30 +264,36 @@ export default function Navbar() {
             <Magnetic strength={0.3}>
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-white px-5 py-2 rounded-sm hover:bg-moss-dark transition-all duration-300"
+                className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-white px-5 py-2 hover:bg-moss-dark transition-all duration-300"
               >
-                {t.nav.orcamento} <span aria-hidden>→</span>
+                {t.nav.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
             </Magnetic>
           </div>
 
-          <button
-            ref={toggleBtnRef}
-            className="lg:hidden p-3 -mr-2 ml-auto"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-label={isOpen ? t.nav.closeMenu : t.nav.menuLabel}
-            aria-expanded={isOpen}
-          >
-            <span
-              className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "rotate-45 translate-y-2" : ""}`}
-            />
-            <span
-              className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "opacity-0" : ""}`}
-            />
-            <span
-              className={`block w-[18px] h-px transition-all duration-300 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
-            />
-          </button>
+          {/* Mobile bar: keep the PT/EN toggle reachable without opening the
+              menu — important for the international (destination-wedding)
+              audience. Hidden while the menu is open (the overlay has its own). */}
+          <div className="lg:hidden flex items-center gap-1 ml-auto">
+            {!isOpen && <LanguageToggle light={light} />}
+            <button
+              ref={toggleBtnRef}
+              className="p-3 -mr-2"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? t.nav.closeMenu : t.nav.menuLabel}
+              aria-expanded={isOpen}
+            >
+              <span
+                className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "rotate-45 translate-y-2" : ""}`}
+              />
+              <span
+                className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "opacity-0" : ""}`}
+              />
+              <span
+                className={`block w-[18px] h-px transition-all duration-300 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
+              />
+            </button>
+          </div>
         </div>
       </div>
 

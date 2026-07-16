@@ -167,7 +167,7 @@ export default async function ServiceDetailPage({
             </div>
           </AnimateIn>
           <AnimateIn delay={120}>
-            <div className="border border-foreground/10 rounded-xl p-8 bg-surface-raised/40">
+            <div className="border border-foreground/10 p-8 bg-surface-raised/40">
               <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-6 flex items-center gap-3">
                 <span className="w-5 h-px bg-gold/60 flex-shrink-0" />
                 {t.servicoDetalhe.includesTitle}
@@ -312,7 +312,7 @@ export default async function ServiceDetailPage({
                 <Link
                   key={r.slug}
                   href={localizeHref(`/servicos/${r.slug}`, locale)}
-                  className="group relative overflow-hidden rounded-xl aspect-[16/9] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
+                  className="group relative overflow-hidden aspect-[16/9] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
                 >
                   <Image
                     src={r.hero}
@@ -362,7 +362,7 @@ export default async function ServiceDetailPage({
           <Magnetic strength={0.4}>
             <Link
               href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
+              className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
             >
               {t.common.pedirOrcamento} <span aria-hidden>→</span>
             </Link>

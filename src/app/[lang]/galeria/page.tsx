@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -7,7 +8,7 @@ import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
-import { getDictionary, normalizeLocale } from "@/lib/i18n";
+import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { PHOTOS } from "./photos-data";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
@@ -123,14 +124,22 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             <p className="text-white/70 text-sm leading-relaxed mb-10 max-w-md">
               {t.galeria.instaText}
             </p>
-            <a
-              href="https://www.instagram.com/liquen.events"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium text-sm tracking-widest uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300"
-            >
-              @liquen.events <span aria-hidden>→</span>
-            </a>
+            <div className="flex flex-wrap items-center gap-4">
+              <Link
+                href={localizeHref("/orcamento", locale)}
+                className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium text-sm tracking-widest uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300"
+              >
+                {t.common.pedirOrcamento} <span aria-hidden>→</span>
+              </Link>
+              <a
+                href="https://www.instagram.com/liquen.events"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-8 py-4 border border-white/30 text-white/85 text-[11px] tracking-[0.2em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
+              >
+                @liquen.events <span aria-hidden>→</span>
+              </a>
+            </div>
           </AnimateIn>
         </div>
       </section>

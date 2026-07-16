@@ -514,16 +514,16 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
 
         {/* ── CTA ── */}
         <AnimateIn from="bottom" delay={430}>
-          <div className="mt-14 flex flex-wrap gap-4">
+          <div className="mt-14 flex flex-wrap items-center gap-x-8 gap-y-4">
             <Link
               href={localizeHref("/", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/72 text-[11px] tracking-[0.2em] uppercase rounded-sm hover:border-foreground/40 hover:text-foreground/85 transition-colors"
+              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/75 text-[11px] tracking-[0.2em] uppercase hover:border-foreground/40 hover:text-foreground/90 transition-colors"
             >
               {tc.voltarInicio}
             </Link>
             <Link
               href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/72 text-[11px] tracking-[0.2em] uppercase rounded-sm hover:border-foreground/40 hover:text-foreground/85 transition-colors"
+              className="text-[11px] tracking-[0.2em] uppercase text-foreground/55 hover:text-moss transition-colors"
             >
               {tc.novoPedido}
             </Link>

@@ -44,6 +44,10 @@ const EVENT_TYPES: EventOption[] = [
   { label: "Outro", category: null, eventType: null },
 ];
 
+// Optional budget range — the labels come from the dictionary (t.orcamento
+// .budgetLabels); these stable ids are what's stored on the quote (BudgetRange).
+const BUDGET_VALUES = ["ate_5k", "5k_15k", "15k_30k", "30k_60k", "60k_plus"] as const;
+
 export default function OrcamentoForm() {
   const { locale, t } = useTranslations();
   const to = t.orcamento;
@@ -54,6 +58,8 @@ export default function OrcamentoForm() {
   const [telefone, setTelefone] = useState("");
   const [data, setData] = useState("");
   const [pessoas, setPessoas] = useState("");
+  const [local, setLocal] = useState("");
+  const [budget, setBudget] = useState(""); // "" = não indicado (opcional)
   const [mensagem, setMensagem] = useState("");
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
   const [sending, setSending] = useState(false);
@@ -76,12 +82,21 @@ export default function OrcamentoForm() {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (!saved) return;
       const d = JSON.parse(saved) as Record<string, string>;
+      // Don't keep personal contact data on the device indefinitely: an
+      // abandoned draft purges itself after 7 days (awkward on shared devices).
+      const ts = Number(d._ts);
+      if (ts && Date.now() - ts > 7 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
       if (d.eventType) setEventType(d.eventType);
       if (d.nome) setNome(d.nome);
       if (d.email) setEmail(d.email);
       if (d.telefone) setTelefone(d.telefone);
       if (d.data) setData(d.data);
       if (d.pessoas) setPessoas(d.pessoas);
+      if (d.local) setLocal(d.local);
+      if (d.budget) setBudget(d.budget);
       if (d.mensagem) setMensagem(d.mensagem);
     } catch {
       /* localStorage indisponível — segue sem rascunho */
@@ -98,12 +113,23 @@ export default function OrcamentoForm() {
     try {
       localStorage.setItem(
         DRAFT_KEY,
-        JSON.stringify({ eventType, nome, email, telefone, data, pessoas, mensagem }),
+        JSON.stringify({
+          eventType,
+          nome,
+          email,
+          telefone,
+          data,
+          pessoas,
+          local,
+          budget,
+          mensagem,
+          _ts: Date.now(),
+        }),
       );
     } catch {
       /* ignora */
     }
-  }, [eventType, nome, email, telefone, data, pessoas, mensagem]);
+  }, [eventType, nome, email, telefone, data, pessoas, local, budget, mensagem]);
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
@@ -138,6 +164,8 @@ export default function OrcamentoForm() {
       eventName: eventType,
       date: data,
       guests: Number(pessoas) || 0,
+      location: local.trim(),
+      budgetRange: budget || null,
       notes: mensagem.trim(),
     };
 
@@ -397,16 +425,58 @@ export default function OrcamentoForm() {
                 </label>
                 <input
                   id="of-pessoas"
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  min={1}
-                  max={100000}
+                  pattern="[0-9]*"
+                  maxLength={6}
                   value={pessoas}
-                  onChange={(e) => setPessoas(e.target.value)}
+                  onChange={(e) => setPessoas(e.target.value.replace(/[^0-9]/g, ""))}
                   className={inputCls}
                   placeholder={to.phPessoas}
                 />
               </div>
+            </div>
+
+            {/* Orçamento aproximado (opcional) — qualifica o lead e permite
+                uma proposta mais certeira em 24h. Toggle simples: clicar de novo
+                limpa a seleção. */}
+            <fieldset className="group">
+              <legend className={labelCls}>{to.labelBudget}</legend>
+              <div className="flex flex-wrap gap-3">
+                {BUDGET_VALUES.map((v, i) => {
+                  const active = budget === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setBudget(active ? "" : v)}
+                      className={`px-4 py-3 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
+                        active
+                          ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
+                          : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
+                      }`}
+                    >
+                      {to.budgetLabels[i] ?? v}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {/* Local / região (opcional) */}
+            <div className="group">
+              <label htmlFor="of-local" className={labelCls}>
+                {to.labelLocal}
+              </label>
+              <input
+                id="of-local"
+                type="text"
+                value={local}
+                onChange={(e) => setLocal(e.target.value)}
+                className={inputCls}
+                placeholder={to.phLocal}
+              />
             </div>
 
             {/* Nome + Email */}
@@ -534,8 +604,17 @@ export default function OrcamentoForm() {
             </div>
 
             {error && (
-              <div role="alert" className="p-4 border border-moss/30 bg-moss/8 rounded-sm">
-                <p className="text-moss-dark text-sm">{error}</p>
+              // Failure state — deliberately NOT moss/green (that's the brand's
+              // success colour). Uses the same gold as the field-level errors so
+              // "something went wrong" reads as a problem, not a confirmation.
+              <div
+                role="alert"
+                className="flex items-start gap-3 p-4 border-l-2 border-gold bg-gold/[0.06] rounded-sm"
+              >
+                <span aria-hidden className="text-gold-text text-base leading-none mt-px">
+                  !
+                </span>
+                <p className="text-gold-text text-sm">{error}</p>
               </div>
             )}
           </form>
