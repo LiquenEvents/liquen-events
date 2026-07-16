@@ -17,7 +17,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const b = await request.json();
-    const name = String(b.name ?? "").trim();
+    // Bound every free-text field (defense-in-depth against storage abuse), the
+    // same way the public quote schema does — admin-only, but still validated.
+    const str = (v: unknown, max: number) => String(v ?? "").slice(0, max);
+    const name = str(b.name, 120).trim();
     if (!name) {
       return NextResponse.json({ error: "O nome é obrigatório." }, { status: 400 });
     }
@@ -27,24 +30,24 @@ export async function POST(request: NextRequest) {
       // QuoteFormData defaults
       category: b.category ?? null,
       eventType: b.eventType ?? null,
-      eventName: b.eventName ?? "",
-      date: b.date ?? "",
+      eventName: str(b.eventName, 160),
+      date: str(b.date, 40),
       endDate: "",
-      location: b.location ?? "",
+      location: str(b.location, 200),
       locationType: "lisboa",
-      guests: Number(b.guests) || 0,
+      guests: Math.min(Math.max(Number(b.guests) || 0, 0), 100000),
       duration: 4,
       isMultiDay: false,
       packageTier: "completo",
       addons: [],
       budgetRange: null,
       urgency: "standard",
-      notes: b.notes ?? "",
-      referralSource: b.referralSource ?? "Contacto direto",
+      notes: str(b.notes, 5000),
+      referralSource: str(b.referralSource, 120) || "Contacto direto",
       name,
-      email: b.email ?? "",
-      phone: b.phone ?? "",
-      company: b.company ?? "",
+      email: str(b.email, 200),
+      phone: str(b.phone, 40),
+      company: str(b.company, 160),
       nif: "",
       acceptTerms: true,
       acceptMarketing: false,

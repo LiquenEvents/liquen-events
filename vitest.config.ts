@@ -11,7 +11,7 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     coverage: {
       provider: "v8",
-      include: ["src/app/orcamento/pricing.ts", "src/lib/**/*.ts"],
+      include: ["src/lib/**/*.ts"],
     },
   },
 });
