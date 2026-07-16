@@ -7,7 +7,10 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
+    // Default to node; component tests opt into jsdom per-file with the
+    // `// @vitest-environment jsdom` directive so the fast lib tests stay lean.
     environment: "node",
+    setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     coverage: {
       provider: "v8",

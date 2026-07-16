@@ -8,7 +8,6 @@ import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
-import TiltCard from "@/components/motion/TiltCard";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
@@ -37,8 +36,6 @@ export async function generateMetadata({
   });
 }
 
-const navMeta = [{ id: "empresas" }, { id: "celebracoes" }];
-
 const eyebrowLight =
   "text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
 
@@ -65,8 +62,20 @@ type Category = {
 // from the dictionary (t.servicos.categories) and is merged in at render time.
 const categoryMeta = [
   {
-    id: "empresas",
+    id: "celebracoes",
     num: "01",
+    layout: "mosaic-left" as const,
+    band: "/imagens/teresinhaeze-909.jpg",
+    services: [
+      { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
+      { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
+      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
+    ],
+  },
+  {
+    id: "empresas",
+    num: "02",
     layout: "mosaic-right" as const,
     band: "/imagens/EW1_1333.jpg",
     services: [
@@ -78,18 +87,6 @@ const categoryMeta = [
       { slug: "eventos-corporativos", image: "/imagens/EW1_1428.jpg" },
       // Jantares de empresa — mesa posta premium
       { slug: "eventos-corporativos", image: "/imagens/EW1_1404.jpg" },
-    ],
-  },
-  {
-    id: "celebracoes",
-    num: "02",
-    layout: "mosaic-left" as const,
-    band: "/imagens/teresinhaeze-909.jpg",
-    services: [
-      { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
-      { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
-      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
     ],
   },
 ];
@@ -128,221 +125,61 @@ const editorial = [
   },
 ];
 
-/* ── Service card ── */
-function ServiceCard({
+/* ── Full-screen service band — one image, one service (SpaceX-style) ── */
+function ServiceBand({
   service,
   index,
   catNum,
   cta,
   locale,
-  sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw",
 }: {
   service: ServiceCard;
   index: number;
   catNum: string;
   cta: string;
   locale: Locale;
-  sizes?: string;
 }) {
   return (
-    <TiltCard fill className="h-full w-full">
-      <Link
-        href={localizeHref(`/servicos/${service.slug}`, locale)}
-        className="group relative block overflow-hidden bg-surface-raised h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
-      >
+    <section
+      className="relative overflow-hidden flex items-end"
+      style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+    >
+      <Parallax speed={0.12} className="absolute inset-0">
         <Image
           src={service.image}
-          {...blurFor(service.image)}
           alt=""
           fill
-          sizes={sizes}
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(service.image)}
         />
-        {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-        {/* Hover darkening */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-500" />
-
-        {/* Index label top-right */}
-        <div aria-hidden className="absolute top-4 right-4">
-          <span className="text-cream/15 text-[9px] tracking-[0.3em] font-mono">
+      </Parallax>
+      <div className="absolute inset-0 bg-black/45" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/10 to-[#080808]/35" />
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-16 lg:pb-24">
+        <AnimateIn>
+          <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
             {catNum}.{String(index + 1).padStart(2, "0")}
-          </span>
-        </div>
-
-        {/* Persistent clickability affordance (desktop) */}
-        <div
-          aria-hidden
-          className="hidden md:flex absolute bottom-6 right-6 lg:bottom-7 lg:right-7 w-10 h-10 rounded-full border border-cream/20 items-center justify-center text-cream/70 group-hover:bg-moss group-hover:border-moss group-hover:text-cream transition-all duration-500"
-        >
-          <span className="text-sm leading-none transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-            ↗
-          </span>
-        </div>
-
-        {/* Bottom content */}
-        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 lg:p-7">
-          <p
-            aria-hidden
-            className="text-moss/60 text-[9px] tracking-[0.5em] font-mono uppercase mb-2"
-          >
-            {String(index + 1).padStart(2, "0")}
           </p>
           <h3
-            className="text-cream font-bold leading-tight mb-2"
-            style={{
-              fontFamily: "var(--font-playfair)",
-              fontSize: "clamp(15px, 1.6vw, 22px)",
-            }}
+            className="text-white font-bold leading-[0.95] tracking-tight max-w-3xl"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 6.5vw, 96px)" }}
           >
             {service.title}
           </h3>
-          {/* Mobile: hidden entirely (title + CTA only — the photo breathes);
-              desktop: reveal on hover. */}
-          <p className="hidden text-cream/70 text-xs leading-relaxed md:block md:opacity-0 md:max-h-0 md:group-hover:opacity-100 md:group-hover:max-h-40 md:group-focus-within:opacity-100 md:group-focus-within:max-h-40 overflow-hidden transition-all duration-500 ease-out">
-            {service.desc}
-          </p>
-          {/* Mobile: persistent CTA; desktop: reveal on hover */}
-          <span className="md:hidden inline-flex items-center text-moss text-[10px] tracking-[0.3em] uppercase mt-2.5">
-            {cta} <span aria-hidden>→</span>
-          </span>
-          <span className="hidden md:inline text-moss text-[10px] tracking-[0.35em] uppercase opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 delay-150">
-            {cta} <span aria-hidden>→</span>
-          </span>
-        </div>
-      </Link>
-    </TiltCard>
-  );
-}
-
-/* ── Mosaic grid — 4 services ── */
-function MosaicGrid({ cat, cta, locale }: { cat: Category; cta: string; locale: Locale }) {
-  const [s0, s1, s2, s3] = cat.services;
-  const isRight = cat.layout === "mosaic-right";
-
-  return (
-    <div
-      className="grid gap-1.5"
-      style={{
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gridTemplateRows: "clamp(240px,30vw,440px) clamp(240px,30vw,440px)",
-      }}
-    >
-      {isRight ? (
-        <>
-          {/* Wide top-left */}
-          <div className="col-span-2 row-span-1">
-            <ServiceCard
-              service={s0}
-              index={0}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 65vw"
-            />
+          <div className="mt-7 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
+            <p className="text-white/75 text-[15px] leading-[1.7] max-w-md">{service.desc}</p>
+            <Link
+              href={localizeHref(`/servicos/${service.slug}`, locale)}
+              className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
+            >
+              {cta}
+              <span aria-hidden>→</span>
+            </Link>
           </div>
-          {/* Tall right */}
-          <div className="col-span-1 row-span-2">
-            <ServiceCard
-              service={s1}
-              index={1}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 35vw"
-            />
-          </div>
-          {/* Bottom left small */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s2}
-              index={2}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-          {/* Bottom mid */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s3}
-              index={3}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Tall left */}
-          <div className="col-span-1 row-span-2">
-            <ServiceCard
-              service={s0}
-              index={0}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 35vw"
-            />
-          </div>
-          {/* Wide top-right */}
-          <div className="col-span-2 row-span-1">
-            <ServiceCard
-              service={s1}
-              index={1}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 65vw"
-            />
-          </div>
-          {/* Bottom mid */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s2}
-              index={2}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-          {/* Bottom right */}
-          <div className="col-span-1 row-span-1">
-            <ServiceCard
-              service={s3}
-              index={3}
-              catNum={cat.num}
-              cta={cta}
-              locale={locale}
-              sizes="(max-width: 640px) 100vw, 33vw"
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ── Mobile card list ── */
-function MobileCardStack({ cat, cta, locale }: { cat: Category; cta: string; locale: Locale }) {
-  return (
-    <div className="grid grid-cols-2 gap-1.5" style={{ gridAutoRows: "clamp(210px, 50vw, 340px)" }}>
-      {cat.services.map((s, i) => (
-        <ServiceCard
-          key={s.title}
-          service={s}
-          index={i}
-          catNum={cat.num}
-          cta={cta}
-          locale={locale}
-          sizes="50vw"
-        />
-      ))}
-    </div>
+        </AnimateIn>
+      </div>
+    </section>
   );
 }
 
@@ -350,7 +187,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const ts = t.servicos;
-  const navItems = navMeta.map((m, i) => ({ ...m, label: ts.nav[i] }));
   const categories: Category[] = categoryMeta.map((m, ci) => {
     const ct = ts.categories[ci];
     return {
@@ -419,65 +255,72 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             ]}
           />
           <AnimateIn delay={150}>
-            <div className="mt-9 flex flex-col sm:flex-row sm:items-end gap-7 sm:gap-12">
-              <p className="text-white/80 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
+            <div className="mt-10">
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors duration-300 group flex-shrink-0"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
               >
-                <span className="w-8 h-px bg-white/30 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
                 {t.common.pedirOrcamento}
+                <span aria-hidden>→</span>
               </Link>
-            </div>
-          </AnimateIn>
-
-          {/* Category quick-nav */}
-          <AnimateIn delay={230}>
-            <div className="mt-12 pt-6 border-t border-white/12 flex items-center gap-6 sm:gap-12">
-              {navItems.map((cat, i) => (
-                <a
-                  key={cat.id}
-                  href={`#${cat.id}`}
-                  className="text-white/65 text-[10px] tracking-[0.42em] uppercase hover:text-moss-light transition-colors duration-300"
-                >
-                  <span className="text-moss-light/60 mr-2 font-mono">0{i + 1}</span>
-                  {cat.label}
-                </a>
-              ))}
             </div>
           </AnimateIn>
         </div>
       </section>
 
-      {/* ── Assinatura / filosofia — luz e respiração, afirma a decoração ── */}
-      <section className="bg-surface py-24 lg:py-32">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <p className="eyebrow mb-6">{ts.philoEyebrow}</p>
-            <h2
-              className="text-foreground font-bold leading-[1.06] tracking-tight max-w-4xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4.6vw, 62px)" }}
-            >
-              {ts.philoTitle}
-            </h2>
-          </AnimateIn>
-          <div className="mt-14 lg:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-12">
-            {ts.philoPillars.map((p, i) => (
-              <AnimateIn key={p.title} delay={i * 90}>
-                <div className="flex flex-col gap-3 border-t border-foreground/15 pt-6">
-                  <span className="text-gold-text font-mono text-[11px] tracking-[0.35em]">
-                    0{i + 1}
-                  </span>
-                  <h3
-                    className="text-foreground font-bold text-xl lg:text-2xl"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {p.title}
-                  </h3>
-                  <p className="text-foreground/68 text-[15px] leading-[1.75]">{p.text}</p>
-                </div>
-              </AnimateIn>
-            ))}
+      {/* ── Assinatura / filosofia — painel cinemático, minimal ──
+          O bloco mais denso de texto passou a uma afirmação única sobre imagem
+          full-bleed: título + as três competências reduzidas a rótulos (sem
+          descrições). Menos leitura, mais presença. */}
+      <section
+        className="relative overflow-hidden"
+        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+      >
+        <Parallax speed={0.12} className="absolute inset-0">
+          <Image
+            src="/imagens/20_10_2025_0358.jpg"
+            alt={t.common.imageAlt.servicosEvening}
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
+            {...blurFor("/imagens/20_10_2025_0358.jpg")}
+          />
+        </Parallax>
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-[#080808]/70" />
+        <div className="relative z-10 flex items-center" style={{ minHeight: "inherit" }}>
+          <div className="max-w-5xl mx-auto w-full px-6 lg:px-16 py-24 lg:py-32 text-center">
+            <AnimateIn>
+              <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase inline-flex items-center justify-center gap-4 mb-9">
+                <span className="w-8 h-px bg-gold" />
+                {ts.philoEyebrow}
+                <span className="w-8 h-px bg-gold" />
+              </p>
+              <h2
+                className="text-white font-bold leading-[1.06] tracking-tight mx-auto max-w-4xl"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 68px)" }}
+              >
+                {ts.philoTitle}
+              </h2>
+            </AnimateIn>
+            <div className="mt-16 lg:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-y-12 gap-x-8 max-w-3xl mx-auto">
+              {ts.philoPillars.map((p, i) => (
+                <AnimateIn key={p.title} delay={i * 90}>
+                  <div className="flex flex-col items-center gap-4">
+                    <span className="text-gold-text/90 font-mono text-[11px] tracking-[0.4em]">
+                      0{i + 1}
+                    </span>
+                    <span aria-hidden className="w-8 h-px bg-white/25" />
+                    <h3
+                      className="text-cream font-bold text-lg lg:text-2xl tracking-wide"
+                      style={{ fontFamily: "var(--font-playfair)" }}
+                    >
+                      {p.title}
+                    </h3>
+                  </div>
+                </AnimateIn>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -485,62 +328,69 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       {/* ── Service categories ── */}
       {categories.map((cat) => (
         <div key={cat.id}>
-          {/* Category header — clean, editorial (light); lets the mosaic photos
-              below carry the imagery and breaks the page's dark rhythm. */}
-          <section id={cat.id} className="bg-surface border-t border-foreground/8 scroll-mt-[60px]">
-            <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 pt-16 lg:pt-24 pb-10 lg:pb-14">
+          {/* Category intro — full-screen cinematic panel (SpaceX-style):
+              one image, one message. The light editorial header was dropped so
+              the page reads as a sequence of immersive full-bleed panels. */}
+          <section
+            id={cat.id}
+            className="relative overflow-hidden scroll-mt-[60px] flex items-end"
+            style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+          >
+            <Parallax speed={0.12} className="absolute inset-0">
+              <Image
+                src={cat.band}
+                alt=""
+                fill
+                sizes="100vw"
+                className="object-cover object-center"
+                {...blurFor(cat.band)}
+              />
+            </Parallax>
+            <div className="absolute inset-0 bg-black/55" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/15 to-[#080808]/45" />
+            <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
               <AnimateIn>
-                <div className="flex items-start gap-5 sm:gap-8">
-                  <span
-                    className="hidden sm:block text-foreground/10 font-bold leading-[0.8] select-none flex-shrink-0"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(56px, 8vw, 128px)",
-                    }}
-                    aria-hidden
+                <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
+                  {cat.num}
+                </p>
+                <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-4 flex items-center gap-3">
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
+                  {cat.subtitle}
+                </p>
+                <h2
+                  className="text-white font-bold leading-[0.92] tracking-tight"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(48px, 8vw, 120px)",
+                  }}
+                >
+                  {cat.label}
+                </h2>
+                <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
+                  <p className="text-white/75 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
+                  <Link
+                    href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
+                    className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
                   >
-                    {cat.num}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="eyebrow mb-3">{cat.subtitle}</p>
-                    <h2
-                      className="text-foreground font-bold leading-[0.95]"
-                      style={{
-                        fontFamily: "var(--font-playfair)",
-                        fontSize: "clamp(40px, 5.5vw, 88px)",
-                      }}
-                    >
-                      {cat.label}
-                    </h2>
-                    <div className="mt-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
-                      <p className="text-foreground/68 text-base leading-[1.8] max-w-md">
-                        {cat.desc}
-                      </p>
-                      <Link
-                        href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
-                        className="group inline-flex items-center gap-3 text-xs text-moss hover:text-moss-dark transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
-                      >
-                        <span>{ts.verDetalhes}</span>
-                        <span className="w-7 h-px bg-moss/40 group-hover:w-12 transition-all duration-500" />
-                      </Link>
-                    </div>
-                  </div>
+                    {ts.verDetalhes}
+                    <span aria-hidden>→</span>
+                  </Link>
                 </div>
               </AnimateIn>
             </div>
           </section>
 
-          {/* Service mosaic — full-bleed, image-forward */}
-          <section className="bg-surface">
-            <AnimateIn from="fade">
-              <div className="hidden lg:block p-1.5">
-                <MosaicGrid cat={cat} cta={ts.verMais} locale={locale} />
-              </div>
-              <div className="lg:hidden p-1.5">
-                <MobileCardStack cat={cat} cta={ts.verMais} locale={locale} />
-              </div>
-            </AnimateIn>
-          </section>
+          {/* Service bands — one full-screen panel per service */}
+          {cat.services.map((s, i) => (
+            <ServiceBand
+              key={`${cat.id}-${i}`}
+              service={s}
+              index={i}
+              catNum={cat.num}
+              cta={ts.verMais}
+              locale={locale}
+            />
+          ))}
         </div>
       ))}
 
@@ -568,10 +418,10 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </Reveal>
       </section>
 
-      {/* ── Cinematic statement (where we work) ── */}
+      {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}
       <section
         className="relative overflow-hidden border-t border-foreground/8"
-        style={{ minHeight: "clamp(420px, 70vh, 800px)" }}
+        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
       >
         <Image
           src="/imagens/J&A-68.jpg"
@@ -607,8 +457,11 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       {/* ── Testimonials ── */}
       <TestimonialsCarousel />
 
-      {/* ── CTA ── */}
-      <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
+      {/* ── CTA — full-screen closing panel ── */}
+      <section
+        className="relative overflow-hidden border-t border-foreground/8 flex items-center py-28 lg:py-40"
+        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+      >
         <Image
           src="/imagens/M&F0497.jpg"
           alt={t.common.imageAlt.servicosEvening}
@@ -620,7 +473,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         <div className="absolute inset-0 bg-black/65" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
@@ -644,14 +497,14 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <Magnetic strength={0.4}>
                 <Link
                   href={localizeHref("/orcamento", locale)}
-                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.28em] uppercase shadow-xl shadow-black/30"
                 >
                   {t.common.pedirOrcamento} →
                 </Link>
               </Magnetic>
               <Link
                 href={localizeHref("/galeria", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
               >
                 {ts.ctaGaleria}
               </Link>

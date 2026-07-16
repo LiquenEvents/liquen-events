@@ -143,8 +143,6 @@ export const en: Dict = {
   home: {
     eyebrow: "Event decoration · Évora · Alentejo",
     heroLines: [
-      { words: ["We", "craft"] },
-      { words: ["events,"] },
       { words: ["we", "immortalise"], moss: true },
       { words: ["memories."], moss: true },
     ],
@@ -463,7 +461,7 @@ export const en: Dict = {
     heroTitle: ["Every event,", "a story", "to tell."],
     heroLead:
       "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
-    nav: ["Companies", "Celebrations"],
+    nav: ["Celebrations", "Companies"],
     verMais: "View more",
     verDetalhes: "View details",
     philoEyebrow: "Our signature",
@@ -484,29 +482,6 @@ export const en: Dict = {
     ],
     categories: [
       {
-        label: "Companies",
-        subtitle: "For companies",
-        desc: "We elevate your brand's image through events that transform teams and celebrate achievements.",
-        services: [
-          {
-            title: "Conferences & Congresses",
-            desc: "Full organisation of corporate conferences, from logistics to audiovisual.",
-          },
-          {
-            title: "Team Building",
-            desc: "Activities and experiences that unite teams and strengthen company culture.",
-          },
-          {
-            title: "Product Launches",
-            desc: "High-impact events to present new products to the market with creativity.",
-          },
-          {
-            title: "Company Dinners",
-            desc: "From Christmas dinners to awards galas, we create memorable moments of celebration.",
-          },
-        ],
-      },
-      {
         label: "Celebrations",
         subtitle: "For individuals",
         desc: "The most important moments of your life, crafted in detail with care and elegance.",
@@ -526,6 +501,29 @@ export const en: Dict = {
           {
             title: "Gala Dinners",
             desc: "Prestige social events with a sophisticated atmosphere and impeccable coordination.",
+          },
+        ],
+      },
+      {
+        label: "Companies",
+        subtitle: "For companies",
+        desc: "We elevate your brand's image through events that transform teams and celebrate achievements.",
+        services: [
+          {
+            title: "Conferences & Congresses",
+            desc: "Full organisation of corporate conferences, from logistics to audiovisual.",
+          },
+          {
+            title: "Team Building",
+            desc: "Activities and experiences that unite teams and strengthen company culture.",
+          },
+          {
+            title: "Product Launches",
+            desc: "High-impact events to present new products to the market with creativity.",
+          },
+          {
+            title: "Company Dinners",
+            desc: "From Christmas dinners to awards galas, we create memorable moments of celebration.",
           },
         ],
       },

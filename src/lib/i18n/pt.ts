@@ -143,8 +143,6 @@ export const pt = {
   home: {
     eyebrow: "Decoração de eventos · Évora · Alentejo",
     heroLines: [
-      { words: ["Organizamos"] },
-      { words: ["eventos,"] },
       { words: ["eternizamos"], moss: true },
       { words: ["memórias."], moss: true },
     ] as { words: string[]; moss?: boolean }[],
@@ -472,7 +470,7 @@ export const pt = {
     heroTitle: ["Cada evento,", "uma história", "por contar."],
     heroLead:
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
-    nav: ["Empresas", "Celebrações"],
+    nav: ["Celebrações", "Empresas"],
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
     philoEyebrow: "A nossa assinatura",
@@ -493,29 +491,6 @@ export const pt = {
     ],
     categories: [
       {
-        label: "Empresas",
-        subtitle: "Para empresas",
-        desc: "Elevamos a imagem da sua marca através de eventos que transformam equipas e celebram conquistas.",
-        services: [
-          {
-            title: "Conferências & Congressos",
-            desc: "Organização completa de conferências empresariais, da logística ao audiovisual.",
-          },
-          {
-            title: "Teambuilding",
-            desc: "Atividades e experiências que unem equipas e fortalecem a cultura organizacional.",
-          },
-          {
-            title: "Lançamentos de Produto",
-            desc: "Eventos de impacto para apresentar novos produtos ao mercado com criatividade.",
-          },
-          {
-            title: "Jantares de Empresa",
-            desc: "Desde jantares de Natal a galas de entrega de prémios, criamos momentos de celebração memoráveis.",
-          },
-        ],
-      },
-      {
         label: "Celebrações",
         subtitle: "Para particulares",
         desc: "Os momentos mais importantes da sua vida, pensados ao pormenor com cuidado e elegância.",
@@ -535,6 +510,29 @@ export const pt = {
           {
             title: "Jantares de Gala",
             desc: "Eventos sociais de prestígio com ambiente sofisticado e coordenação impecável.",
+          },
+        ],
+      },
+      {
+        label: "Empresas",
+        subtitle: "Para empresas",
+        desc: "Elevamos a imagem da sua marca através de eventos que transformam equipas e celebram conquistas.",
+        services: [
+          {
+            title: "Conferências & Congressos",
+            desc: "Organização completa de conferências empresariais, da logística ao audiovisual.",
+          },
+          {
+            title: "Teambuilding",
+            desc: "Atividades e experiências que unem equipas e fortalecem a cultura organizacional.",
+          },
+          {
+            title: "Lançamentos de Produto",
+            desc: "Eventos de impacto para apresentar novos produtos ao mercado com criatividade.",
+          },
+          {
+            title: "Jantares de Empresa",
+            desc: "Desde jantares de Natal a galas de entrega de prémios, criamos momentos de celebração memoráveis.",
           },
         ],
       },
