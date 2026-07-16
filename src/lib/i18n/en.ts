@@ -603,6 +603,7 @@ export const en: Dict = {
     includesTitle: "What's included",
     galleryEyebrow: "Portfolio",
     galleryTitle: "Moments we've created",
+    galleryAlt: "Example of Líquen Events decoration",
     faqTitle: "Frequently asked questions",
     relatedTitle: "Other services",
     ctaTitle: "Shall we bring your event to life?",
