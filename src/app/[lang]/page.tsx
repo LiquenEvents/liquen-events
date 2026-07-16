@@ -78,8 +78,8 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             {t.home.eyebrow}
           </p>
           <h1
-            className="text-white font-bold leading-[0.9] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 5.5vw, 82px)" }}
+            className="text-white font-bold leading-[0.92] tracking-tight"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(46px, 9vw, 128px)" }}
           >
             {/* Readable sentence for SEO / screen readers — the animated words
                 below are laid out with flex gaps (no spaces) and aria-hidden. */}

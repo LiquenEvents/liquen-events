@@ -142,10 +142,7 @@ export const en: Dict = {
 
   home: {
     eyebrow: "Event decoration · Évora · Alentejo",
-    heroLines: [
-      { words: ["we", "immortalise"], moss: true },
-      { words: ["memories."], moss: true },
-    ],
+    heroLines: [{ words: ["We", "immortalise"] }, { words: ["memories"], moss: true }],
     scroll: "Scroll",
     wallEyebrow: "Our work",
     wallTitle: "Unforgettable moments",
