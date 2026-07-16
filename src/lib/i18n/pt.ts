@@ -438,6 +438,22 @@ export const pt = {
     nav: ["Empresas", "Celebrações"],
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
+    philoEyebrow: "A nossa assinatura",
+    philoTitle: "Decoração que dá alma. Coordenação que dá descanso.",
+    philoPillars: [
+      {
+        title: "Decoração",
+        text: "Conceito, flores e cenografia à medida — cada evento com uma identidade própria.",
+      },
+      {
+        title: "Coordenação",
+        text: "No dia, orquestramos tempos, fornecedores e equipa. Sem falhas, sem preocupações.",
+      },
+      {
+        title: "Produção",
+        text: "Da montagem ao último detalhe, tratamos de tudo para só terem de viver o momento.",
+      },
+    ],
     categories: [
       {
         label: "Empresas",

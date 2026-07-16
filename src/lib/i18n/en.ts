@@ -429,6 +429,22 @@ export const en: Dict = {
     nav: ["Companies", "Celebrations"],
     verMais: "View more",
     verDetalhes: "View details",
+    philoEyebrow: "Our signature",
+    philoTitle: "Decoration that gives soul. Coordination that gives peace of mind.",
+    philoPillars: [
+      {
+        title: "Decoration",
+        text: "Bespoke concept, flowers and scenography — every event with an identity of its own.",
+      },
+      {
+        title: "Coordination",
+        text: "On the day, we orchestrate timings, suppliers and team. No slip-ups, no worries.",
+      },
+      {
+        title: "Production",
+        text: "From setup to the last detail, we handle everything so all you do is live the moment.",
+      },
+    ],
     categories: [
       {
         label: "Companies",

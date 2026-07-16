@@ -443,74 +443,86 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
+      {/* ── Assinatura / filosofia — luz e respiração, afirma a decoração ── */}
+      <section className="bg-surface py-24 lg:py-32">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className="eyebrow mb-6">{ts.philoEyebrow}</p>
+            <h2
+              className="text-foreground font-bold leading-[1.06] tracking-tight max-w-4xl"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4.6vw, 62px)" }}
+            >
+              {ts.philoTitle}
+            </h2>
+          </AnimateIn>
+          <div className="mt-14 lg:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-12">
+            {ts.philoPillars.map((p, i) => (
+              <AnimateIn key={p.title} delay={i * 90}>
+                <div className="flex flex-col gap-3 border-t border-foreground/15 pt-6">
+                  <span className="text-gold-text font-mono text-[11px] tracking-[0.35em]">
+                    0{i + 1}
+                  </span>
+                  <h3
+                    className="text-foreground font-bold text-xl lg:text-2xl"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {p.title}
+                  </h3>
+                  <p className="text-foreground/68 text-[15px] leading-[1.75]">{p.text}</p>
+                </div>
+              </AnimateIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Service categories ── */}
       {categories.map((cat) => (
         <div key={cat.id}>
-          {/* Cinematic category band */}
-          <section
-            id={cat.id}
-            className="relative overflow-hidden border-t border-foreground/8 scroll-mt-[60px]"
-            style={{ minHeight: "clamp(440px, 76vh, 840px)" }}
-          >
-            <Image
-              src={cat.band}
-              alt={cat.label}
-              fill
-              sizes="100vw"
-              className="object-cover object-center"
-              {...blurFor(cat.band)}
-            />
-            <div className="absolute inset-0 bg-black/55" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/15 to-[#080808]/45" />
-
-            <div className="relative z-10 h-full flex items-end">
-              <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 py-16 lg:py-24">
-                <AnimateIn>
+          {/* Category header — clean, editorial (light); lets the mosaic photos
+              below carry the imagery and breaks the page's dark rhythm. */}
+          <section id={cat.id} className="bg-surface border-t border-foreground/8 scroll-mt-[60px]">
+            <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 pt-16 lg:pt-24 pb-10 lg:pb-14">
+              <AnimateIn>
+                <div className="flex items-start gap-5 sm:gap-8">
                   <span
-                    className="hidden sm:block text-white/12 font-bold leading-none mb-6 select-none"
+                    className="hidden sm:block text-foreground/10 font-bold leading-[0.8] select-none flex-shrink-0"
                     style={{
                       fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(64px, 9vw, 150px)",
+                      fontSize: "clamp(56px, 8vw, 128px)",
                     }}
                     aria-hidden
                   >
                     {cat.num}
                   </span>
-                  <p className={`${eyebrowLight} mb-5`}>
-                    <span className="w-6 h-px bg-gold flex-shrink-0" />
-                    {cat.subtitle}
-                  </p>
-                  <h2
-                    className="text-white font-bold leading-[0.95] mb-6"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(44px, 6vw, 92px)",
-                    }}
-                  >
-                    {cat.label}
-                  </h2>
-                  <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-                    <p className="hidden lg:block text-white/80 text-base leading-[1.8] max-w-md">
-                      {cat.desc}
-                    </p>
-                    <Link
-                      href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
-                      className="group inline-flex items-center gap-3 text-xs text-white/75 hover:text-white transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
+                  <div className="flex-1 min-w-0">
+                    <p className="eyebrow mb-3">{cat.subtitle}</p>
+                    <h2
+                      className="text-foreground font-bold leading-[0.95]"
+                      style={{
+                        fontFamily: "var(--font-playfair)",
+                        fontSize: "clamp(40px, 5.5vw, 88px)",
+                      }}
                     >
-                      <span>{ts.verDetalhes}</span>
-                      <span className="w-7 h-px bg-white/30 group-hover:w-12 transition-all duration-500" />
-                    </Link>
+                      {cat.label}
+                    </h2>
+                    <div className="mt-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+                      <p className="text-foreground/68 text-base leading-[1.8] max-w-md">
+                        {cat.desc}
+                      </p>
+                      <Link
+                        href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
+                        className="group inline-flex items-center gap-3 text-xs text-moss hover:text-moss-dark transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
+                      >
+                        <span>{ts.verDetalhes}</span>
+                        <span className="w-7 h-px bg-moss/40 group-hover:w-12 transition-all duration-500" />
+                      </Link>
+                    </div>
                   </div>
-                </AnimateIn>
-              </div>
+                </div>
+              </AnimateIn>
             </div>
           </section>
-
-          {/* Mobile: the category description lives on a clean surface, off the
-              photo — the band above stays a punchy image + title only. */}
-          <div className="lg:hidden bg-surface px-6 py-9 border-t border-foreground/8">
-            <p className="text-foreground/70 text-[15px] leading-[1.85] max-w-md">{cat.desc}</p>
-          </div>
 
           {/* Service mosaic — full-bleed, image-forward */}
           <section className="bg-surface">
