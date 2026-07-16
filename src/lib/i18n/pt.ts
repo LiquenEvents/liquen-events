@@ -138,9 +138,9 @@ export const pt = {
   home: {
     eyebrow: "Decoração de eventos · Évora · Alentejo",
     heroLines: [
-      { words: ["Eventos", "que"] },
-      { words: ["ficam", "na"] },
-      { words: ["memória."], moss: true },
+      { words: ["Organizamos", "eventos,"] },
+      { words: ["eternizamos"] },
+      { words: ["memórias."], moss: true },
     ] as { words: string[]; moss?: boolean }[],
     scroll: "Scroll",
     wallEyebrow: "O nosso trabalho",
@@ -428,7 +428,7 @@ export const pt = {
     back: "Líquen Events",
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
-    titleMoss: "a sua ideia.",
+    titleMoss: "a sua ideia",
     lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
     eventTypeLabels: [
       "Casamento",

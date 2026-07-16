@@ -138,9 +138,9 @@ export const en: Dict = {
   home: {
     eyebrow: "Event decoration · Évora · Alentejo",
     heroLines: [
-      { words: ["Events", "that"] },
-      { words: ["stay", "with"] },
-      { words: ["you."], moss: true },
+      { words: ["We", "craft", "events,"] },
+      { words: ["we", "immortalise"] },
+      { words: ["memories."], moss: true },
     ],
     scroll: "Scroll",
     wallEyebrow: "Our work",
@@ -418,7 +418,7 @@ export const en: Dict = {
     back: "Líquen Events",
     eyebrow: "Quote request",
     titleLine1: "Tell us",
-    titleMoss: "your idea.",
+    titleMoss: "your idea",
     lead: "No commitment. We reply with a tailored proposal in under 24 business hours.",
     eventTypeLabels: [
       "Wedding",
