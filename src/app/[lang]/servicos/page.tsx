@@ -419,14 +419,13 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             ]}
           />
           <AnimateIn delay={150}>
-            <div className="mt-9 flex flex-col sm:flex-row sm:items-end gap-7 sm:gap-12">
-              <p className="text-white/80 text-[15px] leading-[1.8] max-w-sm">{ts.heroLead}</p>
+            <div className="mt-10">
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors duration-300 group flex-shrink-0"
+                className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
               >
-                <span className="w-8 h-px bg-white/30 flex-shrink-0 group-hover:w-14 transition-all duration-500" />
                 {t.common.pedirOrcamento}
+                <span aria-hidden>→</span>
               </Link>
             </div>
           </AnimateIn>
@@ -449,35 +448,59 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
-      {/* ── Assinatura / filosofia — luz e respiração, afirma a decoração ── */}
-      <section className="bg-surface py-24 lg:py-32">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <p className="eyebrow mb-6">{ts.philoEyebrow}</p>
-            <h2
-              className="text-foreground font-bold leading-[1.06] tracking-tight max-w-4xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4.6vw, 62px)" }}
-            >
-              {ts.philoTitle}
-            </h2>
-          </AnimateIn>
-          <div className="mt-14 lg:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-12">
-            {ts.philoPillars.map((p, i) => (
-              <AnimateIn key={p.title} delay={i * 90}>
-                <div className="flex flex-col gap-3 border-t border-foreground/15 pt-6">
-                  <span className="text-gold-text font-mono text-[11px] tracking-[0.35em]">
-                    0{i + 1}
-                  </span>
-                  <h3
-                    className="text-foreground font-bold text-xl lg:text-2xl"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {p.title}
-                  </h3>
-                  <p className="text-foreground/68 text-[15px] leading-[1.75]">{p.text}</p>
-                </div>
-              </AnimateIn>
-            ))}
+      {/* ── Assinatura / filosofia — painel cinemático, minimal ──
+          O bloco mais denso de texto passou a uma afirmação única sobre imagem
+          full-bleed: título + as três competências reduzidas a rótulos (sem
+          descrições). Menos leitura, mais presença. */}
+      <section
+        className="relative overflow-hidden"
+        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+      >
+        <Parallax speed={0.12} className="absolute inset-0">
+          <Image
+            src="/imagens/20_10_2025_0358.jpg"
+            alt={t.common.imageAlt.servicosEvening}
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
+            {...blurFor("/imagens/20_10_2025_0358.jpg")}
+          />
+        </Parallax>
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-[#080808]/70" />
+        <div className="relative z-10 flex items-center" style={{ minHeight: "inherit" }}>
+          <div className="max-w-5xl mx-auto w-full px-6 lg:px-16 py-24 lg:py-32 text-center">
+            <AnimateIn>
+              <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase inline-flex items-center justify-center gap-4 mb-9">
+                <span className="w-8 h-px bg-gold" />
+                {ts.philoEyebrow}
+                <span className="w-8 h-px bg-gold" />
+              </p>
+              <h2
+                className="text-white font-bold leading-[1.06] tracking-tight mx-auto max-w-4xl"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 68px)" }}
+              >
+                {ts.philoTitle}
+              </h2>
+            </AnimateIn>
+            <div className="mt-16 lg:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-y-12 gap-x-8 max-w-3xl mx-auto">
+              {ts.philoPillars.map((p, i) => (
+                <AnimateIn key={p.title} delay={i * 90}>
+                  <div className="flex flex-col items-center gap-4">
+                    <span className="text-gold-text/90 font-mono text-[11px] tracking-[0.4em]">
+                      0{i + 1}
+                    </span>
+                    <span aria-hidden className="w-8 h-px bg-white/25" />
+                    <h3
+                      className="text-cream font-bold text-lg lg:text-2xl tracking-wide"
+                      style={{ fontFamily: "var(--font-playfair)" }}
+                    >
+                      {p.title}
+                    </h3>
+                  </div>
+                </AnimateIn>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -518,10 +541,10 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                       </p>
                       <Link
                         href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
-                        className="group inline-flex items-center gap-3 text-xs text-moss hover:text-moss-dark transition-colors duration-300 tracking-[0.3em] uppercase flex-shrink-0"
+                        className="inline-flex items-center gap-3 px-8 py-3.5 border border-foreground/25 text-foreground text-[11px] tracking-[0.28em] uppercase hover:bg-foreground hover:text-surface hover:border-foreground transition-all duration-300 flex-shrink-0"
                       >
-                        <span>{ts.verDetalhes}</span>
-                        <span className="w-7 h-px bg-moss/40 group-hover:w-12 transition-all duration-500" />
+                        {ts.verDetalhes}
+                        <span aria-hidden>→</span>
                       </Link>
                     </div>
                   </div>
