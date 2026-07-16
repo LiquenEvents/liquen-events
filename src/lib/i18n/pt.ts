@@ -87,16 +87,16 @@ export const pt = {
     ogLocale: "pt_PT",
     homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Empresa de decoração de eventos e casamentos com base em Évora: decoração e coordenação de casamentos, eventos corporativos e celebrações em todo o Alentejo e Portugal. Soluções à medida — peça orçamento.",
+      "Decoração de eventos e casamentos em Évora: decoração e coordenação de casamentos, eventos corporativos e celebrações no Alentejo e em Portugal. Peça orçamento.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
-      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos, eventos corporativos e celebrações decorados e coordenados no Alentejo e em todo o Portugal.",
+      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
     servicosTitle: "Decoração de Casamentos e Eventos no Alentejo",
     servicosDescription:
-      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e festas privadas em Évora, no Alentejo e em todo o Portugal. Soluções à medida do seu evento.",
+      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em Évora, no Alentejo e em Portugal.",
     galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
     galeriaDescription:
-      "Galeria de fotografias dos eventos organizados pela Líquen Events no Alentejo e todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
+      "Galeria de fotografias de eventos decorados pela Líquen Events no Alentejo e em Portugal — casamentos, eventos corporativos, conferências e celebrações.",
     clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
@@ -152,10 +152,10 @@ export const pt = {
     heroTitleMoss: "Líquen.",
     scroll: "Scroll",
     manifestoEyebrow: "A nossa essência",
-    manifestoTitleLine1: "Organizamos eventos.",
+    manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
-    manifestoText: "Desde 2018 que transformamos visões em experiências — em todo o Portugal.",
-    statementLead: "Não organizamos apenas eventos.",
+    manifestoText: "Desde 2018 que transformamos espaços em experiências — em todo o Portugal.",
+    statementLead: "Não decoramos apenas espaços.",
     statementRest: " Desenhamos experiências que ficam para sempre.",
     founderEyebrow: "As pessoas",
     founderQuote: "Cada evento é uma oportunidade de criar algo extraordinário. É o que nos move.",
@@ -169,7 +169,7 @@ export const pt = {
 
   galeria: {
     headerLabel: "Os nossos momentos",
-    headerTitle: "Galeria",
+    headerTitle: "Galeria de Casamentos e Eventos",
     headerDesc: "Casamentos, eventos corporativos e celebrações — capturados ao pormenor.",
     instaEyebrow: "Redes sociais",
     instaTitle: "Siga-nos no Instagram",
@@ -481,7 +481,7 @@ export const pt = {
       {
         label: "Celebrações",
         subtitle: "Para particulares",
-        desc: "Os momentos mais importantes da sua vida, planeados ao pormenor com cuidado e elegância.",
+        desc: "Os momentos mais importantes da sua vida, pensados ao pormenor com cuidado e elegância.",
         services: [
           {
             title: "Casamentos",
@@ -569,7 +569,7 @@ export const pt = {
     galleryTitle: "Momentos que criámos",
     faqTitle: "Perguntas frequentes",
     relatedTitle: "Outros serviços",
-    ctaTitle: "Vamos planear o seu evento?",
+    ctaTitle: "Vamos dar vida ao seu evento?",
     viaturasEyebrow: "Serviço exclusivo",
     viaturasTitle: "Aluguer de Viaturas Clássicas",
     viaturasText:
@@ -630,7 +630,7 @@ export const pt = {
   },
 
   footer: {
-    sloganLine1: "Organizamos eventos,",
+    sloganLine1: "Decoramos eventos,",
     sloganLine2: "eternizamos memórias.",
     disponivel: "Disponível para novos eventos",
     paginas: "Páginas",

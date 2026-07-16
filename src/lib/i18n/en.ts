@@ -87,16 +87,16 @@ export const en: Dict = {
     ogLocale: "en_US",
     homeTitle: "Event & Wedding Decoration in Évora, Portugal | Líquen Events",
     homeDescription:
-      "An event and wedding decoration company based in Évora: wedding decoration and coordination, corporate events and celebrations across the Alentejo and Portugal. Bespoke solutions — request a quote.",
+      "Event and wedding decoration in Évora: wedding decoration and coordination, corporate events and celebrations across the Alentejo and Portugal. Request a quote.",
     sobreTitle: "Event Decoration Company in the Alentejo",
     sobreDescription:
-      "Líquen Events, an event decoration company in Évora. Over 100 weddings, corporate events and celebrations decorated and coordinated across the Alentejo and Portugal.",
+      "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
     servicosTitle: "Wedding & Event Decoration in the Alentejo",
     servicosDescription:
-      "Wedding decoration and coordination, plus decoration and planning of corporate events, conferences and private parties in Évora, the Alentejo and across Portugal. Bespoke solutions for your event.",
+      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties in Évora, the Alentejo and Portugal.",
     galeriaTitle: "Wedding & Event Gallery — Alentejo",
     galeriaDescription:
-      "Photo gallery of events organised by Líquen Events in the Alentejo and across Portugal — weddings, corporate events, conferences and celebrations.",
+      "Photo gallery of events decorated by Líquen Events in the Alentejo and Portugal — weddings, corporate events, conferences and celebrations.",
     clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
       "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
@@ -120,7 +120,7 @@ export const en: Dict = {
     ],
     servicosServiceName: "Event decoration and wedding coordination",
     servicosServiceDescription:
-      "Wedding decoration and coordination, plus decoration and planning of corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal.",
+      "Wedding decoration and coordination, plus decoration of corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal.",
   },
 
   home: {
@@ -152,10 +152,10 @@ export const en: Dict = {
     heroTitleMoss: "Líquen.",
     scroll: "Scroll",
     manifestoEyebrow: "Our essence",
-    manifestoTitleLine1: "We craft events.",
+    manifestoTitleLine1: "We decorate events.",
     manifestoTitleLine2: "We immortalise memories.",
-    manifestoText: "Since 2018 we've turned visions into experiences — across Portugal.",
-    statementLead: "We don't just plan events.",
+    manifestoText: "Since 2018 we've turned spaces into experiences — across Portugal.",
+    statementLead: "We don't just decorate spaces.",
     statementRest: " We design experiences that last forever.",
     founderEyebrow: "The people",
     founderQuote:
@@ -170,7 +170,7 @@ export const en: Dict = {
 
   galeria: {
     headerLabel: "Our moments",
-    headerTitle: "Gallery",
+    headerTitle: "Wedding & Event Gallery",
     headerDesc: "Weddings, corporate events and celebrations — captured in detail.",
     instaEyebrow: "Social media",
     instaTitle: "Follow us on Instagram",
@@ -472,7 +472,7 @@ export const en: Dict = {
       {
         label: "Celebrations",
         subtitle: "For individuals",
-        desc: "The most important moments of your life, planned in detail with care and elegance.",
+        desc: "The most important moments of your life, crafted in detail with care and elegance.",
         services: [
           {
             title: "Weddings",
@@ -560,7 +560,7 @@ export const en: Dict = {
     galleryTitle: "Moments we've created",
     faqTitle: "Frequently asked questions",
     relatedTitle: "Other services",
-    ctaTitle: "Shall we plan your event?",
+    ctaTitle: "Shall we bring your event to life?",
     viaturasEyebrow: "Exclusive service",
     viaturasTitle: "Classic Car Rental",
     viaturasText:
@@ -620,7 +620,7 @@ export const en: Dict = {
   },
 
   footer: {
-    sloganLine1: "We craft events,",
+    sloganLine1: "We decorate events,",
     sloganLine2: "we immortalise memories.",
     disponivel: "Available for new events",
     paginas: "Pages",

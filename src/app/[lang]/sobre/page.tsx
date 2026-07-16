@@ -26,7 +26,7 @@ export async function generateMetadata({
     description: t.meta.sobreDescription,
     path: "/sobre",
     image: "/imagens/M&F0497.jpg",
-    keywords: ["organização de eventos Alentejo", "sobre Líquen Events"],
+    keywords: ["decoração de eventos Alentejo", "sobre Líquen Events"],
     ogLocale: t.meta.ogLocale,
   });
 }

@@ -24,7 +24,7 @@ export const SERVICES: ServiceDetail[] = [
     slug: "casamentos",
     eyebrow: "Decoração e Coordenação de Casamentos",
     title: "Decoração de Casamentos no Alentejo e em Portugal",
-    metaTitle: "Decoração de Casamentos no Alentejo — Líquen Events",
+    metaTitle: "Decoração de Casamentos no Alentejo",
     metaDescription:
       "Decoração de casamentos no Alentejo — decoração floral e cenografia à medida, com coordenação do dia para viverem o grande dia sem preocupações. Em herdades, quintas e espaços únicos de todo o Portugal.",
     keywords: [
@@ -72,29 +72,29 @@ export const SERVICES: ServiceDetail[] = [
   {
     slug: "eventos-corporativos",
     eyebrow: "Para Empresas",
-    title: "Eventos Corporativos em Lisboa",
-    metaTitle: "Eventos Corporativos em Lisboa e Conferências",
+    title: "Decoração de Eventos Corporativos em Lisboa",
+    metaTitle: "Decoração de Eventos Corporativos em Lisboa",
     metaDescription:
-      "Organização de eventos corporativos em Lisboa e todo o Portugal: conferências, congressos, teambuilding, lançamentos de produto e jantares de empresa. Produção completa e chave na mão.",
+      "Decoração e cenografia de eventos corporativos em Lisboa e todo o Portugal: conferências, congressos, teambuilding, lançamentos de produto e jantares de empresa — ambiente e produção à medida.",
     keywords: [
+      "decoração de eventos corporativos",
       "eventos corporativos Lisboa",
-      "organização de conferências",
-      "congressos Portugal",
+      "cenografia de conferências",
       "teambuilding empresas",
       "jantar de empresa",
     ],
     hero: "/imagens/EW1_1332.jpg",
     intro: [
-      "Elevamos a imagem da sua marca através de eventos corporativos que transformam equipas e celebram conquistas. A Líquen Events organiza conferências, congressos, teambuildings e jantares de empresa em Lisboa e em todo o Portugal.",
-      "Da logística ao audiovisual, da gestão de inscrições à coordenação no local, tratamos de tudo com o rigor que um evento profissional exige — para que a sua empresa se foque apenas nos resultados.",
+      "Elevamos a imagem da sua marca com eventos corporativos memoráveis. A Líquen Events cria a decoração e a cenografia de conferências, congressos, teambuildings e jantares de empresa em Lisboa e em todo o Portugal.",
+      "Do conceito visual à montagem, da iluminação à coordenação no local, cuidamos de cada detalhe com o rigor que um evento profissional exige — para que a sua empresa se foque apenas nos resultados.",
     ],
     includes: [
-      "Conferências e congressos",
-      "Teambuilding e ativações de equipa",
-      "Lançamentos de produto",
-      "Jantares de empresa e galas de prémios",
-      "Audiovisual, palco e cenografia",
-      "Gestão de inscrições e credenciação",
+      "Conceito visual e cenografia",
+      "Decoração e styling de espaços",
+      "Palco, iluminação e audiovisual",
+      "Ambientação de jantares e galas de empresa",
+      "Sinalética e identidade do evento",
+      "Coordenação e produção no local",
     ],
     gallery: [
       "/imagens/EW1_1330.jpg",
@@ -119,27 +119,28 @@ export const SERVICES: ServiceDetail[] = [
   {
     slug: "festas-e-aniversarios",
     eyebrow: "Celebrações Privadas",
-    title: "Festas de Aniversário e Celebrações Privadas",
-    metaTitle: "Festas de Aniversário e Celebrações Privadas",
+    title: "Decoração de Festas de Aniversário e Celebrações Privadas",
+    metaTitle: "Decoração de Festas e Celebrações Privadas",
     metaDescription:
-      "Organização de festas de aniversário, batizados, comunhões e celebrações privadas no Alentejo. Conceito, decoração, catering e entretenimento à medida.",
+      "Decoração de festas de aniversário, batizados, comunhões e celebrações privadas no Alentejo. Conceito, cenografia, ambiente e coordenação à medida.",
     keywords: [
-      "organização de festas Alentejo",
+      "decoração de festas Alentejo",
+      "decoração de aniversários",
       "festa privada Alentejo",
       "celebrações privadas Portugal",
     ],
     hero: "/imagens/DaniGui_JantarFesta_130.jpg",
     intro: [
-      "Cada celebração é uma história. Organizamos festas de aniversário, batizados, comunhões e celebrações privadas no Alentejo e em todo o Portugal — temáticas ou clássicas, íntimas ou de grande escala.",
-      "Do conceito à decoração, do catering ao entretenimento, criamos momentos memoráveis com a atenção ao detalhe que distingue a Líquen Events.",
+      "Cada celebração é uma história. Criamos a decoração de festas de aniversário, batizados, comunhões e celebrações privadas no Alentejo e em todo o Portugal — temáticas ou clássicas, íntimas ou de grande escala.",
+      "Do conceito e cenografia à mesa e ao ambiente, criamos momentos memoráveis com a atenção ao detalhe que distingue a Líquen Events.",
     ],
     includes: [
-      "Festas de aniversário (todas as idades)",
-      "Batizados e comunhões",
-      "Conceito temático e decoração completa",
-      "Catering, bolo e mesa de doces",
-      "Animação e entretenimento",
-      "Coordenação total no dia",
+      "Conceito temático e cenografia",
+      "Decoração completa do espaço",
+      "Mesa de doces e styling de mesa",
+      "Ambiente, flores e iluminação",
+      "Batizados, comunhões e aniversários",
+      "Coordenação no dia da festa",
     ],
     gallery: [
       "/imagens/DaniGui_JantarFesta_11.jpg",
@@ -160,20 +161,20 @@ export const SERVICES: ServiceDetail[] = [
   {
     slug: "jantares-de-gala",
     eyebrow: "Eventos Sociais",
-    title: "Jantares de Gala e Eventos Sociais de Prestígio",
-    metaTitle: "Jantares de Gala e Eventos Sociais",
+    title: "Decoração de Jantares de Gala e Eventos Sociais",
+    metaTitle: "Decoração de Jantares de Gala",
     metaDescription:
-      "Organização de jantares de gala e eventos sociais de prestígio em Lisboa e Portugal. Ambiente sofisticado, mesa posta premium e coordenação impecável.",
+      "Decoração de jantares de gala e eventos sociais de prestígio em Lisboa e Portugal. Mesa posta premium, cenografia sofisticada e coordenação impecável.",
     keywords: [
+      "decoração de jantares de gala",
       "jantar de gala Portugal",
       "eventos sociais de prestígio",
-      "galas de prémios",
       "evento de prestígio Alentejo",
     ],
     hero: "/imagens/J&P-IMGL3188.jpg",
     intro: [
-      "Para os momentos que pedem sofisticação, organizamos jantares de gala e eventos sociais de prestígio em Lisboa e por todo o Portugal.",
-      "Mesa posta premium, chef convidado, wine pairing e animação ao vivo — uma experiência cuidada ao pormenor, com a coordenação impecável que um evento de gala exige.",
+      "Para os momentos que pedem sofisticação, criamos a decoração de jantares de gala e eventos sociais de prestígio em Lisboa e por todo o Portugal.",
+      "Mesa posta premium, cenografia e iluminação de autor — uma experiência cuidada ao pormenor, com a coordenação impecável que um evento de gala exige.",
     ],
     includes: [
       "Mesa posta e decoração premium",
@@ -210,7 +211,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
     eyebrow: "Wedding Decoration & Coordination",
     title: "Wedding Decoration in the Alentejo and across Portugal",
-    metaTitle: "Wedding Decoration in the Alentejo — Líquen Events",
+    metaTitle: "Wedding Decoration in the Alentejo",
     metaDescription:
       "Wedding decoration in the Alentejo — bespoke floral design and scenography, with day-of coordination so you can simply enjoy your day, at estates, quintas and unique venues across Portugal.",
     intro: [
@@ -239,21 +240,21 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   },
   "eventos-corporativos": {
     eyebrow: "For Companies",
-    title: "Corporate Events in Lisbon",
-    metaTitle: "Corporate Events & Conferences in Lisbon",
+    title: "Corporate Event Decoration in Lisbon",
+    metaTitle: "Corporate Event Decoration in Lisbon",
     metaDescription:
-      "Corporate event planning in Lisbon and across Portugal: conferences, congresses, team-building, product launches and company dinners. Full turnkey production.",
+      "Decoration and scenography for corporate events in Lisbon and across Portugal: conferences, congresses, team-building, product launches and company dinners — bespoke atmosphere and production.",
     intro: [
-      "We elevate your brand's image through corporate events that transform teams and celebrate achievements. Líquen Events organises conferences, congresses, team-building and company dinners in Lisbon and across Portugal.",
-      "From logistics to audiovisual, from registration management to on-site coordination, we handle everything with the rigour a professional event demands — so your company can focus solely on results.",
+      "We elevate your brand's image with memorable corporate events. Líquen Events creates the decoration and scenography for conferences, congresses, team-building and company dinners in Lisbon and across Portugal.",
+      "From the visual concept to the build, from lighting to on-site coordination, we take care of every detail with the rigour a professional event demands — so your company can focus solely on results.",
     ],
     includes: [
-      "Conferences and congresses",
-      "Team building and team activations",
-      "Product launches",
-      "Company dinners and awards galas",
-      "Audiovisual, stage and scenography",
-      "Registration and accreditation management",
+      "Visual concept and scenography",
+      "Decoration and space styling",
+      "Stage, lighting and audiovisual",
+      "Styling of company dinners and galas",
+      "Signage and event identity",
+      "On-site coordination and production",
     ],
     faqs: [
       {
@@ -268,21 +269,21 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   },
   "festas-e-aniversarios": {
     eyebrow: "Private Celebrations",
-    title: "Birthday Parties and Private Celebrations",
-    metaTitle: "Birthday Parties & Private Celebrations",
+    title: "Decoration for Birthday Parties and Private Celebrations",
+    metaTitle: "Party & Private Celebration Decoration",
     metaDescription:
-      "Planning of birthday parties, christenings, communions and private celebrations in the Alentejo. Concept, décor, catering and bespoke entertainment.",
+      "Decoration for birthday parties, christenings, communions and private celebrations in the Alentejo. Concept, scenography, atmosphere and bespoke coordination.",
     intro: [
-      "Every celebration is a story. We organise birthday parties, christenings, communions and private celebrations in the Alentejo and across Portugal — themed or classic, intimate or large-scale.",
-      "From concept to décor, from catering to entertainment, we create memorable moments with the attention to detail that sets Líquen Events apart.",
+      "Every celebration is a story. We create the decoration for birthday parties, christenings, communions and private celebrations in the Alentejo and across Portugal — themed or classic, intimate or large-scale.",
+      "From concept and scenography to the table and the atmosphere, we create memorable moments with the attention to detail that sets Líquen Events apart.",
     ],
     includes: [
-      "Birthday parties (all ages)",
-      "Christenings and communions",
-      "Themed concept and full décor",
-      "Catering, cake and dessert table",
-      "Entertainment and activities",
-      "Full day-of coordination",
+      "Themed concept and scenography",
+      "Full space decoration",
+      "Dessert table and table styling",
+      "Atmosphere, flowers and lighting",
+      "Christenings, communions and birthdays",
+      "Coordination on the day",
     ],
     faqs: [
       {
@@ -293,13 +294,13 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   },
   "jantares-de-gala": {
     eyebrow: "Social Events",
-    title: "Gala Dinners and Prestige Social Events",
-    metaTitle: "Gala Dinners & Social Events",
+    title: "Decoration for Gala Dinners and Social Events",
+    metaTitle: "Gala Dinner Decoration",
     metaDescription:
-      "Planning of gala dinners and prestige social events in Lisbon and Portugal. Sophisticated atmosphere, premium table settings and impeccable coordination.",
+      "Decoration for gala dinners and prestige social events in Lisbon and Portugal. Premium table settings, sophisticated scenography and impeccable coordination.",
     intro: [
-      "For moments that call for sophistication, we organise gala dinners and prestige social events in Lisbon and throughout Portugal.",
-      "Premium table settings, guest chef, wine pairing and live entertainment — a meticulously crafted experience, with the impeccable coordination a gala event demands.",
+      "For moments that call for sophistication, we create the decoration for gala dinners and prestige social events in Lisbon and throughout Portugal.",
+      "Premium table settings, signature scenography and lighting — a meticulously crafted experience, with the impeccable coordination a gala event demands.",
     ],
     includes: [
       "Premium table settings and décor",

@@ -68,7 +68,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   text("LÍQUEN EVENTS", MARGIN, y, { font: bold, size: 20, color: MOSS });
   tr("RECIBO", right, y, { font: bold, size: 12, color: MUTED });
   y -= 16;
-  text("Organizamos eventos, eternizamos memórias.", MARGIN, y, { size: 9, color: MUTED });
+  text("Decoramos eventos, eternizamos memórias.", MARGIN, y, { size: 9, color: MUTED });
   tr(`Nº ${d.number}`, right, y, { size: 9, color: MUTED });
   y -= 14;
   tr(new Date(d.date + "T12:00:00").toLocaleDateString("pt-PT"), right, y, {
@@ -104,7 +104,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const base = d.amount / (1 + d.vatRate);
   const vat = d.amount - base;
 
-  text(`${d.kindLabel} — ${d.description || "Serviços de organização de eventos"}`, MARGIN, y, {
+  text(`${d.kindLabel} — ${d.description || "Serviços de decoração de eventos"}`, MARGIN, y, {
     size: 10,
   });
   tr(eur(d.amount), right, y, { size: 10 });

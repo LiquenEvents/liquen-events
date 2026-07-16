@@ -84,9 +84,9 @@ export async function generateMetadata({
       images: [
         {
           url: SITE.ogImage,
-          width: 2048,
-          height: 1152,
-          alt: "Líquen Events — organização de eventos em Portugal",
+          width: 1200,
+          height: 630,
+          alt: "Líquen Events — decoração de eventos no Alentejo",
         },
       ],
     },
