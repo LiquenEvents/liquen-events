@@ -139,7 +139,7 @@ export const en: Dict = {
     eyebrow: "Event decoration · Évora · Alentejo",
     heroLines: [
       { words: ["We", "craft", "events,"] },
-      { words: ["we", "immortalise"] },
+      { words: ["we", "immortalise"], moss: true },
       { words: ["memories."], moss: true },
     ],
     scroll: "Scroll",
