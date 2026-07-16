@@ -545,6 +545,10 @@ export const en: Dict = {
     faqTitle: "Frequently asked questions",
     relatedTitle: "Other services",
     ctaTitle: "Shall we plan your event?",
+    viaturasEyebrow: "Exclusive service",
+    viaturasTitle: "Classic Car Rental",
+    viaturasText:
+      "For a dream arrival — from the bride's entrance to transport for the newlyweds and guests. Classic cars with a driver and every care taken.",
   },
 
   proposta: {

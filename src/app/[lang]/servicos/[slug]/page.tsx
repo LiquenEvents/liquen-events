@@ -182,6 +182,47 @@ export default async function ServiceDetailPage({
         </div>
       </section>
 
+      {/* ── Aluguer de viaturas — cover band (weddings only) ── */}
+      {svc.slug === "casamentos" && (
+        <section
+          className="relative overflow-hidden border-t border-foreground/8"
+          style={{ minHeight: "clamp(420px, 66vh, 760px)" }}
+        >
+          <Image
+            src="/imagens/viaturas-classicas.jpg"
+            {...blurFor("/imagens/viaturas-classicas.jpg")}
+            alt={t.servicoDetalhe.viaturasTitle}
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/40" />
+          <div className="relative z-10 h-full flex items-end">
+            <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 py-16 lg:py-24">
+              <AnimateIn>
+                <p className="text-cream/80 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center gap-3">
+                  <span className="w-6 h-px bg-gold flex-shrink-0" />
+                  {t.servicoDetalhe.viaturasEyebrow}
+                </p>
+                <h2
+                  className="text-cream font-bold leading-[0.98] mb-6 max-w-2xl"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(30px, 4.5vw, 60px)",
+                  }}
+                >
+                  {t.servicoDetalhe.viaturasTitle}
+                </h2>
+                <p className="text-cream/75 text-base lg:text-lg leading-[1.8] max-w-xl">
+                  {t.servicoDetalhe.viaturasText}
+                </p>
+              </AnimateIn>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Gallery — editorial portfolio ── */}
       <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 mb-10 lg:mb-14">

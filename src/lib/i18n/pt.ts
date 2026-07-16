@@ -554,6 +554,10 @@ export const pt = {
     faqTitle: "Perguntas frequentes",
     relatedTitle: "Outros serviços",
     ctaTitle: "Vamos planear o seu evento?",
+    viaturasEyebrow: "Serviço exclusivo",
+    viaturasTitle: "Aluguer de Viaturas Clássicas",
+    viaturasText:
+      "Para uma chegada de sonho — da entrada da noiva ao transporte dos noivos e convidados. Carros clássicos com motorista e todo o cuidado.",
   },
 
   proposta: {
