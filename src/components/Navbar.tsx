@@ -164,7 +164,7 @@ export default function Navbar() {
   return (
     <nav
       data-public-nav
-      aria-label="Principal"
+      aria-label={t.nav.primaryLabel}
       className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ${
         // NB: nada de "translate-y-0" no estado visível — QUALQUER transform no
         // nav cria um containing block e prenderia o overlay fixed inset-0 do
@@ -221,7 +221,7 @@ export default function Navbar() {
                 href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={pathname === link.href ? "page" : undefined}
-                className={`link-line text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
+                className={`link-line py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                   light
                     ? pathname === link.href
                       ? "text-white nav-active-light"
@@ -301,7 +301,7 @@ export default function Navbar() {
         />
 
         <nav
-          aria-label="Menu"
+          aria-label={t.nav.menuLabel}
           className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain"
         >
           <p

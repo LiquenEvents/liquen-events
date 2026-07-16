@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import AnimateIn from "./AnimateIn";
 import RatingBadge from "./RatingBadge";
 import { useTranslations } from "./LocaleProvider";
+import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 
 export default function TestimonialsCarousel() {
   const { locale, t: dict } = useTranslations();
@@ -15,6 +16,10 @@ export default function TestimonialsCarousel() {
   // >5s auto-advancing carousel must be pausable.
   const [interacting, setInteracting] = useState(false);
   const [docHidden, setDocHidden] = useState(false);
+  // Persistent user control (WCAG 2.2.2) — always-available pause, independent of
+  // hover/focus. Reduced-motion stops autoplay entirely.
+  const [userPaused, setUserPaused] = useState(false);
+  const reduced = useReducedMotion();
 
   const transitionTo = useCallback((next: (current: number) => number) => {
     setVisible(false);
@@ -33,7 +38,7 @@ export default function TestimonialsCarousel() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
-  const paused = interacting || docHidden;
+  const paused = interacting || docHidden || userPaused || reduced;
 
   useEffect(() => {
     if (paused) return;
@@ -83,6 +88,8 @@ export default function TestimonialsCarousel() {
         <AnimateIn delay={80}>
           <div className="max-w-3xl">
             <div
+              aria-live="polite"
+              aria-atomic="true"
               style={{
                 opacity: visible ? 1 : 0,
                 transform: visible ? "none" : "translateY(10px)",
@@ -105,25 +112,49 @@ export default function TestimonialsCarousel() {
             </div>
           </div>
 
-          {/* Dots */}
-          <div className="flex gap-0.5 mt-9 lg:mt-14 -ml-2">
-            {testimonials.map((_, i) => (
+          {/* Dots + pause/play */}
+          <div className="flex items-center gap-4 mt-9 lg:mt-14 -ml-2">
+            <div className="flex gap-0.5">
+              {testimonials.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  aria-label={`${dict.common.testemunhoLabel} ${i + 1}`}
+                  aria-current={i === active ? "true" : undefined}
+                  className="group py-4 px-2 flex-shrink-0"
+                >
+                  <span
+                    className={`block h-px transition-all duration-400 ${
+                      i === active
+                        ? "w-8 bg-moss"
+                        : "w-4 bg-foreground/20 group-hover:bg-foreground/40"
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            {/* Always-available pause control (WCAG 2.2.2); hidden when reduced
+                motion already stops the rotation. */}
+            {!reduced && (
               <button
-                key={i}
-                onClick={() => goTo(i)}
-                aria-label={`${dict.common.testemunhoLabel} ${i + 1}`}
-                aria-current={i === active ? "true" : undefined}
-                className="group py-4 px-2 flex-shrink-0"
+                type="button"
+                onClick={() => setUserPaused((p) => !p)}
+                aria-pressed={userPaused}
+                aria-label={userPaused ? dict.common.retomar : dict.common.pausar}
+                className="inline-flex items-center justify-center w-9 h-9 -m-1 text-foreground/68 hover:text-moss transition-colors"
               >
-                <span
-                  className={`block h-px transition-all duration-400 ${
-                    i === active
-                      ? "w-8 bg-moss"
-                      : "w-4 bg-foreground/20 group-hover:bg-foreground/40"
-                  }`}
-                />
+                {userPaused ? (
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden>
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden>
+                    <rect x="6" y="5" width="4" height="14" rx="1" />
+                    <rect x="14" y="5" width="4" height="14" rx="1" />
+                  </svg>
+                )}
               </button>
-            ))}
+            )}
           </div>
         </AnimateIn>
       </div>

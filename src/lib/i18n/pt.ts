@@ -44,6 +44,7 @@ export const pt = {
   nav: {
     inicio: "Início",
     menuLabel: "Menu",
+    primaryLabel: "Principal",
     sobre: "Sobre",
     servicos: "Serviços",
     galeria: "Galeria",
@@ -66,6 +67,8 @@ export const pt = {
     clientsSay: "O que dizem os clientes",
     reviewsLabel: "avaliações",
     testemunhoLabel: "Testemunho",
+    pausar: "Pausar rotação dos testemunhos",
+    retomar: "Retomar rotação dos testemunhos",
     whatsappPrefill: "Olá, gostaria de saber mais sobre a decoração de eventos.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
@@ -453,6 +456,7 @@ export const pt = {
     phMensagem: "Conte-nos o que imagina para o seu evento — local, ambiente, detalhes especiais…",
     errNome: "Indique o seu nome",
     errEmail: "Email inválido",
+    errTipo: "Selecione o tipo de evento.",
     enviar: "Enviar pedido",
     enviando: "A enviar…",
     ouWhatsApp: "ou pelo WhatsApp",

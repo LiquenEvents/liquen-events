@@ -28,7 +28,10 @@ export default function LanguageToggle({ light = false }: { light?: boolean }) {
     window.location.assign(dest + window.location.search);
   }
 
-  const base = "text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";
+  // px/py enlarge the hit area to the 24×24 minimum (WCAG 2.5.8); the negative
+  // vertical margin keeps the navbar's height unchanged.
+  const base =
+    "px-1.5 py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";
   const activeCls = light ? "text-white" : "text-moss";
   const idleCls = light
     ? "text-white/60 hover:text-white/90"

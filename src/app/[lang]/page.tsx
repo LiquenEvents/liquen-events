@@ -120,7 +120,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             </Magnetic>
             <Link
               href={localizeHref("/galeria", locale)}
-              className="link-line text-xs text-white/55 hover:text-white/85 transition-colors tracking-[0.2em] uppercase"
+              className="link-line text-xs text-white/70 hover:text-white/85 transition-colors tracking-[0.2em] uppercase"
             >
               {t.common.verGaleria}
             </Link>
@@ -137,7 +137,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         </div>
 
         <div className="absolute bottom-8 right-6 lg:right-16 z-10 flex flex-col items-center gap-3 anim-3">
-          <span className="text-white/60 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
+          <span className="text-white/75 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
             {t.home.scroll}
           </span>
           <div className="h-10 w-px overflow-hidden">

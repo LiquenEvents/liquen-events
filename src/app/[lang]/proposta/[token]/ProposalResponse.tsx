@@ -77,7 +77,7 @@ export default function ProposalResponse({ token, initialStatus, clientEmail }: 
             <p className="text-foreground/55 text-sm leading-relaxed">{tp.rejeitadaBody}</p>
           </>
         )}
-        {decided && <p className="text-foreground/30 text-[11px] mt-4">{tp.jaRegistado}</p>}
+        {decided && <p className="text-foreground/68 text-[11px] mt-4">{tp.jaRegistado}</p>}
       </div>
     );
   }
@@ -95,7 +95,7 @@ export default function ProposalResponse({ token, initialStatus, clientEmail }: 
         <button
           onClick={() => respond("recusar")}
           disabled={!!sending}
-          className="sm:w-auto px-6 py-4 rounded-md border border-foreground/15 text-foreground/45 text-xs tracking-[0.2em] uppercase hover:border-foreground/30 hover:text-foreground/65 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="sm:w-auto px-6 py-4 rounded-md border border-foreground/15 text-foreground/72 text-xs tracking-[0.2em] uppercase hover:border-foreground/30 hover:text-foreground/65 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending === "recusar" ? tp.recusarSending : tp.recusar}
         </button>

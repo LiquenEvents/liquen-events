@@ -44,6 +44,7 @@ export const en: Dict = {
   nav: {
     inicio: "Home",
     menuLabel: "Menu",
+    primaryLabel: "Primary",
     sobre: "About",
     servicos: "Services",
     galeria: "Gallery",
@@ -66,6 +67,8 @@ export const en: Dict = {
     clientsSay: "What our clients say",
     reviewsLabel: "reviews",
     testemunhoLabel: "Testimonial",
+    pausar: "Pause testimonial rotation",
+    retomar: "Resume testimonial rotation",
     whatsappPrefill: "Hi, I'd like to know more about your event decoration services.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
@@ -444,6 +447,7 @@ export const en: Dict = {
       "Tell us what you have in mind for your event — venue, atmosphere, special details…",
     errNome: "Please enter your name",
     errEmail: "Invalid email",
+    errTipo: "Please select the event type.",
     enviar: "Send request",
     enviando: "Sending…",
     ouWhatsApp: "or via WhatsApp",

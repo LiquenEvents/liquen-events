@@ -59,6 +59,9 @@ export default function OrcamentoForm() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState<{ nome?: boolean; email?: boolean }>({});
+  // Set once the user tries to submit an incomplete form — drives the visible,
+  // announced error identification (WCAG 3.3.1) instead of a silent disabled button.
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   // Data mínima = hoje (não faz sentido pedir orçamento para uma data passada).
   const [minDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -100,11 +103,19 @@ export default function OrcamentoForm() {
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
+  const tipoErr = attemptedSubmit && eventType === "" ? to.errTipo : "";
   const ready = nome.trim().length >= 2 && /\S+@\S+\.\S+/.test(email) && eventType !== "";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!ready || sending || website) return;
+    if (sending || website) return;
+    // Incomplete: reveal + announce what's missing (the submit stays operable so
+    // keyboard/AT users get a reason, not a silently disabled control).
+    if (!ready) {
+      setTouched({ nome: true, email: true });
+      setAttemptedSubmit(true);
+      return;
+    }
     setSending(true);
     setError(null);
 
@@ -163,7 +174,9 @@ export default function OrcamentoForm() {
   }
 
   const inputCls =
-    "w-full bg-transparent border-b border-foreground/15 pb-3.5 text-base text-foreground placeholder-foreground/45 focus:outline-none focus:border-moss/55 transition-colors duration-300";
+    // border-b at /55 clears the 3:1 non-text-contrast floor so the field is
+    // identifiable (WCAG 1.4.11); focus switches to solid moss.
+    "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/55 focus:outline-none focus:border-moss transition-colors duration-300";
   const labelCls =
     "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
@@ -190,7 +203,7 @@ export default function OrcamentoForm() {
             ← {to.back}
           </Link>
           <div>
-            <p className="text-cream/40 text-[10px] tracking-[0.5em] uppercase mb-7 flex items-center gap-3">
+            <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-7 flex items-center gap-3">
               <span className="w-6 h-px bg-gold/60 flex-shrink-0" />
               {to.eyebrow}
             </p>
@@ -206,7 +219,7 @@ export default function OrcamentoForm() {
               <br />
               <span className="text-moss-light">{to.titleMoss}</span>
             </p>
-            <p className="text-cream/45 text-sm leading-[1.8] max-w-xs">{to.lead}</p>
+            <p className="text-cream/75 text-sm leading-[1.8] max-w-xs">{to.lead}</p>
             <div className="mt-8">
               <RatingBadge
                 label={t.common.reviewsLabel}
@@ -260,7 +273,12 @@ export default function OrcamentoForm() {
             />
 
             {/* Tipo de evento */}
-            <fieldset className="group">
+            <fieldset
+              className="group"
+              aria-required="true"
+              aria-invalid={!!tipoErr}
+              aria-describedby={tipoErr ? "of-tipo-err" : undefined}
+            >
               <legend className={labelCls}>{to.labelTipo}</legend>
               <div className="flex flex-wrap gap-2.5">
                 {EVENT_TYPES.map((o, i) => {
@@ -282,6 +300,11 @@ export default function OrcamentoForm() {
                   );
                 })}
               </div>
+              {tipoErr && (
+                <p id="of-tipo-err" role="alert" className={hintCls}>
+                  {tipoErr}
+                </p>
+              )}
             </fieldset>
 
             {/* Data + Nº de pessoas */}
@@ -400,7 +423,7 @@ export default function OrcamentoForm() {
 
             {/* Ações */}
             <div className="flex flex-wrap items-center gap-x-7 gap-y-4 pt-1">
-              <button type="submit" disabled={!ready || sending} className={PRIMARY_BUTTON_CLASS}>
+              <button type="submit" disabled={sending} className={PRIMARY_BUTTON_CLASS}>
                 {sending ? (
                   <>
                     <span
