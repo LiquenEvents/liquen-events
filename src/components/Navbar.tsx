@@ -222,7 +222,11 @@ const MobileMenu = memo(function MobileMenu({
           único acento é um filete branco que cresce no item ativo. */}
       <nav
         aria-label={t.nav.menuLabel}
-        className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-6 overflow-y-auto overscroll-contain"
+        // min-h-0 lets this flex child actually shrink so overflow-y-auto scrolls
+        // the list INSIDE the nav on short screens — instead of the list growing
+        // and spilling over the compact top bar or the CTA block below. pt-24
+        // clears the (now compact) bar when the menu is open.
+        className="relative flex-1 min-h-0 flex flex-col justify-center px-8 pt-24 pb-6 overflow-y-auto overscroll-contain"
       >
         {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
           const active = pathname === link.href;
@@ -262,7 +266,7 @@ const MobileMenu = memo(function MobileMenu({
       {/* Bloco inferior — CTA de contorno + contactos, monocromático e sóbrio.
           paddingBottom soma o safe-area-inset-bottom (home indicator). */}
       <div
-        className="relative px-8 flex flex-col gap-5"
+        className="relative shrink-0 px-8 flex flex-col gap-5"
         style={{
           paddingBottom: "calc(2rem + env(safe-area-inset-bottom))",
           ...reveal(80 + 5 * 60 + 40),
@@ -478,18 +482,32 @@ export default function Navbar() {
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 xl:px-16">
         <div
           className={`relative flex items-center justify-between transition-[height] duration-500 ${
-            scrolled ? "h-[72px]" : "h-[140px]"
+            // Compact the bar (and shrink the logo) whenever the mobile menu is
+            // open too — the small centred logo then clears the menu's first
+            // link instead of colliding with it.
+            scrolled || isOpen ? "h-[72px]" : "h-[140px]"
           }`}
         >
-          <Link href={localizeHref("/", locale)} className="flex items-center shrink-0">
+          {/* Logo: horizontally centred on mobile (absolute, out of flow), and
+              in-flow on the left from lg up. */}
+          <Link
+            href={localizeHref("/", locale)}
+            className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
+          >
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
               width={210}
               height={125}
-              className={`object-contain w-auto transition-[height] duration-500 ${scrolled ? "h-[46px] sm:h-[52px]" : "h-[76px] sm:h-[120px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${scrolled || isOpen ? "h-[46px] sm:h-[52px]" : "h-[76px] sm:h-[120px]"}`}
             />
           </Link>
+
+          {/* Mobile: language toggle on the LEFT, balancing the centred logo
+              (hidden while the menu is open — the overlay carries its own). */}
+          <div className="lg:hidden flex items-center">
+            {!isOpen && <LanguageToggle light={light} />}
+          </div>
 
           <div className="hidden lg:flex items-center gap-5 xl:gap-9">
             {links.map((link) => (
@@ -541,11 +559,9 @@ export default function Navbar() {
             </Magnetic>
           </div>
 
-          {/* Mobile bar: keep the PT/EN toggle reachable without opening the
-              menu — important for the international (destination-wedding)
-              audience. Hidden while the menu is open (the overlay has its own). */}
-          <div className="lg:hidden flex items-center gap-1 ml-auto">
-            {!isOpen && <LanguageToggle light={light} />}
+          {/* Mobile: hamburger on the RIGHT (balances the left PT/EN toggle
+              around the centred logo). */}
+          <div className="lg:hidden flex items-center">
             <button
               ref={toggleBtnRef}
               className="p-3.5 -mr-2"
