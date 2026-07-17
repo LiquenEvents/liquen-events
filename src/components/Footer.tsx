@@ -1,15 +1,33 @@
 import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
+import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
 
-const stripPhotos = [
-  { src: "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg", span: "col-span-2" },
-  { src: "/imagens/M&F0152.jpg", span: "col-span-1" },
-  { src: "/imagens/EW1_1428.jpg", span: "col-span-1" },
+// The footer photo strip draws a fresh 3 from this pool on every entry to the
+// page (see RotatingPhotoGrid), so it changes as you move around the site.
+const STRIP_POOL = [
+  "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg",
+  "/imagens/M&F0152.jpg",
+  "/imagens/EW1_1428.jpg",
+  "/imagens/hd-edited.jpg",
+  "/imagens/EW1_1330.jpg",
+  "/imagens/J&P-IMGL4769.jpg",
+  "/imagens/teresinhaeze-909.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/matilde-e-tomas0654-1.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
+];
+
+const STRIP_CELLS = [
+  { cls: "col-span-2", sizes: "50vw" },
+  { cls: "col-span-1", sizes: "25vw" },
+  { cls: "col-span-1", sizes: "25vw" },
 ];
 
 // Service detail slugs, paired with t.footer.serviceLinks (same order) — gives
@@ -23,6 +41,7 @@ const serviceSlugs = [
 
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   const t = getDictionary(locale);
+  const stripPool = STRIP_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   const pages: [string, string][] = [
     [t.nav.sobre, "/sobre"],
     [t.nav.servicos, "/servicos"],
@@ -32,22 +51,15 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   ];
   return (
     <footer className="relative bg-transparent overflow-hidden">
-      {/* ── Photo strip — full bleed, 4-col grid ── */}
-      <div className="grid grid-cols-4 h-[180px] sm:h-[240px] lg:h-[300px]">
-        {stripPhotos.map((p, i) => (
-          <div key={i} className={`relative overflow-hidden group ${p.span}`}>
-            <Image
-              src={p.src}
-              {...blurFor(p.src)}
-              alt=""
-              fill
-              sizes="(max-width: 768px) 50vw, 25vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-            />
-            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors duration-500" />
-          </div>
-        ))}
-      </div>
+      {/* ── Photo strip — full bleed, 4-col grid; rotates per entry ── */}
+      <RotatingPhotoGrid
+        cells={STRIP_CELLS}
+        pool={stripPool}
+        alt=""
+        className="grid grid-cols-4 h-[180px] sm:h-[240px] lg:h-[300px]"
+        imgClassName="transition-transform duration-700 group-hover:scale-[1.04]"
+        overlayClassName="bg-black/30 group-hover:bg-black/10"
+      />
 
       {/* ── Main content ── */}
       <div className="border-t border-foreground/6">

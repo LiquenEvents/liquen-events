@@ -98,11 +98,6 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               {t.galeria.headerTitle}
             </h1>
           </AnimateIn>
-          <AnimateIn delay={150}>
-            <p className="text-white/70 text-[15px] sm:text-base max-w-xl leading-[1.75] mt-8 border-t border-white/12 pt-7">
-              {t.galeria.headerDesc}
-            </p>
-          </AnimateIn>
         </div>
       </section>
 

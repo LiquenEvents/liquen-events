@@ -162,7 +162,7 @@ export const en: Dict = {
   sobre: {
     heroEyebrow: "Who we are",
     heroTitlePre: "About ",
-    heroTitleMoss: "Líquen.",
+    heroTitleMoss: "Líquen",
     scroll: "Scroll",
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
@@ -231,7 +231,7 @@ export const en: Dict = {
   clientes: {
     heroEyebrow: "Who trusts us",
     heroTitleLine1: "Our",
-    heroTitleMoss: "Clients.",
+    heroTitleMoss: "Clients",
     heroLead:
       "Companies, institutions and families who chose us for their most special moments — and who honour us with their trust.",
     scroll: "Scroll",
@@ -315,16 +315,16 @@ export const en: Dict = {
     whatsappEyebrow: "Instant reply",
     whatsappTitleLine1: "Prefer to talk",
     whatsappTitleLine2: "right now?",
-    whatsappText: "Talk to us directly on WhatsApp. We're available Monday to Friday, 9am to 8pm.",
+    whatsappText: "Talk to us directly on WhatsApp.",
     form: {
       heroEyebrow: "Get in touch",
       heroTitleLine1: "Let's create something",
-      heroTitleMoss: "extraordinary.",
+      heroTitleMoss: "extraordinary",
       infoEyebrow: "Find us",
       emailLabel: "E-mail",
       emailSub: "We reply within 24 business hours",
       phoneLabel: "Phone",
-      phoneSub: "Mon–Fri, 9am–8pm",
+      phoneSub: "Call or message us",
       locationLabel: "Location",
       locationValue: "Évora, Alentejo — across Portugal",
       locationSub: "In-person meetings available",
@@ -465,7 +465,7 @@ export const en: Dict = {
 
   servicos: {
     heroEyebrow: "What we offer",
-    heroTitle: ["Every event,", "a story", "to tell."],
+    heroTitle: ["Every event,", "a story", "to tell"],
     heroLead:
       "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
     nav: ["Celebrations", "Companies"],

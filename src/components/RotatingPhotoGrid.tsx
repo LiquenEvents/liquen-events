@@ -35,12 +35,14 @@ export default function RotatingPhotoGrid({
   alt,
   className = "",
   imgClassName = "",
+  overlayClassName = "bg-black/15 group-hover:bg-black/0",
 }: {
   cells: GridCell[];
   pool: GridPic[];
   alt: string;
   className?: string;
   imgClassName?: string;
+  overlayClassName?: string;
 }) {
   const n = cells.length;
   const [pics, setPics] = useState<GridPic[]>(() => pool.slice(0, n));
@@ -48,7 +50,6 @@ export default function RotatingPhotoGrid({
   useIsomorphicLayoutEffect(() => {
     if (pool.length > n) setPics(sample(pool, n));
     // pool identity is stable (module-level array) — run once per mount/entry.
-     
   }, []);
 
   return (
@@ -67,7 +68,9 @@ export default function RotatingPhotoGrid({
                 ? { placeholder: "blur" as const, blurDataURL: p.blurDataURL }
                 : {})}
             />
-            <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
+            <div
+              className={`absolute inset-0 transition-colors duration-500 ${overlayClassName}`}
+            />
           </div>
         );
       })}

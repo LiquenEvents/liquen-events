@@ -234,19 +234,6 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   </a>
                 ))}
               </div>
-
-              {/* Promise */}
-              <div className="border-l-2 border-moss/40 pl-7 py-2">
-                <p
-                  className="text-foreground/72 text-base leading-relaxed mb-4"
-                  style={{ fontFamily: "var(--font-playfair)" }}
-                >
-                  {tf.promise}
-                </p>
-                <p className="text-foreground/68 text-[10px] tracking-[0.3em] uppercase">
-                  {tf.promiseSign}
-                </p>
-              </div>
             </div>
 
             {/* ── Direita — CTA para o formulário único (/orcamento) ──
@@ -292,42 +279,6 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 </div>
               </AnimateIn>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Depoimentos ── */}
-      <section className="py-16 sm:py-24 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
-              <span className="w-6 h-px bg-gold flex-shrink-0" />
-              {t.contacto.testimonialsEyebrow}
-            </p>
-          </AnimateIn>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-foreground/[0.06]">
-            {t.testimonials.slice(1).map((item, i) => (
-              <AnimateIn key={item.name} delay={i * 80}>
-                <div className="bg-surface p-10 lg:p-12 flex flex-col gap-6 h-full">
-                  <span
-                    className="text-moss/30 text-4xl font-bold leading-none"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    &ldquo;
-                  </span>
-                  <p
-                    className="text-foreground/72 text-sm leading-[1.9] flex-1"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {item.quote}
-                  </p>
-                  <div>
-                    <p className="text-foreground text-sm font-semibold">{item.name}</p>
-                    <p className="text-moss text-xs mt-1 tracking-wide">{item.role}</p>
-                  </div>
-                </div>
-              </AnimateIn>
-            ))}
           </div>
         </div>
       </section>

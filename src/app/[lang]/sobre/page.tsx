@@ -66,8 +66,6 @@ const GRID_CELLS = [
   { cls: "col-span-2", sizes: WIDE_SIZES },
 ];
 
-const eyebrowLight =
-  "text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
 const eyebrowDark =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
@@ -107,24 +105,11 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-transparent" />
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-28 pt-40">
-          <AnimateIn>
-            <p className={`${eyebrowLight} mb-8`}>
-              <span className="w-8 h-px bg-gold flex-shrink-0" />
-              {t.sobre.heroEyebrow}
-            </p>
-          </AnimateIn>
           <KineticHeading
             className="text-white font-bold leading-[0.88] tracking-tight"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
             lines={[[{ text: t.sobre.heroTitlePre }, { text: t.sobre.heroTitleMoss, moss: true }]]}
           />
-        </div>
-
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
-          <span className="text-white/60 text-[8px] tracking-[0.45em] uppercase">
-            {t.sobre.scroll}
-          </span>
-          <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
         </div>
       </section>
 

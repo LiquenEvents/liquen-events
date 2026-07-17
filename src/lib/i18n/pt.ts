@@ -165,7 +165,7 @@ export const pt = {
   sobre: {
     heroEyebrow: "Quem somos",
     heroTitlePre: "Sobre a ",
-    heroTitleMoss: "Líquen.",
+    heroTitleMoss: "Líquen",
     scroll: "Scroll",
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
@@ -233,7 +233,7 @@ export const pt = {
   clientes: {
     heroEyebrow: "Quem confia em nós",
     heroTitleLine1: "Os Nossos",
-    heroTitleMoss: "Clientes.",
+    heroTitleMoss: "Clientes",
     heroLead:
       "Empresas, instituições e famílias que nos escolheram para os seus momentos mais especiais — e que nos honram com a sua confiança.",
     scroll: "Scroll",
@@ -326,17 +326,16 @@ export const pt = {
     whatsappEyebrow: "Resposta imediata",
     whatsappTitleLine1: "Prefere falar",
     whatsappTitleLine2: "agora?",
-    whatsappText:
-      "Fale connosco diretamente pelo WhatsApp. Estamos disponíveis de segunda a sexta, das 9h às 20h.",
+    whatsappText: "Fale connosco diretamente pelo WhatsApp.",
     form: {
       heroEyebrow: "Fale connosco",
       heroTitleLine1: "Vamos criar algo",
-      heroTitleMoss: "extraordinário.",
+      heroTitleMoss: "extraordinário",
       infoEyebrow: "Encontre-nos",
       emailLabel: "E-mail",
       emailSub: "Respondemos em menos de 24 horas úteis",
       phoneLabel: "Telefone",
-      phoneSub: "Seg–Sex, 9h–20h",
+      phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
       locationValue: "Évora, Alentejo — em todo o Portugal",
       locationSub: "Reuniões presenciais disponíveis",
@@ -477,7 +476,7 @@ export const pt = {
 
   servicos: {
     heroEyebrow: "O que oferecemos",
-    heroTitle: ["Cada evento,", "uma história", "por contar."],
+    heroTitle: ["Cada evento,", "uma história", "por contar"],
     heroLead:
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
     nav: ["Celebrações", "Empresas"],
