@@ -795,7 +795,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               key={c}
               onClick={() => switchCat(c)}
               aria-pressed={cat === c}
-              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
+              className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
                 cat === c
                   ? "bg-moss-dark text-white shadow-lg shadow-moss/20"
                   : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
@@ -842,7 +842,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                     fill
                     sizes="(max-width: 640px) 100vw, 50vw"
                     className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                    loading="eager"
+                    loading="lazy"
                     placeholder="blur"
                     blurDataURL={visible[0].blurDataURL}
                   />

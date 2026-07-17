@@ -57,7 +57,7 @@ export default function StickyCTA() {
       // Shown on every breakpoint: on mobile it's the only persistent path to
       // the quote form (the navbar auto-hides on scroll-down). It sits bottom-
       // LEFT, so it never collides with the bottom-right WhatsApp pill.
-      className={`fixed bottom-5 left-5 lg:bottom-7 lg:left-7 z-40 transition-all duration-500 ${
+      className={`fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-[calc(1.25rem+env(safe-area-inset-left))] lg:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >

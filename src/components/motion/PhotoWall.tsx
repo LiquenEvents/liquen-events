@@ -70,7 +70,7 @@ export default function PhotoWall({
                 src={img.src}
                 alt=""
                 fill
-                sizes="720px"
+                sizes="(max-width: 640px) 420px, (max-width: 1024px) 585px, 720px"
                 className="object-cover"
                 placeholder={img.blurDataURL ? "blur" : undefined}
                 blurDataURL={img.blurDataURL}

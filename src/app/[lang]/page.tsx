@@ -127,7 +127,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           </div>
         </div>
 
-        <div className="absolute bottom-8 right-6 lg:right-16 z-10 flex flex-col items-center gap-3 anim-3">
+        <div className="absolute bottom-8 right-6 lg:right-16 z-10 hidden sm:flex flex-col items-center gap-3 anim-3">
           <span className="text-white/75 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
             {t.home.scroll}
           </span>
@@ -149,8 +149,8 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                   de nível 2, para os títulos dos cartões (h3) deixarem de
                   saltar de h1 → h3. Estilo idêntico ao antigo <p> (o reset do
                   Tailwind zera tamanho/margem dos headings). */}
-              <h2 className="text-foreground/72 text-xs tracking-[0.3em] uppercase flex items-center gap-3 font-normal">
-                <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+              <h2 className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3 font-normal">
+                <span className="w-8 h-px bg-gold/60 flex-shrink-0" />
                 {t.home.servicesEyebrow}
               </h2>
               <Link
@@ -180,7 +180,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                       src={s.image}
                       alt=""
                       fill
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                       {...blurFor(s.image)}
                     />
@@ -197,7 +197,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                       }}
                     />
                     <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
-                      <p className="text-cream/75 text-[8px] sm:text-[9px] tracking-[0.35em] uppercase mb-1">
+                      <p className="text-cream/75 text-[9px] sm:text-[10px] tracking-[0.35em] uppercase mb-1">
                         {s.tag}
                       </p>
                       <h3

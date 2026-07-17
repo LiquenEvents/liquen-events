@@ -219,7 +219,6 @@ export default function Navbar() {
               width={210}
               height={125}
               className={`object-contain w-auto transition-[height] duration-500 ${scrolled ? "h-[52px]" : "h-[120px]"}`}
-              preload
             />
           </Link>
 
@@ -280,7 +279,7 @@ export default function Navbar() {
             {!isOpen && <LanguageToggle light={light} />}
             <button
               ref={toggleBtnRef}
-              className="p-3 -mr-2"
+              className="p-3.5 -mr-2"
               onClick={() => setIsOpen(!isOpen)}
               aria-label={isOpen ? t.nav.closeMenu : t.nav.menuLabel}
               aria-expanded={isOpen}

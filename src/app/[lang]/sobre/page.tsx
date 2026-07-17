@@ -168,19 +168,25 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           stagger
           className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[210px] lg:auto-rows-[260px]"
         >
-          {gallery.map((g, i) => (
-            <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
-              <Image
-                src={g.src}
-                alt={t.sobre.galleryAlt[i] ?? g.alt}
-                fill
-                sizes="(max-width: 768px) 50vw, 50vw"
-                className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                {...blurFor(g.src)}
-              />
-              <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
-            </div>
-          ))}
+          {gallery.map((g, i) => {
+            // Single-column tiles are only 25vw at lg (grid-cols-4); the wide
+            // (col-span-2) tiles are 50vw. Give each the right candidate so the
+            // narrow tiles don't pull a 2×-oversized image on desktop.
+            const wide = g.cls.includes("col-span-2");
+            return (
+              <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
+                <Image
+                  src={g.src}
+                  alt={t.sobre.galleryAlt[i] ?? g.alt}
+                  fill
+                  sizes={wide ? "(max-width: 768px) 50vw, 50vw" : "(max-width: 768px) 50vw, 25vw"}
+                  className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+                  {...blurFor(g.src)}
+                />
+                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
+              </div>
+            );
+          })}
         </Reveal>
       </section>
 

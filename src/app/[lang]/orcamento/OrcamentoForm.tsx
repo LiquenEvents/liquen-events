@@ -410,7 +410,7 @@ export default function OrcamentoForm() {
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-4 py-3 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
+                      className={`px-4 py-3.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
                           ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
                           : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
@@ -485,7 +485,7 @@ export default function OrcamentoForm() {
                       type="button"
                       aria-pressed={active}
                       onClick={() => setBudget(active ? "" : v)}
-                      className={`px-4 py-3 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
+                      className={`px-4 py-3.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
                           ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
                           : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"

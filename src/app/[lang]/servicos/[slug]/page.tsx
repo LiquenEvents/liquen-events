@@ -106,7 +106,7 @@ export default async function ServiceDetailPage({
       {svc.faqs.length > 0 && <FaqJsonLd faqs={svc.faqs} />}
 
       {/* ── Hero ── */}
-      <section className="relative min-h-[70vh] flex items-end overflow-hidden">
+      <section className="relative min-h-[70svh] flex items-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src={svc.hero}
