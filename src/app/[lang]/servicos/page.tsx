@@ -13,7 +13,7 @@ import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
-import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
 import Eyebrow from "@/components/Eyebrow";
 
 export async function generateMetadata({
@@ -532,7 +532,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <Magnetic strength={0.4}>
                 <Link
                   href={localizeHref("/orcamento", locale)}
-                  className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.28em] uppercase shadow-xl shadow-black/30"
+                  className={PRIMARY_BUTTON_DARK_CLASS}
                 >
                   {t.common.pedirOrcamento} →
                 </Link>

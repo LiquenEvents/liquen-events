@@ -12,6 +12,7 @@ import Reveal from "@/components/motion/Reveal";
 import TiltCard from "@/components/motion/TiltCard";
 import PhotoWall from "@/components/motion/PhotoWall";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+import { PRIMARY_BUTTON_DARK_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 // Each tile links to a distinct destination that matches its label
 // (Corporativos / Casamentos / Privados) — the first two deep-link to their
@@ -268,16 +269,10 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Link
-                href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
-              >
+              <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_DARK_CLASS}>
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
-              <Link
-                href={localizeHref("/galeria", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 border border-white/25 text-white/70 font-medium hover:border-white/50 hover:text-white transition-all duration-300 text-sm tracking-[0.18em] uppercase"
-              >
+              <Link href={localizeHref("/galeria", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.verGaleria}
               </Link>
             </div>

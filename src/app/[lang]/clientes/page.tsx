@@ -16,7 +16,7 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { clientLogos } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
-import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
 
 export async function generateMetadata({
   params,
@@ -428,7 +428,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               <Magnetic strength={0.4}>
                 <Link
                   href={localizeHref("/orcamento", locale)}
-                  className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+                  className={PRIMARY_BUTTON_DARK_CLASS}
                 >
                   {t.common.pedirOrcamento} →
                 </Link>

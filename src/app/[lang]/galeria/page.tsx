@@ -9,7 +9,7 @@ import { aspectFor } from "@/lib/image-meta";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
-import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
@@ -126,10 +126,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               {t.galeria.instaText}
             </p>
             <div className="flex flex-wrap items-center gap-4">
-              <Link
-                href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium text-sm tracking-widest uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300"
-              >
+              <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_DARK_CLASS}>
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
               <a

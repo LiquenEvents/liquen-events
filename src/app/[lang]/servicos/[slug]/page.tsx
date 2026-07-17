@@ -13,6 +13,7 @@ import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd"
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "@/lib/services-data";
 import { getDictionary, localizeHref, normalizeLocale } from "@/lib/i18n";
+import { PRIMARY_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
 
 export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
@@ -164,7 +165,7 @@ export default async function ServiceDetailPage({
               ))}
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 mt-6 px-8 py-4 btn-shine bg-moss text-white text-[11px] tracking-[0.24em] uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300 shadow-lg shadow-moss/15"
+                className={`${PRIMARY_BUTTON_CLASS} mt-6`}
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
@@ -377,10 +378,7 @@ export default async function ServiceDetailPage({
             </h2>
           </AnimateIn>
           <Magnetic strength={0.4}>
-            <Link
-              href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase shadow-lg shadow-moss/15"
-            >
+            <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_DARK_CLASS}>
               {t.common.pedirOrcamento} <span aria-hidden>→</span>
             </Link>
           </Magnetic>
