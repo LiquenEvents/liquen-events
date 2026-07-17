@@ -71,19 +71,30 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
     }
 
     // 2) Fall back to the API (works when persisted server-side, e.g. dev).
+    //    Bounded by a timeout so a stalled connection can't leave the page on
+    //    the "loading…" text indefinitely — it settles into the generic
+    //    confirmation instead.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
     (async () => {
       try {
-        const res = await fetch(`/api/orcamento/${id}`, { cache: "no-store" });
+        const res = await fetch(`/api/orcamento/${id}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (res.ok && !cancelled) setQuote(await res.json());
       } catch {
         /* ignore — generic confirmation will be shown */
       } finally {
+        clearTimeout(timeout);
         if (!cancelled) setLoading(false);
       }
     })();
 
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, [id]);
 

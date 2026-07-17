@@ -266,6 +266,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Partial success: the lead is safely in the store but the team's email
+    // didn't go out (e.g. SMTP unset/misconfigured in prod). The visitor still
+    // sees success — the lead isn't lost — but nobody was actively notified, so
+    // it can sit unseen in the dashboard. Log at ERROR so it reaches the alert
+    // fan-out (Sentry/webhook), turning a silent notification gap into a signal.
+    if (persisted && !emailed) {
+      log.error(
+        "orcamento: lead registada mas email à equipa NÃO enviado — verificar SMTP",
+        undefined,
+        { id },
+      );
+    }
+
     // Confirmation to the client, in the language they were browsing in (best-effort).
     try {
       const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);

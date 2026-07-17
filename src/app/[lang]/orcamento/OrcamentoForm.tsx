@@ -177,6 +177,12 @@ export default function OrcamentoForm() {
         .join("\n\n"),
     };
 
+    // Abort a hung request instead of spinning forever on a stalled connection
+    // (3G that opens the socket but never responds). Without this the submit
+    // button spins with no error and no recovery — the worst failure mode on
+    // the site's primary conversion. maxDuration server-side is 30s.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
     try {
       const res = await fetch("/api/orcamento", {
         method: "POST",
@@ -184,6 +190,7 @@ export default function OrcamentoForm() {
         // O honeypot segue no payload para o servidor também poder descartar
         // bots que preencham o campo (a guarda no cliente é contornável).
         body: JSON.stringify({ form, website }),
+        signal: controller.signal,
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.id) throw new Error(json?.error || "falha");
@@ -214,10 +221,34 @@ export default function OrcamentoForm() {
     } catch (e) {
       // Surface the server's specific message (e.g. the "try again / contact us"
       // text when delivery genuinely failed) instead of the generic fallback.
-      const msg = e instanceof Error ? e.message : "";
-      setError(msg && msg !== "falha" ? msg : to.error);
+      // A timeout/network abort has no server message, so it falls back to the
+      // generic retry copy rather than leaking a raw "AbortError" string.
+      let msg = to.error;
+      if (e instanceof Error && e.name !== "AbortError" && e.message && e.message !== "falha") {
+        msg = e.message;
+      }
+      setError(msg);
       setSending(false);
+    } finally {
+      clearTimeout(timeout);
     }
+  }
+
+  // WhatsApp fallback message, composed from whatever the visitor has already
+  // typed, so switching channel mid-form doesn't discard their context (the
+  // team receives the details instead of an empty "Olá"). Recomputed each
+  // render, so the link always reflects the current field state.
+  function waMessage(): string {
+    const idx = EVENT_TYPES.findIndex((o) => o.label === eventType);
+    const tipoLabel = idx >= 0 ? (to.eventTypeLabels[idx] ?? eventType) : "";
+    const lines = [t.common.whatsappPrefill];
+    if (tipoLabel) lines.push(`${to.labelTipo}: ${tipoLabel}`);
+    if (dateFlexible) lines.push(to.dateFlexibleLabel);
+    else if (data) lines.push(`${to.labelData}: ${data}`);
+    if (pessoas) lines.push(`${to.labelPessoas}: ${pessoas}`);
+    if (local.trim()) lines.push(`${to.labelLocal}: ${local.trim()}`);
+    if (nome.trim()) lines.push(`${to.labelNome}: ${nome.trim()}`);
+    return lines.join("\n");
   }
 
   // Arrow-key navigation for the event-type radiogroup (WAI-ARIA radio pattern).
@@ -565,7 +596,7 @@ export default function OrcamentoForm() {
                 )}
               </button>
               <a
-                href={waHref(t.common.whatsappPrefill)}
+                href={waHref(waMessage())}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track("WhatsAppClick", { source: "form" })}
