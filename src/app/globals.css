@@ -107,26 +107,6 @@ html {
   }
 }
 
-/* ── Lenis (momentum scroll) — active only when JS mounts it (não em
-   reduced-motion). Enquanto ativo, o scroll-behavior nativo tem de ficar auto
-   para não brigar com a interpolação do Lenis. ── */
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-.lenis.lenis-smooth iframe {
-  pointer-events: none;
-}
-
 /* ── Base ── */
 body {
   background-color: var(--color-surface);
@@ -439,16 +419,6 @@ body.admin-mode ::-webkit-scrollbar-thumb:hover {
   animation: step-back 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ── Offscreen rendering skip ──
-   Lets the browser skip layout/paint of far-offscreen blocks (huge win on the
-   245-photo gallery masonry, where laying out every item caused long tasks).
-   `auto <length>` remembers each item's real size after first render, so
-   scrolling back never re-lays-out and the scrollbar stays stable. */
-.cv-auto {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 320px;
-}
-
 /* ── Hide scrollbar visually, keep scroll functional ── */
 .scroll-hide {
   -ms-overflow-style: none;
@@ -680,16 +650,6 @@ body[data-menu-open] .whatsapp-fixed {
   border-radius: 0.75rem;
   box-shadow: 0 1px 2px rgba(42, 38, 32, 0.04);
 }
-.bo-card-interactive {
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
-.bo-card-interactive:hover {
-  border-color: rgba(42, 38, 32, 0.16);
-  box-shadow: 0 4px 14px rgba(42, 38, 32, 0.07);
-}
 /* Input / select fields inside the back office */
 .bo-input {
   width: 100%;
@@ -738,23 +698,6 @@ body[data-menu-open] .whatsapp-fixed {
   .bo-skeleton {
     animation: none;
   }
-}
-
-/* ── Back-office: hairline panel + soft hover lift ── */
-.bo-panel {
-  border: 1px solid rgba(42, 38, 32, 0.08);
-  border-radius: 10px;
-  background: rgba(244, 243, 240, 0.6);
-}
-.bo-panel-hover {
-  transition:
-    border-color 0.3s ease,
-    background-color 0.3s ease,
-    transform 0.3s ease;
-}
-.bo-panel-hover:hover {
-  border-color: rgba(42, 38, 32, 0.14);
-  background: rgba(236, 234, 229, 0.8);
 }
 
 /* Eyebrow label — shared editorial micro-heading */
