@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
@@ -255,13 +256,14 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           />
           <AnimateIn delay={150}>
             <div className="mt-10">
-              <Link
+              <TrackedLink
                 href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "services-hero" }}
                 className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 {t.common.pedirOrcamento}
                 <span aria-hidden>→</span>
-              </Link>
+              </TrackedLink>
             </div>
           </AnimateIn>
         </div>
@@ -427,12 +429,13 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
               <Magnetic strength={0.4}>
-                <Link
+                <TrackedLink
                   href={localizeHref("/orcamento", locale)}
+                  trackProps={{ source: "services-cta" }}
                   className={PRIMARY_BUTTON_DARK_CLASS}
                 >
                   {t.common.pedirOrcamento} →
-                </Link>
+                </TrackedLink>
               </Magnetic>
               <Link href={localizeHref("/galeria", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {ts.ctaGaleria}

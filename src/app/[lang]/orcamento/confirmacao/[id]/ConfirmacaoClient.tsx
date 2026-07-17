@@ -8,6 +8,7 @@ import { SITE } from "@/lib/site";
 import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
 import { localizeHref } from "@/lib/i18n";
+import { track } from "@/lib/track";
 
 const STATUS_COLORS: Record<string, string> = {
   pendente: "text-moss-dark",
@@ -51,6 +52,12 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
   // mismatch (the server renders none).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Funnel completion: reaching this page IS the successful submit landing, so
+  // fire it here to measure submit → confirmation (the back half of the funnel
+  // was previously invisible). Once per mount; inert without Plausible.
+  useEffect(() => {
+    track("QuoteConfirmed");
+  }, []);
   useEffect(() => {
     if (!loading) h1Ref.current?.focus();
   }, [loading]);

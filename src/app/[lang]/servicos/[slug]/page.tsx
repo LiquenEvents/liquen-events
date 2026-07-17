@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
@@ -165,12 +166,13 @@ export default async function ServiceDetailPage({
                   {emphasize(p)}
                 </p>
               ))}
-              <Link
+              <TrackedLink
                 href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "service-detail-intro", servico: slug }}
                 className={`${PRIMARY_BUTTON_CLASS} mt-6`}
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
-              </Link>
+              </TrackedLink>
             </div>
           </AnimateIn>
           <AnimateIn delay={120}>
@@ -380,9 +382,13 @@ export default async function ServiceDetailPage({
             </h2>
           </AnimateIn>
           <Magnetic strength={0.4}>
-            <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_DARK_CLASS}>
+            <TrackedLink
+              href={localizeHref("/orcamento", locale)}
+              trackProps={{ source: "service-detail-cta", servico: slug }}
+              className={PRIMARY_BUTTON_DARK_CLASS}
+            >
               {t.common.pedirOrcamento} <span aria-hidden>→</span>
-            </Link>
+            </TrackedLink>
           </Magnetic>
         </div>
       </section>

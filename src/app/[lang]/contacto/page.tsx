@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import FAQ from "./FAQ";
 import AnimateIn from "@/components/AnimateIn";
 import Image from "next/image";
@@ -271,12 +272,13 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   <p className="text-cream/85 text-base leading-[1.85] max-w-md mb-12">
                     {td.ctaText}
                   </p>
-                  <Link
+                  <TrackedLink
                     href={localizeHref("/orcamento", locale)}
+                    trackProps={{ source: "contacto" }}
                     className="inline-flex w-fit items-center gap-3 bg-cream px-8 py-4 text-[11px] font-medium uppercase tracking-[0.3em] text-ink transition-all duration-300 hover:bg-cream-dark"
                   >
                     {td.ctaButton} →
-                  </Link>
+                  </TrackedLink>
                 </div>
               </AnimateIn>
             </div>

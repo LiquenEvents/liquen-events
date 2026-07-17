@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
@@ -110,12 +111,13 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           </h1>
           <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-4 anim-2">
             <Magnetic strength={0.4}>
-              <Link
+              <TrackedLink
                 href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "hero" }}
                 className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/35 text-white text-[10px] tracking-[0.18em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
-              </Link>
+              </TrackedLink>
             </Magnetic>
             <Link
               href={localizeHref("/galeria", locale)}
@@ -265,9 +267,13 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_DARK_CLASS}>
+              <TrackedLink
+                href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "home-cta" }}
+                className={PRIMARY_BUTTON_DARK_CLASS}
+              >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
-              </Link>
+              </TrackedLink>
               <Link href={localizeHref("/galeria", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.verGaleria}
               </Link>

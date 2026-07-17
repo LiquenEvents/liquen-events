@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
@@ -283,12 +284,13 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           <AnimateIn delay={180}>
             <div className="flex flex-wrap items-center gap-4">
               <Magnetic strength={0.4}>
-                <Link
+                <TrackedLink
                   href={localizeHref("/orcamento", locale)}
+                  trackProps={{ source: "sobre" }}
                   className={PRIMARY_BUTTON_DARK_CLASS}
                 >
                   {t.common.pedirOrcamento} →
-                </Link>
+                </TrackedLink>
               </Magnetic>
               <Link href={localizeHref("/contacto", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.entrarContacto}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -136,9 +137,13 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               {t.galeria.instaText}
             </p>
             <div className="flex flex-wrap items-center gap-4">
-              <Link href={localizeHref("/orcamento", locale)} className={PRIMARY_BUTTON_DARK_CLASS}>
+              <TrackedLink
+                href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "galeria" }}
+                className={PRIMARY_BUTTON_DARK_CLASS}
+              >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
-              </Link>
+              </TrackedLink>
               <a
                 href="https://www.instagram.com/liquen.events"
                 target="_blank"
