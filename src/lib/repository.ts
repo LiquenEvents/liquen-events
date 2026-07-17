@@ -3,6 +3,16 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "./supabase";
+import { log } from "./logger";
+
+// Default upper bound on a single unpaginated list read. The admin dashboard's
+// list endpoints (quotes, proposals, suppliers, tasks, calendar) fan out to
+// `list()` with no explicit limit; without a cap the whole table is transferred
+// and serialized on every load, which only grows with the business. 1000 is far
+// above any plausible current volume (so behaviour is identical today) while
+// bounding the worst case — and if a list ever DOES hit the cap we warn rather
+// than silently hide the overflow. Override per-entity via `Mapper.listLimit`.
+const DEFAULT_LIST_LIMIT = 1000;
 
 /**
  * Unified data-access layer.
@@ -35,6 +45,8 @@ export interface Mapper<T> {
   selectColumns?: string;
   /** Default ordering applied to lists. */
   order?: { column: string; ascending: boolean };
+  /** Upper bound on an unpaginated `list()` read (defaults to DEFAULT_LIST_LIMIT). */
+  listLimit?: number;
   /** Comparator mirroring `order` for the file backend. */
   fileCompare?: (a: T, b: T) => number;
   /** Set updated_at on Supabase updates (table must have the column). */
@@ -91,13 +103,23 @@ export class SupabaseBackend<T> implements Backend<T> {
   private map = (r: unknown) => this.m.fromRow(r as Record<string, unknown>);
 
   async list(): Promise<T[]> {
+    const limit = this.m.listLimit ?? DEFAULT_LIST_LIMIT;
     const base = this.sb.from(this.m.table).select(this.cols);
-    const q = this.m.order
+    const ordered = this.m.order
       ? base.order(this.m.order.column, { ascending: this.m.order.ascending })
       : base;
-    const { data, error } = await q;
+    const { data, error } = await ordered.limit(limit);
     if (error) throw error;
-    return (data ?? []).map(this.map);
+    const rows = data ?? [];
+    // Never truncate silently: if we came back exactly full there may be more
+    // rows beyond the cap, which is a signal to add real pagination.
+    if (rows.length >= limit) {
+      log.warn("list() hit the row cap — results may be truncated", {
+        table: this.m.table,
+        limit,
+      });
+    }
+    return rows.map(this.map);
   }
 
   async get(id: string): Promise<T | null> {
