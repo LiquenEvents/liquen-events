@@ -11,6 +11,7 @@ import RatingBadge from "@/components/RatingBadge";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
+import { track } from "@/lib/track";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -69,6 +70,15 @@ export default function OrcamentoForm() {
   // Set once the user tries to submit an incomplete form — drives the visible,
   // announced error identification (WCAG 3.3.1) instead of a silent disabled button.
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  // Fire a single "QuoteStart" analytics event on the first interaction, so the
+  // owner can measure form-start → submit (abandonment). No-ops without Plausible.
+  const startedRef = useRef(false);
+  const markStart = () => {
+    if (!startedRef.current) {
+      startedRef.current = true;
+      track("QuoteStart");
+    }
+  };
   // Refs for focus management on invalid submit + the event-type radiogroup.
   const nomeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
@@ -186,6 +196,8 @@ export default function OrcamentoForm() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.id) throw new Error(json?.error || "falha");
+
+      track("QuoteSubmit", { tipo: opt?.eventType ?? eventType });
 
       // Hand-off para a página de confirmação (funciona em qualquer host).
       try {
@@ -336,7 +348,12 @@ export default function OrcamentoForm() {
             />
           </div>
 
-          <form onSubmit={submit} aria-busy={sending} className="flex flex-col gap-11">
+          <form
+            onSubmit={submit}
+            onFocusCapture={markStart}
+            aria-busy={sending}
+            className="flex flex-col gap-11"
+          >
             {/* Required-fields key, before the fields so the '*' is explained
                 first (WCAG 3.3.2 Labels or Instructions). */}
             <p className="text-foreground/68 text-[11px] leading-relaxed -mb-4">
@@ -613,6 +630,7 @@ export default function OrcamentoForm() {
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => track("WhatsAppClick", { source: "form" })}
                 className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/68 hover:text-moss transition-colors"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />

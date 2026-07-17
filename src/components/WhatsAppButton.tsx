@@ -5,6 +5,7 @@ import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 import { useTranslations } from "./LocaleProvider";
 import { usePublicPathname } from "@/lib/use-public-pathname";
+import { track } from "@/lib/track";
 
 export default function WhatsAppButton() {
   const [visible, setVisible] = useState(false);
@@ -40,6 +41,7 @@ export default function WhatsAppButton() {
       href={WHATSAPP_HREF}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => track("WhatsAppClick", { source: "float" })}
       aria-label={t.common.contactWhatsApp}
       // Invisible during the 1.5s reveal delay / at the footer — keep it out of
       // the tab order and a11y tree until it's actually shown (WCAG 2.4.3).

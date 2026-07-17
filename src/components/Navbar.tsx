@@ -9,6 +9,7 @@ import LanguageToggle from "./LanguageToggle";
 import Magnetic from "@/components/motion/Magnetic";
 import { SITE } from "@/lib/site";
 import { localizeHref } from "@/lib/i18n";
+import { track } from "@/lib/track";
 
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
@@ -264,6 +265,7 @@ export default function Navbar() {
             <Magnetic strength={0.3}>
               <Link
                 href={localizeHref("/orcamento", locale)}
+                onClick={() => track("CTAClick", { source: "nav" })}
                 className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-white px-5 py-2 hover:bg-moss-dark transition-all duration-300"
               >
                 {t.nav.pedirOrcamento} <span aria-hidden>→</span>
@@ -373,6 +375,7 @@ export default function Navbar() {
         >
           <Link
             href={localizeHref("/orcamento", locale)}
+            onClick={() => track("CTAClick", { source: "nav-mobile" })}
             className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-white px-5 py-4 rounded-sm"
           >
             {t.nav.pedirOrcamento} <span aria-hidden>→</span>

@@ -29,6 +29,12 @@ export default function Analytics() {
     <>
       {origin && <link rel="preconnect" href={origin} />}
       <Script defer data-domain={domain} src={src} strategy="afterInteractive" />
+      {/* Custom-events queue stub: makes `window.plausible(...)` callable (and
+          buffered) before the script finishes loading, so early CTA/form events
+          aren't dropped. */}
+      <Script id="plausible-init" strategy="afterInteractive">
+        {`window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }`}
+      </Script>
     </>
   );
 }
