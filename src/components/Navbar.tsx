@@ -45,6 +45,7 @@ export default function Navbar() {
     pathname === "/clientes" ||
     pathname === "/contacto" ||
     pathname === "/servicos" ||
+    pathname === "/galeria" ||
     pathname.startsWith("/servicos/");
   // O overlay do menu mobile é escuro — com ele aberto o traço do botão e os
   // textos da barra precisam do tratamento claro, seja qual for a página.

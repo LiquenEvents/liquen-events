@@ -55,7 +55,12 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
       <FaqJsonLd faqs={t.contacto.faqs} />
 
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden" style={{ height: "65svh", minHeight: "420px" }}>
+      {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed to
+          the very top behind the transparent navbar (no white strip / hairline). */}
+      <section
+        className="relative -mt-24 overflow-hidden"
+        style={{ height: "65svh", minHeight: "420px" }}
+      >
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src={heroImg}

@@ -106,7 +106,9 @@ export default async function ServiceDetailPage({
       {svc.faqs.length > 0 && <FaqJsonLd faqs={svc.faqs} />}
 
       {/* ── Hero ── */}
-      <section className="relative min-h-[70svh] flex items-end overflow-hidden">
+      {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed to
+          the very top behind the transparent navbar (no white strip / hairline). */}
+      <section className="relative -mt-24 min-h-[70svh] flex items-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src={svc.hero}

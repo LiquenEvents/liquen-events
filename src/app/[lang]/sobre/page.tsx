@@ -82,7 +82,9 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       />
 
       {/* ── HERO ── */}
-      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
+      {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed to
+          the very top behind the transparent navbar (no white strip / hairline). */}
+      <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
