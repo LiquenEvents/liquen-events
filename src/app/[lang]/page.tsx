@@ -66,8 +66,16 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
           className="absolute inset-0 h-full w-full"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/92 via-[#080808]/25 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
+        {/* Two hero veils merged into one layer (multiple backgrounds paint
+            first-listed on top, so the former upper div is listed first): same
+            pixels, one paint/composite pass instead of two. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(0,0,0,0.3), transparent), linear-gradient(to top, rgba(8,8,8,0.92), rgba(8,8,8,0.25), transparent)",
+          }}
+        />
 
         {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
             photograph owns the first screen. Still the page's single <h1>. */}
@@ -198,8 +206,15 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           className="object-cover object-center"
           {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
         />
-        <div className="absolute inset-0 bg-black/48" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged into one layer (gradient listed first = on
+            top, matching the former div order). Same look, one paint pass. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
+          }}
+        />
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>

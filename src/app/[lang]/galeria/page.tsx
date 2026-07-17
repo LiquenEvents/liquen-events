@@ -122,8 +122,14 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           className="object-cover object-center"
           {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
         />
-        <div className="absolute inset-0 bg-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#080808]/85 via-[#080808]/35 to-transparent" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(8,8,8,0.85), rgba(8,8,8,0.35), transparent), linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2))",
+          }}
+        />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 py-20 lg:py-28">
           <AnimateIn>
             <p className="text-white/70 text-[10px] tracking-[0.48em] uppercase mb-8 flex items-center gap-3">

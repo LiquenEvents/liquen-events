@@ -369,8 +369,14 @@ export default async function ServiceDetailPage({
           className="object-cover object-bottom"
           {...blurFor(ctaImg)}
         />
-        <div className="absolute inset-0 bg-black/48" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
+          }}
+        />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <h2

@@ -114,8 +114,16 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
         <HeroWebGL src="/imagens/EW1_1393.jpg" className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/92 via-[#080808]/25 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
+        {/* Two hero veils merged into one layer (former upper div listed first,
+            since multiple backgrounds paint first-listed on top). Same pixels,
+            one paint/composite pass. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(0,0,0,0.3), transparent), linear-gradient(to top, rgba(8,8,8,0.92), rgba(8,8,8,0.25), transparent)",
+          }}
+        />
 
         {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
             photograph owns the first screen. Still the page's single <h1>. */}
@@ -150,8 +158,14 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor(introImg)}
         />
-        <div className="absolute inset-0 bg-black/42" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
+          }}
+        />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid lg:grid-cols-[1fr_auto] gap-16 lg:gap-24 items-end">
             <AnimateIn>
@@ -289,8 +303,14 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor(wordsImg)}
         />
-        <div className="absolute inset-0 bg-black/42" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
+          }}
+        />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-14">
             <h2
@@ -366,8 +386,14 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor("/imagens/DJI_20250913190635_0120_D.jpg")}
         />
-        <div className="absolute inset-0 bg-black/48" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
+          }}
+        />
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>

@@ -190,8 +190,14 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             {...blurFor("/imagens/M&F0497.jpg")}
           />
         </Parallax>
-        <div className="absolute inset-0 bg-black/42" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
+          }}
+        />
         <div className="relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
             <p
@@ -266,8 +272,14 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           className="object-cover object-center"
           {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
         />
-        <div className="absolute inset-0 bg-black/48" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
+          }}
+        />
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
