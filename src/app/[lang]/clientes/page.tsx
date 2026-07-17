@@ -9,7 +9,6 @@ import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
 import CountUp from "@/components/CountUp";
 import HeroWebGL from "@/components/motion/HeroWebGL";
-import Reveal from "@/components/motion/Reveal";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
@@ -235,61 +234,6 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           <AnimateIn delay={120}>
             <ClientLogoGrid clients={clientLogos} />
           </AnimateIn>
-        </div>
-      </section>
-
-      {/* ── FEATURED TESTIMONIAL (editorial split) ── */}
-      <section className="bg-surface border-b border-foreground/8 overflow-hidden">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-[1fr_45%] min-h-[600px]">
-            {/* Quote side */}
-            <AnimateIn className="flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-28">
-              <p className={`${eyebrow} mb-8`}>
-                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                {t.clientes.featuredEyebrow}
-              </p>
-              <span
-                className="text-moss/15 leading-[0.75] select-none block -mb-1"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(56px, 7vw, 96px)" }}
-                aria-hidden
-              >
-                &ldquo;
-              </span>
-              <blockquote
-                className="text-foreground/75 leading-[1.65] mt-4"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.2vw, 26px)" }}
-              >
-                {t.clientes.featuredQuote}
-              </blockquote>
-              <div className="mt-10 pt-7 border-t border-foreground/10 flex items-center gap-5">
-                <div className="w-8 h-px bg-gold flex-shrink-0" />
-                <div>
-                  <p className="text-foreground text-sm font-semibold tracking-wide">
-                    {t.clientes.featuredName}
-                  </p>
-                  <p className="text-moss text-[10px] mt-1 tracking-[0.2em] uppercase">
-                    {t.clientes.featuredRole}
-                  </p>
-                </div>
-              </div>
-            </AnimateIn>
-
-            {/* Photo side — cinematic mask-wipe reveal (same vocabulary as the
-                editorial grids), so this hero-grade image is uncovered on scroll
-                instead of just sitting there. */}
-            <Reveal as="div" variant="mask" className="relative min-h-[380px] lg:min-h-0">
-              <Image
-                src="/imagens/428708341-339551125742979-6565889301500133407-n.jpg"
-                alt={t.common.imageAlt.clientesDinner}
-                fill
-                sizes="(max-width: 1024px) 100vw, 45vw"
-                className="object-cover object-center"
-                {...blurFor("/imagens/428708341-339551125742979-6565889301500133407-n.jpg")}
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#080808] via-[#080808]/15 to-transparent lg:block hidden" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/30 to-transparent lg:hidden" />
-            </Reveal>
-          </div>
         </div>
       </section>
 
