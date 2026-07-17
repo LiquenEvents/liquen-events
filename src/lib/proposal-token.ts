@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
+import { log } from "./logger";
 
 /**
  * Signed, expiring tokens for the public "accept your proposal online" links.
@@ -22,9 +23,22 @@ function secret(): string {
   const s = process.env.SESSION_SECRET ?? process.env.ADMIN_SESSION_SECRET;
   if (s && s.length >= 16) return s;
   if (process.env.NODE_ENV === "production") {
-    // Never sign with a public/committed value in prod. A random per-process key
-    // means links can't be forged (they simply stop validating after a restart,
-    // which is the safe failure mode for a misconfigured deployment).
+    const hash = process.env.ADMIN_PASSWORD_HASH;
+    if (hash) {
+      // Derive a STABLE (but non-public) key from the secret password hash, the
+      // same way admin-auth does. A per-process random key would differ between
+      // concurrently-warm serverless instances, so a proposal link signed by one
+      // instance would 401 when the client's click lands on another — breaking
+      // real accept/decline links, not just surviving restarts. Still: set a real
+      // SESSION_SECRET.
+      log.error(
+        "proposal-token: SESSION_SECRET não definido em produção — a derivar do ADMIN_PASSWORD_HASH; defina um SESSION_SECRET aleatório de 32+ caracteres",
+      );
+      return `derived:${hash}`;
+    }
+    // Neither secret configured: fall back to a per-process random key. Links may
+    // stop validating across instances/restarts, but there's no stable secret to
+    // sign with and we must never use a public/committed value.
     if (!randomFallbackSecret) randomFallbackSecret = randomBytes(32).toString("base64url");
     return randomFallbackSecret;
   }

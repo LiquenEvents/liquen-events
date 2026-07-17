@@ -5,14 +5,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "./supabase";
 import { log } from "./logger";
 
-// Default upper bound on a single unpaginated list read. The admin dashboard's
-// list endpoints (quotes, proposals, suppliers, tasks, calendar) fan out to
-// `list()` with no explicit limit; without a cap the whole table is transferred
-// and serialized on every load, which only grows with the business. 1000 is far
-// above any plausible current volume (so behaviour is identical today) while
-// bounding the worst case — and if a list ever DOES hit the cap we warn rather
-// than silently hide the overflow. Override per-entity via `Mapper.listLimit`.
-const DEFAULT_LIST_LIMIT = 1000;
+// NOTE: `list()` is intentionally UNBOUNDED by default. A blanket row cap was
+// tried but reverted: consumers like the "full backup" export, the admin stats
+// pipeline, and the daily digest expect the COMPLETE table, and an ascending-
+// ordered table (the calendar) would drop the most-recent/upcoming rows first —
+// both are silent data loss the operator can't see. A cap only makes sense with
+// real pagination. A per-entity `Mapper.listLimit` opt-in remains for a future
+// bounded/paginated reader; when set, hitting it logs a warning (never silent).
 
 /**
  * Unified data-access layer.
@@ -103,18 +102,18 @@ export class SupabaseBackend<T> implements Backend<T> {
   private map = (r: unknown) => this.m.fromRow(r as Record<string, unknown>);
 
   async list(): Promise<T[]> {
-    const limit = this.m.listLimit ?? DEFAULT_LIST_LIMIT;
+    const limit = this.m.listLimit; // undefined ⇒ fetch everything (no cap)
     const base = this.sb.from(this.m.table).select(this.cols);
     const ordered = this.m.order
       ? base.order(this.m.order.column, { ascending: this.m.order.ascending })
       : base;
-    const { data, error } = await ordered.limit(limit);
+    const { data, error } = await (limit != null ? ordered.limit(limit) : ordered);
     if (error) throw error;
     const rows = data ?? [];
-    // Never truncate silently: if we came back exactly full there may be more
-    // rows beyond the cap, which is a signal to add real pagination.
-    if (rows.length >= limit) {
-      log.warn("list() hit the row cap — results may be truncated", {
+    // Only an EXPLICIT opt-in limit can truncate — and never silently: a full
+    // page is the signal that real pagination is needed.
+    if (limit != null && rows.length >= limit) {
+      log.warn("list() hit the configured row cap — results may be truncated", {
         table: this.m.table,
         limit,
       });

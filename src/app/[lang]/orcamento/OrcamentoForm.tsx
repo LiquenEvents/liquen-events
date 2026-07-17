@@ -192,7 +192,11 @@ export default function OrcamentoForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (sending || website) return;
+    // Don't gate the submit on the honeypot here: if anything ever populates the
+    // hidden `website` field, a bare `return` would make the button appear dead
+    // with no feedback and lose a real lead. The field still rides the payload so
+    // the SERVER can silently discard bots — that's the sole enforcement point.
+    if (sending) return;
     // Incomplete: reveal + announce what's missing (the submit stays operable so
     // keyboard/AT users get a reason, not a silently disabled control).
     if (!ready) {
