@@ -212,45 +212,18 @@ const MobileMenu = memo(function MobileMenu({
       aria-modal={isOpen}
       aria-label={t.nav.menuLabel}
       aria-hidden={!isOpen}
-      className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#0d100c] transition-[opacity,visibility] duration-500 ${
+      className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#0c0e0b] transition-[opacity,visibility] duration-500 ${
         isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
       }`}
     >
-      {/* Atmosfera — três camadas estáticas que dão profundidade sem tocar na
-          legibilidade: brilho musgo no topo (junto ao logótipo), um calor
-          dourado muito ténue no canto inferior (por trás do CTA) e um
-          escurecimento na base para os textos assentarem. O grão de filme
-          global (body::before) passa por cima e unifica tudo. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(99,122,95,0.16),transparent_55%)]"
-      />
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[radial-gradient(85%_55%_at_12%_112%,rgba(214,171,58,0.08),transparent_60%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/45 to-transparent"
-      />
-
+      {/* Menu SpaceX — minimalismo puro: fundo liso monocromático, sem
+          numeração, sem serif, sem brilhos nem dourados. A tipografia sans
+          maiúscula muito espaçada e o espaço branco fazem todo o trabalho; o
+          único acento é um filete branco que cresce no item ativo. */}
       <nav
         aria-label={t.nav.menuLabel}
-        className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain"
+        className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-6 overflow-y-auto overscroll-contain"
       >
-        {/* Eyebrow — motivo da casa (traço dourado + "MENU" muito espaçado),
-            equilibrado à direita por uma legenda de marca (place names, iguais
-            nas duas línguas). */}
-        <div className="flex items-center justify-between mb-8" style={reveal(60)}>
-          <p className="flex items-center gap-3 text-cream/35 text-[10px] tracking-[0.45em] uppercase">
-            <span className="w-7 h-px bg-gold/70 flex-shrink-0" />
-            {t.nav.menuLabel}
-          </p>
-          <span className="text-cream/25 text-[10px] tracking-[0.28em] uppercase">
-            {SITE.city} · {SITE.region}
-          </span>
-        </div>
-
         {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
           const active = pathname === link.href;
           return (
@@ -259,56 +232,25 @@ const MobileMenu = memo(function MobileMenu({
               href={localizeHref(link.href, locale)}
               transitionTypes={navTypes(link.href)}
               aria-current={active ? "page" : undefined}
-              className="group relative flex items-center gap-4 sm:gap-6 py-4 border-b border-white/[0.06]"
-              style={reveal(150 + i * 65)}
+              className={`group flex items-center justify-between py-5 sm:py-6 transition-colors duration-300 ${
+                active ? "text-white" : "text-white/55 hover:text-white"
+              }`}
+              style={reveal(80 + i * 60)}
             >
-              {/* Index — passa a marcador editorial: numeral dourado pequeno,
-                  alinhado ao topo da inicial serifada, que acende no estado
-                  ativo / hover. Largura fixa para as palavras alinharem. */}
               <span
-                className={`w-7 flex-shrink-0 self-start pt-[0.55rem] text-[10px] tracking-[0.25em] tabular-nums transition-colors duration-300 ${
-                  active ? "text-gold" : "text-gold/40 group-hover:text-gold/80"
-                }`}
-              >
-                0{i + 1}
-              </span>
-
-              <span
-                className={`leading-[1.02] tracking-[-0.01em] text-[clamp(30px,8.5vw,46px)] transition-[color,transform] duration-500 ${
-                  active ? "text-moss-light" : "text-cream group-hover:text-white"
-                } ${reduce ? "" : "group-hover:translate-x-2 will-change-transform"}`}
-                style={{
-                  fontFamily: "var(--font-playfair)",
-                  transitionTimingFunction: MENU_EASE,
-                }}
-              >
-                {link.label}
-              </span>
-
-              {/* Seta — chega da esquerda no hover; presente no item ativo. */}
-              <span
-                aria-hidden
-                className={`ml-auto text-lg leading-none transition-all duration-500 ${
-                  active
-                    ? "text-moss-light opacity-100 translate-x-0"
-                    : `text-cream/40 opacity-0 group-hover:opacity-100 ${reduce ? "" : "-translate-x-2 group-hover:translate-x-0"}`
+                className={`text-[15px] sm:text-base tracking-[0.26em] uppercase font-light ${
+                  reduce ? "" : "transition-transform duration-500 group-hover:translate-x-1.5"
                 }`}
                 style={{ transitionTimingFunction: MENU_EASE }}
               >
-                →
+                {link.label}
               </span>
-
-              {/* Traço que se desenha — reutiliza o motivo .link-line do site:
-                  o hairline musgo cresce da esquerda no hover e fica desenhado
-                  na página atual. Sob reduced-motion troca de estado sem animar. */}
               <span
                 aria-hidden
-                className={`pointer-events-none absolute inset-x-0 -bottom-px h-px bg-moss-light ${
-                  reduce ? "" : "transition-transform duration-500"
-                } ${
+                className={`h-px bg-current ${reduce ? "" : "transition-all duration-500"} ${
                   active
-                    ? "origin-left scale-x-100"
-                    : "origin-right scale-x-0 group-hover:origin-left group-hover:scale-x-100 group-focus-visible:origin-left group-focus-visible:scale-x-100"
+                    ? "w-7 opacity-100"
+                    : "w-0 opacity-0 group-hover:w-4 group-hover:opacity-50"
                 }`}
                 style={{ transitionTimingFunction: MENU_EASE }}
               />
@@ -317,76 +259,71 @@ const MobileMenu = memo(function MobileMenu({
         })}
       </nav>
 
-      {/* Bloco inferior — CTA premium + contactos + redes + idioma.
-          paddingBottom soma o safe-area-inset-bottom (home indicator) ao
-          espaçamento base — a auditoria assinalou que a base ignorava o inset. */}
+      {/* Bloco inferior — CTA de contorno + contactos, monocromático e sóbrio.
+          paddingBottom soma o safe-area-inset-bottom (home indicator). */}
       <div
-        className="relative px-8 flex flex-col gap-6"
+        className="relative px-8 flex flex-col gap-5"
         style={{
-          paddingBottom: "calc(2.25rem + env(safe-area-inset-bottom))",
-          ...reveal(150 + 5 * 65 + 40),
+          paddingBottom: "calc(2rem + env(safe-area-inset-bottom))",
+          ...reveal(80 + 5 * 60 + 40),
         }}
       >
         <Link
           href={localizeHref("/orcamento", locale)}
           onClick={() => track("CTAClick", { source: "nav-mobile" })}
-          className="group relative flex items-center justify-center gap-3 w-full btn-shine bg-moss text-white px-6 py-[18px] text-[11px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-moss-dark shadow-[0_20px_45px_-22px_rgba(99,122,95,0.95)]"
+          className="group flex items-center justify-between w-full border border-white/25 px-6 py-4 text-white text-[11px] tracking-[0.3em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
         >
-          {/* Filete dourado no topo do botão — remate de luxo, motivo da casa. */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gold/40"
-          />
           <span>{t.nav.pedirOrcamento}</span>
           <span
             aria-hidden
-            className={`text-base leading-none transition-transform duration-300 ${reduce ? "" : "group-hover:translate-x-1"}`}
+            className={reduce ? "" : "transition-transform duration-300 group-hover:translate-x-1"}
             style={{ transitionTimingFunction: MENU_EASE }}
           >
             →
           </span>
         </Link>
 
-        <div className="flex items-end justify-between gap-4 border-t border-white/[0.08] pt-6">
-          <div className="flex flex-col gap-2 min-w-0">
+        <div className="flex flex-col gap-1.5 pt-5 border-t border-white/10 text-[12px] tracking-wide">
+          <a
+            href={`mailto:${SITE.email}`}
+            className="group inline-flex items-center gap-2.5 text-white/65 hover:text-white transition-colors min-w-0"
+          >
+            <span className="text-white/30 group-hover:text-white/60 transition-colors flex-shrink-0">
+              <IconMail />
+            </span>
+            <span className="truncate">{SITE.email}</span>
+          </a>
+          <a
+            href={`tel:${SITE.phone}`}
+            className="group inline-flex items-center gap-2.5 text-white/65 hover:text-white transition-colors"
+          >
+            <span className="text-white/30 group-hover:text-white/60 transition-colors flex-shrink-0">
+              <IconPhone />
+            </span>
+            {SITE.phoneDisplay}
+          </a>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 -ml-2.5">
             <a
-              href={`mailto:${SITE.email}`}
-              className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors min-w-0"
+              href={SITE.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="inline-flex h-11 w-11 items-center justify-center text-white/40 hover:text-white transition-colors"
             >
-              <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
-                <IconMail />
-              </span>
-              <span className="truncate">{SITE.email}</span>
+              <IconInstagram />
             </a>
             <a
-              href={`tel:${SITE.phone}`}
-              className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors"
+              href={SITE.facebook}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              className="inline-flex h-11 w-11 items-center justify-center text-white/40 hover:text-white transition-colors"
             >
-              <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
-                <IconPhone />
-              </span>
-              {SITE.phoneDisplay}
+              <IconFacebook />
             </a>
-            <div className="flex items-center gap-1 pt-1.5 -ml-2.5">
-              <a
-                href={SITE.instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
-              >
-                <IconInstagram />
-              </a>
-              <a
-                href={SITE.facebook}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
-              >
-                <IconFacebook />
-              </a>
-            </div>
           </div>
           <LanguageToggle light />
         </div>
