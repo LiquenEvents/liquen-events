@@ -18,6 +18,7 @@ import { clientLogos } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -40,49 +41,34 @@ export async function generateMetadata({
 const eyebrow =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
-const mosaicItems = [
-  {
-    src: "/imagens/EW1_1408.jpg",
-    alt: "Receção de evento corporativo num pátio em Évora",
-    label: "Corporativo",
-    cls: "col-span-2 md:col-span-5 md:row-span-2",
-  },
-  {
-    src: "/imagens/DaniGui_Preview20.jpg",
-    alt: "Casamento com decoração floral numa herdade do Alentejo",
-    label: "Casamento",
-    cls: "md:col-span-4 md:row-span-1",
-  },
-  {
-    src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-    alt: "Jantar de gala à luz de velas num evento no Alentejo",
-    label: "Gala",
-    cls: "md:col-span-3 md:row-span-1",
-  },
-  {
-    src: "/imagens/stephanie-mizio-558.jpg",
-    alt: "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
-    label: "Casamento",
-    cls: "md:col-span-4 md:row-span-1",
-  },
-  {
-    src: "/imagens/M&F0512.jpg",
-    alt: "Jantar de gala com mesa posta e velas",
-    label: "Jantar",
-    cls: "md:col-span-3 md:row-span-1",
-  },
-  {
-    src: "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
-    alt: "Gala corporativa num salão decorado à noite",
-    label: "Gala",
-    cls: "col-span-2 md:col-span-7 md:row-span-1",
-  },
-  {
-    src: "/imagens/hd-edited.jpg",
-    alt: "Evento institucional com palco e plateia",
-    label: "Institucional",
-    cls: "col-span-2 md:col-span-5 md:row-span-1",
-  },
+// The mosaic draws a fresh 7 from this pool on every entry to the page (see
+// RotatingPhotoGrid). Landscape event frames — corporate, weddings, galas.
+const MOSAIC_POOL = [
+  "/imagens/EW1_1408.jpg",
+  "/imagens/DaniGui_Preview20.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/stephanie-mizio-558.jpg",
+  "/imagens/M&F0512.jpg",
+  "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
+  "/imagens/hd-edited.jpg",
+  "/imagens/EW1_1330.jpg",
+  "/imagens/J&P-IMGL4769.jpg",
+  "/imagens/EW1_1404.jpg",
+  "/imagens/teresinhaeze-909.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+];
+
+const MOSAIC_SIZES = "(max-width: 768px) 100vw, 40vw";
+const MOSAIC_CELLS = [
+  { cls: "col-span-2 md:col-span-5 md:row-span-2", sizes: MOSAIC_SIZES },
+  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_SIZES },
+  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_SIZES },
+  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_SIZES },
+  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_SIZES },
+  { cls: "col-span-2 md:col-span-7 md:row-span-1", sizes: MOSAIC_SIZES },
+  { cls: "col-span-2 md:col-span-5 md:row-span-1", sizes: MOSAIC_SIZES },
 ];
 
 export default async function ClientesPage({ params }: { params: Promise<{ lang: string }> }) {
@@ -91,6 +77,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
   const testimonials = t.clientes.testimonials;
   const introImg = "/imagens/EW1_1404.jpg";
   const wordsImg = "/imagens/stephanie-mizio-555.jpg";
+  const mosaicPool = MOSAIC_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   return (
     <>
       <BreadcrumbJsonLd
@@ -342,30 +329,13 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.mosaicEyebrow}
             </p>
           </AnimateIn>
-          <Reveal
-            as="div"
-            variant="mask"
-            stagger
+          <RotatingPhotoGrid
+            cells={MOSAIC_CELLS}
+            pool={mosaicPool}
+            alt={t.common.imageAlt.clientesCorporate}
             className="grid grid-cols-2 md:grid-cols-12 gap-2 auto-rows-[150px] md:auto-rows-auto md:grid-rows-[210px_210px_230px]"
-          >
-            {mosaicItems.map((item, i) => (
-              <div key={i} className={`${item.cls} relative overflow-hidden group`}>
-                <Image
-                  src={item.src}
-                  alt={t.clientes.galleryAlt[i] ?? item.alt}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 40vw"
-                  className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                  {...blurFor(item.src)}
-                />
-                <div className="absolute inset-0 bg-black/25 group-hover:bg-black/5 transition-colors duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <span className="absolute bottom-4 left-4 text-white/0 group-hover:text-white/65 group-focus-within:text-white/65 transition-all duration-500 text-[9px] tracking-[0.42em] uppercase font-medium">
-                  {t.clientes.mosaicLabels[i] ?? item.label}
-                </span>
-              </div>
-            ))}
-          </Reveal>
+            imgClassName="transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+          />
         </div>
       </section>
 
