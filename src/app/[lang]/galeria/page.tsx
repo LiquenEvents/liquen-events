@@ -11,15 +11,28 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
+import { interleaveByCollection } from "./interleave";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
 // site-wide JSON maps never reach the gallery's client bundle — GaleriaClient
 // only receives the handful of fields each photo actually needs.
-const galleryPhotos = PHOTOS.map((p) => ({
-  ...p,
-  blurDataURL: blurFor(p.src).blurDataURL,
-  aspectRatio: aspectFor(p.src),
-}));
+//
+// Every photo carries its aspectRatio (the masonry layout needs it up front),
+// but blur placeholders are shipped ONLY for the photos that paint first — the
+// first couple of pages of the default (unseeded) interleave that SSR renders.
+// Blur data-URIs for all 400+ photos were ~60KB of RSC flight data that mostly
+// wasn't needed on first paint; the tail falls back to the gallery's near-black
+// background as it decodes.
+const BLUR_PRELOAD = 60;
+const withRatio = PHOTOS.map((p) => ({ ...p, aspectRatio: aspectFor(p.src) }));
+const firstPaintSrc = new Set(
+  interleaveByCollection(withRatio)
+    .slice(0, BLUR_PRELOAD)
+    .map((p) => p.src),
+);
+const galleryPhotos = withRatio.map((p) =>
+  firstPaintSrc.has(p.src) ? { ...p, blurDataURL: blurFor(p.src).blurDataURL } : p,
+);
 
 export async function generateMetadata({
   params,
