@@ -155,16 +155,16 @@ export default async function ServiceDetailPage({
       </section>
 
       {/* ── Intro + includes ── */}
-      <section className="py-24 bg-surface">
+      <section className="py-20 lg:py-28 bg-surface">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-16">
           <AnimateIn>
-            <div className="flex flex-col gap-6 text-foreground/68 text-[16px] leading-[1.9]">
+            <div className="flex flex-col gap-6 text-foreground/72 text-[16px] leading-[1.8]">
               {svc.intro.map((p, i) => (
                 <p
                   key={i}
                   className={
                     i === 0
-                      ? "text-[19px] lg:text-[23px] leading-[1.6] text-foreground/85"
+                      ? "text-[19px] lg:text-[22px] leading-[1.6] text-foreground/85"
                       : undefined
                   }
                 >
@@ -181,9 +181,9 @@ export default async function ServiceDetailPage({
             </div>
           </AnimateIn>
           <AnimateIn delay={120}>
-            <div className="border border-foreground/10 p-8 bg-surface-raised/40">
-              <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-6 flex items-center gap-3">
-                <span className="w-5 h-px bg-gold/60 flex-shrink-0" />
+            <div className="border border-foreground/10 p-8">
+              <p className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-6 flex items-center gap-3">
+                <span className="w-8 h-px bg-gold flex-shrink-0" />
                 {t.servicoDetalhe.includesTitle}
               </p>
               <ul className="flex flex-col gap-4">
@@ -215,24 +215,20 @@ export default async function ServiceDetailPage({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
           <div className="relative z-10 h-full flex items-end">
-            <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 py-16 lg:py-24">
+            <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
-                <p className="text-cream/80 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center gap-3">
-                  <span className="w-6 h-px bg-gold flex-shrink-0" />
-                  {t.servicoDetalhe.viaturasEyebrow}
-                </p>
-                <h2
-                  className="text-cream font-bold leading-[0.98] mb-6 max-w-2xl"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(30px, 4.5vw, 60px)",
-                  }}
-                >
-                  {t.servicoDetalhe.viaturasTitle}
-                </h2>
-                <p className="text-cream/75 text-base lg:text-lg leading-[1.8] max-w-xl">
-                  {t.servicoDetalhe.viaturasText}
-                </p>
+                <div className="max-w-md">
+                  <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                    <span className="w-6 h-px bg-gold flex-shrink-0" />
+                    {t.servicoDetalhe.viaturasEyebrow}
+                  </p>
+                  <h2 className="text-white font-semibold uppercase tracking-[0.16em] text-[15px] sm:text-[17px] leading-snug">
+                    {t.servicoDetalhe.viaturasTitle}
+                  </h2>
+                  <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-sm">
+                    {t.servicoDetalhe.viaturasText}
+                  </p>
+                </div>
               </AnimateIn>
             </div>
           </div>
@@ -243,7 +239,7 @@ export default async function ServiceDetailPage({
       <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 mb-10 lg:mb-14">
           <AnimateIn>
-            <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase flex items-center gap-3">
+            <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase flex items-center gap-3">
               <span className="w-8 h-px bg-gold flex-shrink-0" />
               {t.servicoDetalhe.galleryEyebrow}
             </p>
@@ -283,7 +279,6 @@ export default async function ServiceDetailPage({
                     sizes={`(max-width: 1024px) 50vw, ${dvw}`}
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
                 </div>
               );
             })}
@@ -293,11 +288,11 @@ export default async function ServiceDetailPage({
 
       {/* ── FAQ ── */}
       {svc.faqs.length > 0 && (
-        <section className="py-24 bg-surface border-t border-foreground/8">
+        <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
           <div className="max-w-3xl mx-auto px-6 lg:px-16">
             <AnimateIn>
-              <h2 className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
-                <span className="w-5 h-px bg-gold/50" /> {t.servicoDetalhe.faqTitle}
+              <h2 className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+                <span className="w-8 h-px bg-gold flex-shrink-0" /> {t.servicoDetalhe.faqTitle}
               </h2>
             </AnimateIn>
             <Reveal as="div" stagger={0.08} className="flex flex-col">
@@ -320,11 +315,11 @@ export default async function ServiceDetailPage({
 
       {/* ── Related ── */}
       {related.length > 0 && (
-        <section className="py-24 bg-surface border-t border-foreground/8">
+        <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
           <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <AnimateIn>
-              <h2 className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
-                <span className="w-5 h-px bg-gold/50" /> {t.servicoDetalhe.relatedTitle}
+              <h2 className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+                <span className="w-8 h-px bg-gold flex-shrink-0" /> {t.servicoDetalhe.relatedTitle}
               </h2>
             </AnimateIn>
             <Reveal as="div" stagger={0.1} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -342,13 +337,13 @@ export default async function ServiceDetailPage({
                     sizes="50vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
                   <div className="absolute bottom-0 p-6">
-                    <p className="text-moss-light text-[9px] tracking-[0.35em] uppercase mb-1.5">
+                    <p className="text-white/60 text-[10px] tracking-[0.35em] uppercase mb-1.5">
                       {r.eyebrow}
                     </p>
                     <h3
-                      className="text-cream text-xl font-bold group-hover:text-moss transition-colors"
+                      className="text-cream text-xl font-bold"
                       style={{ fontFamily: "var(--font-playfair)" }}
                     >
                       {r.title}

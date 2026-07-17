@@ -194,7 +194,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               </p>
               <h2
                 className="text-foreground font-bold leading-[1.05]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 3.8vw, 50px)" }}
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
               >
                 {t.clientes.logosTitle}
               </h2>
@@ -220,20 +220,20 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           <div className="grid lg:grid-cols-[1fr_45%] min-h-[600px]">
             {/* Quote side */}
             <AnimateIn className="flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-28">
-              <p className={`${eyebrow} mb-12`}>
+              <p className={`${eyebrow} mb-8`}>
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 {t.clientes.featuredEyebrow}
               </p>
               <span
-                className="text-moss/15 leading-[0.75] select-none block -mb-2"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(80px, 12vw, 160px)" }}
+                className="text-moss/15 leading-[0.75] select-none block -mb-1"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(56px, 7vw, 96px)" }}
                 aria-hidden
               >
                 &ldquo;
               </span>
               <blockquote
                 className="text-foreground/75 leading-[1.65] mt-4"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.2vw, 27px)" }}
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.2vw, 26px)" }}
               >
                 {t.clientes.featuredQuote}
               </blockquote>
@@ -279,13 +279,13 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor(wordsImg)}
         />
-        <div className="absolute inset-0 bg-black/72" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/70 via-transparent to-[#080808]/70" />
+        <div className="absolute inset-0 bg-black/42" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-14">
             <h2
               className="text-white font-bold leading-[1.05]"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.2vw, 42px)" }}
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
             >
               {t.clientes.gridTitle}
             </h2>

@@ -124,7 +124,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       </section>
 
       {/* ── MANIFESTO — short statement + image ── */}
-      <section className="py-20 lg:py-32 bg-surface">
+      <section className="py-20 lg:py-28 bg-surface">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
           <AnimateIn from="left">
             <p className={`${eyebrowDark} mb-8`}>
@@ -164,7 +164,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           cells={GRID_CELLS}
           pool={gridPool}
           alt={t.common.imageAlt.sobreCelebration}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[210px] lg:auto-rows-[260px]"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
           imgClassName="transition-transform duration-[1.2s] ease-out group-hover:scale-105"
         />
       </section>
@@ -214,7 +214,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <Reveal
               as="div"
               variant="mask"
-              className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden shadow-2xl shadow-black/25 ring-1 ring-foreground/5"
+              className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden ring-1 ring-foreground/10"
             >
               <Image
                 src="/imagens/catarina-gaspar.jpg"
@@ -232,12 +232,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 {t.sobre.founderEyebrow}
               </p>
-              <span
-                className="block text-moss/25 text-6xl font-bold leading-none mb-6"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
-                &ldquo;
-              </span>
               <p
                 className="text-foreground/78 leading-[1.5]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3vw, 38px)" }}

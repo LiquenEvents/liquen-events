@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import FAQ from "./FAQ";
 import AnimateIn from "@/components/AnimateIn";
@@ -110,13 +109,13 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
             {/* ── Esquerda — canais diretos ── */}
-            <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
-              <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
-                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+            <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-14 lg:py-24 lg:pr-20">
+              <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase mb-12 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {tf.infoEyebrow}
               </p>
 
-              <div className="flex flex-col divide-y divide-foreground/8 mb-12">
+              <div className="flex flex-col divide-y divide-foreground/8 mb-10">
                 {[
                   {
                     label: tf.emailLabel,
@@ -137,8 +136,8 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     sub: tf.locationSub,
                   },
                 ].map((item) => (
-                  <div key={item.label} className="py-7">
-                    <p className="text-foreground/78 text-[10px] tracking-[0.45em] uppercase mb-2">
+                  <div key={item.label} className="py-6">
+                    <p className="text-foreground/55 text-[10px] tracking-[0.4em] uppercase mb-2.5">
                       {item.label}
                     </p>
                     {item.href ? (
@@ -154,7 +153,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     ) : (
                       <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
                     )}
-                    <p className="text-foreground/68 text-xs">{item.sub}</p>
+                    <p className="text-foreground/55 text-xs leading-relaxed">{item.sub}</p>
                   </div>
                 ))}
               </div>
@@ -164,17 +163,17 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
+                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/15 hover:border-foreground/40 transition-colors duration-300 group mb-3"
               >
                 <span className="text-moss flex-shrink-0">
                   <WhatsAppIcon className="w-4 h-4" />
                 </span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
+                <span className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 group-hover:text-foreground transition-colors">
                   {tf.whatsappLink}
                 </span>
                 <span
                   aria-hidden
-                  className="ml-auto text-foreground/40 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                  className="ml-auto text-foreground/35 group-hover:text-foreground/70 transition-colors duration-300 text-sm"
                 >
                   →
                 </span>
@@ -186,7 +185,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={SITE.googleBusiness}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/12 hover:border-gold/50 hover:bg-gold/[0.06] transition-all duration-300 group mb-12"
+                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/15 hover:border-foreground/40 transition-colors duration-300 group mb-12"
               >
                 <span className="flex-shrink-0" aria-hidden>
                   <svg viewBox="0 0 24 24" className="w-4 h-4">
@@ -208,19 +207,19 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     />
                   </svg>
                 </span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
+                <span className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 group-hover:text-foreground transition-colors">
                   {tf.googleLink}
                 </span>
                 <span
                   aria-hidden
-                  className="ml-auto text-foreground/40 group-hover:text-gold group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                  className="ml-auto text-foreground/35 group-hover:text-foreground/70 transition-colors duration-300 text-sm"
                 >
                   →
                 </span>
               </a>
 
               {/* Redes */}
-              <div className="flex gap-7 mb-14">
+              <div className="flex gap-7">
                 {[
                   { label: "Instagram", href: SITE.instagram },
                   { label: "Facebook", href: SITE.facebook },
@@ -230,7 +229,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/68 hover:text-foreground/78 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
+                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 hover:text-foreground transition-colors border-b border-foreground/15 pb-0.5 hover:border-foreground/40"
                   >
                     {s.label}
                   </a>
@@ -255,7 +254,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               <AnimateIn>
                 <div className="relative">
                   <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-                    <span className="w-5 h-px bg-gold flex-shrink-0" />
+                    <span className="w-6 h-px bg-gold flex-shrink-0" />
                     {td.ctaEyebrow}
                   </p>
                   <h2
@@ -337,8 +336,8 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/50 via-[#080808]/15 to-[#080808]/55" />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
-            <p className="text-white/75 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold flex-shrink-0" />
+            <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
+              <span className="w-6 h-px bg-gold flex-shrink-0" />
               {t.contacto.nextEyebrow}
             </p>
           </AnimateIn>
@@ -374,7 +373,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           <AnimateIn>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
               <div className="lg:sticky" style={{ top: "6rem" }}>
-                <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
+                <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
                   <span className="w-6 h-px bg-gold flex-shrink-0" />
                   {t.contacto.faqEyebrow}
                 </p>
@@ -386,7 +385,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   <br />
                   {t.contacto.faqTitleLine2}
                 </h2>
-                <p className="text-foreground/72 text-sm leading-relaxed mt-6 max-w-xs">
+                <p className="text-foreground/60 text-sm leading-relaxed mt-6 max-w-xs">
                   {t.contacto.faqSub}
                 </p>
               </div>

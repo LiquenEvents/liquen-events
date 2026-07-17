@@ -7,8 +7,6 @@ import TitleReveal from "@/components/TitleReveal";
 import { blurFor } from "@/lib/blur";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
-import Reveal from "@/components/motion/Reveal";
-import TiltCard from "@/components/motion/TiltCard";
 import PhotoWall from "@/components/motion/PhotoWall";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { PRIMARY_BUTTON_DARK_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
@@ -116,10 +114,10 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       <ClientMarquee />
 
       {/* ── Services — minimal image tiles ── */}
-      <section className="py-16 lg:py-24 bg-surface">
-        <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-16">
+      <section className="py-20 lg:py-28 bg-surface">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
-            <div className="flex items-end justify-between mb-8 lg:mb-12">
+            <div className="flex items-end justify-between mb-10 lg:mb-14">
               {/* Cabeçalho de secção (h2): dá à grelha de serviços um heading
                   de nível 2, para os títulos dos cartões (h3) deixarem de
                   saltar de h1 → h3. Estilo idêntico ao antigo <p> (o reset do
@@ -142,49 +140,37 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               </Link>
             </div>
           </AnimateIn>
+          {/* Full-SpaceX tiles: the photograph carries each card. One light
+              bottom-gradient veil (matches the hero + /servicos panels), a small
+              tucked caption in the sans, and a single restrained hover — no tilt,
+              sheen or accent swaps. */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {services.map((s, i) => (
-              <Reveal key={s.title} variant="mask" delay={i * 0.08}>
-                <TiltCard>
-                  <Link
-                    href={localizeHref(s.href, locale)}
-                    className="group relative block overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
-                    style={{ aspectRatio: "3/4" }}
-                  >
-                    <Image
-                      src={s.image}
-                      alt=""
-                      fill
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                      {...blurFor(s.image)}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent group-hover:from-black/70 transition-all duration-500" />
-                    {/* Cursor-tracked specular sheen (reads --mx/--my from TiltCard). */}
-                    <span
-                      aria-hidden
-                      data-sheen
-                      className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                      style={{
-                        background:
-                          "radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.5), transparent 62%)",
-                        mixBlendMode: "soft-light",
-                      }}
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-6">
-                      <p className="text-cream/75 text-[9px] sm:text-[10px] tracking-[0.35em] uppercase mb-1">
-                        {s.tag}
-                      </p>
-                      <h3
-                        className="text-cream text-base sm:text-lg lg:text-2xl font-bold group-hover:text-moss transition-colors duration-200"
-                        style={{ fontFamily: "var(--font-playfair)" }}
-                      >
-                        {s.title}
-                      </h3>
-                    </div>
-                  </Link>
-                </TiltCard>
-              </Reveal>
+              <AnimateIn key={s.title} delay={i * 90} from="clip">
+                <Link
+                  href={localizeHref(s.href, locale)}
+                  className="group relative block overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
+                  style={{ aspectRatio: "3/4" }}
+                >
+                  <Image
+                    src={s.image}
+                    alt=""
+                    fill
+                    sizes="(max-width: 1024px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                    {...blurFor(s.image)}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5 lg:p-6">
+                    <p className="text-white/60 text-[10px] tracking-[0.4em] uppercase mb-2">
+                      {s.tag}
+                    </p>
+                    <h3 className="text-white font-semibold uppercase tracking-[0.16em] text-[15px] sm:text-[17px] leading-snug">
+                      {s.title}
+                    </h3>
+                  </div>
+                </Link>
+              </AnimateIn>
             ))}
           </div>
         </div>
@@ -199,18 +185,19 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         title={t.home.wallTitle}
       />
 
-      {/* ── CTA ── */}
-      <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
-        <Parallax speed={0.1} className="absolute inset-0">
-          <Image
-            src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
-            alt={t.common.imageAlt.homeWedding}
-            fill
-            sizes="100vw"
-            className="object-cover object-center scale-110"
-            {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
-          />
-        </Parallax>
+      {/* ── CTA — full-screen closing panel (matches /servicos) ── */}
+      <section
+        className="relative overflow-hidden border-t border-foreground/8 flex items-center py-28 lg:py-40"
+        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+      >
+        <Image
+          src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
+          alt={t.common.imageAlt.homeWedding}
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
+        />
         <div className="absolute inset-0 bg-black/48" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
