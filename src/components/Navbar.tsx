@@ -1,15 +1,96 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
 import Magnetic from "@/components/motion/Magnetic";
+import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 import { SITE } from "@/lib/site";
 import { localizeHref } from "@/lib/i18n";
 import { track } from "@/lib/track";
+
+// House easing — the same expressive cubic-bézier used across the site's
+// reveals (galeria, heroes, link-line). Kept as a constant so the mobile-menu
+// cascade shares the exact motion signature of the rest of the brand.
+const MENU_EASE = "cubic-bezier(0.16,1,0.3,1)";
+
+// ── Hairline stroke icons for the overlay's contact + social block. Language-
+// neutral affordances (an envelope reads the same in PT and EN), drawn to match
+// the site's thin-line motif. Purely decorative — labelled by their parent <a>. ──
+function IconMail() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="5" width="18" height="14" rx="1.5" />
+      <path d="m3.5 6.5 8.5 6 8.5-6" />
+    </svg>
+  );
+}
+function IconPhone() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M6.5 3.5h3l1.4 3.9-2 1.4a12 12 0 0 0 4.9 4.9l1.4-2 3.9 1.4v3a1.8 1.8 0 0 1-1.9 1.8A15.8 15.8 0 0 1 4.7 5.4 1.8 1.8 0 0 1 6.5 3.5Z" />
+    </svg>
+  );
+}
+function IconInstagram() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" />
+      <circle cx="12" cy="12" r="3.7" />
+      <circle cx="17" cy="7" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+function IconFacebook() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M14.5 8.5V6.8c0-.8.3-1.3 1.4-1.3h1.4V2.7A18 18 0 0 0 15 2.5c-2.3 0-3.9 1.4-3.9 4v2h-2.6v3h2.6v8h3.4v-8h2.4l.5-3Z" />
+    </svg>
+  );
+}
 
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
@@ -27,6 +108,24 @@ export default function Navbar() {
   const [hidden, setHidden] = useState(false);
   const pathname = usePublicPathname();
   const { locale, t } = useTranslations();
+  const reduce = useReducedMotion();
+
+  // Staggered reveal for the overlay's blocks — a single source of truth so the
+  // eyebrow, each link and the footer share the same cascade + easing. Under
+  // prefers-reduced-motion everything simply cross-fades in place (no travel).
+  const reveal = (delay: number): CSSProperties =>
+    reduce
+      ? {
+          opacity: isOpen ? 1 : 0,
+          transition: isOpen ? "opacity 0.3s ease" : "opacity 0.15s ease",
+        }
+      : {
+          opacity: isOpen ? 1 : 0,
+          transform: isOpen ? "none" : "translateY(24px)",
+          transition: isOpen
+            ? `opacity 0.6s ${MENU_EASE} ${delay}ms, transform 0.6s ${MENU_EASE} ${delay}ms`
+            : "opacity 0.15s ease, transform 0.15s ease",
+        };
 
   const links = [
     { href: "/sobre", label: t.nav.sobre },
@@ -297,37 +396,54 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* ── Menu mobile — overlay a ecrã inteiro, tipografia display em cascata ── */}
+      {/* ── Menu mobile — overlay a ecrã inteiro, tipografia editorial em cascata.
+          O logótipo e o X vivem na barra (z-10) e "atravessam" este painel, que
+          fica em -z-10; por isso o overlay não repete o cabeçalho. ── */}
       <div
         ref={menuRef}
         role="dialog"
         aria-modal={isOpen}
         aria-label={t.nav.menuLabel}
         aria-hidden={!isOpen}
-        className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#10140f] transition-[opacity,visibility] duration-500 ${
+        className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#0d100c] transition-[opacity,visibility] duration-500 ${
           isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
         }`}
       >
-        {/* Vinheta subtil — profundidade sem sujar o fundo */}
+        {/* Atmosfera — três camadas estáticas que dão profundidade sem tocar na
+            legibilidade: brilho musgo no topo (junto ao logótipo), um calor
+            dourado muito ténue no canto inferior (por trás do CTA) e um
+            escurecimento na base para os textos assentarem. O grão de filme
+            global (body::before) passa por cima e unifica tudo. */}
         <div
           aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(90%_55%_at_50%_0%,rgba(99,122,95,0.10),transparent_70%)]"
+          className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(99,122,95,0.16),transparent_55%)]"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[radial-gradient(85%_55%_at_12%_112%,rgba(214,171,58,0.08),transparent_60%)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/45 to-transparent"
         />
 
         <nav
           aria-label={t.nav.menuLabel}
           className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain"
         >
-          <p
-            className="text-cream/30 text-[10px] tracking-[0.45em] uppercase flex items-center gap-3 mb-6"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              transition: isOpen ? "opacity 0.5s ease 100ms" : "opacity 0.15s ease",
-            }}
-          >
-            <span className="w-6 h-px bg-gold/60 flex-shrink-0" />
-            {t.nav.menuLabel}
-          </p>
+          {/* Eyebrow — motivo da casa (traço dourado + "MENU" muito espaçado),
+              equilibrado à direita por uma legenda de marca (place names, iguais
+              nas duas línguas). */}
+          <div className="flex items-center justify-between mb-8" style={reveal(60)}>
+            <p className="flex items-center gap-3 text-cream/35 text-[10px] tracking-[0.45em] uppercase">
+              <span className="w-7 h-px bg-gold/70 flex-shrink-0" />
+              {t.nav.menuLabel}
+            </p>
+            <span className="text-cream/25 text-[10px] tracking-[0.28em] uppercase">
+              {SITE.city} · {SITE.region}
+            </span>
+          </div>
+
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
             const active = pathname === link.href;
             return (
@@ -336,62 +452,134 @@ export default function Navbar() {
                 href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
-                className="group flex items-center justify-between gap-4 py-[18px] border-b border-white/[0.07]"
-                style={{
-                  opacity: isOpen ? 1 : 0,
-                  transform: isOpen ? "none" : "translateY(22px)",
-                  transition: isOpen
-                    ? `opacity 0.5s cubic-bezier(0.16,1,0.3,1) ${150 + i * 55}ms, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${150 + i * 55}ms`
-                    : "opacity 0.15s ease, transform 0.15s ease",
-                }}
+                className="group relative flex items-center gap-4 sm:gap-6 py-4 border-b border-white/[0.06]"
+                style={reveal(150 + i * 65)}
               >
+                {/* Index — passa a marcador editorial: numeral dourado pequeno,
+                    alinhado ao topo da inicial serifada, que acende no estado
+                    ativo / hover. Largura fixa para as palavras alinharem. */}
                 <span
-                  className={`text-[clamp(24px,6vw,32px)] leading-none transition-colors duration-300 ${
-                    active ? "text-moss-light" : "text-cream group-hover:text-moss-light"
+                  className={`w-7 flex-shrink-0 self-start pt-[0.55rem] text-[10px] tracking-[0.25em] tabular-nums transition-colors duration-300 ${
+                    active ? "text-gold" : "text-gold/40 group-hover:text-gold/80"
                   }`}
-                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  0{i + 1}
+                </span>
+
+                <span
+                  className={`leading-[1.02] tracking-[-0.01em] text-[clamp(30px,8.5vw,46px)] transition-[color,transform] duration-500 ${
+                    active ? "text-moss-light" : "text-cream group-hover:text-white"
+                  } ${reduce ? "" : "group-hover:translate-x-2 will-change-transform"}`}
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    transitionTimingFunction: MENU_EASE,
+                  }}
                 >
                   {link.label}
                 </span>
-                <span className="text-cream/22 text-[10px] tracking-[0.3em] tabular-nums">
-                  0{i + 1}
+
+                {/* Seta — chega da esquerda no hover; presente no item ativo. */}
+                <span
+                  aria-hidden
+                  className={`ml-auto text-lg leading-none transition-all duration-500 ${
+                    active
+                      ? "text-moss-light opacity-100 translate-x-0"
+                      : `text-cream/40 opacity-0 group-hover:opacity-100 ${reduce ? "" : "-translate-x-2 group-hover:translate-x-0"}`
+                  }`}
+                  style={{ transitionTimingFunction: MENU_EASE }}
+                >
+                  →
                 </span>
+
+                {/* Traço que se desenha — reutiliza o motivo .link-line do site:
+                    o hairline musgo cresce da esquerda no hover e fica desenhado
+                    na página atual. Sob reduced-motion troca de estado sem animar. */}
+                <span
+                  aria-hidden
+                  className={`pointer-events-none absolute inset-x-0 -bottom-px h-px bg-moss-light ${
+                    reduce ? "" : "transition-transform duration-500"
+                  } ${
+                    active
+                      ? "origin-left scale-x-100"
+                      : "origin-right scale-x-0 group-hover:origin-left group-hover:scale-x-100 group-focus-visible:origin-left group-focus-visible:scale-x-100"
+                  }`}
+                  style={{ transitionTimingFunction: MENU_EASE }}
+                />
               </Link>
             );
           })}
         </nav>
 
+        {/* Bloco inferior — CTA premium + contactos + redes + idioma.
+            paddingBottom soma o safe-area-inset-bottom (home indicator) ao
+            espaçamento base — a auditoria assinalou que a base ignorava o inset. */}
         <div
-          className="relative px-8 pb-10 flex flex-col gap-7"
+          className="relative px-8 flex flex-col gap-6"
           style={{
-            opacity: isOpen ? 1 : 0,
-            transform: isOpen ? "none" : "translateY(16px)",
-            transition: isOpen
-              ? "opacity 0.5s cubic-bezier(0.16,1,0.3,1) 460ms, transform 0.5s cubic-bezier(0.16,1,0.3,1) 460ms"
-              : "opacity 0.15s ease, transform 0.15s ease",
+            paddingBottom: "calc(2.25rem + env(safe-area-inset-bottom))",
+            ...reveal(150 + 5 * 65 + 40),
           }}
         >
           <Link
             href={localizeHref("/orcamento", locale)}
             onClick={() => track("CTAClick", { source: "nav-mobile" })}
-            className="block text-center text-[11px] tracking-[0.22em] uppercase btn-shine bg-moss text-white px-5 py-4 rounded-sm"
+            className="group relative flex items-center justify-center gap-3 w-full btn-shine bg-moss text-white px-6 py-[18px] text-[11px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-moss-dark shadow-[0_20px_45px_-22px_rgba(99,122,95,0.95)]"
           >
-            {t.nav.pedirOrcamento} <span aria-hidden>→</span>
+            {/* Filete dourado no topo do botão — remate de luxo, motivo da casa. */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gold/40"
+            />
+            <span>{t.nav.pedirOrcamento}</span>
+            <span
+              aria-hidden
+              className={`text-base leading-none transition-transform duration-300 ${reduce ? "" : "group-hover:translate-x-1"}`}
+              style={{ transitionTimingFunction: MENU_EASE }}
+            >
+              →
+            </span>
           </Link>
-          <div className="flex items-end justify-between gap-4 border-t border-white/[0.07] pt-6">
-            <div className="flex flex-col gap-1.5 min-w-0">
+
+          <div className="flex items-end justify-between gap-4 border-t border-white/[0.08] pt-6">
+            <div className="flex flex-col gap-2 min-w-0">
               <a
                 href={`mailto:${SITE.email}`}
-                className="text-cream/70 hover:text-cream text-[11px] tracking-wide transition-colors truncate"
+                className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors min-w-0"
               >
-                {SITE.email}
+                <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
+                  <IconMail />
+                </span>
+                <span className="truncate">{SITE.email}</span>
               </a>
               <a
                 href={`tel:${SITE.phone}`}
-                className="text-cream/70 hover:text-cream text-[11px] tracking-wide transition-colors"
+                className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors"
               >
+                <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
+                  <IconPhone />
+                </span>
                 {SITE.phoneDisplay}
               </a>
+              <div className="flex items-center gap-1 pt-1.5 -ml-2.5">
+                <a
+                  href={SITE.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
+                >
+                  <IconInstagram />
+                </a>
+                <a
+                  href={SITE.facebook}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
+                >
+                  <IconFacebook />
+                </a>
+              </div>
             </div>
             <LanguageToggle light />
           </div>
