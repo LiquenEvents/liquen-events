@@ -298,7 +298,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               "linear-gradient(to top, rgba(8,8,8,0.8), rgba(8,8,8,0.4), rgba(8,8,8,0.65)), linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55))",
           }}
         />
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
+        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-6 flex items-center gap-3">
               <span className="w-8 h-px bg-gold flex-shrink-0" />
@@ -438,7 +438,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
           }}
         />
-        <div className="relative z-10 h-full flex items-center">
+        <div className="text-veil-shadow relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
             <AnimateIn>
               <p className={`${eyebrowLight} mb-7`}>
@@ -484,7 +484,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           }}
         />
 
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="text-veil-shadow relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />

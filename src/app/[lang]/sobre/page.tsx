@@ -200,7 +200,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
           }}
         />
-        <div className="relative z-10 h-full flex items-center">
+        <div className="text-veil-shadow relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
             <p
               className="text-cream font-bold leading-[1.12] max-w-4xl"
@@ -283,7 +283,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           }}
         />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />

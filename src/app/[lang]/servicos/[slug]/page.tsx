@@ -380,7 +380,7 @@ export default async function ServiceDetailPage({
               "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
           }}
         />
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
+        <div className="text-veil-shadow relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <h2
               className="text-white font-bold leading-[0.95] mb-12 max-w-2xl"

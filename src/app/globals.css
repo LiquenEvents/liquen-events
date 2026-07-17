@@ -154,6 +154,14 @@ body {
 .pt-safe {
   padding-top: env(safe-area-inset-top);
 }
+/* Subtle scrim behind white text that sits over the near-transparent MIDDLE of
+   a hero veil (vertically-centered statements/CTAs). It lifts contrast to AA on
+   bright photo regions without darkening the photo itself — imperceptible over
+   dark areas, only doing work where the text would otherwise wash out. Same
+   treatment already used on the clientes lead statement. */
+.text-veil-shadow {
+  text-shadow: 0 1px 24px rgba(8, 8, 8, 0.6);
+}
 /* Safety net: never allow accidental horizontal scroll on small screens */
 body {
   overflow-x: clip;
