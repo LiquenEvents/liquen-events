@@ -173,7 +173,12 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                     <p className="text-white/60 text-[10px] tracking-[0.4em] uppercase mb-2">
                       {s.tag}
                     </p>
-                    <h3 className="text-white font-semibold uppercase tracking-[0.16em] text-[15px] sm:text-[17px] leading-snug">
+                    {/* Mobile: two-column tiles are only ~127px wide inside the
+                        padding, so the longest title ("Corporativos", 12 letters)
+                        overflowed the tile's overflow-hidden edge with the full
+                        0.16em tracking. Ease the size + tracking on small screens;
+                        restore the airy sizing from sm up where the tiles widen. */}
+                    <h3 className="text-white font-semibold uppercase tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[17px] leading-snug">
                       {s.title}
                     </h3>
                   </div>

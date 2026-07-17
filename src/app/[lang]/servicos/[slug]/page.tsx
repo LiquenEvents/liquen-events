@@ -292,28 +292,47 @@ export default async function ServiceDetailPage({
         </div>
       </section>
 
-      {/* ── FAQ ── */}
+      {/* ── FAQ (image-backed, SpaceX-style: light text over a photo + veil) ── */}
       {svc.faqs.length > 0 && (
-        <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
-          <div className="max-w-3xl mx-auto px-6 lg:px-16">
+        <section className="relative py-20 lg:py-28 border-t border-white/10 overflow-hidden">
+          <Image
+            src={svc.hero}
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
+            {...blurFor(svc.hero)}
+          />
+          {/* Strong, near-flat veil — this section is text-heavy, so the service's
+              own photo reads as a dark atmospheric texture while every question
+              stays legible. Matches the /contacto FAQ treatment. */}
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(11,13,10,0.86), rgba(11,13,10,0.9)), linear-gradient(to right, rgba(11,13,10,0.4), transparent 60%)",
+            }}
+          />
+          <div className="relative z-10 max-w-3xl mx-auto px-6 lg:px-16">
             <AnimateIn>
-              <h2 className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+              <h2 className="text-veil-shadow text-white/70 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
                 <span className="w-8 h-px bg-gold flex-shrink-0" /> {t.servicoDetalhe.faqTitle}
               </h2>
             </AnimateIn>
-            <Reveal as="div" stagger={0.08} className="flex flex-col">
+            <Reveal as="div" stagger={0.08} className="text-veil-shadow flex flex-col">
               {svc.faqs.map((f) => (
-                <div key={f.q} className="border-t border-foreground/8 py-7">
+                <div key={f.q} className="border-t border-white/12 py-7">
                   <h3
-                    className="text-foreground/80 text-base mb-3"
+                    className="text-white text-base mb-3"
                     style={{ fontFamily: "var(--font-playfair)" }}
                   >
                     {f.q}
                   </h3>
-                  <p className="text-foreground/78 text-sm leading-[1.9]">{f.a}</p>
+                  <p className="text-white/80 text-sm leading-[1.9]">{f.a}</p>
                 </div>
               ))}
-              <div className="border-t border-foreground/8" />
+              <div className="border-t border-white/12" />
             </Reveal>
           </div>
         </section>
