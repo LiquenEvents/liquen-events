@@ -4,7 +4,6 @@ import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
 import { blurFor } from "@/lib/blur";
-import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Magnetic from "@/components/motion/Magnetic";
@@ -223,9 +222,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         eyebrow={t.home.wallEyebrow}
         title={t.home.wallTitle}
       />
-
-      {/* ── Testimonials ── */}
-      <TestimonialsCarousel />
 
       {/* ── CTA ── */}
       <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
