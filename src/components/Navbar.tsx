@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, memo, type CSSProperties } from "react";
+import { useState, useEffect, useRef, useCallback, memo, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePublicPathname } from "@/lib/use-public-pathname";
@@ -9,7 +9,7 @@ import LanguageToggle from "./LanguageToggle";
 import Magnetic from "@/components/motion/Magnetic";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 import { SITE } from "@/lib/site";
-import { localizeHref } from "@/lib/i18n";
+import { localizeHref, type ChromeDict, type Locale } from "@/lib/i18n";
 import { track } from "@/lib/track";
 
 // House easing — the same expressive cubic-bézier used across the site's
@@ -104,13 +104,30 @@ function orderIdx(path: string): number {
   return i === -1 ? 0 : i;
 }
 
-export default function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [hidden, setHidden] = useState(false);
-  const pathname = usePublicPathname();
-  const { locale, t } = useTranslations();
-  const reduce = useReducedMotion();
+// The full-screen mobile menu overlay, extracted into a memoized child so the
+// Navbar's frequent scroll-driven re-renders (scrolled/hidden state) no longer
+// reconcile this ~180-line dialog subtree. It depends ONLY on isOpen / pathname
+// / locale / t / reduce / onClose — none of which change on scroll — and all of
+// links/navTypes/reveal are derived INSIDE it (not passed as fresh props) so the
+// memo comparison actually holds. The focus-trap / open-focus effect lives here
+// with the menuRef it guards; `onClose` (stable, from the parent) closes the
+// menu and returns focus to the hamburger button, which stays in the parent.
+const MobileMenu = memo(function MobileMenu({
+  isOpen,
+  pathname,
+  locale,
+  t,
+  reduce,
+  onClose,
+}: {
+  isOpen: boolean;
+  pathname: string;
+  locale: Locale;
+  t: ChromeDict;
+  reduce: boolean;
+  onClose: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Staggered reveal for the overlay's blocks — a single source of truth so the
   // eyebrow, each link and the footer share the same cascade + easing. Under
@@ -128,6 +145,263 @@ export default function Navbar() {
             ? `opacity 0.6s ${MENU_EASE} ${delay}ms, transform 0.6s ${MENU_EASE} ${delay}ms`
             : "opacity 0.15s ease, transform 0.15s ease",
         };
+
+  const links = [
+    { href: "/sobre", label: t.nav.sobre },
+    { href: "/servicos", label: t.nav.servicos },
+    { href: "/galeria", label: t.nav.galeria },
+    { href: "/clientes", label: t.nav.clientes },
+  ];
+
+  const navTypes = (href: string) => [
+    orderIdx(href) >= orderIdx(pathname) ? "nav-forward" : "nav-back",
+  ];
+
+  // Escape closes the overlay + traps Tab inside it (WAI-ARIA dialog pattern).
+  // Focus moves to the first link on open and back to the toggle button on
+  // close (via onClose), so keyboard users never land on a hidden element.
+  useEffect(() => {
+    if (!isOpen) return;
+    const menu = menuRef.current;
+    const focusables = () =>
+      Array.from(
+        menu?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    // Double rAF: the click that opened the menu is still asserting its own
+    // (browser-default) focus on the toggle button through the first painted
+    // frame — a single rAF loses that race and focus silently snaps back to
+    // the button. Waiting a second frame reliably lands on the menu instead.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => focusables()[0]?.focus());
+    });
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      role="dialog"
+      aria-modal={isOpen}
+      aria-label={t.nav.menuLabel}
+      aria-hidden={!isOpen}
+      className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#0d100c] transition-[opacity,visibility] duration-500 ${
+        isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
+      }`}
+    >
+      {/* Atmosfera — três camadas estáticas que dão profundidade sem tocar na
+          legibilidade: brilho musgo no topo (junto ao logótipo), um calor
+          dourado muito ténue no canto inferior (por trás do CTA) e um
+          escurecimento na base para os textos assentarem. O grão de filme
+          global (body::before) passa por cima e unifica tudo. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(99,122,95,0.16),transparent_55%)]"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[radial-gradient(85%_55%_at_12%_112%,rgba(214,171,58,0.08),transparent_60%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/45 to-transparent"
+      />
+
+      <nav
+        aria-label={t.nav.menuLabel}
+        className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain"
+      >
+        {/* Eyebrow — motivo da casa (traço dourado + "MENU" muito espaçado),
+            equilibrado à direita por uma legenda de marca (place names, iguais
+            nas duas línguas). */}
+        <div className="flex items-center justify-between mb-8" style={reveal(60)}>
+          <p className="flex items-center gap-3 text-cream/35 text-[10px] tracking-[0.45em] uppercase">
+            <span className="w-7 h-px bg-gold/70 flex-shrink-0" />
+            {t.nav.menuLabel}
+          </p>
+          <span className="text-cream/25 text-[10px] tracking-[0.28em] uppercase">
+            {SITE.city} · {SITE.region}
+          </span>
+        </div>
+
+        {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
+          const active = pathname === link.href;
+          return (
+            <Link
+              key={link.href}
+              href={localizeHref(link.href, locale)}
+              transitionTypes={navTypes(link.href)}
+              aria-current={active ? "page" : undefined}
+              className="group relative flex items-center gap-4 sm:gap-6 py-4 border-b border-white/[0.06]"
+              style={reveal(150 + i * 65)}
+            >
+              {/* Index — passa a marcador editorial: numeral dourado pequeno,
+                  alinhado ao topo da inicial serifada, que acende no estado
+                  ativo / hover. Largura fixa para as palavras alinharem. */}
+              <span
+                className={`w-7 flex-shrink-0 self-start pt-[0.55rem] text-[10px] tracking-[0.25em] tabular-nums transition-colors duration-300 ${
+                  active ? "text-gold" : "text-gold/40 group-hover:text-gold/80"
+                }`}
+              >
+                0{i + 1}
+              </span>
+
+              <span
+                className={`leading-[1.02] tracking-[-0.01em] text-[clamp(30px,8.5vw,46px)] transition-[color,transform] duration-500 ${
+                  active ? "text-moss-light" : "text-cream group-hover:text-white"
+                } ${reduce ? "" : "group-hover:translate-x-2 will-change-transform"}`}
+                style={{
+                  fontFamily: "var(--font-playfair)",
+                  transitionTimingFunction: MENU_EASE,
+                }}
+              >
+                {link.label}
+              </span>
+
+              {/* Seta — chega da esquerda no hover; presente no item ativo. */}
+              <span
+                aria-hidden
+                className={`ml-auto text-lg leading-none transition-all duration-500 ${
+                  active
+                    ? "text-moss-light opacity-100 translate-x-0"
+                    : `text-cream/40 opacity-0 group-hover:opacity-100 ${reduce ? "" : "-translate-x-2 group-hover:translate-x-0"}`
+                }`}
+                style={{ transitionTimingFunction: MENU_EASE }}
+              >
+                →
+              </span>
+
+              {/* Traço que se desenha — reutiliza o motivo .link-line do site:
+                  o hairline musgo cresce da esquerda no hover e fica desenhado
+                  na página atual. Sob reduced-motion troca de estado sem animar. */}
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute inset-x-0 -bottom-px h-px bg-moss-light ${
+                  reduce ? "" : "transition-transform duration-500"
+                } ${
+                  active
+                    ? "origin-left scale-x-100"
+                    : "origin-right scale-x-0 group-hover:origin-left group-hover:scale-x-100 group-focus-visible:origin-left group-focus-visible:scale-x-100"
+                }`}
+                style={{ transitionTimingFunction: MENU_EASE }}
+              />
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bloco inferior — CTA premium + contactos + redes + idioma.
+          paddingBottom soma o safe-area-inset-bottom (home indicator) ao
+          espaçamento base — a auditoria assinalou que a base ignorava o inset. */}
+      <div
+        className="relative px-8 flex flex-col gap-6"
+        style={{
+          paddingBottom: "calc(2.25rem + env(safe-area-inset-bottom))",
+          ...reveal(150 + 5 * 65 + 40),
+        }}
+      >
+        <Link
+          href={localizeHref("/orcamento", locale)}
+          onClick={() => track("CTAClick", { source: "nav-mobile" })}
+          className="group relative flex items-center justify-center gap-3 w-full btn-shine bg-moss text-white px-6 py-[18px] text-[11px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-moss-dark shadow-[0_20px_45px_-22px_rgba(99,122,95,0.95)]"
+        >
+          {/* Filete dourado no topo do botão — remate de luxo, motivo da casa. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gold/40"
+          />
+          <span>{t.nav.pedirOrcamento}</span>
+          <span
+            aria-hidden
+            className={`text-base leading-none transition-transform duration-300 ${reduce ? "" : "group-hover:translate-x-1"}`}
+            style={{ transitionTimingFunction: MENU_EASE }}
+          >
+            →
+          </span>
+        </Link>
+
+        <div className="flex items-end justify-between gap-4 border-t border-white/[0.08] pt-6">
+          <div className="flex flex-col gap-2 min-w-0">
+            <a
+              href={`mailto:${SITE.email}`}
+              className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors min-w-0"
+            >
+              <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
+                <IconMail />
+              </span>
+              <span className="truncate">{SITE.email}</span>
+            </a>
+            <a
+              href={`tel:${SITE.phone}`}
+              className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors"
+            >
+              <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
+                <IconPhone />
+              </span>
+              {SITE.phoneDisplay}
+            </a>
+            <div className="flex items-center gap-1 pt-1.5 -ml-2.5">
+              <a
+                href={SITE.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
+              >
+                <IconInstagram />
+              </a>
+              <a
+                href={SITE.facebook}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
+              >
+                <IconFacebook />
+              </a>
+            </div>
+          </div>
+          <LanguageToggle light />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+export default function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const pathname = usePublicPathname();
+  const { locale, t } = useTranslations();
+  const reduce = useReducedMotion();
 
   const links = [
     { href: "/sobre", label: t.nav.sobre },
@@ -220,58 +494,16 @@ export default function Navbar() {
     };
   }, [isOpen]);
 
-  // Escape closes the overlay + traps Tab inside it (WAI-ARIA dialog pattern)
-  // — the one full-screen menu in the codebase that didn't already follow the
-  // gallery lightbox's focus-management. Focus moves to the first link on
-  // open and back to the toggle button on close, so keyboard users never
-  // land on a hidden/invisible element.
-  const menuRef = useRef<HTMLDivElement>(null);
+  // The hamburger toggle stays in the top bar; the overlay's focus-trap (in
+  // MobileMenu) calls onClose to close the menu and return focus here, so
+  // keyboard users never land on a hidden element. useCallback keeps onClose a
+  // stable reference across the Navbar's scroll re-renders, so MobileMenu's memo
+  // isn't defeated by a fresh callback each render.
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!isOpen) return;
-    const menu = menuRef.current;
-    const focusables = () =>
-      Array.from(
-        menu?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      );
-    // Double rAF: the click that opened the menu is still asserting its own
-    // (browser-default) focus on the toggle button through the first painted
-    // frame — a single rAF loses that race and focus silently snaps back to
-    // the button. Waiting a second frame reliably lands on the menu instead.
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => focusables()[0]?.focus());
-    });
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setIsOpen(false);
-        toggleBtnRef.current?.focus();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const items = focusables();
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isOpen]);
+  const closeMenu = useCallback(() => {
+    setIsOpen(false);
+    toggleBtnRef.current?.focus();
+  }, []);
 
   return (
     <nav
@@ -398,195 +630,14 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* ── Menu mobile — overlay a ecrã inteiro, tipografia editorial em cascata.
-          O logótipo e o X vivem na barra (z-10) e "atravessam" este painel, que
-          fica em -z-10; por isso o overlay não repete o cabeçalho. ── */}
-      <div
-        ref={menuRef}
-        role="dialog"
-        aria-modal={isOpen}
-        aria-label={t.nav.menuLabel}
-        aria-hidden={!isOpen}
-        className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#0d100c] transition-[opacity,visibility] duration-500 ${
-          isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
-        }`}
-      >
-        {/* Atmosfera — três camadas estáticas que dão profundidade sem tocar na
-            legibilidade: brilho musgo no topo (junto ao logótipo), um calor
-            dourado muito ténue no canto inferior (por trás do CTA) e um
-            escurecimento na base para os textos assentarem. O grão de filme
-            global (body::before) passa por cima e unifica tudo. */}
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,rgba(99,122,95,0.16),transparent_55%)]"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(85%_55%_at_12%_112%,rgba(214,171,58,0.08),transparent_60%)]"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/45 to-transparent"
-        />
-
-        <nav
-          aria-label={t.nav.menuLabel}
-          className="relative flex-1 flex flex-col justify-center px-8 pt-28 pb-4 overflow-y-auto overscroll-contain"
-        >
-          {/* Eyebrow — motivo da casa (traço dourado + "MENU" muito espaçado),
-              equilibrado à direita por uma legenda de marca (place names, iguais
-              nas duas línguas). */}
-          <div className="flex items-center justify-between mb-8" style={reveal(60)}>
-            <p className="flex items-center gap-3 text-cream/35 text-[10px] tracking-[0.45em] uppercase">
-              <span className="w-7 h-px bg-gold/70 flex-shrink-0" />
-              {t.nav.menuLabel}
-            </p>
-            <span className="text-cream/25 text-[10px] tracking-[0.28em] uppercase">
-              {SITE.city} · {SITE.region}
-            </span>
-          </div>
-
-          {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
-            const active = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={localizeHref(link.href, locale)}
-                transitionTypes={navTypes(link.href)}
-                aria-current={active ? "page" : undefined}
-                className="group relative flex items-center gap-4 sm:gap-6 py-4 border-b border-white/[0.06]"
-                style={reveal(150 + i * 65)}
-              >
-                {/* Index — passa a marcador editorial: numeral dourado pequeno,
-                    alinhado ao topo da inicial serifada, que acende no estado
-                    ativo / hover. Largura fixa para as palavras alinharem. */}
-                <span
-                  className={`w-7 flex-shrink-0 self-start pt-[0.55rem] text-[10px] tracking-[0.25em] tabular-nums transition-colors duration-300 ${
-                    active ? "text-gold" : "text-gold/40 group-hover:text-gold/80"
-                  }`}
-                >
-                  0{i + 1}
-                </span>
-
-                <span
-                  className={`leading-[1.02] tracking-[-0.01em] text-[clamp(30px,8.5vw,46px)] transition-[color,transform] duration-500 ${
-                    active ? "text-moss-light" : "text-cream group-hover:text-white"
-                  } ${reduce ? "" : "group-hover:translate-x-2 will-change-transform"}`}
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    transitionTimingFunction: MENU_EASE,
-                  }}
-                >
-                  {link.label}
-                </span>
-
-                {/* Seta — chega da esquerda no hover; presente no item ativo. */}
-                <span
-                  aria-hidden
-                  className={`ml-auto text-lg leading-none transition-all duration-500 ${
-                    active
-                      ? "text-moss-light opacity-100 translate-x-0"
-                      : `text-cream/40 opacity-0 group-hover:opacity-100 ${reduce ? "" : "-translate-x-2 group-hover:translate-x-0"}`
-                  }`}
-                  style={{ transitionTimingFunction: MENU_EASE }}
-                >
-                  →
-                </span>
-
-                {/* Traço que se desenha — reutiliza o motivo .link-line do site:
-                    o hairline musgo cresce da esquerda no hover e fica desenhado
-                    na página atual. Sob reduced-motion troca de estado sem animar. */}
-                <span
-                  aria-hidden
-                  className={`pointer-events-none absolute inset-x-0 -bottom-px h-px bg-moss-light ${
-                    reduce ? "" : "transition-transform duration-500"
-                  } ${
-                    active
-                      ? "origin-left scale-x-100"
-                      : "origin-right scale-x-0 group-hover:origin-left group-hover:scale-x-100 group-focus-visible:origin-left group-focus-visible:scale-x-100"
-                  }`}
-                  style={{ transitionTimingFunction: MENU_EASE }}
-                />
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Bloco inferior — CTA premium + contactos + redes + idioma.
-            paddingBottom soma o safe-area-inset-bottom (home indicator) ao
-            espaçamento base — a auditoria assinalou que a base ignorava o inset. */}
-        <div
-          className="relative px-8 flex flex-col gap-6"
-          style={{
-            paddingBottom: "calc(2.25rem + env(safe-area-inset-bottom))",
-            ...reveal(150 + 5 * 65 + 40),
-          }}
-        >
-          <Link
-            href={localizeHref("/orcamento", locale)}
-            onClick={() => track("CTAClick", { source: "nav-mobile" })}
-            className="group relative flex items-center justify-center gap-3 w-full btn-shine bg-moss text-white px-6 py-[18px] text-[11px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-moss-dark shadow-[0_20px_45px_-22px_rgba(99,122,95,0.95)]"
-          >
-            {/* Filete dourado no topo do botão — remate de luxo, motivo da casa. */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gold/40"
-            />
-            <span>{t.nav.pedirOrcamento}</span>
-            <span
-              aria-hidden
-              className={`text-base leading-none transition-transform duration-300 ${reduce ? "" : "group-hover:translate-x-1"}`}
-              style={{ transitionTimingFunction: MENU_EASE }}
-            >
-              →
-            </span>
-          </Link>
-
-          <div className="flex items-end justify-between gap-4 border-t border-white/[0.08] pt-6">
-            <div className="flex flex-col gap-2 min-w-0">
-              <a
-                href={`mailto:${SITE.email}`}
-                className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors min-w-0"
-              >
-                <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
-                  <IconMail />
-                </span>
-                <span className="truncate">{SITE.email}</span>
-              </a>
-              <a
-                href={`tel:${SITE.phone}`}
-                className="group inline-flex items-center gap-2.5 py-1 text-cream/70 hover:text-cream text-[12px] tracking-wide transition-colors"
-              >
-                <span className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0">
-                  <IconPhone />
-                </span>
-                {SITE.phoneDisplay}
-              </a>
-              <div className="flex items-center gap-1 pt-1.5 -ml-2.5">
-                <a
-                  href={SITE.instagram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
-                >
-                  <IconInstagram />
-                </a>
-                <a
-                  href={SITE.facebook}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Facebook"
-                  className="inline-flex h-11 w-11 items-center justify-center text-cream/55 hover:text-cream transition-colors"
-                >
-                  <IconFacebook />
-                </a>
-              </div>
-            </div>
-            <LanguageToggle light />
-          </div>
-        </div>
-      </div>
+      <MobileMenu
+        isOpen={isOpen}
+        pathname={pathname}
+        locale={locale}
+        t={t}
+        reduce={reduce}
+        onClose={closeMenu}
+      />
     </nav>
   );
 }
