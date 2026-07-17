@@ -1,3 +1,4 @@
+import "server-only";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { Proposal } from "@/lib/orcamento/types";
 import { SITE } from "@/lib/site";

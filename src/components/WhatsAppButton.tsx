@@ -7,20 +7,43 @@ import { useTranslations } from "./LocaleProvider";
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { track } from "@/lib/track";
 
+// Run `cb` when the browser is idle, falling back to a short timeout where
+// requestIdleCallback isn't available (e.g. Safari). Returns a canceller.
+// Keeps the reveal timer / IntersectionObserver setup out of the critical
+// hydration window — the pill is invisible + inert for its 1.5s reveal delay
+// anyway, so mounting its logic a beat later is imperceptible.
+function onIdle(cb: () => void): () => void {
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+    const id = window.requestIdleCallback(cb, { timeout: 2000 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = setTimeout(cb, 200);
+  return () => clearTimeout(id);
+}
+
 export default function WhatsAppButton() {
+  const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const [atFooter, setAtFooter] = useState(false);
   const { t } = useTranslations();
   const pathname = usePublicPathname();
 
+  // Defer the whole island (DOM + timer + observer) past first paint: nothing
+  // renders and no work runs until the browser is idle. Both SSR and the first
+  // client render return null, so there's no hydration mismatch and no subtree
+  // to hydrate up front.
+  useEffect(() => onIdle(() => setMounted(true)), []);
+
   useEffect(() => {
+    if (!mounted) return;
     const id = setTimeout(() => setVisible(true), 1500);
     return () => clearTimeout(id);
-  }, []);
+  }, [mounted]);
 
   // Retract once the footer is in view so the pill never covers the footer's
   // links / legal text on mobile (mirrors StickyCTA's behaviour).
   useEffect(() => {
+    if (!mounted) return;
     const footer = document.querySelector("footer");
     if (!footer) return;
     const io = new IntersectionObserver(([entry]) => setAtFooter(entry.isIntersecting), {
@@ -28,11 +51,11 @@ export default function WhatsAppButton() {
     });
     io.observe(footer);
     return () => io.disconnect();
-  }, [pathname]);
+  }, [mounted, pathname]);
 
   // The quote form and its confirmation already offer WhatsApp/contact inline;
   // the floating pill there only overlaps the submit / action buttons on mobile.
-  if (pathname.startsWith("/orcamento")) return null;
+  if (pathname.startsWith("/orcamento") || !mounted) return null;
 
   const show = visible && !atFooter;
 

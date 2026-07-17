@@ -1,3 +1,4 @@
+import "server-only";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { SITE } from "@/lib/site";
 

@@ -28,10 +28,16 @@ export default function Analytics() {
   return (
     <>
       {origin && <link rel="preconnect" href={origin} />}
-      <Script defer data-domain={domain} src={src} strategy="afterInteractive" />
+      {/* The tracking script itself is background/low-priority: load it during
+          browser idle time (`lazyOnload`) so it never competes with first-paint
+          hydration. `defer` keeps it non-blocking as well. Early events are not
+          lost — the queue stub below runs `afterInteractive` and buffers them
+          until this script loads and flushes `window.plausible.q`. */}
+      <Script defer data-domain={domain} src={src} strategy="lazyOnload" />
       {/* Custom-events queue stub: makes `window.plausible(...)` callable (and
           buffered) before the script finishes loading, so early CTA/form events
-          aren't dropped. */}
+          aren't dropped. Kept `afterInteractive` so the queue exists as early as
+          possible even though the tracker itself loads lazily. */}
       <Script id="plausible-init" strategy="afterInteractive">
         {`window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments) }`}
       </Script>

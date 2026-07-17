@@ -1,3 +1,4 @@
+import "server-only";
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { NextRequest } from "next/server";

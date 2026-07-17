@@ -1,3 +1,4 @@
+import "server-only";
 import type { Proposal } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 

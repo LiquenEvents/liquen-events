@@ -1,3 +1,4 @@
+import "server-only";
 import { esc } from "./mail";
 import type { Locale } from "./i18n/config";
 

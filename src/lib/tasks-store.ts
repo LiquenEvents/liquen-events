@@ -1,3 +1,4 @@
+import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Task } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";

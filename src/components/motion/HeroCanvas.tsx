@@ -178,23 +178,15 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     const ro = new ResizeObserver(setCover);
     ro.observe(host);
 
-    // pause when offscreen or tab hidden — no wasted GPU
-    let visible = true;
-    const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting), {
-      threshold: 0,
-    });
-    io.observe(host);
-
     const start = performance.now();
     let raf = 0;
+    let running = false;
     let firstFrame = true;
     let lastPaint = 0;
     let driftT = 0; // ambient-drift clock — only advances on frames we draw
     let lastScrollY = -1;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const hidden = document.hidden || !visible;
-      if (hidden && !firstFrame) return;
 
       const elapsed = (now - start) / 1000;
       const intro = elapsed < 2.6; // the load reveal — always draw (full 60fps)
@@ -231,10 +223,47 @@ export default function HeroCanvas({ src, className }: { src: string; className?
         canvas.style.opacity = "1"; // fade the WebGL layer in over the still
       }
     };
-    raf = requestAnimationFrame(loop);
+
+    // Genuinely STOP the rAF loop whenever the hero can't be seen — a background
+    // tab or a hero scrolled out of view should cost zero main-thread wakeups,
+    // not a 60Hz callback that early-returns each frame. WebGL preserves the last
+    // drawn frame on the canvas, so resuming is seamless and the visual is
+    // identical when visible.
+    const startLoop = () => {
+      if (running) return;
+      running = true;
+      lastPaint = performance.now(); // reset the drift delta so it can't jump on resume
+      raf = requestAnimationFrame(loop);
+    };
+    const stopLoop = () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      raf = 0;
+    };
+
+    // pause when offscreen or tab hidden — no wasted GPU
+    let visible = true;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        visible = e.isIntersecting;
+        if (visible && !document.hidden) startLoop();
+        else stopLoop();
+      },
+      { threshold: 0 },
+    );
+    io.observe(host);
+
+    const onVisibility = () => {
+      if (document.hidden) stopLoop();
+      else if (visible) startLoop();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    startLoop();
 
     return () => {
-      cancelAnimationFrame(raf);
+      stopLoop();
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointermove", onPointer);
       heroImg?.removeEventListener("load", onHeroLoad);
       ro.disconnect();
