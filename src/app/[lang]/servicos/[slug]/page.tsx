@@ -362,10 +362,10 @@ export default async function ServiceDetailPage({
           alt=""
           fill
           sizes="100vw"
-          className="object-cover object-center"
+          className="object-cover object-bottom"
           {...blurFor(ctaImg)}
         />
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/66" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>

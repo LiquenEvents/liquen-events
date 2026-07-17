@@ -149,8 +149,8 @@ function ServiceBand({
           {...blurFor(service.image)}
         />
       </Parallax>
-      <div className="absolute inset-0 bg-black/45" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/10 to-[#080808]/35" />
+      <div className="absolute inset-0 bg-black/55" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-[#080808]/40" />
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-16 lg:pb-24">
         <AnimateIn>
           <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
@@ -163,7 +163,7 @@ function ServiceBand({
             {service.title}
           </h3>
           <div className="mt-7 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
-            <p className="text-white/75 text-[15px] leading-[1.7] max-w-md">{service.desc}</p>
+            <p className="text-white/85 text-[15px] leading-[1.7] max-w-md">{service.desc}</p>
             <Link
               href={localizeHref(`/servicos/${service.slug}`, locale)}
               className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
@@ -341,8 +341,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {...blurFor(cat.band)}
               />
             </Parallax>
-            <div className="absolute inset-0 bg-black/55" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/15 to-[#080808]/45" />
+            <div className="absolute inset-0 bg-black/60" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-[#080808]/50" />
             <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
               <AnimateIn>
                 <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
@@ -362,7 +362,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                   {cat.label}
                 </h2>
                 <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
-                  <p className="text-white/75 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
+                  <p className="text-white/85 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
                   <Link
                     href={localizeHref(
                       `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,

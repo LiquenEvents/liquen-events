@@ -171,14 +171,18 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor(introImg)}
         />
-        <div className="absolute inset-0 bg-black/62" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/80 via-transparent to-[#080808]/40" />
+        <div className="absolute inset-0 bg-black/72" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/35 to-[#080808]/55" />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid lg:grid-cols-[1fr_auto] gap-16 lg:gap-24 items-end">
             <AnimateIn>
               <p
-                className="text-white/85 leading-[1.72]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 2.8vw, 36px)" }}
+                className="text-white/90 leading-[1.72]"
+                style={{
+                  fontFamily: "var(--font-playfair)",
+                  fontSize: "clamp(22px, 2.8vw, 36px)",
+                  textShadow: "0 1px 24px rgba(8,8,8,0.6)",
+                }}
               >
                 {t.clientes.leadPre}
                 <span className="text-moss-light">{t.clientes.leadMoss}</span>
@@ -195,7 +199,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                 </span>
                 <span
                   aria-hidden="true"
-                  className="text-cream/35 font-bold leading-none"
+                  className="text-cream/45 font-bold leading-none"
                   style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
                 >
                   {SITE.founded}
