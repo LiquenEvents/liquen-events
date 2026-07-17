@@ -251,22 +251,29 @@ export default async function ServiceDetailPage({
             stagger={0.08}
             className="grid grid-cols-2 lg:grid-cols-6 gap-1.5 auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
           >
-            {svc.gallery.map((src, i) => (
-              <div
-                key={i}
-                className={`relative overflow-hidden group ${GALLERY_SPANS[i % GALLERY_SPANS.length]}`}
-              >
-                <Image
-                  src={src}
-                  {...blurFor(src)}
-                  alt={t.servicoDetalhe.galleryAlt}
-                  fill
-                  sizes="(max-width: 1024px) 50vw, 33vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
-              </div>
-            ))}
+            {svc.gallery.map((src, i) => {
+              // Match the real column span (grid is 6-col at lg) so the wide
+              // feature tiles aren't served a 33vw candidate and upscaled.
+              const span = GALLERY_SPANS[i % GALLERY_SPANS.length];
+              const dvw = span.includes("col-span-4")
+                ? "67vw"
+                : span.includes("col-span-3")
+                  ? "50vw"
+                  : "33vw";
+              return (
+                <div key={i} className={`relative overflow-hidden group ${span}`}>
+                  <Image
+                    src={src}
+                    {...blurFor(src)}
+                    alt={t.servicoDetalhe.galleryAlt}
+                    fill
+                    sizes={`(max-width: 1024px) 50vw, ${dvw}`}
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
+                </div>
+              );
+            })}
           </Reveal>
         </div>
       </section>

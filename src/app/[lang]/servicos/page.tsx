@@ -136,10 +136,9 @@ function ServiceBand({
   locale: Locale;
 }) {
   return (
-    <section
-      className="relative overflow-hidden flex items-end"
-      style={{ minHeight: "clamp(420px, 60vh, 680px)" }}
-    >
+    // Shorter on phones (≈46svh) so 8 stacked service bands don't become an
+    // endless scroll; full cinematic height from lg up.
+    <section className="relative overflow-hidden flex items-end min-h-[46svh] lg:min-h-[clamp(480px,60vh,680px)]">
       <Parallax speed={0.12} className="absolute inset-0">
         <Image
           src={service.image}
@@ -357,7 +356,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                   className="text-white font-bold leading-[0.92] tracking-tight"
                   style={{
                     fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(48px, 8vw, 120px)",
+                    fontSize: "clamp(42px, 8vw, 120px)",
                   }}
                 >
                   {cat.label}
@@ -398,19 +397,27 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           stagger
           className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
         >
-          {editorial.map((g, i) => (
-            <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
-              <Image
-                src={g.src}
-                alt={t.servicos.galleryAlt[i] ?? g.alt}
-                fill
-                sizes="(max-width: 768px) 50vw, 25vw"
-                className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                {...blurFor(g.src)}
-              />
-              <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
-            </div>
-          ))}
+          {editorial.map((g, i) => {
+            // Match the real rendered width so wide feature tiles aren't served a
+            // 25vw candidate and upscaled: grid is 2-col below lg, 4-col at lg+,
+            // so a col-span-2 tile is 100vw (mobile) / 50vw (desktop).
+            const wide = g.cls.includes("col-span-2");
+            return (
+              <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
+                <Image
+                  src={g.src}
+                  alt={t.servicos.galleryAlt[i] ?? g.alt}
+                  fill
+                  sizes={
+                    wide ? "(max-width: 1024px) 100vw, 50vw" : "(max-width: 1024px) 50vw, 25vw"
+                  }
+                  className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+                  {...blurFor(g.src)}
+                />
+                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
+              </div>
+            );
+          })}
         </Reveal>
       </section>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { clientLogos } from "@/data";
 import { logoHeight, logoDimsFor } from "@/lib/logo";
 import { useTranslations } from "./LocaleProvider";
@@ -56,13 +56,31 @@ function Mark({
 
 export default function ClientMarquee() {
   const { t } = useTranslations();
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Pause the infinite scroll while the band is off-screen — no point
+  // compositing a wide moving strip the user can't see (battery / GPU).
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => el.classList.toggle("marquee-paused", !e.isIntersecting),
+      { rootMargin: "150px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <div className="relative py-7 border-y border-foreground/8 overflow-hidden">
       {/* sr-only heading so heading-navigation users find the client band. */}
       <h2 className="sr-only">{t.nav.clientes}</h2>
       <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
       <div className="absolute inset-y-0 right-0 w-16 sm:w-24 bg-gradient-to-l from-surface to-transparent z-10 pointer-events-none" />
-      <div className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap">
+      <div
+        ref={trackRef}
+        className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap"
+      >
         {[...clientLogos, ...clientLogos].map((c, i) => (
           <Mark key={i} name={c.name} logo={c.logo} duplicate={i >= clientLogos.length} />
         ))}

@@ -24,6 +24,7 @@ interface Item {
   top: number; // document-space top (transform-compensated)
   height: number;
   shift: number; // last applied translateY
+  active: boolean; // currently promoted (will-change) because it's near-viewport
 }
 
 const items = new Set<Item>();
@@ -50,8 +51,20 @@ function frame() {
   const viewCentre = y + vh / 2;
   for (const it of items) {
     const offset = it.top + it.height / 2 - viewCentre;
-    // Far off-screen: nothing to move (bail before any DOM write).
-    if (offset > vh * 1.5 || offset < -vh * 1.5) continue;
+    // Far off-screen: drop the compositor promotion so we don't pin dozens of
+    // viewport-sized layers (e.g. ~12 on /servicos) that aren't moving.
+    if (offset > vh * 1.5 || offset < -vh * 1.5) {
+      if (it.active) {
+        it.active = false;
+        it.el.style.willChange = "auto";
+      }
+      continue;
+    }
+    // Near-viewport: promote just before transforming.
+    if (!it.active) {
+      it.active = true;
+      it.el.style.willChange = "transform";
+    }
     const shift = Math.round(-offset * it.speed * 10) / 10;
     if (shift !== it.shift) {
       it.shift = shift;
@@ -108,9 +121,8 @@ export default function Parallax({ children, className = "", speed = 0.12 }: Pro
     if (!el) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
 
-    const item: Item = { el, speed, top: 0, height: 0, shift: 0 };
+    const item: Item = { el, speed, top: 0, height: 0, shift: 0, active: false };
     items.add(item);
-    el.style.willChange = "transform";
     listen();
 
     // Measure this item now (others keep their cached geometry) and place it.
