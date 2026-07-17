@@ -87,21 +87,18 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
-            src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
+            src="/imagens/hd-edited.jpg"
             alt={t.common.imageAlt.sobreCelebration}
             fill
             preload
             sizes="100vw"
             className="object-cover object-center hero-settle"
-            {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3204.jpg")}
+            {...blurFor("/imagens/hd-edited.jpg")}
           />
         </Parallax>
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
-        <HeroWebGL
-          src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
-          className="absolute inset-0 h-full w-full"
-        />
+        <HeroWebGL src="/imagens/hd-edited.jpg" className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-transparent" />
 
