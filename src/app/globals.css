@@ -150,12 +150,9 @@ body {
     font-size: 16px;
   }
 }
-/* Safe-area helpers for fixed / edge elements (notch & home indicator) */
+/* Safe-area helper for fixed / edge elements (notch). */
 .pt-safe {
   padding-top: env(safe-area-inset-top);
-}
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
 }
 /* Safety net: never allow accidental horizontal scroll on small screens */
 body {
@@ -306,15 +303,7 @@ body::before {
 }
 
 /* ── Hero CSS animations (no JS — always in viewport on load) ── */
-.anim-0 {
-  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.anim-1 {
-  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 180ms both;
-}
-.anim-2 {
-  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 360ms both;
-}
+/* Only .anim-3 is used (the hero CTA row); .anim-0/1/2 were orphaned. */
 .anim-3 {
   animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 560ms both;
 }
@@ -389,34 +378,6 @@ body.admin-mode ::-webkit-scrollbar-thumb {
 }
 body.admin-mode ::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 122, 95, 0.45);
-}
-
-/* ── Wizard step transitions ── */
-@keyframes step-forward {
-  from {
-    opacity: 0;
-    transform: translateX(28px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-@keyframes step-back {
-  from {
-    opacity: 0;
-    transform: translateX(-28px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-.animate-step-forward {
-  animation: step-forward 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.animate-step-back {
-  animation: step-back 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── Hide scrollbar visually, keep scroll functional ── */
@@ -715,9 +676,6 @@ body:has([data-orcamento-mode]) .eyebrow {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-0,
-  .anim-1,
-  .anim-2,
   .anim-3 {
     animation: none;
     opacity: 1;
@@ -730,10 +688,6 @@ body:has([data-orcamento-mode]) .eyebrow {
   .animate-spin,
   .animate-pulse,
   .footer-ping {
-    animation: none;
-  }
-  .animate-step-forward,
-  .animate-step-back {
     animation: none;
   }
   .view-in {
@@ -845,7 +799,10 @@ body:has([data-orcamento-mode]) .eyebrow {
   position: absolute;
   top: 0;
   border-radius: 62% 38% 54% 46% / 58% 44% 56% 42%;
-  will-change: transform, opacity;
+  /* No explicit will-change: the browser already promotes an element with an
+     active transform/opacity animation, so this only pinned 16 compositor
+     layers AFTER the one-shot fall finished (fill-mode: both leaves them
+     mounted). Dropping it keeps the animation identical, no lingering layers. */
   /* Longhands (not the `animation` shorthand): a var() in the shorthand's time
      slots makes Lightning CSS drop the whole rule. Duration/delay come per-petal
      via inline style; the keyframe still reads --petal-x/rot/op fine. */
@@ -1112,9 +1069,6 @@ body:has([data-orcamento-mode]) .eyebrow {
 /* ── Print / PDF ── */
 @media print {
   body::before {
-    display: none !important;
-  }
-  .no-print {
     display: none !important;
   }
   nav,

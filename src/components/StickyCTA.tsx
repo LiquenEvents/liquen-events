@@ -67,7 +67,10 @@ export default function StickyCTA() {
     });
     io.observe(footer);
     return () => io.disconnect();
-  }, [mounted, pathname]);
+    // The <footer> lives in the persistent root layout, so it's the same node on
+    // every route — observe it once when we mount idly, not tear-down/recreate
+    // the observer on each client-side navigation.
+  }, [mounted]);
 
   if (hidden || !mounted) return null;
 

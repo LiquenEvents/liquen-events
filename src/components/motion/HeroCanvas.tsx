@@ -126,12 +126,18 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     const mesh = new Mesh(gl, { geometry, program });
 
     let imgAspect = 1;
+    // Cached host height for the scroll uniform. The draw loop needs it every
+    // frame, but it only changes on resize — which the ResizeObserver below
+    // already reports via setCover — so we read `clientHeight` there (off the
+    // hot path) instead of forcing a layout read on every drawn frame.
+    let heroH = host.clientHeight || window.innerHeight;
     const setCover = () => {
       // Size from the HOST (OGL's constructor pins the canvas to its own default
       // 300×150 and rewrites canvas.style.width, so measuring the canvas would
       // dead-lock at 300). setSize rewrites the canvas px size to fill the host.
       const w = host.clientWidth || window.innerWidth;
       const h = host.clientHeight || window.innerHeight;
+      heroH = h;
       renderer.setSize(w, h);
       const viewAspect = w / h;
       const ratio = viewAspect / imgAspect;
@@ -214,7 +220,6 @@ export default function HeroCanvas({ src, className }: { src: string; className?
       current.x += (target.x - current.x) * 0.05;
       current.y += (target.y - current.y) * 0.05;
       u.uMouse.value = [current.x, current.y];
-      const heroH = host.clientHeight || window.innerHeight;
       u.uScroll.value = Math.min(1, scrollY / heroH);
 
       renderer.render({ scene: mesh });

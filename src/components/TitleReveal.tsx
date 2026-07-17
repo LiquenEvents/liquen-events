@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import { observeOnceInView } from "@/lib/motion/observeInView";
 
 interface Props {
   text: string;
@@ -37,17 +38,9 @@ export default function TitleReveal({
       setVisible(true);
       return;
     }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.2, rootMargin: "0px 0px -60px 0px" },
+    return observeOnceInView(el, { threshold: 0.2, rootMargin: "0px 0px -60px 0px" }, () =>
+      setVisible(true),
     );
-    observer.observe(el);
-    return () => observer.disconnect();
   }, []);
 
   const words = text.split(/\s+/).filter(Boolean);

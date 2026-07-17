@@ -66,11 +66,20 @@ export default function Magnetic({
         raf = requestAnimationFrame(tick);
       } else {
         raf = 0;
+        // Drop the compositor hint once settled so an idle CTA doesn't pin a
+        // promoted layer between interactions.
+        node.style.willChange = "";
       }
     };
 
     const ensureRunning = () => {
       if (!raf) {
+        // Promote only for the duration of an active follow/settle. On touch and
+        // reduced-motion this effect returns early above, so will-change is never
+        // applied at all — no permanent layer for visitors the effect never runs
+        // for (previously a static `will-change-transform` class pinned one for
+        // every visit regardless).
+        node.style.willChange = "transform";
         last = 0;
         raf = requestAnimationFrame(tick);
       }
@@ -88,8 +97,10 @@ export default function Magnetic({
       ensureRunning();
     };
 
-    node.addEventListener("pointermove", onMove);
-    node.addEventListener("pointerleave", onLeave);
+    // Passive: onMove/onLeave never preventDefault, matching every other
+    // pointer/scroll listener in the motion layer.
+    node.addEventListener("pointermove", onMove, { passive: true });
+    node.addEventListener("pointerleave", onLeave, { passive: true });
 
     return () => {
       node.removeEventListener("pointermove", onMove);
@@ -100,7 +111,7 @@ export default function Magnetic({
   }, [strength]);
 
   return (
-    <span ref={ref} className={`inline-block will-change-transform ${className ?? ""}`}>
+    <span ref={ref} className={`inline-block ${className ?? ""}`}>
       {children}
     </span>
   );

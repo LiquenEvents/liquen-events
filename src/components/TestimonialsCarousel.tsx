@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import AnimateIn from "./AnimateIn";
 import RatingBadge from "./RatingBadge";
 import { useTranslations } from "./LocaleProvider";
@@ -24,6 +24,11 @@ export default function TestimonialsCarousel() {
   const [manualNav, setManualNav] = useState(false);
   const reduced = useReducedMotion();
 
+  // Track the pending fade timer so a rapid second nav (two dot clicks inside
+  // the 380ms fade, or a click landing on an autoplay tick) can't leave two
+  // timeouts racing — the stale one would briefly stomp the intended slide.
+  // Also cleared on unmount so no setState fires against a gone component.
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionTo = useCallback(
     (next: (current: number) => number) => {
       // Reduced motion: swap instantly, no fade.
@@ -33,13 +38,15 @@ export default function TestimonialsCarousel() {
         return;
       }
       setVisible(false);
-      setTimeout(() => {
+      if (fadeTimer.current) clearTimeout(fadeTimer.current);
+      fadeTimer.current = setTimeout(() => {
         setActive(next);
         setVisible(true);
       }, 380);
     },
     [reduced],
   );
+  useEffect(() => () => clearTimeout(fadeTimer.current ?? undefined), []);
 
   const goTo = useCallback(
     (i: number) => {

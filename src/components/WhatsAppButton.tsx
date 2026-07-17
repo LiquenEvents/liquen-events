@@ -51,7 +51,9 @@ export default function WhatsAppButton() {
     });
     io.observe(footer);
     return () => io.disconnect();
-  }, [mounted, pathname]);
+    // <footer> is in the persistent root layout — same node every route — so the
+    // observer is created once on idle mount, not recreated per navigation.
+  }, [mounted]);
 
   // The quote form and its confirmation already offer WhatsApp/contact inline;
   // the floating pill there only overlaps the submit / action buttons on mobile.

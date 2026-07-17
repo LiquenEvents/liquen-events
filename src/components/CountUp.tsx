@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
+import { observeOnceInView } from "@/lib/motion/observeInView";
 
 interface Props {
   to: number;
@@ -47,23 +48,17 @@ export default function CountUp({
 
     setValue(from); // seed the start synchronously, before paint
     let raf = 0;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-        observer.disconnect(); // fire once
-        const t0 = performance.now();
-        const tick = (now: number) => {
-          const p = Math.min((now - t0) / duration, 1);
-          setValue(Math.round(from + easeOutCubic(p) * (to - from)));
-          if (p < 1) raf = requestAnimationFrame(tick);
-        };
-        raf = requestAnimationFrame(tick);
-      },
-      { threshold: 0.5 },
-    );
-    observer.observe(el);
+    const stop = observeOnceInView(el, { threshold: 0.5 }, () => {
+      const t0 = performance.now();
+      const tick = (now: number) => {
+        const p = Math.min((now - t0) / duration, 1);
+        setValue(Math.round(from + easeOutCubic(p) * (to - from)));
+        if (p < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    });
     return () => {
-      observer.disconnect();
+      stop();
       if (raf) cancelAnimationFrame(raf);
     };
   }, [to, from, duration]);

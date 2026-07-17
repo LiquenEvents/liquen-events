@@ -85,6 +85,15 @@ export default function ClientLogoGrid({ clients }: { clients: Client[] }) {
     if (!("IntersectionObserver" in window)) return;
 
     el.classList.add("cl-armed"); // hide (synchronously, before paint) to reveal
+    // Once each logo's staggered reveal finishes, drop its compositor hint so the
+    // wall doesn't leave ~20 promoted layers pinned for the rest of the page's
+    // life (mirrors the .g-reveal / Reveal.tsx transitionend cleanup). The armed
+    // "from" state in globals.css sets will-change; here we clear it per cell.
+    const onRevealEnd = (e: TransitionEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.classList.contains("cl-reveal")) target.style.willChange = "auto";
+    };
+    el.addEventListener("transitionend", onRevealEnd);
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -95,7 +104,10 @@ export default function ClientLogoGrid({ clients }: { clients: Client[] }) {
       { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("transitionend", onRevealEnd);
+    };
   }, []);
 
   return (
