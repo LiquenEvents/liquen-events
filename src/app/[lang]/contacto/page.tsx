@@ -428,9 +428,12 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── WhatsApp CTA ──
-          Fundo com foto de evento + tinta verde-escura por cima: mantém a
-          identidade da marca e garante o contraste AA do texto cream. */}
-      <section className="py-20 sm:py-32 bg-moss-dark relative overflow-hidden border-t border-moss/20">
+          Foto de evento com um escurecimento cinematográfico (preto) — o mesmo
+          tratamento das restantes secções finais do site, para a imagem
+          respirar em vez de ficar lavada de verde. Um brilho verde muito subtil
+          no canto mantém o toque de marca; o texto cream continua a garantir
+          contraste AA sobre o véu escuro. */}
+      <section className="py-20 sm:py-32 bg-[#0c0e0b] relative overflow-hidden border-t border-white/10">
         <Image
           src={whatsappCtaImg}
           {...blurFor(whatsappCtaImg)}
@@ -440,12 +443,13 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           sizes="100vw"
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-moss-dark/88" />
+        <div className="absolute inset-0 bg-black/55" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/15 to-[#080808]/45" />
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(99, 122, 95, 0.5) 0%, transparent 55%)",
+              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(99, 122, 95, 0.28) 0%, transparent 55%)",
           }}
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
