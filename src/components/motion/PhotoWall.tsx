@@ -93,6 +93,13 @@ export default function PhotoWall({
                 fill
                 sizes="(max-width: 640px) 420px, (max-width: 1024px) 585px, 720px"
                 className="object-cover"
+                // Eager, not lazy: the marquee brings frames into view by a CSS
+                // translateX animation, which native lazy-loading (scroll-based)
+                // doesn't react to — so off-screen frames never loaded and the
+                // strip showed as a blurred smear. There are only 12 unique srcs
+                // (duplicated to 24, so the copies are cache hits), so eager-
+                // loading the ribbon is cheap and keeps the portfolio crisp.
+                loading="eager"
                 placeholder={img.blurDataURL ? "blur" : undefined}
                 blurDataURL={img.blurDataURL}
               />
