@@ -213,19 +213,22 @@ export default async function ServiceDetailPage({
             sizes="100vw"
             className="object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-          <div className="relative z-10 h-full flex items-end">
+          {/* This band's photo is brighter than the other service bands, so the
+              caption needs a touch more darkening: a stronger mid-stop on the
+              gradient + the veil text-shadow keep the small paragraph legible. */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/92 via-[#080808]/45 to-[#080808]/10" />
+          <div className="text-veil-shadow relative z-10 h-full flex items-end">
             <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
                 <div className="max-w-md">
-                  <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                  <p className="text-white/75 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
                     <span className="w-6 h-px bg-gold flex-shrink-0" />
                     {t.servicoDetalhe.viaturasEyebrow}
                   </p>
                   <h2 className="text-white font-semibold uppercase tracking-[0.16em] text-[15px] sm:text-[17px] leading-snug">
                     {t.servicoDetalhe.viaturasTitle}
                   </h2>
-                  <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-sm">
+                  <p className="mt-3 text-white/85 text-[12.5px] leading-[1.6] max-w-sm">
                     {t.servicoDetalhe.viaturasText}
                   </p>
                 </div>

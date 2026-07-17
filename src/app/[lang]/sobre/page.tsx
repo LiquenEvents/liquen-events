@@ -132,7 +132,9 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       </section>
 
       {/* ── MANIFESTO — short statement + image ── */}
-      <section className="py-20 lg:py-28 bg-surface">
+      {/* overflow-x-clip contains the ~4px the from-left/right reveal transforms
+          and grid rounding push past the viewport edge on mobile. */}
+      <section className="py-20 lg:py-28 bg-surface overflow-x-clip">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
           <AnimateIn from="left">
             <p className={`${eyebrowDark} mb-8`}>
@@ -210,7 +212,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               <TitleReveal
                 text={t.sobre.statementRest}
                 as="span"
-                className="text-cream/40"
+                className="text-cream/70"
                 step={50}
                 delay={t.sobre.statementLead.split(/\s+/).length * 50 + 80}
               />

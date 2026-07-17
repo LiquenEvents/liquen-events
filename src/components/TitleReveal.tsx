@@ -56,7 +56,16 @@ export default function TitleReveal({
         // never inside the `overflow-hidden` mask — otherwise it gets clipped and
         // the words render run-together.
         <Fragment key={i}>
-          <span aria-hidden className="inline-block overflow-hidden align-bottom">
+          {/* pb/-mb pair: the overflow-hidden mask that hides the word-rise
+              would otherwise clip glyph DESCENDERS that sit below the baseline —
+              most visibly Playfair's capital "J" (so "Junte" read as "Iunte"),
+              plus lowercase g/j/p/q/y. The bottom padding extends the clip box
+              down to fit them; the equal negative margin keeps the line's
+              layout height unchanged. */}
+          <span
+            aria-hidden
+            className="inline-block overflow-hidden align-bottom pb-[0.16em] -mb-[0.16em]"
+          >
             <span
               className={`inline-block ${visible ? "word-rise" : "opacity-0"}`}
               style={{ "--word-delay": `${delay + i * step}ms` } as React.CSSProperties}

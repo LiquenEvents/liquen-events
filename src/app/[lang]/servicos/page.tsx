@@ -475,7 +475,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           className="absolute inset-0"
           style={{
             backgroundImage:
-              "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
+              "linear-gradient(to top, rgba(8,8,8,0.9), rgba(8,8,8,0.35), rgba(8,8,8,0.55)), linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5))",
           }}
         />
 
@@ -492,7 +492,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             >
               {ts.ctaTitleLine1}
               <br />
-              <span className="text-moss">{ts.ctaTitleMoss}</span>
+              <span className="text-moss-light">{ts.ctaTitleMoss}</span>
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>

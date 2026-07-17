@@ -84,9 +84,10 @@ export const SERVICES: ServiceDetail[] = [
       "teambuilding empresas",
       "jantar de empresa",
     ],
-    hero: "/imagens/EW1_1408.jpg",
-    // `hero` is portrait — use a landscape frame from the same shoot for the
-    // social-share card so it doesn't render cropped to a sliver.
+    // Landscape twilight-courtyard frame (was EW1_1408, a portrait shot whose
+    // wide-hero centre-crop landed on a pale, out-of-focus band — reading as a
+    // broken/hazy hero and leaving the white nav links low-contrast).
+    hero: "/imagens/EW1_1332.jpg",
     ogImage: "/imagens/EW1_1404.jpg",
     intro: [
       "Elevamos a imagem da sua marca com eventos corporativos memoráveis em Lisboa e em todo o Portugal. Cada tipo de evento tem a sua abordagem dedicada — conferências e congressos, teambuilding, lançamentos de produto e jantares de empresa.",
