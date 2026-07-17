@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
@@ -14,7 +13,6 @@ import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
-import Eyebrow from "@/components/Eyebrow";
 
 export async function generateMetadata({
   params,
@@ -218,7 +216,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       />
 
       {/* ── HERO — full-bleed immersive ── */}
-      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
+      {/* -mt-24 cancels the global <main> pt-24 so the hero image runs to the
+          very top behind the transparent navbar (no white strip / hairline). */}
+      <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/EW1_1330.jpg"
@@ -266,159 +266,76 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
-      {/* ── Assinatura / filosofia — painel cinemático, minimal ──
-          O bloco mais denso de texto passou a uma afirmação única sobre imagem
-          full-bleed: título + as três competências reduzidas a rótulos (sem
-          descrições). Menos leitura, mais presença. */}
-      <section
-        className="relative overflow-hidden"
-        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
-      >
-        <Parallax speed={0.12} className="absolute inset-0">
-          <Image
-            src="/imagens/20_10_2025_0358.jpg"
-            alt={t.common.imageAlt.servicosEvening}
-            fill
-            sizes="100vw"
-            className="object-cover object-center"
-            {...blurFor("/imagens/20_10_2025_0358.jpg")}
-          />
-        </Parallax>
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-[#080808]/70" />
-        <div className="relative z-10 flex items-center" style={{ minHeight: "inherit" }}>
-          <div className="max-w-5xl mx-auto w-full px-6 lg:px-16 py-24 lg:py-32 text-center">
-            <AnimateIn>
-              <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase inline-flex items-center justify-center gap-4 mb-9">
-                <span className="w-8 h-px bg-gold" />
-                {ts.philoEyebrow}
-                <span className="w-8 h-px bg-gold" />
-              </p>
-              <h2
-                className="text-white font-bold leading-[1.06] tracking-tight mx-auto max-w-4xl"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 68px)" }}
-              >
-                {ts.philoTitle}
-              </h2>
-            </AnimateIn>
-            <div className="mt-16 lg:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-y-12 gap-x-8 max-w-3xl mx-auto">
-              {ts.philoPillars.map((p, i) => (
-                <AnimateIn key={p.title} delay={i * 90}>
-                  <div className="flex flex-col items-center gap-4">
-                    <span className="text-gold font-mono text-[11px] tracking-[0.4em]">
-                      0{i + 1}
-                    </span>
-                    <span aria-hidden className="w-8 h-px bg-white/25" />
-                    <h3
-                      className="text-cream font-bold text-lg lg:text-2xl tracking-wide"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
-                      {p.title}
-                    </h3>
-                  </div>
-                </AnimateIn>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── Service categories ── */}
-      {categories.map((cat, ci) => (
-        <Fragment key={cat.id}>
-          <div>
-            {/* Category intro — full-screen cinematic panel (SpaceX-style):
+      {categories.map((cat) => (
+        <div key={cat.id}>
+          {/* Category intro — full-screen cinematic panel (SpaceX-style):
               one image, one message. The light editorial header was dropped so
               the page reads as a sequence of immersive full-bleed panels. */}
-            <section
-              id={cat.id}
-              className="relative overflow-hidden scroll-mt-[60px] flex items-end"
-              style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
-            >
-              <Parallax speed={0.12} className="absolute inset-0">
-                <Image
-                  src={cat.band}
-                  alt=""
-                  fill
-                  sizes="100vw"
-                  className="object-cover object-center"
-                  {...blurFor(cat.band)}
-                />
-              </Parallax>
-              <div className="absolute inset-0 bg-black/60" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-[#080808]/50" />
-              <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
-                <AnimateIn>
-                  <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
-                    {cat.num}
-                  </p>
-                  <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-4 flex items-center gap-3">
-                    <span className="w-8 h-px bg-gold flex-shrink-0" />
-                    {cat.subtitle}
-                  </p>
-                  <h2
-                    className="text-white font-bold leading-[0.92] tracking-tight"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(42px, 8vw, 120px)",
-                    }}
-                  >
-                    {cat.label}
-                  </h2>
-                  <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
-                    <p className="text-white/85 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
-                    <Link
-                      href={localizeHref(
-                        `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
-                        locale,
-                      )}
-                      className={`${OUTLINE_LIGHT_BUTTON_CLASS} flex-shrink-0`}
-                    >
-                      {ts.verDetalhes}
-                      <span aria-hidden>→</span>
-                    </Link>
-                  </div>
-                </AnimateIn>
-              </div>
-            </section>
-
-            {/* Service bands — one full-screen panel per service */}
-            {cat.services.map((s, i) => (
-              <ServiceBand
-                key={`${cat.id}-${i}`}
-                service={s}
-                index={i}
-                catNum={cat.num}
-                cta={ts.verMais}
-                locale={locale}
+          <section
+            id={cat.id}
+            className="relative overflow-hidden scroll-mt-[60px] flex items-end"
+            style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+          >
+            <Parallax speed={0.12} className="absolute inset-0">
+              <Image
+                src={cat.band}
+                alt=""
+                fill
+                sizes="100vw"
+                className="object-cover object-center"
+                {...blurFor(cat.band)}
               />
-            ))}
-          </div>
-
-          {/* Light interlude between the two categories — one calm, airy beat so
-              the run of dark full-bleed panels doesn't flatten into a tunnel
-              (and it quietly carries a proof line). */}
-          {ci === 0 && (
-            <section className="bg-surface py-24 lg:py-36 border-y border-foreground/8">
-              <div className="max-w-4xl mx-auto px-6 lg:px-16 text-center">
-                <AnimateIn>
-                  <Eyebrow center className="mb-8">
-                    {ts.interludeEyebrow}
-                  </Eyebrow>
-                  <p
-                    className="text-foreground font-bold leading-[1.12] mx-auto max-w-3xl"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(28px, 4.2vw, 54px)",
-                    }}
+            </Parallax>
+            <div className="absolute inset-0 bg-black/60" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-[#080808]/50" />
+            <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
+              <AnimateIn>
+                <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
+                  {cat.num}
+                </p>
+                <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-4 flex items-center gap-3">
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
+                  {cat.subtitle}
+                </p>
+                <h2
+                  className="text-white font-bold leading-[0.92] tracking-tight"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(42px, 8vw, 120px)",
+                  }}
+                >
+                  {cat.label}
+                </h2>
+                <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
+                  <p className="text-white/85 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
+                  <Link
+                    href={localizeHref(
+                      `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
+                      locale,
+                    )}
+                    className={`${OUTLINE_LIGHT_BUTTON_CLASS} flex-shrink-0`}
                   >
-                    {ts.interludeTitle}
-                  </p>
-                </AnimateIn>
-              </div>
-            </section>
-          )}
-        </Fragment>
+                    {ts.verDetalhes}
+                    <span aria-hidden>→</span>
+                  </Link>
+                </div>
+              </AnimateIn>
+            </div>
+          </section>
+
+          {/* Service bands — one full-screen panel per service */}
+          {cat.services.map((s, i) => (
+            <ServiceBand
+              key={`${cat.id}-${i}`}
+              service={s}
+              index={i}
+              catNum={cat.num}
+              cta={ts.verMais}
+              locale={locale}
+            />
+          ))}
+        </div>
       ))}
 
       {/* ── Editorial photo grid (full-bleed) ── */}
