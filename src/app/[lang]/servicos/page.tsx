@@ -66,7 +66,7 @@ const categoryMeta = [
     id: "celebracoes",
     num: "01",
     layout: "mosaic-left" as const,
-    band: "/imagens/teresinhaeze-909.jpg",
+    band: "/imagens/DaniGui_Preview20.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
@@ -81,8 +81,8 @@ const categoryMeta = [
     band: "/imagens/EW1_1333.jpg",
     services: [
       { slug: "conferencias-e-congressos", image: "/imagens/EW1_1332.jpg" },
-      { slug: "teambuilding", image: "/imagens/EW1_1398.jpg" },
-      { slug: "lancamentos-de-produto", image: "/imagens/EW1_1428.jpg" },
+      { slug: "teambuilding", image: "/imagens/EW1_1330.jpg" },
+      { slug: "lancamentos-de-produto", image: "/imagens/DaniGui_JantarFesta_130.jpg" },
       { slug: "jantares-de-empresa", image: "/imagens/EW1_1404.jpg" },
     ],
   },
@@ -329,11 +329,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               </AnimateIn>
             ))}
           </div>
-          <AnimateIn delay={120}>
-            <p className="mt-14 pt-8 border-t border-white/15 text-white/60 text-sm tracking-wide">
-              {ts.interludeTitle}
-            </p>
-          </AnimateIn>
         </div>
       </section>
 

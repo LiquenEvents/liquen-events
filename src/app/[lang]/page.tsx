@@ -154,7 +154,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               sheen or accent swaps. */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {services.map((s, i) => (
-              <AnimateIn key={s.title} delay={i * 90} from="clip">
+              <AnimateIn key={s.title} delay={i * 90}>
                 <Link
                   href={localizeHref(s.href, locale)}
                   className="group relative block overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"

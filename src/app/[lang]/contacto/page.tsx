@@ -373,29 +373,47 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
-      {/* ── FAQ ── */}
-      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      {/* ── FAQ (image-backed, SpaceX-style: light text over a photo + veil) ── */}
+      <section className="relative py-16 sm:py-28 border-t border-white/10 overflow-hidden">
+        <Image
+          src="/imagens/EW1_1332.jpg"
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/EW1_1332.jpg")}
+        />
+        {/* Strong, near-flat veil — this section is text-heavy, so the photo
+            reads as a dark atmospheric texture while every question stays legible. */}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(11,13,10,0.86), rgba(11,13,10,0.9)), linear-gradient(to right, rgba(11,13,10,0.4), transparent 60%)",
+          }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
-              <div className="lg:sticky" style={{ top: "6rem" }}>
-                <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+              <div className="text-veil-shadow lg:sticky" style={{ top: "6rem" }}>
+                <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
                   <span className="w-6 h-px bg-gold flex-shrink-0" />
                   {t.contacto.faqEyebrow}
                 </p>
                 <h2
-                  className="text-foreground text-4xl lg:text-5xl font-bold leading-tight"
+                  className="text-white text-4xl lg:text-5xl font-bold leading-tight"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
                   {t.contacto.faqTitleLine1}
                   <br />
                   {t.contacto.faqTitleLine2}
                 </h2>
-                <p className="text-foreground/60 text-sm leading-relaxed mt-6 max-w-xs">
+                <p className="text-white/65 text-sm leading-relaxed mt-6 max-w-xs">
                   {t.contacto.faqSub}
                 </p>
               </div>
-              <FAQ faqs={t.contacto.faqs} />
+              <FAQ faqs={t.contacto.faqs} light />
             </div>
           </AnimateIn>
         </div>
