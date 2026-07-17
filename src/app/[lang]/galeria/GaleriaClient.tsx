@@ -995,7 +995,10 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
 
             {/* Barra superior */}
             <div
-              className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 py-3.5 flex-shrink-0"
+              className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 pb-3.5 flex-shrink-0"
+              // Clear the notch so the counter / close button aren't hidden under
+              // the status bar on notched phones (keeps its base top padding too).
+              style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3">
@@ -1029,7 +1032,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                   onClick={() => setPlaying((p) => !p)}
                   aria-label={playing ? t.galeria.lbPause : t.galeria.lbPlay}
                   aria-pressed={playing}
-                  className={`p-2 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
+                  className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
                 >
                   {playing ? (
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1045,7 +1048,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                 <button
                   onClick={close}
                   aria-label={t.galeria.lbClose}
-                  className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
+                  className="p-3 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -1093,7 +1096,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               {/* Foto principal */}
               <div
                 ref={photoLayerRef}
-                className="lb-photo-layer absolute inset-0 mx-14 md:mx-20 overflow-hidden"
+                className="lb-photo-layer absolute inset-0 mx-2 md:mx-20 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <VTWrap key={lb} name={vtId(pool[lb].src)} exit="vt-lb">
