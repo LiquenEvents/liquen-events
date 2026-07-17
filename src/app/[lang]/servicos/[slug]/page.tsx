@@ -7,7 +7,6 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
-import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
@@ -124,8 +123,10 @@ export default async function ServiceDetailPage({
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
         <HeroWebGL src={svc.hero} className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20" />
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-20">
+        {/* Image-first (SpaceX-style): only the bottom darkens enough to keep the
+            white caption legible — no heavy full-panel veil. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-14 lg:pb-20">
           <nav
             aria-label={t.nav.breadcrumb}
             className="text-[11px] tracking-[0.2em] uppercase text-cream/60 mb-8"
@@ -137,15 +138,19 @@ export default async function ServiceDetailPage({
               <span aria-hidden>←</span> {t.nav.servicos}
             </Link>
           </nav>
-          <p className="text-cream/80 text-[10px] tracking-[0.5em] uppercase mb-6 flex items-center gap-3">
-            <span className="w-8 h-px bg-gold flex-shrink-0" />
-            {svc.eyebrow}
-          </p>
-          <KineticHeading
-            className="text-cream font-bold leading-[0.95] max-w-4xl"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-detail)" }}
-            lines={[[{ text: svc.title }]]}
-          />
+          {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
+              photograph owns the first screen. Still the page's single <h1>. */}
+          <AnimateIn>
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {svc.eyebrow}
+              </p>
+              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+                {svc.title}
+              </h1>
+            </div>
+          </AnimateIn>
         </div>
       </section>
 
@@ -208,8 +213,7 @@ export default async function ServiceDetailPage({
             sizes="100vw"
             className="object-cover object-center"
           />
-          <div className="absolute inset-0 bg-black/50" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
           <div className="relative z-10 h-full flex items-end">
             <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 py-16 lg:py-24">
               <AnimateIn>
@@ -370,8 +374,8 @@ export default async function ServiceDetailPage({
           className="object-cover object-bottom"
           {...blurFor(ctaImg)}
         />
-        <div className="absolute inset-0 bg-black/66" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
+        <div className="absolute inset-0 bg-black/48" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <h2

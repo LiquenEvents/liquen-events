@@ -9,7 +9,6 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import Parallax from "@/components/Parallax";
-import KineticHeading from "@/components/KineticHeading";
 import RatingBadge from "@/components/RatingBadge";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import { waHref } from "@/data";
@@ -77,25 +76,26 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
         <HeroWebGL src={heroImg} className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
-        <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
+        {/* SpaceX-style: photo breathes; a small caption tucked bottom-left. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+        <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-14 lg:pb-20">
           <div className="max-w-7xl mx-auto w-full">
-            <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/60 flex-shrink-0" />
-              {tf.heroEyebrow}
-            </p>
-            <KineticHeading
-              className="text-cream font-bold leading-[0.88] tracking-tight"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 7.5vw, 100px)" }}
-              lines={[[{ text: tf.heroTitleLine1 }], [{ text: tf.heroTitleMoss, moss: true }]]}
-            />
-            <div className="mt-7">
-              <RatingBadge
-                label={t.common.reviewsLabel}
-                ptFormat={locale === "pt"}
-                starClassName="text-gold"
-                textClassName="text-cream/75"
-              />
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {tf.heroEyebrow}
+              </p>
+              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+                {tf.heroTitleLine1} {tf.heroTitleMoss}
+              </h1>
+              <div className="mt-4">
+                <RatingBadge
+                  label={t.common.reviewsLabel}
+                  ptFormat={locale === "pt"}
+                  starClassName="text-gold"
+                  textClassName="text-white/75"
+                />
+              </div>
             </div>
           </div>
         </div>

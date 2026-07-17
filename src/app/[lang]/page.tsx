@@ -7,7 +7,6 @@ import TitleReveal from "@/components/TitleReveal";
 import { blurFor } from "@/lib/blur";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
-import Magnetic from "@/components/motion/Magnetic";
 import Reveal from "@/components/motion/Reveal";
 import TiltCard from "@/components/motion/TiltCard";
 import PhotoWall from "@/components/motion/PhotoWall";
@@ -69,63 +68,38 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
           className="absolute inset-0 h-full w-full"
         />
-        <div className="absolute inset-0 bg-black/15" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/75 via-[#080808]/10 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/92 via-[#080808]/25 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
-          <p className="text-white/70 text-[10px] sm:text-xs tracking-[0.45em] uppercase mb-8 lg:mb-12 anim-0 flex items-center gap-3">
-            <span className="inline-block w-8 h-px bg-gold flex-shrink-0" />
-            {t.home.eyebrow}
-          </p>
-          <h1
-            className="text-white font-bold leading-[0.92] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(42px, 8.5vw, 132px)" }}
-          >
-            {/* Readable sentence for SEO / screen readers — the animated words
-                below are laid out with flex gaps (no spaces) and aria-hidden. */}
-            <span className="sr-only">
-              {t.home.heroLines.map((l) => l.words.join(" ")).join(" ")}
-            </span>
-            {t.home.heroLines.map(({ words, moss }, lineIndex) => {
-              const delay = [180, 360, 520][lineIndex] ?? 520;
-              return (
-                <span
-                  key={words.join("")}
-                  aria-hidden
-                  className="flex flex-wrap"
-                  style={{ gap: "0.26em" }}
+        {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
+            photograph owns the first screen. Still the page's single <h1>. */}
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
+          <AnimateIn>
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {t.home.eyebrow}
+              </p>
+              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+                {t.home.heroLines.map((l) => l.words.join(" ")).join(" ")}
+              </h1>
+              <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <TrackedLink
+                  href={localizeHref("/orcamento", locale)}
+                  trackProps={{ source: "hero" }}
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
                 >
-                  {words.map((word, i) => (
-                    <span
-                      key={word + i}
-                      className={`inline-block word-rise${moss ? " text-moss" : ""}`}
-                      style={{ "--word-delay": `${delay + i * 110}ms` } as React.CSSProperties}
-                    >
-                      {word}
-                    </span>
-                  ))}
-                </span>
-              );
-            })}
-          </h1>
-          <div className="mt-10 lg:mt-14 flex flex-wrap items-center gap-4 anim-2">
-            <Magnetic strength={0.4}>
-              <TrackedLink
-                href={localizeHref("/orcamento", locale)}
-                trackProps={{ source: "hero" }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/35 text-white text-[10px] tracking-[0.18em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
-              >
-                {t.common.pedirOrcamento} <span aria-hidden>→</span>
-              </TrackedLink>
-            </Magnetic>
-            <Link
-              href={localizeHref("/galeria", locale)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/40 text-white/85 text-[10px] tracking-[0.18em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
-            >
-              {t.common.verGaleria}
-            </Link>
-          </div>
+                  {t.common.pedirOrcamento} <span aria-hidden>→</span>
+                </TrackedLink>
+                <Link
+                  href={localizeHref("/galeria", locale)}
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
+                >
+                  {t.common.verGaleria} <span aria-hidden>→</span>
+                </Link>
+              </div>
+            </div>
+          </AnimateIn>
         </div>
 
         <div className="absolute bottom-8 right-6 lg:right-16 z-10 hidden sm:flex flex-col items-center gap-3 anim-3">
@@ -237,7 +211,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
           />
         </Parallax>
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/48" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">

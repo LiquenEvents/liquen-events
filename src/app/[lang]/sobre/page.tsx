@@ -6,7 +6,6 @@ import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
-import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
 import Magnetic from "@/components/motion/Magnetic";
@@ -102,15 +101,25 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
         <HeroWebGL src="/imagens/hd-edited.jpg" className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-transparent" />
+        {/* SpaceX scrim: single bottom-anchored gradient so the photograph reads
+            full at the top; no heavy flat veil. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-28 pt-40">
-          <KineticHeading
-            className="text-white font-bold leading-[0.88] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
-            lines={[[{ text: t.sobre.heroTitlePre }, { text: t.sobre.heroTitleMoss, moss: true }]]}
-          />
+        {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
+            photograph owns the first screen. Still the page's single <h1>. No CTA
+            on this hero, so the understated link is omitted. */}
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
+          <AnimateIn>
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {t.sobre.heroEyebrow}
+              </p>
+              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+                {`${t.sobre.heroTitlePre}${t.sobre.heroTitleMoss}`}
+              </h1>
+            </div>
+          </AnimateIn>
         </div>
       </section>
 
@@ -175,7 +184,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             {...blurFor("/imagens/M&F0497.jpg")}
           />
         </Parallax>
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/42" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
         <div className="relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
@@ -257,7 +266,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           className="object-cover object-center"
           {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
         />
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/48" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">

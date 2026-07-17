@@ -79,25 +79,23 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             {...blurFor("/imagens/DaniGui_Preview20.jpg")}
           />
         </Parallax>
-        <div className="absolute inset-0 bg-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-[#0b0b0b]/15 to-transparent" />
-        {/* Extra readability gradient only behind the bottom-left text block */}
-        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        {/* Image-first (SpaceX-style): only the bottom darkens enough to keep the
+            white caption legible — no heavy full-panel veil. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20 pt-40">
+        {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
+            photograph owns the first screen. Still the page's single <h1>. */}
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
           <AnimateIn>
-            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-7 flex items-center gap-3">
-              <span className="w-8 h-px bg-gold flex-shrink-0" />
-              {t.galeria.headerLabel}
-            </p>
-          </AnimateIn>
-          <AnimateIn delay={80}>
-            <h1
-              className="text-white font-bold leading-[0.88] tracking-tight"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-section)" }}
-            >
-              {t.galeria.headerTitle}
-            </h1>
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {t.galeria.headerLabel}
+              </p>
+              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+                {t.galeria.headerTitle}
+              </h1>
+            </div>
           </AnimateIn>
         </div>
       </section>
@@ -119,8 +117,8 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           className="object-cover object-center"
           {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
         />
-        <div className="absolute inset-0 bg-black/70" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-transparent to-[#0b0b0b]/60" />
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#080808]/85 via-[#080808]/35 to-transparent" />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 py-20 lg:py-28">
           <AnimateIn>
             <p className="text-white/70 text-[10px] tracking-[0.48em] uppercase mb-8 flex items-center gap-3">
