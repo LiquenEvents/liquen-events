@@ -53,8 +53,14 @@ const GRID_POOL = [
   "/imagens/DaniGui_JantarFesta_26.jpg",
 ];
 
-const WIDE_SIZES = "(max-width: 768px) 50vw, 50vw";
-const NARROW_SIZES = "(max-width: 768px) 50vw, 25vw";
+// The grid is 2-col below `lg` and 4-col from `lg` (1024px) up, full-bleed (no
+// max-width wrapper). So a col-span-2 cell is the full row on mobile (100vw) and
+// half the row from lg (50vw); a col-span-1 cell is 50vw on mobile and 25vw from
+// lg. The old values declared 50vw for wide cells on mobile (they render 100vw,
+// so the browser under-fetched and upscaled) and switched at 768px instead of
+// the real 1024px column breakpoint.
+const WIDE_SIZES = "(max-width: 1024px) 100vw, 50vw";
+const NARROW_SIZES = "(max-width: 1024px) 50vw, 25vw";
 // Fixed cell layout (spans + the right `sizes` per cell); whichever photo lands
 // in a cell, the shape stays the same.
 const GRID_CELLS = [

@@ -60,15 +60,25 @@ const MOSAIC_POOL = [
   "/imagens/stephanie-mizio-555.jpg",
 ];
 
-const MOSAIC_SIZES = "(max-width: 768px) 100vw, 40vw";
+// The mosaic is a 2-col grid below `md` and a 12-col grid from `md` (768px) up,
+// inside the max-w-7xl (1280px) container with lg:px-16 padding. So each cell's
+// real rendered width is: on mobile 100vw when it spans both columns, else 50vw;
+// from md a fraction of the ~1152px content width matching its column span. The
+// old single value declared 100vw on mobile for EVERY cell — but four of them
+// only fill one of the two mobile columns (50vw), so they were fetched at ~2×.
+// Per-span sizes below; the fixed px is the capped column width past 1280px.
+const MOSAIC_5 = "(max-width: 767px) 100vw, (max-width: 1279px) 42vw, 448px"; // md:col-span-5, wide on mobile
+const MOSAIC_7 = "(max-width: 767px) 100vw, (max-width: 1279px) 58vw, 624px"; // md:col-span-7, wide on mobile
+const MOSAIC_4 = "(max-width: 767px) 50vw, (max-width: 1279px) 33vw, 360px"; // md:col-span-4, one mobile column
+const MOSAIC_3 = "(max-width: 767px) 50vw, (max-width: 1279px) 25vw, 272px"; // md:col-span-3, one mobile column
 const MOSAIC_CELLS = [
-  { cls: "col-span-2 md:col-span-5 md:row-span-2", sizes: MOSAIC_SIZES },
-  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_SIZES },
-  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_SIZES },
-  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_SIZES },
-  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_SIZES },
-  { cls: "col-span-2 md:col-span-7 md:row-span-1", sizes: MOSAIC_SIZES },
-  { cls: "col-span-2 md:col-span-5 md:row-span-1", sizes: MOSAIC_SIZES },
+  { cls: "col-span-2 md:col-span-5 md:row-span-2", sizes: MOSAIC_5 },
+  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_4 },
+  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_3 },
+  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_4 },
+  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_3 },
+  { cls: "col-span-2 md:col-span-7 md:row-span-1", sizes: MOSAIC_7 },
+  { cls: "col-span-2 md:col-span-5 md:row-span-1", sizes: MOSAIC_5 },
 ];
 
 export default async function ClientesPage({ params }: { params: Promise<{ lang: string }> }) {

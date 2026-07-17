@@ -813,6 +813,9 @@ body:has([data-orcamento-mode]) .eyebrow {
   .lb-kenburns {
     animation: none;
     opacity: 1;
+    /* No animation for these users, so don't leave a permanent compositor-layer
+       hint behind (mirrors the .g-reveal / .cl-reveal reduced-motion cleanup). */
+    will-change: auto;
   }
   .lb-progress {
     animation: none;

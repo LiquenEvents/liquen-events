@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { clientLogos } from "@/data";
 import { logoHeight, logoDimsFor } from "@/lib/logo";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { useTranslations } from "./LocaleProvider";
 
 /**
@@ -63,6 +64,10 @@ export default function ClientMarquee() {
   useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
+    // Under prefers-reduced-motion the marquee animation is already `none`
+    // (globals.css), so there's nothing to pause — skip the observer entirely
+    // rather than run it to toggle a class that does nothing.
+    if (prefersReducedMotion()) return;
     const io = new IntersectionObserver(
       ([e]) => el.classList.toggle("marquee-paused", !e.isIntersecting),
       { rootMargin: "150px" },

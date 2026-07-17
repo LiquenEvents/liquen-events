@@ -156,7 +156,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                     src={s.image}
                     alt=""
                     fill
-                    sizes="(max-width: 1024px) 50vw, 33vw"
+                    sizes="(max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 384px"
                     className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                     {...blurFor(s.image)}
                   />

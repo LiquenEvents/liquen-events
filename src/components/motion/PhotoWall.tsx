@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -7,8 +10,12 @@ import Image from "next/image";
  *
  * Deliberately NOT WebGL (the 3D carousel was retired on request): the strip
  * is a pure-CSS marquee (see .animate-marquee — 50s linear, pauses on hover,
- * stands still under prefers-reduced-motion), server-rendered so it's also the
- * LCP content and costs no client JS at all.
+ * stands still under prefers-reduced-motion). The markup is still fully
+ * server-rendered (SSR + no-JS visitors get the animated strip immediately);
+ * a tiny client effect only adds an IntersectionObserver that toggles the
+ * existing `.marquee-paused` class so the 24-frame transform loop stops
+ * compositing work while the band is scrolled off-screen. First paint is
+ * unchanged (default = running), so nothing about the look or LCP shifts.
  */
 export type WallImage = { src: string; blurDataURL?: string };
 
@@ -25,8 +32,22 @@ export default function PhotoWall({
   eyebrow: string;
   title: string;
 }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [offscreen, setOffscreen] = useState(false);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([entry]) => setOffscreen(!entry.isIntersecting), {
+      rootMargin: "200px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <section
+      ref={sectionRef}
       aria-labelledby="photowall-heading"
       className="relative bg-[#10140f] border-y border-white/8 overflow-hidden"
     >
@@ -60,7 +81,7 @@ export default function PhotoWall({
       <div className="relative mt-10 sm:mt-12 lg:mt-16">
         <div className="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-[#10140f] to-transparent z-20 pointer-events-none" />
         <div className="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-[#10140f] to-transparent z-20 pointer-events-none" />
-        <div className="flex gap-2.5 animate-marquee w-max">
+        <div className={`flex gap-2.5 animate-marquee w-max${offscreen ? " marquee-paused" : ""}`}>
           {[...images, ...images].map((img, i) => (
             <div
               key={i}
@@ -70,7 +91,7 @@ export default function PhotoWall({
                 src={img.src}
                 alt=""
                 fill
-                sizes="(max-width: 640px) 420px, (max-width: 1024px) 585px, 720px"
+                sizes="(max-width: 640px) 360px, (max-width: 1024px) 585px, 720px"
                 className="object-cover"
                 placeholder={img.blurDataURL ? "blur" : undefined}
                 blurDataURL={img.blurDataURL}

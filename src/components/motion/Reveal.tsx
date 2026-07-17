@@ -71,15 +71,50 @@ export default function Reveal({
       t.style.transform = "";
       t.style.opacity = "";
       t.style.willChange = "";
+      t.style.transition = "";
+    };
+    // Plain-CSS reveal to the final visible state — used only as the degraded
+    // fallback when the lazy GSAP chunk is slow or fails. It transitions to the
+    // same end state GSAP would land on, so content is never left stuck hidden.
+    const cssReveal = (t: HTMLElement) => {
+      const ease = "cubic-bezier(0.16, 1, 0.3, 1)";
+      if (variant === "mask") {
+        t.style.transition = `clip-path ${duration}s ${ease}, transform ${duration}s ${ease}`;
+        t.style.clipPath = "inset(0 0 0% 0)";
+        t.style.transform = "translateY(0px)";
+      } else if (variant === "fade") {
+        t.style.transition = `opacity ${duration}s ${ease}`;
+        t.style.opacity = "1";
+      } else {
+        t.style.transition = `opacity ${duration}s ${ease}, transform ${duration}s ${ease}`;
+        t.style.opacity = "1";
+        t.style.transform = "translateY(0px)";
+      }
     };
     for (const t of targets) applyHide(t);
 
     let ctx: { revert: () => void } | undefined;
     let cancelled = false;
+    let gsapReady = false;
 
-    Promise.all([import("gsap"), import("gsap/ScrollTrigger")]).then(
-      ([{ gsap }, { ScrollTrigger }]) => {
+    // Time-based failsafe: if the ~27KB GSAP chunk hasn't resolved within
+    // FAILSAFE_MS (slow network, offline, or a failed request), reveal the
+    // content with a plain-CSS transition and skip the GSAP handoff, so
+    // above-the-fold content can never be stranded in its hidden "from" state.
+    // On a normal load GSAP resolves well within this window and clears the
+    // timer, leaving the cinematic ScrollTrigger reveal completely intact.
+    const FAILSAFE_MS = 1200;
+    const failsafe = window.setTimeout(() => {
+      if (gsapReady || cancelled || !ref.current) return;
+      cancelled = true; // block the pending GSAP handoff from re-hiding/replaying
+      for (const t of targets) cssReveal(t);
+    }, FAILSAFE_MS);
+
+    Promise.all([import("gsap"), import("gsap/ScrollTrigger")])
+      .then(([{ gsap }, { ScrollTrigger }]) => {
         if (cancelled || !ref.current) return;
+        gsapReady = true;
+        window.clearTimeout(failsafe);
         gsap.registerPlugin(ScrollTrigger);
         const ease = "power3.out";
         ctx = gsap.context(() => {
@@ -105,11 +140,19 @@ export default function Reveal({
             scrollTrigger: { trigger: el, start, once: true },
           });
         }, el);
-      },
-    );
+      })
+      .catch(() => {
+        // Chunk failed to load — clear the inline hide so content is never
+        // left stuck invisible.
+        if (cancelled || !ref.current) return;
+        cancelled = true;
+        window.clearTimeout(failsafe);
+        for (const t of targets) clearHide(t);
+      });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(failsafe);
       if (ctx) ctx.revert();
       // GSAP never loaded (slow chunk / unmounted first) — clear the inline hide
       // so content is never left stuck invisible.

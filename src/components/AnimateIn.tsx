@@ -10,6 +10,50 @@ interface Props {
   from?: "bottom" | "left" | "right" | "fade" | "clip";
 }
 
+// AnimateIn is rendered dozens of times per page. Instead of each instance
+// spinning up its OWN IntersectionObserver, they all share a SINGLE module-level
+// observer. Each element registers a one-shot reveal callback in a WeakMap; when
+// the shared observer reports the element intersecting, it fires that callback
+// once and stops watching the element. N reveals therefore cost one observer, not
+// N — with byte-for-byte the same threshold / rootMargin, so the reveal geometry
+// is identical to the previous per-instance observers.
+type RevealCallback = () => void;
+
+let sharedObserver: IntersectionObserver | null = null;
+const revealCallbacks = new WeakMap<Element, RevealCallback>();
+
+function getSharedObserver(): IntersectionObserver {
+  if (sharedObserver) return sharedObserver;
+  sharedObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const cb = revealCallbacks.get(entry.target);
+        if (cb) {
+          // Fire once, then stop watching this element (mirrors the original
+          // per-instance `observer.disconnect()` after the first intersection).
+          revealCallbacks.delete(entry.target);
+          sharedObserver!.unobserve(entry.target);
+          cb();
+        }
+      }
+    },
+    { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+  );
+  return sharedObserver;
+}
+
+function observeReveal(el: Element, cb: RevealCallback) {
+  revealCallbacks.set(el, cb);
+  getSharedObserver().observe(el);
+}
+
+function unobserveReveal(el: Element) {
+  if (!revealCallbacks.has(el)) return;
+  revealCallbacks.delete(el);
+  sharedObserver?.unobserve(el);
+}
+
 export default function AnimateIn({ children, className = "", delay = 0, from = "bottom" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   // Start VISIBLE so the server HTML — and anyone whose JS fails or is disabled —
@@ -24,17 +68,8 @@ export default function AnimateIn({ children, className = "", delay = 0, from = 
     // Reduced motion (and no IntersectionObserver): leave it visible, no reveal.
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     setVisible(false); // hide synchronously, before paint
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+    observeReveal(el, () => setVisible(true));
+    return () => unobserveReveal(el);
   }, []);
 
   const transforms: Record<string, string> = {
