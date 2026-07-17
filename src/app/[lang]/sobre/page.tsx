@@ -232,7 +232,13 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
           <div className="relative flex items-center justify-center px-6 py-14 lg:py-0 min-h-[440px] lg:min-h-[560px]">
-            <div className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden shadow-2xl shadow-black/25 ring-1 ring-foreground/5">
+            {/* Founder portrait uncovered with the same cinematic mask-wipe used
+                on the editorial grids, so it arrives instead of just being there. */}
+            <Reveal
+              as="div"
+              variant="mask"
+              className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden shadow-2xl shadow-black/25 ring-1 ring-foreground/5"
+            >
               <Image
                 src="/imagens/catarina-gaspar.jpg"
                 alt={t.common.imageAlt.sobreFounder}
@@ -241,7 +247,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 className="object-cover"
                 {...blurFor("/imagens/catarina-gaspar.jpg")}
               />
-            </div>
+            </Reveal>
           </div>
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
             <AnimateIn>

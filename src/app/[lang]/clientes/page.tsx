@@ -6,7 +6,8 @@ import AnimateIn from "@/components/AnimateIn";
 import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
-import RatingBadge from "@/components/RatingBadge";
+import TitleReveal from "@/components/TitleReveal";
+import CountUp from "@/components/CountUp";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
@@ -121,12 +122,6 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
-          <AnimateIn>
-            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3 mb-10">
-              <span className="w-8 h-px bg-gold flex-shrink-0" />
-              {t.clientes.heroEyebrow}
-            </p>
-          </AnimateIn>
           <KineticHeading
             className="text-white font-bold leading-[0.88] tracking-tight"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
@@ -135,29 +130,6 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               [{ text: t.clientes.heroTitleMoss, moss: true }],
             ]}
           />
-          <AnimateIn delay={180}>
-            <div className="mt-10 border-l-2 border-moss/50 pl-6 max-w-md">
-              <p className="text-white/70 text-base leading-[1.8]">{t.clientes.heroLead}</p>
-            </div>
-          </AnimateIn>
-          <AnimateIn delay={260}>
-            <div className="mt-8">
-              <RatingBadge
-                label={t.common.reviewsLabel}
-                ptFormat={locale === "pt"}
-                starClassName="text-gold"
-                textClassName="text-white/75"
-              />
-            </div>
-          </AnimateIn>
-        </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
-          <span className="text-white/60 text-[8px] tracking-[0.45em] uppercase">
-            {t.clientes.scroll}
-          </span>
-          <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
         </div>
       </section>
 
@@ -205,7 +177,11 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                   className="text-cream/45 font-bold leading-none"
                   style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
                 >
-                  {SITE.founded}
+                  {/* The founding year climbs to 2018 on scroll-in. Counting from
+                      2000 keeps every intermediate frame a plausible year (only the
+                      last two digits move) — a quiet heritage flourish. Decorative
+                      (aria-hidden) and SSR/reduced-motion safe: shows 2018 at rest. */}
+                  <CountUp from={2000} to={Number(SITE.founded)} duration={1400} />
                 </span>
               </div>
             </AnimateIn>
@@ -280,8 +256,10 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               </div>
             </AnimateIn>
 
-            {/* Photo side */}
-            <div className="relative min-h-[380px] lg:min-h-0">
+            {/* Photo side — cinematic mask-wipe reveal (same vocabulary as the
+                editorial grids), so this hero-grade image is uncovered on scroll
+                instead of just sitting there. */}
+            <Reveal as="div" variant="mask" className="relative min-h-[380px] lg:min-h-0">
               <Image
                 src="/imagens/428708341-339551125742979-6565889301500133407-n.jpg"
                 alt={t.common.imageAlt.clientesDinner}
@@ -292,7 +270,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[#080808] via-[#080808]/15 to-transparent lg:block hidden" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/30 to-transparent lg:hidden" />
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -411,15 +389,17 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.ctaEyebrow}
               <span className="w-8 h-px bg-gold" />
             </p>
-            <h2
-              className="text-white font-bold leading-[0.88] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(50px, 9vw, 128px)" }}
-            >
-              {t.clientes.ctaTitleLine1}
-              <br />
-              {t.clientes.ctaTitleLine2}
-            </h2>
           </AnimateIn>
+          <h2
+            className="text-white font-bold leading-[0.88] tracking-tight mb-6"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(50px, 9vw, 128px)" }}
+          >
+            {/* Closing headline resolves word-by-word (the hero/logo-wall
+                signature) — matching the home & sobre CTAs so the site's big
+                finish reads the same everywhere. Reduced motion: words appear. */}
+            <TitleReveal text={t.clientes.ctaTitleLine1} as="span" className="block" />
+            <TitleReveal text={t.clientes.ctaTitleLine2} as="span" className="block" delay={220} />
+          </h2>
           <AnimateIn delay={110}>
             <p className="text-white/70 text-base leading-relaxed max-w-sm mb-14">
               {t.clientes.ctaText}
