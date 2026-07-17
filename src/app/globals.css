@@ -317,7 +317,7 @@ body::before {
 }
 
 .animate-marquee {
-  animation: marquee 50s linear infinite;
+  animation: marquee 30s linear infinite;
 }
 .animate-marquee:hover,
 .animate-marquee.marquee-paused {
