@@ -43,6 +43,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
   // Fundos de foto para os dois CTA (com véu por cima para manter o contraste).
   const orcamentoCtaImg = "/imagens/DaniGui_JantarFesta_130.jpg";
   const whatsappCtaImg = "/imagens/Natalia e Jonathan-198.jpg";
+  const stepsBgImg = "/imagens/stephanie-mizio-555.jpg";
   return (
     <>
       <BreadcrumbJsonLd
@@ -317,40 +318,47 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         </AnimateIn>
       </section>
 
-      {/* ── O que acontece a seguir ── */}
-      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      {/* ── O que acontece a seguir — sobre foto de evento, com véu escuro ── */}
+      <section className="relative py-16 sm:py-28 overflow-hidden border-t border-foreground/8">
+        <Image
+          src={stepsBgImg}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(stepsBgImg)}
+        />
+        <div className="absolute inset-0 bg-black/72" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/75 via-[#080808]/50 to-[#080808]/75" />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
-            <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+            <p className="text-white/75 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
+              <span className="w-5 h-px bg-gold flex-shrink-0" />
               {t.contacto.nextEyebrow}
             </p>
           </AnimateIn>
           <div>
             {steps.map((p, i) => (
               <AnimateIn key={p.step} delay={i * 70}>
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-foreground/8">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-white/15">
                   <div className="lg:col-span-1 flex items-start gap-4">
-                    <span
-                      aria-hidden
-                      className="text-foreground/25 text-xs font-mono mt-1 tabular-nums"
-                    >
+                    <span aria-hidden className="text-white/40 text-xs font-mono mt-1 tabular-nums">
                       {p.step}
                     </span>
                     <h3
-                      className="text-foreground text-lg font-bold"
+                      className="text-white text-lg font-bold"
                       style={{ fontFamily: "var(--font-playfair)" }}
                     >
                       {p.title}
                     </h3>
                   </div>
-                  <p className="lg:col-span-4 text-foreground/72 text-sm leading-relaxed max-w-xl">
+                  <p className="lg:col-span-4 text-white/75 text-sm leading-relaxed max-w-xl">
                     {p.desc}
                   </p>
                 </div>
               </AnimateIn>
             ))}
-            <div className="border-t border-foreground/8" />
+            <div className="border-t border-white/15" />
           </div>
         </div>
       </section>
