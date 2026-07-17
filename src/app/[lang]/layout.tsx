@@ -76,6 +76,8 @@ export async function generateMetadata({
     openGraph: {
       type: "website",
       locale: t.meta.ogLocale,
+      // Tell Facebook/LinkedIn the other language exists (reciprocal signal).
+      alternateLocale: t.meta.ogLocale === "pt_PT" ? "en_GB" : "pt_PT",
       siteName: SITE.name,
       url: `${SITE.url}${canonical === "/" ? "" : canonical}`,
       title,

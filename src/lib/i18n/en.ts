@@ -101,7 +101,7 @@ export const en: Dict = {
   },
 
   meta: {
-    ogLocale: "en_US",
+    ogLocale: "en_GB",
     homeTitle: "Event & Wedding Decoration in Évora, Portugal | Líquen Events",
     homeDescription:
       "Wedding decoration and coordination, corporate events and celebrations in Évora, the Alentejo and across Portugal. From concept to the last detail — request a quote.",
