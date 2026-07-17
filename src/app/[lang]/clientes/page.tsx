@@ -44,43 +44,43 @@ const mosaicItems = [
     src: "/imagens/EW1_1408.jpg",
     alt: "Receção de evento corporativo num pátio em Évora",
     label: "Corporativo",
-    cls: "col-span-5 row-span-2",
+    cls: "col-span-2 md:col-span-5 md:row-span-2",
   },
   {
     src: "/imagens/DaniGui_Preview20.jpg",
     alt: "Casamento com decoração floral numa herdade do Alentejo",
     label: "Casamento",
-    cls: "col-span-4 row-span-1",
+    cls: "md:col-span-4 md:row-span-1",
   },
   {
     src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
     alt: "Jantar de gala à luz de velas num evento no Alentejo",
     label: "Gala",
-    cls: "col-span-3 row-span-1",
+    cls: "md:col-span-3 md:row-span-1",
   },
   {
     src: "/imagens/stephanie-mizio-558.jpg",
     alt: "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
     label: "Casamento",
-    cls: "col-span-4 row-span-1",
+    cls: "md:col-span-4 md:row-span-1",
   },
   {
     src: "/imagens/M&F0512.jpg",
     alt: "Jantar de gala com mesa posta e velas",
     label: "Jantar",
-    cls: "col-span-3 row-span-1",
+    cls: "md:col-span-3 md:row-span-1",
   },
   {
     src: "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
     alt: "Gala corporativa num salão decorado à noite",
     label: "Gala",
-    cls: "col-span-7 row-span-1",
+    cls: "col-span-2 md:col-span-7 md:row-span-1",
   },
   {
     src: "/imagens/hd-edited.jpg",
     alt: "Evento institucional com palco e plateia",
     label: "Institucional",
-    cls: "col-span-5 row-span-1",
+    cls: "col-span-2 md:col-span-5 md:row-span-1",
   },
 ];
 
@@ -366,7 +366,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             as="div"
             variant="mask"
             stagger
-            className="grid grid-cols-12 gap-2 grid-rows-[210px_210px_230px]"
+            className="grid grid-cols-2 md:grid-cols-12 gap-2 auto-rows-[150px] md:auto-rows-auto md:grid-rows-[210px_210px_230px]"
           >
             {mosaicItems.map((item, i) => (
               <div key={i} className={`${item.cls} relative overflow-hidden group`}>
