@@ -294,7 +294,7 @@ export const en: Dict = {
       ctaTitleLine1: "Request your",
       ctaTitleMoss: "quote.",
       ctaText:
-        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the channels alongside.",
+        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the direct channels.",
       ctaButton: "Request a quote",
     },
     testimonialsEyebrow: "What our clients say",
@@ -436,7 +436,7 @@ export const en: Dict = {
     dateFlexibleLabel: "Date still to be decided",
     labelPessoas: "No. of people",
     labelLocal: "Location / region",
-    labelBudget: "Approximate budget",
+    labelBudget: "Approximate budget (optional)",
     budgetLabels: ["Up to €5,000", "€5,000–15,000", "€15,000–30,000", "€30,000–60,000", "€60,000+"],
     labelNome: "Name",
     labelEmail: "Email",
@@ -457,6 +457,10 @@ export const en: Dict = {
     ouWhatsApp: "or via WhatsApp",
     error: "We couldn't send your request. Please try again or reach us on WhatsApp.",
     requiredNote: "Fields marked with * are required.",
+    submitReassure: "No commitment · Reply within 24 business hours.",
+    privacyPre: "By submitting, you accept our ",
+    privacyLinkLabel: "Privacy Policy",
+    privacyPost: ". We never share your details.",
   },
 
   servicos: {

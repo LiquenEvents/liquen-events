@@ -638,6 +638,21 @@ export default function OrcamentoForm() {
               </a>
             </div>
 
+            {/* Reassurance + privacy at the point of decision — the moment
+                hesitation peaks. Reuses facts already shown up top. */}
+            <p className="mt-6 text-[11px] leading-relaxed text-foreground/55 max-w-md">
+              {to.submitReassure}
+              <br />
+              {to.privacyPre}
+              <Link
+                href={localizeHref("/privacidade", locale)}
+                className="underline underline-offset-2 hover:text-foreground/80 transition-colors"
+              >
+                {to.privacyLinkLabel}
+              </Link>
+              {to.privacyPost}
+            </p>
+
             {error && (
               // Failure state — deliberately NOT moss/green (that's the brand's
               // success colour). Uses the same gold as the field-level errors so
