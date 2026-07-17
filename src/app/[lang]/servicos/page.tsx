@@ -152,25 +152,26 @@ function ServiceBand({
           the bottom — where the number/title/description sit — darkens enough to
           keep the white text legible. No heavy full-panel veil. */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-16 lg:pb-24">
+      {/* Full-SpaceX: a small, discreet caption tucked in the corner so the
+          photograph carries the panel. Tiny mono index, compact uppercase
+          service name, a one-line description, and an understated link. */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-12 lg:pb-16">
         <AnimateIn>
-          <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
-            {catNum}.{String(index + 1).padStart(2, "0")}
-          </p>
-          <h3
-            className="text-white font-bold leading-[0.95] tracking-tight max-w-3xl"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 6.5vw, 96px)" }}
-          >
-            {service.title}
-          </h3>
-          <div className="mt-7 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
-            <p className="text-white/85 text-[15px] leading-[1.7] max-w-md">{service.desc}</p>
+          <div className="max-w-sm">
+            <p className="text-white/55 font-mono text-[10px] tracking-[0.4em] mb-3">
+              {catNum}.{String(index + 1).padStart(2, "0")}
+            </p>
+            <h3 className="text-white font-semibold uppercase tracking-[0.16em] text-[15px] sm:text-[17px] leading-snug">
+              {service.title}
+            </h3>
+            <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
+              {service.desc}
+            </p>
             <Link
               href={localizeHref(`/servicos/${service.slug}`, locale)}
-              className={`${OUTLINE_LIGHT_BUTTON_CLASS} flex-shrink-0`}
+              className="mt-5 inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
             >
-              {cta}
-              <span aria-hidden>→</span>
+              {cta} <span aria-hidden>→</span>
             </Link>
           </div>
         </AnimateIn>
@@ -329,7 +330,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           <section
             id={cat.id}
             className="relative overflow-hidden scroll-mt-[60px] flex items-end"
-            style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+            style={{ minHeight: "clamp(500px, 80vh, 820px)" }}
           >
             <Parallax speed={0.12} className="absolute inset-0">
               <Image
@@ -342,35 +343,33 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               />
             </Parallax>
             <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-            <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
+            {/* Full-SpaceX: a small category caption tucked in the corner; the
+                photograph carries the panel. Slightly larger than a service band
+                to signal it opens a category. */}
+            <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
-                <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
-                  {cat.num}
-                </p>
-                <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-4 flex items-center gap-3">
-                  <span className="w-8 h-px bg-gold flex-shrink-0" />
-                  {cat.subtitle}
-                </p>
-                <h2
-                  className="text-white font-bold leading-[0.92] tracking-tight"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(42px, 8vw, 120px)",
-                  }}
-                >
-                  {cat.label}
-                </h2>
-                <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
-                  <p className="text-white/85 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
+                <div className="max-w-md">
+                  <p className="text-white/55 font-mono text-[10px] tracking-[0.4em] mb-4">
+                    {cat.num}
+                  </p>
+                  <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                    <span className="w-6 h-px bg-gold flex-shrink-0" />
+                    {cat.subtitle}
+                  </p>
+                  <h2 className="text-white font-semibold uppercase tracking-[0.18em] text-[19px] sm:text-[22px] leading-snug">
+                    {cat.label}
+                  </h2>
+                  <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
+                    {cat.desc}
+                  </p>
                   <Link
                     href={localizeHref(
                       `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
                       locale,
                     )}
-                    className={`${OUTLINE_LIGHT_BUTTON_CLASS} flex-shrink-0`}
+                    className="mt-5 inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
                   >
-                    {ts.verDetalhes}
-                    <span aria-hidden>→</span>
+                    {ts.verDetalhes} <span aria-hidden>→</span>
                   </Link>
                 </div>
               </AnimateIn>
