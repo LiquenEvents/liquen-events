@@ -1,6 +1,5 @@
 import "server-only";
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
-import bcrypt from "bcryptjs";
 import type { NextRequest } from "next/server";
 import { verifyTotp } from "./totp";
 import { log } from "./logger";
@@ -150,22 +149,31 @@ export function checkTotp(name: string, code: string): boolean {
  * single shared password accepted with any display name (current UX).
  * Returns the resolved user, or null when credentials are wrong.
  */
-export function verifyCredentials(name: string, password: string): { name: string } | null {
+// Async + lazy `import("bcryptjs")`: bcrypt is ONLY needed here (the login POST),
+// yet this module is also imported by hot, mostly-unauthenticated paths — the
+// health probe and the public /api/orcamento route both pull in `isAuthed`
+// from here. Keeping bcryptjs out of the top-level import means those paths no
+// longer pay to load it; the login route (the sole caller) absorbs one await.
+export async function verifyCredentials(
+  name: string,
+  password: string,
+): Promise<{ name: string } | null> {
   if (!password) return null;
   const cleanName = name.trim().slice(0, 40);
+  const { compareSync } = (await import("bcryptjs")).default;
 
   const users = configuredUsers();
   if (users) {
     const u = users.find((x) => x.name.toLowerCase() === cleanName.toLowerCase());
-    if (u && bcrypt.compareSync(password, u.passwordHash)) return { name: u.name };
+    if (u && compareSync(password, u.passwordHash)) return { name: u.name };
     // Unknown name: still run one bcrypt compare so the response time doesn't
     // reveal whether the admin display-name exists (username enumeration).
-    if (!u) bcrypt.compareSync(password, DEV_SHARED_HASH);
+    if (!u) compareSync(password, DEV_SHARED_HASH);
     return null;
   }
 
   const hash = sharedHash();
-  if (hash && bcrypt.compareSync(password, hash)) {
+  if (hash && compareSync(password, hash)) {
     return { name: cleanName || "Equipa" };
   }
   return null;

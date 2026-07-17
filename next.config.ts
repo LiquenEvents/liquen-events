@@ -107,6 +107,16 @@ const nextConfig: NextConfig = {
         source: "/logos/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
+      {
+        // Root-level static assets fetched on effectively every visit/crawl but
+        // NOT served through /_next/image (so they miss minimumCacheTTL) and NOT
+        // under /imagens or /logos: the PWA manifest icons and the social OG
+        // image. With output:standalone (self-hosted, no platform CDN backfill)
+        // these otherwise revalidate on every request. Hashless filenames, but
+        // they only change on a deploy, so a long immutable TTL is safe.
+        source: "/:file(og-liquen.jpg|icon-192.png|icon-512.png|icon-maskable-512.png)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
     ];
   },
 };

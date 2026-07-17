@@ -4,7 +4,6 @@ import type { Proposal } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
-import { renderProposalPdf } from "@/lib/proposal-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
@@ -98,6 +97,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           CATEGORIES.find((c) => c.id === quote.category)?.label)
         : CATEGORIES.find((c) => c.id === quote.category)?.label;
 
+    // Lazy-load pdf-lib (large) only when actually rendering a PDF: this route's
+    // GET handler lists proposals and never renders one, so the top-level import
+    // was dragging pdf-lib into every cold start of the admin polling the list.
+    const { renderProposalPdf } = await import("@/lib/proposal-pdf");
     const pdfBytes = await renderProposalPdf(proposal, {
       eventType,
       date: quote.date,

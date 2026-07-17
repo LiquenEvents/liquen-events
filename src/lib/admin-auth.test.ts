@@ -26,26 +26,26 @@ afterEach(() => {
 });
 
 describe("verifyCredentials — shared password fallback", () => {
-  it("accepts the default dev password with any name", () => {
-    expect(verifyCredentials("Catarina", "liquen2026")).toEqual({ name: "Catarina" });
+  it("accepts the default dev password with any name", async () => {
+    expect(await verifyCredentials("Catarina", "liquen2026")).toEqual({ name: "Catarina" });
   });
 
-  it("rejects a wrong password", () => {
-    expect(verifyCredentials("Catarina", "wrong")).toBeNull();
+  it("rejects a wrong password", async () => {
+    expect(await verifyCredentials("Catarina", "wrong")).toBeNull();
   });
 
-  it("rejects an empty password", () => {
-    expect(verifyCredentials("Catarina", "")).toBeNull();
+  it("rejects an empty password", async () => {
+    expect(await verifyCredentials("Catarina", "")).toBeNull();
   });
 
-  it("defaults the display name when none is given", () => {
-    expect(verifyCredentials("", "liquen2026")).toEqual({ name: "Equipa" });
+  it("defaults the display name when none is given", async () => {
+    expect(await verifyCredentials("", "liquen2026")).toEqual({ name: "Equipa" });
   });
 
-  it("honours a custom ADMIN_PASSWORD_HASH", () => {
+  it("honours a custom ADMIN_PASSWORD_HASH", async () => {
     process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("s3cret!", 10);
-    expect(verifyCredentials("Rui", "s3cret!")).toEqual({ name: "Rui" });
-    expect(verifyCredentials("Rui", "liquen2026")).toBeNull();
+    expect(await verifyCredentials("Rui", "s3cret!")).toEqual({ name: "Rui" });
+    expect(await verifyCredentials("Rui", "liquen2026")).toBeNull();
   });
 });
 
@@ -57,26 +57,26 @@ describe("verifyCredentials — individual accounts (ADMIN_USERS)", () => {
     ]);
   });
 
-  it("matches each user against their own password", () => {
-    expect(verifyCredentials("Catarina", "cat-pass")).toEqual({ name: "Catarina" });
-    expect(verifyCredentials("Rui", "rui-pass")).toEqual({ name: "Rui" });
+  it("matches each user against their own password", async () => {
+    expect(await verifyCredentials("Catarina", "cat-pass")).toEqual({ name: "Catarina" });
+    expect(await verifyCredentials("Rui", "rui-pass")).toEqual({ name: "Rui" });
   });
 
-  it("does not accept another user's password", () => {
-    expect(verifyCredentials("Catarina", "rui-pass")).toBeNull();
+  it("does not accept another user's password", async () => {
+    expect(await verifyCredentials("Catarina", "rui-pass")).toBeNull();
   });
 
-  it("matches the name case-insensitively", () => {
-    expect(verifyCredentials("catarina", "cat-pass")).toEqual({ name: "Catarina" });
+  it("matches the name case-insensitively", async () => {
+    expect(await verifyCredentials("catarina", "cat-pass")).toEqual({ name: "Catarina" });
   });
 
-  it("rejects unknown users", () => {
-    expect(verifyCredentials("Intruder", "cat-pass")).toBeNull();
+  it("rejects unknown users", async () => {
+    expect(await verifyCredentials("Intruder", "cat-pass")).toBeNull();
   });
 
-  it("falls back to shared password when ADMIN_USERS is malformed", () => {
+  it("falls back to shared password when ADMIN_USERS is malformed", async () => {
     process.env.ADMIN_USERS = "{not json";
-    expect(verifyCredentials("Anyone", "liquen2026")).toEqual({ name: "Anyone" });
+    expect(await verifyCredentials("Anyone", "liquen2026")).toEqual({ name: "Anyone" });
   });
 });
 

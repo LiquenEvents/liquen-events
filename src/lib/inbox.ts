@@ -1,6 +1,12 @@
 import "server-only";
-import { ImapFlow } from "imapflow";
-import { simpleParser } from "mailparser";
+import type { ImapFlow } from "imapflow";
+
+// imapflow (~1.9MB) and mailparser are imported lazily inside the functions that
+// use them, NOT at module top level: `imapConfigured()`/`imapHost()` are pure
+// env-var checks that many callers (the every-few-minutes inbox-check cron, the
+// admin inbox listing) hit on the "not configured" / list-only fast paths, and
+// those must not pay to parse+evaluate ~2MB of IMAP/mail deps just to no-op.
+// The list path never needs mailparser at all — only getInboxMessage does.
 
 /**
  * Read-only IMAP access to the team inbox, used by the dashboard so replies
@@ -33,7 +39,8 @@ export function imapConfigured(): boolean {
   return !!(imapHost() && user && pass);
 }
 
-function makeClient(): ImapFlow {
+async function makeClient(): Promise<ImapFlow> {
+  const { ImapFlow } = await import("imapflow");
   const port = Number(process.env.IMAP_PORT ?? 993);
   return new ImapFlow({
     host: imapHost()!,
@@ -57,7 +64,7 @@ export interface InboxItem {
 }
 
 export async function listInbox(limit = 30): Promise<InboxItem[]> {
-  const client = makeClient();
+  const client = await makeClient();
   await client.connect();
   try {
     const lock = await client.getMailboxLock("INBOX");
@@ -92,13 +99,14 @@ export interface InboxMessage extends InboxItem {
 }
 
 export async function getInboxMessage(uid: number): Promise<InboxMessage | null> {
-  const client = makeClient();
+  const client = await makeClient();
   await client.connect();
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
       const dl = await client.download(String(uid), undefined, { uid: true });
       if (!dl) return null;
+      const { simpleParser } = await import("mailparser");
       const parsed = await simpleParser(dl.content);
       const f = parsed.from?.value?.[0];
       return {

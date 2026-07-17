@@ -68,7 +68,7 @@ export default function AdminLogin() {
             alt="Líquen Events"
             width={210}
             height={125}
-            priority
+            preload
             className="h-20 w-auto object-contain opacity-95 mx-auto mb-8"
           />
           <p
@@ -95,7 +95,7 @@ export default function AdminLogin() {
             alt="Líquen Events"
             width={210}
             height={125}
-            priority
+            preload
             className="h-14 w-auto object-contain opacity-95"
           />
         </div>

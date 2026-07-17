@@ -110,7 +110,13 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except Next's static output; the function itself lets
-  // metadata files and assets through untouched (see isNonLocalized).
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  // Run on everything except Next's static output AND the public static assets
+  // this function would only ever no-op anyway (see isNonLocalized). Excluding
+  // the high-volume asset folders (event photos, logos) and the root metadata
+  // files from the matcher means each such request skips the Node proxy
+  // invocation entirely and is served straight from the static layer — the
+  // response is byte-for-byte identical to the previous NextResponse.next().
+  matcher: [
+    "/((?!_next/static|_next/image|imagens/|logos/|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt).*)",
+  ],
 };

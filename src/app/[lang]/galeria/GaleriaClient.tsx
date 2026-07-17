@@ -751,7 +751,12 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                             src={p.src}
                             alt={altText(p.src, p.label)}
                             fill
-                            sizes="(max-width: 768px) 50vw, 33vw"
+                            // Match the real column count (1 col <640px, 2 cols
+                            // 640–767px, 3 cols ≥768px). The old value declared
+                            // 50vw on phones where a tile is actually full-width,
+                            // under-fetching and softening the flagship gallery
+                            // photos on mobile — the majority of visitors.
+                            sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
                             className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                             loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
                             {...blurProps(p)}

@@ -47,6 +47,11 @@ function Mark({
         alt={duplicate ? "" : name}
         width={d[0]}
         height={d[1]}
+        // Without `sizes`, next/image builds a 1x/2x srcset off the raw source
+        // width and serves a ~640–1280px file for a logo rendered ≤170px wide.
+        // Declaring the CSS cap switches it to a viewport/DPR-aware srcset that
+        // picks a correctly-small candidate — same pixels, far fewer bytes.
+        sizes="(max-width: 640px) 140px, 170px"
         style={{ height: `${h}px` }}
         className="w-auto max-w-[140px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
         onError={() => setFailed(true)}
