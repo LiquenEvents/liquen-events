@@ -7,12 +7,12 @@ import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
-import Reveal from "@/components/motion/Reveal";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -88,38 +88,35 @@ const categoryMeta = [
   },
 ];
 
-// Full-bleed editorial photo grid (mirrors the Sobre page rhythm).
-const editorial = [
-  {
-    src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-    cls: "col-span-2 row-span-2",
-    alt: "Casamento ao ar livre organizado pela Líquen Events no Alentejo",
-  },
-  {
-    src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-    cls: "col-span-2",
-    alt: "Jantar de celebração com decoração elegante à luz de velas",
-  },
-  {
-    src: "/imagens/DJI_20250913190635_0120_D.jpg",
-    cls: "col-span-1",
-    alt: "Vista aérea de um evento numa herdade do Alentejo",
-  },
-  {
-    src: "/imagens/20_10_2025_0407.jpg",
-    cls: "col-span-1",
-    alt: "Receção de evento ao final da tarde no Alentejo",
-  },
-  {
-    src: "/imagens/stephanie-mizio-555.jpg",
-    cls: "col-span-2",
-    alt: "Receção de casamento ao ar livre ao pôr do sol no Alentejo",
-  },
-  {
-    src: "/imagens/DaniGui_Adois_61.jpg",
-    cls: "col-span-2",
-    alt: "Retrato dos noivos durante um casamento no Alentejo",
-  },
+// Full-bleed editorial photo grid (mirrors the Sobre page rhythm). Draws a
+// fresh 6 from this pool on every entry to the page (see RotatingPhotoGrid) —
+// all landscape frames so any lands cleanly in a wide or narrow cell.
+const EDITORIAL_POOL = [
+  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/20_10_2025_0407.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+  "/imagens/DaniGui_Adois_61.jpg",
+  "/imagens/hd-edited.jpg",
+  "/imagens/EW1_1330.jpg",
+  "/imagens/J&P-IMGL4769.jpg",
+  "/imagens/EW1_1408.jpg",
+  "/imagens/teresinhaeze-909.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
+  "/imagens/matilde-e-tomas0654-1.jpg",
+  "/imagens/stephanie-mizio-760.jpg",
+];
+
+const ED_WIDE = "(max-width: 1024px) 100vw, 50vw";
+const ED_NARROW = "(max-width: 1024px) 50vw, 25vw";
+const EDITORIAL_CELLS = [
+  { cls: "col-span-2 row-span-2", sizes: ED_WIDE },
+  { cls: "col-span-2", sizes: ED_WIDE },
+  { cls: "col-span-1", sizes: ED_NARROW },
+  { cls: "col-span-1", sizes: ED_NARROW },
+  { cls: "col-span-2", sizes: ED_WIDE },
+  { cls: "col-span-2", sizes: ED_WIDE },
 ];
 
 /* ── Full-screen service band — one image, one service (SpaceX-style) ── */
@@ -183,6 +180,10 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const ts = t.servicos;
+  const editorialPool = EDITORIAL_POOL.map((src) => ({
+    src,
+    blurDataURL: blurFor(src).blurDataURL,
+  }));
   const categories: Category[] = categoryMeta.map((m, ci) => {
     const ct = ts.categories[ci];
     return {
@@ -340,34 +341,13 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
       {/* ── Editorial photo grid (full-bleed) ── */}
       <section className="bg-surface border-t border-foreground/8">
-        <Reveal
-          as="div"
-          variant="mask"
-          stagger
+        <RotatingPhotoGrid
+          cells={EDITORIAL_CELLS}
+          pool={editorialPool}
+          alt={t.common.imageAlt.servicosEndOfDay}
           className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
-        >
-          {editorial.map((g, i) => {
-            // Match the real rendered width so wide feature tiles aren't served a
-            // 25vw candidate and upscaled: grid is 2-col below lg, 4-col at lg+,
-            // so a col-span-2 tile is 100vw (mobile) / 50vw (desktop).
-            const wide = g.cls.includes("col-span-2");
-            return (
-              <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
-                <Image
-                  src={g.src}
-                  alt={t.servicos.galleryAlt[i] ?? g.alt}
-                  fill
-                  sizes={
-                    wide ? "(max-width: 1024px) 100vw, 50vw" : "(max-width: 1024px) 50vw, 25vw"
-                  }
-                  className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                  {...blurFor(g.src)}
-                />
-                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
-              </div>
-            );
-          })}
-        </Reveal>
+          imgClassName="transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+        />
       </section>
 
       {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}

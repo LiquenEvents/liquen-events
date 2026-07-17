@@ -13,6 +13,7 @@ import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -32,37 +33,37 @@ export async function generateMetadata({
   });
 }
 
-const gallery = [
-  {
-    src: "/imagens/J&A-68.jpg",
-    cls: "col-span-2 row-span-2",
-    alt: "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
-  },
-  {
-    src: "/imagens/matilde-e-tomas0654-1.jpg",
-    cls: "col-span-2",
-    alt: "Festa de casamento sob luzes suspensas ao anoitecer",
-  },
-  {
-    src: "/imagens/DaniGui_Adois_61.jpg",
-    cls: "col-span-1",
-    alt: "Noivos abraçados durante a celebração do casamento",
-  },
-  {
-    src: "/imagens/stephanie-mizio-350.jpg",
-    cls: "col-span-1",
-    alt: "Mesa posta de casamento com flores e velas",
-  },
-  {
-    src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-    cls: "col-span-2",
-    alt: "Casamento ao entardecer ao ar livre no Alentejo",
-  },
-  {
-    src: "/imagens/ines-goncalo-252.jpg",
-    cls: "col-span-2",
-    alt: "Decoração floral de cerimónia de casamento no Alentejo",
-  },
+// The editorial wall draws a fresh 6 from this pool on every entry to the page
+// (see RotatingPhotoGrid). All landscape event frames, so they read well in
+// either a wide or a narrow cell.
+const GRID_POOL = [
+  "/imagens/J&A-68.jpg",
+  "/imagens/matilde-e-tomas0654-1.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+  "/imagens/ines-goncalo-252.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/teresinhaeze-909.jpg",
+  "/imagens/EW1_1330.jpg",
+  "/imagens/J&P-IMGL4769.jpg",
+  "/imagens/hd-edited.jpg",
+  "/imagens/EW1_1408.jpg",
+  "/imagens/20_10_2025_0407.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
+];
+
+const WIDE_SIZES = "(max-width: 768px) 50vw, 50vw";
+const NARROW_SIZES = "(max-width: 768px) 50vw, 25vw";
+// Fixed cell layout (spans + the right `sizes` per cell); whichever photo lands
+// in a cell, the shape stays the same.
+const GRID_CELLS = [
+  { cls: "col-span-2 row-span-2", sizes: WIDE_SIZES },
+  { cls: "col-span-2", sizes: WIDE_SIZES },
+  { cls: "col-span-1", sizes: NARROW_SIZES },
+  { cls: "col-span-1", sizes: NARROW_SIZES },
+  { cls: "col-span-2", sizes: WIDE_SIZES },
+  { cls: "col-span-2", sizes: WIDE_SIZES },
 ];
 
 const eyebrowLight =
@@ -73,6 +74,9 @@ const eyebrowDark =
 export default async function SobrePage({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
+  // Enrich the wall's pool with blur placeholders server-side (keeps blur-map
+  // out of the client bundle); the client picks a random 6 per visit.
+  const gridPool = GRID_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   return (
     <>
       <BreadcrumbJsonLd
@@ -161,32 +165,13 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
 
       {/* ── EDITORIAL PHOTO GRID ── */}
       <section className="bg-surface">
-        <Reveal
-          as="div"
-          variant="mask"
-          stagger
+        <RotatingPhotoGrid
+          cells={GRID_CELLS}
+          pool={gridPool}
+          alt={t.common.imageAlt.sobreCelebration}
           className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[210px] lg:auto-rows-[260px]"
-        >
-          {gallery.map((g, i) => {
-            // Single-column tiles are only 25vw at lg (grid-cols-4); the wide
-            // (col-span-2) tiles are 50vw. Give each the right candidate so the
-            // narrow tiles don't pull a 2×-oversized image on desktop.
-            const wide = g.cls.includes("col-span-2");
-            return (
-              <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
-                <Image
-                  src={g.src}
-                  alt={t.sobre.galleryAlt[i] ?? g.alt}
-                  fill
-                  sizes={wide ? "(max-width: 768px) 50vw, 50vw" : "(max-width: 768px) 50vw, 25vw"}
-                  className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                  {...blurFor(g.src)}
-                />
-                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
-              </div>
-            );
-          })}
-        </Reveal>
+          imgClassName="transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+        />
       </section>
 
       {/* ── CINEMATIC STATEMENT ── */}
