@@ -57,6 +57,7 @@ export default function OrcamentoForm() {
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [data, setData] = useState("");
+  const [dateFlexible, setDateFlexible] = useState(false);
   const [pessoas, setPessoas] = useState("");
   const [local, setLocal] = useState("");
   const [budget, setBudget] = useState(""); // "" = não indicado (opcional)
@@ -94,6 +95,7 @@ export default function OrcamentoForm() {
       if (d.email) setEmail(d.email);
       if (d.telefone) setTelefone(d.telefone);
       if (d.data) setData(d.data);
+      if (d.dateFlexible) setDateFlexible(d.dateFlexible === "1");
       if (d.pessoas) setPessoas(d.pessoas);
       if (d.local) setLocal(d.local);
       if (d.budget) setBudget(d.budget);
@@ -119,6 +121,7 @@ export default function OrcamentoForm() {
           email,
           telefone,
           data,
+          dateFlexible: dateFlexible ? "1" : "",
           pessoas,
           local,
           budget,
@@ -129,7 +132,7 @@ export default function OrcamentoForm() {
     } catch {
       /* ignora */
     }
-  }, [eventType, nome, email, telefone, data, pessoas, local, budget, mensagem]);
+  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, budget, mensagem]);
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
@@ -162,11 +165,15 @@ export default function OrcamentoForm() {
       category: opt?.category ?? null,
       eventType: opt?.eventType ?? null,
       eventName: eventType,
-      date: data,
+      date: dateFlexible ? "" : data,
       guests: Number(pessoas) || 0,
       location: local.trim(),
       budgetRange: budget || null,
-      notes: mensagem.trim(),
+      // Capture the "no fixed date yet" signal for the team (a high-value
+      // early-stage lead segment) by folding it into the notes.
+      notes: [dateFlexible ? `(${to.dateFlexibleLabel})` : "", mensagem.trim()]
+        .filter(Boolean)
+        .join("\n\n"),
     };
 
     try {
@@ -415,9 +422,19 @@ export default function OrcamentoForm() {
                   type="date"
                   min={minDate}
                   value={data}
+                  disabled={dateFlexible}
                   onChange={(e) => setData(e.target.value)}
-                  className={`${inputCls} [color-scheme:light]`}
+                  className={`${inputCls} [color-scheme:light] ${dateFlexible ? "opacity-40" : ""}`}
                 />
+                <label className="mt-3 inline-flex items-center gap-2.5 cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={dateFlexible}
+                    onChange={(e) => setDateFlexible(e.target.checked)}
+                    className="w-4 h-4 accent-moss cursor-pointer"
+                  />
+                  <span className="text-[11px] tracking-wide">{to.dateFlexibleLabel}</span>
+                </label>
               </div>
               <div className="group">
                 <label htmlFor="of-pessoas" className={labelCls}>

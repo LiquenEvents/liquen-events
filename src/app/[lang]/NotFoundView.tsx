@@ -7,8 +7,18 @@ import { useTranslations } from "@/components/LocaleProvider";
 export default function NotFoundView() {
   const { locale, t } = useTranslations();
   return (
-    <section className="min-h-[80vh] flex items-center justify-center px-6 bg-surface">
-      <div className="max-w-xl text-center">
+    <section className="relative min-h-[80vh] flex items-center justify-center px-6 bg-surface overflow-hidden">
+      {/* Soft moss wash so the 404 holds the site's cinematic tier instead of
+          reading as a bare framework default. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(70% 60% at 50% 34%, rgba(99, 122, 95, 0.1), transparent 70%)",
+        }}
+      />
+      <div className="relative max-w-xl text-center">
         <p
           className="text-moss/30 font-bold leading-none mb-6 select-none"
           style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(80px, 16vw, 200px)" }}
@@ -31,13 +41,13 @@ export default function NotFoundView() {
         <div className="flex flex-wrap gap-4 justify-center">
           <Link
             href={localizeHref("/", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium rounded-sm hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
+            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.voltarInicio} →
           </Link>
           <Link
             href={localizeHref("/contacto", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/20 text-foreground/72 font-medium rounded-sm hover:border-foreground/40 hover:text-foreground transition-all duration-300 text-sm tracking-widest uppercase"
+            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/20 text-foreground/72 font-medium hover:border-foreground/40 hover:text-foreground transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.falarConnosco}
           </Link>

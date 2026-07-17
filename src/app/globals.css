@@ -127,24 +127,6 @@ html.lenis body {
   pointer-events: none;
 }
 
-/* ── Film grain — textura cinematográfica global (ver FilmGrain.tsx).
-   ANTES: um overlay fixo com `mix-blend-mode: overlay` que "jittava" ~8×/s para
-   sempre. Um blend-mode num elemento fixo a cobrir o ecrã obriga o browser a
-   recompor+misturar o viewport INTEIRO a cada frame de scroll (o conteúdo por
-   baixo muda), e a animação recompunha-o continuamente mesmo parado — a maior
-   causa de o site parecer "travado".
-   AGORA: estático e sem blend. Mantém a textura de grão a custo ~zero (uma
-   camada composta uma única vez, nunca repintada durante o scroll). ── */
-.film-grain {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  pointer-events: none;
-  opacity: 0.045;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-}
-
 /* ── Base ── */
 body {
   background-color: var(--color-surface);

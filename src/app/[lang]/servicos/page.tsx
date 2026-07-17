@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
@@ -321,75 +322,103 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── Service categories ── */}
-      {categories.map((cat) => (
-        <div key={cat.id}>
-          {/* Category intro — full-screen cinematic panel (SpaceX-style):
+      {categories.map((cat, ci) => (
+        <Fragment key={cat.id}>
+          <div>
+            {/* Category intro — full-screen cinematic panel (SpaceX-style):
               one image, one message. The light editorial header was dropped so
               the page reads as a sequence of immersive full-bleed panels. */}
-          <section
-            id={cat.id}
-            className="relative overflow-hidden scroll-mt-[60px] flex items-end"
-            style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
-          >
-            <Parallax speed={0.12} className="absolute inset-0">
-              <Image
-                src={cat.band}
-                alt=""
-                fill
-                sizes="100vw"
-                className="object-cover object-center"
-                {...blurFor(cat.band)}
-              />
-            </Parallax>
-            <div className="absolute inset-0 bg-black/60" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-[#080808]/50" />
-            <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
-              <AnimateIn>
-                <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
-                  {cat.num}
-                </p>
-                <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-4 flex items-center gap-3">
-                  <span className="w-8 h-px bg-gold flex-shrink-0" />
-                  {cat.subtitle}
-                </p>
-                <h2
-                  className="text-white font-bold leading-[0.92] tracking-tight"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(42px, 8vw, 120px)",
-                  }}
-                >
-                  {cat.label}
-                </h2>
-                <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
-                  <p className="text-white/85 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
-                  <Link
-                    href={localizeHref(
-                      `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
-                      locale,
-                    )}
-                    className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
+            <section
+              id={cat.id}
+              className="relative overflow-hidden scroll-mt-[60px] flex items-end"
+              style={{ minHeight: "clamp(560px, 92vh, 960px)" }}
+            >
+              <Parallax speed={0.12} className="absolute inset-0">
+                <Image
+                  src={cat.band}
+                  alt=""
+                  fill
+                  sizes="100vw"
+                  className="object-cover object-center"
+                  {...blurFor(cat.band)}
+                />
+              </Parallax>
+              <div className="absolute inset-0 bg-black/60" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-[#080808]/50" />
+              <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
+                <AnimateIn>
+                  <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
+                    {cat.num}
+                  </p>
+                  <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase mb-4 flex items-center gap-3">
+                    <span className="w-8 h-px bg-gold flex-shrink-0" />
+                    {cat.subtitle}
+                  </p>
+                  <h2
+                    className="text-white font-bold leading-[0.92] tracking-tight"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(42px, 8vw, 120px)",
+                    }}
                   >
-                    {ts.verDetalhes}
-                    <span aria-hidden>→</span>
-                  </Link>
-                </div>
-              </AnimateIn>
-            </div>
-          </section>
+                    {cat.label}
+                  </h2>
+                  <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
+                    <p className="text-white/85 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
+                    <Link
+                      href={localizeHref(
+                        `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
+                        locale,
+                      )}
+                      className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
+                    >
+                      {ts.verDetalhes}
+                      <span aria-hidden>→</span>
+                    </Link>
+                  </div>
+                </AnimateIn>
+              </div>
+            </section>
 
-          {/* Service bands — one full-screen panel per service */}
-          {cat.services.map((s, i) => (
-            <ServiceBand
-              key={`${cat.id}-${i}`}
-              service={s}
-              index={i}
-              catNum={cat.num}
-              cta={ts.verMais}
-              locale={locale}
-            />
-          ))}
-        </div>
+            {/* Service bands — one full-screen panel per service */}
+            {cat.services.map((s, i) => (
+              <ServiceBand
+                key={`${cat.id}-${i}`}
+                service={s}
+                index={i}
+                catNum={cat.num}
+                cta={ts.verMais}
+                locale={locale}
+              />
+            ))}
+          </div>
+
+          {/* Light interlude between the two categories — one calm, airy beat so
+              the run of dark full-bleed panels doesn't flatten into a tunnel
+              (and it quietly carries a proof line). */}
+          {ci === 0 && (
+            <section className="bg-surface py-24 lg:py-36 border-y border-foreground/8">
+              <div className="max-w-4xl mx-auto px-6 lg:px-16 text-center">
+                <AnimateIn>
+                  <p className="text-foreground/45 text-[10px] tracking-[0.5em] uppercase mb-8 inline-flex items-center gap-4">
+                    <span className="w-8 h-px bg-gold/50" />
+                    {ts.interludeEyebrow}
+                    <span className="w-8 h-px bg-gold/50" />
+                  </p>
+                  <p
+                    className="text-foreground font-bold leading-[1.12] mx-auto max-w-3xl"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(28px, 4.2vw, 54px)",
+                    }}
+                  >
+                    {ts.interludeTitle}
+                  </p>
+                </AnimateIn>
+              </div>
+            </section>
+          )}
+        </Fragment>
       ))}
 
       {/* ── Editorial photo grid (full-bleed) ── */}

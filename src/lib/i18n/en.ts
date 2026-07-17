@@ -433,6 +433,7 @@ export const en: Dict = {
     ],
     labelTipo: "Event type",
     labelData: "Event date",
+    dateFlexibleLabel: "Date still to be decided",
     labelPessoas: "No. of people",
     labelLocal: "Location / region",
     labelBudget: "Approximate budget",
@@ -464,6 +465,8 @@ export const en: Dict = {
     heroLead:
       "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
     nav: ["Celebrations", "Companies"],
+    interludeEyebrow: "Líquen Events",
+    interludeTitle: "From Évora to all of Portugal — over 100 events since 2018.",
     verMais: "View more",
     verDetalhes: "View details",
     philoEyebrow: "Our signature",

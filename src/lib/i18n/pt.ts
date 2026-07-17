@@ -446,6 +446,7 @@ export const pt = {
     ],
     labelTipo: "Tipo de evento",
     labelData: "Data do evento",
+    dateFlexibleLabel: "Data ainda a definir",
     labelPessoas: "Nº de pessoas",
     labelLocal: "Local / região",
     labelBudget: "Orçamento aproximado",
@@ -476,6 +477,8 @@ export const pt = {
     heroLead:
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
     nav: ["Celebrações", "Empresas"],
+    interludeEyebrow: "Líquen Events",
+    interludeTitle: "De Évora para todo o Portugal — mais de 100 eventos desde 2018.",
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
     philoEyebrow: "A nossa assinatura",

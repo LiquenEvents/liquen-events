@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Empresa de decoração de eventos no Alentejo e em Portugal — casamentos, eventos corporativos e celebrações.",
     start_url: "/",
     display: "standalone",
-    background_color: "#faf8f3",
-    theme_color: "#faf8f3",
+    background_color: "#ffffff",
+    theme_color: "#ffffff",
     lang: "pt-PT",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
