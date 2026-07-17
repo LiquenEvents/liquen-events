@@ -13,6 +13,8 @@ import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import Eyebrow from "@/components/Eyebrow";
 
 export async function generateMetadata({
   params,
@@ -167,7 +169,7 @@ function ServiceBand({
             <p className="text-white/85 text-[15px] leading-[1.7] max-w-md">{service.desc}</p>
             <Link
               href={localizeHref(`/servicos/${service.slug}`, locale)}
-              className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
+              className={`${OUTLINE_LIGHT_BUTTON_CLASS} flex-shrink-0`}
             >
               {cta}
               <span aria-hidden>→</span>
@@ -254,7 +256,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <div className="mt-10">
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 {t.common.pedirOrcamento}
                 <span aria-hidden>→</span>
@@ -370,7 +372,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                         `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
                         locale,
                       )}
-                      className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
+                      className={`${OUTLINE_LIGHT_BUTTON_CLASS} flex-shrink-0`}
                     >
                       {ts.verDetalhes}
                       <span aria-hidden>→</span>
@@ -400,11 +402,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <section className="bg-surface py-24 lg:py-36 border-y border-foreground/8">
               <div className="max-w-4xl mx-auto px-6 lg:px-16 text-center">
                 <AnimateIn>
-                  <p className="text-foreground/45 text-[10px] tracking-[0.5em] uppercase mb-8 inline-flex items-center gap-4">
-                    <span className="w-8 h-px bg-gold/50" />
+                  <Eyebrow center className="mb-8">
                     {ts.interludeEyebrow}
-                    <span className="w-8 h-px bg-gold/50" />
-                  </p>
+                  </Eyebrow>
                   <p
                     className="text-foreground font-bold leading-[1.12] mx-auto max-w-3xl"
                     style={{
@@ -537,10 +537,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                   {t.common.pedirOrcamento} →
                 </Link>
               </Magnetic>
-              <Link
-                href={localizeHref("/galeria", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
-              >
+              <Link href={localizeHref("/galeria", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {ts.ctaGaleria}
               </Link>
             </div>

@@ -9,6 +9,7 @@ import { aspectFor } from "@/lib/image-meta";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
@@ -135,7 +136,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
                 href="https://www.instagram.com/liquen.events"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 px-8 py-4 border border-white/30 text-white/85 text-[11px] tracking-[0.2em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 @liquen.events <span aria-hidden>→</span>
               </a>

@@ -16,6 +16,7 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { clientLogos } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 export async function generateMetadata({
   params,
@@ -432,10 +433,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                   {t.common.pedirOrcamento} →
                 </Link>
               </Magnetic>
-              <Link
-                href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 border border-white/30 text-white/85 text-[11px] tracking-[0.2em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
-              >
+              <Link href={localizeHref("/contacto", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.falarConnosco}
               </Link>
             </div>
