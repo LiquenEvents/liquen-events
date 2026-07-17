@@ -11,8 +11,13 @@ import { useEffect, useRef } from "react";
  *    (mount, resize, window load) into document-space coordinates; each frame
  *    only reads `window.scrollY` and writes transforms. No getBoundingClientRect
  *    per frame ⇒ no layout thrashing, no forced reflows.
- *  - Transform-only writes (compositor work), skipped entirely while the
- *    element is far off-screen, and skipped when the value didn't change.
+ *  - A single shared IntersectionObserver decides which layers are near the
+ *    viewport. Only those visible/near layers are in the per-frame loop and only
+ *    they carry `will-change`; far off-screen layers do ZERO work each frame
+ *    (no offset math, no branch) — on pages with ~12 heroes that turns a
+ *    12-iteration loop into a 2–3-iteration one.
+ *  - Transform-only writes (compositor work), skipped when the value didn't
+ *    change.
  *  - Inert under prefers-reduced-motion.
  *
  * NB: the parent needs `overflow-hidden`, and the child some scale headroom
@@ -24,12 +29,24 @@ interface Item {
   top: number; // document-space top (transform-compensated)
   height: number;
   shift: number; // last applied translateY
-  active: boolean; // currently promoted (will-change) because it's near-viewport
+  active: boolean; // near-viewport per the IntersectionObserver (in the frame loop)
 }
 
 const items = new Set<Item>();
+// Subset of `items` currently near the viewport — the only ones the per-frame
+// loop touches. Membership is driven by the IntersectionObserver, not by math
+// re-run every scroll tick.
+const onscreen = new Set<Item>();
+const byEl = new WeakMap<Element, Item>();
+let io: IntersectionObserver | null = null;
 let raf = 0;
 let listening = false;
+
+// Start tracking a layer ~1.5 viewports before it scrolls into view so its
+// drift is already in place — no pop on entry. Matches the old center-distance
+// activation window (offset < vh * 1.5), so the active-set size is unchanged;
+// the win is that everything beyond it is no longer iterated at all.
+const ROOT_MARGIN = "150% 0px 150% 0px";
 
 function measureAll() {
   const y = window.scrollY;
@@ -49,22 +66,9 @@ function frame() {
   const y = window.scrollY;
   const vh = window.innerHeight;
   const viewCentre = y + vh / 2;
-  for (const it of items) {
+  // Only near-viewport layers — off-screen ones aren't in this set.
+  for (const it of onscreen) {
     const offset = it.top + it.height / 2 - viewCentre;
-    // Far off-screen: drop the compositor promotion so we don't pin dozens of
-    // viewport-sized layers (e.g. ~12 on /servicos) that aren't moving.
-    if (offset > vh * 1.5 || offset < -vh * 1.5) {
-      if (it.active) {
-        it.active = false;
-        it.el.style.willChange = "auto";
-      }
-      continue;
-    }
-    // Near-viewport: promote just before transforming.
-    if (!it.active) {
-      it.active = true;
-      it.el.style.willChange = "transform";
-    }
     const shift = Math.round(-offset * it.speed * 10) / 10;
     if (shift !== it.shift) {
       it.shift = shift;
@@ -86,9 +90,32 @@ function onResize() {
   });
 }
 
+function onIntersect(entries: IntersectionObserverEntry[]) {
+  for (const e of entries) {
+    const it = byEl.get(e.target);
+    if (!it) continue;
+    if (e.isIntersecting) {
+      if (!it.active) {
+        it.active = true;
+        onscreen.add(it);
+        // Promote to a compositor layer only while it's actually animating.
+        it.el.style.willChange = "transform";
+      }
+    } else if (it.active) {
+      it.active = false;
+      onscreen.delete(it);
+      // Drop the promotion so we don't pin dozens of viewport-sized layers
+      // (e.g. ~12 on /servicos) that aren't moving.
+      it.el.style.willChange = "auto";
+    }
+  }
+  schedule();
+}
+
 function listen() {
   if (listening) return;
   listening = true;
+  io = new IntersectionObserver(onIntersect, { rootMargin: ROOT_MARGIN });
   window.addEventListener("scroll", schedule, { passive: true });
   window.addEventListener("resize", onResize, { passive: true });
   // Late layout shifts (images/fonts settling) move everything below them.
@@ -101,6 +128,8 @@ function unlisten() {
   window.removeEventListener("scroll", schedule);
   window.removeEventListener("resize", onResize);
   window.removeEventListener("load", measureAll);
+  io?.disconnect();
+  io = null;
   if (raf) cancelAnimationFrame(raf);
   raf = 0;
 }
@@ -123,18 +152,25 @@ export default function Parallax({ children, className = "", speed = 0.12 }: Pro
 
     const item: Item = { el, speed, top: 0, height: 0, shift: 0, active: false };
     items.add(item);
+    byEl.set(el, item);
     listen();
 
     // Measure this item now (others keep their cached geometry) and place it.
     const r = el.getBoundingClientRect();
     item.top = r.top + window.scrollY;
     item.height = r.height;
+    // The IntersectionObserver decides whether it enters the frame loop; a
+    // near-viewport layer is picked up on the observer's first (async) callback.
+    io?.observe(el);
     schedule();
     // One late re-measure catches content that settles after hydration.
     const settle = window.setTimeout(measureAll, 900);
 
     return () => {
       window.clearTimeout(settle);
+      io?.unobserve(el);
+      byEl.delete(el);
+      onscreen.delete(item);
       items.delete(item);
       el.style.willChange = "";
       el.style.transform = "";

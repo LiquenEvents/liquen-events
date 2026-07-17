@@ -16,15 +16,20 @@ import { interleaveByCollection } from "./interleave";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
 // site-wide JSON maps never reach the gallery's client bundle — GaleriaClient
-// only receives the handful of fields each photo actually needs.
+// only receives the handful of fields each photo actually needs. Each photo
+// object ships exactly { src, label, aspectRatio, blurDataURL? } and the client
+// consumes all four (src/label → alt + filtering, aspectRatio → masonry,
+// blurDataURL → placeholder), so there are no dead fields left to trim.
 //
 // Every photo carries its aspectRatio (the masonry layout needs it up front),
-// but blur placeholders are shipped ONLY for the photos that paint first — the
-// first couple of pages of the default (unseeded) interleave that SSR renders.
-// Blur data-URIs for all 400+ photos were ~60KB of RSC flight data that mostly
-// wasn't needed on first paint; the tail falls back to the gallery's near-black
-// background as it decodes.
-const BLUR_PRELOAD = 60;
+// but blur placeholders are shipped ONLY for the photos that paint first. The
+// client mounts with `shown = PAGE` (24) tiles, so the blur set is sized to
+// cover that first-paint screenful with a small margin — the dominant weight in
+// this array is the blur data-URIs (~1–2KB each), so shipping them for tiles the
+// first paint never shows was pure RSC flight-data waste. Everything past this
+// window (loaded later by infinite scroll) falls back to the gallery's near-
+// black background as it decodes, exactly like the long tail already did.
+const BLUR_PRELOAD = 30;
 const withRatio = PHOTOS.map((p) => ({ ...p, aspectRatio: aspectFor(p.src) }));
 const firstPaintSrc = new Set(
   interleaveByCollection(withRatio)

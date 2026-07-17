@@ -21,10 +21,15 @@ export default function ScrollProgress() {
     if (!bar) return;
 
     let frame = 0;
+    let last = -1;
     const apply = () => {
       frame = 0;
       const max = root.scrollHeight - root.clientHeight;
       const progress = max > 0 ? Math.min(root.scrollTop / max, 1) : 0;
+      // Skip the DOM write when the value hasn't moved (e.g. resize ticks at the
+      // same scroll position) so we don't re-trigger the transform/transition.
+      if (progress === last) return;
+      last = progress;
       bar.style.transform = `scaleX(${progress})`;
     };
     const schedule = () => {

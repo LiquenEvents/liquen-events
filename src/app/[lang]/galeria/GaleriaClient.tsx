@@ -81,6 +81,42 @@ function collectionFromSlug(slug: string, names: string[]): string | null {
 const STRIP = 7;
 const SLIDE_MS = 5000; // ritmo do slideshow cinematográfico
 
+// Corre trabalho NÃO crítico quando a main thread está livre, para que a
+// hidratação e a primeira interação não fiquem bloqueadas por observers /
+// listeners que a primeira pintura não precisa. `requestIdleCallback` onde
+// existe; caso contrário (Safari) um setTimeout curto. Devolve um cancelador.
+function onIdle(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const w = window as typeof window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (id: number) => void;
+  };
+  if (typeof w.requestIdleCallback === "function") {
+    const id = w.requestIdleCallback(cb, { timeout: 500 });
+    return () => w.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(cb, 1);
+  return () => window.clearTimeout(id);
+}
+
+// Nome View-Transition estável de uma foto (puro → nível de módulo, partilhado
+// pela grelha e pelo lightbox).
+const vtId = (src: string) => `g-${src.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+// Rede lenta? Em Save-Data ou effectiveType 2g/3g não vale a pena pré-carregar
+// especulativamente os vizinhos full-screen do lightbox (imagens grandes que o
+// utilizador pode nunca ver). Em rede normal → comportamento inalterado.
+const SLOW_ET = new Set(["slow-2g", "2g", "3g"]);
+function shouldPreloadNeighbours(): boolean {
+  if (typeof navigator === "undefined") return true;
+  const c = (
+    navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
+  ).connection;
+  if (!c) return true;
+  if (c.saveData) return false;
+  return !(c.effectiveType && SLOW_ET.has(c.effectiveType));
+}
+
 // Keyboard focus ring that survives `overflow-hidden`. The global :focus-visible
 // outline is a box-shadow, which these image cells clip; an *inset* ring renders
 // inside the box, so it stays visible for keyboard users tabbing the grid.
@@ -142,23 +178,36 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // every fresh entry to the gallery lays out differently. It never changes
   // after mount, so the grid stays put while browsing (no mid-scroll reshuffle).
   const [orderSeed, setOrderSeed] = useState("");
-  useEffect(() => {
-    setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36));
-  }, []);
+  // Re-roll da ordem por visita — não crítico para a primeira pintura (o SSR
+  // mostra a ordem por defeito), por isso é adiado para idle: a grelha só se
+  // re-baralha depois de a hidratação assentar, libertando o TTI.
+  useEffect(
+    () => onIdle(() => setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36))),
+    [],
+  );
   const [fading, setFading] = useState(false);
   // Right-edge fade on the filter pill row, only while it actually
   // overflows — hints "more categories, swipe" without permanently
   // clipping the last pill on wide viewports where everything fits.
   const [filtersOverflow, setFiltersOverflow] = useState(false);
   const filterScrollRef = useRef<HTMLDivElement>(null);
+  // O fade de overflow é uma dica visual, não crítica → mede em idle (evita um
+  // ResizeObserver na main thread durante a hidratação).
   useEffect(() => {
-    const el = filterScrollRef.current;
-    if (!el) return;
-    const check = () => setFiltersOverflow(el.scrollWidth - el.clientWidth > 4);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
+    let disconnect = () => {};
+    const cancel = onIdle(() => {
+      const el = filterScrollRef.current;
+      if (!el) return;
+      const check = () => setFiltersOverflow(el.scrollWidth - el.clientWidth > 4);
+      check();
+      const ro = new ResizeObserver(check);
+      ro.observe(el);
+      disconnect = () => ro.disconnect();
+    });
+    return () => {
+      cancel();
+      disconnect();
+    };
   }, []);
   const [lb, setLb] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -206,22 +255,17 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // — a navegar, filtrar, redimensionar — não há nomes nenhuns, portanto a
   // colisão é impossível; no morph existe exatamente um par miniatura↔lightbox.
   const [morphSrc, setMorphSrc] = useState<string | null>(null);
-  const vtId = (src: string) => `g-${src.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   /** Nome VT de uma tile: só quando é a foto em morph E é a sua instância
       visível (mosaico em sm+, masonry em mobile — codificado em `active`). */
   const tileName = (src: string, active: boolean) =>
     active && morphSrc === src ? vtId(src) : undefined;
   const mosaicName = (idx: number) => tileName(visible[idx].src, idx === 0 || isSm === true);
   const masonryName = (idx: number, src: string) => tileName(src, idx < 5 ? isSm === false : true);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
-  // Drag-to-dismiss / swipe gesture on the lightbox (touch). The photo layer
-  // and backdrop are driven directly via refs during the drag (no per-frame
-  // React re-render → stays at 60fps); state only changes on release.
-  const photoLayerRef = useRef<HTMLDivElement>(null);
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
-  const open = lb !== null;
+  // O lightbox (portal, listeners de teclado/gesto, trap de foco, slideshow,
+  // pré-carga de vizinhos) vive num componente-filho `Lightbox` que só é montado
+  // quando `lb !== null`. Assim, nada da sua configuração — refs, efeitos,
+  // listeners — corre na primeira pintura; só arranca quando o utilizador abre
+  // uma foto. Comportamento idêntico depois de aberto.
   const { t } = useTranslations();
 
   // Scroll-reveal for masonry tiles — they fade+rise as they enter view, so the
@@ -277,19 +321,27 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // página cresce muito com o scroll infinito). Listener passivo, throttled com
   // rAF; setShowTop só re-renderiza quando o booleano muda (React ignora o resto).
   const [showTop, setShowTop] = useState(false);
+  // O botão "voltar ao topo" só interessa depois de o utilizador descer bastante,
+  // por isso registamos o scroll listener em idle — nada de trabalho de scroll na
+  // main thread durante a primeira pintura.
   useEffect(() => {
     let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        setShowTop(window.scrollY > 1200);
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    let remove = () => {};
+    const cancel = onIdle(() => {
+      const onScroll = () => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          setShowTop(window.scrollY > 1200);
+        });
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      remove = () => window.removeEventListener("scroll", onScroll);
+    });
     return () => {
-      window.removeEventListener("scroll", onScroll);
+      cancel();
+      remove();
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
@@ -303,24 +355,31 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // filter. Read post-hydration (avoids any SSR/CSR mismatch) and on every
   // hashchange.
   useEffect(() => {
-    const apply = () => {
-      const hash = window.location.hash.replace(/^#/, "");
-      if (hash.startsWith("c-")) {
-        const name = collectionFromSlug(hash.slice(2), collectionNames);
-        if (name) {
-          setCollectionFilter(name);
-          setShown(PAGE);
-          return;
+    let remove = () => {};
+    const cancel = onIdle(() => {
+      const apply = () => {
+        const hash = window.location.hash.replace(/^#/, "");
+        if (hash.startsWith("c-")) {
+          const name = collectionFromSlug(hash.slice(2), collectionNames);
+          if (name) {
+            setCollectionFilter(name);
+            setShown(PAGE);
+            return;
+          }
         }
-      }
-      setCollectionFilter(null);
-      const c = catFromSlug(hash);
-      setCat((prev) => (prev === c ? prev : c));
-      setShown(PAGE);
+        setCollectionFilter(null);
+        const c = catFromSlug(hash);
+        setCat((prev) => (prev === c ? prev : c));
+        setShown(PAGE);
+      };
+      apply();
+      window.addEventListener("hashchange", apply);
+      remove = () => window.removeEventListener("hashchange", apply);
+    });
+    return () => {
+      cancel();
+      remove();
     };
-    apply();
-    window.addEventListener("hashchange", apply);
-    return () => window.removeEventListener("hashchange", apply);
   }, [collectionNames]);
 
   // Localized display helpers — internal label keys stay PT (used for
@@ -470,135 +529,9 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
     return () => clearTimeout(id);
   }, [lb, morphSrc]);
 
-  useEffect(() => {
-    if (lb === null) return;
-    const fn = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
-      else if (e.key === " " || e.code === "Space") {
-        e.preventDefault();
-        setPlaying((p) => !p);
-      } else if (e.key === "Tab" && dialogRef.current) {
-        // Trap focus inside the lightbox dialog.
-        const f = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, a[href], [tabindex]:not([tabindex="-1"])',
-        );
-        if (!f.length) return;
-        const first = f[0];
-        const last = f[f.length - 1];
-        const active = document.activeElement;
-        if (!dialogRef.current.contains(active)) {
-          e.preventDefault();
-          first.focus();
-        } else if (e.shiftKey && active === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && active === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", fn);
-    return () => window.removeEventListener("keydown", fn);
-  }, [lb, close, prev, next]);
-
-  // Move focus into the dialog on open; restore it to the trigger on close.
-  useEffect(() => {
-    if (!open) return;
-    restoreFocusRef.current = document.activeElement as HTMLElement | null;
-    const id = requestAnimationFrame(() => dialogRef.current?.focus());
-    return () => {
-      cancelAnimationFrame(id);
-      restoreFocusRef.current?.focus?.();
-    };
-  }, [open]);
-
-  // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
-  // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
-  useEffect(() => {
-    if (lb === null || !playing) return;
-    if (typeof document !== "undefined" && document.hidden) return;
-    const id = window.setTimeout(next, SLIDE_MS);
-    return () => window.clearTimeout(id);
-  }, [lb, playing, next]);
-
-  useEffect(() => {
-    document.body.style.overflow = lb !== null ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [lb]);
-
-  // Touch gestures on the open lightbox: horizontal swipe = prev/next,
-  // vertical drag-down = dismiss (the photo follows the finger and the backdrop
-  // fades, iOS-photos style). Attached as a NATIVE non-passive listener so the
-  // vertical drag can preventDefault (kill the rubber-band); the photo/backdrop
-  // are moved by writing to refs, never React state, so a drag never re-renders.
-  useEffect(() => {
-    if (lb === null) return;
-    const root = dialogRef.current;
-    if (!root) return;
-    const g = gestureRef.current;
-    const layer = () => photoLayerRef.current;
-    const backdrop = () => backdropRef.current;
-
-    const onStart = (e: TouchEvent) => {
-      const t = e.touches[0];
-      g.x = t.clientX;
-      g.y = t.clientY;
-      g.dx = 0;
-      g.dy = 0;
-      g.axis = "";
-    };
-    const onMove = (e: TouchEvent) => {
-      const t = e.touches[0];
-      g.dx = t.clientX - g.x;
-      g.dy = t.clientY - g.y;
-      if (g.axis === "") {
-        if (Math.abs(g.dx) < 8 && Math.abs(g.dy) < 8) return;
-        g.axis = Math.abs(g.dy) > Math.abs(g.dx) ? "y" : "x";
-        if (g.axis === "y") layer()?.classList.add("lb-dragging");
-      }
-      if (g.axis === "y" && g.dy > 0) {
-        e.preventDefault();
-        const l = layer();
-        const b = backdrop();
-        const scale = 1 - Math.min(g.dy / 1400, 0.12);
-        if (l) l.style.transform = `translateY(${g.dy}px) scale(${scale})`;
-        if (b) b.style.opacity = String(1 - Math.min(g.dy / 500, 0.72));
-      }
-    };
-    const onEnd = () => {
-      const l = layer();
-      const b = backdrop();
-      if (g.axis === "y") {
-        l?.classList.remove("lb-dragging");
-        if (g.dy > 120) {
-          if (l) l.style.transform = "translateY(115%) scale(0.88)";
-          if (b) b.style.opacity = "0";
-          window.setTimeout(dismiss, 220);
-        } else {
-          if (l) l.style.transform = "";
-          if (b) b.style.opacity = "";
-        }
-      } else if (g.axis === "x" && Math.abs(g.dx) > 50) {
-        if (g.dx < 0) next();
-        else prev();
-      }
-      g.axis = "";
-    };
-
-    root.addEventListener("touchstart", onStart, { passive: true });
-    root.addEventListener("touchmove", onMove, { passive: false });
-    root.addEventListener("touchend", onEnd, { passive: true });
-    return () => {
-      root.removeEventListener("touchstart", onStart);
-      root.removeEventListener("touchmove", onMove);
-      root.removeEventListener("touchend", onEnd);
-    };
-  }, [lb, next, prev, dismiss]);
+  // (Todos os efeitos exclusivos do lightbox — teclado/trap de foco, foco de
+  // entrada/saída, slideshow, bloqueio de scroll do body e gestos táteis — vivem
+  // agora dentro do componente `Lightbox`, que só monta quando está aberto.)
 
   function switchCat(c: Cat) {
     if (c === cat && !collectionFilter) return;
@@ -624,25 +557,20 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // first and re-opening after would fire two back-to-back ViewTransitions
   // on the same names — the exact bug that made resizing across the mobile
   // breakpoint log duplicate-name errors (see [[galeria-polish-jul-2026]]).
-  function viewCollection(name: string) {
-    const newPool = photos.filter((p) => collectionFor(p.src) === name);
-    const currentSrc = lb !== null ? pool[lb].src : null;
-    const newIdx = currentSrc ? newPool.findIndex((p) => p.src === currentSrc) : -1;
-    setCollectionFilter(name);
-    setShown(PAGE);
-    setJustOpened(false);
-    if (newIdx >= 0) setLb(newIdx);
-    else if (lb !== null) close();
-    window.history.replaceState(null, "", `#c-${collectionSlug(name)}`);
-  }
-
-  // Thumbnail strip around current photo
-  const half = Math.floor(STRIP / 2);
-  const stripStart = lb !== null ? Math.max(0, Math.min(lb - half, pool.length - STRIP)) : 0;
-  const stripIdx =
-    lb !== null
-      ? Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k)
-      : [];
+  const viewCollection = useCallback(
+    (name: string) => {
+      const newPool = photos.filter((p) => collectionFor(p.src) === name);
+      const currentSrc = lb !== null ? pool[lb].src : null;
+      const newIdx = currentSrc ? newPool.findIndex((p) => p.src === currentSrc) : -1;
+      setCollectionFilter(name);
+      setShown(PAGE);
+      setJustOpened(false);
+      if (newIdx >= 0) setLb(newIdx);
+      else if (lb !== null) close();
+      window.history.replaceState(null, "", `#c-${collectionSlug(name)}`);
+    },
+    [photos, pool, lb, close],
+  );
 
   // One pass over the pool (386 photos), memoized on `photos` — the old form
   // re-filtered the whole array once per category on every render (scroll,
@@ -876,210 +804,28 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
         </div>
       )}
 
-      {/* ── Lightbox ── */}
-      {lb !== null &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${t.galeria.lbGallery} — ${labelText(pool[lb].label)}, ${t.galeria.lbPhoto} ${lb + 1} ${t.galeria.lbOf} ${pool.length}`}
-            tabIndex={-1}
-            className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
-            onClick={close}
-          >
-            {/* Fundo preto — camada própria que só anima opacidade, para o morph
-                da foto poder crescer por cima sem brigar com o <ViewTransition>.
-                É também o que o gesto de arrastar-para-baixo desvanece. */}
-            <div ref={backdropRef} className="lb-backdrop absolute inset-0 bg-black" />
-
-            {/* Barra superior */}
-            <div
-              className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 pb-3.5 flex-shrink-0"
-              // Clear the notch so the counter / close button aren't hidden under
-              // the status bar on notched phones (keeps its base top padding too).
-              style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-white/60 text-xs font-light tabular-nums">{lb + 1}</span>
-                <span className="text-white/20 text-xs">/</span>
-                <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
-                <span className="w-px h-3 bg-white/10 mx-1" />
-                {collectionFor(pool[lb].src) && (
-                  <span className="flex items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        viewCollection(collectionFor(pool[lb].src)!);
-                      }}
-                      aria-label={`${t.galeria.viewWedding} — ${collectionFor(pool[lb].src)}`}
-                      title={t.galeria.viewWedding}
-                      className="text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
-                      {collectionFor(pool[lb].src)}
-                    </button>
-                    <span className="text-white/20 mx-1.5">·</span>
-                  </span>
-                )}
-                <span className="text-white/65 text-[10px] tracking-[0.15em] uppercase">
-                  {labelText(pool[lb].label)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPlaying((p) => !p)}
-                  aria-label={playing ? t.galeria.lbPause : t.galeria.lbPlay}
-                  aria-pressed={playing}
-                  className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
-                >
-                  {playing ? (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <rect x="6" y="5" width="4" height="14" rx="1" />
-                      <rect x="14" y="5" width="4" height="14" rx="1" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.8-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
-                    </svg>
-                  )}
-                </button>
-                <button
-                  onClick={close}
-                  aria-label={t.galeria.lbClose}
-                  className="p-3 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Barra de progresso do slideshow — reinicia a cada foto */}
-            {playing && (
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/8 z-20 pointer-events-none">
-                <div
-                  key={lb}
-                  className="lb-progress h-full bg-gradient-to-r from-moss to-moss-light origin-left"
-                />
-              </div>
-            )}
-
-            {/* Área da foto + botões */}
-            <div className="relative flex-1 flex items-center justify-center min-h-0">
-              {/* Botão anterior */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  prev();
-                }}
-                aria-label={t.galeria.lbPrev}
-                className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-
-              {/* Foto principal */}
-              <div
-                ref={photoLayerRef}
-                className="lb-photo-layer absolute inset-0 mx-2 md:mx-20 overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <VTWrap key={lb} name={vtId(pool[lb].src)} exit="vt-lb">
-                  <Image
-                    key={lb}
-                    src={pool[lb].src}
-                    alt={altText(pool[lb].src, pool[lb].label)}
-                    fill
-                    sizes="90vw"
-                    className={`object-contain ${
-                      playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
-                    }`}
-                    {...blurProps(pool[lb])}
-                  />
-                </VTWrap>
-              </div>
-
-              {/* Pré-carrega os vizinhos (anterior/seguinte) para que ← → seja
-                  instantâneo — fetch na mesma resolução do visor, fora de ecrã. */}
-              <div
-                aria-hidden
-                className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
-              >
-                {Array.from(new Set([(lb - 1 + pool.length) % pool.length, (lb + 1) % pool.length]))
-                  .filter((i) => i !== lb)
-                  .map((i) => (
-                    <Image key={i} src={pool[i].src} alt="" fill sizes="90vw" loading="eager" />
-                  ))}
-              </div>
-
-              {/* Botão próxima */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  next();
-                }}
-                aria-label={t.galeria.lbNext}
-                className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Strip de thumbnails */}
-            <div
-              className="lb-chrome flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {stripIdx.map((idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setJustOpened(false);
-                    setLb(idx);
-                  }}
-                  aria-label={`${t.galeria.lbPhoto} ${idx + 1} ${t.galeria.lbOf} ${pool.length}`}
-                  aria-current={idx === lb ? "true" : undefined}
-                  className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
-                    idx === lb
-                      ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
-                      : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
-                  }`}
-                >
-                  <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
-                </button>
-              ))}
-            </div>
-
-            {/* Dicas teclado */}
-            <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
-              {t.galeria.keyboardHint}
-            </p>
-          </div>,
-          document.body,
-        )}
+      {/* ── Lightbox ── LAZY-MOUNT: só existe quando aberto. Todo o seu JS de
+          runtime — portal, listeners de teclado/gesto, trap de foco, slideshow,
+          pré-carga de vizinhos — não corre na primeira pintura; arranca apenas
+          ao abrir uma foto e desmonta ao fechar. Comportamento idêntico. */}
+      {lb !== null && (
+        <Lightbox
+          index={lb}
+          pool={pool}
+          playing={playing}
+          setPlaying={setPlaying}
+          closing={closing}
+          justOpened={justOpened}
+          setJustOpened={setJustOpened}
+          setLb={setLb}
+          close={close}
+          prev={prev}
+          next={next}
+          dismiss={dismiss}
+          viewCollection={viewCollection}
+          t={t}
+        />
+      )}
 
       {/* ── Voltar ao topo ── Empilhado por cima do botão de WhatsApp (canto
           inferior direito); o canto esquerdo já tem o CTA "Pedir orçamento"
@@ -1104,5 +850,402 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
         </svg>
       </button>
     </>
+  );
+}
+
+type Dict = ReturnType<typeof useTranslations>["t"];
+
+/**
+ * O lightbox propriamente dito. É montado SÓ quando aberto (ver `GaleriaClient`),
+ * por isso todos os seus refs, efeitos e listeners (teclado, trap de foco, foco
+ * de entrada/saída, slideshow, bloqueio de scroll, gestos táteis, pré-carga de
+ * vizinhos) só arrancam ao abrir — nunca na primeira pintura da galeria. O
+ * comportamento, o morph <ViewTransition> e a UX de fecho são idênticos ao que
+ * era quando este código vivia inline no componente-pai.
+ */
+function Lightbox({
+  index,
+  pool,
+  playing,
+  setPlaying,
+  closing,
+  justOpened,
+  setJustOpened,
+  setLb,
+  close,
+  prev,
+  next,
+  dismiss,
+  viewCollection,
+  t,
+}: {
+  index: number;
+  pool: Photo[];
+  playing: boolean;
+  setPlaying: React.Dispatch<React.SetStateAction<boolean>>;
+  closing: boolean;
+  justOpened: boolean;
+  setJustOpened: (v: boolean) => void;
+  setLb: (v: number | null) => void;
+  close: () => void;
+  prev: () => void;
+  next: () => void;
+  dismiss: () => void;
+  viewCollection: (name: string) => void;
+  t: Dict;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // Drag-to-dismiss / swipe gesture on the lightbox (touch). The photo layer
+  // and backdrop are driven directly via refs during the drag (no per-frame
+  // React re-render → stays at 60fps); state only changes on release.
+  const photoLayerRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
+
+  const labelText = (l: Label) => t.galeria.labels[l];
+  const altText = (src: string, l: Label) => {
+    const base = t.galeria.alt[l];
+    const c = collectionFor(src);
+    return c ? `${base} — ${c}` : base;
+  };
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") prev();
+      else if (e.key === "ArrowRight") next();
+      else if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        setPlaying((p) => !p);
+      } else if (e.key === "Tab" && dialogRef.current) {
+        // Trap focus inside the lightbox dialog.
+        const f = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, a[href], [tabindex]:not([tabindex="-1"])',
+        );
+        if (!f.length) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        const active = document.activeElement;
+        if (!dialogRef.current.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, [close, prev, next, setPlaying]);
+
+  // Move focus into the dialog on open; restore it to the trigger on close
+  // (mount = abrir, unmount = fechar, já que este componente só vive aberto).
+  useEffect(() => {
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    const id = requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      restoreFocusRef.current?.focus?.();
+    };
+  }, []);
+
+  // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
+  // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
+  useEffect(() => {
+    if (!playing) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const id = window.setTimeout(next, SLIDE_MS);
+    return () => window.clearTimeout(id);
+  }, [playing, next]);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  // Touch gestures on the open lightbox: horizontal swipe = prev/next,
+  // vertical drag-down = dismiss (the photo follows the finger and the backdrop
+  // fades, iOS-photos style). Attached as a NATIVE non-passive listener so the
+  // vertical drag can preventDefault (kill the rubber-band); the photo/backdrop
+  // are moved by writing to refs, never React state, so a drag never re-renders.
+  useEffect(() => {
+    const root = dialogRef.current;
+    if (!root) return;
+    const g = gestureRef.current;
+    const layer = () => photoLayerRef.current;
+    const backdrop = () => backdropRef.current;
+
+    const onStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      g.x = touch.clientX;
+      g.y = touch.clientY;
+      g.dx = 0;
+      g.dy = 0;
+      g.axis = "";
+    };
+    const onMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      g.dx = touch.clientX - g.x;
+      g.dy = touch.clientY - g.y;
+      if (g.axis === "") {
+        if (Math.abs(g.dx) < 8 && Math.abs(g.dy) < 8) return;
+        g.axis = Math.abs(g.dy) > Math.abs(g.dx) ? "y" : "x";
+        if (g.axis === "y") layer()?.classList.add("lb-dragging");
+      }
+      if (g.axis === "y" && g.dy > 0) {
+        e.preventDefault();
+        const l = layer();
+        const b = backdrop();
+        const scale = 1 - Math.min(g.dy / 1400, 0.12);
+        if (l) l.style.transform = `translateY(${g.dy}px) scale(${scale})`;
+        if (b) b.style.opacity = String(1 - Math.min(g.dy / 500, 0.72));
+      }
+    };
+    const onEnd = () => {
+      const l = layer();
+      const b = backdrop();
+      if (g.axis === "y") {
+        l?.classList.remove("lb-dragging");
+        if (g.dy > 120) {
+          if (l) l.style.transform = "translateY(115%) scale(0.88)";
+          if (b) b.style.opacity = "0";
+          window.setTimeout(dismiss, 220);
+        } else {
+          if (l) l.style.transform = "";
+          if (b) b.style.opacity = "";
+        }
+      } else if (g.axis === "x" && Math.abs(g.dx) > 50) {
+        if (g.dx < 0) next();
+        else prev();
+      }
+      g.axis = "";
+    };
+
+    root.addEventListener("touchstart", onStart, { passive: true });
+    root.addEventListener("touchmove", onMove, { passive: false });
+    root.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      root.removeEventListener("touchstart", onStart);
+      root.removeEventListener("touchmove", onMove);
+      root.removeEventListener("touchend", onEnd);
+    };
+  }, [next, prev, dismiss]);
+
+  if (typeof document === "undefined") return null;
+
+  // Thumbnail strip around current photo
+  const half = Math.floor(STRIP / 2);
+  const stripStart = Math.max(0, Math.min(index - half, pool.length - STRIP));
+  const stripIdx = Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k);
+  // Em rede lenta / Save-Data não pré-carregamos os vizinhos full-screen.
+  const preloadNeighbours = shouldPreloadNeighbours();
+
+  return createPortal(
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${t.galeria.lbGallery} — ${labelText(pool[index].label)}, ${t.galeria.lbPhoto} ${index + 1} ${t.galeria.lbOf} ${pool.length}`}
+      tabIndex={-1}
+      className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
+      onClick={close}
+    >
+      {/* Fundo preto — camada própria que só anima opacidade, para o morph
+          da foto poder crescer por cima sem brigar com o <ViewTransition>.
+          É também o que o gesto de arrastar-para-baixo desvanece. */}
+      <div ref={backdropRef} className="lb-backdrop absolute inset-0 bg-black" />
+
+      {/* Barra superior */}
+      <div
+        className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 pb-3.5 flex-shrink-0"
+        // Clear the notch so the counter / close button aren't hidden under
+        // the status bar on notched phones (keeps its base top padding too).
+        style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-white/60 text-xs font-light tabular-nums">{index + 1}</span>
+          <span className="text-white/20 text-xs">/</span>
+          <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
+          <span className="w-px h-3 bg-white/10 mx-1" />
+          {collectionFor(pool[index].src) && (
+            <span className="flex items-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  viewCollection(collectionFor(pool[index].src)!);
+                }}
+                aria-label={`${t.galeria.viewWedding} — ${collectionFor(pool[index].src)}`}
+                title={t.galeria.viewWedding}
+                className="text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
+                style={{ fontFamily: "var(--font-playfair)" }}
+              >
+                {collectionFor(pool[index].src)}
+              </button>
+              <span className="text-white/20 mx-1.5">·</span>
+            </span>
+          )}
+          <span className="text-white/65 text-[10px] tracking-[0.15em] uppercase">
+            {labelText(pool[index].label)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPlaying((p) => !p)}
+            aria-label={playing ? t.galeria.lbPause : t.galeria.lbPlay}
+            aria-pressed={playing}
+            className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
+          >
+            {playing ? (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.8-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={close}
+            aria-label={t.galeria.lbClose}
+            className="p-3 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Barra de progresso do slideshow — reinicia a cada foto */}
+      {playing && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/8 z-20 pointer-events-none">
+          <div
+            key={index}
+            className="lb-progress h-full bg-gradient-to-r from-moss to-moss-light origin-left"
+          />
+        </div>
+      )}
+
+      {/* Área da foto + botões */}
+      <div className="relative flex-1 flex items-center justify-center min-h-0">
+        {/* Botão anterior */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            prev();
+          }}
+          aria-label={t.galeria.lbPrev}
+          className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
+
+        {/* Foto principal */}
+        <div
+          ref={photoLayerRef}
+          className="lb-photo-layer absolute inset-0 mx-2 md:mx-20 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <VTWrap key={index} name={vtId(pool[index].src)} exit="vt-lb">
+            <Image
+              key={index}
+              src={pool[index].src}
+              alt={altText(pool[index].src, pool[index].label)}
+              fill
+              sizes="90vw"
+              className={`object-contain ${
+                playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
+              }`}
+              {...blurProps(pool[index])}
+            />
+          </VTWrap>
+        </div>
+
+        {/* Pré-carrega os vizinhos (anterior/seguinte) para que ← → seja
+            instantâneo — fetch na mesma resolução do visor, fora de ecrã.
+            Só em rede boa: em Save-Data / 2g / 3g é ignorado para não gastar
+            dados com imagens grandes que talvez nunca sejam vistas. */}
+        <div
+          aria-hidden
+          className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
+        >
+          {preloadNeighbours &&
+            Array.from(
+              new Set([(index - 1 + pool.length) % pool.length, (index + 1) % pool.length]),
+            )
+              .filter((i) => i !== index)
+              .map((i) => (
+                <Image key={i} src={pool[i].src} alt="" fill sizes="90vw" loading="eager" />
+              ))}
+        </div>
+
+        {/* Botão próxima */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            next();
+          }}
+          aria-label={t.galeria.lbNext}
+          className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Strip de thumbnails */}
+      <div
+        className="lb-chrome flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {stripIdx.map((idx) => (
+          <button
+            key={idx}
+            onClick={() => {
+              setJustOpened(false);
+              setLb(idx);
+            }}
+            aria-label={`${t.galeria.lbPhoto} ${idx + 1} ${t.galeria.lbOf} ${pool.length}`}
+            aria-current={idx === index ? "true" : undefined}
+            className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
+              idx === index
+                ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
+                : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
+            }`}
+          >
+            <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+          </button>
+        ))}
+      </div>
+
+      {/* Dicas teclado */}
+      <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
+        {t.galeria.keyboardHint}
+      </p>
+    </div>,
+    document.body,
   );
 }

@@ -22,16 +22,45 @@ export function generateStaticParams() {
   return LOCALES.map((lang) => ({ lang }));
 }
 
+// Both faces stay VARIABLE (no `weight`): a single woff2 per family that
+// already covers every weight the design uses — Inter 300–700 (font-light
+// counters → font-bold) and Playfair 400–700 (400 nav menu / gallery captions /
+// faux-italic sign-off, 500 a gallery caption, 700 headings; the site never
+// renders any weight above 700 or below 300). Pinning discrete weights would be
+// a payload REGRESSION here: next/font emits one static file per weight for a
+// variable font, i.e. 5 files for Inter and 3 for Playfair instead of one each.
+// next/font already trims to the `wght` axis and, with `subsets: ["latin"]`,
+// to the Latin glyphs — which cover the PT/EN diacritics (ã õ ç é …) — so the
+// payload is already minimal.
+//
+// The CLS work is in the fallback wiring: display:"swap" keeps text visible
+// immediately (several heroes mask their title reveal, but body copy must never
+// be invisible → not "optional"); adjustFontFallback (default true, set
+// explicitly so it can't silently regress) size-adjusts the fallback metrics;
+// and the metric-near fallback stacks below mean the swap barely reflows the
+// large Playfair headings.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
+  adjustFontFallback: true,
+  fallback: [
+    "system-ui",
+    "-apple-system",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Arial",
+    "sans-serif",
+  ],
 });
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
   display: "swap",
+  adjustFontFallback: true,
+  fallback: ["Georgia", "Times New Roman", "Times", "serif"],
 });
 
 export async function generateMetadata({
