@@ -301,7 +301,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">
+            <p className="text-white/70 text-base leading-relaxed max-w-md mb-12">
               {t.sobre.ctaText}
             </p>
           </AnimateIn>

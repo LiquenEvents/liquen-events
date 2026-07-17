@@ -251,7 +251,7 @@ export default function OrcamentoForm() {
     // identifiable (WCAG 1.4.11); focus switches to solid moss.
     "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/65 focus:outline-none focus:border-moss transition-colors duration-300";
   const labelCls =
-    "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
+    "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-dark";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
   return (

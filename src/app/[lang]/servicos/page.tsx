@@ -305,7 +305,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               {ts.philoPillars.map((p, i) => (
                 <AnimateIn key={p.title} delay={i * 90}>
                   <div className="flex flex-col items-center gap-4">
-                    <span className="text-gold-text/90 font-mono text-[11px] tracking-[0.4em]">
+                    <span className="text-gold font-mono text-[11px] tracking-[0.4em]">
                       0{i + 1}
                     </span>
                     <span aria-hidden className="w-8 h-px bg-white/25" />

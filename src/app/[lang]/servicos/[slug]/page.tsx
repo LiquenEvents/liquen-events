@@ -336,7 +336,7 @@ export default async function ServiceDetailPage({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent" />
                   <div className="absolute bottom-0 p-6">
-                    <p className="text-moss/70 text-[9px] tracking-[0.35em] uppercase mb-1.5">
+                    <p className="text-moss-light text-[9px] tracking-[0.35em] uppercase mb-1.5">
                       {r.eyebrow}
                     </p>
                     <h3

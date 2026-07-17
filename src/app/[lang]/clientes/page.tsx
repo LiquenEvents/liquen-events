@@ -135,7 +135,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           />
           <AnimateIn delay={180}>
             <div className="mt-10 border-l-2 border-moss/50 pl-6 max-w-md">
-              <p className="text-white/60 text-base leading-[1.8]">{t.clientes.heroLead}</p>
+              <p className="text-white/70 text-base leading-[1.8]">{t.clientes.heroLead}</p>
             </div>
           </AnimateIn>
           <AnimateIn delay={260}>
@@ -419,7 +419,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/60 text-base leading-relaxed max-w-sm mb-14">
+            <p className="text-white/70 text-base leading-relaxed max-w-sm mb-14">
               {t.clientes.ctaText}
             </p>
           </AnimateIn>

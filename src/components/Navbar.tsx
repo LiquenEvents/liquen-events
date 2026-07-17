@@ -196,7 +196,7 @@ export default function Navbar() {
       {light && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/35 via-black/10 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 via-black/15 to-transparent"
         />
       )}
       {/* px-12 (not px-16) in the lg→xl band: at exactly 1024px the nav links and
@@ -255,8 +255,8 @@ export default function Navbar() {
               transitionTypes={navTypes("/contacto")}
               className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-all duration-300 ${
                 light
-                  ? "border-white/35 text-white/90 hover:border-white/70 hover:bg-white/10"
-                  : "border-moss/35 text-moss hover:border-moss/60 hover:bg-moss/10"
+                  ? "border-white/50 text-white/90 hover:border-white/80 hover:bg-white/10"
+                  : "border-moss/60 text-moss hover:border-moss/80 hover:bg-moss/10"
               }`}
             >
               {t.nav.contacto}

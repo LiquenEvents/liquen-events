@@ -375,7 +375,10 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               <AnimateIn key={p.step} delay={i * 70}>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-foreground/8">
                   <div className="lg:col-span-1 flex items-start gap-4">
-                    <span className="text-foreground/15 text-xs font-mono mt-1 tabular-nums">
+                    <span
+                      aria-hidden
+                      className="text-foreground/25 text-xs font-mono mt-1 tabular-nums"
+                    >
                       {p.step}
                     </span>
                     <h3

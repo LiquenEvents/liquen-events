@@ -120,7 +120,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             </Magnetic>
             <Link
               href={localizeHref("/galeria", locale)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/25 text-white/85 text-[10px] tracking-[0.18em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/40 text-white/85 text-[10px] tracking-[0.18em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300"
             >
               {t.common.verGaleria}
             </Link>
@@ -263,7 +263,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             />
           </h2>
           <AnimateIn delay={110}>
-            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">
+            <p className="text-white/70 text-base leading-relaxed max-w-md mb-12">
               {t.home.ctaText}
             </p>
           </AnimateIn>
