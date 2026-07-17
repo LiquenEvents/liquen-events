@@ -229,7 +229,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 hover:text-foreground transition-colors border-b border-foreground/15 pb-0.5 hover:border-foreground/40"
+                    className="inline-flex items-center min-h-[24px] py-1.5 text-[11px] tracking-[0.25em] uppercase text-foreground/60 hover:text-foreground transition-colors border-b border-foreground/15 hover:border-foreground/40"
                   >
                     {s.label}
                   </a>

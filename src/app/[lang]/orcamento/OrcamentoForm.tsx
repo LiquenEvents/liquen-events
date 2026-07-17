@@ -495,7 +495,7 @@ export default function OrcamentoForm({
                   onChange={(e) => setData(e.target.value)}
                   className={`${inputCls} [color-scheme:light] ${dateFlexible ? "opacity-40" : ""}`}
                 />
-                <label className="mt-3 inline-flex items-center gap-2.5 cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
+                <label className="mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
                   <input
                     type="checkbox"
                     checked={dateFlexible}

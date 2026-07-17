@@ -274,7 +274,10 @@ export default async function ServiceDetailPage({
                   <Image
                     src={src}
                     {...blurFor(src)}
-                    alt={t.servicoDetalhe.galleryAlt}
+                    // Distinct alt per photo (base phrase + service + index) so
+                    // screen-reader users can tell the portfolio images apart
+                    // instead of hearing one identical string repeated.
+                    alt={`${t.servicoDetalhe.galleryAlt} — ${svc.title} ${i + 1}`}
                     fill
                     sizes={`(max-width: 1024px) 50vw, ${dvw}`}
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
