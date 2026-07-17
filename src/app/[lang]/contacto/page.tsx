@@ -330,8 +330,11 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor(stepsBgImg)}
         />
-        <div className="absolute inset-0 bg-black/72" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/75 via-[#080808]/50 to-[#080808]/75" />
+        {/* Lighter veil so the venue photo actually reads through — a moderate
+            uniform tint (white text spans the whole panel) plus a soft top/bottom
+            gradient for the eyebrow and final divider. */}
+        <div className="absolute inset-0 bg-black/35" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/50 via-[#080808]/15 to-[#080808]/55" />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-white/75 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
@@ -409,8 +412,10 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           sizes="100vw"
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-black/55" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/15 to-[#080808]/45" />
+        {/* Text lives in the left column, so darken only the left and let the
+            photo read on the right (SpaceX-style — image breathes). */}
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#080808]/85 via-[#080808]/35 to-transparent" />
         <div
           className="absolute inset-0 pointer-events-none"
           style={{

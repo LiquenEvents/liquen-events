@@ -148,8 +148,10 @@ function ServiceBand({
           {...blurFor(service.image)}
         />
       </Parallax>
-      <div className="absolute inset-0 bg-black/55" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-[#080808]/40" />
+      {/* Image-first (SpaceX-style): the photo reads fully at the top, and only
+          the bottom — where the number/title/description sit — darkens enough to
+          keep the white text legible. No heavy full-panel veil. */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-16 lg:pb-24">
         <AnimateIn>
           <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
@@ -235,9 +237,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
         <HeroWebGL src="/imagens/EW1_1330.jpg" className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/92 via-[#080808]/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20 pt-40">
           <AnimateIn>
@@ -340,8 +341,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {...blurFor(cat.band)}
               />
             </Parallax>
-            <div className="absolute inset-0 bg-black/60" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-[#080808]/50" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
             <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-24">
               <AnimateIn>
                 <p className="text-white/50 font-mono text-[11px] tracking-[0.4em] mb-5">
@@ -415,7 +415,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor("/imagens/J&A-68.jpg")}
         />
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/42" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
         <div className="relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
@@ -454,7 +454,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor("/imagens/M&F0497.jpg")}
         />
-        <div className="absolute inset-0 bg-black/65" />
+        <div className="absolute inset-0 bg-black/48" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
