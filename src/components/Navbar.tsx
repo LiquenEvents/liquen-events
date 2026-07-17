@@ -211,16 +211,13 @@ export default function Navbar() {
             scrolled ? "h-[72px]" : "h-[140px]"
           }`}
         >
-          <Link
-            href={localizeHref("/", locale)}
-            className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
-          >
+          <Link href={localizeHref("/", locale)} className="flex items-center shrink-0">
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
               width={210}
               height={125}
-              className={`object-contain w-auto transition-[height] duration-500 ${scrolled ? "h-[52px]" : "h-[120px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${scrolled ? "h-[46px] sm:h-[52px]" : "h-[76px] sm:h-[120px]"}`}
             />
           </Link>
 

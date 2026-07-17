@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { blurFor } from "@/lib/blur";
-import RatingBadge from "@/components/RatingBadge";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
@@ -288,14 +287,6 @@ export default function OrcamentoForm() {
             <p className="mt-5 text-cream/55 text-[10px] tracking-[0.28em] uppercase">
               {to.processHint}
             </p>
-            <div className="mt-8">
-              <RatingBadge
-                label={t.common.reviewsLabel}
-                ptFormat={locale === "pt"}
-                starClassName="text-gold"
-                textClassName="text-cream/75"
-              />
-            </div>
           </div>
         </div>
       </aside>
@@ -321,24 +312,6 @@ export default function OrcamentoForm() {
           >
             {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
           </h1>
-
-          {/* Reassurance on mobile: the desktop image panel carries the
-              "no commitment / 24h / reviews" cues, but it's hidden below lg —
-              so mobile users (the majority) would otherwise reach a bare form.
-              Restore the strongest trust + process signals right where hesitation
-              peaks, without breaking the minimal look. */}
-          <div className="lg:hidden mb-12 flex flex-col gap-4">
-            <p className="text-foreground/70 text-sm leading-relaxed">{to.lead}</p>
-            <p className="text-foreground/55 text-[10px] tracking-[0.28em] uppercase">
-              {to.processHint}
-            </p>
-            <RatingBadge
-              label={t.common.reviewsLabel}
-              ptFormat={locale === "pt"}
-              starClassName="text-gold"
-              textClassName="text-foreground/70"
-            />
-          </div>
 
           <form
             onSubmit={submit}
