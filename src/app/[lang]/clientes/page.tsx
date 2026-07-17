@@ -87,6 +87,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const testimonials = t.clientes.testimonials;
+  const introImg = "/imagens/EW1_1404.jpg";
+  const wordsImg = "/imagens/stephanie-mizio-555.jpg";
   return (
     <>
       <BreadcrumbJsonLd
@@ -160,16 +162,26 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       <ClientMarquee />
 
       {/* ── LEAD STATEMENT ── */}
-      <section className="py-28 lg:py-36 bg-surface border-b border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      <section className="relative py-28 lg:py-36 overflow-hidden border-b border-foreground/8">
+        <Image
+          src={introImg}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(introImg)}
+        />
+        <div className="absolute inset-0 bg-black/62" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/80 via-transparent to-[#080808]/40" />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid lg:grid-cols-[1fr_auto] gap-16 lg:gap-24 items-end">
             <AnimateIn>
               <p
-                className="text-foreground/72 leading-[1.72]"
+                className="text-white/85 leading-[1.72]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 2.8vw, 36px)" }}
               >
                 {t.clientes.leadPre}
-                <span className="text-moss">{t.clientes.leadMoss}</span>
+                <span className="text-moss-light">{t.clientes.leadMoss}</span>
                 {t.clientes.leadPost}
               </p>
             </AnimateIn>
@@ -177,13 +189,13 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               <div className="flex flex-col items-end gap-1.5 text-right min-w-[120px]">
                 <span
                   aria-hidden="true"
-                  className="text-foreground/45 text-[9px] tracking-[0.45em] uppercase block"
+                  className="text-cream/55 text-[9px] tracking-[0.45em] uppercase block"
                 >
                   {t.clientes.desde}
                 </span>
                 <span
                   aria-hidden="true"
-                  className="text-foreground/25 font-bold leading-none"
+                  className="text-cream/35 font-bold leading-none"
                   style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
                 >
                   {SITE.founded}
@@ -279,30 +291,40 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── TESTIMONIALS GRID ── */}
-      <section className="py-24 lg:py-28 bg-surface border-b border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      <section className="relative py-24 lg:py-28 overflow-hidden border-b border-foreground/8">
+        <Image
+          src={wordsImg}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(wordsImg)}
+        />
+        <div className="absolute inset-0 bg-black/72" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/70 via-transparent to-[#080808]/70" />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-14">
             <h2
-              className="text-foreground font-bold leading-[1.05]"
+              className="text-white font-bold leading-[1.05]"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.2vw, 42px)" }}
             >
               {t.clientes.gridTitle}
             </h2>
           </AnimateIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/[0.05]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/10">
             {testimonials.map((item, i) => (
               <AnimateIn key={item.name} delay={i * 55} className="h-full">
-                <figure className="h-full flex flex-col p-8 lg:p-10 bg-surface hover:bg-surface-raised/25 transition-colors duration-500">
+                <figure className="h-full flex flex-col p-8 lg:p-10 bg-[#0c0e0b]/55 backdrop-blur-sm hover:bg-[#0c0e0b]/70 transition-colors duration-500">
                   <span
-                    className="text-moss/20 text-5xl leading-none mb-5 select-none"
+                    className="text-moss-light/25 text-5xl leading-none mb-5 select-none"
                     style={{ fontFamily: "var(--font-playfair)" }}
                     aria-hidden
                   >
                     &ldquo;
                   </span>
                   <blockquote
-                    className="text-foreground/72 leading-[1.72] flex-1"
+                    className="text-cream/85 leading-[1.72] flex-1"
                     style={{
                       fontFamily: "var(--font-playfair)",
                       fontSize: "clamp(16px, 1.7vw, 19px)",
@@ -310,11 +332,11 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                   >
                     {item.text}
                   </blockquote>
-                  <figcaption className="mt-8 pt-6 border-t border-foreground/8 flex items-center gap-4">
+                  <figcaption className="mt-8 pt-6 border-t border-white/12 flex items-center gap-4">
                     <div className="w-6 h-px bg-gold flex-shrink-0" />
                     <div>
-                      <p className="text-foreground text-sm font-semibold">{item.name}</p>
-                      <p className="text-moss text-[10px] mt-0.5 tracking-[0.18em] uppercase">
+                      <p className="text-white text-sm font-semibold">{item.name}</p>
+                      <p className="text-moss-light text-[10px] mt-0.5 tracking-[0.18em] uppercase">
                         {item.event}
                       </p>
                     </div>

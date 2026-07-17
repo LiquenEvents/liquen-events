@@ -82,6 +82,10 @@ export default async function ServiceDetailPage({
     ReturnType<typeof getService>
   >[];
 
+  // Closing CTA backdrop — a frame from this service's own gallery (falls back
+  // to the hero) so the final call-to-action stays on-topic and cinematic.
+  const ctaImg = svc.gallery.at(-1) ?? svc.hero;
+
   return (
     <>
       <BreadcrumbJsonLd
@@ -348,19 +352,25 @@ export default async function ServiceDetailPage({
         </section>
       )}
 
-      {/* ── CTA ── */}
-      <section className="relative py-40 bg-surface border-t border-foreground/8 overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 65% 80% at 0% 105%, rgba(99, 122, 95, 0.11) 0%, transparent 58%)",
-          }}
+      {/* ── CTA — full-bleed cinematic closer ── */}
+      <section
+        className="relative flex items-center overflow-hidden border-t border-foreground/8 py-28 lg:py-40"
+        style={{ minHeight: "clamp(460px, 68vh, 760px)" }}
+      >
+        <Image
+          src={ctaImg}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(ctaImg)}
         />
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <h2
-              className="text-foreground font-bold leading-[0.95] mb-12 max-w-2xl"
+              className="text-white font-bold leading-[0.95] mb-12 max-w-2xl"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5.5vw, 76px)" }}
             >
               {t.servicoDetalhe.ctaTitle}
