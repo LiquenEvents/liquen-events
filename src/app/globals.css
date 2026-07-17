@@ -1057,6 +1057,112 @@ body:has([data-orcamento-mode]) .eyebrow {
   }
 }
 
+/* ── Client logo wall (ClientLogoGrid) — compact grid, editorial scroll-reveal
+      + moss hover ──
+   The 19 client logos resolve in as one staggered wave when the block scrolls
+   into view: each rises + sharpens (blur→crisp) + fades, offset by index via
+   --cl-delay. A single IntersectionObserver on the grid adds .cl-in once, then
+   disconnects — no scroll listeners, no per-frame JS. Only transform/opacity/
+   filter animate (compositor work). JS adds .cl-armed before arming the reveal,
+   so without JS — and under reduced motion — the logos stay fully visible
+   (they're client proof and must always render legibly). */
+
+/* Cells share borders, so nothing translates the cell itself (that would open
+   seams between neighbours). Instead a soft moss spotlight blooms behind the
+   logo and the cell picks up the faintest moss tint. */
+.cl-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(58% 70% at 50% 50%, rgba(99, 122, 95, 0.11), transparent 72%);
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.cl-cell:hover {
+  background-color: rgba(99, 122, 95, 0.045);
+}
+.cl-cell:hover::before {
+  opacity: 1;
+}
+
+/* On hover the logo lifts + swells a touch, and the black silhouette crossfades
+   to a true moss recolor: a moss-filled layer masked by the logo's own alpha. */
+.cl-logo {
+  position: relative;
+  display: inline-flex;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cl-cell:hover .cl-logo {
+  transform: translateY(-2px) scale(1.045);
+}
+.cl-black {
+  transition: opacity 0.5s ease;
+}
+.cl-cell:hover .cl-black {
+  opacity: 0;
+}
+.cl-moss {
+  position: absolute;
+  inset: 0;
+  background-color: var(--color-moss);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  pointer-events: none;
+}
+.cl-cell:hover .cl-moss {
+  opacity: 1;
+}
+
+/* Entrance reveal. The hidden "from" state exists only once JS arms it
+   (.cl-armed), so no-JS visitors never face a blank wall. */
+.cl-armed .cl-reveal {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  filter: blur(6px);
+  will-change: opacity, transform, filter;
+}
+.cl-armed.cl-in .cl-reveal {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+  transition:
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--cl-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Final state, instantly — no rise, blur or crossfade motion. Hover still
+     recolors to moss (a state change, not motion), just without a transition. */
+  .cl-armed .cl-reveal,
+  .cl-armed.cl-in .cl-reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+    will-change: auto;
+  }
+  .cl-cell,
+  .cl-cell::before,
+  .cl-logo,
+  .cl-black,
+  .cl-moss {
+    transition: none;
+  }
+  .cl-cell:hover .cl-logo {
+    transform: none;
+  }
+}
+
 /* ── Print / PDF ── */
 @media print {
   body::before {
