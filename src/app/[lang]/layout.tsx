@@ -97,6 +97,14 @@ export async function generateMetadata({
       description,
       images: [SITE.ogImage],
     },
+    // iOS "Add to Home Screen": a standalone title + status-bar style, so an
+    // installed shortcut shows "Líquen" and branded chrome instead of the raw
+    // <title> and default bar.
+    appleWebApp: {
+      capable: true,
+      title: "Líquen",
+      statusBarStyle: "default",
+    },
     // Favicon/ícones gerados a partir de src/app/icon.png e apple-icon.png (logo Líquen).
     // Add GOOGLE_SITE_VERIFICATION in the environment to verify Search Console.
     verification: process.env.GOOGLE_SITE_VERIFICATION
@@ -106,7 +114,12 @@ export async function generateMetadata({
 }
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  // Brand cream in light; a deep moss for dark-mode UA chrome, instead of a flat
+  // white that reads as unconsidered.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f4ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#1b2119" },
+  ],
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
