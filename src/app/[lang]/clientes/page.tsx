@@ -177,13 +177,13 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               <div className="flex flex-col items-end gap-1.5 text-right min-w-[120px]">
                 <span
                   aria-hidden="true"
-                  className="text-foreground/12 text-[9px] tracking-[0.45em] uppercase block"
+                  className="text-foreground/45 text-[9px] tracking-[0.45em] uppercase block"
                 >
                   {t.clientes.desde}
                 </span>
                 <span
                   aria-hidden="true"
-                  className="text-foreground/10 font-bold leading-none"
+                  className="text-foreground/25 font-bold leading-none"
                   style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
                 >
                   {SITE.founded}
@@ -213,7 +213,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             <AnimateIn delay={80} className="hidden lg:block">
               <span
                 aria-hidden="true"
-                className="text-foreground/12 text-[9px] tracking-[0.4em] uppercase"
+                className="text-foreground/45 text-[9px] tracking-[0.4em] uppercase"
               >
                 {clientLogos.length} {t.clientes.clientesCount}
               </span>

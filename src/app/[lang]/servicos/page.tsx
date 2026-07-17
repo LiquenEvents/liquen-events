@@ -364,7 +364,10 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-10">
                   <p className="text-white/75 text-[15px] leading-[1.7] max-w-sm">{cat.desc}</p>
                   <Link
-                    href={localizeHref(`/servicos/${cat.services[0].slug}`, locale)}
+                    href={localizeHref(
+                      `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
+                      locale,
+                    )}
                     className="inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300 flex-shrink-0"
                   >
                     {ts.verDetalhes}

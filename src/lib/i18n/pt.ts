@@ -104,7 +104,7 @@ export const pt = {
     ogLocale: "pt_PT",
     homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Decoração de eventos e casamentos em Évora: decoração e coordenação de casamentos, eventos corporativos e celebrações no Alentejo e em Portugal. Peça orçamento.",
+      "Decoração e coordenação de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em todo o Portugal. Do conceito ao último detalhe — peça orçamento.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
       "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
@@ -148,7 +148,7 @@ export const pt = {
     }[],
     scroll: "Scroll",
     wallEyebrow: "O nosso trabalho",
-    wallTitle: "Momentos inesquecíveis",
+    wallTitle: "O que fica para sempre",
     servicesEyebrow: "O que fazemos",
     services: [
       { tag: "Empresas", title: "Corporativos" },
@@ -387,7 +387,7 @@ export const pt = {
       enviando: "A enviar…",
       resposta24: "Resposta em 24h",
       errNome: "Indique o seu nome",
-      errEmail: "Email inválido",
+      errEmail: "E-mail inválido",
       error: "Não foi possível enviar. Tente novamente ou contacte-nos pelo WhatsApp.",
       successEyebrow: "Enviado com sucesso",
       successTitle1: "Mensagem",
@@ -451,7 +451,7 @@ export const pt = {
     labelBudget: "Orçamento aproximado",
     budgetLabels: ["Até 5.000€", "5.000–15.000€", "15.000–30.000€", "30.000–60.000€", "60.000€+"],
     labelNome: "Nome",
-    labelEmail: "Email",
+    labelEmail: "E-mail",
     labelTelefone: "Telefone",
     labelMensagem: "Mensagem",
     phPessoas: "Ex.: 120",
@@ -547,8 +547,8 @@ export const pt = {
     seoText:
       "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
     ctaEyebrow: "Próximo passo",
-    ctaTitleLine1: "Tem um evento",
-    ctaTitleMoss: "em mente?",
+    ctaTitleLine1: "Vamos dar vida",
+    ctaTitleMoss: "à sua ideia?",
     ctaText:
       "Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
     ctaGaleria: "Ver a galeria",

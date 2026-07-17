@@ -184,7 +184,7 @@ export const SERVICES: ServiceDetail[] = [
     includes: [
       "Mesa posta e decoração premium",
       "Chef convidado e menu de autor",
-      "Wine pairing",
+      "Harmonização de vinhos",
       "Cenografia e iluminação",
       "Animação e entretenimento",
       "Coordenação integral do evento",

@@ -104,7 +104,7 @@ export const en: Dict = {
     ogLocale: "en_US",
     homeTitle: "Event & Wedding Decoration in Évora, Portugal | Líquen Events",
     homeDescription:
-      "Event and wedding decoration in Évora: wedding decoration and coordination, corporate events and celebrations across the Alentejo and Portugal. Request a quote.",
+      "Wedding decoration and coordination, corporate events and celebrations in Évora, the Alentejo and across Portugal. From concept to the last detail — request a quote.",
     sobreTitle: "Event Decoration Company in the Alentejo",
     sobreDescription:
       "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
@@ -142,10 +142,10 @@ export const en: Dict = {
 
   home: {
     eyebrow: "Event decoration · Évora · Alentejo",
-    heroLines: [{ words: ["We", "immortalise"] }, { words: ["memories"], moss: true }],
+    heroLines: [{ words: ["We", "make", "memories"] }, { words: ["last"], moss: true }],
     scroll: "Scroll",
     wallEyebrow: "Our work",
-    wallTitle: "Unforgettable moments",
+    wallTitle: "What stays with you",
     servicesEyebrow: "What we do",
     services: [
       { tag: "Companies", title: "Corporate" },
@@ -166,7 +166,7 @@ export const en: Dict = {
     scroll: "Scroll",
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
-    manifestoTitleLine2: "We immortalise memories.",
+    manifestoTitleLine2: "We make memories last.",
     manifestoText: "Since 2018 we've turned spaces into experiences — across Portugal.",
     statementLead: "We don't just decorate spaces.",
     statementRest: " We design experiences that last forever.",
@@ -535,8 +535,8 @@ export const en: Dict = {
     seoText:
       "Weddings, corporate events and celebrations — from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
     ctaEyebrow: "Next step",
-    ctaTitleLine1: "Have an event",
-    ctaTitleMoss: "in mind?",
+    ctaTitleLine1: "Shall we bring",
+    ctaTitleMoss: "your idea to life?",
     ctaText:
       "Talk to us. No commitment, no cost. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
@@ -668,7 +668,7 @@ export const en: Dict = {
 
   footer: {
     sloganLine1: "We decorate events,",
-    sloganLine2: "we immortalise memories.",
+    sloganLine2: "we make memories last.",
     disponivel: "Available for new events",
     paginas: "Pages",
     servicosTitulo: "Services",

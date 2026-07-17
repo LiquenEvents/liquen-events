@@ -74,7 +74,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
           <div className="max-w-7xl mx-auto w-full">
             <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
+              <span className="w-5 h-px bg-gold/60 flex-shrink-0" />
               {tf.heroEyebrow}
             </p>
             <KineticHeading
@@ -105,7 +105,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             {/* ── Esquerda — canais diretos ── */}
             <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
               <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
-                <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
+                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 {tf.infoEyebrow}
               </p>
 
@@ -157,7 +157,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
+                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
               >
                 <span className="text-moss flex-shrink-0">
                   <WhatsAppIcon className="w-4 h-4" />
@@ -179,7 +179,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={SITE.googleBusiness}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-gold/50 hover:bg-gold/[0.06] transition-all duration-300 group mb-12"
+                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/12 hover:border-gold/50 hover:bg-gold/[0.06] transition-all duration-300 group mb-12"
               >
                 <span className="flex-shrink-0" aria-hidden>
                   <svg viewBox="0 0 24 24" className="w-4 h-4">
@@ -261,7 +261,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               <AnimateIn>
                 <div className="relative">
                   <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-                    <span className="w-5 h-px bg-gold rounded-full flex-shrink-0" />
+                    <span className="w-5 h-px bg-gold flex-shrink-0" />
                     {td.ctaEyebrow}
                   </p>
                   <h2
@@ -280,7 +280,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   </p>
                   <Link
                     href={localizeHref("/orcamento", locale)}
-                    className="inline-flex w-fit items-center gap-3 rounded-sm bg-cream px-8 py-4 text-[11px] font-medium uppercase tracking-[0.3em] text-ink transition-all duration-300 hover:bg-cream-dark"
+                    className="inline-flex w-fit items-center gap-3 bg-cream px-8 py-4 text-[11px] font-medium uppercase tracking-[0.3em] text-ink transition-all duration-300 hover:bg-cream-dark"
                   >
                     {td.ctaButton} →
                   </Link>
@@ -296,7 +296,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
-              <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+              <span className="w-6 h-px bg-gold flex-shrink-0" />
               {t.contacto.testimonialsEyebrow}
             </p>
           </AnimateIn>
@@ -403,7 +403,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
               <div className="lg:sticky" style={{ top: "6rem" }}>
                 <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
-                  <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+                  <span className="w-6 h-px bg-gold flex-shrink-0" />
                   {t.contacto.faqEyebrow}
                 </p>
                 <h2
@@ -442,13 +442,13 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(124, 133, 75,0.5) 0%, transparent 55%)",
+              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(99, 122, 95, 0.5) 0%, transparent 55%)",
           }}
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
           <AnimateIn>
             <p className="text-cream/80 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-cream/45 rounded-full flex-shrink-0" />
+              <span className="w-5 h-px bg-cream/45 flex-shrink-0" />
               {t.contacto.whatsappEyebrow}
             </p>
             <h2
@@ -467,14 +467,14 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-cream text-ink font-medium rounded-sm hover:bg-cream-dark transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
+                className="inline-flex items-center gap-3 px-8 py-4 bg-cream text-ink font-medium hover:bg-cream-dark transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {t.common.abrirWhatsApp} →
               </a>
               <a
                 href={`mailto:${SITE.email}`}
-                className="inline-flex items-center gap-3 px-8 py-4 border border-cream/35 text-cream/85 font-medium rounded-sm hover:border-cream/60 hover:text-cream transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
+                className="inline-flex items-center gap-3 px-8 py-4 border border-cream/35 text-cream/85 font-medium hover:border-cream/60 hover:text-cream transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
               >
                 {t.common.enviarEmail}
               </a>

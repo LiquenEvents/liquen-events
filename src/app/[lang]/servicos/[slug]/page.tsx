@@ -160,7 +160,7 @@ export default async function ServiceDetailPage({
               ))}
               <Link
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-3 mt-4 text-sm text-moss hover:gap-5 transition-all duration-300 tracking-widest uppercase"
+                className="inline-flex items-center gap-3 mt-6 px-8 py-4 btn-shine bg-moss text-white text-[11px] tracking-[0.24em] uppercase hover:bg-moss-dark hover:gap-5 transition-all duration-300 shadow-lg shadow-moss/15"
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </Link>
@@ -354,7 +354,7 @@ export default async function ServiceDetailPage({
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 65% 80% at 0% 105%, rgba(124, 133, 75,0.11) 0%, transparent 58%)",
+              "radial-gradient(ellipse 65% 80% at 0% 105%, rgba(99, 122, 95, 0.11) 0%, transparent 58%)",
           }}
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">

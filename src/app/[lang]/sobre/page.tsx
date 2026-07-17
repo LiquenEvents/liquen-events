@@ -145,7 +145,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </p>
           </AnimateIn>
           <AnimateIn from="right" delay={120}>
-            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl">
+            <div className="relative aspect-[4/5] overflow-hidden">
               <Image
                 src="/imagens/DaniGui_Preview12.jpg"
                 alt={t.common.imageAlt.sobrePortrait}
@@ -223,7 +223,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
           <div className="relative flex items-center justify-center px-6 py-14 lg:py-0 min-h-[440px] lg:min-h-[560px]">
-            <div className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden rounded-2xl shadow-2xl shadow-black/25 ring-1 ring-foreground/5">
+            <div className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden shadow-2xl shadow-black/25 ring-1 ring-foreground/5">
               <Image
                 src="/imagens/catarina-gaspar.jpg"
                 alt={t.common.imageAlt.sobreFounder}

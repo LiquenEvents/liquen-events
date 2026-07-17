@@ -168,11 +168,11 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           </AnimateIn>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {services.map((s, i) => (
-              <Reveal key={s.title} variant="mask" delay={i * 0.08} className="rounded-xl">
-                <TiltCard className="rounded-xl">
+              <Reveal key={s.title} variant="mask" delay={i * 0.08}>
+                <TiltCard>
                   <Link
                     href={localizeHref(s.href, locale)}
-                    className="group relative block rounded-xl overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
+                    className="group relative block overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
                     style={{ aspectRatio: "3/4" }}
                   >
                     <Image
