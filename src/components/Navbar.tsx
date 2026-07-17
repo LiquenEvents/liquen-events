@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useRef, memo, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePublicPathname } from "@/lib/use-public-pathname";
@@ -20,7 +20,9 @@ const MENU_EASE = "cubic-bezier(0.16,1,0.3,1)";
 // ── Hairline stroke icons for the overlay's contact + social block. Language-
 // neutral affordances (an envelope reads the same in PT and EN), drawn to match
 // the site's thin-line motif. Purely decorative — labelled by their parent <a>. ──
-function IconMail() {
+// memo: these four are prop-less, so memoizing lets React skip reconciling their
+// SVG subtrees entirely when the Navbar re-renders on scroll (scrolled/hidden).
+const IconMail = memo(function IconMail() {
   return (
     <svg
       width="15"
@@ -37,8 +39,8 @@ function IconMail() {
       <path d="m3.5 6.5 8.5 6 8.5-6" />
     </svg>
   );
-}
-function IconPhone() {
+});
+const IconPhone = memo(function IconPhone() {
   return (
     <svg
       width="15"
@@ -54,8 +56,8 @@ function IconPhone() {
       <path d="M6.5 3.5h3l1.4 3.9-2 1.4a12 12 0 0 0 4.9 4.9l1.4-2 3.9 1.4v3a1.8 1.8 0 0 1-1.9 1.8A15.8 15.8 0 0 1 4.7 5.4 1.8 1.8 0 0 1 6.5 3.5Z" />
     </svg>
   );
-}
-function IconInstagram() {
+});
+const IconInstagram = memo(function IconInstagram() {
   return (
     <svg
       width="17"
@@ -73,8 +75,8 @@ function IconInstagram() {
       <circle cx="17" cy="7" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   );
-}
-function IconFacebook() {
+});
+const IconFacebook = memo(function IconFacebook() {
   return (
     <svg
       width="17"
@@ -90,7 +92,7 @@ function IconFacebook() {
       <path d="M14.5 8.5V6.8c0-.8.3-1.3 1.4-1.3h1.4V2.7A18 18 0 0 0 15 2.5c-2.3 0-3.9 1.4-3.9 4v2h-2.6v3h2.6v8h3.4v-8h2.4l.5-3Z" />
     </svg>
   );
-}
+});
 
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza

@@ -8,8 +8,12 @@
 // Geometry + type are shared; only the drop shadow changes with the ground it
 // sits on (a moss glow is invisible on a dark photo; a black shadow is
 // invisible on cream) — hence the two exported variants below.
+// `transition-[gap,background-color]` (not `transition-all`): the only things
+// that change on hover here are the gap (gap-3→gap-5, the icon drift) and the
+// background (bg-moss→bg-moss-dark). Naming them keeps the identical animation
+// while sparing the browser from evaluating every animatable property each hover.
 const PRIMARY_BUTTON_BASE =
-  "inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-[11px] tracking-[0.3em] uppercase disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3";
+  "inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-[gap,background-color] duration-300 text-[11px] tracking-[0.3em] uppercase disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3";
 
 // On light / cream sections (form submits, service-intro CTA): soft moss lift.
 export const PRIMARY_BUTTON_CLASS = `${PRIMARY_BUTTON_BASE} shadow-lg shadow-moss/15`;
@@ -23,5 +27,7 @@ export const PRIMARY_BUTTON_DARK_CLASS = `${PRIMARY_BUTTON_BASE} shadow-xl shado
 // hover. Single source of truth so every dark-section CTA — /servicos bands,
 // sobre, galeria, clientes — stays pixel-identical. Add `flex-shrink-0` inline
 // where the button sits in a flex row next to a heading.
+// `transition-colors` (not `transition-all`): hover only swaps background, text
+// and border colours — identical look, no whole-property-set evaluation.
 export const OUTLINE_LIGHT_BUTTON_CLASS =
-  "inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-all duration-300";
+  "inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-colors duration-300";
