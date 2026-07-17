@@ -45,10 +45,6 @@ const EVENT_TYPES: EventOption[] = [
   { label: "Outro", category: null, eventType: null },
 ];
 
-// Optional budget range — the labels come from the dictionary (t.orcamento
-// .budgetLabels); these stable ids are what's stored on the quote (BudgetRange).
-const BUDGET_VALUES = ["ate_5k", "5k_15k", "15k_30k", "30k_60k", "60k_plus"] as const;
-
 export default function OrcamentoForm() {
   const { locale, t } = useTranslations();
   const to = t.orcamento;
@@ -61,7 +57,6 @@ export default function OrcamentoForm() {
   const [dateFlexible, setDateFlexible] = useState(false);
   const [pessoas, setPessoas] = useState("");
   const [local, setLocal] = useState("");
-  const [budget, setBudget] = useState(""); // "" = não indicado (opcional)
   const [mensagem, setMensagem] = useState("");
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
   const [sending, setSending] = useState(false);
@@ -108,7 +103,6 @@ export default function OrcamentoForm() {
       if (d.dateFlexible) setDateFlexible(d.dateFlexible === "1");
       if (d.pessoas) setPessoas(d.pessoas);
       if (d.local) setLocal(d.local);
-      if (d.budget) setBudget(d.budget);
       if (d.mensagem) setMensagem(d.mensagem);
     } catch {
       /* localStorage indisponível — segue sem rascunho */
@@ -134,7 +128,6 @@ export default function OrcamentoForm() {
           dateFlexible: dateFlexible ? "1" : "",
           pessoas,
           local,
-          budget,
           mensagem,
           _ts: Date.now(),
         }),
@@ -142,7 +135,7 @@ export default function OrcamentoForm() {
     } catch {
       /* ignora */
     }
-  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, budget, mensagem]);
+  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem]);
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
@@ -178,7 +171,6 @@ export default function OrcamentoForm() {
       date: dateFlexible ? "" : data,
       guests: Number(pessoas) || 0,
       location: local.trim(),
-      budgetRange: budget || null,
       // Capture the "no fixed date yet" signal for the team (a high-value
       // early-stage lead segment) by folding it into the notes.
       notes: [dateFlexible ? `(${to.dateFlexibleLabel})` : "", mensagem.trim()]
@@ -470,33 +462,6 @@ export default function OrcamentoForm() {
                 />
               </div>
             </div>
-
-            {/* Orçamento aproximado (opcional) — qualifica o lead e permite
-                uma proposta mais certeira em 24h. Toggle simples: clicar de novo
-                limpa a seleção. */}
-            <fieldset className="group">
-              <legend className={labelCls}>{to.labelBudget}</legend>
-              <div className="flex flex-wrap gap-3">
-                {BUDGET_VALUES.map((v, i) => {
-                  const active = budget === v;
-                  return (
-                    <button
-                      key={v}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setBudget(active ? "" : v)}
-                      className={`px-4 py-3.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
-                        active
-                          ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
-                          : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
-                      }`}
-                    >
-                      {to.budgetLabels[i] ?? v}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
 
             {/* Local / região (opcional) */}
             <div className="group">

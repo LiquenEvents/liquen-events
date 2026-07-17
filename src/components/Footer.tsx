@@ -56,7 +56,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
         cells={STRIP_CELLS}
         pool={stripPool}
         alt=""
-        className="grid grid-cols-4 h-[180px] sm:h-[240px] lg:h-[300px]"
+        className="grid grid-cols-4 h-[130px] sm:h-[170px] lg:h-[210px]"
         imgClassName="transition-transform duration-700 group-hover:scale-[1.04]"
         overlayClassName="bg-black/30 group-hover:bg-black/10"
       />
@@ -64,7 +64,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
       {/* ── Main content ── */}
       <div className="border-t border-foreground/6">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="py-12 md:py-20 grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-16">
+          <div className="py-10 md:py-14 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12">
             {/* Brand column */}
             <div className="md:col-span-5 flex flex-col">
               <Image
