@@ -116,8 +116,11 @@ export default function TestimonialsCarousel() {
                 transition: reduced ? "none" : "opacity 0.38s ease, transform 0.38s ease",
               }}
             >
+              {/* min-height reserves space for the longest testimonial so the
+                  6s auto-rotation doesn't reflow the dots + the section below it
+                  (a recurring layout shift that field CLS captures). */}
               <p
-                className="text-foreground text-xl sm:text-2xl lg:text-[2.2rem] font-bold leading-[1.35] mb-8 lg:mb-12"
+                className="text-foreground text-xl sm:text-2xl lg:text-[2.2rem] font-bold leading-[1.35] mb-8 lg:mb-12 min-h-[11rem] sm:min-h-[10rem] lg:min-h-[13rem]"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
                 &ldquo;{t.quote}&rdquo;

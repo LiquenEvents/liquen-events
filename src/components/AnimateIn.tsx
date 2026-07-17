@@ -94,12 +94,11 @@ export default function AnimateIn({ children, className = "", delay = 0, from = 
         transition: isClip
           ? `transform 0.75s ${easing}, clip-path 0.75s ${easing}`
           : `opacity 0.75s ${easing}, transform 0.75s ${easing}`,
-        willChange: "opacity, transform",
-      }}
-      onTransitionEnd={() => {
-        if (visible && ref.current) {
-          ref.current.style.willChange = "auto";
-        }
+        // Only hint the compositor while the element is armed (hidden, waiting to
+        // reveal). Once revealed — and under reduced motion / no-JS, where it's
+        // permanently visible and never animates — drop the hint so we don't pin
+        // a compositor layer forever on dozens of instances per page.
+        willChange: visible ? undefined : isClip ? "transform, clip-path" : "opacity, transform",
       }}
     >
       {children}

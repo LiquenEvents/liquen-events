@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import OrcamentoForm from "./OrcamentoForm";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
+import { blurFor } from "@/lib/blur";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
+
+// The form's decorative left-panel image. Its blur placeholder is resolved here
+// (server-side) so the blur-map JSON never ships to the client with the form.
+const PANEL_IMG = "/imagens/DaniGui_JantarFesta_1.jpg";
 
 export async function generateMetadata({
   params,
@@ -31,7 +36,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ lang
         homeName={t.nav.inicio}
         items={[{ name: t.nav.orcamento, path: "/orcamento" }]}
       />
-      <OrcamentoForm />
+      <OrcamentoForm panelBlur={blurFor(PANEL_IMG).blurDataURL} />
     </>
   );
 }

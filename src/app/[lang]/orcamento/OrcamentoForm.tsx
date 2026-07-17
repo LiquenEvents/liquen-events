@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
-import { blurFor } from "@/lib/blur";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
@@ -44,7 +43,11 @@ const EVENT_TYPES: EventOption[] = [
   { label: "Outro", category: null, eventType: null },
 ];
 
-export default function OrcamentoForm() {
+// `panelBlur` (the left-panel image's blur placeholder) is resolved on the
+// SERVER page and passed in as a single string, so this client component never
+// imports blurFor / blur-map.json — that ~107KB map used to bundle into this
+// route just to place one decorative image's placeholder.
+export default function OrcamentoForm({ panelBlur }: { panelBlur: string }) {
   const { locale, t } = useTranslations();
   const to = t.orcamento;
   const router = useRouter();
@@ -110,30 +113,36 @@ export default function OrcamentoForm() {
 
   // Grava o rascunho a cada alteração. Salta a 1ª execução para não escrever o
   // estado vazio inicial por cima de um rascunho ainda por restaurar acima.
+  // Debounced (~500ms): keystrokes on the 9 fields no longer each trigger a
+  // synchronous JSON.stringify + localStorage write on the main thread — only
+  // the last change in a burst persists, keeping typing snappy (INP).
   useEffect(() => {
     if (firstSave.current) {
       firstSave.current = false;
       return;
     }
-    try {
-      localStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({
-          eventType,
-          nome,
-          email,
-          telefone,
-          data,
-          dateFlexible: dateFlexible ? "1" : "",
-          pessoas,
-          local,
-          mensagem,
-          _ts: Date.now(),
-        }),
-      );
-    } catch {
-      /* ignora */
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({
+            eventType,
+            nome,
+            email,
+            telefone,
+            data,
+            dateFlexible: dateFlexible ? "1" : "",
+            pessoas,
+            local,
+            mensagem,
+            _ts: Date.now(),
+          }),
+        );
+      } catch {
+        /* ignora */
+      }
+    }, 500);
+    return () => clearTimeout(timer);
   }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem]);
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
@@ -282,7 +291,8 @@ export default function OrcamentoForm() {
       <aside className="relative hidden lg:block overflow-hidden">
         <Image
           src="/imagens/DaniGui_JantarFesta_1.jpg"
-          {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
+          placeholder="blur"
+          blurDataURL={panelBlur}
           alt={t.common.imageAlt.orcamentoPanel}
           fill
           preload
