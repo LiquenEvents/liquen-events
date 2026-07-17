@@ -12,6 +12,7 @@ export interface ServiceDetail {
   metaDescription: string;
   keywords: string[];
   hero: string; // hero image
+  ogImage?: string; // landscape social-share image when `hero` is portrait
   intro: string[]; // intro paragraphs (keyword-rich)
   includes: string[]; // what's included
   gallery: string[]; // supporting images
@@ -26,7 +27,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Decoração de Casamentos no Alentejo e em Portugal",
     metaTitle: "Decoração de Casamentos no Alentejo",
     metaDescription:
-      "Decoração de casamentos no Alentejo — decoração floral e cenografia à medida, com coordenação do dia para viverem o grande dia sem preocupações. Em herdades, quintas e espaços únicos de todo o Portugal.",
+      "Decoração de casamentos no Alentejo — design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos de todo o Portugal.",
     keywords: [
       "decoração de casamentos Alentejo",
       "decoração de casamentos",
@@ -75,7 +76,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Decoração de Eventos Corporativos em Lisboa",
     metaTitle: "Decoração de Eventos Corporativos em Lisboa",
     metaDescription:
-      "Decoração e cenografia de eventos corporativos em Lisboa e todo o Portugal: conferências, congressos, teambuilding, lançamentos de produto e jantares de empresa — ambiente e produção à medida.",
+      "Decoração e cenografia de eventos corporativos em Lisboa e Portugal: conferências, congressos, teambuilding, lançamentos e jantares de empresa à medida.",
     keywords: [
       "decoração de eventos corporativos",
       "eventos corporativos Lisboa",
@@ -84,6 +85,9 @@ export const SERVICES: ServiceDetail[] = [
       "jantar de empresa",
     ],
     hero: "/imagens/EW1_1408.jpg",
+    // `hero` is portrait — use a landscape frame from the same shoot for the
+    // social-share card so it doesn't render cropped to a sliver.
+    ogImage: "/imagens/EW1_1404.jpg",
     intro: [
       "Elevamos a imagem da sua marca com eventos corporativos memoráveis em Lisboa e em todo o Portugal. Cada tipo de evento tem a sua abordagem dedicada — conferências e congressos, teambuilding, lançamentos de produto e jantares de empresa.",
       "Do conceito visual à montagem, da iluminação à coordenação no local, cuidamos de cada detalhe com o rigor que um evento profissional exige — para que a sua empresa se foque apenas nos resultados.",
@@ -290,7 +294,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Teambuilding e Experiências de Equipa",
     metaTitle: "Teambuilding para Empresas no Alentejo",
     metaDescription:
-      "Organização de teambuilding e experiências de equipa no Alentejo e em Portugal — atividades e ambientes à medida que unem equipas e fortalecem a cultura da empresa.",
+      "Organização de teambuilding e experiências de equipa no Alentejo e em Portugal — atividades e ambientes à medida que unem e fortalecem a equipa.",
     keywords: [
       "teambuilding empresas",
       "teambuilding Alentejo",
@@ -369,7 +373,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Jantares de Empresa e Galas Corporativas",
     metaTitle: "Decoração de Jantares de Empresa",
     metaDescription:
-      "Decoração e ambientação de jantares de empresa e galas corporativas em Lisboa e Portugal — de jantares de Natal a galas de prémios, com mesa posta premium e coordenação impecável.",
+      "Decoração de jantares de empresa e galas corporativas em Lisboa e Portugal — de jantares de Natal a galas de prémios, com mesa posta premium.",
     keywords: [
       "jantar de empresa",
       "gala corporativa",
@@ -424,7 +428,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Wedding Decoration in the Alentejo and across Portugal",
     metaTitle: "Wedding Decoration in the Alentejo",
     metaDescription:
-      "Wedding decoration in the Alentejo — bespoke floral design and scenography, with day-of coordination so you can simply enjoy your day, at estates, quintas and unique venues across Portugal.",
+      "Wedding decoration in the Alentejo — bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues across Portugal.",
     intro: [
       "Your wedding is one of a kind — and the decoration is what gives it soul. Líquen Events creates your wedding's decoration throughout the Alentejo and Portugal, from historic estates and quintas to the most intimate venues: concept, flowers and scenography considered down to the last detail.",
       "And on the day, we coordinate everything — timeline, suppliers, setup and the unexpected — so all you have to do is live the moment.",
@@ -454,7 +458,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Corporate Event Decoration in Lisbon",
     metaTitle: "Corporate Event Decoration in Lisbon",
     metaDescription:
-      "Decoration and scenography for corporate events in Lisbon and across Portugal: conferences, congresses, team-building, product launches and company dinners — bespoke atmosphere and production.",
+      "Decoration and scenography for corporate events in Lisbon and Portugal: conferences, congresses, team-building, product launches and company dinners.",
     intro: [
       "We elevate your brand's image with memorable corporate events in Lisbon and across Portugal. Each type of event has its own dedicated approach — conferences and congresses, team building, product launches and company dinners.",
       "From the visual concept to the build, from lighting to on-site coordination, we take care of every detail with the rigour a professional event demands — so your company can focus solely on results.",
@@ -528,7 +532,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Christening & Communion Decoration in the Alentejo",
     metaTitle: "Christening & Communion Decoration",
     metaDescription:
-      "Decoration for christenings and communions in the Alentejo and across Portugal — intimate family celebrations, with bespoke concept, flowers and table styling, organised with care.",
+      "Decoration for christenings and communions in the Alentejo and across Portugal — intimate family celebrations, with bespoke concept, flowers and table styling.",
     intro: [
       "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations in the Alentejo and across Portugal — intimate or larger in scale, always with the same care.",
       "From concept to the table, from flowers to the atmosphere, we handle every detail so all you have to do is be with the people who matter.",
@@ -578,7 +582,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Team Building & Team Experiences",
     metaTitle: "Team Building for Companies in the Alentejo",
     metaDescription:
-      "Team building and team experiences in the Alentejo and across Portugal — bespoke activities and settings that bring teams together and strengthen company culture.",
+      "Team building and team experiences in the Alentejo and Portugal — bespoke activities and settings that bring teams together and strengthen company culture.",
     intro: [
       "The best teams are built outside the meeting room. Líquen Events creates team-building experiences in the Alentejo and across Portugal — from concept to setting, designed to bring teams together and celebrate achievements.",
       "We handle the venue, the logistics and every detail, so your company can simply enjoy the moment.",
@@ -623,7 +627,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Company Dinners & Corporate Galas",
     metaTitle: "Company Dinner Decoration",
     metaDescription:
-      "Decoration and styling for company dinners and corporate galas in Lisbon and Portugal — from Christmas dinners to awards galas, with premium table settings and impeccable coordination.",
+      "Decoration for company dinners and corporate galas in Lisbon and Portugal — from Christmas dinners to awards galas, with premium table settings.",
     intro: [
       "From the Christmas dinner to the awards gala, company dinners are moments of celebration that deserve care. Líquen Events creates the decoration and styling for these events in Lisbon and across Portugal.",
       "Premium table settings, bespoke scenography and lighting, with the impeccable coordination a memorable evening demands.",

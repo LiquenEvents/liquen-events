@@ -6,11 +6,19 @@ import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import ProposalResponse from "./ProposalResponse";
 
-// Private, per-client link — never index it.
-export const metadata: Metadata = {
-  title: "A sua proposta — Líquen Events",
-  robots: { index: false, follow: false },
-};
+// Private, per-client link — never index it. Localized title so an EN client
+// isn't announced a Portuguese document title on <html lang="en">.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  return {
+    title: locale === "en" ? "Your proposal — Líquen Events" : "A sua proposta — Líquen Events",
+    robots: { index: false, follow: false },
+  };
+}
 
 const eur = (n: number, currency = "EUR", dateLocale = "pt-PT") =>
   new Intl.NumberFormat(dateLocale, {

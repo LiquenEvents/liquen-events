@@ -27,7 +27,9 @@ export async function generateMetadata({
     title: t.meta.sobreTitle,
     description: t.meta.sobreDescription,
     path: "/sobre",
-    image: "/imagens/M&F0497.jpg",
+    // Landscape (2560×1707) — the page's own hero. The previous OG image was a
+    // portrait crop, which social platforms render as a broken sliver.
+    image: "/imagens/hd-edited.jpg",
     keywords: ["decoração de eventos Alentejo", "sobre Líquen Events"],
     ogLocale: t.meta.ogLocale,
   });

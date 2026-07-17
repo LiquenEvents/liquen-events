@@ -104,7 +104,7 @@ export const pt = {
     ogLocale: "pt_PT",
     homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Decoração e coordenação de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em todo o Portugal. Do conceito ao último detalhe — peça orçamento.",
+      "Decoração de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em Portugal. Do conceito ao último detalhe — peça orçamento.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
       "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
@@ -122,7 +122,7 @@ export const pt = {
       "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
     orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas úteis.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em 24 horas úteis.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so

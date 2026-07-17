@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import NotFoundView from "./NotFoundView";
 
+// not-found.tsx can't read route params, so the <title> can't be localized
+// here. Use a language-neutral title (rather than PT-only) so an EN visitor on
+// a broken /en/* link doesn't get a Portuguese document title. The visible body
+// (NotFoundView) still renders in the correct language via LocaleProvider.
 export const metadata: Metadata = {
-  title: "Página não encontrada",
+  title: "404 — Líquen Events",
   robots: { index: false, follow: false },
 };
 

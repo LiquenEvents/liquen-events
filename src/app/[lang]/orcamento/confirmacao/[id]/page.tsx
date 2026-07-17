@@ -3,11 +3,19 @@ import ConfirmacaoClient from "./ConfirmacaoClient";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
 
 // Per-quote page (carries a reference + the client's event details) — keep it
-// out of search indexes.
-export const metadata: Metadata = {
-  title: "Pedido Recebido",
-  robots: { index: false, follow: false },
-};
+// out of search indexes. Title is localized so an EN visitor on <html lang="en">
+// doesn't get a Portuguese document title announced.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = normalizeLocale((await params).lang);
+  return {
+    title: locale === "en" ? "Request Received" : "Pedido Recebido",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function ConfirmacaoPage({
   params,

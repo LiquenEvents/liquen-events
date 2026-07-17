@@ -62,7 +62,7 @@ export async function generateMetadata({
     title: svc.metaTitle,
     description: svc.metaDescription,
     path: `/servicos/${svc.slug}`,
-    image: svc.hero,
+    image: svc.ogImage ?? svc.hero,
     keywords: svc.keywords,
     ogLocale: getDictionary(locale).meta.ogLocale,
   });
