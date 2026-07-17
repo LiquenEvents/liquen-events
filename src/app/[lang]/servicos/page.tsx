@@ -441,7 +441,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── Testimonials ── */}
-      <TestimonialsCarousel />
+      <TestimonialsCarousel testimonials={t.testimonials} />
 
       {/* ── CTA — full-screen closing panel ── */}
       <section

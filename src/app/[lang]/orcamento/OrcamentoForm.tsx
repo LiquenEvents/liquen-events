@@ -8,6 +8,7 @@ import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
+import type { Dict } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
 
@@ -47,9 +48,18 @@ const EVENT_TYPES: EventOption[] = [
 // SERVER page and passed in as a single string, so this client component never
 // imports blurFor / blur-map.json — that ~107KB map used to bundle into this
 // route just to place one decorative image's placeholder.
-export default function OrcamentoForm({ panelBlur }: { panelBlur: string }) {
+export default function OrcamentoForm({
+  panelBlur,
+  orcamento,
+}: {
+  panelBlur: string;
+  orcamento: Dict["orcamento"];
+}) {
+  // locale + common come from the site-wide chrome context; the heavier
+  // `orcamento` namespace is passed in from the /orcamento server page so it
+  // doesn't ride the global LocaleProvider slice on every page.
   const { locale, t } = useTranslations();
-  const to = t.orcamento;
+  const to = orcamento;
   const router = useRouter();
   const [eventType, setEventType] = useState("");
   const [nome, setNome] = useState("");

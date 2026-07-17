@@ -6,7 +6,7 @@ import Image from "next/image";
 import type { Label } from "./photos-data";
 import { collectionFor } from "./collections";
 import { type Photo, interleaveByCollection } from "./interleave";
-import { useTranslations } from "@/components/LocaleProvider";
+import type { Dict } from "@/lib/i18n";
 import { ViewTransition } from "@/components/vt";
 
 /**
@@ -162,7 +162,13 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   );
 }
 
-export default function GaleriaClient({ photos }: { photos: Photo[] }) {
+export default function GaleriaClient({
+  photos,
+  dict,
+}: {
+  photos: Photo[];
+  dict: Dict["galeria"];
+}) {
   const collectionNames = useMemo(
     () =>
       Array.from(new Set(photos.map((p) => collectionFor(p.src)).filter((c): c is string => !!c))),
@@ -266,7 +272,6 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // quando `lb !== null`. Assim, nada da sua configuração — refs, efeitos,
   // listeners — corre na primeira pintura; só arranca quando o utilizador abre
   // uma foto. Comportamento idêntico depois de aberto.
-  const { t } = useTranslations();
 
   // Scroll-reveal for masonry tiles — they fade+rise as they enter view, so the
   // wall assembles itself instead of popping in. One shared IntersectionObserver
@@ -384,14 +389,14 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
 
   // Localized display helpers — internal label keys stay PT (used for
   // filtering); only what the user reads is translated.
-  const labelText = (l: Label) => t.galeria.labels[l];
-  // Per-photo alt text. The category template (t.galeria.alt) alone would make
+  const labelText = (l: Label) => dict.labels[l];
+  // Per-photo alt text. The category template (dict.alt) alone would make
   // hundreds of photos share one identical string (bad for image SEO + a11y),
   // so when the shoot/couple is known we append it — every photo then reads
   // uniquely and descriptively (e.g. "Casamento … no Alentejo — Daniela &
   // Guilherme") while keeping the localized, keyword-rich base.
   const altText = (src: string, l: Label) => {
-    const base = t.galeria.alt[l];
+    const base = dict.alt[l];
     const c = collectionFor(src);
     return c ? `${base} — ${c}` : base;
   };
@@ -602,7 +607,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            {t.galeria.backToGallery}
+            {dict.backToGallery}
           </button>
           <div className="min-w-0">
             <p
@@ -612,7 +617,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               {collectionFilter}
             </p>
             <p className="text-white/55 text-[10px] tracking-[0.15em] uppercase mt-0.5">
-              {pool.length} {t.galeria.photosLabel}
+              {pool.length} {dict.photosLabel}
             </p>
           </div>
         </div>
@@ -633,7 +638,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                   : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
               }`}
             >
-              {t.galeria.labels[c]}
+              {dict.labels[c]}
               <span
                 className={`text-[10px] tabular-nums ${cat === c ? "text-cream/90" : "text-white/50"}`}
               >
@@ -791,7 +796,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               onClick={() => setShown((s) => Math.min(s + PAGE, pool.length))}
               className="group flex items-center gap-3 rounded-full border border-white/15 px-10 py-3.5 text-xs uppercase tracking-[0.2em] text-white/60 transition-all duration-300 hover:border-white/40 hover:text-white/90"
             >
-              {t.galeria.verMais}
+              {dict.verMais}
               <span className="text-white/55 transition-colors group-hover:text-moss-light">
                 +{Math.min(PAGE, pool.length - shown)}
               </span>
@@ -804,7 +809,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
             />
           </div>
           <p role="status" className="text-[10px] tracking-widest text-white/55">
-            {shown} {t.galeria.de} {pool.length}
+            {shown} {dict.de} {pool.length}
           </p>
         </div>
       )}
@@ -826,9 +831,9 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
           close={close}
           prev={prev}
           next={next}
+          dict={dict}
           dismiss={dismiss}
           viewCollection={viewCollection}
-          t={t}
         />
       )}
 
@@ -837,8 +842,8 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
           (StickyCTA). Escondido enquanto o lightbox está aberto. */}
       <button
         onClick={scrollTop}
-        aria-label={t.galeria.backToTop}
-        title={t.galeria.backToTop}
+        aria-label={dict.backToTop}
+        title={dict.backToTop}
         inert={!(showTop && lb === null)}
         className={`fixed z-40 grid h-11 w-11 place-items-center rounded-full bg-black/50 text-white/80 ring-1 ring-white/15 backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/70 hover:text-white active:scale-95 ${
           showTop && lb === null
@@ -857,8 +862,6 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
     </>
   );
 }
-
-type Dict = ReturnType<typeof useTranslations>["t"];
 
 /**
  * O lightbox propriamente dito. É montado SÓ quando aberto (ver `GaleriaClient`),
@@ -882,7 +885,7 @@ function Lightbox({
   next,
   dismiss,
   viewCollection,
-  t,
+  dict,
 }: {
   index: number;
   pool: Photo[];
@@ -897,7 +900,7 @@ function Lightbox({
   next: () => void;
   dismiss: () => void;
   viewCollection: (name: string) => void;
-  t: Dict;
+  dict: Dict["galeria"];
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -908,9 +911,9 @@ function Lightbox({
   const backdropRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
 
-  const labelText = (l: Label) => t.galeria.labels[l];
+  const labelText = (l: Label) => dict.labels[l];
   const altText = (src: string, l: Label) => {
-    const base = t.galeria.alt[l];
+    const base = dict.alt[l];
     const c = collectionFor(src);
     return c ? `${base} — ${c}` : base;
   };
@@ -1057,7 +1060,7 @@ function Lightbox({
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`${t.galeria.lbGallery} — ${labelText(pool[index].label)}, ${t.galeria.lbPhoto} ${index + 1} ${t.galeria.lbOf} ${pool.length}`}
+      aria-label={`${dict.lbGallery} — ${labelText(pool[index].label)}, ${dict.lbPhoto} ${index + 1} ${dict.lbOf} ${pool.length}`}
       tabIndex={-1}
       className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
       onClick={close}
@@ -1087,8 +1090,8 @@ function Lightbox({
                   e.stopPropagation();
                   viewCollection(collectionFor(pool[index].src)!);
                 }}
-                aria-label={`${t.galeria.viewWedding} — ${collectionFor(pool[index].src)}`}
-                title={t.galeria.viewWedding}
+                aria-label={`${dict.viewWedding} — ${collectionFor(pool[index].src)}`}
+                title={dict.viewWedding}
                 className="text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
@@ -1104,7 +1107,7 @@ function Lightbox({
         <div className="flex items-center gap-1">
           <button
             onClick={() => setPlaying((p) => !p)}
-            aria-label={playing ? t.galeria.lbPause : t.galeria.lbPlay}
+            aria-label={playing ? dict.lbPause : dict.lbPlay}
             aria-pressed={playing}
             className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
           >
@@ -1121,7 +1124,7 @@ function Lightbox({
           </button>
           <button
             onClick={close}
-            aria-label={t.galeria.lbClose}
+            aria-label={dict.lbClose}
             className="p-3 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1154,7 +1157,7 @@ function Lightbox({
             e.stopPropagation();
             prev();
           }}
-          aria-label={t.galeria.lbPrev}
+          aria-label={dict.lbPrev}
           className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1212,7 +1215,7 @@ function Lightbox({
             e.stopPropagation();
             next();
           }}
-          aria-label={t.galeria.lbNext}
+          aria-label={dict.lbNext}
           className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1233,7 +1236,7 @@ function Lightbox({
               setJustOpened(false);
               setLb(idx);
             }}
-            aria-label={`${t.galeria.lbPhoto} ${idx + 1} ${t.galeria.lbOf} ${pool.length}`}
+            aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
             aria-current={idx === index ? "true" : undefined}
             className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
               idx === index
@@ -1248,7 +1251,7 @@ function Lightbox({
 
       {/* Dicas teclado */}
       <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
-        {t.galeria.keyboardHint}
+        {dict.keyboardHint}
       </p>
     </div>,
     document.body,

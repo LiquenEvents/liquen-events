@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "@/components/LocaleProvider";
+import type { Dict } from "@/lib/i18n";
 
-export default function FAQ() {
-  const { t } = useTranslations();
-  const faqs = t.contacto.faqs;
+// `faqs` is passed in from the server page (which already resolves it for the
+// FaqJsonLd) rather than pulled from context — the contacto namespace no longer
+// needs to ride the site-wide LocaleProvider slice.
+export default function FAQ({ faqs }: { faqs: Dict["contacto"]["faqs"] }) {
   const [open, setOpen] = useState<number | null>(null);
 
   return (

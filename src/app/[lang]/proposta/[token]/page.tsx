@@ -170,6 +170,7 @@ export default async function ProposalPage({
           token={token}
           initialStatus={proposal.status}
           clientEmail={proposal.clientEmail}
+          proposta={t}
         />
 
         <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">

@@ -389,7 +389,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   {t.contacto.faqSub}
                 </p>
               </div>
-              <FAQ />
+              <FAQ faqs={t.contacto.faqs} />
             </div>
           </AnimateIn>
         </div>

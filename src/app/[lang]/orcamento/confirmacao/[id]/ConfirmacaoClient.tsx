@@ -8,6 +8,7 @@ import { SITE } from "@/lib/site";
 import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
 import { localizeHref } from "@/lib/i18n";
+import type { Dict } from "@/lib/i18n";
 import { track } from "@/lib/track";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -39,9 +40,17 @@ const PETALS = [
   { l: 34, w: 12, h: 9, c: "moss-light", d: 8, dl: 3.7, r: -260, x: 35, o: 0.75 },
 ];
 
-export default function ConfirmacaoClient({ id }: { id: string }) {
-  const { locale, t } = useTranslations();
-  const tc = t.confirmacao;
+export default function ConfirmacaoClient({
+  id,
+  confirmacao,
+}: {
+  id: string;
+  confirmacao: Dict["confirmacao"];
+}) {
+  // locale comes from the site-wide chrome context; the confirmacao namespace
+  // is passed in from this route's server page.
+  const { locale } = useTranslations();
+  const tc = confirmacao;
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   // After the client-side hand-off from the form, move focus to the confirmation

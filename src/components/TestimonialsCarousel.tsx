@@ -1,14 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { Dict } from "@/lib/i18n";
 import AnimateIn from "./AnimateIn";
 import RatingBadge from "./RatingBadge";
 import { useTranslations } from "./LocaleProvider";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 
-export default function TestimonialsCarousel() {
+export default function TestimonialsCarousel({
+  testimonials,
+}: {
+  testimonials: Dict["testimonials"];
+}) {
+  // locale + common (labels) still come from the site-wide chrome context; only
+  // the heavier `testimonials` namespace is passed in from the /servicos page.
   const { locale, t: dict } = useTranslations();
-  const testimonials = dict.testimonials;
   const [active, setActive] = useState(0);
   const [visible, setVisible] = useState(true);
   // Pause autoplay while the user is interacting (hover/focus) or the tab is

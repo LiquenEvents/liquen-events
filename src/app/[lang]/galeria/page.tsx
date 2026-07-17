@@ -108,7 +108,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       {/* ── Gallery (dark, immersive) ── */}
       <section className="py-12 lg:py-16 bg-[#0b0b0b]">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-          <GaleriaClient photos={galleryPhotos} />
+          <GaleriaClient photos={galleryPhotos} dict={t.galeria} />
         </div>
       </section>
 

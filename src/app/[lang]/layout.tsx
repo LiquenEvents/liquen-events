@@ -11,7 +11,7 @@ import Analytics from "@/components/Analytics";
 import PageTransition from "@/components/PageTransition";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import SmoothScroll from "@/components/motion/SmoothScroll";
-import { getDictionary, htmlLang, normalizeLocale, LOCALES } from "@/lib/i18n";
+import { getDictionary, htmlLang, normalizeLocale, LOCALES, pickChromeDict } from "@/lib/i18n";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
 
 // Prerender both locales at build time. The locale now comes from the route
@@ -178,7 +178,7 @@ export default async function RootLayout({
       className={`${inter.variable} ${playfair.variable}`}
     >
       <body className="flex flex-col min-h-screen antialiased">
-        <LocaleProvider locale={locale} dict={t}>
+        <LocaleProvider locale={locale} dict={pickChromeDict(t)}>
           <SmoothScroll>
             {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
             <StructuredData locale={locale} />

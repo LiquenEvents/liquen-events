@@ -36,7 +36,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ lang
         homeName={t.nav.inicio}
         items={[{ name: t.nav.orcamento, path: "/orcamento" }]}
       />
-      <OrcamentoForm panelBlur={blurFor(PANEL_IMG).blurDataURL} />
+      <OrcamentoForm panelBlur={blurFor(PANEL_IMG).blurDataURL} orcamento={t.orcamento} />
     </>
   );
 }

@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/orcamento/types";
-import { useTranslations } from "@/components/LocaleProvider";
+import type { Dict } from "@/lib/i18n";
 
 interface Props {
   token: string;
   initialStatus: ProposalStatus;
   clientEmail: string;
+  // Passed in from the server page instead of the site-wide chrome context, so
+  // the proposta namespace only ships on this token route.
+  proposta: Dict["proposta"];
 }
 
-export default function ProposalResponse({ token, initialStatus, clientEmail }: Props) {
-  const { t } = useTranslations();
-  const tp = t.proposta.response;
+export default function ProposalResponse({ token, initialStatus, clientEmail, proposta }: Props) {
+  const tp = proposta.response;
   const decided = initialStatus === "aceite" || initialStatus === "rejeitada";
   const [status, setStatus] = useState<"aceite" | "rejeitada" | null>(
     initialStatus === "aceite" ? "aceite" : initialStatus === "rejeitada" ? "rejeitada" : null,
