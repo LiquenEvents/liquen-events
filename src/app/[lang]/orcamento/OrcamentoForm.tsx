@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -116,34 +116,64 @@ export default function OrcamentoForm({ panelBlur }: { panelBlur: string }) {
   // Debounced (~500ms): keystrokes on the 9 fields no longer each trigger a
   // synchronous JSON.stringify + localStorage write on the main thread — only
   // the last change in a burst persists, keeping typing snappy (INP).
+  //
+  // The latest draft is mirrored into a ref every render so it can be flushed
+  // SYNCHRONOUSLY when the page is being hidden/unloaded — otherwise a fast
+  // navigate-away (or tab close) mid-debounce would drop the pending write and
+  // lose the draft the user expects to survive the round-trip.
+  const draftRef = useRef<Record<string, string> | null>(null);
+  useEffect(() => {
+    draftRef.current = {
+      eventType,
+      nome,
+      email,
+      telefone,
+      data,
+      dateFlexible: dateFlexible ? "1" : "",
+      pessoas,
+      local,
+      mensagem,
+    };
+  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem]);
+  // Once the quote is submitted the draft is intentionally cleared; block any
+  // later lifecycle flush (the router.push unmount below) from resurrecting it.
+  const submittedRef = useRef(false);
+  const flushDraft = useCallback(() => {
+    if (firstSave.current || submittedRef.current) return; // nothing to persist
+    const d = draftRef.current;
+    if (!d) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, _ts: Date.now() }));
+    } catch {
+      /* ignora */
+    }
+  }, []);
+
   useEffect(() => {
     if (firstSave.current) {
       firstSave.current = false;
       return;
     }
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(
-          DRAFT_KEY,
-          JSON.stringify({
-            eventType,
-            nome,
-            email,
-            telefone,
-            data,
-            dateFlexible: dateFlexible ? "1" : "",
-            pessoas,
-            local,
-            mensagem,
-            _ts: Date.now(),
-          }),
-        );
-      } catch {
-        /* ignora */
-      }
-    }, 500);
+    const timer = setTimeout(flushDraft, 500);
     return () => clearTimeout(timer);
-  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem]);
+  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem, flushDraft]);
+
+  // Persist immediately when the page is hidden or torn down (navigation, tab
+  // close, bfcache). `visibilitychange → hidden` and `pagehide` are the only
+  // reliably-fired lifecycle events for this; the effect cleanup covers the
+  // client-side route change that unmounts the form before either fires.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushDraft();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flushDraft);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flushDraft);
+      flushDraft();
+    };
+  }, [flushDraft]);
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
@@ -220,7 +250,9 @@ export default function OrcamentoForm({ panelBlur }: { panelBlur: string }) {
       } catch {
         /* sessionStorage indisponível — a confirmação usa o fallback genérico */
       }
-      // Pedido enviado: limpa o rascunho local para não reaparecer depois.
+      // Pedido enviado: limpa o rascunho local para não reaparecer depois, e
+      // trava o flush de ciclo de vida para o unmount da navegação não o repor.
+      submittedRef.current = true;
       try {
         localStorage.removeItem(DRAFT_KEY);
       } catch {
