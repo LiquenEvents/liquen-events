@@ -35,6 +35,27 @@ export default function PhotoWall({
   const sectionRef = useRef<HTMLElement>(null);
   const [offscreen, setOffscreen] = useState(false);
 
+  // How many frames the strip shows at once (duplicated for the seamless loop).
+  const VISIBLE = Math.min(12, images.length);
+  // First paint is deterministic (matches the server HTML — no hydration
+  // mismatch): the pool's leading slice. After mount we shuffle the FULL pool
+  // and re-sample, so each visit shows a fresh cut of landscape photos.
+  const [frames, setFrames] = useState<WallImage[]>(() => images.slice(0, VISIBLE));
+
+  useEffect(() => {
+    // Fisher–Yates over a copy; Math.random only runs client-side (post-hydration).
+    const pool = images.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    // Intentional post-hydration setState: the shuffle MUST run only on the
+    // client (Math.random can't touch the SSR render without a hydration
+    // mismatch), so a one-shot re-sample after mount is exactly right here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFrames(pool.slice(0, VISIBLE));
+  }, [images, VISIBLE]);
+
   useEffect(() => {
     const el = sectionRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
@@ -81,8 +102,14 @@ export default function PhotoWall({
       <div className="relative mt-10 sm:mt-12 lg:mt-16">
         <div className="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-[#10140f] to-transparent z-20 pointer-events-none" />
         <div className="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-[#10140f] to-transparent z-20 pointer-events-none" />
-        <div className={`flex gap-2.5 animate-marquee w-max${offscreen ? " marquee-paused" : ""}`}>
-          {[...images, ...images].map((img, i) => (
+        {/* animationDuration overrides the shared .animate-marquee (30s) with a
+            brisker glide for the big photo strip — the class still supplies the
+            keyframes, hover/off-screen pause, and reduced-motion `none`. */}
+        <div
+          className={`flex gap-2.5 animate-marquee w-max${offscreen ? " marquee-paused" : ""}`}
+          style={{ animationDuration: "22s" }}
+        >
+          {[...frames, ...frames].map((img, i) => (
             <div
               key={i}
               className="relative h-[280px] sm:h-[390px] lg:h-[480px] w-[420px] sm:w-[585px] lg:w-[720px] flex-shrink-0 overflow-hidden rounded-lg"

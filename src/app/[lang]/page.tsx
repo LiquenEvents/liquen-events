@@ -8,6 +8,8 @@ import { blurFor } from "@/lib/blur";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import PhotoWall from "@/components/motion/PhotoWall";
+import { PHOTOS } from "./galeria/photos-data";
+import { ratioFor } from "@/lib/image-meta";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { PRIMARY_BUTTON_DARK_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
@@ -38,6 +40,33 @@ const ribbon = [
   "/imagens/DaniGui_JantarFesta_48.jpg",
   "/imagens/ines-goncalo-421.jpg",
 ];
+
+// Landscape-only pool for the photo wall. The 12 curated frames above are the
+// spine; we widen the pool with a spread of landscape gallery photos (filtered
+// to ≥1.4:1 so the wide frames never crop to a sliver) so PhotoWall can shuffle
+// and sample a fresh cut on every visit. Blur placeholders are ~150 B each, so
+// this ~30-image pool adds only a few KB to the flight payload.
+const WALL_RATIO_MIN = 1.4;
+// Even spread across a category so the pool doesn't cluster on one photo series.
+function spreadPick(arr: string[], n: number): string[] {
+  if (arr.length <= n) return arr;
+  const step = arr.length / n;
+  return Array.from({ length: n }, (_, i) => arr[Math.floor(i * step)]);
+}
+const landscapeByLabel = (label: string, n: number) =>
+  spreadPick(
+    PHOTOS.filter((p) => p.label === label && ratioFor(p.src) >= WALL_RATIO_MIN).map((p) => p.src),
+    n,
+  );
+const wallPool = Array.from(
+  new Set([
+    ...ribbon,
+    ...landscapeByLabel("Casamento", 12),
+    ...landscapeByLabel("Corporativo", 5),
+    ...landscapeByLabel("Evento", 4),
+    ...landscapeByLabel("Aéreo", 2),
+  ]),
+);
 
 export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
@@ -191,7 +220,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
       {/* ── Gallery photo wall — 3D curved carousel (flat ribbon fallback) ── */}
       <PhotoWall
-        images={ribbon.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }))}
+        images={wallPool.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }))}
         href={localizeHref("/galeria", locale)}
         label={t.common.verGaleria}
         eyebrow={t.home.wallEyebrow}
