@@ -127,8 +127,10 @@ const FOCUS_RING =
 function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   return (
     <>
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 p-3.5 flex items-end justify-between gap-2 opacity-0 group-hover:opacity-100 translate-y-1.5 group-hover:translate-y-0 transition-all duration-300 pointer-events-none">
+      {/* Reveal on keyboard focus too (not just hover) so tabbing the grid
+          surfaces the same caption sighted mouse users get (WCAG 1.4.13). */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 p-3.5 flex items-end justify-between gap-2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 translate-y-1.5 group-hover:translate-y-0 group-focus-visible:translate-y-0 transition-all duration-300 pointer-events-none">
         <span className="min-w-0">
           <span
             className="block text-white/90 text-[12px] font-medium truncate"
@@ -1079,9 +1081,9 @@ function Lightbox({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
-          <span className="text-white/60 text-xs font-light tabular-nums">{index + 1}</span>
-          <span className="text-white/20 text-xs">/</span>
-          <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
+          <span className="text-white/70 text-xs font-light tabular-nums">{index + 1}</span>
+          <span className="text-white/40 text-xs">/</span>
+          <span className="text-white/55 text-xs tabular-nums">{pool.length}</span>
           <span className="w-px h-3 bg-white/10 mx-1" />
           {collectionFor(pool[index].src) && (
             <span className="flex items-center">
@@ -1250,7 +1252,7 @@ function Lightbox({
       </div>
 
       {/* Dicas teclado */}
-      <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
+      <p className="text-center text-white/45 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
         {dict.keyboardHint}
       </p>
     </div>,

@@ -88,17 +88,21 @@ export default function ProposalResponse({ token, initialStatus, clientEmail, pr
   return (
     <div className="mt-9">
       <div className="flex flex-col sm:flex-row gap-3">
+        {/* aria-disabled (not the native `disabled` attribute): a real `disabled`
+            flipped mid-request yanks focus off the button to <body>; the respond()
+            handler already no-ops while `sending`, so the button stays focusable
+            and operable-but-inert. (Mirrors OrcamentoForm's submit.) */}
         <button
           onClick={() => respond("aceitar")}
-          disabled={!!sending}
-          className="flex-1 py-4 rounded-md bg-moss text-white text-xs tracking-[0.2em] uppercase font-medium hover:bg-moss-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-disabled={!!sending}
+          className="flex-1 py-4 rounded-md bg-moss text-white text-xs tracking-[0.2em] uppercase font-medium hover:bg-moss-dark transition-colors aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
         >
           {sending === "aceitar" ? tp.aceitarSending : tp.aceitar}
         </button>
         <button
           onClick={() => respond("recusar")}
-          disabled={!!sending}
-          className="sm:w-auto px-6 py-4 rounded-md border border-foreground/15 text-foreground/72 text-xs tracking-[0.2em] uppercase hover:border-foreground/30 hover:text-foreground/65 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-disabled={!!sending}
+          className="sm:w-auto px-6 py-4 rounded-md border border-foreground/15 text-foreground/72 text-xs tracking-[0.2em] uppercase hover:border-foreground/30 hover:text-foreground/65 transition-colors aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
         >
           {sending === "recusar" ? tp.recusarSending : tp.recusar}
         </button>

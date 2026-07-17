@@ -225,42 +225,48 @@ const MobileMenu = memo(function MobileMenu({
         // min-h-0 lets this flex child actually shrink so overflow-y-auto scrolls
         // the list INSIDE the nav on short screens — instead of the list growing
         // and spilling over the compact top bar or the CTA block below. pt-24
-        // clears the (now compact) bar when the menu is open.
-        className="relative flex-1 min-h-0 flex flex-col justify-center px-8 pt-24 pb-6 overflow-y-auto overscroll-contain"
+        // clears the (now compact) bar when the menu is open. Centering is done
+        // with `m-auto` on the inner list (NOT justify-center on this scroller):
+        // margin:auto centers only when the list fits and collapses to a normal
+        // top-aligned, fully-scrollable start when it doesn't — so the first link
+        // is never stranded above an unreachable overflow on short/landscape.
+        className="relative flex-1 min-h-0 flex flex-col px-8 pt-24 pb-6 overflow-y-auto overscroll-contain"
       >
-        {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
-          const active = pathname === link.href;
-          return (
-            <Link
-              key={link.href}
-              href={localizeHref(link.href, locale)}
-              transitionTypes={navTypes(link.href)}
-              aria-current={active ? "page" : undefined}
-              className={`group flex items-center justify-between py-5 sm:py-6 transition-colors duration-300 ${
-                active ? "text-white" : "text-white/55 hover:text-white"
-              }`}
-              style={reveal(80 + i * 60)}
-            >
-              <span
-                className={`text-[15px] sm:text-base tracking-[0.26em] uppercase font-light ${
-                  reduce ? "" : "transition-transform duration-500 group-hover:translate-x-1.5"
+        <div className="m-auto w-full">
+          {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
+            const active = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={localizeHref(link.href, locale)}
+                transitionTypes={navTypes(link.href)}
+                aria-current={active ? "page" : undefined}
+                className={`group flex items-center justify-between py-5 sm:py-6 transition-colors duration-300 ${
+                  active ? "text-white" : "text-white/55 hover:text-white"
                 }`}
-                style={{ transitionTimingFunction: MENU_EASE }}
+                style={reveal(80 + i * 60)}
               >
-                {link.label}
-              </span>
-              <span
-                aria-hidden
-                className={`h-px bg-current ${reduce ? "" : "transition-all duration-500"} ${
-                  active
-                    ? "w-7 opacity-100"
-                    : "w-0 opacity-0 group-hover:w-4 group-hover:opacity-50"
-                }`}
-                style={{ transitionTimingFunction: MENU_EASE }}
-              />
-            </Link>
-          );
-        })}
+                <span
+                  className={`text-[15px] sm:text-base tracking-[0.26em] uppercase font-light ${
+                    reduce ? "" : "transition-transform duration-500 group-hover:translate-x-1.5"
+                  }`}
+                  style={{ transitionTimingFunction: MENU_EASE }}
+                >
+                  {link.label}
+                </span>
+                <span
+                  aria-hidden
+                  className={`h-px bg-current ${reduce ? "" : "transition-all duration-500"} ${
+                    active
+                      ? "w-7 opacity-100"
+                      : "w-0 opacity-0 group-hover:w-4 group-hover:opacity-50"
+                  }`}
+                  style={{ transitionTimingFunction: MENU_EASE }}
+                />
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Bloco inferior — CTA de contorno + contactos, monocromático e sóbrio.
