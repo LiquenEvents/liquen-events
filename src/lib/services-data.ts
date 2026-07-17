@@ -83,9 +83,9 @@ export const SERVICES: ServiceDetail[] = [
       "teambuilding empresas",
       "jantar de empresa",
     ],
-    hero: "/imagens/EW1_1332.jpg",
+    hero: "/imagens/EW1_1408.jpg",
     intro: [
-      "Elevamos a imagem da sua marca com eventos corporativos memoráveis. A Líquen Events cria a decoração e a cenografia de conferências, congressos, teambuildings e jantares de empresa em Lisboa e em todo o Portugal.",
+      "Elevamos a imagem da sua marca com eventos corporativos memoráveis em Lisboa e em todo o Portugal. Cada tipo de evento tem a sua abordagem dedicada — conferências e congressos, teambuilding, lançamentos de produto e jantares de empresa.",
       "Do conceito visual à montagem, da iluminação à coordenação no local, cuidamos de cada detalhe com o rigor que um evento profissional exige — para que a sua empresa se foque apenas nos resultados.",
     ],
     includes: [
@@ -114,7 +114,12 @@ export const SERVICES: ServiceDetail[] = [
         a: "Sim, temos experiência em eventos com logística internacional, incluindo tradução simultânea, alojamento e transfers.",
       },
     ],
-    related: ["casamentos", "jantares-de-gala"],
+    related: [
+      "conferencias-e-congressos",
+      "teambuilding",
+      "lancamentos-de-produto",
+      "jantares-de-empresa",
+    ],
   },
   {
     slug: "festas-e-aniversarios",
@@ -385,7 +390,7 @@ export const SERVICES: ServiceDetail[] = [
       "Coordenação integral da noite",
     ],
     gallery: [
-      "/imagens/EW1_1404.jpg",
+      "/imagens/EW1_1405.jpg",
       "/imagens/EW1_1428.jpg",
       "/imagens/EW1_1332.jpg",
       "/imagens/EW1_1398.jpg",
@@ -403,9 +408,10 @@ export const SERVICES: ServiceDetail[] = [
 ];
 
 /**
- * English overrides for the visible copy (eyebrow, H1 title, intro, includes,
- * FAQs). metaTitle/metaDescription/keywords stay Portuguese — PT is the
- * canonical, indexed language; the EN versions are a reading option.
+ * English overrides for the visible copy AND the page metadata (eyebrow, H1
+ * title, intro, includes, FAQs, metaTitle, metaDescription). Only `keywords`
+ * stays Portuguese — PT is the canonical, indexed language; getService() merges
+ * the English copy for /en/servicos/*.
  */
 type ServiceCopy = Pick<
   ServiceDetail,
@@ -450,7 +456,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     metaDescription:
       "Decoration and scenography for corporate events in Lisbon and across Portugal: conferences, congresses, team-building, product launches and company dinners — bespoke atmosphere and production.",
     intro: [
-      "We elevate your brand's image with memorable corporate events. Líquen Events creates the decoration and scenography for conferences, congresses, team-building and company dinners in Lisbon and across Portugal.",
+      "We elevate your brand's image with memorable corporate events in Lisbon and across Portugal. Each type of event has its own dedicated approach — conferences and congresses, team building, product launches and company dinners.",
       "From the visual concept to the build, from lighting to on-site coordination, we take care of every detail with the rigour a professional event demands — so your company can focus solely on results.",
     ],
     includes: [
