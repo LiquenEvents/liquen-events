@@ -254,7 +254,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               [{ text: ts.heroTitle[1] }, { text: ts.heroTitle[2], moss: true }],
             ]}
           />
-          <AnimateIn delay={150}>
+          <AnimateIn delay={120}>
+            <p className="mt-8 text-white/80 text-base lg:text-lg leading-[1.7] max-w-xl">
+              {ts.heroLead}
+            </p>
+          </AnimateIn>
+          <AnimateIn delay={200}>
             <div className="mt-10">
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}
@@ -265,6 +270,51 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 <span aria-hidden>→</span>
               </TrackedLink>
             </div>
+          </AnimateIn>
+        </div>
+      </section>
+
+      {/* ── Como trabalhamos — a nossa assinatura ──
+          A light editorial break after the cinematic hero that finally renders
+          the studio's signature approach (decoration + coordination + production)
+          — copy that already existed in the dictionary but was never on screen.
+          Gives the page words and a differentiator before the service panels. */}
+      <section className="bg-surface border-t border-foreground/8 py-20 lg:py-28">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            <p className="text-gold-text text-[10px] tracking-[0.5em] uppercase mb-6 flex items-center gap-3">
+              <span className="w-8 h-px bg-gold flex-shrink-0" />
+              {ts.philoEyebrow}
+            </p>
+            <h2
+              className="text-foreground font-bold leading-[1.05] tracking-tight max-w-3xl"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 4.5vw, 60px)" }}
+            >
+              {ts.philoTitle}
+            </h2>
+          </AnimateIn>
+          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-12 border-t border-foreground/10 pt-14">
+            {ts.philoPillars.map((p, i) => (
+              <AnimateIn key={p.title} delay={i * 90}>
+                <div className="flex flex-col">
+                  <span className="font-mono text-[11px] tracking-[0.4em] text-moss mb-5">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h3
+                    className="text-foreground font-bold text-xl lg:text-2xl mb-4"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {p.title}
+                  </h3>
+                  <p className="text-foreground/72 text-[15px] leading-[1.75] max-w-xs">{p.text}</p>
+                </div>
+              </AnimateIn>
+            ))}
+          </div>
+          <AnimateIn delay={120}>
+            <p className="mt-14 pt-8 border-t border-foreground/10 text-foreground/60 text-sm tracking-wide">
+              {ts.interludeTitle}
+            </p>
           </AnimateIn>
         </div>
       </section>
