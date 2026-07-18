@@ -627,7 +627,10 @@ export default function GaleriaClient({
                     fill
                     sizes="(max-width: 640px) 100vw, 50vw"
                     className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                    loading="lazy"
+                    // The 2×2 flagship tile is the largest grid image, the LCP
+                    // candidate on this route, and the lightbox morph source —
+                    // eager so it resolves without a lazy delay / pop-in.
+                    loading="eager"
                     {...blurProps(visible[0])}
                   />
                 </VTWrap>
