@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import WhatsAppIcon from "./WhatsAppIcon";
-import { WHATSAPP_HREF } from "@/data";
+import { waHref } from "@/data";
 import { useTranslations } from "./LocaleProvider";
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { track } from "@/lib/track";
@@ -63,7 +63,7 @@ export default function WhatsAppButton() {
 
   return (
     <a
-      href={WHATSAPP_HREF}
+      href={waHref(t.common.whatsappPrefill)}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track("WhatsAppClick", { source: "float" })}

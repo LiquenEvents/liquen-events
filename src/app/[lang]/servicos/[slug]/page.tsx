@@ -10,7 +10,7 @@ import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
-import { SERVICES, getService } from "@/lib/services-data";
+import { SERVICES, getService, quoteTipoForSlug } from "@/lib/services-data";
 import { getDictionary, localizeHref, normalizeLocale } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
@@ -85,6 +85,12 @@ export default async function ServiceDetailPage({
   // Closing CTA backdrop — a frame from this service's own gallery (falls back
   // to the hero) so the final call-to-action stays on-topic and cinematic.
   const ctaImg = svc.gallery.at(-1) ?? svc.hero;
+
+  // Deep-link the quote CTAs with the matching event type so a visitor arriving
+  // from this service page lands with it pre-selected (see OrcamentoForm).
+  const quoteTipo = quoteTipoForSlug(svc.slug);
+  const orcamentoHref =
+    localizeHref("/orcamento", locale) + (quoteTipo ? `?tipo=${quoteTipo}` : "");
 
   return (
     <>
@@ -171,7 +177,7 @@ export default async function ServiceDetailPage({
                 </p>
               ))}
               <TrackedLink
-                href={localizeHref("/orcamento", locale)}
+                href={orcamentoHref}
                 trackProps={{ source: "service-detail-intro", servico: slug }}
                 className={`${PRIMARY_BUTTON_CLASS} mt-6`}
               >
@@ -427,7 +433,7 @@ export default async function ServiceDetailPage({
             </h2>
           </AnimateIn>
           <TrackedLink
-            href={localizeHref("/orcamento", locale)}
+            href={orcamentoHref}
             trackProps={{ source: "service-detail-cta", servico: slug }}
             className={OUTLINE_LIGHT_BUTTON_CLASS}
           >

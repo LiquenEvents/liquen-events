@@ -656,3 +656,25 @@ export function getService(slug: string, locale: "pt" | "en" = "pt"): ServiceDet
   if (locale === "en" && SERVICES_EN[slug]) return { ...svc, ...SERVICES_EN[slug] };
   return svc;
 }
+
+// Maps a service slug to the quote form's event-type id (OrcamentoForm
+// EVENT_TYPES), so a "Pedir orçamento" link from a service page can deep-link
+// `?tipo=` and land with the type pre-selected — the visitor doesn't re-pick
+// what they just came from. Unmapped slugs simply omit the param. Corporate
+// sub-services all map to the single "Corporativo" option.
+const SLUG_TO_QUOTE_TIPO: Record<string, string> = {
+  casamentos: "casamentos",
+  "eventos-corporativos": "conferencias",
+  "festas-e-aniversarios": "aniversarios",
+  "jantares-de-gala": "jantares_gala",
+  "batizados-e-comunhoes": "batizados",
+  "conferencias-e-congressos": "conferencias",
+  teambuilding: "conferencias",
+  "lancamentos-de-produto": "conferencias",
+  "jantares-de-empresa": "conferencias",
+};
+
+/** Quote-form event-type id for a service slug, or undefined if none applies. */
+export function quoteTipoForSlug(slug: string): string | undefined {
+  return SLUG_TO_QUOTE_TIPO[slug];
+}

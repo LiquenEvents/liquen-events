@@ -155,6 +155,23 @@ export default function OrcamentoForm({
     }
   }, []);
 
+  // Deep-link pre-selection: a service page can link to /orcamento?tipo=casamentos
+  // so the visitor arrives with the event type already chosen instead of
+  // re-picking what they just came from. Declared AFTER the draft restore so an
+  // explicit link wins over a stale draft; unknown values are ignored. Reads
+  // window.location directly (no useSearchParams) to avoid a CSR bailout.
+  useEffect(() => {
+    try {
+      const tipo = new URLSearchParams(window.location.search).get("tipo");
+      if (!tipo) return;
+      const opt = EVENT_TYPES.find((o) => o.eventType === tipo);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (opt) setEventType(opt.label);
+    } catch {
+      /* sem query string acessível — segue sem pré-seleção */
+    }
+  }, []);
+
   // Grava o rascunho a cada alteração. Salta a 1ª execução para não escrever o
   // estado vazio inicial por cima de um rascunho ainda por restaurar acima.
   // Debounced (~500ms): keystrokes on the 9 fields no longer each trigger a
