@@ -151,8 +151,8 @@ export const pt = {
     wallTitle: "O que fica para sempre",
     servicesEyebrow: "O que fazemos",
     services: [
-      { tag: "Empresas", title: "Corporativos" },
       { tag: "Celebrações", title: "Casamentos" },
+      { tag: "Empresas", title: "Corporativos" },
       { tag: "Celebrações", title: "Privados" },
     ],
     ctaEyebrow: "Próximo passo",

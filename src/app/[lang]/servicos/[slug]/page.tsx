@@ -213,8 +213,8 @@ export default async function ServiceDetailPage({
       {/* ── Aluguer de viaturas — cover band (weddings only) ── */}
       {svc.slug === "casamentos" && (
         <section
-          className="relative overflow-hidden border-t border-foreground/8"
-          style={{ minHeight: "clamp(420px, 66vh, 760px)" }}
+          className="relative overflow-hidden border-t border-foreground/8 flex items-end"
+          style={{ minHeight: "clamp(360px, 60vh, 640px)" }}
         >
           <Image
             src="/imagens/viaturas-classicas.jpg"
@@ -228,7 +228,11 @@ export default async function ServiceDetailPage({
               caption needs a touch more darkening: a stronger mid-stop on the
               gradient + the veil text-shadow keep the small paragraph legible. */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/92 via-[#080808]/45 to-[#080808]/10" />
-          <div className="text-veil-shadow relative z-10 h-full flex items-end">
+          {/* The <section> is `flex items-end`, so this caption sits at the
+              bottom of the band's min-height (a bare `h-full` here wouldn't
+              resolve against the section's min-height and the caption floated
+              to the top, leaving the band looking empty). */}
+          <div className="text-veil-shadow relative z-10 w-full">
             <div className="max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
                 <div className="max-w-md">

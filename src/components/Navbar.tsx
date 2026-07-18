@@ -373,12 +373,11 @@ export default function Navbar() {
   // ou com o menu aberto. Uma vez em scroll a barra ganha fundo sólido próprio,
   // pelo que o gradiente deixaria apenas uma sombra a sangrar para o conteúdo.
   const showScrim = (!scrolled && overDarkHero) || isOpen;
-  // Tratamento claro (texto/traços brancos) da barra. Precisa dele em três
-  // estados escuros: sobre o hero escuro no topo, com o menu mobile aberto, e
-  // AGORA também em scroll — a barra passa a ter fundo escuro sólido (#0c0e0b),
-  // por isso os links (que alternam via `light`) têm de ficar brancos para
-  // continuarem legíveis sobre esse fundo em vez do moss (invisível no escuro).
-  const light = scrolled || overDarkHero || isOpen;
+  // Tratamento claro (texto/traços brancos) da barra — SÓ sobre o hero escuro no
+  // topo (barra transparente) ou com o menu mobile aberto. Em scroll a barra
+  // passa a CLARA (surface), por isso os links voltam ao tratamento escuro (moss)
+  // para ficarem legíveis sobre esse fundo claro.
+  const light = (!scrolled && overDarkHero) || isOpen;
 
   const navTypes = (href: string) => [
     orderIdx(href) >= orderIdx(pathname) ? "nav-forward" : "nav-back",
@@ -469,16 +468,14 @@ export default function Navbar() {
         // menu mobile à altura da barra em vez do viewport inteiro.
         hidden && !isOpen ? "-translate-y-full" : ""
       } ${
-        // Barra sólida escura ao estilo spacex.com: fundo #0c0e0b a 95% + filete
-        // branco ténue em baixo. SEM backdrop-blur de propósito — um
-        // backdrop-filter num elemento fixo obriga o browser a voltar a desfocar
-        // o conteúdo por trás da barra a CADA frame de scroll (custo real em
-        // dispositivos fracos) e, pior, cria um containing-block que prenderia o
-        // overlay `fixed inset-0` do menu mobile à altura da barra em vez do
-        // viewport. A 95% de opacidade o fundo já é praticamente sólido, pelo que
-        // o blur seria impercetível — o efeito visual mantém-se sem esses custos.
+        // Barra CLARA sólida ao fazer scroll (fundo surface a 95% + filete ténue
+        // + sombra suave). SEM backdrop-blur de propósito — um backdrop-filter num
+        // elemento fixo cria um containing-block que prenderia o overlay
+        // `fixed inset-0` do menu mobile à altura da barra em vez do viewport
+        // (além do custo de re-desfocar a cada frame de scroll). A 95% de opacidade
+        // já é praticamente sólida, pelo que o blur seria impercetível.
         scrolled
-          ? "bg-[#0c0e0b]/95 border-b border-white/10 shadow-sm shadow-black/20"
+          ? "bg-surface/95 border-b border-foreground/10 shadow-sm shadow-black/5"
           : "bg-transparent border-b border-transparent"
       }`}
     >

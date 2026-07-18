@@ -57,7 +57,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
         cells={STRIP_CELLS}
         pool={stripPool}
         alt=""
-        className="grid grid-cols-4 h-[130px] sm:h-[170px] lg:h-[210px]"
+        className="grid grid-cols-4 h-[96px] sm:h-[120px] lg:h-[150px]"
         imgClassName="transition-transform duration-700 group-hover:scale-[1.04]"
         overlayClassName="bg-black/30 group-hover:bg-black/10"
       />
@@ -65,7 +65,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
       {/* ── Main content ── */}
       <div className="border-t border-foreground/6">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="py-10 md:py-14 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12">
+          <div className="py-8 md:py-10 grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10">
             {/* Brand column */}
             <div className="md:col-span-5 flex flex-col">
               <Image
@@ -73,18 +73,17 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 alt="Líquen Events"
                 width={215}
                 height={128}
-                className="object-contain mb-6 h-28 sm:h-36 w-auto"
+                className="object-contain mb-4 h-14 sm:h-16 w-auto"
               />
-              <p className="text-foreground/72 text-sm leading-[1.85] max-w-[260px] mb-7">
+              <p className="text-foreground/72 text-[13px] leading-[1.7] max-w-[260px] mb-5">
                 {t.footer.sloganLine1}
                 <br />
                 {t.footer.sloganLine2}
               </p>
 
               {/* Social icons — sem o antigo badge "disponível": nada de pontos
-                  a pulsar (idioma SpaceX = sem ornamentos animados). mb-9 passou
-                  para este bloco para manter o mesmo respiro abaixo do slogan. */}
-              <div className="flex items-center gap-5 mt-2">
+                  a pulsar (idioma SpaceX = sem ornamentos animados). */}
+              <div className="flex items-center gap-5 mt-1">
                 {[
                   {
                     label: "Instagram",
@@ -152,10 +151,10 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
 
             {/* Pages */}
             <div className="md:col-span-3">
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-8">
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.paginas}
               </p>
-              <ul className="flex flex-col gap-4">
+              <ul className="flex flex-col gap-2.5">
                 {pages.map(([label, href]) => (
                   <li key={href}>
                     <Link
@@ -167,10 +166,10 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   </li>
                 ))}
               </ul>
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mt-10 mb-8">
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mt-6 mb-4">
                 {t.footer.servicosTitulo}
               </p>
-              <ul className="flex flex-col gap-4">
+              <ul className="flex flex-col gap-2.5">
                 {serviceSlugs.map((slug, i) => (
                   <li key={slug}>
                     <Link
@@ -186,10 +185,10 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
 
             {/* Contact */}
             <div className="md:col-span-4">
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-8">
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.contacto}
               </p>
-              <div className="flex flex-col gap-4 text-[13px] text-foreground/72 mb-10">
+              <div className="flex flex-col gap-2.5 text-[13px] text-foreground/72 mb-6">
                 <a
                   href={`mailto:${SITE.email}`}
                   className="link-line hover:text-foreground/78 transition-colors duration-300"
@@ -221,7 +220,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
       </div>
 
       {/* ── Copyright bar ── */}
-      <div className="border-t border-foreground/6 py-6">
+      <div className="border-t border-foreground/6 py-4">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <p className="text-[11px] text-foreground/78 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — {t.footer.rights}

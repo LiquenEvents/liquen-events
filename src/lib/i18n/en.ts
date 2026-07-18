@@ -148,8 +148,8 @@ export const en: Dict = {
     wallTitle: "What stays with you",
     servicesEyebrow: "What we do",
     services: [
-      { tag: "Companies", title: "Corporate" },
       { tag: "Celebrations", title: "Weddings" },
+      { tag: "Companies", title: "Corporate" },
       { tag: "Celebrations", title: "Private" },
     ],
     ctaEyebrow: "Next step",

@@ -20,8 +20,8 @@ import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 // image here is a wide ~1.5:1 frame — EW1_1408 and JantarFesta_27 were portraits
 // that centre-cropped to a sliver, so they're swapped for landscape siblings.
 const serviceLinks = [
-  { image: "/imagens/EW1_1332.jpg", href: "/servicos/eventos-corporativos" },
   { image: "/imagens/DaniGui_Preview20.jpg", href: "/servicos/casamentos" },
+  { image: "/imagens/EW1_1332.jpg", href: "/servicos/eventos-corporativos" },
   { image: "/imagens/DaniGui_JantarFesta_26.jpg", href: "/servicos#celebracoes" },
 ];
 
