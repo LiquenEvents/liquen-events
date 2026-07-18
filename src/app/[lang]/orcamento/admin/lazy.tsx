@@ -33,6 +33,7 @@ export const StatsDashboard = dynamic(() => import("./StatsDashboard"), { loadin
 export const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
 export const EmailTemplates = dynamic(() => import("./EmailTemplates"), { loading: ViewLoading });
 export const Faturas = dynamic(() => import("./Faturas"), { loading: ViewLoading });
+export const Contratos = dynamic(() => import("./Contratos"), { loading: ViewLoading });
 export const Inventario = dynamic(() => import("./Inventario"), { loading: ViewLoading });
 export const Seguimentos = dynamic(() => import("./FollowUps"), { loading: ViewLoading });
 

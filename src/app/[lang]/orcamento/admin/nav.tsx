@@ -19,6 +19,7 @@ export type View =
   | "seguimentos"
   | "estatisticas"
   | "faturas"
+  | "contratos"
   | "modelos-email"
   | "inbox";
 
@@ -232,6 +233,24 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M6 2h9l4 4v16l-3-1.5L13 22l-3-1.5L7 22l-1-1V2z" />
         <path d="M9 8h6M9 12h6M9 16h3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "contratos",
+    label: "Contratos",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="m9 14 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

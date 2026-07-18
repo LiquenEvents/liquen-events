@@ -37,6 +37,7 @@ import {
   ProductionPlan,
   EmailTemplates,
   Faturas,
+  Contratos,
   Inventario,
   Seguimentos,
   ClientMessenger,
@@ -740,6 +741,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     seguimentos: "Seguimentos",
     estatisticas: "Estatísticas",
     faturas: "Faturas",
+    contratos: "Contratos",
     "modelos-email": "Modelos de email",
     inbox: "Inbox",
   };
@@ -757,6 +759,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     seguimentos: "Seguimentos automáticos a fazer",
     estatisticas: "Métricas e desempenho",
     faturas: "Livro de faturação e pagamentos",
+    contratos: "Aceitações de condições e estado de cada contrato",
     "modelos-email": "Emails reutilizáveis da equipa",
     inbox: "Mensagens recebidas",
   };
@@ -1196,6 +1199,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "faturas" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <Faturas quotes={quotes} />
+            </div>
+          )}
+
+          {/* ── Contratos ── */}
+          {view === "contratos" && (
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+              <Contratos />
             </div>
           )}
 
