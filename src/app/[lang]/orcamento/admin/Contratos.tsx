@@ -280,13 +280,25 @@ export default function Contratos() {
                           v{c.termsVersion}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => setExpanded(isOpen ? null : c.id)}
-                            className="text-[10px] tracking-[0.08em] uppercase font-medium text-[#4d6350] hover:text-[#3a5c39] transition-colors"
-                            aria-expanded={isOpen}
-                          >
-                            {isOpen ? "Fechar" : "Ver termos"}
-                          </button>
+                          <div className="inline-flex items-center gap-3">
+                            <button
+                              onClick={() => setExpanded(isOpen ? null : c.id)}
+                              className="text-[10px] tracking-[0.08em] uppercase font-medium text-[#4d6350] hover:text-[#3a5c39] transition-colors"
+                              aria-expanded={isOpen}
+                            >
+                              {isOpen ? "Fechar" : "Ver termos"}
+                            </button>
+                            {/* Prova em papel do contrato — abre o PDF numa nova aba. */}
+                            <a
+                              href={`/api/contratos/${c.id}/pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] tracking-[0.08em] uppercase font-medium text-foreground/40 hover:text-foreground/70 transition-colors"
+                              title="Descarregar contrato em PDF"
+                            >
+                              PDF
+                            </a>
+                          </div>
                         </td>
                       </tr>
                       {isOpen && (

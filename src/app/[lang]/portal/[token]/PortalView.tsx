@@ -42,6 +42,7 @@ interface PortalViewProps {
     acceptedName?: string;
     termsVersion?: string;
   } | null;
+  contratoPdfHref: string | null;
   invoices: InvoiceRow[];
   schedule: { sinal: number; saldo: number } | null;
   currency: string;
@@ -96,6 +97,7 @@ export default function PortalView({
   proposal,
   pdfHref,
   contract,
+  contratoPdfHref,
   invoices,
   schedule,
   currency,
@@ -171,13 +173,23 @@ export default function PortalView({
         {/* ── Contrato ── */}
         <Section title={t.contrato.title}>
           {contract && contract.status === "aceite" ? (
-            <p className="text-foreground/80 text-sm leading-relaxed">
-              {fill(t.contrato.aceite, {
-                date: contract.acceptedAt ?? "",
-                name: contract.acceptedName ?? "",
-                version: contract.termsVersion ?? "",
-              })}
-            </p>
+            <div className="flex flex-col gap-4">
+              <p className="text-foreground/80 text-sm leading-relaxed">
+                {fill(t.contrato.aceite, {
+                  date: contract.acceptedAt ?? "",
+                  name: contract.acceptedName ?? "",
+                  version: contract.termsVersion ?? "",
+                })}
+              </p>
+              {contratoPdfHref && (
+                <a
+                  href={contratoPdfHref}
+                  className="inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
+                >
+                  {t.contrato.download}
+                </a>
+              )}
+            </div>
           ) : (
             <div>
               <p className="text-foreground/85 text-sm font-medium">{t.contrato.pendingTitle}</p>

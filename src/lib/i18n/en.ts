@@ -706,6 +706,7 @@ export const en: Dict = {
     contrato: {
       title: "Contract",
       aceite: "Terms accepted on {date} by {name} (v{version}).",
+      download: "Download contract (PDF)",
       pendingTitle: "Acceptance pending",
       pendingBody:
         "Once you've reviewed the proposal, you can accept the terms through the link we sent you by email. We look forward to it.",

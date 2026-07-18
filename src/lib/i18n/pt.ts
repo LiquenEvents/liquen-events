@@ -718,6 +718,7 @@ export const pt = {
     contrato: {
       title: "Contrato",
       aceite: "Condições aceites em {date} por {name} (v{version}).",
+      download: "Descarregar contrato (PDF)",
       pendingTitle: "Aceitação pendente",
       pendingBody:
         "Depois de rever a proposta, poderá aceitar as condições através do link que lhe enviámos por e-mail. Ficamos a aguardar.",

@@ -64,6 +64,17 @@ export const getContractByProposal = (proposalId: string): Promise<Contract | nu
   repo
     .where("proposal_id", proposalId, (c) => c.proposalId === proposalId)
     .then((rows) => rows[0] ?? null);
+/**
+ * Contrato ACEITE mais recente de um pedido — o que o portal do cliente
+ * descarrega em PDF. O aceite vive numa proposta (idempotência é por proposta),
+ * mas o portal só conhece o pedido; procuramos por `quoteId` e ficamos com o
+ * aceite mais recente (as linhas já vêm por `created_at` descendente). Devolve
+ * null se o pedido ainda não tem um contrato aceite. Server-only.
+ */
+export const getAcceptedContractByQuote = (quoteId: string): Promise<Contract | null> =>
+  repo
+    .where("quote_id", quoteId, (c) => c.quoteId === quoteId)
+    .then((rows) => rows.find((c) => c.status === "aceite") ?? null);
 export const createContract = (c: Contract): Promise<void> => repo.create(c);
 export const updateContract = (id: string, patch: Partial<Contract>): Promise<Contract | null> =>
   repo.update(id, patch);

@@ -104,6 +104,9 @@ export default async function PortalPage({
             }
           : null
       }
+      // Só oferecemos o PDF do contrato quando ele foi de facto assinado — o
+      // endpoint só serve o aceite mais recente do pedido.
+      contratoPdfHref={contract?.status === "aceite" ? `/api/portal/${token}/contrato-pdf` : null}
       invoices={invoices.map((i) => ({
         id: i.id,
         number: i.number,
