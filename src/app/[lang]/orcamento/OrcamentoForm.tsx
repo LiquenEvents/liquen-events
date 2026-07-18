@@ -11,6 +11,7 @@ import { localizeHref } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
+import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -33,6 +34,16 @@ const DRAFT_KEY = "liquen-orcamento-draft";
 // even across a reload) is deduplicated server-side into one lead + one email
 // instead of two. It survives reloads (localStorage) and is regenerated only
 // after a successful send.
+// Read the first-touch acquisition source recorded by LeadSourceCapture on
+// entry (empty for direct visits or when sessionStorage is unavailable).
+function readLeadSource(): string {
+  try {
+    return sessionStorage.getItem(LEAD_SOURCE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 const SUBMISSION_KEY = "liquen-orcamento-sid";
 function ensureSubmissionId(): string {
   try {
@@ -251,6 +262,10 @@ export default function OrcamentoForm({
       notes: [dateFlexible ? `(${to.dateFlexibleLabel})` : "", mensagem.trim()]
         .filter(Boolean)
         .join("\n\n"),
+      // First-touch acquisition source (UTM/referrer), captured on entry by
+      // LeadSourceCapture. Feeds the admin's conversion-by-source aggregation;
+      // empty for direct visits.
+      referralSource: readLeadSource(),
     };
 
     // Abort a hung request instead of spinning forever on a stalled connection

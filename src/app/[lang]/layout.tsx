@@ -8,6 +8,7 @@ import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
 import Analytics from "@/components/Analytics";
+import LeadSourceCapture from "@/components/LeadSourceCapture";
 import PageTransition from "@/components/PageTransition";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import SmoothScroll from "@/components/motion/SmoothScroll";
@@ -183,6 +184,7 @@ export default async function RootLayout({
             {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
             <StructuredData locale={locale} />
             <Analytics />
+            <LeadSourceCapture />
             <a
               href="#conteudo"
               className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-white focus:rounded-md focus:text-sm"
