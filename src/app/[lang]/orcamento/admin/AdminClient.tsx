@@ -33,6 +33,7 @@ import {
   StatsDashboard,
   Inbox,
   ProposalBuilder,
+  ProposalStudio,
   ClientMessenger,
   EventChecklist,
   EventTimeline,
@@ -2279,6 +2280,28 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                       {detailTab === "comunicacao" && (
                         <>
+                          <ProposalStudio
+                            key={`studio-${selected.id}`}
+                            quote={selected}
+                            onSent={() => {
+                              setQuotes((prev) =>
+                                prev.map((q) =>
+                                  q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                ),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, status: "cotado" } : prev));
+                              setEditStatus("cotado");
+                              appendActivity(selected.id, [
+                                {
+                                  id: randomId(),
+                                  at: new Date().toISOString(),
+                                  kind: "proposal_sent",
+                                  actor: userName,
+                                  summary: "Proposta enviada ao cliente (Studio)",
+                                },
+                              ]);
+                            }}
+                          />
                           <ProposalBuilder
                             quote={selected}
                             onSent={(total) => {

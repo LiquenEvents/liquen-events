@@ -1,0 +1,1127 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useToast } from "./Toast";
+import { withProposalDefaults } from "@/lib/proposal-doc";
+import type { Quote } from "@/lib/orcamento/types";
+
+/**
+ * Visual editor for the studio's multi-page proposal PDF. Produces a
+ * {@link ProposalDoc}-shaped payload (minus the fixed boilerplate, which the
+ * server fills via {@link withProposalDefaults}) and previews / e-mails it.
+ */
+type StudioDoc = Parameters<typeof withProposalDefaults>[0];
+
+// ── Shared styling (matches ProposalBuilder / PaymentsPanel) ──
+const LABEL = "block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2";
+const INPUT = "bo-input w-full px-3 py-2 text-sm text-foreground/70";
+const INPUT_SM = "bo-input w-full min-w-0 px-2.5 py-2 text-xs text-foreground/75";
+const ADD_BTN =
+  "text-[10px] tracking-[0.2em] uppercase text-[#4d6350]/70 hover:text-[#4d6350] transition-colors";
+const REMOVE_BTN =
+  "text-foreground/25 hover:text-[#b5654a] transition-colors text-sm leading-none shrink-0";
+
+const PT_MONTHS = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  casamentos: "Casamento",
+  batizados: "Batizado",
+  aniversarios: "Aniversário",
+  jantares_gala: "Jantar de Gala",
+  conferencias: "Conferência",
+  teambuilding: "Teambuilding",
+  lancamentos: "Lançamento de Produto",
+  jantares_empresa: "Jantar de Empresa",
+};
+
+function eventTypeLabel(q: Quote): string {
+  if (q.eventType && EVENT_TYPE_LABELS[q.eventType]) return EVENT_TYPE_LABELS[q.eventType];
+  if (q.category === "empresas") return "Evento Corporativo";
+  return "Casamento";
+}
+
+/** yyyy-mm-dd → "12 de setembro de 2026"; passes through anything else. */
+function formatEventDate(d?: string): string {
+  if (!d) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+  if (!m) return d;
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return d;
+  return `${Number(m[3])} de ${PT_MONTHS[month - 1]} de ${m[1]}`;
+}
+
+function buildRef(d: StudioDoc): string {
+  const tpl = d.template === "organizacao" ? "Organização" : "Decoração";
+  return `PO ${tpl} ${d.eventType} ${d.clientNames} · ${d.eventDate}`.replace(/\s+/g, " ").trim();
+}
+
+function initialDoc(quote: Quote): StudioDoc {
+  const base: StudioDoc = {
+    template: "decoracao",
+    ref: "",
+    clientNames: quote.name ?? "",
+    eventType: eventTypeLabel(quote),
+    eventDate: formatEventDate(quote.date),
+    location: quote.location ?? "",
+    guests: quote.guests ? `${quote.guests} pax` : "",
+    ceremony: "",
+    time: "",
+    serviceGroups: [],
+    moodBoards: [],
+    cronograma: [],
+    budgetItems: [],
+    totalLabel: "Valor Total Decoração",
+    totalText: "",
+    budgetRows: [],
+    totalEstimatedText: "",
+    budgetNote: "",
+    coverImages: [],
+  };
+  base.ref = buildRef(base);
+  return base;
+}
+
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+
+function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
+  const j = i + dir;
+  if (j < 0 || j >= arr.length) return arr;
+  const copy = arr.slice();
+  [copy[i], copy[j]] = [copy[j], copy[i]];
+  return copy;
+}
+
+interface Props {
+  quote: Quote;
+  onSent?: () => void;
+}
+
+export default function ProposalStudio({ quote, onSent }: Props) {
+  const { toast } = useToast();
+  const DRAFT_KEY = `liquen-proposal-studio-${quote.id}`;
+  const SIDE_KEY = `${DRAFT_KEY}:meta`;
+
+  const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
+  // path → signed url, so freshly-uploaded images render as thumbnails.
+  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  const [refEdited, setRefEdited] = useState(false);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState<null | "preview" | "send">(null);
+  const [confirmSend, setConfirmSend] = useState(false);
+  const hydrated = useRef(false);
+
+  // ── Restore draft on mount ──
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") setDoc((d) => ({ ...d, ...parsed }));
+      }
+      const rawMeta = localStorage.getItem(SIDE_KEY);
+      if (rawMeta) {
+        const meta = JSON.parse(rawMeta);
+        if (meta?.urls && typeof meta.urls === "object") setAssetUrls(meta.urls);
+        if (typeof meta?.refEdited === "boolean") setRefEdited(meta.refEdited);
+      }
+    } catch {
+      /* ignore corrupt draft */
+    }
+    hydrated.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Auto-compose the reference until the user overrides it ──
+  useEffect(() => {
+    if (refEdited) return;
+    setDoc((d) => {
+      const next = buildRef(d);
+      return d.ref === next ? d : { ...d, ref: next };
+    });
+  }, [doc.template, doc.eventType, doc.clientNames, doc.eventDate, refEdited]);
+
+  // ── Debounced draft persistence ──
+  useEffect(() => {
+    if (!hydrated.current) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
+        localStorage.setItem(SIDE_KEY, JSON.stringify({ urls: assetUrls, refEdited }));
+      } catch {
+        /* quota / unavailable — non-fatal */
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [doc, assetUrls, refEdited, DRAFT_KEY, SIDE_KEY]);
+
+  const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
+
+  function setTemplate(t: "decoracao" | "organizacao") {
+    patch({
+      template: t,
+      headerTitle:
+        t === "organizacao" ? "Proposta de orçamento para Organização de Casamento" : undefined,
+    });
+  }
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(SIDE_KEY);
+    } catch {
+      /* ignore */
+    }
+    setDoc(initialDoc(quote));
+    setAssetUrls({});
+    setRefEdited(false);
+    setConfirmSend(false);
+    toast("Rascunho limpo", "info");
+  }
+
+  // ── Image upload ──
+  async function uploadImages(files: File[]): Promise<{ path: string; url: string }[]> {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    const res = await fetch(`/api/orcamento/${quote.id}/assets`, { method: "POST", body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || "Falha ao carregar as imagens.");
+    const images: { path: string; url: string }[] = data?.images ?? [];
+    setAssetUrls((prev) => {
+      const next = { ...prev };
+      for (const im of images) next[im.path] = im.url;
+      return next;
+    });
+    return images;
+  }
+
+  async function handleUpload(key: string, files: File[], onPaths: (paths: string[]) => void) {
+    if (files.length === 0) return;
+    setUploading((u) => ({ ...u, [key]: true }));
+    try {
+      const images = await uploadImages(files);
+      onPaths(images.map((im) => im.path));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao carregar imagens.", "error");
+    } finally {
+      setUploading((u) => ({ ...u, [key]: false }));
+    }
+  }
+
+  // ── Service groups ──
+  function addGroup() {
+    setDoc((d) => ({
+      ...d,
+      serviceGroups: [
+        ...d.serviceGroups,
+        { letter: `${LETTERS[d.serviceGroups.length] ?? ""})`, title: "", items: [] },
+      ],
+    }));
+  }
+  function updateGroup(gi: number, p: Partial<StudioDoc["serviceGroups"][number]>) {
+    setDoc((d) => ({
+      ...d,
+      serviceGroups: d.serviceGroups.map((g, i) => (i === gi ? { ...g, ...p } : g)),
+    }));
+  }
+  function removeGroup(gi: number) {
+    setDoc((d) => ({ ...d, serviceGroups: d.serviceGroups.filter((_, i) => i !== gi) }));
+  }
+  function moveGroup(gi: number, dir: -1 | 1) {
+    setDoc((d) => ({ ...d, serviceGroups: move(d.serviceGroups, gi, dir) }));
+  }
+  function addServiceItem(gi: number) {
+    setDoc((d) => ({
+      ...d,
+      serviceGroups: d.serviceGroups.map((g, i) =>
+        i === gi ? { ...g, items: [...g.items, { label: "", desc: "" }] } : g,
+      ),
+    }));
+  }
+  function updateServiceItem(gi: number, ii: number, p: Partial<{ label: string; desc: string }>) {
+    setDoc((d) => ({
+      ...d,
+      serviceGroups: d.serviceGroups.map((g, i) =>
+        i === gi ? { ...g, items: g.items.map((it, j) => (j === ii ? { ...it, ...p } : it)) } : g,
+      ),
+    }));
+  }
+  function removeServiceItem(gi: number, ii: number) {
+    setDoc((d) => ({
+      ...d,
+      serviceGroups: d.serviceGroups.map((g, i) =>
+        i === gi ? { ...g, items: g.items.filter((_, j) => j !== ii) } : g,
+      ),
+    }));
+  }
+
+  // ── Mood boards (decoracao) ──
+  function addBoard() {
+    setDoc((d) => ({
+      ...d,
+      moodBoards: [...d.moodBoards, { title: "", annotation: "", images: [] }],
+    }));
+  }
+  function updateBoard(bi: number, p: Partial<StudioDoc["moodBoards"][number]>) {
+    setDoc((d) => ({
+      ...d,
+      moodBoards: d.moodBoards.map((b, i) => (i === bi ? { ...b, ...p } : b)),
+    }));
+  }
+  function removeBoard(bi: number) {
+    setDoc((d) => ({ ...d, moodBoards: d.moodBoards.filter((_, i) => i !== bi) }));
+  }
+  function moveBoard(bi: number, dir: -1 | 1) {
+    setDoc((d) => ({ ...d, moodBoards: move(d.moodBoards, bi, dir) }));
+  }
+  function addBoardImages(bi: number, paths: string[]) {
+    setDoc((d) => ({
+      ...d,
+      moodBoards: d.moodBoards.map((b, i) =>
+        i === bi ? { ...b, images: [...b.images, ...paths] } : b,
+      ),
+    }));
+  }
+  function removeBoardImage(bi: number, path: string) {
+    setDoc((d) => ({
+      ...d,
+      moodBoards: d.moodBoards.map((b, i) =>
+        i === bi ? { ...b, images: b.images.filter((p) => p !== path) } : b,
+      ),
+    }));
+  }
+
+  // ── Cover images (two slots) ──
+  function setCoverAt(idx: number, path: string) {
+    setDoc((d) => {
+      const cover = [...(d.coverImages ?? [])];
+      cover[idx] = path;
+      return { ...d, coverImages: cover };
+    });
+  }
+  function removeCoverAt(idx: number) {
+    setDoc((d) => ({ ...d, coverImages: (d.coverImages ?? []).filter((_, i) => i !== idx) }));
+  }
+
+  // ── Cronograma (organizacao) ──
+  function addPhase() {
+    setDoc((d) => ({ ...d, cronograma: [...(d.cronograma ?? []), { title: "", items: [] }] }));
+  }
+  function updatePhase(pi: number, p: Partial<{ title: string; items: string[] }>) {
+    setDoc((d) => ({
+      ...d,
+      cronograma: (d.cronograma ?? []).map((ph, i) => (i === pi ? { ...ph, ...p } : ph)),
+    }));
+  }
+  function removePhase(pi: number) {
+    setDoc((d) => ({ ...d, cronograma: (d.cronograma ?? []).filter((_, i) => i !== pi) }));
+  }
+  function movePhase(pi: number, dir: -1 | 1) {
+    setDoc((d) => ({ ...d, cronograma: move(d.cronograma ?? [], pi, dir) }));
+  }
+  function addPhaseItem(pi: number) {
+    setDoc((d) => ({
+      ...d,
+      cronograma: (d.cronograma ?? []).map((ph, i) =>
+        i === pi ? { ...ph, items: [...ph.items, ""] } : ph,
+      ),
+    }));
+  }
+  function updatePhaseItem(pi: number, ii: number, value: string) {
+    setDoc((d) => ({
+      ...d,
+      cronograma: (d.cronograma ?? []).map((ph, i) =>
+        i === pi ? { ...ph, items: ph.items.map((it, j) => (j === ii ? value : it)) } : ph,
+      ),
+    }));
+  }
+  function removePhaseItem(pi: number, ii: number) {
+    setDoc((d) => ({
+      ...d,
+      cronograma: (d.cronograma ?? []).map((ph, i) =>
+        i === pi ? { ...ph, items: ph.items.filter((_, j) => j !== ii) } : ph,
+      ),
+    }));
+  }
+
+  // ── Budget: decoracao (grouped) ──
+  function addBudgetItem() {
+    setDoc((d) => ({ ...d, budgetItems: [...d.budgetItems, ""] }));
+  }
+  function updateBudgetItem(i: number, value: string) {
+    setDoc((d) => ({ ...d, budgetItems: d.budgetItems.map((v, j) => (j === i ? value : v)) }));
+  }
+  function removeBudgetItem(i: number) {
+    setDoc((d) => ({ ...d, budgetItems: d.budgetItems.filter((_, j) => j !== i) }));
+  }
+
+  // ── Budget: organizacao (per-item rows) ──
+  function addBudgetRow() {
+    setDoc((d) => ({ ...d, budgetRows: [...(d.budgetRows ?? []), { item: "", price: "" }] }));
+  }
+  function updateBudgetRow(i: number, p: Partial<{ item: string; price: string }>) {
+    setDoc((d) => ({
+      ...d,
+      budgetRows: (d.budgetRows ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)),
+    }));
+  }
+  function removeBudgetRow(i: number) {
+    setDoc((d) => ({ ...d, budgetRows: (d.budgetRows ?? []).filter((_, j) => j !== i) }));
+  }
+
+  // ── Actions ──
+  async function preview() {
+    if (busy) return;
+    setBusy("preview");
+    try {
+      const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "preview", doc }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Não foi possível gerar a pré-visualização.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro na pré-visualização.", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function send() {
+    if (busy) return;
+    setBusy("send");
+    setConfirmSend(false);
+    try {
+      const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "send", doc }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
+      toast(
+        data?.emailed ? "Proposta enviada" : "Proposta gerada (e-mail não configurado)",
+        data?.emailed ? "success" : "info",
+      );
+      onSent?.();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao enviar a proposta.", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const isDeco = doc.template !== "organizacao";
+  const canSend = !!doc.ref.trim() && !!doc.clientNames.trim();
+
+  return (
+    <div className="border-t border-foreground/10 pt-5">
+      <div className="flex items-center justify-between mb-4">
+        <p className="bo-eyebrow">Estúdio de Propostas (PDF)</p>
+        <button
+          type="button"
+          onClick={clearDraft}
+          className="text-[10px] tracking-[0.15em] uppercase text-foreground/30 hover:text-[#b5654a] transition-colors"
+        >
+          Limpar rascunho
+        </button>
+      </div>
+
+      {/* Template selector */}
+      <div className="inline-flex gap-1 p-1 rounded-xl bg-foreground/[0.04] mb-6">
+        {(["decoracao", "organizacao"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTemplate(t)}
+            aria-pressed={doc.template === t || (t === "decoracao" && isDeco)}
+            className={`px-4 py-1.5 rounded-lg text-[10px] tracking-[0.15em] uppercase transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
+              (t === "decoracao") === isDeco
+                ? "bg-white text-foreground/70 shadow-sm"
+                : "text-foreground/35 hover:text-foreground/55"
+            }`}
+          >
+            {t === "decoracao" ? "Decoração" : "Organização"}
+          </button>
+        ))}
+      </div>
+
+      {/* Event fields */}
+      <Section title="Evento">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Labeled label="Clientes">
+            <input
+              className={INPUT}
+              value={doc.clientNames}
+              onChange={(e) => patch({ clientNames: e.target.value })}
+              placeholder="Maria & Zé"
+            />
+          </Labeled>
+          <Labeled label="Tipo de evento">
+            <input
+              className={INPUT}
+              value={doc.eventType}
+              onChange={(e) => patch({ eventType: e.target.value })}
+              placeholder="Casamento"
+            />
+          </Labeled>
+          <Labeled label="Data">
+            <input
+              className={INPUT}
+              value={doc.eventDate}
+              onChange={(e) => patch({ eventDate: e.target.value })}
+              placeholder="12 de setembro de 2026"
+            />
+          </Labeled>
+          <Labeled label="Local">
+            <input
+              className={INPUT}
+              value={doc.location}
+              onChange={(e) => patch({ location: e.target.value })}
+              placeholder="Monte da Oliveirinha, Évora"
+            />
+          </Labeled>
+          <Labeled label="Convidados">
+            <input
+              className={INPUT}
+              value={doc.guests}
+              onChange={(e) => patch({ guests: e.target.value })}
+              placeholder="150 pax"
+            />
+          </Labeled>
+          {isDeco && (
+            <>
+              <Labeled label="Cerimónia">
+                <input
+                  className={INPUT}
+                  value={doc.ceremony ?? ""}
+                  onChange={(e) => patch({ ceremony: e.target.value })}
+                  placeholder="Civil, simbólica"
+                />
+              </Labeled>
+              <Labeled label="Hora">
+                <input
+                  className={INPUT}
+                  value={doc.time ?? ""}
+                  onChange={(e) => patch({ time: e.target.value })}
+                  placeholder="A definir"
+                />
+              </Labeled>
+            </>
+          )}
+        </div>
+
+        {/* Reference (advanced) */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="studio-ref" className={`${LABEL} mb-0`}>
+              Referência (cabeçalho)
+            </label>
+            {refEdited && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRefEdited(false);
+                  setDoc((d) => ({ ...d, ref: buildRef(d) }));
+                }}
+                className={ADD_BTN}
+              >
+                ↺ Automática
+              </button>
+            )}
+          </div>
+          <input
+            id="studio-ref"
+            className={INPUT}
+            value={doc.ref}
+            onChange={(e) => {
+              setRefEdited(true);
+              patch({ ref: e.target.value });
+            }}
+          />
+        </div>
+      </Section>
+
+      {/* Cover images */}
+      <Section title="Imagens de capa (2)">
+        <div className="grid grid-cols-2 gap-3">
+          {[0, 1].map((idx) => {
+            const path = doc.coverImages?.[idx];
+            return (
+              <div key={idx}>
+                {path ? (
+                  <Thumb
+                    url={assetUrls[path]}
+                    onRemove={() => removeCoverAt(idx)}
+                    className="aspect-[4/3]"
+                  />
+                ) : (
+                  <UploadArea
+                    label={`Capa ${idx + 1}`}
+                    busy={!!uploading[`cover-${idx}`]}
+                    multiple={false}
+                    onFiles={(files) =>
+                      handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
+                        setCoverAt(idx, paths[0]),
+                      )
+                    }
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      {/* Service groups */}
+      <Section title="Serviços">
+        <div className="flex flex-col gap-3">
+          {doc.serviceGroups.map((g, gi) => (
+            <div
+              key={gi}
+              className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] p-3"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  className="bo-input w-12 px-2 py-2 text-xs text-foreground/70 text-center"
+                  value={g.letter ?? ""}
+                  onChange={(e) => updateGroup(gi, { letter: e.target.value })}
+                  placeholder="a)"
+                  aria-label="Marcador"
+                />
+                <input
+                  className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                  value={g.title}
+                  onChange={(e) => updateGroup(gi, { title: e.target.value })}
+                  placeholder="Decoração Floral de Casamento"
+                  aria-label="Título do grupo"
+                />
+                <MoveBtns
+                  onUp={() => moveGroup(gi, -1)}
+                  onDown={() => moveGroup(gi, 1)}
+                  disUp={gi === 0}
+                  disDown={gi === doc.serviceGroups.length - 1}
+                />
+                <button
+                  type="button"
+                  className={REMOVE_BTN}
+                  onClick={() => removeGroup(gi)}
+                  aria-label="Remover grupo"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex flex-col gap-2 pl-1">
+                {g.items.map((it, ii) => (
+                  <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
+                    <input
+                      className={INPUT_SM}
+                      value={it.label}
+                      onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
+                      placeholder="Reunião inicial"
+                      aria-label="Item"
+                    />
+                    {!isDeco && (
+                      <input
+                        className={INPUT_SM}
+                        value={it.desc ?? ""}
+                        onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
+                        placeholder="Descrição"
+                        aria-label="Descrição do item"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      className={`${REMOVE_BTN} sm:mt-2`}
+                      onClick={() => removeServiceItem(gi, ii)}
+                      aria-label="Remover item"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className={ADD_BTN} onClick={() => addServiceItem(gi)}>
+                  + Adicionar item
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button type="button" className={`${ADD_BTN} mt-3`} onClick={addGroup}>
+          + Adicionar grupo de serviços
+        </button>
+      </Section>
+
+      {/* Mood boards — decoracao only */}
+      {isDeco && (
+        <Section title="Mood boards">
+          <div className="flex flex-col gap-3">
+            {doc.moodBoards.map((b, bi) => (
+              <div
+                key={bi}
+                className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] p-3"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                    value={b.title}
+                    onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                    placeholder="Decoração Cerimónia"
+                    aria-label="Título do mood board"
+                  />
+                  <MoveBtns
+                    onUp={() => moveBoard(bi, -1)}
+                    onDown={() => moveBoard(bi, 1)}
+                    disUp={bi === 0}
+                    disDown={bi === doc.moodBoards.length - 1}
+                  />
+                  <button
+                    type="button"
+                    className={REMOVE_BTN}
+                    onClick={() => removeBoard(bi)}
+                    aria-label="Remover mood board"
+                  >
+                    ×
+                  </button>
+                </div>
+                <input
+                  className={`${INPUT_SM} mb-2`}
+                  value={b.annotation ?? ""}
+                  onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
+                  placeholder="Anotação (opcional)"
+                  aria-label="Anotação"
+                />
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {b.images.map((path) => (
+                    <Thumb
+                      key={path}
+                      url={assetUrls[path]}
+                      onRemove={() => removeBoardImage(bi, path)}
+                      className="aspect-square"
+                    />
+                  ))}
+                  <UploadArea
+                    label="+ Imagens"
+                    busy={!!uploading[`board-${bi}`]}
+                    multiple
+                    compact
+                    onFiles={(files) =>
+                      handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <button type="button" className={`${ADD_BTN} mt-3`} onClick={addBoard}>
+            + Adicionar mood board
+          </button>
+        </Section>
+      )}
+
+      {/* Cronograma — organizacao only */}
+      {!isDeco && (
+        <Section title="Cronograma de Organização">
+          <div className="flex flex-col gap-3">
+            {(doc.cronograma ?? []).map((ph, pi) => (
+              <div
+                key={pi}
+                className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] p-3"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                    value={ph.title}
+                    onChange={(e) => updatePhase(pi, { title: e.target.value })}
+                    placeholder="6-12 meses antes do casamento"
+                    aria-label="Título da fase"
+                  />
+                  <MoveBtns
+                    onUp={() => movePhase(pi, -1)}
+                    onDown={() => movePhase(pi, 1)}
+                    disUp={pi === 0}
+                    disDown={pi === (doc.cronograma?.length ?? 0) - 1}
+                  />
+                  <button
+                    type="button"
+                    className={REMOVE_BTN}
+                    onClick={() => removePhase(pi)}
+                    aria-label="Remover fase"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="flex flex-col gap-2 pl-1">
+                  {ph.items.map((it, ii) => (
+                    <div key={ii} className="flex items-center gap-2">
+                      <input
+                        className={INPUT_SM}
+                        value={it}
+                        onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
+                        placeholder="Definição do conceito"
+                        aria-label="Tarefa"
+                      />
+                      <button
+                        type="button"
+                        className={REMOVE_BTN}
+                        onClick={() => removePhaseItem(pi, ii)}
+                        aria-label="Remover tarefa"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
+                    + Adicionar tarefa
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
+            + Adicionar fase
+          </button>
+        </Section>
+      )}
+
+      {/* Budget */}
+      <Section title="Orçamento Proposto">
+        {isDeco ? (
+          <>
+            <div className="flex flex-col gap-2 mb-3">
+              {doc.budgetItems.map((it, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    className={INPUT_SM}
+                    value={it}
+                    onChange={(e) => updateBudgetItem(i, e.target.value)}
+                    placeholder="Decor Cerimónia"
+                    aria-label="Item de orçamento"
+                  />
+                  <button
+                    type="button"
+                    className={REMOVE_BTN}
+                    onClick={() => removeBudgetItem(i)}
+                    aria-label="Remover item"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
+                + Adicionar item
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Labeled label="Rótulo do total">
+                <input
+                  className={INPUT}
+                  value={doc.totalLabel}
+                  onChange={(e) => patch({ totalLabel: e.target.value })}
+                  placeholder="Valor Total Decoração"
+                />
+              </Labeled>
+              <Labeled label="Valor total">
+                <input
+                  className={INPUT}
+                  value={doc.totalText}
+                  onChange={(e) => patch({ totalText: e.target.value })}
+                  placeholder="3.000,00 € + IVA"
+                />
+              </Labeled>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2 mb-3">
+              <div className="flex gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                <span className="flex-1">Item</span>
+                <span className="w-28">Valor</span>
+                <span className="w-5" />
+              </div>
+              {(doc.budgetRows ?? []).map((r, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                    value={r.item}
+                    onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
+                    placeholder="Coordenação do dia"
+                    aria-label="Item"
+                  />
+                  <input
+                    className="bo-input w-28 px-2.5 py-2 text-xs text-foreground/75 text-right"
+                    value={r.price}
+                    onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
+                    placeholder="1.500,00 €"
+                    aria-label="Valor"
+                  />
+                  <button
+                    type="button"
+                    className={REMOVE_BTN}
+                    onClick={() => removeBudgetRow(i)}
+                    aria-label="Remover linha"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
+                + Adicionar linha
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Labeled label="Valor total estimado">
+                <input
+                  className={INPUT}
+                  value={doc.totalEstimatedText ?? ""}
+                  onChange={(e) => patch({ totalEstimatedText: e.target.value })}
+                  placeholder="12.500,00 €"
+                />
+              </Labeled>
+              <Labeled label="Nota do orçamento">
+                <textarea
+                  rows={2}
+                  className={`${INPUT} resize-none`}
+                  value={doc.budgetNote ?? ""}
+                  onChange={(e) => patch({ budgetNote: e.target.value })}
+                  placeholder="Os valores são estimativas e podem ser ajustados…"
+                />
+              </Labeled>
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* Actions */}
+      <div className="sticky bottom-0 -mx-1 mt-6 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/85 px-1 py-3 backdrop-blur">
+        <button
+          type="button"
+          onClick={preview}
+          disabled={busy !== null}
+          className={`px-4 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase transition-colors shadow-sm ${
+            busy !== null
+              ? "bg-white/60 text-foreground/30 cursor-not-allowed border border-foreground/[0.08]"
+              : "bg-white border border-foreground/[0.12] text-foreground/55 hover:text-foreground/75"
+          }`}
+        >
+          {busy === "preview" ? "A gerar…" : "Pré-visualizar"}
+        </button>
+
+        {confirmSend ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-foreground/50">
+              Enviar para {quote.email || "o cliente"}?
+            </span>
+            <button
+              type="button"
+              onClick={send}
+              disabled={busy !== null}
+              className={`px-4 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase transition-colors ${
+                busy !== null
+                  ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
+                  : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
+              }`}
+            >
+              {busy === "send" ? "A enviar…" : "Confirmar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmSend(false)}
+              className="text-[10px] tracking-[0.15em] uppercase text-foreground/35 hover:text-foreground/60"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmSend(true)}
+            disabled={busy !== null || !canSend}
+            title={canSend ? undefined : "Preencha clientes e referência."}
+            className={`px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase transition-colors ${
+              busy !== null || !canSend
+                ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
+                : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
+            }`}
+          >
+            Gerar e enviar ao cliente →
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Small presentational helpers ──
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-6">
+      <p className="text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-3">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className={LABEL}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function MoveBtns({
+  onUp,
+  onDown,
+  disUp,
+  disDown,
+}: {
+  onUp: () => void;
+  onDown: () => void;
+  disUp: boolean;
+  disDown: boolean;
+}) {
+  const base =
+    "w-6 h-6 rounded-md text-foreground/35 hover:text-foreground/65 hover:bg-foreground/[0.06] disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-xs leading-none";
+  return (
+    <div className="flex items-center gap-0.5 shrink-0">
+      <button
+        type="button"
+        className={base}
+        onClick={onUp}
+        disabled={disUp}
+        aria-label="Mover para cima"
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        className={base}
+        onClick={onDown}
+        disabled={disDown}
+        aria-label="Mover para baixo"
+      >
+        ↓
+      </button>
+    </div>
+  );
+}
+
+function Thumb({
+  url,
+  onRemove,
+  className = "",
+}: {
+  url?: string;
+  onRemove: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${className}`}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-[9px] tracking-[0.15em] uppercase text-foreground/30">
+          Imagem
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="Remover imagem"
+        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function UploadArea({
+  label,
+  busy,
+  multiple,
+  compact = false,
+  onFiles,
+}: {
+  label: string;
+  busy: boolean;
+  multiple: boolean;
+  compact?: boolean;
+  onFiles: (files: File[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [drag, setDrag] = useState(false);
+
+  function pick(list: FileList | null) {
+    if (!list) return;
+    const files = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    if (files.length) onFiles(files);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => inputRef.current?.click()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        pick(e.dataTransfer.files);
+      }}
+      className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
+        compact ? "aspect-square p-2" : "aspect-[4/3] p-3"
+      } ${
+        drag
+          ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
+          : "border-foreground/[0.18] bg-foreground/[0.02] hover:border-[#4d6350]/45"
+      }`}
+    >
+      <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">
+        {busy ? "A carregar…" : label}
+      </span>
+      {!busy && !compact && (
+        <span className="text-[9px] text-foreground/25">arraste ou clique</span>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple={multiple}
+        className="hidden"
+        onChange={(e) => {
+          pick(e.target.files);
+          e.target.value = "";
+        }}
+      />
+    </button>
+  );
+}

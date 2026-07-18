@@ -36,6 +36,9 @@ export const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
 export const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), {
   loading: PanelLoading,
 });
+export const ProposalStudio = dynamic(() => import("./ProposalStudio"), {
+  loading: PanelLoading,
+});
 export const ClientMessenger = dynamic(() => import("./ClientMessenger"), {
   loading: PanelLoading,
 });
