@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal, updateProposal } from "@/lib/proposals-store";
 import { updateQuoteWith } from "@/lib/quotes-store";
-import { getContractByProposal, createContract, newContractId } from "@/lib/contracts-store";
+import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
 import { TERMS_VERSION, DEFAULT_TERMS, termsToPlainText } from "@/lib/contract-terms";
 import {
   createInvoice,
@@ -123,23 +123,27 @@ export async function POST(request: NextRequest) {
     // duplicates the contract nor the invoice.
     if (accepted) {
       try {
-        const existing = await getContractByProposal(proposal.id);
-        if (!existing) {
-          await createContract({
-            id: newContractId(),
-            quoteId: proposal.quoteId,
-            proposalId: proposal.id,
-            clientName: proposal.clientName,
-            clientEmail: proposal.clientEmail,
-            termsVersion: TERMS_VERSION,
-            termsSnapshot: termsToPlainText(DEFAULT_TERMS),
-            status: "aceite",
-            createdAt: respondedAt,
-            acceptedAt: respondedAt,
-            acceptedName,
-            acceptedIp: clientIp(request),
-          });
-
+        // O CONTRATO é o lock do aceite: tentamos criá-lo primeiro e só emitimos
+        // o sinal se fomos NÓS a criá-lo. `createContractIfAbsent` mantém o
+        // caminho rápido (getContractByProposal) e, além disso, trata um conflito
+        // do índice único `contracts_proposal_id_uk` como "já aceite" — fechando
+        // a janela TOCTOU em que dois aceites concorrentes criariam 2 contratos +
+        // 2 sinais. `created:false` ⇒ outro aceite já tratou de tudo, não emitimos.
+        const { created } = await createContractIfAbsent({
+          id: newContractId(),
+          quoteId: proposal.quoteId,
+          proposalId: proposal.id,
+          clientName: proposal.clientName,
+          clientEmail: proposal.clientEmail,
+          termsVersion: TERMS_VERSION,
+          termsSnapshot: termsToPlainText(DEFAULT_TERMS),
+          status: "aceite",
+          createdAt: respondedAt,
+          acceptedAt: respondedAt,
+          acceptedName,
+          acceptedIp: clientIp(request),
+        });
+        if (created) {
           // 30% sinal — confirms the reservation of the date.
           const { sinal } = splitThirtySeventy(proposal.total);
           const invoiceNumber = await nextInvoiceNumber();

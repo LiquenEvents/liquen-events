@@ -68,5 +68,38 @@ export const createContract = (c: Contract): Promise<void> => repo.create(c);
 export const updateContract = (id: string, patch: Partial<Contract>): Promise<Contract | null> =>
   repo.update(id, patch);
 
+/**
+ * Cria o contrato só se ainda não existir um para a proposta, e devolve se foi
+ * ESTA chamada a criá-lo. O contrato é o LOCK do aceite: quem o cria é quem
+ * emite o sinal — assim dois aceites concorrentes produzem um só contrato e um
+ * só sinal.
+ *
+ * Defesa em profundidade sobre o índice único `contracts_proposal_id_uk`
+ * (db/schema.sql): numa corrida no Supabase/serverless, os dois pedidos passam
+ * ambos o `getContractByProposal` (nenhum vê contrato ainda), mas só um vence o
+ * índice no insert — o outro apanha o conflito de unicidade aqui, relê o
+ * contrato vencedor e sai com `created:false`, por isso NÃO emite um 2.º sinal.
+ * (O fallback de ficheiro serializa as escritas, logo esta guarda endurece
+ * sobretudo o caminho Supabase — que é o objetivo.)
+ */
+export async function createContractIfAbsent(
+  c: Contract,
+): Promise<{ created: boolean; contract: Contract }> {
+  // Caminho rápido: já existe ⇒ ninguém cria de novo.
+  const existing = await getContractByProposal(c.proposalId);
+  if (existing) return { created: false, contract: existing };
+  try {
+    await createContract(c);
+    return { created: true, contract: c };
+  } catch (err) {
+    // O insert falhou. Se foi o índice único (corrida TOCTOU entre o check e o
+    // insert), o contrato do vencedor já lá está: tratamos como "já aceite".
+    const raced = await getContractByProposal(c.proposalId);
+    if (raced) return { created: false, contract: raced };
+    // Não foi unicidade (falha genuína de persistência) — propaga.
+    throw err;
+  }
+}
+
 /** Fresh, unguessable contract id. */
 export const newContractId = (): string => randomUUID();

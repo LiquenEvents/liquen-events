@@ -66,24 +66,50 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Todo o documento entregue ao cliente é numerado e registado: a numeração
     // é sequencial (FT AAAA/NNNN), obrigatória e visível na vista de Faturas.
     //
-    // Idempotência: se já existir uma fatura para esta linha de pagamento
-    // (mesmo `paymentId`; na sua ausência, mesma espécie + valor para o pedido)
-    // reaproveitamo-la em vez de cunhar um número novo — descarregar ou reenviar
-    // o mesmo recibo não duplica o livro nem salta números da sequência.
+    // INVARIANTE DE INTEGRIDADE: no máximo UMA fatura de sinal e UMA de saldo por
+    // pedido, para sempre — nenhum caminho pode cunhar uma segunda.
+    //
+    // O sinal e o saldo são AUTO-emitidos noutros fluxos (aceite da proposta ⇒
+    // sinal; transição sinal→paga ⇒ saldo) e NÃO carregam o marcador `[pag:<id>]`.
+    // Quando o painel emite o recibo dessa mesma parcela envia SEMPRE `paymentId`,
+    // por isso uma deduplicação guiada só pelo marcador nunca casaria com a fatura
+    // auto-emitida e cunharia um SEGUNDO sinal/saldo (double-billing). Por isso,
+    // para estas duas espécies, reaproveitamos SEMPRE uma fatura existente da
+    // mesma espécie para o pedido (ela é única por invariante); só criamos quando
+    // não existe nenhuma.
+    //
+    // Para as restantes espécies (total/pagamento), a chave de idempotência é o
+    // marcador da linha de pagamento OU, em recurso, a mesma espécie + valor — o
+    // fallback continua alcançável mesmo com `paymentRef` presente (marcador OU
+    // espécie+valor), para reaproveitar um documento anterior sem marcador.
     const ledger = await listInvoicesForQuote(id);
+    const isSinalOrSaldo = invoiceKind === "sinal" || invoiceKind === "saldo";
     let invoice =
-      ledger.find((inv) =>
-        paymentRef
-          ? (inv.note ?? "").includes(paymentRef)
-          : inv.kind === invoiceKind && inv.amount === amount,
-      ) ?? null;
+      (isSinalOrSaldo
+        ? ledger.find((inv) => inv.kind === invoiceKind)
+        : ledger.find(
+            (inv) =>
+              (!!paymentRef && (inv.note ?? "").includes(paymentRef)) ||
+              (inv.kind === invoiceKind && inv.amount === amount),
+          )) ?? null;
 
     if (invoice) {
-      // Documento já emitido: se entretanto foi liquidado, actualizamos o estado
-      // (mantendo o MESMO número) para a reimpressão reflectir a realidade.
+      // Documento já emitido: reaproveitamos o MESMO número — nunca criamos um
+      // segundo sinal/saldo. Actualizamos apenas o que a realidade deste recibo
+      // exige: se representa liquidação, marcamos `paga`; e se traz um marcador de
+      // pagamento que a fatura (auto-emitida) ainda não tem, anexamo-lo à nota
+      // para reemissões futuras casarem pelo marcador e deixar o rasto da linha
+      // de pagamento que a liquidou.
+      const patch: Partial<Invoice> = {};
       if (paid && invoice.status !== "paga") {
-        invoice =
-          (await updateInvoice(invoice.id, { status: "paga", paidAt: issuedAt })) ?? invoice;
+        patch.status = "paga";
+        patch.paidAt = issuedAt;
+      }
+      if (paymentRef && !(invoice.note ?? "").includes(paymentRef)) {
+        patch.note = [invoice.note, paymentRef].filter(Boolean).join(" ");
+      }
+      if (Object.keys(patch).length > 0) {
+        invoice = (await updateInvoice(invoice.id, patch)) ?? invoice;
       }
     } else {
       // Novo documento: alocamos o próximo número da sequência e registamo-lo no

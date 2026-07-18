@@ -116,6 +116,60 @@ describe("POST /api/orcamento/[id]/fatura", () => {
     expect(ledger.rows).toHaveLength(1);
   });
 
+  it("reuses an auto-issued sinal (no [pag:] marker) instead of minting a second one (P0 #39)", async () => {
+    // Auto-emitida no aceite da proposta: espécie sinal, SEM marcador [pag:],
+    // ainda `emitida`. É o cenário exato do double-billing.
+    ledger.rows.push({
+      id: "auto-sinal",
+      number: "FT 2026/0001",
+      quoteId: "LIQ-1",
+      kind: "sinal",
+      amount: 3750,
+      status: "emitida",
+      note: "Sinal 30% — reserva de data (aceitação da proposta)",
+    });
+
+    // O painel emite o recibo dessa parcela — envia SEMPRE `paymentId`.
+    const res = await POST(
+      req({ paymentId: "pay-1", kind: "sinal", amount: 3750, date: "2026-07-18", paid: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+
+    // Nenhum segundo sinal: mesmo número FT, sem nova linha, sem createInvoice
+    // nem novo número de sequência.
+    expect(json.number).toBe("FT 2026/0001");
+    expect(createInvoice).not.toHaveBeenCalled();
+    expect(nextInvoiceNumber).not.toHaveBeenCalled();
+    expect(ledger.rows).toHaveLength(1);
+
+    // O sinal existente passou a `paga` e ganhou o marcador de pagamento.
+    expect(ledger.rows[0]).toMatchObject({ status: "paga", paidAt: "2026-07-18" });
+    expect(String(ledger.rows[0].note)).toContain("[pag:pay-1]");
+  });
+
+  it("never mints a second sinal even if the receipt amount differs from the auto-issued one (#39)", async () => {
+    ledger.rows.push({
+      id: "auto-sinal",
+      number: "FT 2026/0001",
+      quoteId: "LIQ-1",
+      kind: "sinal",
+      amount: 3750,
+      status: "emitida",
+      note: "Sinal 30%",
+    });
+    const res = await POST(
+      req({ paymentId: "pay-2", kind: "sinal", amount: 9999, paid: false }),
+      ctx("LIQ-1"),
+    );
+    const json = await res.json();
+    // A invariante é uma-por-espécie: reaproveita a existente, não cunha outra.
+    expect(json.number).toBe("FT 2026/0001");
+    expect(createInvoice).not.toHaveBeenCalled();
+    expect(ledger.rows).toHaveLength(1);
+  });
+
   it("rejects a non-positive amount with 400 and never touches the ledger", async () => {
     const res = await POST(req({ paymentId: "p-0", kind: "sinal", amount: 0 }), ctx("LIQ-1"));
     expect(res.status).toBe(400);

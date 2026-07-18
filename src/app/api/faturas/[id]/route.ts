@@ -33,20 +33,41 @@ const SALDO_DUE_DAYS = 30;
  */
 async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
   try {
-    // 1. Idempotência: um único saldo por pedido. Se já houver um (mesmo
-    //    anulado), não emitimos outro — a equipa reconcilia manualmente.
+    // 1. Idempotência: no máximo UM saldo ACTIVO por pedido. Um saldo `anulada`
+    //    NÃO conta — ele representa um saldo órfão que foi anulado quando o sinal
+    //    reverteu (ver `maybeAnnulOrphanSaldo`), por isso um novo pagamento do
+    //    sinal corrigido tem de poder reemitir um saldo fresco. Se contássemos os
+    //    anulados, a guarda bloquearia permanentemente a reemissão corrigida.
     const existing = await listInvoicesForQuote(sinal.quoteId);
-    if (existing.some((i) => i.kind === "saldo")) return null;
+    if (existing.some((i) => i.kind === "saldo" && i.status !== "anulada")) return null;
 
-    // 2. Valor do saldo — derivado de forma autoritária. Preferimos o total da
-    //    proposta (a fonte de verdade do preço acordado) e o mesmo split 30/70
-    //    usado na emissão do sinal; se não houver proposta, derivamos do próprio
-    //    sinal (sinal ≈ 30% ⇒ saldo = sinal / 3 × 7).
-    const proposal = await getProposalByQuote(sinal.quoteId);
-    const amount =
-      proposal && proposal.total > 0
-        ? splitThirtySeventy(proposal.total).saldo
-        : round2((sinal.amount / 3) * 7);
+    // 2. Valor do saldo — a fonte de verdade é o SINAL EFECTIVAMENTE FATURADO,
+    //    não a proposta. `getProposalByQuote` devolve a proposta mais RECENTE, que
+    //    pode ter sido revista após o aceite; usá-la daria um saldo incoerente com
+    //    o sinal já cobrado (ex.: sinal €3000 de €10000 + saldo €8400 de uma
+    //    proposta revista para €12000). Como o sinal é 30%, o saldo é sinal/3×7 —
+    //    e as duas parcelas fecham sempre o mesmo total acordado.
+    const amount = round2((sinal.amount / 3) * 7);
+
+    // Verificação de sanidade (só observabilidade): se existir uma proposta e o
+    // seu saldo 70% divergir do valor derivado do sinal, registamos — indício de
+    // proposta revista após o aceite, a reconciliar manualmente. O valor faturado
+    // continua a ser o derivado do sinal; a proposta NUNCA o sobrepõe.
+    try {
+      const proposal = await getProposalByQuote(sinal.quoteId);
+      if (proposal && proposal.total > 0) {
+        const fromProposal = splitThirtySeventy(proposal.total).saldo;
+        if (fromProposal !== amount) {
+          log.warn("faturas: saldo derivado do sinal diverge da proposta mais recente", {
+            quoteId: sinal.quoteId,
+            fromSinal: amount,
+            fromProposal,
+          });
+        }
+      }
+    } catch {
+      /* cross-check é opcional — nunca afeta o valor faturado nem o fluxo */
+    }
 
     const issuedAt = new Date().toISOString().slice(0, 10);
     // Vencimento por omissão: hoje + 30 dias. A data do evento não é conhecida
@@ -74,6 +95,33 @@ async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
     return saldo;
   } catch (err) {
     log.error("faturas: emissão automática do saldo falhou", err, { quoteId: sinal.quoteId });
+    return null;
+  }
+}
+
+/**
+ * Simétrico de `maybeAutoIssueSaldo`: quando um sinal deixa de estar `paga` —
+ * revertido (paga→emitida) ou anulado (→anulada) — o saldo 70% que foi emitido
+ * automaticamente nessa liquidação fica órfão. Se ainda estiver por pagar
+ * (`emitida`), anulamo-lo para não deixar uma dívida fantasma no livro. Um saldo
+ * já `paga` NÃO se toca (dinheiro real entrou; a equipa reconcilia à mão).
+ *
+ * Best-effort e totalmente isolado: NUNCA pode fazer falhar o PATCH original.
+ * Devolve o saldo anulado (ou null) para a UI poder refrescar.
+ */
+async function maybeAnnulOrphanSaldo(sinal: Invoice): Promise<Invoice | null> {
+  try {
+    const existing = await listInvoicesForQuote(sinal.quoteId);
+    const orphan = existing.find((i) => i.kind === "saldo" && i.status === "emitida");
+    if (!orphan) return null;
+    const annulled = await updateInvoice(orphan.id, {
+      status: "anulada",
+      paidAt: undefined,
+      note: [orphan.note, "(anulado: sinal revertido)"].filter(Boolean).join(" "),
+    });
+    return annulled ?? null;
+  } catch (err) {
+    log.error("faturas: anulação do saldo órfão falhou", err, { quoteId: sinal.quoteId });
     return null;
   }
 }
@@ -141,10 +189,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // saldo. A criação é best-effort e nunca pode fazer falhar a marcação acima.
     const becamePaid =
       updated.kind === "sinal" && updated.status === "paga" && prior.status !== "paga";
-    const saldo = becamePaid ? await maybeAutoIssueSaldo(updated) : null;
+    // Reversão sinal paga→(emitida|anulada): o saldo auto-emitido nessa liquidação
+    // fica órfão — se ainda não foi pago, anulamo-lo para não estranular o livro.
+    const revertedFromPaid =
+      updated.kind === "sinal" && prior.status === "paga" && updated.status !== "paga";
 
-    // Incluímos o saldo criado (quando há) para a UI poder refrescar sem refetch.
-    return NextResponse.json(saldo ? { ...updated, saldoAutoIssued: saldo } : updated);
+    const saldo = becamePaid ? await maybeAutoIssueSaldo(updated) : null;
+    const saldoAnnulled = revertedFromPaid ? await maybeAnnulOrphanSaldo(updated) : null;
+
+    // Incluímos o saldo criado/anulado (quando há) para a UI refrescar sem refetch.
+    if (saldo) return NextResponse.json({ ...updated, saldoAutoIssued: saldo });
+    if (saldoAnnulled) return NextResponse.json({ ...updated, saldoAnnulled });
+    return NextResponse.json(updated);
   } catch (err) {
     log.error("faturas PATCH falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

@@ -174,6 +174,14 @@ create table if not exists public.contracts (
 
 create index if not exists contracts_proposal_id_idx on public.contracts (proposal_id);
 
+-- Um contrato por proposta — garantia de unicidade na própria base de dados.
+-- É o lock do aceite: dois aceites concorrentes passam ambos o
+-- getContractByProposal (nenhum vê contrato ainda), mas só um vence este índice
+-- no insert; o outro apanha o conflito e sai sem emitir um 2.º sinal (ver
+-- createContractIfAbsent). Idempotente (IF NOT EXISTS). Os proposal_id nulos não
+-- colidem entre si no Postgres, por isso um contrato sem proposta não é bloqueado.
+create unique index if not exists contracts_proposal_id_uk on public.contracts (proposal_id);
+
 -- ── Restrições de integridade (CHECK) ───────────────────────────
 -- Garantem, na própria base de dados, que os campos de estado/tipo só
 -- aceitam os valores que a aplicação conhece e que os montantes não são

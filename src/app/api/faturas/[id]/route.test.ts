@@ -130,6 +130,75 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     expect(createInvoice).not.toHaveBeenCalled();
   });
 
+  it("derives the saldo from the billed sinal, ignoring a differing newest-proposal total (#41)", async () => {
+    seedSinal("s7"); // sinal €3750
+    // Proposta revista APÓS o aceite: total maior ⇒ o saldo 70% da proposta seria
+    // €14000. Não deve ser usado — a fonte de verdade é o sinal já faturado.
+    proposalsDb.store.set("q-s7", { total: 20000 });
+
+    const { req, params } = patchReq("s7", { status: "paga" });
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    // 3750 / 3 * 7 = 8750, e NÃO 14000 (70% de 20000).
+    expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 8750 });
+  });
+
+  it("annuls an unpaid auto-saldo when the sinal is reverted from paga (#41)", async () => {
+    seedSinal("s8", { status: "paga", paidAt: "2026-07-05" });
+    // Saldo órfão auto-emitido, ainda por pagar.
+    invoicesDb.store.set("saldo-8", {
+      id: "saldo-8",
+      quoteId: "q-s8",
+      kind: "saldo",
+      amount: 8750,
+      status: "emitida",
+    });
+
+    const { req, params } = patchReq("s8", { status: "emitida" }); // paga → emitida
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json).toMatchObject({ id: "s8", status: "emitida" });
+    // O saldo órfão foi anulado (não fica a estrangular o livro).
+    expect(json.saldoAnnulled).toMatchObject({ id: "saldo-8", kind: "saldo", status: "anulada" });
+    expect(invoicesDb.store.get("saldo-8")?.status).toBe("anulada");
+  });
+
+  it("does NOT annul a saldo that is already paga when the sinal is reverted (#41)", async () => {
+    seedSinal("s9", { status: "paga", paidAt: "2026-07-05" });
+    invoicesDb.store.set("saldo-9", {
+      id: "saldo-9",
+      quoteId: "q-s9",
+      kind: "saldo",
+      amount: 8750,
+      status: "paga", // dinheiro real entrou — não se toca
+    });
+
+    const { req, params } = patchReq("s9", { status: "emitida" });
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAnnulled).toBeUndefined();
+    expect(invoicesDb.store.get("saldo-9")?.status).toBe("paga");
+  });
+
+  it("re-issues a fresh saldo after an orphan was annulled (guard ignores anulada) (#41)", async () => {
+    seedSinal("s10");
+    // Um saldo anulado (órfão de uma reversão anterior) NÃO deve bloquear a
+    // reemissão quando o sinal corrigido volta a ser pago.
+    invoicesDb.store.set("saldo-10", {
+      id: "saldo-10",
+      quoteId: "q-s10",
+      kind: "saldo",
+      amount: 8750,
+      status: "anulada",
+    });
+
+    const { req, params } = patchReq("s10", { status: "paga" });
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 8750 });
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+
   it("does NOT auto-issue for a non-sinal invoice", async () => {
     seedSinal("t1", { kind: "total" });
     const { req, params } = patchReq("t1", { status: "paga" });

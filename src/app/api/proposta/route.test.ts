@@ -42,11 +42,25 @@ vi.mock("@/lib/rate-limit", () => ({
 // the accept path creates a fresh contract + sinal invoice; the idempotency test
 // overrides it to return an existing one.
 const contractsDb = vi.hoisted(() => ({ existing: null as Record<string, unknown> | null }));
-vi.mock("@/lib/contracts-store", () => ({
-  getContractByProposal: vi.fn(async () => contractsDb.existing),
-  createContract: vi.fn(async (c: Record<string, unknown>) => c),
-  newContractId: vi.fn(() => "contract-id"),
-}));
+vi.mock("@/lib/contracts-store", () => {
+  const getContractByProposal = vi.fn(async () => contractsDb.existing);
+  const createContract = vi.fn(async (c: Record<string, unknown>) => c);
+  // Espelha o helper real sobre os primitivos mockados: regista via
+  // createContract e só reporta created:true quando não pré-existia contrato —
+  // assim as asserções existentes sobre createContract continuam válidas.
+  const createContractIfAbsent = vi.fn(async (c: Record<string, unknown>) => {
+    const existing = await getContractByProposal();
+    if (existing) return { created: false, contract: existing };
+    await createContract(c);
+    return { created: true, contract: c };
+  });
+  return {
+    getContractByProposal,
+    createContract,
+    createContractIfAbsent,
+    newContractId: vi.fn(() => "contract-id"),
+  };
+});
 vi.mock("@/lib/invoices-store", () => ({
   createInvoice: vi.fn(async (i: Record<string, unknown>) => i),
   newInvoiceId: vi.fn(() => "invoice-id"),
@@ -60,7 +74,7 @@ vi.mock("@/lib/invoices-store", () => ({
 import { POST } from "./route";
 import { createProposalToken } from "@/lib/proposal-token";
 import { updateQuoteWith } from "@/lib/quotes-store";
-import { createContract } from "@/lib/contracts-store";
+import { createContract, createContractIfAbsent } from "@/lib/contracts-store";
 import { createInvoice } from "@/lib/invoices-store";
 
 /** The consent payload the accept path now requires (terms + signer name). */
@@ -173,6 +187,23 @@ describe("POST /api/proposta", () => {
     );
     expect(res.status).toBe(200);
     expect(createContract).not.toHaveBeenCalled();
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("a concurrent accept that loses the contract-creation race issues no 2nd contract/sinal (TOCTOU #40)", async () => {
+    seedProposal("p8");
+    // Corrida: ambos os aceites passaram o getContractByProposal (nenhum via
+    // contrato), mas o índice único deixou só o OUTRO vencer o insert — o nosso
+    // helper reporta created:false. Não podemos então emitir um 2.º sinal.
+    vi.mocked(createContractIfAbsent).mockResolvedValueOnce({
+      created: false,
+      contract: { id: "winner", proposalId: "p8", status: "aceite" },
+    });
+    const res = await POST(
+      postReq({ token: createProposalToken("p8"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    // Proposta na mesma marcada aceite, mas sem sinal duplicado.
     expect(createInvoice).not.toHaveBeenCalled();
   });
 
