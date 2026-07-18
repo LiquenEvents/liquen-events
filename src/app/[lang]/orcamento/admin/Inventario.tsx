@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { PropItem } from "@/lib/inventory-store";
-import { PROP_CATEGORIES } from "@/lib/inventory-store";
+import type { PropItem } from "@/lib/inventory-types";
+import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
 

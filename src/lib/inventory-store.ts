@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { createRepository, type Mapper } from "./repository";
+import type { PropItem } from "./inventory-types";
 
 /**
  * Decor prop / material inventory for the studio back office.
@@ -9,31 +10,13 @@ import { createRepository, type Mapper } from "./repository";
  * textiles, furniture…) with quantity, condition and where each lives. Persisted
  * through the shared Repository — Supabase table `inventory_items` when
  * configured, else a dev JSON file. `updatedAt` is server-managed (touch).
+ *
+ * The `PropItem` type and `PROP_CATEGORIES` list live in the client-safe
+ * `inventory-types` module (re-exported here for convenience) so client
+ * components can use them without importing this server-only store.
  */
-export interface PropItem {
-  id: string;
-  name: string;
-  category: string;
-  quantity: number;
-  unit?: string;
-  condition: "novo" | "bom" | "usado" | "danificado";
-  location?: string;
-  notes?: string;
-  updatedAt: string;
-}
-
-/** Decor-relevant categories (European Portuguese, AO90). */
-export const PROP_CATEGORIES: string[] = [
-  "Vasos e Jarras",
-  "Castiçais e Velas",
-  "Têxteis",
-  "Mobiliário",
-  "Iluminação",
-  "Estruturas e Arcos",
-  "Loiça e Copos",
-  "Sinalética",
-  "Outro",
-];
+export type { PropCondition, PropItem } from "./inventory-types";
+export { PROP_CATEGORIES } from "./inventory-types";
 
 export const mapper: Mapper<PropItem> = {
   table: "inventory_items",
