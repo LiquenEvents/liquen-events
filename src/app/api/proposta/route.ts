@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal, updateProposal } from "@/lib/proposals-store";
 import { updateQuoteWith } from "@/lib/quotes-store";
+import { getContractByProposal, createContract, newContractId } from "@/lib/contracts-store";
+import { TERMS_VERSION, DEFAULT_TERMS, termsToPlainText } from "@/lib/contract-terms";
+import {
+  createInvoice,
+  newInvoiceId,
+  nextInvoiceNumber,
+  splitThirtySeventy,
+} from "@/lib/invoices-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
@@ -77,6 +85,14 @@ export async function POST(request: NextRequest) {
     }
 
     const accepted = action === "aceitar";
+    // Accepting is a binding commitment, so it must carry an explicit agreement
+    // to the Termos & Condições plus the name of who is accepting (the signature
+    // recorded in the contract). Declining requires neither.
+    const acceptedName = typeof body?.acceptedName === "string" ? body.acceptedName.trim() : "";
+    if (accepted && (body?.acceptedTerms !== true || !acceptedName)) {
+      return NextResponse.json({ error: "É necessário aceitar as condições." }, { status: 400 });
+    }
+
     const newStatus = accepted ? "aceite" : "rejeitada";
     const respondedAt = new Date().toISOString();
     await updateProposal(proposal.id, { status: newStatus, respondedAt });
@@ -101,6 +117,73 @@ export async function POST(request: NextRequest) {
       }));
     } catch (e) {
       log.error("proposta: atualizar pedido falhou", e, { id: proposal.quoteId });
+    }
+
+    // On acceptance, record the contract (terms agreement) and auto-emit the 30%
+    // sinal invoice into the ledger. Best-effort and fully wrapped: this must
+    // NEVER block or fail the client's confirmation — if it throws, the proposal
+    // is still accepted and the team can reconcile from the back office. Idempotent
+    // via the per-proposal contract: a second accept (or a retry) neither
+    // duplicates the contract nor the invoice.
+    if (accepted) {
+      try {
+        const existing = await getContractByProposal(proposal.id);
+        if (!existing) {
+          await createContract({
+            id: newContractId(),
+            quoteId: proposal.quoteId,
+            proposalId: proposal.id,
+            clientName: proposal.clientName,
+            clientEmail: proposal.clientEmail,
+            termsVersion: TERMS_VERSION,
+            termsSnapshot: termsToPlainText(DEFAULT_TERMS),
+            status: "aceite",
+            createdAt: respondedAt,
+            acceptedAt: respondedAt,
+            acceptedName,
+            acceptedIp: clientIp(request),
+          });
+
+          // 30% sinal — confirms the reservation of the date.
+          const { sinal } = splitThirtySeventy(proposal.total);
+          const invoiceNumber = await nextInvoiceNumber();
+          await createInvoice({
+            id: newInvoiceId(),
+            number: invoiceNumber,
+            quoteId: proposal.quoteId,
+            clientName: proposal.clientName,
+            clientEmail: proposal.clientEmail,
+            kind: "sinal",
+            amount: sinal,
+            vatRate: 0.23,
+            issuedAt: new Date().toISOString().slice(0, 10),
+            status: "emitida",
+            note: "Sinal 30% — reserva de data (aceitação da proposta)",
+          });
+
+          // Leave a trace in the quote's audit trail (separate from the client's
+          // status_change entry above) so the team sees the contract + invoice.
+          try {
+            const entry = {
+              id: randomBytes(4).toString("hex"),
+              at: respondedAt,
+              kind: "note_added" as const,
+              actor: acceptedName,
+              summary: `Termos aceites (v${TERMS_VERSION}) · fatura de sinal ${invoiceNumber} emitida (${eur(sinal)})`,
+            };
+            await updateQuoteWith(proposal.quoteId, (quote) => ({
+              ...quote,
+              activityLog: [...(quote.activityLog ?? []), entry],
+            }));
+          } catch (e) {
+            log.error("proposta: registo de atividade do contrato falhou", e, {
+              id: proposal.quoteId,
+            });
+          }
+        }
+      } catch (e) {
+        log.error("proposta: contrato/fatura de sinal falhou", e, { id: proposal.id });
+      }
     }
 
     // Notify the team (best-effort — never block the client's confirmation).

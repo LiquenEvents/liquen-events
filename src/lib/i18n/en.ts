@@ -658,6 +658,13 @@ export const en: Dict = {
       errorSuffix: "Alternatively,",
       errorLink: "email us",
     },
+    terms: {
+      toggle: "Read the Terms & Conditions",
+      checkboxLabel: "I have read and accept the Terms & Conditions",
+      nameLabel: "Name of who is accepting",
+      namePlaceholder: "Your full name",
+      missing: "To accept, please confirm the terms and enter your name.",
+    },
   },
 
   errors: {

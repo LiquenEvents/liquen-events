@@ -37,10 +37,34 @@ vi.mock("@/lib/rate-limit", () => ({
   clientIp: () => "test-ip",
   sweep: () => {},
 }));
+// Isolate from the (server-only) contract + invoice stores so accepting doesn't
+// touch the repository/filesystem. `getContractByProposal` defaults to null so
+// the accept path creates a fresh contract + sinal invoice; the idempotency test
+// overrides it to return an existing one.
+const contractsDb = vi.hoisted(() => ({ existing: null as Record<string, unknown> | null }));
+vi.mock("@/lib/contracts-store", () => ({
+  getContractByProposal: vi.fn(async () => contractsDb.existing),
+  createContract: vi.fn(async (c: Record<string, unknown>) => c),
+  newContractId: vi.fn(() => "contract-id"),
+}));
+vi.mock("@/lib/invoices-store", () => ({
+  createInvoice: vi.fn(async (i: Record<string, unknown>) => i),
+  newInvoiceId: vi.fn(() => "invoice-id"),
+  nextInvoiceNumber: vi.fn(async () => "FT 2026/0001"),
+  splitThirtySeventy: (total: number) => ({
+    sinal: Math.round(total * 0.3 * 100) / 100,
+    saldo: Math.round(total * 0.7 * 100) / 100,
+  }),
+}));
 
 import { POST } from "./route";
 import { createProposalToken } from "@/lib/proposal-token";
 import { updateQuoteWith } from "@/lib/quotes-store";
+import { createContract } from "@/lib/contracts-store";
+import { createInvoice } from "@/lib/invoices-store";
+
+/** The consent payload the accept path now requires (terms + signer name). */
+const CONSENT = { acceptedTerms: true, acceptedName: "Cliente Teste" };
 
 function postReq(body: unknown): NextRequest {
   return new Request("https://liquen.test/api/proposta", {
@@ -66,6 +90,7 @@ beforeEach(() => {
   process.env.SESSION_SECRET = "integration-test-secret-1234567890";
   proposalsDb.store.clear();
   quotesDb.store.clear();
+  contractsDb.existing = null;
   vi.clearAllMocks();
 });
 
@@ -89,9 +114,27 @@ describe("POST /api/proposta", () => {
     expect(res.status).toBe(404);
   });
 
-  it("accepts a proposal: marks it aceite and advances the quote", async () => {
+  it("rejects acceptance without terms consent (or signer name) with 400", async () => {
+    seedProposal("p3a");
+    // Missing acceptedTerms/acceptedName entirely.
+    const bare = await POST(postReq({ token: createProposalToken("p3a"), action: "aceitar" }));
+    expect(bare.status).toBe(400);
+    // Terms ticked but no name.
+    const noName = await POST(
+      postReq({ token: createProposalToken("p3a"), action: "aceitar", acceptedTerms: true }),
+    );
+    expect(noName.status).toBe(400);
+    // Nothing was mutated.
+    expect(proposalsDb.store.get("p3a")?.status).toBe("enviada");
+    expect(updateQuoteWith).not.toHaveBeenCalled();
+    expect(createContract).not.toHaveBeenCalled();
+  });
+
+  it("accepts a proposal: marks it aceite, advances the quote, records a contract + 30% sinal invoice", async () => {
     seedProposal("p3");
-    const res = await POST(postReq({ token: createProposalToken("p3"), action: "aceitar" }));
+    const res = await POST(
+      postReq({ token: createProposalToken("p3"), action: "aceitar", ...CONSENT }),
+    );
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toMatchObject({ ok: true, status: "aceite" });
@@ -100,10 +143,37 @@ describe("POST /api/proposta", () => {
     // Quote advances AND the client's decision lands in the activity log
     // (via updateQuoteWith, so a concurrent back-office edit can't drop it).
     expect(updateQuoteWith).toHaveBeenCalledWith("q-p3", expect.any(Function));
+    // Two audit entries land: the client's decision, then the contract/sinal note.
     expect(quotesDb.store.get("q-p3")).toMatchObject({
       status: "aceite",
-      activityLog: [expect.objectContaining({ kind: "status_change", actor: "Cliente Teste" })],
+      activityLog: expect.arrayContaining([
+        expect.objectContaining({ kind: "status_change", actor: "Cliente Teste" }),
+        expect.objectContaining({ kind: "note_added" }),
+      ]),
     });
+    // A signed contract is recorded (name + terms version snapshot)…
+    expect(createContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        proposalId: "p3",
+        status: "aceite",
+        acceptedName: "Cliente Teste",
+      }),
+    );
+    // …and the 30% sinal invoice is auto-issued into the ledger (12500 × 0.3).
+    expect(createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "sinal", amount: 3750 }),
+    );
+  });
+
+  it("does not duplicate the contract/invoice when one already exists for the proposal", async () => {
+    seedProposal("p3b");
+    contractsDb.existing = { id: "existing", proposalId: "p3b", status: "aceite" };
+    const res = await POST(
+      postReq({ token: createProposalToken("p3b"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(createContract).not.toHaveBeenCalled();
+    expect(createInvoice).not.toHaveBeenCalled();
   });
 
   it("declines a proposal: marks it rejeitada and the quote rejeitado", async () => {

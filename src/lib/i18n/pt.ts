@@ -670,6 +670,13 @@ export const pt = {
       errorSuffix: "Em alternativa,",
       errorLink: "escreva-nos",
     },
+    terms: {
+      toggle: "Ler os Termos e Condições",
+      checkboxLabel: "Li e aceito os Termos e Condições",
+      nameLabel: "Nome de quem aceita",
+      namePlaceholder: "O seu nome completo",
+      missing: "Para aceitar, confirme os termos e indique o seu nome.",
+    },
   },
 
   errors: {

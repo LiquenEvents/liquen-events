@@ -153,6 +153,27 @@ create table if not exists public.inventory_items (
 
 create index if not exists inventory_category_idx on public.inventory_items (category);
 
+-- ── Contratos / aceitação de Termos & Condições ─────────────────
+-- Registo, por proposta, da aceitação das condições pelo cliente ao confirmar
+-- a proposta no link público: quem aceitou, quando, de que IP, a versão dos
+-- termos e um snapshot imutável do texto acordado (prova/auditoria).
+create table if not exists public.contracts (
+  id             text primary key,
+  quote_id       text,
+  proposal_id    text,
+  client_name    text,
+  client_email   text,
+  terms_version  text,
+  terms_snapshot text,
+  status         text not null default 'pendente',  -- pendente | aceite
+  created_at     timestamptz not null default now(),
+  accepted_at    timestamptz,
+  accepted_name  text,
+  accepted_ip    text
+);
+
+create index if not exists contracts_proposal_id_idx on public.contracts (proposal_id);
+
 -- ── Restrições de integridade (CHECK) ───────────────────────────
 -- Garantem, na própria base de dados, que os campos de estado/tipo só
 -- aceitam os valores que a aplicação conhece e que os montantes não são
@@ -205,6 +226,11 @@ do $$ begin
     alter table public.inventory_items add constraint inventory_condition_chk
       check (condition in ('novo','bom','usado','danificado')) not valid;
   end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'contracts_status_chk') then
+    alter table public.contracts add constraint contracts_status_chk
+      check (status in ('pendente','aceite')) not valid;
+  end if;
 end $$;
 
 -- ── Segurança ───────────────────────────────────────────────────
@@ -220,3 +246,4 @@ alter table public.app_state enable row level security;
 alter table public.email_templates enable row level security;
 alter table public.invoices    enable row level security;
 alter table public.inventory_items enable row level security;
+alter table public.contracts enable row level security;
