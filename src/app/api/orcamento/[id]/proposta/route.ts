@@ -133,6 +133,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       </p>
     </div>`;
 
+    // Plain-text alternative for the same email. A multipart/alternative message
+    // (html + text) is less likely to be flagged by spam filters and is readable
+    // by text-only / screen-reader mail clients — the two highest-value emails
+    // (this proposal + the receipt) were HTML-only. Raw values here (no esc):
+    // escaping is an HTML concern; plain text takes them verbatim.
+    const clientText = [
+      "A sua proposta — Líquen Events",
+      "",
+      `Olá ${quote.name},`,
+      "",
+      `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eur(total)} (IVA incluído).`,
+      proposal.validUntil
+        ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
+        : "",
+      "",
+      `Ver e responder à proposta online: ${acceptUrl}`,
+      "",
+      "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
+      "",
+      `Líquen Events · ${MAIL_TO} · ${SITE.phoneDisplay}`,
+    ]
+      .filter((line) => line !== "")
+      .join("\n");
+
     // Persist the proposal BEFORE emailing. The email carries a signed accept
     // link; sending it before the proposal exists means that link 404s the moment
     // the client clicks "accept". A persistence failure here is fatal — we do not
@@ -152,6 +176,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       replyTo: MAIL_TO,
       subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
       html: clientHtml,
+      text: clientText,
       attachments: [
         {
           filename: `Proposta-Liquen-${id}.pdf`,

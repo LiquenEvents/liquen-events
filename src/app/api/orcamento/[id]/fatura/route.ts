@@ -71,11 +71,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo o recibo no valor de <strong style="color:#7c854b">${eur(amount)}</strong>.</p>
         <p style="font-size:13px;color:#777;margin-top:20px">Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}</p>
       </div>`;
+      // Plain-text alternative (multipart/alternative): better spam-filter
+      // standing and readable by text-only / screen-reader mail clients.
+      const text = [
+        "Recibo — Líquen Events",
+        "",
+        `Olá ${quote.name},`,
+        "",
+        `Segue em anexo o recibo no valor de ${eur(amount)}.`,
+        "",
+        `Líquen Events · ${MAIL_TO} · ${SITE.phoneDisplay}`,
+      ].join("\n");
       const mail = await sendMail({
         to: quote.email,
         replyTo: MAIL_TO,
         subject: `Recibo ${number} — Líquen Events`,
         html,
+        text,
         attachments: [
           {
             filename: `Recibo-${number.replace(/\//g, "-")}.pdf`,
