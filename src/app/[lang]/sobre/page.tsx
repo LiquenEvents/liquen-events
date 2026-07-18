@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
-import KineticHeading from "@/components/KineticHeading";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
-import Magnetic from "@/components/motion/Magnetic";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -25,53 +26,62 @@ export async function generateMetadata({
     title: t.meta.sobreTitle,
     description: t.meta.sobreDescription,
     path: "/sobre",
-    image: "/imagens/M&F0497.jpg",
+    // Landscape (2560×1707) — the page's own hero. The previous OG image was a
+    // portrait crop, which social platforms render as a broken sliver.
+    image: "/imagens/hd-edited.jpg",
     keywords: ["decoração de eventos Alentejo", "sobre Líquen Events"],
     ogLocale: t.meta.ogLocale,
   });
 }
 
-const gallery = [
-  {
-    src: "/imagens/J&A-68.jpg",
-    cls: "col-span-2 row-span-2",
-    alt: "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
-  },
-  {
-    src: "/imagens/matilde-e-tomas0654-1.jpg",
-    cls: "col-span-2",
-    alt: "Festa de casamento sob luzes suspensas ao anoitecer",
-  },
-  {
-    src: "/imagens/DaniGui_Adois_61.jpg",
-    cls: "col-span-1",
-    alt: "Noivos abraçados durante a celebração do casamento",
-  },
-  {
-    src: "/imagens/stephanie-mizio-350.jpg",
-    cls: "col-span-1",
-    alt: "Mesa posta de casamento com flores e velas",
-  },
-  {
-    src: "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-    cls: "col-span-2",
-    alt: "Casamento ao entardecer ao ar livre no Alentejo",
-  },
-  {
-    src: "/imagens/ines-goncalo-252.jpg",
-    cls: "col-span-2",
-    alt: "Decoração floral de cerimónia de casamento no Alentejo",
-  },
+// The editorial wall draws a fresh 6 from this pool on every entry to the page
+// (see RotatingPhotoGrid). All landscape event frames, so they read well in
+// either a wide or a narrow cell.
+const GRID_POOL = [
+  "/imagens/J&A-68.jpg",
+  "/imagens/matilde-e-tomas0654-1.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+  "/imagens/ines-goncalo-252.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/teresinhaeze-909.jpg",
+  "/imagens/EW1_1330.jpg",
+  "/imagens/J&P-IMGL4769.jpg",
+  "/imagens/hd-edited.jpg",
+  "/imagens/EW1_1408.jpg",
+  "/imagens/20_10_2025_0407.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
 ];
 
-const eyebrowLight =
-  "text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3";
+// The grid is 2-col below `lg` and 4-col from `lg` (1024px) up, full-bleed (no
+// max-width wrapper). So a col-span-2 cell is the full row on mobile (100vw) and
+// half the row from lg (50vw); a col-span-1 cell is 50vw on mobile and 25vw from
+// lg. The old values declared 50vw for wide cells on mobile (they render 100vw,
+// so the browser under-fetched and upscaled) and switched at 768px instead of
+// the real 1024px column breakpoint.
+const WIDE_SIZES = "(max-width: 1024px) 100vw, 50vw";
+const NARROW_SIZES = "(max-width: 1024px) 50vw, 25vw";
+// Fixed cell layout (spans + the right `sizes` per cell); whichever photo lands
+// in a cell, the shape stays the same.
+const GRID_CELLS = [
+  { cls: "col-span-2 row-span-2", sizes: WIDE_SIZES },
+  { cls: "col-span-2", sizes: WIDE_SIZES },
+  { cls: "col-span-1", sizes: NARROW_SIZES },
+  { cls: "col-span-1", sizes: NARROW_SIZES },
+  { cls: "col-span-2", sizes: WIDE_SIZES },
+  { cls: "col-span-2", sizes: WIDE_SIZES },
+];
+
 const eyebrowDark =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 export default async function SobrePage({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
+  // Enrich the wall's pool with blur placeholders server-side (keeps blur-map
+  // out of the client bundle); the client picks a random 6 per visit.
+  const gridPool = GRID_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   return (
     <>
       <BreadcrumbJsonLd
@@ -81,51 +91,51 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       />
 
       {/* ── HERO ── */}
-      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
+      {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed to
+          the very top behind the transparent navbar (no white strip / hairline). */}
+      <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
-            src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
+            src="/imagens/hd-edited.jpg"
             alt={t.common.imageAlt.sobreCelebration}
             fill
             preload
             sizes="100vw"
             className="object-cover object-center hero-settle"
-            {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3204.jpg")}
+            {...blurFor("/imagens/hd-edited.jpg")}
           />
         </Parallax>
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
-        <HeroWebGL
-          src="/imagens/JOAO_E_PEDRO_1Y1A3204.jpg"
-          className="absolute inset-0 h-full w-full"
-        />
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/20 to-transparent" />
+        <HeroWebGL src="/imagens/hd-edited.jpg" className="absolute inset-0 h-full w-full" />
+        {/* SpaceX scrim: single bottom-anchored gradient so the photograph reads
+            full at the top; no heavy flat veil. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-16 lg:pb-28 pt-40">
+        {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
+            photograph owns the first screen. Still the page's single <h1>. No CTA
+            on this hero, so the understated link is omitted. */}
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
           <AnimateIn>
-            <p className={`${eyebrowLight} mb-8`}>
-              <span className="w-8 h-px bg-gold flex-shrink-0" />
-              {t.sobre.heroEyebrow}
-            </p>
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {t.sobre.heroEyebrow}
+              </p>
+              {/* SpaceX display tracking (.tracking-display, -0.02em) replaces the
+                  airy caption tracking so the caps pull together on the h1. */}
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
+                {`${t.sobre.heroTitlePre}${t.sobre.heroTitleMoss}`}
+              </h1>
+            </div>
           </AnimateIn>
-          <KineticHeading
-            className="text-white font-bold leading-[0.88] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
-            lines={[[{ text: t.sobre.heroTitlePre }, { text: t.sobre.heroTitleMoss, moss: true }]]}
-          />
-        </div>
-
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
-          <span className="text-white/60 text-[8px] tracking-[0.45em] uppercase">
-            {t.sobre.scroll}
-          </span>
-          <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
         </div>
       </section>
 
       {/* ── MANIFESTO — short statement + image ── */}
-      <section className="py-20 lg:py-32 bg-surface">
+      {/* overflow-x-clip contains the ~4px the from-left/right reveal transforms
+          and grid rounding push past the viewport edge on mobile. */}
+      <section className="py-20 lg:py-28 bg-surface overflow-x-clip">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
           <AnimateIn from="left">
             <p className={`${eyebrowDark} mb-8`}>
@@ -145,15 +155,33 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </p>
           </AnimateIn>
           <AnimateIn from="right" delay={120}>
-            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl">
+            {/* From lg the photo breaks out of the content frame and bleeds to
+                the right viewport edge (SpaceX full-bleed): the negative margin
+                cancels the container's centering slack + its 4rem padding. The
+                section's overflow-x-clip swallows the ~half-scrollbar of 100vw
+                overshoot, so nothing scrolls sideways. */}
+            <div className="relative aspect-[4/5] overflow-hidden lg:-mr-[calc((100vw_-_min(100vw,80rem))/2_+_4rem)]">
               <Image
                 src="/imagens/DaniGui_Preview12.jpg"
                 alt={t.common.imageAlt.sobrePortrait}
                 fill
-                sizes="(max-width: 1024px) 100vw, 45vw"
+                sizes="(max-width: 1024px) 100vw, 55vw"
                 className="object-cover"
                 {...blurFor("/imagens/DaniGui_Preview12.jpg")}
               />
+              {/* SpaceX chapter treatment on the full-bleed photo: a bottom-left
+                  scrim + corner caption (single gold dash + uppercase eyebrow),
+                  the same idiom as the home service chapters. */}
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/20 to-[#080808]/5"
+              />
+              <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8">
+                <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
+                  {t.sobre.manifestoImageCaption}
+                </p>
+              </div>
             </div>
           </AnimateIn>
         </div>
@@ -161,26 +189,13 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
 
       {/* ── EDITORIAL PHOTO GRID ── */}
       <section className="bg-surface">
-        <Reveal
-          as="div"
-          variant="mask"
-          stagger
-          className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[210px] lg:auto-rows-[260px]"
-        >
-          {gallery.map((g, i) => (
-            <div key={i} className={`relative overflow-hidden group ${g.cls}`}>
-              <Image
-                src={g.src}
-                alt={t.sobre.galleryAlt[i] ?? g.alt}
-                fill
-                sizes="(max-width: 768px) 50vw, 50vw"
-                className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                {...blurFor(g.src)}
-              />
-              <div className="absolute inset-0 bg-black/15 group-hover:bg-black/0 transition-colors duration-500" />
-            </div>
-          ))}
-        </Reveal>
+        <RotatingPhotoGrid
+          cells={GRID_CELLS}
+          pool={gridPool}
+          alt={t.common.imageAlt.sobreCelebration}
+          className="grid grid-cols-2 lg:grid-cols-4 gap-0 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
+          imgClassName="transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
+        />
       </section>
 
       {/* ── CINEMATIC STATEMENT ── */}
@@ -198,9 +213,15 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             {...blurFor("/imagens/M&F0497.jpg")}
           />
         </Parallax>
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-[#080808]/50" />
-        <div className="relative z-10 h-full flex items-center">
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
+          }}
+        />
+        <div className="text-veil-shadow relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
             <p
               className="text-cream font-bold leading-[1.12] max-w-4xl"
@@ -210,7 +231,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               <TitleReveal
                 text={t.sobre.statementRest}
                 as="span"
-                className="text-cream/40"
+                className="text-cream/70"
                 step={50}
                 delay={t.sobre.statementLead.split(/\s+/).length * 50 + 80}
               />
@@ -222,16 +243,32 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       {/* ── FOUNDER ── */}
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="relative flex items-center justify-center px-6 py-14 lg:py-0 min-h-[440px] lg:min-h-[560px]">
-            <div className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden rounded-2xl shadow-2xl shadow-black/25 ring-1 ring-foreground/5">
+          <div className="relative overflow-hidden min-h-[460px] lg:min-h-[620px]">
+            {/* Founder portrait as a full-bleed chapter panel (fills its column,
+                bleeding to the section edge) instead of a small centred frame —
+                uncovered with the same cinematic mask-wipe used on the editorial
+                grids, so it arrives instead of just being there. */}
+            <Reveal as="div" variant="mask" className="absolute inset-0">
               <Image
                 src="/imagens/catarina-gaspar.jpg"
                 alt={t.common.imageAlt.sobreFounder}
                 fill
-                sizes="(max-width: 1024px) 80vw, 340px"
-                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover object-center"
                 {...blurFor("/imagens/catarina-gaspar.jpg")}
               />
+            </Reveal>
+            {/* Chapter scrim + bottom-left caption (gold dash + uppercase
+                eyebrow), matching the manifesto and home service chapters. */}
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-t from-[#080808]/80 via-[#080808]/15 to-transparent"
+            />
+            <div className="absolute inset-x-0 bottom-0 p-6 lg:p-10">
+              <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
+                <span className="w-8 h-px bg-gold flex-shrink-0" />
+                {t.sobre.founderRole}
+              </p>
             </div>
           </div>
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
@@ -240,12 +277,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
                 {t.sobre.founderEyebrow}
               </p>
-              <span
-                className="block text-moss/25 text-6xl font-bold leading-none mb-6"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
-                &ldquo;
-              </span>
               <p
                 className="text-foreground/78 leading-[1.5]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3vw, 38px)" }}
@@ -274,15 +305,20 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           className="object-cover object-center"
           {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
         />
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-transparent to-[#080808]/50" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
+          }}
+        />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.sobre.ctaEyebrow}
-              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"
@@ -294,19 +330,23 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/60 text-base leading-relaxed max-w-md mb-12">
+            <p className="text-white/70 text-base leading-relaxed max-w-md mb-12">
               {t.sobre.ctaText}
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <Magnetic strength={0.4}>
-              <Link
-                href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <TrackedLink
+                href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "sobre" }}
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
-                {t.common.entrarContacto} →
+                {t.common.pedirOrcamento} →
+              </TrackedLink>
+              <Link href={localizeHref("/contacto", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
+                {t.common.entrarContacto}
               </Link>
-            </Magnetic>
+            </div>
           </AnimateIn>
         </div>
       </section>

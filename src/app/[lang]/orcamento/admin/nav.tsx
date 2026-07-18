@@ -15,7 +15,12 @@ export type View =
   | "propostas"
   | "tarefas"
   | "fornecedores"
+  | "inventario"
+  | "seguimentos"
   | "estatisticas"
+  | "faturas"
+  | "contratos"
+  | "modelos-email"
   | "inbox";
 
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
@@ -164,6 +169,40 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     ),
   },
   {
+    id: "inventario",
+    label: "Inventário",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M3 8l9-5 9 5v8l-9 5-9-5V8z" strokeLinejoin="round" />
+        <path d="M3 8l9 5 9-5M12 13v8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "seguimentos",
+    label: "Seguimentos",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M12 7v5l3 2" strokeLinecap="round" />
+        <circle cx="12" cy="12" r="9" />
+      </svg>
+    ),
+  },
+  {
     id: "estatisticas",
     label: "Estatísticas",
     icon: (
@@ -177,6 +216,58 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M3 3v18h18" strokeLinecap="round" />
         <path d="M7 14l3-4 3 3 4-6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "faturas",
+    label: "Faturas",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M6 2h9l4 4v16l-3-1.5L13 22l-3-1.5L7 22l-1-1V2z" />
+        <path d="M9 8h6M9 12h6M9 16h3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "contratos",
+    label: "Contratos",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="m9 14 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "modelos-email",
+    label: "Modelos de email",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 8l9 5 9-5M8 14h4" strokeLinecap="round" />
       </svg>
     ),
   },

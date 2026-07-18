@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useFocusTrap } from "./useFocusTrap";
 
 interface Props {
   open: boolean;
@@ -45,6 +46,8 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
 
 /** A discoverable cheat-sheet for the back-office keyboard shortcuts (opens with "?"). */
 export default function ShortcutsModal({ open, onClose }: Props) {
+  // Trap Tab within the dialog + restore focus to the trigger on close.
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -60,6 +63,7 @@ export default function ShortcutsModal({ open, onClose }: Props) {
     <div className="fixed inset-0 z-[90] flex items-center justify-center px-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Atalhos de teclado"

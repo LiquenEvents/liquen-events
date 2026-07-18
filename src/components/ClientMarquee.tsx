@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { clientLogos } from "@/data";
 import { logoHeight, logoDimsFor } from "@/lib/logo";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { useTranslations } from "./LocaleProvider";
 
 /**
@@ -46,6 +47,11 @@ function Mark({
         alt={duplicate ? "" : name}
         width={d[0]}
         height={d[1]}
+        // Without `sizes`, next/image builds a 1x/2x srcset off the raw source
+        // width and serves a ~640–1280px file for a logo rendered ≤170px wide.
+        // Declaring the CSS cap switches it to a viewport/DPR-aware srcset that
+        // picks a correctly-small candidate — same pixels, far fewer bytes.
+        sizes="(max-width: 640px) 140px, 170px"
         style={{ height: `${h}px` }}
         className="w-auto max-w-[140px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
         onError={() => setFailed(true)}
@@ -56,13 +62,35 @@ function Mark({
 
 export default function ClientMarquee() {
   const { t } = useTranslations();
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Pause the infinite scroll while the band is off-screen — no point
+  // compositing a wide moving strip the user can't see (battery / GPU).
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    // Under prefers-reduced-motion the marquee animation is already `none`
+    // (globals.css), so there's nothing to pause — skip the observer entirely
+    // rather than run it to toggle a class that does nothing.
+    if (prefersReducedMotion()) return;
+    const io = new IntersectionObserver(
+      ([e]) => el.classList.toggle("marquee-paused", !e.isIntersecting),
+      { rootMargin: "150px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <div className="relative py-7 border-y border-foreground/8 overflow-hidden">
       {/* sr-only heading so heading-navigation users find the client band. */}
       <h2 className="sr-only">{t.nav.clientes}</h2>
       <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
       <div className="absolute inset-y-0 right-0 w-16 sm:w-24 bg-gradient-to-l from-surface to-transparent z-10 pointer-events-none" />
-      <div className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap">
+      <div
+        ref={trackRef}
+        className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap"
+      >
         {[...clientLogos, ...clientLogos].map((c, i) => (
           <Mark key={i} name={c.name} logo={c.logo} duplicate={i >= clientLogos.length} />
         ))}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
+import { useFocusTrap } from "./useFocusTrap";
 
 export interface Command {
   id: string;
@@ -42,6 +43,8 @@ export default function CommandPalette({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Trap Tab within the dialog + restore focus to the trigger on close.
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
 
   useEffect(() => {
     if (open) {
@@ -136,6 +139,7 @@ export default function CommandPalette({
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Pesquisar e navegar"

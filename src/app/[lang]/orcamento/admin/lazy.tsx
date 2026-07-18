@@ -31,15 +31,24 @@ export const Tarefas = dynamic(() => import("./Tarefas"), { loading: ViewLoading
 export const Fornecedores = dynamic(() => import("./Fornecedores"), { loading: ViewLoading });
 export const StatsDashboard = dynamic(() => import("./StatsDashboard"), { loading: ViewLoading });
 export const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
+export const EmailTemplates = dynamic(() => import("./EmailTemplates"), { loading: ViewLoading });
+export const Faturas = dynamic(() => import("./Faturas"), { loading: ViewLoading });
+export const Contratos = dynamic(() => import("./Contratos"), { loading: ViewLoading });
+export const Inventario = dynamic(() => import("./Inventario"), { loading: ViewLoading });
+export const Seguimentos = dynamic(() => import("./FollowUps"), { loading: ViewLoading });
 
 // ── Detail-panel tools (only needed once a quote is opened) ──
 export const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), {
+  loading: PanelLoading,
+});
+export const ProposalStudio = dynamic(() => import("./ProposalStudio"), {
   loading: PanelLoading,
 });
 export const ClientMessenger = dynamic(() => import("./ClientMessenger"), {
   loading: PanelLoading,
 });
 export const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
+export const ProductionPlan = dynamic(() => import("./ProductionPlan"), { loading: PanelLoading });
 export const EventTimeline = dynamic(() => import("./EventTimeline"), { loading: PanelLoading });
 export const PaymentsPanel = dynamic(() => import("./PaymentsPanel"), { loading: PanelLoading });
 export const EventCosts = dynamic(() => import("./EventCosts"), { loading: PanelLoading });

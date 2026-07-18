@@ -1,7 +1,17 @@
+import "server-only";
 import { promises as fs } from "fs";
 import path from "path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "./supabase";
+import { log } from "./logger";
+
+// NOTE: `list()` is intentionally UNBOUNDED by default. A blanket row cap was
+// tried but reverted: consumers like the "full backup" export, the admin stats
+// pipeline, and the daily digest expect the COMPLETE table, and an ascending-
+// ordered table (the calendar) would drop the most-recent/upcoming rows first —
+// both are silent data loss the operator can't see. A cap only makes sense with
+// real pagination. A per-entity `Mapper.listLimit` opt-in remains for a future
+// bounded/paginated reader; when set, hitting it logs a warning (never silent).
 
 /**
  * Unified data-access layer.
@@ -34,6 +44,8 @@ export interface Mapper<T> {
   selectColumns?: string;
   /** Default ordering applied to lists. */
   order?: { column: string; ascending: boolean };
+  /** Upper bound on an unpaginated `list()` read (defaults to DEFAULT_LIST_LIMIT). */
+  listLimit?: number;
   /** Comparator mirroring `order` for the file backend. */
   fileCompare?: (a: T, b: T) => number;
   /** Set updated_at on Supabase updates (table must have the column). */
@@ -90,13 +102,23 @@ export class SupabaseBackend<T> implements Backend<T> {
   private map = (r: unknown) => this.m.fromRow(r as Record<string, unknown>);
 
   async list(): Promise<T[]> {
+    const limit = this.m.listLimit; // undefined ⇒ fetch everything (no cap)
     const base = this.sb.from(this.m.table).select(this.cols);
-    const q = this.m.order
+    const ordered = this.m.order
       ? base.order(this.m.order.column, { ascending: this.m.order.ascending })
       : base;
-    const { data, error } = await q;
+    const { data, error } = await (limit != null ? ordered.limit(limit) : ordered);
     if (error) throw error;
-    return (data ?? []).map(this.map);
+    const rows = data ?? [];
+    // Only an EXPLICIT opt-in limit can truncate — and never silently: a full
+    // page is the signal that real pagination is needed.
+    if (limit != null && rows.length >= limit) {
+      log.warn("list() hit the configured row cap — results may be truncated", {
+        table: this.m.table,
+        limit,
+      });
+    }
+    return rows.map(this.map);
   }
 
   async get(id: string): Promise<T | null> {
@@ -194,6 +216,23 @@ export class FileBackend<T> implements Backend<T> {
     await fs.writeFile(this.file, JSON.stringify(rows, null, 2));
   }
 
+  // The file backend is a DEV fallback only. In production it means Supabase is
+  // unconfigured (env.ts already flags this critical) — so a write would land in
+  // an ephemeral file that vanishes on the next deploy, i.e. silent data loss
+  // reported to the caller as success. Refuse the write loudly instead: the POST
+  // route then treats the lead as un-persisted and falls back to email + an
+  // honest error, and the miss reaches alerting via log.error. Reads still work.
+  private assertWritableInProd(): void {
+    if (process.env.NODE_ENV === "production") {
+      log.error(
+        "repository: gravação recusada — Supabase não configurado em produção; o fallback para ficheiro é volátil. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.",
+        undefined,
+        { file: this.m.fileName },
+      );
+      throw new Error("Persistence unavailable: Supabase not configured in production");
+    }
+  }
+
   async list(): Promise<T[]> {
     const all = await this.read();
     return this.m.fileCompare ? [...all].sort(this.m.fileCompare) : all;
@@ -209,6 +248,7 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async insert(entity: T): Promise<void> {
+    this.assertWritableInProd();
     return this.serialize(async () => {
       const all = await this.read();
       all.push(entity);
@@ -217,6 +257,7 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async persist(id: string, merged: T): Promise<void> {
+    this.assertWritableInProd();
     return this.serialize(async () => {
       const all = await this.read();
       const idx = all.findIndex((e) => this.m.getId(e) === id);
@@ -227,6 +268,7 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async remove(id: string): Promise<void> {
+    this.assertWritableInProd();
     return this.serialize(async () => {
       const all = await this.read();
       await this.write(all.filter((e) => this.m.getId(e) !== id));

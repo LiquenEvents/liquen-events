@@ -67,6 +67,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "quotedPrice",
     "adminNotes",
     "checklist",
+    "productionPlan",
     "payments",
     "timeline",
     "eventSuppliers",

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { createProposalToken, readProposalToken } from "./proposal-token";
+import { createSession } from "./admin-auth";
 
 // proposal-token reads the signing secret lazily from the environment, so keep
 // each test hermetic by controlling SESSION_SECRET.
@@ -84,5 +85,39 @@ describe("proposal-token — signed accept links", () => {
     expect(a).not.toEqual(b);
     expect(readProposalToken(a)).toEqual({ proposalId: "prop-A" });
     expect(readProposalToken(b)).toEqual({ proposalId: "prop-B" });
+  });
+
+  // Domain separation: an admin session token must NOT read as a proposal token
+  // (the session signs with a derived key AND declares typ:"session").
+  it("does not accept an admin session token as a proposal link", () => {
+    const session = createSession("Catarina");
+    expect(readProposalToken(session)).toBeNull();
+  });
+
+  it("rejects a validly-signed token that declares a non-proposal type", () => {
+    expect(
+      readProposalToken(forge({ typ: "session", pid: "prop-1", exp: Date.now() + 1e9 })),
+    ).toBeNull();
+  });
+
+  // Backward compatibility: accept links minted before the typ claim existed
+  // (payload had only { pid, exp }) must keep validating for their 14-day life.
+  it("still accepts a legacy token that carries no type claim", () => {
+    expect(readProposalToken(forge({ pid: "prop-legacy", exp: Date.now() + 1e9 }))).toEqual({
+      proposalId: "prop-legacy",
+    });
+  });
+});
+
+describe("quoteIdFor — idempotency id", () => {
+  it("is deterministic for the same submission id", async () => {
+    const { quoteIdFor } = await import("./quotes-store");
+    expect(quoteIdFor("sub-abc")).toBe(quoteIdFor("sub-abc"));
+  });
+
+  it("differs across submission ids and looks like a quote reference", async () => {
+    const { quoteIdFor } = await import("./quotes-store");
+    expect(quoteIdFor("sub-abc")).not.toBe(quoteIdFor("sub-xyz"));
+    expect(quoteIdFor("sub-abc")).toMatch(/^LIQ-[0-9A-F]{6}-[0-9A-F]{16}$/);
   });
 });

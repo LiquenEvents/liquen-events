@@ -198,7 +198,14 @@ export interface Quote extends QuoteFormData {
   adminNotes?: string;
   lastUpdated?: string;
   messages?: QuoteMessage[];
+  /** Event/logistics checklist (EventChecklist) — geral do evento, gerado a
+      partir de `checklistTemplate`. NÃO confundir com `productionPlan`. */
   checklist?: ChecklistItem[];
+  /** Plano de produção decor (ProductionPlan) — fases de atelier do sourcing ao
+      strike, cada item prefixado com a fase. Campo próprio para não colidir com
+      `checklist`: os dois painéis vivem lado a lado no separador Produção e
+      partilhar o mesmo campo levava a perda de dados. */
+  productionPlan?: ChecklistItem[];
   payments?: Payment[];
   timeline?: TimelineItem[];
   eventSuppliers?: EventSupplier[];
@@ -276,4 +283,8 @@ export interface Proposal {
   sentAt?: string;
   /** When the client accepted/declined via the public link. */
   respondedAt?: string;
+  /** Rich multi-page proposal document (Proposal Studio). Stored so the studio
+   *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
+   *  not bytes. Optional — legacy line-item proposals don't set it. */
+  doc?: import("@/lib/proposal-doc").ProposalDoc;
 }

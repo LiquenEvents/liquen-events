@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
 interface Props {
   children: React.ReactNode;
@@ -10,63 +11,106 @@ interface Props {
   from?: "bottom" | "left" | "right" | "fade" | "clip";
 }
 
+const TRANSFORMS: Record<string, string> = {
+  bottom: "translateY(28px)",
+  left: "translateX(-28px)",
+  right: "translateX(28px)",
+  fade: "none",
+  clip: "translateY(16px)",
+};
+
+// AnimateIn is rendered dozens of times per page. Instead of each instance
+// spinning up its OWN IntersectionObserver, they all share a SINGLE module-level
+// observer. Each element registers a one-shot reveal callback in a WeakMap; when
+// the shared observer reports the element intersecting, it fires that callback
+// once and stops watching the element. N reveals therefore cost one observer, not
+// N — with byte-for-byte the same threshold / rootMargin, so the reveal geometry
+// is identical to the previous per-instance observers.
+type RevealCallback = () => void;
+
+let sharedObserver: IntersectionObserver | null = null;
+const revealCallbacks = new WeakMap<Element, RevealCallback>();
+
+function getSharedObserver(): IntersectionObserver {
+  if (sharedObserver) return sharedObserver;
+  sharedObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const cb = revealCallbacks.get(entry.target);
+        if (cb) {
+          // Fire once, then stop watching this element (mirrors the original
+          // per-instance `observer.disconnect()` after the first intersection).
+          revealCallbacks.delete(entry.target);
+          sharedObserver!.unobserve(entry.target);
+          cb();
+        }
+      }
+    },
+    { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+  );
+  return sharedObserver;
+}
+
+function observeReveal(el: Element, cb: RevealCallback) {
+  revealCallbacks.set(el, cb);
+  getSharedObserver().observe(el);
+}
+
+function unobserveReveal(el: Element) {
+  if (!revealCallbacks.has(el)) return;
+  revealCallbacks.delete(el);
+  sharedObserver?.unobserve(el);
+}
+
 export default function AnimateIn({ children, className = "", delay = 0, from = "bottom" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  // Start VISIBLE so the server HTML — and anyone whose JS fails or is disabled —
-  // always sees the content (previously the SSR markup was opacity:0, leaving it
-  // permanently invisible without JS). The layout effect re-hides it before the
-  // first paint to play the scroll reveal, so there's no flash.
-  const [visible, setVisible] = useState(true);
 
+  // Hide/reveal by writing inline styles DIRECTLY on the node — no React state,
+  // so a page with dozens of instances doesn't run N synchronous re-renders in
+  // the pre-paint commit (which is exactly the work a View-Transition arrival
+  // waits on, and read as "stutter"). Mirrors motion/Reveal. SSR renders the
+  // element in its natural visible state, so no-JS / reduced-motion visitors
+  // always see the content; the pre-paint layout effect re-hides it, so there's
+  // no flash.
   useIsomorphicLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Reduced motion (and no IntersectionObserver): leave it visible, no reveal.
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    setVisible(false); // hide synchronously, before paint
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    if (prefersReducedMotion()) return; // leave visible, no reveal
 
-  const transforms: Record<string, string> = {
-    bottom: "translateY(28px)",
-    left: "translateX(-28px)",
-    right: "translateX(28px)",
-    fade: "none",
-    clip: "translateY(16px)",
-  };
+    const isClip = from === "clip";
+    const easing = `cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`;
 
-  const isClip = from === "clip";
-  const easing = `cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`;
+    // Hide synchronously, before paint.
+    if (isClip) {
+      el.style.clipPath = "inset(0 0 100% 0)";
+      el.style.transform = TRANSFORMS.clip;
+      el.style.willChange = "transform, clip-path";
+    } else {
+      el.style.opacity = "0";
+      el.style.transform = TRANSFORMS[from];
+      el.style.willChange = "opacity, transform";
+    }
+
+    const reveal = () => {
+      el.style.transition = isClip
+        ? `transform 0.75s ${easing}, clip-path 0.75s ${easing}`
+        : `opacity 0.75s ${easing}, transform 0.75s ${easing}`;
+      el.style.transform = "none";
+      if (isClip) el.style.clipPath = "inset(0 0 0% 0)";
+      else el.style.opacity = "1";
+      const done = () => {
+        el.style.willChange = ""; // drop the compositor hint once settled
+        el.removeEventListener("transitionend", done);
+      };
+      el.addEventListener("transitionend", done);
+    };
+    observeReveal(el, reveal);
+    return () => unobserveReveal(el);
+  }, [from, delay]);
 
   return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: visible ? 1 : isClip ? 1 : 0,
-        transform: visible ? "none" : transforms[from],
-        clipPath: isClip ? (visible ? "inset(0 0 0% 0)" : "inset(0 0 100% 0)") : undefined,
-        transition: isClip
-          ? `transform 0.75s ${easing}, clip-path 0.75s ${easing}`
-          : `opacity 0.75s ${easing}, transform 0.75s ${easing}`,
-        willChange: "opacity, transform",
-      }}
-      onTransitionEnd={() => {
-        if (visible && ref.current) {
-          ref.current.style.willChange = "auto";
-        }
-      }}
-    >
+    <div ref={ref} className={className}>
       {children}
     </div>
   );

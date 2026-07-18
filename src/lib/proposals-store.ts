@@ -1,3 +1,4 @@
+import "server-only";
 import type { Proposal } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
@@ -53,3 +54,7 @@ export const updateProposal = (id: string, patch: Partial<Proposal>): Promise<Pr
   repo.update(id, patch);
 export const listProposalsForQuote = (quoteId: string): Promise<Proposal[]> =>
   repo.where("quote_id", quoteId, (p) => p.quoteId === quoteId);
+/** The newest proposal for a quote (created_at descending), or null. The client
+    portal shows a quote's current proposal — the most recently created one. */
+export const getProposalByQuote = (quoteId: string): Promise<Proposal | null> =>
+  listProposalsForQuote(quoteId).then((rows) => rows[0] ?? null);

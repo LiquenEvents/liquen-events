@@ -126,12 +126,18 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     const mesh = new Mesh(gl, { geometry, program });
 
     let imgAspect = 1;
+    // Cached host height for the scroll uniform. The draw loop needs it every
+    // frame, but it only changes on resize — which the ResizeObserver below
+    // already reports via setCover — so we read `clientHeight` there (off the
+    // hot path) instead of forcing a layout read on every drawn frame.
+    let heroH = host.clientHeight || window.innerHeight;
     const setCover = () => {
       // Size from the HOST (OGL's constructor pins the canvas to its own default
       // 300×150 and rewrites canvas.style.width, so measuring the canvas would
       // dead-lock at 300). setSize rewrites the canvas px size to fill the host.
       const w = host.clientWidth || window.innerWidth;
       const h = host.clientHeight || window.innerHeight;
+      heroH = h;
       renderer.setSize(w, h);
       const viewAspect = w / h;
       const ratio = viewAspect / imgAspect;
@@ -178,23 +184,15 @@ export default function HeroCanvas({ src, className }: { src: string; className?
     const ro = new ResizeObserver(setCover);
     ro.observe(host);
 
-    // pause when offscreen or tab hidden — no wasted GPU
-    let visible = true;
-    const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting), {
-      threshold: 0,
-    });
-    io.observe(host);
-
     const start = performance.now();
     let raf = 0;
+    let running = false;
     let firstFrame = true;
     let lastPaint = 0;
     let driftT = 0; // ambient-drift clock — only advances on frames we draw
     let lastScrollY = -1;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const hidden = document.hidden || !visible;
-      if (hidden && !firstFrame) return;
 
       const elapsed = (now - start) / 1000;
       const intro = elapsed < 2.6; // the load reveal — always draw (full 60fps)
@@ -222,7 +220,6 @@ export default function HeroCanvas({ src, className }: { src: string; className?
       current.x += (target.x - current.x) * 0.05;
       current.y += (target.y - current.y) * 0.05;
       u.uMouse.value = [current.x, current.y];
-      const heroH = host.clientHeight || window.innerHeight;
       u.uScroll.value = Math.min(1, scrollY / heroH);
 
       renderer.render({ scene: mesh });
@@ -231,10 +228,47 @@ export default function HeroCanvas({ src, className }: { src: string; className?
         canvas.style.opacity = "1"; // fade the WebGL layer in over the still
       }
     };
-    raf = requestAnimationFrame(loop);
+
+    // Genuinely STOP the rAF loop whenever the hero can't be seen — a background
+    // tab or a hero scrolled out of view should cost zero main-thread wakeups,
+    // not a 60Hz callback that early-returns each frame. WebGL preserves the last
+    // drawn frame on the canvas, so resuming is seamless and the visual is
+    // identical when visible.
+    const startLoop = () => {
+      if (running) return;
+      running = true;
+      lastPaint = performance.now(); // reset the drift delta so it can't jump on resume
+      raf = requestAnimationFrame(loop);
+    };
+    const stopLoop = () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      raf = 0;
+    };
+
+    // pause when offscreen or tab hidden — no wasted GPU
+    let visible = true;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        visible = e.isIntersecting;
+        if (visible && !document.hidden) startLoop();
+        else stopLoop();
+      },
+      { threshold: 0 },
+    );
+    io.observe(host);
+
+    const onVisibility = () => {
+      if (document.hidden) stopLoop();
+      else if (visible) startLoop();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    startLoop();
 
     return () => {
-      cancelAnimationFrame(raf);
+      stopLoop();
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointermove", onPointer);
       heroImg?.removeEventListener("load", onHeroLoad);
       ro.disconnect();

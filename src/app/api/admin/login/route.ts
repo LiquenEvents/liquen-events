@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Pedido inválido" }, { status: 400 });
   }
 
-  const user = verifyCredentials(name, password);
+  const user = await verifyCredentials(name, password);
   if (!user) {
     log.warn("admin login failed", { ip, name, reason: "credentials" });
     return NextResponse.json({ error: "Credenciais incorretas" }, { status: 401 });

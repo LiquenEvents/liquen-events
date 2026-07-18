@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import { observeOnceInView } from "@/lib/motion/observeInView";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
 interface Props {
   text: string;
@@ -33,21 +35,13 @@ export default function TitleReveal({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    if (prefersReducedMotion()) {
       setVisible(true);
       return;
     }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.2, rootMargin: "0px 0px -60px 0px" },
+    return observeOnceInView(el, { threshold: 0.2, rootMargin: "0px 0px -60px 0px" }, () =>
+      setVisible(true),
     );
-    observer.observe(el);
-    return () => observer.disconnect();
   }, []);
 
   const words = text.split(/\s+/).filter(Boolean);
@@ -63,7 +57,16 @@ export default function TitleReveal({
         // never inside the `overflow-hidden` mask — otherwise it gets clipped and
         // the words render run-together.
         <Fragment key={i}>
-          <span aria-hidden className="inline-block overflow-hidden align-bottom">
+          {/* pb/-mb pair: the overflow-hidden mask that hides the word-rise
+              would otherwise clip glyph DESCENDERS that sit below the baseline —
+              most visibly Playfair's capital "J" (so "Junte" read as "Iunte"),
+              plus lowercase g/j/p/q/y. The bottom padding extends the clip box
+              down to fit them; the equal negative margin keeps the line's
+              layout height unchanged. */}
+          <span
+            aria-hidden
+            className="inline-block overflow-hidden align-bottom pb-[0.16em] -mb-[0.16em]"
+          >
             <span
               className={`inline-block ${visible ? "word-rise" : "opacity-0"}`}
               style={{ "--word-delay": `${delay + i * step}ms` } as React.CSSProperties}

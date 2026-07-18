@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
-import { blurFor } from "@/lib/blur";
-import RatingBadge from "@/components/RatingBadge";
 import { useTranslations } from "@/components/LocaleProvider";
 import { localizeHref } from "@/lib/i18n";
+import type { Dict } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
+import { track } from "@/lib/track";
+import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -29,6 +30,39 @@ type Cat = "empresas" | "particulares" | null;
 // they typed. Stored on the visitor's own device; cleared on a successful send.
 const DRAFT_KEY = "liquen-orcamento-draft";
 
+// A stable id for THIS enquiry, so a retried submit (lost response → resubmit,
+// even across a reload) is deduplicated server-side into one lead + one email
+// instead of two. It survives reloads (localStorage) and is regenerated only
+// after a successful send.
+// Read the first-touch acquisition source recorded by LeadSourceCapture on
+// entry (empty for direct visits or when sessionStorage is unavailable).
+function readLeadSource(): string {
+  try {
+    return sessionStorage.getItem(LEAD_SOURCE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const SUBMISSION_KEY = "liquen-orcamento-sid";
+function ensureSubmissionId(): string {
+  try {
+    let sid = localStorage.getItem(SUBMISSION_KEY);
+    if (!sid) {
+      sid =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem(SUBMISSION_KEY, sid);
+    }
+    return sid;
+  } catch {
+    // No localStorage (private mode / blocked): fall back to a per-call id — no
+    // cross-reload dedup, but the request still carries a valid submissionId.
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
 interface EventOption {
   label: string;
   category: Cat;
@@ -44,16 +78,31 @@ const EVENT_TYPES: EventOption[] = [
   { label: "Outro", category: null, eventType: null },
 ];
 
-export default function OrcamentoForm() {
+// `panelBlur` (the left-panel image's blur placeholder) is resolved on the
+// SERVER page and passed in as a single string, so this client component never
+// imports blurFor / blur-map.json — that ~107KB map used to bundle into this
+// route just to place one decorative image's placeholder.
+export default function OrcamentoForm({
+  panelBlur,
+  orcamento,
+}: {
+  panelBlur: string;
+  orcamento: Dict["orcamento"];
+}) {
+  // locale + common come from the site-wide chrome context; the heavier
+  // `orcamento` namespace is passed in from the /orcamento server page so it
+  // doesn't ride the global LocaleProvider slice on every page.
   const { locale, t } = useTranslations();
-  const to = t.orcamento;
+  const to = orcamento;
   const router = useRouter();
   const [eventType, setEventType] = useState("");
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [data, setData] = useState("");
+  const [dateFlexible, setDateFlexible] = useState(false);
   const [pessoas, setPessoas] = useState("");
+  const [local, setLocal] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
   const [sending, setSending] = useState(false);
@@ -62,6 +111,15 @@ export default function OrcamentoForm() {
   // Set once the user tries to submit an incomplete form — drives the visible,
   // announced error identification (WCAG 3.3.1) instead of a silent disabled button.
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  // Fire a single "QuoteStart" analytics event on the first interaction, so the
+  // owner can measure form-start → submit (abandonment). No-ops without Plausible.
+  const startedRef = useRef(false);
+  const markStart = () => {
+    if (!startedRef.current) {
+      startedRef.current = true;
+      track("QuoteStart");
+    }
+  };
   // Refs for focus management on invalid submit + the event-type radiogroup.
   const nomeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
@@ -76,34 +134,107 @@ export default function OrcamentoForm() {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (!saved) return;
       const d = JSON.parse(saved) as Record<string, string>;
+      // Don't keep personal contact data on the device indefinitely: an
+      // abandoned draft purges itself after 7 days (awkward on shared devices).
+      const ts = Number(d._ts);
+      if (ts && Date.now() - ts > 7 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
       if (d.eventType) setEventType(d.eventType);
       if (d.nome) setNome(d.nome);
       if (d.email) setEmail(d.email);
       if (d.telefone) setTelefone(d.telefone);
       if (d.data) setData(d.data);
+      if (d.dateFlexible) setDateFlexible(d.dateFlexible === "1");
       if (d.pessoas) setPessoas(d.pessoas);
+      if (d.local) setLocal(d.local);
       if (d.mensagem) setMensagem(d.mensagem);
     } catch {
       /* localStorage indisponível — segue sem rascunho */
     }
   }, []);
 
+  // Deep-link pre-selection: a service page can link to /orcamento?tipo=casamentos
+  // so the visitor arrives with the event type already chosen instead of
+  // re-picking what they just came from. Declared AFTER the draft restore so an
+  // explicit link wins over a stale draft; unknown values are ignored. Reads
+  // window.location directly (no useSearchParams) to avoid a CSR bailout.
+  useEffect(() => {
+    try {
+      const tipo = new URLSearchParams(window.location.search).get("tipo");
+      if (!tipo) return;
+      const opt = EVENT_TYPES.find((o) => o.eventType === tipo);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (opt) setEventType(opt.label);
+    } catch {
+      /* sem query string acessível — segue sem pré-seleção */
+    }
+  }, []);
+
   // Grava o rascunho a cada alteração. Salta a 1ª execução para não escrever o
   // estado vazio inicial por cima de um rascunho ainda por restaurar acima.
+  // Debounced (~500ms): keystrokes on the 9 fields no longer each trigger a
+  // synchronous JSON.stringify + localStorage write on the main thread — only
+  // the last change in a burst persists, keeping typing snappy (INP).
+  //
+  // The latest draft is mirrored into a ref every render so it can be flushed
+  // SYNCHRONOUSLY when the page is being hidden/unloaded — otherwise a fast
+  // navigate-away (or tab close) mid-debounce would drop the pending write and
+  // lose the draft the user expects to survive the round-trip.
+  const draftRef = useRef<Record<string, string> | null>(null);
+  useEffect(() => {
+    draftRef.current = {
+      eventType,
+      nome,
+      email,
+      telefone,
+      data,
+      dateFlexible: dateFlexible ? "1" : "",
+      pessoas,
+      local,
+      mensagem,
+    };
+  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem]);
+  // Once the quote is submitted the draft is intentionally cleared; block any
+  // later lifecycle flush (the router.push unmount below) from resurrecting it.
+  const submittedRef = useRef(false);
+  const flushDraft = useCallback(() => {
+    if (firstSave.current || submittedRef.current) return; // nothing to persist
+    const d = draftRef.current;
+    if (!d) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, _ts: Date.now() }));
+    } catch {
+      /* ignora */
+    }
+  }, []);
+
   useEffect(() => {
     if (firstSave.current) {
       firstSave.current = false;
       return;
     }
-    try {
-      localStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({ eventType, nome, email, telefone, data, pessoas, mensagem }),
-      );
-    } catch {
-      /* ignora */
-    }
-  }, [eventType, nome, email, telefone, data, pessoas, mensagem]);
+    const timer = setTimeout(flushDraft, 500);
+    return () => clearTimeout(timer);
+  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem, flushDraft]);
+
+  // Persist immediately when the page is hidden or torn down (navigation, tab
+  // close, bfcache). `visibilitychange → hidden` and `pagehide` are the only
+  // reliably-fired lifecycle events for this; the effect cleanup covers the
+  // client-side route change that unmounts the form before either fires.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushDraft();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flushDraft);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flushDraft);
+      flushDraft();
+    };
+  }, [flushDraft]);
 
   const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
   const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
@@ -112,7 +243,11 @@ export default function OrcamentoForm() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (sending || website) return;
+    // Don't gate the submit on the honeypot here: if anything ever populates the
+    // hidden `website` field, a bare `return` would make the button appear dead
+    // with no feedback and lose a real lead. The field still rides the payload so
+    // the SERVER can silently discard bots — that's the sole enforcement point.
+    if (sending) return;
     // Incomplete: reveal + announce what's missing (the submit stays operable so
     // keyboard/AT users get a reason, not a silently disabled control).
     if (!ready) {
@@ -136,21 +271,41 @@ export default function OrcamentoForm() {
       category: opt?.category ?? null,
       eventType: opt?.eventType ?? null,
       eventName: eventType,
-      date: data,
+      date: dateFlexible ? "" : data,
       guests: Number(pessoas) || 0,
-      notes: mensagem.trim(),
+      location: local.trim(),
+      // Capture the "no fixed date yet" signal for the team (a high-value
+      // early-stage lead segment) by folding it into the notes.
+      notes: [dateFlexible ? `(${to.dateFlexibleLabel})` : "", mensagem.trim()]
+        .filter(Boolean)
+        .join("\n\n"),
+      // First-touch acquisition source (UTM/referrer), captured on entry by
+      // LeadSourceCapture. Feeds the admin's conversion-by-source aggregation;
+      // empty for direct visits.
+      referralSource: readLeadSource(),
     };
 
+    // Abort a hung request instead of spinning forever on a stalled connection
+    // (3G that opens the socket but never responds). Without this the submit
+    // button spins with no error and no recovery — the worst failure mode on
+    // the site's primary conversion. maxDuration server-side is 30s.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
     try {
       const res = await fetch("/api/orcamento", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // O honeypot segue no payload para o servidor também poder descartar
         // bots que preencham o campo (a guarda no cliente é contornável).
-        body: JSON.stringify({ form, website }),
+        // submissionId torna o envio idempotente (reenvio após resposta perdida
+        // = um só lead + um só email).
+        body: JSON.stringify({ form, website, submissionId: ensureSubmissionId() }),
+        signal: controller.signal,
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.id) throw new Error(json?.error || "falha");
+
+      track("QuoteSubmit", { tipo: opt?.eventType ?? eventType });
 
       // Hand-off para a página de confirmação (funciona em qualquer host).
       try {
@@ -166,9 +321,14 @@ export default function OrcamentoForm() {
       } catch {
         /* sessionStorage indisponível — a confirmação usa o fallback genérico */
       }
-      // Pedido enviado: limpa o rascunho local para não reaparecer depois.
+      // Pedido enviado: limpa o rascunho local para não reaparecer depois, e
+      // trava o flush de ciclo de vida para o unmount da navegação não o repor.
+      submittedRef.current = true;
       try {
         localStorage.removeItem(DRAFT_KEY);
+        // Retire this enquiry's idempotency id so a genuinely NEW enquiry later
+        // gets a fresh one (and doesn't dedup against the just-sent lead).
+        localStorage.removeItem(SUBMISSION_KEY);
       } catch {
         /* ignora */
       }
@@ -176,10 +336,34 @@ export default function OrcamentoForm() {
     } catch (e) {
       // Surface the server's specific message (e.g. the "try again / contact us"
       // text when delivery genuinely failed) instead of the generic fallback.
-      const msg = e instanceof Error ? e.message : "";
-      setError(msg && msg !== "falha" ? msg : to.error);
+      // A timeout/network abort has no server message, so it falls back to the
+      // generic retry copy rather than leaking a raw "AbortError" string.
+      let msg = to.error;
+      if (e instanceof Error && e.name !== "AbortError" && e.message && e.message !== "falha") {
+        msg = e.message;
+      }
+      setError(msg);
       setSending(false);
+    } finally {
+      clearTimeout(timeout);
     }
+  }
+
+  // WhatsApp fallback message, composed from whatever the visitor has already
+  // typed, so switching channel mid-form doesn't discard their context (the
+  // team receives the details instead of an empty "Olá"). Recomputed each
+  // render, so the link always reflects the current field state.
+  function waMessage(): string {
+    const idx = EVENT_TYPES.findIndex((o) => o.label === eventType);
+    const tipoLabel = idx >= 0 ? (to.eventTypeLabels[idx] ?? eventType) : "";
+    const lines = [t.common.whatsappPrefill];
+    if (tipoLabel) lines.push(`${to.labelTipo}: ${tipoLabel}`);
+    if (dateFlexible) lines.push(to.dateFlexibleLabel);
+    else if (data) lines.push(`${to.labelData}: ${data}`);
+    if (pessoas) lines.push(`${to.labelPessoas}: ${pessoas}`);
+    if (local.trim()) lines.push(`${to.labelLocal}: ${local.trim()}`);
+    if (nome.trim()) lines.push(`${to.labelNome}: ${nome.trim()}`);
+    return lines.join("\n");
   }
 
   // Arrow-key navigation for the event-type radiogroup (WAI-ARIA radio pattern).
@@ -204,7 +388,7 @@ export default function OrcamentoForm() {
     // identifiable (WCAG 1.4.11); focus switches to solid moss.
     "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/65 focus:outline-none focus:border-moss transition-colors duration-300";
   const labelCls =
-    "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-light";
+    "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-dark";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
   return (
@@ -213,7 +397,8 @@ export default function OrcamentoForm() {
       <aside className="relative hidden lg:block overflow-hidden">
         <Image
           src="/imagens/DaniGui_JantarFesta_1.jpg"
-          {...blurFor("/imagens/DaniGui_JantarFesta_1.jpg")}
+          placeholder="blur"
+          blurDataURL={panelBlur}
           alt={t.common.imageAlt.orcamentoPanel}
           fill
           preload
@@ -246,14 +431,9 @@ export default function OrcamentoForm() {
               <span className="text-moss-light">{to.titleMoss}</span>
             </p>
             <p className="text-cream/75 text-sm leading-[1.8] max-w-xs">{to.lead}</p>
-            <div className="mt-8">
-              <RatingBadge
-                label={t.common.reviewsLabel}
-                ptFormat={locale === "pt"}
-                starClassName="text-gold"
-                textClassName="text-cream/75"
-              />
-            </div>
+            <p className="mt-5 text-cream/55 text-[10px] tracking-[0.28em] uppercase">
+              {to.processHint}
+            </p>
           </div>
         </div>
       </aside>
@@ -274,13 +454,18 @@ export default function OrcamentoForm() {
               desktop (where the left panel shows the display title). Always in
               the a11y tree, so heading navigation works at every breakpoint. */}
           <h1
-            className="lg:sr-only text-foreground font-bold leading-[0.95] tracking-tight mb-12"
+            className="lg:sr-only text-foreground font-bold leading-[0.95] tracking-tight mb-6"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 9vw, 52px)" }}
           >
             {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
           </h1>
 
-          <form onSubmit={submit} aria-busy={sending} className="flex flex-col gap-11">
+          <form
+            onSubmit={submit}
+            onFocusCapture={markStart}
+            aria-busy={sending}
+            className="flex flex-col gap-11"
+          >
             {/* Required-fields key, before the fields so the '*' is explained
                 first (WCAG 3.3.2 Labels or Instructions). */}
             <p className="text-foreground/68 text-[11px] leading-relaxed -mb-4">
@@ -321,7 +506,7 @@ export default function OrcamentoForm() {
                 aria-invalid={!!tipoErr}
                 aria-describedby={tipoErr ? "of-tipo-err" : undefined}
                 onKeyDown={onRadioKey}
-                className="flex flex-wrap gap-2.5"
+                className="flex flex-wrap gap-3"
               >
                 {EVENT_TYPES.map((o, i) => {
                   const active = eventType === o.label;
@@ -337,7 +522,7 @@ export default function OrcamentoForm() {
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-4 py-2.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
+                      className={`px-4 py-3.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
                         active
                           ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
                           : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
@@ -366,9 +551,19 @@ export default function OrcamentoForm() {
                   type="date"
                   min={minDate}
                   value={data}
+                  disabled={dateFlexible}
                   onChange={(e) => setData(e.target.value)}
-                  className={`${inputCls} [color-scheme:light]`}
+                  className={`${inputCls} [color-scheme:light] ${dateFlexible ? "opacity-40" : ""}`}
                 />
+                <label className="mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={dateFlexible}
+                    onChange={(e) => setDateFlexible(e.target.checked)}
+                    className="w-4 h-4 accent-moss cursor-pointer"
+                  />
+                  <span className="text-[11px] tracking-wide">{to.dateFlexibleLabel}</span>
+                </label>
               </div>
               <div className="group">
                 <label htmlFor="of-pessoas" className={labelCls}>
@@ -376,16 +571,31 @@ export default function OrcamentoForm() {
                 </label>
                 <input
                   id="of-pessoas"
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  min={1}
-                  max={100000}
+                  pattern="[0-9]*"
+                  maxLength={6}
                   value={pessoas}
-                  onChange={(e) => setPessoas(e.target.value)}
+                  onChange={(e) => setPessoas(e.target.value.replace(/[^0-9]/g, ""))}
                   className={inputCls}
                   placeholder={to.phPessoas}
                 />
               </div>
+            </div>
+
+            {/* Local / região (opcional) */}
+            <div className="group">
+              <label htmlFor="of-local" className={labelCls}>
+                {to.labelLocal}
+              </label>
+              <input
+                id="of-local"
+                type="text"
+                value={local}
+                onChange={(e) => setLocal(e.target.value)}
+                className={inputCls}
+                placeholder={to.phLocal}
+              />
             </div>
 
             {/* Nome + Email */}
@@ -502,19 +712,45 @@ export default function OrcamentoForm() {
                 )}
               </button>
               <a
-                href={waHref(t.common.whatsappPrefill)}
+                href={waHref(waMessage())}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => track("WhatsAppClick", { source: "form" })}
                 className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/68 hover:text-moss transition-colors"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {to.ouWhatsApp}
+                <span className="sr-only"> ({t.common.newWindow})</span>
               </a>
             </div>
 
+            {/* Reassurance + privacy at the point of decision — the moment
+                hesitation peaks. Reuses facts already shown up top. */}
+            <p className="mt-6 text-[11px] leading-relaxed text-foreground/55 max-w-md">
+              {to.submitReassure}
+              <br />
+              {to.privacyPre}
+              <Link
+                href={localizeHref("/privacidade", locale)}
+                className="underline underline-offset-2 hover:text-foreground/80 transition-colors"
+              >
+                {to.privacyLinkLabel}
+              </Link>
+              {to.privacyPost}
+            </p>
+
             {error && (
-              <div role="alert" className="p-4 border border-moss/30 bg-moss/8 rounded-sm">
-                <p className="text-moss-dark text-sm">{error}</p>
+              // Failure state — deliberately NOT moss/green (that's the brand's
+              // success colour). Uses the same gold as the field-level errors so
+              // "something went wrong" reads as a problem, not a confirmation.
+              <div
+                role="alert"
+                className="flex items-start gap-3 p-4 border-l-2 border-gold bg-gold/[0.06] rounded-sm"
+              >
+                <span aria-hidden className="text-gold-text text-base leading-none mt-px">
+                  !
+                </span>
+                <p className="text-gold-text text-sm">{error}</p>
               </div>
             )}
           </form>

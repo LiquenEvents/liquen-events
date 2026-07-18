@@ -1,14 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { Dict } from "@/lib/i18n";
 import AnimateIn from "./AnimateIn";
 import RatingBadge from "./RatingBadge";
 import { useTranslations } from "./LocaleProvider";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 
-export default function TestimonialsCarousel() {
+export default function TestimonialsCarousel({
+  testimonials,
+}: {
+  testimonials: Dict["testimonials"];
+}) {
+  // locale + common (labels) still come from the site-wide chrome context; only
+  // the heavier `testimonials` namespace is passed in from the /servicos page.
   const { locale, t: dict } = useTranslations();
-  const testimonials = dict.testimonials;
   const [active, setActive] = useState(0);
   const [visible, setVisible] = useState(true);
   // Pause autoplay while the user is interacting (hover/focus) or the tab is
@@ -16,6 +22,11 @@ export default function TestimonialsCarousel() {
   // >5s auto-advancing carousel must be pausable.
   const [interacting, setInteracting] = useState(false);
   const [docHidden, setDocHidden] = useState(false);
+  // Also pause autoplay while the carousel is scrolled off-screen: it's below
+  // the fold on the pages that use it, so without this the 6s timer + its fade
+  // re-renders run during scroll-critical time for a component nobody can see.
+  const [onScreen, setOnScreen] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
   // Persistent user control (WCAG 2.2.2) — always-available pause, independent of
   // hover/focus. Reduced-motion stops autoplay entirely.
   const [userPaused, setUserPaused] = useState(false);
@@ -24,6 +35,11 @@ export default function TestimonialsCarousel() {
   const [manualNav, setManualNav] = useState(false);
   const reduced = useReducedMotion();
 
+  // Track the pending fade timer so a rapid second nav (two dot clicks inside
+  // the 380ms fade, or a click landing on an autoplay tick) can't leave two
+  // timeouts racing — the stale one would briefly stomp the intended slide.
+  // Also cleared on unmount so no setState fires against a gone component.
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionTo = useCallback(
     (next: (current: number) => number) => {
       // Reduced motion: swap instantly, no fade.
@@ -33,13 +49,15 @@ export default function TestimonialsCarousel() {
         return;
       }
       setVisible(false);
-      setTimeout(() => {
+      if (fadeTimer.current) clearTimeout(fadeTimer.current);
+      fadeTimer.current = setTimeout(() => {
         setActive(next);
         setVisible(true);
       }, 380);
     },
     [reduced],
   );
+  useEffect(() => () => clearTimeout(fadeTimer.current ?? undefined), []);
 
   const goTo = useCallback(
     (i: number) => {
@@ -56,7 +74,20 @@ export default function TestimonialsCarousel() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
-  const paused = interacting || docHidden || userPaused || reduced;
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setOnScreen(true); // no IO → don't permanently pause
+      return;
+    }
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), {
+      rootMargin: "200px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const paused = interacting || docHidden || userPaused || reduced || !onScreen;
 
   useEffect(() => {
     if (paused) return;
@@ -74,6 +105,7 @@ export default function TestimonialsCarousel() {
 
   return (
     <section
+      ref={sectionRef}
       className="relative py-20 lg:py-32 bg-surface border-t border-foreground/6 overflow-hidden"
       onMouseEnter={() => setInteracting(true)}
       onMouseLeave={() => setInteracting(false)}
@@ -116,8 +148,11 @@ export default function TestimonialsCarousel() {
                 transition: reduced ? "none" : "opacity 0.38s ease, transform 0.38s ease",
               }}
             >
+              {/* min-height reserves space for the longest testimonial so the
+                  6s auto-rotation doesn't reflow the dots + the section below it
+                  (a recurring layout shift that field CLS captures). */}
               <p
-                className="text-foreground text-xl sm:text-2xl lg:text-[2.2rem] font-bold leading-[1.35] mb-8 lg:mb-12"
+                className="text-foreground text-xl sm:text-2xl lg:text-[2.2rem] font-bold leading-[1.35] mb-8 lg:mb-12 min-h-[11rem] sm:min-h-[10rem] lg:min-h-[13rem]"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
                 &ldquo;{t.quote}&rdquo;

@@ -25,9 +25,10 @@ export default function StructuredData({ locale }: { locale: Locale }) {
 
   const graph = [
     {
-      // EventPlanner is the schema.org LocalBusiness subtype that matches the
-      // business exactly — more specific than the generic ProfessionalService.
-      "@type": ["Organization", "LocalBusiness", "EventPlanner"],
+      // ProfessionalService is the real schema.org LocalBusiness subtype for a
+      // service studio. ("EventPlanner" isn't a schema.org type — search engines
+      // ignore unknown types, losing the intended specificity.)
+      "@type": ["Organization", "LocalBusiness", "ProfessionalService"],
       "@id": orgId,
       name: SITE.name,
       legalName: SITE.legalName,

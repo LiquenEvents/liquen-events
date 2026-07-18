@@ -109,6 +109,187 @@ create table if not exists public.app_state (
   updated_at  timestamptz not null default now()
 );
 
+-- ── Modelos de email (transacionais, editáveis no back office) ──
+create table if not exists public.email_templates (
+  id          text primary key,          -- slug: proposta-enviada, sinal-recebido…
+  name        text not null,
+  subject     text not null,
+  body        text not null,             -- HTML com {merge} fields
+  updated_at  timestamptz not null default now()
+);
+
+-- ── Faturas (livro de faturação, numeração sequencial) ──────────
+create table if not exists public.invoices (
+  id           text primary key,
+  number       text not null,            -- FT 2026/0007
+  quote_id     text,
+  client_name  text,
+  client_email text,
+  kind         text not null default 'total',  -- sinal | saldo | total
+  amount       numeric not null default 0,     -- com IVA
+  vat_rate     numeric not null default 0.23,
+  issued_at    date,
+  due_at       date,
+  paid_at      date,
+  status       text not null default 'emitida', -- emitida | paga | anulada
+  note         text
+);
+
+create index if not exists invoices_quote_id_idx on public.invoices (quote_id);
+create index if not exists invoices_status_idx   on public.invoices (status);
+
+-- Backstop de unicidade sinal/saldo (defesa em profundidade sobre a app) ──────
+-- Invariante: no máximo UMA fatura de sinal e UMA de saldo NÃO anuladas por
+-- pedido. A app já verifica-e-recusa antes de inserir, mas duas emissões
+-- concorrentes (dois sinal→paga em simultâneo a auto-emitir o saldo, ou o
+-- operador a emitir à mão no mesmo instante) passam ambas a verificação e
+-- inserem — TOCTOU. Estes índices parciais únicos fecham a janela na própria
+-- base de dados: só uma linha vence, a outra apanha uma violação de unicidade
+-- (23505) que a app trata como "já emitido" (ver isUniqueViolation +
+-- maybeAutoIssueSaldo + rota /faturas). As faturas anuladas ficam FORA do índice
+-- (status <> 'anulada'), para permitir reemitir um saldo/sinal fresco depois de
+-- anular o anterior. Os quote_id nulos (faturas manuais sem pedido) não colidem.
+--
+-- ⚠️ OPERACIONAL: numa instalação que já acumulou sinais/saldos duplicados do
+-- bug antigo, a CRIAÇÃO destes índices FALHA. É preciso reconciliar primeiro
+-- (anular os duplicados, deixando um único ativo por tipo/pedido) e só depois
+-- correr este ficheiro.
+create unique index if not exists invoices_one_active_sinal_uk
+  on public.invoices (quote_id)
+  where kind = 'sinal' and status <> 'anulada';
+create unique index if not exists invoices_one_active_saldo_uk
+  on public.invoices (quote_id)
+  where kind = 'saldo' and status <> 'anulada';
+
+-- ── Contador atómico de numeração de faturas (por ano) ──────────
+-- A numeração fiscal portuguesa tem de ser única e estritamente sequencial.
+-- Fazer o incremento na aplicação (ler → +1 → gravar, com um `await` no meio)
+-- é uma corrida: duas emissões em simultâneo leem o mesmo valor e ambas gravam
+-- n+1, produzindo um FT duplicado/saltado. Delegamos o incremento à base de
+-- dados. Uma linha por ano — o reset anual fica embutido na chave.
+create table if not exists public.invoice_counters (
+  year  int primary key,
+  n     int not null default 0
+);
+
+-- Devolve, de forma atómica, o próximo número de sequência para o ano dado.
+-- `insert … on conflict … do update … returning` é UMA só instrução: o lock de
+-- linha do Postgres serializa emissões concorrentes, cada uma recebe um `n`
+-- distinto e consecutivo, nunca o mesmo. A aplicação formata depois `FT AAAA/NNNN`.
+-- Idempotente (create or replace) — seguro correr o ficheiro as vezes que forem.
+create or replace function public.next_invoice_seq(p_year int)
+returns int
+language sql
+as $$
+  insert into public.invoice_counters (year, n)
+  values (p_year, 1)
+  on conflict (year) do update set n = public.invoice_counters.n + 1
+  returning n;
+$$;
+
+-- ── Inventário de adereços / materiais de decoração ─────────────
+create table if not exists public.inventory_items (
+  id          text primary key,
+  name        text not null,
+  category    text not null default 'Outro',
+  quantity    integer not null default 0,
+  unit        text,
+  condition   text not null default 'bom',   -- novo | bom | usado | danificado
+  location    text,
+  notes       text,
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists inventory_category_idx on public.inventory_items (category);
+
+-- ── Contratos / aceitação de Termos & Condições ─────────────────
+-- Registo, por proposta, da aceitação das condições pelo cliente ao confirmar
+-- a proposta no link público: quem aceitou, quando, de que IP, a versão dos
+-- termos e um snapshot imutável do texto acordado (prova/auditoria).
+create table if not exists public.contracts (
+  id             text primary key,
+  quote_id       text,
+  proposal_id    text,
+  client_name    text,
+  client_email   text,
+  terms_version  text,
+  terms_snapshot text,
+  status         text not null default 'pendente',  -- pendente | aceite
+  created_at     timestamptz not null default now(),
+  accepted_at    timestamptz,
+  accepted_name  text,
+  accepted_ip    text
+);
+
+create index if not exists contracts_proposal_id_idx on public.contracts (proposal_id);
+
+-- Um contrato por proposta — garantia de unicidade na própria base de dados.
+-- É o lock do aceite: dois aceites concorrentes passam ambos o
+-- getContractByProposal (nenhum vê contrato ainda), mas só um vence este índice
+-- no insert; o outro apanha o conflito e sai sem emitir um 2.º sinal (ver
+-- createContractIfAbsent). Idempotente (IF NOT EXISTS). Os proposal_id nulos não
+-- colidem entre si no Postgres, por isso um contrato sem proposta não é bloqueado.
+create unique index if not exists contracts_proposal_id_uk on public.contracts (proposal_id);
+
+-- ── Restrições de integridade (CHECK) ───────────────────────────
+-- Garantem, na própria base de dados, que os campos de estado/tipo só
+-- aceitam os valores que a aplicação conhece e que os montantes não são
+-- negativos — mesmo que algo escreva fora da app. Adicionadas de forma
+-- idempotente (só se ainda não existirem) e como NOT VALID, para nunca
+-- falharem numa instalação já existente com dados antigos: passam a ser
+-- aplicadas a partir da próxima escrita, sem varrer as linhas atuais.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'quotes_status_chk') then
+    alter table public.quotes add constraint quotes_status_chk
+      check (status in ('pendente','em_revisao','cotado','aceite','rejeitado')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'proposals_status_chk') then
+    alter table public.proposals add constraint proposals_status_chk
+      check (status in ('rascunho','enviada','aceite','rejeitada')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'proposals_amounts_chk') then
+    alter table public.proposals add constraint proposals_amounts_chk
+      check (vat_rate >= 0 and subtotal >= 0 and vat >= 0 and total >= 0) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'tasks_priority_chk') then
+    alter table public.tasks add constraint tasks_priority_chk
+      check (priority in ('baixa','normal','alta')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'calendar_events_kind_chk') then
+    alter table public.calendar_events add constraint calendar_events_kind_chk
+      check (kind in ('reuniao','evento','bloqueio','nota')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'invoices_status_chk') then
+    alter table public.invoices add constraint invoices_status_chk
+      check (status in ('emitida','paga','anulada')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'invoices_kind_chk') then
+    alter table public.invoices add constraint invoices_kind_chk
+      check (kind in ('sinal','saldo','total')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'invoices_amount_chk') then
+    alter table public.invoices add constraint invoices_amount_chk
+      check (amount >= 0 and vat_rate >= 0) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'inventory_condition_chk') then
+    alter table public.inventory_items add constraint inventory_condition_chk
+      check (condition in ('novo','bom','usado','danificado')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'contracts_status_chk') then
+    alter table public.contracts add constraint contracts_status_chk
+      check (status in ('pendente','aceite')) not valid;
+  end if;
+end $$;
+
 -- ── Segurança ───────────────────────────────────────────────────
 -- Ativamos RLS sem políticas públicas: só o servidor (service_role key,
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.
@@ -119,3 +300,8 @@ alter table public.suppliers enable row level security;
 alter table public.calendar_events enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.app_state enable row level security;
+alter table public.email_templates enable row level security;
+alter table public.invoices    enable row level security;
+alter table public.invoice_counters enable row level security;
+alter table public.inventory_items enable row level security;
+alter table public.contracts enable row level security;

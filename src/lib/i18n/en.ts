@@ -53,17 +53,18 @@ export const en: Dict = {
     clientes: "Clients",
     contacto: "Contact",
     orcamento: "Quote",
-    pedirOrcamento: "Request a Quote",
+    pedirOrcamento: "Request a quote",
   },
 
   common: {
-    pedirOrcamento: "Request a Quote",
+    pedirOrcamento: "Request a quote",
     verGaleria: "View gallery",
     verServicos: "View services",
-    entrarContacto: "Get in Touch",
+    entrarContacto: "Get in touch",
     falarConnosco: "Talk to us",
     voltarInicio: "Back to home",
     abrirWhatsApp: "Open WhatsApp",
+    newWindow: "opens in a new window",
     enviarEmail: "Send e-mail",
     contactWhatsApp: "Contact us on WhatsApp",
     clientsSay: "What our clients say",
@@ -101,10 +102,10 @@ export const en: Dict = {
   },
 
   meta: {
-    ogLocale: "en_US",
-    homeTitle: "Event & Wedding Decoration in Évora, Portugal | Líquen Events",
+    ogLocale: "en_GB",
+    homeTitle: "Event & Wedding Decoration in Évora | Líquen Events",
     homeDescription:
-      "Event and wedding decoration in Évora: wedding decoration and coordination, corporate events and celebrations across the Alentejo and Portugal. Request a quote.",
+      "Wedding decoration, corporate events and celebrations in Évora, the Alentejo and across Portugal. From concept to the last detail — request a quote.",
     sobreTitle: "Event Decoration Company in the Alentejo",
     sobreDescription:
       "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
@@ -141,18 +142,15 @@ export const en: Dict = {
   },
 
   home: {
-    eyebrow: "Event decoration · Évora · Alentejo",
-    heroLines: [
-      { words: ["we", "immortalise"], moss: true },
-      { words: ["memories."], moss: true },
-    ],
+    eyebrow: "Event decoration",
+    heroLines: [{ words: ["We", "make", "memories"] }, { words: ["last"], moss: true }],
     scroll: "Scroll",
     wallEyebrow: "Our work",
-    wallTitle: "Unforgettable moments",
+    wallTitle: "What stays with you",
     servicesEyebrow: "What we do",
     services: [
-      { tag: "Companies", title: "Corporate" },
       { tag: "Celebrations", title: "Weddings" },
+      { tag: "Companies", title: "Corporate" },
       { tag: "Celebrations", title: "Private" },
     ],
     ctaEyebrow: "Next step",
@@ -165,12 +163,14 @@ export const en: Dict = {
   sobre: {
     heroEyebrow: "Who we are",
     heroTitlePre: "About ",
-    heroTitleMoss: "Líquen.",
+    heroTitleMoss: "Líquen",
     scroll: "Scroll",
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
-    manifestoTitleLine2: "We immortalise memories.",
+    manifestoTitleLine2: "We make memories last.",
     manifestoText: "Since 2018 we've turned spaces into experiences — across Portugal.",
+    // Corner caption (chapter idiom) over the manifesto photograph.
+    manifestoImageCaption: "Évora · Alentejo",
     statementLead: "We don't just decorate spaces.",
     statementRest: " We design experiences that last forever.",
     founderEyebrow: "The people",
@@ -234,7 +234,7 @@ export const en: Dict = {
   clientes: {
     heroEyebrow: "Who trusts us",
     heroTitleLine1: "Our",
-    heroTitleMoss: "Clients.",
+    heroTitleMoss: "Clients",
     heroLead:
       "Companies, institutions and families who chose us for their most special moments — and who honour us with their trust.",
     scroll: "Scroll",
@@ -297,7 +297,7 @@ export const en: Dict = {
       ctaTitleLine1: "Request your",
       ctaTitleMoss: "quote.",
       ctaText:
-        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the channels alongside.",
+        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the direct channels.",
       ctaButton: "Request a quote",
     },
     testimonialsEyebrow: "What our clients say",
@@ -318,16 +318,16 @@ export const en: Dict = {
     whatsappEyebrow: "Instant reply",
     whatsappTitleLine1: "Prefer to talk",
     whatsappTitleLine2: "right now?",
-    whatsappText: "Talk to us directly on WhatsApp. We're available Monday to Friday, 9am to 8pm.",
+    whatsappText: "Talk to us directly on WhatsApp.",
     form: {
       heroEyebrow: "Get in touch",
       heroTitleLine1: "Let's create something",
-      heroTitleMoss: "extraordinary.",
+      heroTitleMoss: "extraordinary",
       infoEyebrow: "Find us",
       emailLabel: "E-mail",
       emailSub: "We reply within 24 business hours",
       phoneLabel: "Phone",
-      phoneSub: "Mon–Fri, 9am–8pm",
+      phoneSub: "Call or message us",
       locationLabel: "Location",
       locationValue: "Évora, Alentejo — across Portugal",
       locationSub: "In-person meetings available",
@@ -345,7 +345,6 @@ export const en: Dict = {
         { value: "Other", desc: "A custom event, tailored to you" },
       ],
       guestRanges: ["Up to 30", "30–80", "80–150", "150–300", "300+"],
-      budgetRanges: ["< €5,000", "€5,000–15,000", "€15,000–30,000", "€30,000+", "To be defined"],
       step1Title1: "What kind of event",
       step1Title2: "are you planning?",
       step1Sub: "Select the option that best describes your event.",
@@ -420,11 +419,12 @@ export const en: Dict = {
   },
 
   orcamento: {
-    back: "Líquen Events",
+    back: "Home",
     eyebrow: "Quote request",
     titleLine1: "Tell us",
     titleMoss: "your idea",
     lead: "No commitment. We reply with a tailored proposal in under 24 business hours.",
+    processHint: "Request → Proposal in 24h → Meeting",
     eventTypeLabels: [
       "Wedding",
       "Corporate",
@@ -435,12 +435,15 @@ export const en: Dict = {
     ],
     labelTipo: "Event type",
     labelData: "Event date",
+    dateFlexibleLabel: "Date still to be decided",
     labelPessoas: "No. of people",
+    labelLocal: "Location / region",
     labelNome: "Name",
     labelEmail: "Email",
     labelTelefone: "Phone",
     labelMensagem: "Message",
     phPessoas: "e.g. 120",
+    phLocal: "e.g. Évora, Alentejo…",
     phNome: "Your name",
     phEmail: "email@example.com",
     phTelefone: "+351 9XX XXX XXX",
@@ -453,15 +456,21 @@ export const en: Dict = {
     enviando: "Sending…",
     ouWhatsApp: "or via WhatsApp",
     error: "We couldn't send your request. Please try again or reach us on WhatsApp.",
-    requiredNote: "Fields marked with * are required. Reply within 24 business hours.",
+    requiredNote: "Fields marked with * are required.",
+    submitReassure: "No commitment · Reply within 24 business hours.",
+    privacyPre: "By submitting, you accept our ",
+    privacyLinkLabel: "Privacy Policy",
+    privacyPost: ". We never share your details.",
   },
 
   servicos: {
     heroEyebrow: "What we offer",
-    heroTitle: ["Every event,", "a story", "to tell."],
+    heroTitle: ["Every event,", "a story", "to tell"],
     heroLead:
       "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
     nav: ["Celebrations", "Companies"],
+    interludeEyebrow: "Líquen Events",
+    interludeTitle: "From Évora to all of Portugal — over 100 events since 2018.",
     verMais: "View more",
     verDetalhes: "View details",
     philoEyebrow: "Our signature",
@@ -533,8 +542,8 @@ export const en: Dict = {
     seoText:
       "Weddings, corporate events and celebrations — from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
     ctaEyebrow: "Next step",
-    ctaTitleLine1: "Have an event",
-    ctaTitleMoss: "in mind?",
+    ctaTitleLine1: "Shall we bring",
+    ctaTitleMoss: "your idea to life?",
     ctaText:
       "Talk to us. No commitment, no cost. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
@@ -649,6 +658,93 @@ export const en: Dict = {
       errorSuffix: "Alternatively,",
       errorLink: "email us",
     },
+    terms: {
+      toggle: "Read the Terms & Conditions",
+      checkboxLabel: "I have read and accept the Terms & Conditions",
+      nameLabel: "Name of who is accepting",
+      namePlaceholder: "Your full name",
+      missing: "To accept, please confirm the terms and enter your name.",
+    },
+  },
+
+  portal: {
+    title: "Client Portal — Líquen Events",
+    eyebrow: "Client Portal",
+    greeting: "Hello",
+    intro:
+      "Here you'll find everything about your event with us in one place: the proposal, the terms, payments and next steps.",
+    dateLocale: "en-GB",
+    // Friendly labels per event type (the portal only reads data; substitution
+    // happens on the server and is sent down as plain text).
+    eventTypes: {
+      casamentos: "Wedding",
+      batizados: "Christening",
+      aniversarios: "Birthday",
+      jantares_gala: "Gala Dinner",
+      conferencias: "Conference",
+      teambuilding: "Team Building",
+      lancamentos: "Product Launch",
+      jantares_empresa: "Company Dinner",
+    },
+    eventFallbackEmpresa: "Corporate Event",
+    eventFallbackParticular: "Event",
+    semData: "Date to be confirmed",
+    semLocal: "Location to be confirmed",
+    proposta: {
+      title: "Proposal",
+      statusLabel: "Status",
+      status: {
+        rascunho: "In preparation",
+        enviada: "Sent — awaiting your response",
+        aceite: "Accepted",
+        rejeitada: "Declined",
+      },
+      totalLabel: "Total",
+      download: "Download proposal (PDF)",
+      none: "No proposal is available yet. We're preparing it and will let you know as soon as it's ready.",
+    },
+    contrato: {
+      title: "Contract",
+      aceite: "Terms accepted on {date} by {name} (v{version}).",
+      download: "Download contract (PDF)",
+      pendingTitle: "Acceptance pending",
+      pendingBody:
+        "Once you've reviewed the proposal, you can accept the terms through the link we sent you by email. We look forward to it.",
+    },
+    pagamentos: {
+      title: "Payments",
+      intro:
+        "Payment is staged: a 30% deposit to reserve the date and the 70% balance before the event.",
+      scheduleTitle: "Expected schedule",
+      sinal: "Deposit (30%)",
+      saldo: "Balance (70%)",
+      faturasTitle: "Invoices",
+      thNumero: "No.",
+      thTipo: "Type",
+      thMontante: "Amount",
+      thEstado: "Status",
+      kind: {
+        sinal: "Deposit",
+        saldo: "Balance",
+        total: "Total",
+      },
+      estado: {
+        emitida: "Pending",
+        paga: "Paid",
+        anulada: "Void",
+      },
+      emitidaEm: "Issued on {date}",
+      pagaEm: "Paid on {date}",
+      venceEm: "Due on {date}",
+      semTotal: "The payment schedule becomes available once the proposal is ready.",
+      noInvoices:
+        "We haven't issued any invoices yet. The expected schedule is shown above; we'll send each invoice as it's issued.",
+    },
+    proximos: {
+      title: "Next steps",
+      body: "If you have any questions about the proposal, the terms or payments, we're here to help. Just reply to our email or use the contacts below.",
+      contactTitle: "Get in touch",
+    },
   },
 
   errors: {
@@ -666,7 +762,7 @@ export const en: Dict = {
 
   footer: {
     sloganLine1: "We decorate events,",
-    sloganLine2: "we immortalise memories.",
+    sloganLine2: "we make memories last.",
     disponivel: "Available for new events",
     paginas: "Pages",
     servicosTitulo: "Services",

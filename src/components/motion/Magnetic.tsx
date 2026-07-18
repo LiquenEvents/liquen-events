@@ -8,9 +8,14 @@ import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffec
  * Magnetic hover: the wrapped element eases toward the pointer while hovered and
  * springs back on leave — the tactile micro-interaction premium sites use on
  * their CTAs. Fine-pointer only (no-op on touch), and disabled under reduced
- * motion. Renders an inline-block wrapper so it hugs the child. GSAP is loaded
- * lazily so it never sits in the initial JS payload; the pull becomes active
- * once its small chunk resolves.
+ * motion. Renders an inline-block wrapper so it hugs the child.
+ *
+ * The follow is a tiny self-contained requestAnimationFrame lerp: each frame the
+ * current translate is interpolated toward the target (the pointer offset scaled
+ * by `strength`), which produces the same exponential-decay "power3.out" settle
+ * GSAP's `quickTo` gave — pointer retargets continuously, leave targets zero, so
+ * it eases back to center. The smoothing is frame-rate independent (`1 - e^-kt`)
+ * so it feels identical on 60/120Hz displays. No animation library ships.
  */
 export default function Magnetic({
   children,
@@ -24,47 +29,89 @@ export default function Magnetic({
   const ref = useRef<HTMLSpanElement | null>(null);
 
   useIsomorphicLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || prefersReducedMotion()) return;
+    const node = ref.current;
+    if (!node || prefersReducedMotion()) return;
     if (!window.matchMedia("(pointer: fine)").matches) return;
 
-    let cancelled = false;
-    let cleanup: (() => void) | undefined;
+    // Per-second smoothing rate. Tuned to match GSAP's duration:0.5 power3.out
+    // settle — the element covers most of the gap in ~0.3s and eases the rest.
+    const SMOOTH = 11;
 
-    import("gsap").then(({ gsap }) => {
-      if (cancelled) return;
-      const node = ref.current;
-      if (!node) return;
+    let curX = 0;
+    let curY = 0;
+    let tgtX = 0;
+    let tgtY = 0;
+    let raf = 0;
+    let last = 0;
 
-      const xTo = gsap.quickTo(node, "x", { duration: 0.5, ease: "power3.out" });
-      const yTo = gsap.quickTo(node, "y", { duration: 0.5, ease: "power3.out" });
+    const tick = (now: number) => {
+      const dt = last ? Math.min((now - last) / 1000, 0.05) : 1 / 60;
+      last = now;
 
-      const onMove = (e: PointerEvent) => {
-        const r = node.getBoundingClientRect();
-        xTo((e.clientX - (r.left + r.width / 2)) * strength);
-        yTo((e.clientY - (r.top + r.height / 2)) * strength);
-      };
-      const onLeave = () => {
-        xTo(0);
-        yTo(0);
-      };
-      node.addEventListener("pointermove", onMove);
-      node.addEventListener("pointerleave", onLeave);
-      cleanup = () => {
-        node.removeEventListener("pointermove", onMove);
-        node.removeEventListener("pointerleave", onLeave);
-        gsap.killTweensOf(node);
-      };
-    });
+      // Frame-rate-independent exponential approach toward the target.
+      const a = 1 - Math.exp(-SMOOTH * dt);
+      curX += (tgtX - curX) * a;
+      curY += (tgtY - curY) * a;
+
+      const settled = Math.abs(tgtX - curX) < 0.01 && Math.abs(tgtY - curY) < 0.01;
+      if (settled) {
+        curX = tgtX;
+        curY = tgtY;
+      }
+      node.style.transform = `translate(${curX}px, ${curY}px)`;
+
+      // Keep spinning until we've converged on the current target; then idle
+      // (a held-still hover or a completed ease-back to center both stop here).
+      if (!settled) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        raf = 0;
+        // Drop the compositor hint once settled so an idle CTA doesn't pin a
+        // promoted layer between interactions.
+        node.style.willChange = "";
+      }
+    };
+
+    const ensureRunning = () => {
+      if (!raf) {
+        // Promote only for the duration of an active follow/settle. On touch and
+        // reduced-motion this effect returns early above, so will-change is never
+        // applied at all — no permanent layer for visitors the effect never runs
+        // for (previously a static `will-change-transform` class pinned one for
+        // every visit regardless).
+        node.style.willChange = "transform";
+        last = 0;
+        raf = requestAnimationFrame(tick);
+      }
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const r = node.getBoundingClientRect();
+      tgtX = (e.clientX - (r.left + r.width / 2)) * strength;
+      tgtY = (e.clientY - (r.top + r.height / 2)) * strength;
+      ensureRunning();
+    };
+    const onLeave = () => {
+      tgtX = 0;
+      tgtY = 0;
+      ensureRunning();
+    };
+
+    // Passive: onMove/onLeave never preventDefault, matching every other
+    // pointer/scroll listener in the motion layer.
+    node.addEventListener("pointermove", onMove, { passive: true });
+    node.addEventListener("pointerleave", onLeave, { passive: true });
 
     return () => {
-      cancelled = true;
-      cleanup?.();
+      node.removeEventListener("pointermove", onMove);
+      node.removeEventListener("pointerleave", onLeave);
+      if (raf) cancelAnimationFrame(raf);
+      node.style.transform = "";
     };
   }, [strength]);
 
   return (
-    <span ref={ref} className={`inline-block will-change-transform ${className ?? ""}`}>
+    <span ref={ref} className={`inline-block ${className ?? ""}`}>
       {children}
     </span>
   );

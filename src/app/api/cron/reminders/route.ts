@@ -5,6 +5,7 @@ import { listCalendarEvents } from "@/lib/calendar-store";
 import { sendPushToAll } from "@/lib/push";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
+import { eur0 as eur } from "@/lib/money";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const maxDuration = 60;
  * summary to the team's devices:
  *   · events happening in the next 3 days
  *   · payments due (or overdue) within 7 days
- *   · quotes still awaiting a first reply for 2+ days
+ *   · quotes still awaiting a first reply for 24h+
  *   · follow-ups due today or overdue
  *
  * Protected by CRON_SECRET: the caller must send it as a Bearer token (never a
@@ -38,13 +39,6 @@ function authorized(req: NextRequest): boolean {
   const expected = createHash("sha256").update(`Bearer ${secret}`).digest();
   return timingSafeEqual(provided, expected);
 }
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
 
 export async function GET(request: NextRequest) {
   if (!authorized(request)) {
@@ -93,13 +87,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Quotes awaiting a first reply for 2+ days
-    const twoDaysAgo = Date.now() - 2 * 864e5;
+    // 3. Quotes awaiting a first reply for 24h+. The site promises a reply
+    //    "within 24 business hours" in several places, so the safety-net digest
+    //    must flag a lead once it crosses that line — not wait a second day.
+    const oneDayAgo = Date.now() - 864e5;
     const awaiting = quotes.filter(
       (q) =>
         (q.status === "pendente" || q.status === "em_revisao") &&
         !(q.messages && q.messages.length > 0) &&
-        new Date(q.submittedAt).getTime() < twoDaysAgo,
+        new Date(q.submittedAt).getTime() < oneDayAgo,
     ).length;
 
     // 4. Follow-ups due today or overdue (active deals only)

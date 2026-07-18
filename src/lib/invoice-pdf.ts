@@ -1,5 +1,8 @@
+import "server-only";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { SITE } from "@/lib/site";
+import { eur } from "@/lib/money";
+import { winAnsiSafe } from "@/lib/pdf-text";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
 const INK = rgb(0.1, 0.1, 0.1);
@@ -8,13 +11,6 @@ const LINE = rgb(0.85, 0.85, 0.85);
 
 const A4 = { w: 595.28, h: 841.89 };
 const MARGIN = 56;
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
 
 export interface InvoiceData {
   number: string;
@@ -39,22 +35,33 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const right = A4.w - MARGIN;
   let y = A4.h - MARGIN;
 
+  // Sanitizamos NO ponto de desenho: `s` pode conter texto do cliente (nome,
+  // descrição…) com caracteres que o WinAnsi/Helvetica não codifica e que
+  // fariam `drawText`/`widthOfTextAtSize` lançar (→ recibo 500). `tr` sanitiza
+  // antes de medir a largura, para o alinhamento à direita usar a string real.
   const text = (
     s: string,
     x: number,
     yy: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) =>
-    page.drawText(s, { x, y: yy, font: o.font ?? font, size: o.size ?? 10, color: o.color ?? INK });
+    page.drawText(winAnsiSafe(s), {
+      x,
+      y: yy,
+      font: o.font ?? font,
+      size: o.size ?? 10,
+      color: o.color ?? INK,
+    });
   const tr = (
     s: string,
     xr: number,
     yy: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) => {
+    const safe = winAnsiSafe(s);
     const f = o.font ?? font;
     const size = o.size ?? 10;
-    text(s, xr - f.widthOfTextAtSize(s, size), yy, o);
+    text(safe, xr - f.widthOfTextAtSize(safe, size), yy, o);
   };
   const hr = (yy: number) =>
     page.drawLine({

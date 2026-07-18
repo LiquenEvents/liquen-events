@@ -1,15 +1,34 @@
 import Link from "next/link";
 import Image from "next/image";
+import TrackedLink from "@/components/TrackedLink";
 import { blurFor } from "@/lib/blur";
+import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
 
-const stripPhotos = [
-  { src: "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg", span: "col-span-2" },
-  { src: "/imagens/M&F0152.jpg", span: "col-span-1" },
-  { src: "/imagens/EW1_1428.jpg", span: "col-span-1" },
+// The footer photo strip draws a fresh 3 from this pool on every entry to the
+// page (see RotatingPhotoGrid), so it changes as you move around the site.
+const STRIP_POOL = [
+  "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg",
+  "/imagens/M&F0152.jpg",
+  "/imagens/EW1_1428.jpg",
+  "/imagens/hd-edited.jpg",
+  "/imagens/EW1_1330.jpg",
+  "/imagens/J&P-IMGL4769.jpg",
+  "/imagens/teresinhaeze-909.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/matilde-e-tomas0654-1.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
+];
+
+const STRIP_CELLS = [
+  { cls: "col-span-2", sizes: "50vw" },
+  { cls: "col-span-1", sizes: "25vw" },
+  { cls: "col-span-1", sizes: "25vw" },
 ];
 
 // Service detail slugs, paired with t.footer.serviceLinks (same order) — gives
@@ -23,6 +42,7 @@ const serviceSlugs = [
 
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   const t = getDictionary(locale);
+  const stripPool = STRIP_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   const pages: [string, string][] = [
     [t.nav.sobre, "/sobre"],
     [t.nav.servicos, "/servicos"],
@@ -32,27 +52,20 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   ];
   return (
     <footer className="relative bg-transparent overflow-hidden">
-      {/* ── Photo strip — full bleed, 4-col grid ── */}
-      <div className="grid grid-cols-4 h-[180px] sm:h-[240px] lg:h-[300px]">
-        {stripPhotos.map((p, i) => (
-          <div key={i} className={`relative overflow-hidden group ${p.span}`}>
-            <Image
-              src={p.src}
-              {...blurFor(p.src)}
-              alt=""
-              fill
-              sizes="(max-width: 768px) 50vw, 25vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-            />
-            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors duration-500" />
-          </div>
-        ))}
-      </div>
+      {/* ── Photo strip — full bleed, 4-col grid; rotates per entry ── */}
+      <RotatingPhotoGrid
+        cells={STRIP_CELLS}
+        pool={stripPool}
+        alt=""
+        className="grid grid-cols-4 h-[96px] sm:h-[120px] lg:h-[150px]"
+        imgClassName="transition-transform duration-700 group-hover:scale-[1.04]"
+        overlayClassName="bg-black/30 group-hover:bg-black/10"
+      />
 
       {/* ── Main content ── */}
       <div className="border-t border-foreground/6">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="py-12 md:py-20 grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-16">
+          <div className="py-8 md:py-10 grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10">
             {/* Brand column */}
             <div className="md:col-span-5 flex flex-col">
               <Image
@@ -60,27 +73,17 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 alt="Líquen Events"
                 width={215}
                 height={128}
-                className="object-contain mb-6 h-28 sm:h-36 w-auto"
+                className="object-contain mb-4 h-14 sm:h-16 w-auto"
               />
-              <p className="text-foreground/72 text-sm leading-[1.85] max-w-[260px] mb-7">
+              <p className="text-foreground/72 text-[13px] leading-[1.7] max-w-[260px] mb-5">
                 {t.footer.sloganLine1}
                 <br />
                 {t.footer.sloganLine2}
               </p>
 
-              {/* Disponível badge */}
-              <div className="flex items-center gap-2.5 mb-9">
-                <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="footer-ping absolute inline-flex h-full w-full rounded-full bg-moss opacity-60" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-moss" />
-                </span>
-                <span className="text-[10px] tracking-[0.32em] uppercase text-foreground/72">
-                  {t.footer.disponivel}
-                </span>
-              </div>
-
-              {/* Social icons */}
-              <div className="flex items-center gap-5">
+              {/* Social icons — sem o antigo badge "disponível": nada de pontos
+                  a pulsar (idioma SpaceX = sem ornamentos animados). */}
+              <div className="flex items-center gap-5 mt-1">
                 {[
                   {
                     label: "Instagram",
@@ -126,7 +129,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={s.label}
+                    aria-label={`${s.label} (${t.common.newWindow})`}
                     className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
                   >
                     {s.icon}
@@ -138,7 +141,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   href={WHATSAPP_HREF}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="WhatsApp"
+                  aria-label={`WhatsApp (${t.common.newWindow})`}
                   className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
                 >
                   <WhatsAppIcon className="w-[18px] h-[18px]" />
@@ -148,10 +151,10 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
 
             {/* Pages */}
             <div className="md:col-span-3">
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-8">
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.paginas}
               </p>
-              <ul className="flex flex-col gap-4">
+              <ul className="flex flex-col gap-2.5">
                 {pages.map(([label, href]) => (
                   <li key={href}>
                     <Link
@@ -163,10 +166,10 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   </li>
                 ))}
               </ul>
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mt-10 mb-8">
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mt-6 mb-4">
                 {t.footer.servicosTitulo}
               </p>
-              <ul className="flex flex-col gap-4">
+              <ul className="flex flex-col gap-2.5">
                 {serviceSlugs.map((slug, i) => (
                   <li key={slug}>
                     <Link
@@ -182,10 +185,10 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
 
             {/* Contact */}
             <div className="md:col-span-4">
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-8">
+              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.contacto}
               </p>
-              <div className="flex flex-col gap-4 text-[13px] text-foreground/72 mb-10">
+              <div className="flex flex-col gap-2.5 text-[13px] text-foreground/72 mb-6">
                 <a
                   href={`mailto:${SITE.email}`}
                   className="link-line hover:text-foreground/78 transition-colors duration-300"
@@ -200,19 +203,24 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 </a>
                 <span className="text-foreground/78">{t.footer.country}</span>
               </div>
-              <Link
+              {/* CTA no idioma SpaceX — filete quadrado que enche no hover com
+                  inversão de texto (o ground do footer é branco, por isso enche
+                  a foreground escura e o texto passa a claro), em vez do antigo
+                  hover que só tingia o traço de moss. */}
+              <TrackedLink
                 href={localizeHref("/orcamento", locale)}
-                className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/12 text-foreground/68 text-[11px] tracking-[0.25em] uppercase rounded-sm hover:border-moss/40 hover:text-moss transition-all duration-300"
+                trackProps={{ source: "footer" }}
+                className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/25 text-foreground/70 text-[11px] tracking-[0.25em] uppercase hover:bg-foreground hover:text-white hover:border-foreground transition-colors duration-300 ease-expo"
               >
                 {t.footer.pedirOrcamento} <span aria-hidden>→</span>
-              </Link>
+              </TrackedLink>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── Copyright bar ── */}
-      <div className="border-t border-foreground/6 py-6">
+      <div className="border-t border-foreground/6 py-4">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <p className="text-[11px] text-foreground/78 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — {t.footer.rights}

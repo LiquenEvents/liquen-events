@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
 /**
  * Tactile 3D tilt-on-hover wrapper — the "liquid glass" moment for the service
@@ -42,7 +43,7 @@ export default function TiltCard({
 
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== "mouse") return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (prefersReducedMotion()) return;
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();

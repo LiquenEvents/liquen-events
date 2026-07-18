@@ -36,9 +36,14 @@
    Change a tier's weight here, not across the page files. (The /contacto hero
    keeps its own larger scale, inline on that page.) */
 :root {
-  --hero-display: clamp(56px, 10vw, 150px);
-  --hero-section: clamp(52px, 9vw, 132px);
+  --hero-display: clamp(48px, 10vw, 150px);
+  --hero-section: clamp(46px, 9vw, 132px);
   --hero-detail: clamp(36px, 6vw, 84px);
+  /* One signature ease-out for the whole site — the dominant curve already used
+     by the route/reveal animations. Collapsing the two near-identical variants
+     (the old .ease-expo and Reveal's curve) onto it makes adjacent motion read
+     as one coherent system rather than three slightly different decelerations. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
@@ -58,6 +63,29 @@ body.admin-mode {
   --color-surface-raised: #f4f3f0;
   --color-surface-elevated: #ffffff;
   --color-foreground: #2a2620;
+  /* ── Back-office text-contrast tokens (WCAG 1.4.3) ──
+     The admin surface is pure white, so foreground (#2a2620) at a low alpha
+     silently drops informational text below 4.5:1. These three audited levels
+     mirror the public site's .eyebrow discipline (a legible micro-heading, not a
+     ghost). Use them for INFORMATIONAL text instead of arbitrary text-foreground/NN.
+       --bo-text        ~6.4:1  strong body info (values, emails, ids, dates)
+       --bo-text-muted  ~5.6:1  secondary info — still passes AA body text
+       --bo-text-faint  ~4.1:1  decorative-only micro-labels (≥3:1; never the sole
+                                carrier of information) */
+  --bo-text: rgba(42, 38, 32, 0.78);
+  --bo-text-muted: rgba(42, 38, 32, 0.7);
+  --bo-text-faint: rgba(42, 38, 32, 0.6);
+}
+/* Matching utilities so the tokens can be applied like the Tailwind text-* class
+   they replace. */
+body.admin-mode .bo-text {
+  color: var(--bo-text);
+}
+body.admin-mode .bo-text-muted {
+  color: var(--bo-text-muted);
+}
+body.admin-mode .bo-text-faint {
+  color: var(--bo-text-faint);
 }
 
 /* ── Selection ── */
@@ -90,6 +118,15 @@ body.admin-mode {
     0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
 }
+/* Windows High Contrast / forced-colors mode strips box-shadows, so the ring
+   above disappears and keyboard focus becomes invisible. Restore a real system
+   outline there (CanvasText adapts to the user's chosen contrast theme). */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
 
 /* ── Smooth scroll ── */
 html {
@@ -105,44 +142,6 @@ html {
   html {
     scroll-behavior: auto;
   }
-}
-
-/* ── Lenis (momentum scroll) — active only when JS mounts it (não em
-   reduced-motion). Enquanto ativo, o scroll-behavior nativo tem de ficar auto
-   para não brigar com a interpolação do Lenis. ── */
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-.lenis.lenis-smooth iframe {
-  pointer-events: none;
-}
-
-/* ── Film grain — textura cinematográfica global (ver FilmGrain.tsx).
-   ANTES: um overlay fixo com `mix-blend-mode: overlay` que "jittava" ~8×/s para
-   sempre. Um blend-mode num elemento fixo a cobrir o ecrã obriga o browser a
-   recompor+misturar o viewport INTEIRO a cada frame de scroll (o conteúdo por
-   baixo muda), e a animação recompunha-o continuamente mesmo parado — a maior
-   causa de o site parecer "travado".
-   AGORA: estático e sem blend. Mantém a textura de grão a custo ~zero (uma
-   camada composta uma única vez, nunca repintada durante o scroll). ── */
-.film-grain {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  pointer-events: none;
-  opacity: 0.045;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
 }
 
 /* ── Base ── */
@@ -188,12 +187,17 @@ body {
     font-size: 16px;
   }
 }
-/* Safe-area helpers for fixed / edge elements (notch & home indicator) */
+/* Safe-area helper for fixed / edge elements (notch). */
 .pt-safe {
   padding-top: env(safe-area-inset-top);
 }
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+/* Subtle scrim behind white text that sits over the near-transparent MIDDLE of
+   a hero veil (vertically-centered statements/CTAs). It lifts contrast to AA on
+   bright photo regions without darkening the photo itself — imperceptible over
+   dark areas, only doing work where the text would otherwise wash out. Same
+   treatment already used on the clientes lead statement. */
+.text-veil-shadow {
+  text-shadow: 0 1px 24px rgba(8, 8, 8, 0.6);
 }
 /* Safety net: never allow accidental horizontal scroll on small screens */
 body {
@@ -236,7 +240,9 @@ body::before {
   background: currentColor;
   transform-origin: right;
   transform: scaleX(0);
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  /* 0.3s to match the color transition on the same links (was 0.45s, so the
+     underline lagged the colour by ~150ms). */
+  transition: transform 0.3s var(--ease-out);
 }
 .link-line:hover::after {
   transform-origin: left;
@@ -344,23 +350,16 @@ body::before {
 }
 
 /* ── Hero CSS animations (no JS — always in viewport on load) ── */
-.anim-0 {
-  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.anim-1 {
-  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 180ms both;
-}
-.anim-2 {
-  animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 360ms both;
-}
+/* Only .anim-3 is used (the hero CTA row); .anim-0/1/2 were orphaned. */
 .anim-3 {
   animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 560ms both;
 }
 
 .animate-marquee {
-  animation: marquee 50s linear infinite;
+  animation: marquee 30s linear infinite;
 }
-.animate-marquee:hover {
+.animate-marquee:hover,
+.animate-marquee.marquee-paused {
   animation-play-state: paused;
 }
 
@@ -397,6 +396,49 @@ body::before {
   animation: footer-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* ── Signature easing utility — the fast-out/slow-settle curve used for hovers
+   and reveals. Now aliases the shared --ease-out token so the whole site shares
+   one deceleration. Pair with a transition-* utility. ── */
+.ease-expo {
+  transition-timing-function: var(--ease-out);
+}
+
+/* ── SpaceX display tracking — their big uppercase D-DIN headlines run at a
+   slightly NEGATIVE letter-spacing (h1 ≈ -1px at 69px). Apply to the large
+   uppercase display titles (hero captions, chapter/band headlines) so the
+   caps pull together the way they do on spacex.com, instead of the airy
+   default. Small type keeps its own wide tracking. ── */
+.tracking-display {
+  letter-spacing: -0.02em;
+}
+
+/* ── SpaceX scroll chevron — the bottom-of-panel down-arrow that pulses in
+   once, holds, then repeats (their `fadeBounce`, ~5s loop). Pinned near the
+   bottom-centre of a full-screen chapter. Gated off under reduced motion. ── */
+@keyframes scroll-chevron {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.scroll-chevron {
+  animation: scroll-chevron 5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-chevron {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 /* ── Orçamento / Back-office full-screen mode ── */
 body:has([data-orcamento-mode]) footer,
 body:has([data-orcamento-mode]) .whatsapp-fixed,
@@ -426,44 +468,6 @@ body.admin-mode ::-webkit-scrollbar-thumb {
 }
 body.admin-mode ::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 122, 95, 0.45);
-}
-
-/* ── Wizard step transitions ── */
-@keyframes step-forward {
-  from {
-    opacity: 0;
-    transform: translateX(28px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-@keyframes step-back {
-  from {
-    opacity: 0;
-    transform: translateX(-28px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-.animate-step-forward {
-  animation: step-forward 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.animate-step-back {
-  animation: step-back 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* ── Offscreen rendering skip ──
-   Lets the browser skip layout/paint of far-offscreen blocks (huge win on the
-   245-photo gallery masonry, where laying out every item caused long tasks).
-   `auto <length>` remembers each item's real size after first render, so
-   scrolling back never re-lays-out and the scrollbar stays stable. */
-.cv-auto {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 320px;
 }
 
 /* ── Hide scrollbar visually, keep scroll functional ── */
@@ -530,7 +534,7 @@ body[data-menu-open] .whatsapp-fixed {
   /* `backwards` (not `both`): applies the start state before the animation but
      does NOT leave a lingering transform afterwards — a persistent transform
      would create a containing block and break position:fixed overlays inside. */
-  animation: route-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: route-fade 0.42s var(--ease-out) backwards;
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
@@ -542,7 +546,10 @@ body[data-menu-open] .whatsapp-fixed {
   animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both vt-depart;
 }
 ::view-transition-new(.vt-page) {
-  animation: 480ms cubic-bezier(0.16, 1, 0.3, 1) 90ms both vt-arrive;
+  /* Shorter arrive (was 480ms + 90ms ≈ 570ms) so navigation feels immediate
+     rather than heavy. No incoming delay — dead time before anything moves reads
+     as lag. The old page still departs quickly (200ms). */
+  animation: 360ms var(--ease-out) both vt-arrive;
 }
 @keyframes vt-depart {
   to {
@@ -551,9 +558,14 @@ body[data-menu-open] .whatsapp-fixed {
   }
 }
 @keyframes vt-arrive {
+  /* Pure fade — no translateY. The incoming page's own reveals (AnimateIn /
+     Reveal) already rise the hero caption ~28px; when the whole route ALSO rose
+     22px at a different duration the two stacked and read "mushy" at the moment
+     the new page should feel crisp. The fade now hands off cleanly to the
+     on-page rise. (Directional vt-page-fwd/bwd keep their translateX — different
+     axis, no clash.) */
   from {
     opacity: 0;
-    transform: translateY(22px);
   }
 }
 
@@ -561,13 +573,13 @@ body[data-menu-open] .whatsapp-fixed {
   animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-left;
 }
 ::view-transition-new(.vt-page-fwd) {
-  animation: 500ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both vt-in-right;
+  animation: 380ms var(--ease-out) both vt-in-right;
 }
 ::view-transition-old(.vt-page-bwd) {
   animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-right;
 }
 ::view-transition-new(.vt-page-bwd) {
-  animation: 500ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both vt-in-left;
+  animation: 380ms var(--ease-out) both vt-in-left;
 }
 @keyframes vt-out-left {
   to {
@@ -697,16 +709,6 @@ body[data-menu-open] .whatsapp-fixed {
   border-radius: 0.75rem;
   box-shadow: 0 1px 2px rgba(42, 38, 32, 0.04);
 }
-.bo-card-interactive {
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
-.bo-card-interactive:hover {
-  border-color: rgba(42, 38, 32, 0.16);
-  box-shadow: 0 4px 14px rgba(42, 38, 32, 0.07);
-}
 /* Input / select fields inside the back office */
 .bo-input {
   width: 100%;
@@ -721,9 +723,10 @@ body[data-menu-open] .whatsapp-fixed {
   outline: none;
   border-color: rgba(42, 38, 32, 0.75);
 }
-/* Eyebrow label used atop panels */
+/* Eyebrow label used atop panels — ~4.1:1 on white so the section it heads is
+   legible, not a ghost (WCAG 1.4.3; matches the public .eyebrow discipline). */
 .bo-eyebrow {
-  color: rgba(42, 38, 32, 0.35);
+  color: rgba(42, 38, 32, 0.6);
   font-size: 10px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -757,23 +760,6 @@ body[data-menu-open] .whatsapp-fixed {
   }
 }
 
-/* ── Back-office: hairline panel + soft hover lift ── */
-.bo-panel {
-  border: 1px solid rgba(42, 38, 32, 0.08);
-  border-radius: 10px;
-  background: rgba(244, 243, 240, 0.6);
-}
-.bo-panel-hover {
-  transition:
-    border-color 0.3s ease,
-    background-color 0.3s ease,
-    transform 0.3s ease;
-}
-.bo-panel-hover:hover {
-  border-color: rgba(42, 38, 32, 0.14);
-  background: rgba(236, 234, 229, 0.8);
-}
-
 /* Eyebrow label — shared editorial micro-heading */
 .eyebrow {
   font-size: 10px;
@@ -789,9 +775,6 @@ body:has([data-orcamento-mode]) .eyebrow {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-0,
-  .anim-1,
-  .anim-2,
   .anim-3 {
     animation: none;
     opacity: 1;
@@ -804,10 +787,6 @@ body:has([data-orcamento-mode]) .eyebrow {
   .animate-spin,
   .animate-pulse,
   .footer-ping {
-    animation: none;
-  }
-  .animate-step-forward,
-  .animate-step-back {
     animation: none;
   }
   .view-in {
@@ -830,6 +809,9 @@ body:has([data-orcamento-mode]) .eyebrow {
   .lb-kenburns {
     animation: none;
     opacity: 1;
+    /* No animation for these users, so don't leave a permanent compositor-layer
+       hint behind (mirrors the .g-reveal / .cl-reveal reduced-motion cleanup). */
+    will-change: auto;
   }
   .lb-progress {
     animation: none;
@@ -866,6 +848,15 @@ body:has([data-orcamento-mode]) .eyebrow {
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {
   background-color: #12160f;
+  /* Skip rendering off-screen tiles' contents (the <Image>) so a long gallery
+     doesn't keep hundreds of decoded layers laid out — the fix for the measured
+     scroll cost. Safe against the old "dark gap" regression BECAUSE the box
+     height here is fully determined by the inline `aspect-ratio` (not by the
+     skipped content): the reserved size is always correct, so nothing collapses.
+     `contain-intrinsic-size: auto` lets the browser remember the last real size
+     as a belt-and-braces fallback. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto;
 }
 
 /* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
@@ -916,7 +907,10 @@ body:has([data-orcamento-mode]) .eyebrow {
   position: absolute;
   top: 0;
   border-radius: 62% 38% 54% 46% / 58% 44% 56% 42%;
-  will-change: transform, opacity;
+  /* No explicit will-change: the browser already promotes an element with an
+     active transform/opacity animation, so this only pinned 16 compositor
+     layers AFTER the one-shot fall finished (fill-mode: both leaves them
+     mounted). Dropping it keeps the animation identical, no lingering layers. */
   /* Longhands (not the `animation` shorthand): a var() in the shorthand's time
      slots makes Lightning CSS drop the whole rule. Duration/delay come per-petal
      via inline style; the keyframe still reads --petal-x/rot/op fine. */
@@ -1039,14 +1033,6 @@ body:has([data-orcamento-mode]) .eyebrow {
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
 }
 
-/* Fade da fila de filtros, só aplicada quando ela realmente transborda
-   (ver ResizeObserver em GaleriaClient) — sugere "há mais categorias, arrasta"
-   sem cortar o último pill em ecrãs onde tudo já cabe. */
-.g-filter-fade {
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .g-reveal {
     opacity: 1;
@@ -1074,12 +1060,115 @@ body:has([data-orcamento-mode]) .eyebrow {
   }
 }
 
+/* ── Client logo wall (ClientLogoGrid) — compact grid, editorial scroll-reveal
+      + moss hover ──
+   The 19 client logos resolve in as one staggered wave when the block scrolls
+   into view: each rises + sharpens (blur→crisp) + fades, offset by index via
+   --cl-delay. A single IntersectionObserver on the grid adds .cl-in once, then
+   disconnects — no scroll listeners, no per-frame JS. Only transform/opacity/
+   filter animate (compositor work). JS adds .cl-armed before arming the reveal,
+   so without JS — and under reduced motion — the logos stay fully visible
+   (they're client proof and must always render legibly). */
+
+/* Cells share borders, so nothing translates the cell itself (that would open
+   seams between neighbours). Instead a soft moss spotlight blooms behind the
+   logo and the cell picks up the faintest moss tint. */
+.cl-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(58% 70% at 50% 50%, rgba(99, 122, 95, 0.11), transparent 72%);
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.cl-cell:hover {
+  background-color: rgba(99, 122, 95, 0.045);
+}
+.cl-cell:hover::before {
+  opacity: 1;
+}
+
+/* On hover the logo lifts + swells a touch, and the black silhouette crossfades
+   to a true moss recolor: a moss-filled layer masked by the logo's own alpha. */
+.cl-logo {
+  position: relative;
+  display: inline-flex;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cl-cell:hover .cl-logo {
+  transform: translateY(-2px) scale(1.045);
+}
+.cl-black {
+  transition: opacity 0.5s ease;
+}
+.cl-cell:hover .cl-black {
+  opacity: 0;
+}
+.cl-moss {
+  position: absolute;
+  inset: 0;
+  background-color: var(--color-moss);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  pointer-events: none;
+}
+.cl-cell:hover .cl-moss {
+  opacity: 1;
+}
+
+/* Entrance reveal. The hidden "from" state exists only once JS arms it
+   (.cl-armed), so no-JS visitors never face a blank wall. */
+.cl-armed .cl-reveal {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  filter: blur(6px);
+  will-change: opacity, transform, filter;
+}
+.cl-armed.cl-in .cl-reveal {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+  transition:
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--cl-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Final state, instantly — no rise, blur or crossfade motion. Hover still
+     recolors to moss (a state change, not motion), just without a transition. */
+  .cl-armed .cl-reveal,
+  .cl-armed.cl-in .cl-reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+    will-change: auto;
+  }
+  .cl-cell,
+  .cl-cell::before,
+  .cl-logo,
+  .cl-black,
+  .cl-moss {
+    transition: none;
+  }
+  .cl-cell:hover .cl-logo {
+    transform: none;
+  }
+}
+
 /* ── Print / PDF ── */
 @media print {
   body::before {
-    display: none !important;
-  }
-  .no-print {
     display: none !important;
   }
   nav,

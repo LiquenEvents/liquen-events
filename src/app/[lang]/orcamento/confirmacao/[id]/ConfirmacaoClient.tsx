@@ -8,6 +8,8 @@ import { SITE } from "@/lib/site";
 import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
 import { localizeHref } from "@/lib/i18n";
+import type { Dict } from "@/lib/i18n";
+import { track } from "@/lib/track";
 
 const STATUS_COLORS: Record<string, string> = {
   pendente: "text-moss-dark",
@@ -38,9 +40,17 @@ const PETALS = [
   { l: 34, w: 12, h: 9, c: "moss-light", d: 8, dl: 3.7, r: -260, x: 35, o: 0.75 },
 ];
 
-export default function ConfirmacaoClient({ id }: { id: string }) {
+export default function ConfirmacaoClient({
+  id,
+  confirmacao,
+}: {
+  id: string;
+  confirmacao: Dict["confirmacao"];
+}) {
+  // locale comes from the site-wide chrome context; the confirmacao namespace
+  // is passed in from this route's server page.
   const { locale, t } = useTranslations();
-  const tc = t.confirmacao;
+  const tc = confirmacao;
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   // After the client-side hand-off from the form, move focus to the confirmation
@@ -51,6 +61,12 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
   // mismatch (the server renders none).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Funnel completion: reaching this page IS the successful submit landing, so
+  // fire it here to measure submit → confirmation (the back half of the funnel
+  // was previously invisible). Once per mount; inert without Plausible.
+  useEffect(() => {
+    track("QuoteConfirmed");
+  }, []);
   useEffect(() => {
     if (!loading) h1Ref.current?.focus();
   }, [loading]);
@@ -71,19 +87,30 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
     }
 
     // 2) Fall back to the API (works when persisted server-side, e.g. dev).
+    //    Bounded by a timeout so a stalled connection can't leave the page on
+    //    the "loading…" text indefinitely — it settles into the generic
+    //    confirmation instead.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
     (async () => {
       try {
-        const res = await fetch(`/api/orcamento/${id}`, { cache: "no-store" });
+        const res = await fetch(`/api/orcamento/${id}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (res.ok && !cancelled) setQuote(await res.json());
       } catch {
         /* ignore — generic confirmation will be shown */
       } finally {
+        clearTimeout(timeout);
         if (!cancelled) setLoading(false);
       }
     })();
 
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, [id]);
 
@@ -501,6 +528,7 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
                     className={cls}
                   >
                     {inner}
+                    <span className="sr-only"> ({t.common.newWindow})</span>
                   </a>
                 ) : (
                   <Link key={c.label} href={c.href} className={cls}>
@@ -514,16 +542,16 @@ export default function ConfirmacaoClient({ id }: { id: string }) {
 
         {/* ── CTA ── */}
         <AnimateIn from="bottom" delay={430}>
-          <div className="mt-14 flex flex-wrap gap-4">
+          <div className="mt-14 flex flex-wrap items-center gap-x-8 gap-y-4">
             <Link
               href={localizeHref("/", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 btn-shine bg-moss text-white text-[11px] tracking-[0.2em] uppercase rounded-full hover:bg-moss-dark transition-colors shadow-lg shadow-moss/15"
+              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/75 text-[11px] tracking-[0.2em] uppercase hover:border-foreground/40 hover:text-foreground/90 transition-colors"
             >
-              {tc.voltarInicio} →
+              {tc.voltarInicio}
             </Link>
             <Link
               href={localizeHref("/orcamento", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/72 text-[11px] tracking-[0.2em] uppercase rounded-full hover:border-foreground/40 hover:text-foreground/75 transition-colors"
+              className="text-[11px] tracking-[0.2em] uppercase text-foreground/55 hover:text-moss transition-colors"
             >
               {tc.novoPedido}
             </Link>

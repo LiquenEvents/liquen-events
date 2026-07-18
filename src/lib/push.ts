@@ -1,3 +1,4 @@
+import "server-only";
 import webpush from "web-push";
 import { promises as fs } from "fs";
 import path from "path";
@@ -33,7 +34,7 @@ export function pushConfigured(): boolean {
     webpush.setVapidDetails(
       process.env.VAPID_SUBJECT ?? "mailto:liquen.alentejo@gmail.com",
       pub,
-      priv
+      priv,
     );
     configured = true;
   }
@@ -90,7 +91,10 @@ async function listSubscriptions(): Promise<PushSub[]> {
   const sb = getSupabase();
   if (sb) {
     const { data } = await sb.from(TABLE).select("endpoint, keys");
-    return (data ?? []).map((r) => ({ endpoint: r.endpoint as string, keys: r.keys as PushSub["keys"] }));
+    return (data ?? []).map((r) => ({
+      endpoint: r.endpoint as string,
+      keys: r.keys as PushSub["keys"],
+    }));
   }
   return fileRead();
 }
@@ -122,7 +126,7 @@ export async function sendPushToAll(payload: PushPayload): Promise<{ sent: numbe
           await removeSubscription(sub.endpoint).catch(() => {});
         }
       }
-    })
+    }),
   );
 
   return { sent };

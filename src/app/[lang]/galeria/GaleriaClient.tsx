@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from "react";
 import { createPortal, flushSync } from "react-dom";
 import Image from "next/image";
-import type { PhotoSrc, Label } from "./photos-data";
+import type { Label } from "./photos-data";
 import { collectionFor } from "./collections";
-import { useTranslations } from "@/components/LocaleProvider";
+import { type Photo, interleaveByCollection } from "./interleave";
+import type { Dict } from "@/lib/i18n";
 import { ViewTransition } from "@/components/vt";
 
 /**
@@ -33,114 +34,23 @@ function VTWrap({
   );
 }
 
-/** Photo enriched server-side with its blur placeholder + real aspect ratio
- *  (see photos-data.ts) — keeps the site-wide blur-map.json / image-dims.json
- *  out of this client bundle. */
-export interface Photo extends PhotoSrc {
-  blurDataURL: string;
-  aspectRatio: string;
-}
-
-/** The event/collection bucket a photo belongs to (named couple, else its
-    category). Photos with no bucket match still cluster by category. */
-function bucketKey(p: Photo): string {
-  return collectionFor(p.src) ?? `cat:${p.label}`;
-}
-
-// Stable per-string hash → [0,1). Deterministic (same on server + client, so
-// no hydration mismatch) and independent of array position, so it seeds a
-// reproducible "shuffle" without any global RNG state. FNV-1a.
-function hashUnit(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) / 4294967296;
-}
-
-/**
- * Spread photos so the grid feels genuinely shuffled — no two consecutive
- * photos from the same event, every collection appearing throughout (not
- * bunched), AND no rigid repeating pattern.
- *
- * Method: within its own bucket each photo gets an evenly-stepped position
- * `(j + 0.5) / size`, so a big shoot's frames land ~1/frequency apart across
- * the whole list (never bunched). Crucially, each bucket is then rotated by its
- * OWN random phase (`hashUnit(key)`, wrapped into [0,1)) — so the shoots don't
- * all start at 0 and fall into a mechanical A,B,C,A,B,C rotation; they
- * interleave at different offsets, reading as a real shuffle. A small per-photo
- * jitter breaks any residual lock-step. Fully deterministic (same on SSR +
- * client — no hydration mismatch). A final de-adjacency pass removes the rare
- * same-event neighbour.
- */
-// `seed` re-rolls the arrangement per visit: mixed into every hash input so the
-// per-bucket phase, jitter and tiebreak all shift together — a genuinely
-// different (but still well-spread, no-bunching) order each time. Empty seed on
-// the server + first client render keeps SSR and hydration identical; the client
-// swaps in a random seed once mounted (see `orderSeed`), so each entry differs
-// while the order stays fixed for the whole visit (never reshuffles mid-scroll).
-function interleaveByCollection(list: Photo[], seed = ""): Photo[] {
-  const buckets = new Map<string, Photo[]>();
-  const order: string[] = [];
-  for (const p of list) {
-    const key = bucketKey(p);
-    let arr = buckets.get(key);
-    if (!arr) {
-      arr = [];
-      buckets.set(key, arr);
-      order.push(key);
-    }
-    arr.push(p);
-  }
-  const ranked: { p: Photo; rank: number }[] = [];
-  for (const key of order) {
-    const arr = buckets.get(key)!;
-    const phase = hashUnit(key + seed); // per-bucket rotation → staggered interleave
-    for (let j = 0; j < arr.length; j++) {
-      const jitter = (hashUnit(arr[j].src + seed) - 0.5) * 0.12;
-      let rank = (j + 0.5) / arr.length + phase + jitter;
-      rank -= Math.floor(rank); // wrap into [0,1)
-      ranked.push({ p: arr[j], rank });
-    }
-  }
-  ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src + seed) - hashUnit(b.p.src + seed));
-  return deAdjacent(ranked.map((r) => r.p));
-}
-
-/**
- * Final safety pass: keep same-event photos apart. Beyond the immediate
- * neighbour, it enforces a WINDOW — no photo may share its event with any of the
- * `window` photos just before it — so a big shoot never shows two of its frames
- * a tile or two apart (which in a 2–3 column masonry reads as "fotos do mesmo
- * evento juntas"). For each violation it pulls forward the nearest later photo
- * whose event isn't in that window. When no such photo exists (the tail, or a
- * category that is a single shoot) it's left as-is — best effort.
- */
-function deAdjacent(list: Photo[], window = 3): Photo[] {
-  const out = [...list];
-  for (let i = 1; i < out.length; i++) {
-    const recent = new Set<string>();
-    for (let k = Math.max(0, i - window); k < i; k++) recent.add(bucketKey(out[k]));
-    if (!recent.has(bucketKey(out[i]))) continue;
-    let swap = -1;
-    for (let j = i + 1; j < out.length; j++) {
-      if (!recent.has(bucketKey(out[j]))) {
-        swap = j;
-        break;
-      }
-    }
-    if (swap !== -1) {
-      const [moved] = out.splice(swap, 1);
-      out.splice(i, 0, moved);
-    }
-  }
-  return out;
-}
-
 const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
+
+// next/image throws if placeholder="blur" is set without a blurDataURL. The
+// gallery only ships blur data for the first-paint photos (payload trim in
+// page.tsx); the rest fall back to the default placeholder over the gallery's
+// near-black background.
+function blurProps(p: Photo) {
+  return p.blurDataURL ? ({ placeholder: "blur", blurDataURL: p.blurDataURL } as const) : {};
+}
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
+// Fewer tiles on the FIRST paint than each subsequent page: React hydrating the
+// initial grid is a synchronous burst (measured up to a ~1s main-thread freeze
+// on a 6×-throttled phone when navigating into /galeria). A smaller first mount
+// cuts that freeze; the infinite-scroll append (in a yieldable startTransition)
+// fills the rest within a frame. Same value SSR + client → no hydration mismatch.
+const INITIAL_PAGE = 12;
 
 // URL-hash slugs for each category, so a filtered view is shareable &
 // bookmarkable (e.g. /galeria#casamentos) and survives the back button.
@@ -177,6 +87,42 @@ function collectionFromSlug(slug: string, names: string[]): string | null {
 const STRIP = 7;
 const SLIDE_MS = 5000; // ritmo do slideshow cinematográfico
 
+// Corre trabalho NÃO crítico quando a main thread está livre, para que a
+// hidratação e a primeira interação não fiquem bloqueadas por observers /
+// listeners que a primeira pintura não precisa. `requestIdleCallback` onde
+// existe; caso contrário (Safari) um setTimeout curto. Devolve um cancelador.
+function onIdle(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const w = window as typeof window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (id: number) => void;
+  };
+  if (typeof w.requestIdleCallback === "function") {
+    const id = w.requestIdleCallback(cb, { timeout: 500 });
+    return () => w.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(cb, 1);
+  return () => window.clearTimeout(id);
+}
+
+// Nome View-Transition estável de uma foto (puro → nível de módulo, partilhado
+// pela grelha e pelo lightbox).
+const vtId = (src: string) => `g-${src.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+// Rede lenta? Em Save-Data ou effectiveType 2g/3g não vale a pena pré-carregar
+// especulativamente os vizinhos full-screen do lightbox (imagens grandes que o
+// utilizador pode nunca ver). Em rede normal → comportamento inalterado.
+const SLOW_ET = new Set(["slow-2g", "2g", "3g"]);
+function shouldPreloadNeighbours(): boolean {
+  if (typeof navigator === "undefined") return true;
+  const c = (
+    navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
+  ).connection;
+  if (!c) return true;
+  if (c.saveData) return false;
+  return !(c.effectiveType && SLOW_ET.has(c.effectiveType));
+}
+
 // Keyboard focus ring that survives `overflow-hidden`. The global :focus-visible
 // outline is a box-shadow, which these image cells clip; an *inset* ring renders
 // inside the box, so it stays visible for keyboard users tabbing the grid.
@@ -187,8 +133,10 @@ const FOCUS_RING =
 function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   return (
     <>
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 p-3.5 flex items-end justify-between gap-2 opacity-0 group-hover:opacity-100 translate-y-1.5 group-hover:translate-y-0 transition-all duration-300 pointer-events-none">
+      {/* Reveal on keyboard focus too (not just hover) so tabbing the grid
+          surfaces the same caption sighted mouse users get (WCAG 1.4.13). */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 p-3.5 flex items-end justify-between gap-2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 translate-y-1.5 group-hover:translate-y-0 group-focus-visible:translate-y-0 transition-all duration-300 pointer-events-none">
         <span className="min-w-0">
           <span
             className="block text-white/90 text-[12px] font-medium truncate"
@@ -222,7 +170,13 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   );
 }
 
-export default function GaleriaClient({ photos }: { photos: Photo[] }) {
+export default function GaleriaClient({
+  photos,
+  dict,
+}: {
+  photos: Photo[];
+  dict: Dict["galeria"];
+}) {
   const collectionNames = useMemo(
     () =>
       Array.from(new Set(photos.map((p) => collectionFor(p.src)).filter((c): c is string => !!c))),
@@ -232,30 +186,20 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // Non-null = "ver este casamento" mode: browsing one couple's full story
   // (in shoot order, no interleaving) instead of a category grid.
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
-  const [shown, setShown] = useState(PAGE);
+  const [shown, setShown] = useState(INITIAL_PAGE);
   // Per-visit arrangement seed. Empty on SSR + first client render (so hydration
   // matches); a random value is set once on mount, re-rolling the interleave so
   // every fresh entry to the gallery lays out differently. It never changes
   // after mount, so the grid stays put while browsing (no mid-scroll reshuffle).
   const [orderSeed, setOrderSeed] = useState("");
-  useEffect(() => {
-    setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36));
-  }, []);
+  // Re-roll da ordem por visita — não crítico para a primeira pintura (o SSR
+  // mostra a ordem por defeito), por isso é adiado para idle: a grelha só se
+  // re-baralha depois de a hidratação assentar, libertando o TTI.
+  useEffect(
+    () => onIdle(() => setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36))),
+    [],
+  );
   const [fading, setFading] = useState(false);
-  // Right-edge fade on the filter pill row, only while it actually
-  // overflows — hints "more categories, swipe" without permanently
-  // clipping the last pill on wide viewports where everything fits.
-  const [filtersOverflow, setFiltersOverflow] = useState(false);
-  const filterScrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = filterScrollRef.current;
-    if (!el) return;
-    const check = () => setFiltersOverflow(el.scrollWidth - el.clientWidth > 4);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
   const [lb, setLb] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   // A fechar? Enquanto true o lightbox corre o fade+scale de saída (lb-closing)
@@ -302,23 +246,17 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // — a navegar, filtrar, redimensionar — não há nomes nenhuns, portanto a
   // colisão é impossível; no morph existe exatamente um par miniatura↔lightbox.
   const [morphSrc, setMorphSrc] = useState<string | null>(null);
-  const vtId = (src: string) => `g-${src.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   /** Nome VT de uma tile: só quando é a foto em morph E é a sua instância
       visível (mosaico em sm+, masonry em mobile — codificado em `active`). */
   const tileName = (src: string, active: boolean) =>
     active && morphSrc === src ? vtId(src) : undefined;
   const mosaicName = (idx: number) => tileName(visible[idx].src, idx === 0 || isSm === true);
   const masonryName = (idx: number, src: string) => tileName(src, idx < 5 ? isSm === false : true);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
-  // Drag-to-dismiss / swipe gesture on the lightbox (touch). The photo layer
-  // and backdrop are driven directly via refs during the drag (no per-frame
-  // React re-render → stays at 60fps); state only changes on release.
-  const photoLayerRef = useRef<HTMLDivElement>(null);
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
-  const open = lb !== null;
-  const { t } = useTranslations();
+  // O lightbox (portal, listeners de teclado/gesto, trap de foco, slideshow,
+  // pré-carga de vizinhos) vive num componente-filho `Lightbox` que só é montado
+  // quando `lb !== null`. Assim, nada da sua configuração — refs, efeitos,
+  // listeners — corre na primeira pintura; só arranca quando o utilizador abre
+  // uma foto. Comportamento idêntico depois de aberto.
 
   // Scroll-reveal for masonry tiles — they fade+rise as they enter view, so the
   // wall assembles itself instead of popping in. One shared IntersectionObserver
@@ -373,19 +311,27 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // página cresce muito com o scroll infinito). Listener passivo, throttled com
   // rAF; setShowTop só re-renderiza quando o booleano muda (React ignora o resto).
   const [showTop, setShowTop] = useState(false);
+  // O botão "voltar ao topo" só interessa depois de o utilizador descer bastante,
+  // por isso registamos o scroll listener em idle — nada de trabalho de scroll na
+  // main thread durante a primeira pintura.
   useEffect(() => {
     let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        setShowTop(window.scrollY > 1200);
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    let remove = () => {};
+    const cancel = onIdle(() => {
+      const onScroll = () => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          setShowTop(window.scrollY > 1200);
+        });
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      remove = () => window.removeEventListener("scroll", onScroll);
+    });
     return () => {
-      window.removeEventListener("scroll", onScroll);
+      cancel();
+      remove();
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);
@@ -399,36 +345,43 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // filter. Read post-hydration (avoids any SSR/CSR mismatch) and on every
   // hashchange.
   useEffect(() => {
-    const apply = () => {
-      const hash = window.location.hash.replace(/^#/, "");
-      if (hash.startsWith("c-")) {
-        const name = collectionFromSlug(hash.slice(2), collectionNames);
-        if (name) {
-          setCollectionFilter(name);
-          setShown(PAGE);
-          return;
+    let remove = () => {};
+    const cancel = onIdle(() => {
+      const apply = () => {
+        const hash = window.location.hash.replace(/^#/, "");
+        if (hash.startsWith("c-")) {
+          const name = collectionFromSlug(hash.slice(2), collectionNames);
+          if (name) {
+            setCollectionFilter(name);
+            setShown(PAGE);
+            return;
+          }
         }
-      }
-      setCollectionFilter(null);
-      const c = catFromSlug(hash);
-      setCat((prev) => (prev === c ? prev : c));
-      setShown(PAGE);
+        setCollectionFilter(null);
+        const c = catFromSlug(hash);
+        setCat((prev) => (prev === c ? prev : c));
+        setShown(PAGE);
+      };
+      apply();
+      window.addEventListener("hashchange", apply);
+      remove = () => window.removeEventListener("hashchange", apply);
+    });
+    return () => {
+      cancel();
+      remove();
     };
-    apply();
-    window.addEventListener("hashchange", apply);
-    return () => window.removeEventListener("hashchange", apply);
   }, [collectionNames]);
 
   // Localized display helpers — internal label keys stay PT (used for
   // filtering); only what the user reads is translated.
-  const labelText = (l: Label) => t.galeria.labels[l];
-  // Per-photo alt text. The category template (t.galeria.alt) alone would make
+  const labelText = (l: Label) => dict.labels[l];
+  // Per-photo alt text. The category template (dict.alt) alone would make
   // hundreds of photos share one identical string (bad for image SEO + a11y),
   // so when the shoot/couple is known we append it — every photo then reads
   // uniquely and descriptively (e.g. "Casamento … no Alentejo — Daniela &
   // Guilherme") while keeping the localized, keyword-rich base.
   const altText = (src: string, l: Label) => {
-    const base = t.galeria.alt[l];
+    const base = dict.alt[l];
     const c = collectionFor(src);
     return c ? `${base} — ${c}` : base;
   };
@@ -566,135 +519,9 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
     return () => clearTimeout(id);
   }, [lb, morphSrc]);
 
-  useEffect(() => {
-    if (lb === null) return;
-    const fn = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
-      else if (e.key === " " || e.code === "Space") {
-        e.preventDefault();
-        setPlaying((p) => !p);
-      } else if (e.key === "Tab" && dialogRef.current) {
-        // Trap focus inside the lightbox dialog.
-        const f = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, a[href], [tabindex]:not([tabindex="-1"])',
-        );
-        if (!f.length) return;
-        const first = f[0];
-        const last = f[f.length - 1];
-        const active = document.activeElement;
-        if (!dialogRef.current.contains(active)) {
-          e.preventDefault();
-          first.focus();
-        } else if (e.shiftKey && active === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && active === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", fn);
-    return () => window.removeEventListener("keydown", fn);
-  }, [lb, close, prev, next]);
-
-  // Move focus into the dialog on open; restore it to the trigger on close.
-  useEffect(() => {
-    if (!open) return;
-    restoreFocusRef.current = document.activeElement as HTMLElement | null;
-    const id = requestAnimationFrame(() => dialogRef.current?.focus());
-    return () => {
-      cancelAnimationFrame(id);
-      restoreFocusRef.current?.focus?.();
-    };
-  }, [open]);
-
-  // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
-  // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
-  useEffect(() => {
-    if (lb === null || !playing) return;
-    if (typeof document !== "undefined" && document.hidden) return;
-    const id = window.setTimeout(next, SLIDE_MS);
-    return () => window.clearTimeout(id);
-  }, [lb, playing, next]);
-
-  useEffect(() => {
-    document.body.style.overflow = lb !== null ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [lb]);
-
-  // Touch gestures on the open lightbox: horizontal swipe = prev/next,
-  // vertical drag-down = dismiss (the photo follows the finger and the backdrop
-  // fades, iOS-photos style). Attached as a NATIVE non-passive listener so the
-  // vertical drag can preventDefault (kill the rubber-band); the photo/backdrop
-  // are moved by writing to refs, never React state, so a drag never re-renders.
-  useEffect(() => {
-    if (lb === null) return;
-    const root = dialogRef.current;
-    if (!root) return;
-    const g = gestureRef.current;
-    const layer = () => photoLayerRef.current;
-    const backdrop = () => backdropRef.current;
-
-    const onStart = (e: TouchEvent) => {
-      const t = e.touches[0];
-      g.x = t.clientX;
-      g.y = t.clientY;
-      g.dx = 0;
-      g.dy = 0;
-      g.axis = "";
-    };
-    const onMove = (e: TouchEvent) => {
-      const t = e.touches[0];
-      g.dx = t.clientX - g.x;
-      g.dy = t.clientY - g.y;
-      if (g.axis === "") {
-        if (Math.abs(g.dx) < 8 && Math.abs(g.dy) < 8) return;
-        g.axis = Math.abs(g.dy) > Math.abs(g.dx) ? "y" : "x";
-        if (g.axis === "y") layer()?.classList.add("lb-dragging");
-      }
-      if (g.axis === "y" && g.dy > 0) {
-        e.preventDefault();
-        const l = layer();
-        const b = backdrop();
-        const scale = 1 - Math.min(g.dy / 1400, 0.12);
-        if (l) l.style.transform = `translateY(${g.dy}px) scale(${scale})`;
-        if (b) b.style.opacity = String(1 - Math.min(g.dy / 500, 0.72));
-      }
-    };
-    const onEnd = () => {
-      const l = layer();
-      const b = backdrop();
-      if (g.axis === "y") {
-        l?.classList.remove("lb-dragging");
-        if (g.dy > 120) {
-          if (l) l.style.transform = "translateY(115%) scale(0.88)";
-          if (b) b.style.opacity = "0";
-          window.setTimeout(dismiss, 220);
-        } else {
-          if (l) l.style.transform = "";
-          if (b) b.style.opacity = "";
-        }
-      } else if (g.axis === "x" && Math.abs(g.dx) > 50) {
-        if (g.dx < 0) next();
-        else prev();
-      }
-      g.axis = "";
-    };
-
-    root.addEventListener("touchstart", onStart, { passive: true });
-    root.addEventListener("touchmove", onMove, { passive: false });
-    root.addEventListener("touchend", onEnd, { passive: true });
-    return () => {
-      root.removeEventListener("touchstart", onStart);
-      root.removeEventListener("touchmove", onMove);
-      root.removeEventListener("touchend", onEnd);
-    };
-  }, [lb, next, prev, dismiss]);
+  // (Todos os efeitos exclusivos do lightbox — teclado/trap de foco, foco de
+  // entrada/saída, slideshow, bloqueio de scroll do body e gestos táteis — vivem
+  // agora dentro do componente `Lightbox`, que só monta quando está aberto.)
 
   function switchCat(c: Cat) {
     if (c === cat && !collectionFilter) return;
@@ -720,47 +547,31 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
   // first and re-opening after would fire two back-to-back ViewTransitions
   // on the same names — the exact bug that made resizing across the mobile
   // breakpoint log duplicate-name errors (see [[galeria-polish-jul-2026]]).
-  function viewCollection(name: string) {
-    const newPool = photos.filter((p) => collectionFor(p.src) === name);
-    const currentSrc = lb !== null ? pool[lb].src : null;
-    const newIdx = currentSrc ? newPool.findIndex((p) => p.src === currentSrc) : -1;
-    setCollectionFilter(name);
-    setShown(PAGE);
-    setJustOpened(false);
-    if (newIdx >= 0) setLb(newIdx);
-    else if (lb !== null) close();
-    window.history.replaceState(null, "", `#c-${collectionSlug(name)}`);
-  }
-
-  // Thumbnail strip around current photo
-  const half = Math.floor(STRIP / 2);
-  const stripStart = lb !== null ? Math.max(0, Math.min(lb - half, pool.length - STRIP)) : 0;
-  const stripIdx =
-    lb !== null
-      ? Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k)
-      : [];
-
-  // One pass over the pool (386 photos), memoized on `photos` — the old form
-  // re-filtered the whole array once per category on every render (scroll,
-  // hover, lightbox open all triggered it).
-  const counts = useMemo(() => {
-    const acc = Object.fromEntries(CATS.map((c) => [c, 0])) as Record<Cat, number>;
-    for (const p of photos) {
-      const label = p.label as Cat;
-      if (label in acc) acc[label] += 1;
-    }
-    acc.Todos = photos.length;
-    return acc;
-  }, [photos]);
+  const viewCollection = useCallback(
+    (name: string) => {
+      const newPool = photos.filter((p) => collectionFor(p.src) === name);
+      const currentSrc = lb !== null ? pool[lb].src : null;
+      const newIdx = currentSrc ? newPool.findIndex((p) => p.src === currentSrc) : -1;
+      setCollectionFilter(name);
+      setShown(PAGE);
+      setJustOpened(false);
+      if (newIdx >= 0) setLb(newIdx);
+      else if (lb !== null) close();
+      window.history.replaceState(null, "", `#c-${collectionSlug(name)}`);
+    },
+    [photos, pool, lb, close],
+  );
 
   return (
     <>
       {/* ── Filtros / vista de casamento ── */}
+      {/* A grelha é full-bleed (o wrapper max-w/px saiu da page), por isso o
+          chrome dos filtros leva aqui o seu próprio padding lateral. */}
       {collectionFilter ? (
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-8 px-3 sm:px-4 lg:px-6">
           <button
             onClick={() => switchCat("Todos")}
-            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90 transition-all duration-300"
+            className="flex-shrink-0 flex min-h-[44px] items-center gap-1.5 border border-white/25 px-4 py-2 text-[11px] tracking-[0.2em] uppercase text-white/70 hover:border-white/60 hover:text-white transition-colors duration-300"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -770,7 +581,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            {t.galeria.backToGallery}
+            {dict.backToGallery}
           </button>
           <div className="min-w-0">
             <p
@@ -780,36 +591,16 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               {collectionFilter}
             </p>
             <p className="text-white/55 text-[10px] tracking-[0.15em] uppercase mt-0.5">
-              {pool.length} {t.galeria.photosLabel}
+              {pool.length} {dict.photosLabel}
             </p>
           </div>
         </div>
       ) : (
-        <div
-          ref={filterScrollRef}
-          className={`flex gap-2 mb-8 overflow-x-auto pb-1 scrollbar-none${filtersOverflow ? " g-filter-fade" : ""}`}
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
-          {CATS.map((c) => (
-            <button
-              key={c}
-              onClick={() => switchCat(c)}
-              aria-pressed={cat === c}
-              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
-                cat === c
-                  ? "bg-moss-dark text-white shadow-lg shadow-moss/20"
-                  : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
-              }`}
-            >
-              {t.galeria.labels[c]}
-              <span
-                className={`text-[10px] tabular-nums ${cat === c ? "text-cream/90" : "text-white/50"}`}
-              >
-                {counts[c]}
-              </span>
-            </button>
-          ))}
-        </div>
+        /* Barra de categorias removida a pedido — a galeria mostra todas as
+           fotos numa só grelha, sem chrome de filtros. (A vista de coleção
+           acima, com o chip "voltar à galeria", mantém-se para o deep-link a
+           um casamento específico.) */
+        <div className="mb-2" />
       )}
 
       {/* ── Grid ── */}
@@ -842,9 +633,11 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                     fill
                     sizes="(max-width: 640px) 100vw, 50vw"
                     className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+                    // The 2×2 flagship tile is the largest grid image, the LCP
+                    // candidate on this route, and the lightbox morph source —
+                    // eager so it resolves without a lazy delay / pop-in.
                     loading="eager"
-                    placeholder="blur"
-                    blurDataURL={visible[0].blurDataURL}
+                    {...blurProps(visible[0])}
                   />
                 </VTWrap>
               )}
@@ -872,8 +665,7 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                         sizes="25vw"
                         className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                         loading="lazy"
-                        placeholder="blur"
-                        blurDataURL={visible[idx].blurDataURL}
+                        {...blurProps(visible[idx])}
                       />
                     </VTWrap>
                   )}
@@ -921,11 +713,15 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
                             src={p.src}
                             alt={altText(p.src, p.label)}
                             fill
-                            sizes="(max-width: 768px) 50vw, 33vw"
+                            // Match the real column count (1 col <640px, 2 cols
+                            // 640–767px, 3 cols ≥768px). The old value declared
+                            // 50vw on phones where a tile is actually full-width,
+                            // under-fetching and softening the flagship gallery
+                            // photos on mobile — the majority of visitors.
+                            sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
                             className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                             loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
-                            placeholder="blur"
-                            blurDataURL={p.blurDataURL}
+                            {...blurProps(p)}
                           />
                         </VTWrap>
                       )}
@@ -952,13 +748,14 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
               <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
             </div>
           ) : (
-            // Fallback sem IntersectionObserver — botão manual.
+            // Fallback sem IntersectionObserver — botão manual (ghost quadrado,
+            // preenche a branco no hover como os CTA do idioma SpaceX).
             <button
               onClick={() => setShown((s) => Math.min(s + PAGE, pool.length))}
-              className="group flex items-center gap-3 rounded-full border border-white/15 px-10 py-3.5 text-xs uppercase tracking-[0.2em] text-white/60 transition-all duration-300 hover:border-white/40 hover:text-white/90"
+              className="group flex min-h-[44px] items-center gap-3 border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.3em] text-white transition-colors duration-300 hover:border-white hover:bg-white hover:text-[#0c0e0b]"
             >
-              {t.galeria.verMais}
-              <span className="text-white/55 transition-colors group-hover:text-moss-light">
+              {dict.verMais}
+              <span className="text-white/55 transition-colors group-hover:text-[#0c0e0b]/70">
                 +{Math.min(PAGE, pool.length - shown)}
               </span>
             </button>
@@ -970,221 +767,41 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
             />
           </div>
           <p role="status" className="text-[10px] tracking-widest text-white/55">
-            {shown} {t.galeria.de} {pool.length}
+            {shown} {dict.de} {pool.length}
           </p>
         </div>
       )}
 
-      {/* ── Lightbox ── */}
-      {lb !== null &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${t.galeria.lbGallery} — ${labelText(pool[lb].label)}, ${t.galeria.lbPhoto} ${lb + 1} ${t.galeria.lbOf} ${pool.length}`}
-            tabIndex={-1}
-            className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
-            onClick={close}
-          >
-            {/* Fundo preto — camada própria que só anima opacidade, para o morph
-                da foto poder crescer por cima sem brigar com o <ViewTransition>.
-                É também o que o gesto de arrastar-para-baixo desvanece. */}
-            <div ref={backdropRef} className="lb-backdrop absolute inset-0 bg-black" />
-
-            {/* Barra superior */}
-            <div
-              className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 py-3.5 flex-shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-white/60 text-xs font-light tabular-nums">{lb + 1}</span>
-                <span className="text-white/20 text-xs">/</span>
-                <span className="text-white/25 text-xs tabular-nums">{pool.length}</span>
-                <span className="w-px h-3 bg-white/10 mx-1" />
-                {collectionFor(pool[lb].src) && (
-                  <span className="flex items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        viewCollection(collectionFor(pool[lb].src)!);
-                      }}
-                      aria-label={`${t.galeria.viewWedding} — ${collectionFor(pool[lb].src)}`}
-                      title={t.galeria.viewWedding}
-                      className="text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
-                      {collectionFor(pool[lb].src)}
-                    </button>
-                    <span className="text-white/20 mx-1.5">·</span>
-                  </span>
-                )}
-                <span className="text-white/65 text-[10px] tracking-[0.15em] uppercase">
-                  {labelText(pool[lb].label)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPlaying((p) => !p)}
-                  aria-label={playing ? t.galeria.lbPause : t.galeria.lbPlay}
-                  aria-pressed={playing}
-                  className={`p-2 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
-                >
-                  {playing ? (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <rect x="6" y="5" width="4" height="14" rx="1" />
-                      <rect x="14" y="5" width="4" height="14" rx="1" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.8-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
-                    </svg>
-                  )}
-                </button>
-                <button
-                  onClick={close}
-                  aria-label={t.galeria.lbClose}
-                  className="p-2 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Barra de progresso do slideshow — reinicia a cada foto */}
-            {playing && (
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/8 z-20 pointer-events-none">
-                <div
-                  key={lb}
-                  className="lb-progress h-full bg-gradient-to-r from-moss to-moss-light origin-left"
-                />
-              </div>
-            )}
-
-            {/* Área da foto + botões */}
-            <div className="relative flex-1 flex items-center justify-center min-h-0">
-              {/* Botão anterior */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  prev();
-                }}
-                aria-label={t.galeria.lbPrev}
-                className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-
-              {/* Foto principal */}
-              <div
-                ref={photoLayerRef}
-                className="lb-photo-layer absolute inset-0 mx-14 md:mx-20 overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <VTWrap key={lb} name={vtId(pool[lb].src)} exit="vt-lb">
-                  <Image
-                    key={lb}
-                    src={pool[lb].src}
-                    alt={altText(pool[lb].src, pool[lb].label)}
-                    fill
-                    sizes="90vw"
-                    className={`object-contain ${
-                      playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
-                    }`}
-                    placeholder="blur"
-                    blurDataURL={pool[lb].blurDataURL}
-                  />
-                </VTWrap>
-              </div>
-
-              {/* Pré-carrega os vizinhos (anterior/seguinte) para que ← → seja
-                  instantâneo — fetch na mesma resolução do visor, fora de ecrã. */}
-              <div
-                aria-hidden
-                className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
-              >
-                {Array.from(new Set([(lb - 1 + pool.length) % pool.length, (lb + 1) % pool.length]))
-                  .filter((i) => i !== lb)
-                  .map((i) => (
-                    <Image key={i} src={pool[i].src} alt="" fill sizes="90vw" loading="eager" />
-                  ))}
-              </div>
-
-              {/* Botão próxima */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  next();
-                }}
-                aria-label={t.galeria.lbNext}
-                className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Strip de thumbnails */}
-            <div
-              className="lb-chrome flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {stripIdx.map((idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setJustOpened(false);
-                    setLb(idx);
-                  }}
-                  aria-label={`${t.galeria.lbPhoto} ${idx + 1} ${t.galeria.lbOf} ${pool.length}`}
-                  aria-current={idx === lb ? "true" : undefined}
-                  className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
-                    idx === lb
-                      ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
-                      : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
-                  }`}
-                >
-                  <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
-                </button>
-              ))}
-            </div>
-
-            {/* Dicas teclado */}
-            <p className="text-center text-white/15 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
-              {t.galeria.keyboardHint}
-            </p>
-          </div>,
-          document.body,
-        )}
+      {/* ── Lightbox ── LAZY-MOUNT: só existe quando aberto. Todo o seu JS de
+          runtime — portal, listeners de teclado/gesto, trap de foco, slideshow,
+          pré-carga de vizinhos — não corre na primeira pintura; arranca apenas
+          ao abrir uma foto e desmonta ao fechar. Comportamento idêntico. */}
+      {lb !== null && (
+        <Lightbox
+          index={lb}
+          pool={pool}
+          playing={playing}
+          setPlaying={setPlaying}
+          closing={closing}
+          justOpened={justOpened}
+          setJustOpened={setJustOpened}
+          setLb={setLb}
+          close={close}
+          prev={prev}
+          next={next}
+          dict={dict}
+          dismiss={dismiss}
+          viewCollection={viewCollection}
+        />
+      )}
 
       {/* ── Voltar ao topo ── Empilhado por cima do botão de WhatsApp (canto
           inferior direito); o canto esquerdo já tem o CTA "Pedir orçamento"
           (StickyCTA). Escondido enquanto o lightbox está aberto. */}
       <button
         onClick={scrollTop}
-        aria-label={t.galeria.backToTop}
-        title={t.galeria.backToTop}
+        aria-label={dict.backToTop}
+        title={dict.backToTop}
         inert={!(showTop && lb === null)}
         className={`fixed z-40 grid h-11 w-11 place-items-center rounded-full bg-black/50 text-white/80 ring-1 ring-white/15 backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/70 hover:text-white active:scale-95 ${
           showTop && lb === null
@@ -1201,5 +818,400 @@ export default function GaleriaClient({ photos }: { photos: Photo[] }) {
         </svg>
       </button>
     </>
+  );
+}
+
+/**
+ * O lightbox propriamente dito. É montado SÓ quando aberto (ver `GaleriaClient`),
+ * por isso todos os seus refs, efeitos e listeners (teclado, trap de foco, foco
+ * de entrada/saída, slideshow, bloqueio de scroll, gestos táteis, pré-carga de
+ * vizinhos) só arrancam ao abrir — nunca na primeira pintura da galeria. O
+ * comportamento, o morph <ViewTransition> e a UX de fecho são idênticos ao que
+ * era quando este código vivia inline no componente-pai.
+ */
+function Lightbox({
+  index,
+  pool,
+  playing,
+  setPlaying,
+  closing,
+  justOpened,
+  setJustOpened,
+  setLb,
+  close,
+  prev,
+  next,
+  dismiss,
+  viewCollection,
+  dict,
+}: {
+  index: number;
+  pool: Photo[];
+  playing: boolean;
+  setPlaying: React.Dispatch<React.SetStateAction<boolean>>;
+  closing: boolean;
+  justOpened: boolean;
+  setJustOpened: (v: boolean) => void;
+  setLb: (v: number | null) => void;
+  close: () => void;
+  prev: () => void;
+  next: () => void;
+  dismiss: () => void;
+  viewCollection: (name: string) => void;
+  dict: Dict["galeria"];
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // Drag-to-dismiss / swipe gesture on the lightbox (touch). The photo layer
+  // and backdrop are driven directly via refs during the drag (no per-frame
+  // React re-render → stays at 60fps); state only changes on release.
+  const photoLayerRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
+
+  const labelText = (l: Label) => dict.labels[l];
+  const altText = (src: string, l: Label) => {
+    const base = dict.alt[l];
+    const c = collectionFor(src);
+    return c ? `${base} — ${c}` : base;
+  };
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") prev();
+      else if (e.key === "ArrowRight") next();
+      else if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        setPlaying((p) => !p);
+      } else if (e.key === "Tab" && dialogRef.current) {
+        // Trap focus inside the lightbox dialog.
+        const f = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, a[href], [tabindex]:not([tabindex="-1"])',
+        );
+        if (!f.length) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        const active = document.activeElement;
+        if (!dialogRef.current.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, [close, prev, next, setPlaying]);
+
+  // Move focus into the dialog on open; restore it to the trigger on close
+  // (mount = abrir, unmount = fechar, já que este componente só vive aberto).
+  useEffect(() => {
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    const id = requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      restoreFocusRef.current?.focus?.();
+    };
+  }, []);
+
+  // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
+  // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
+  useEffect(() => {
+    if (!playing) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const id = window.setTimeout(next, SLIDE_MS);
+    return () => window.clearTimeout(id);
+  }, [playing, next]);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  // Touch gestures on the open lightbox: horizontal swipe = prev/next,
+  // vertical drag-down = dismiss (the photo follows the finger and the backdrop
+  // fades, iOS-photos style). Attached as a NATIVE non-passive listener so the
+  // vertical drag can preventDefault (kill the rubber-band); the photo/backdrop
+  // are moved by writing to refs, never React state, so a drag never re-renders.
+  useEffect(() => {
+    const root = dialogRef.current;
+    if (!root) return;
+    const g = gestureRef.current;
+    const layer = () => photoLayerRef.current;
+    const backdrop = () => backdropRef.current;
+
+    const onStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      g.x = touch.clientX;
+      g.y = touch.clientY;
+      g.dx = 0;
+      g.dy = 0;
+      g.axis = "";
+    };
+    const onMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      g.dx = touch.clientX - g.x;
+      g.dy = touch.clientY - g.y;
+      if (g.axis === "") {
+        if (Math.abs(g.dx) < 8 && Math.abs(g.dy) < 8) return;
+        g.axis = Math.abs(g.dy) > Math.abs(g.dx) ? "y" : "x";
+        if (g.axis === "y") layer()?.classList.add("lb-dragging");
+      }
+      if (g.axis === "y" && g.dy > 0) {
+        e.preventDefault();
+        const l = layer();
+        const b = backdrop();
+        const scale = 1 - Math.min(g.dy / 1400, 0.12);
+        if (l) l.style.transform = `translateY(${g.dy}px) scale(${scale})`;
+        if (b) b.style.opacity = String(1 - Math.min(g.dy / 500, 0.72));
+      }
+    };
+    const onEnd = () => {
+      const l = layer();
+      const b = backdrop();
+      if (g.axis === "y") {
+        l?.classList.remove("lb-dragging");
+        if (g.dy > 120) {
+          if (l) l.style.transform = "translateY(115%) scale(0.88)";
+          if (b) b.style.opacity = "0";
+          window.setTimeout(dismiss, 220);
+        } else {
+          if (l) l.style.transform = "";
+          if (b) b.style.opacity = "";
+        }
+      } else if (g.axis === "x" && Math.abs(g.dx) > 50) {
+        if (g.dx < 0) next();
+        else prev();
+      }
+      g.axis = "";
+    };
+
+    root.addEventListener("touchstart", onStart, { passive: true });
+    root.addEventListener("touchmove", onMove, { passive: false });
+    root.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      root.removeEventListener("touchstart", onStart);
+      root.removeEventListener("touchmove", onMove);
+      root.removeEventListener("touchend", onEnd);
+    };
+  }, [next, prev, dismiss]);
+
+  if (typeof document === "undefined") return null;
+
+  // Thumbnail strip around current photo
+  const half = Math.floor(STRIP / 2);
+  const stripStart = Math.max(0, Math.min(index - half, pool.length - STRIP));
+  const stripIdx = Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k);
+  // Em rede lenta / Save-Data não pré-carregamos os vizinhos full-screen.
+  const preloadNeighbours = shouldPreloadNeighbours();
+
+  return createPortal(
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${dict.lbGallery} — ${labelText(pool[index].label)}, ${dict.lbPhoto} ${index + 1} ${dict.lbOf} ${pool.length}`}
+      tabIndex={-1}
+      className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
+      onClick={close}
+    >
+      {/* Fundo preto — camada própria que só anima opacidade, para o morph
+          da foto poder crescer por cima sem brigar com o <ViewTransition>.
+          É também o que o gesto de arrastar-para-baixo desvanece. */}
+      <div ref={backdropRef} className="lb-backdrop absolute inset-0 bg-black" />
+
+      {/* Barra superior */}
+      <div
+        className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 pb-3.5 flex-shrink-0"
+        // Clear the notch so the counter / close button aren't hidden under
+        // the status bar on notched phones (keeps its base top padding too).
+        style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-white/70 text-xs font-light tabular-nums">{index + 1}</span>
+          <span className="text-white/40 text-xs">/</span>
+          <span className="text-white/55 text-xs tabular-nums">{pool.length}</span>
+          <span className="w-px h-3 bg-white/10 mx-1" />
+          {collectionFor(pool[index].src) && (
+            <span className="flex items-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  viewCollection(collectionFor(pool[index].src)!);
+                }}
+                aria-label={`${dict.viewWedding} — ${collectionFor(pool[index].src)}`}
+                title={dict.viewWedding}
+                className="text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
+                style={{ fontFamily: "var(--font-playfair)" }}
+              >
+                {collectionFor(pool[index].src)}
+              </button>
+              <span className="text-white/20 mx-1.5">·</span>
+            </span>
+          )}
+          <span className="text-white/65 text-[10px] tracking-[0.15em] uppercase">
+            {labelText(pool[index].label)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPlaying((p) => !p)}
+            aria-label={playing ? dict.lbPause : dict.lbPlay}
+            aria-pressed={playing}
+            className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
+          >
+            {playing ? (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.8-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={close}
+            aria-label={dict.lbClose}
+            className="p-3 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Barra de progresso do slideshow — reinicia a cada foto */}
+      {playing && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/8 z-20 pointer-events-none">
+          <div
+            key={index}
+            className="lb-progress h-full bg-gradient-to-r from-moss to-moss-light origin-left"
+          />
+        </div>
+      )}
+
+      {/* Área da foto + botões */}
+      <div className="relative flex-1 flex items-center justify-center min-h-0">
+        {/* Botão anterior */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            prev();
+          }}
+          aria-label={dict.lbPrev}
+          className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
+
+        {/* Foto principal */}
+        <div
+          ref={photoLayerRef}
+          className="lb-photo-layer absolute inset-0 mx-2 md:mx-20 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <VTWrap key={index} name={vtId(pool[index].src)} exit="vt-lb">
+            <Image
+              key={index}
+              src={pool[index].src}
+              alt={altText(pool[index].src, pool[index].label)}
+              fill
+              sizes="90vw"
+              className={`object-contain ${
+                playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
+              }`}
+              {...blurProps(pool[index])}
+            />
+          </VTWrap>
+        </div>
+
+        {/* Pré-carrega os vizinhos (anterior/seguinte) para que ← → seja
+            instantâneo — fetch na mesma resolução do visor, fora de ecrã.
+            Só em rede boa: em Save-Data / 2g / 3g é ignorado para não gastar
+            dados com imagens grandes que talvez nunca sejam vistas. */}
+        <div
+          aria-hidden
+          className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
+        >
+          {preloadNeighbours &&
+            Array.from(
+              new Set([(index - 1 + pool.length) % pool.length, (index + 1) % pool.length]),
+            )
+              .filter((i) => i !== index)
+              .map((i) => (
+                <Image key={i} src={pool[i].src} alt="" fill sizes="90vw" loading="eager" />
+              ))}
+        </div>
+
+        {/* Botão próxima */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            next();
+          }}
+          aria-label={dict.lbNext}
+          className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Strip de thumbnails */}
+      <div
+        className="lb-chrome flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {stripIdx.map((idx) => (
+          <button
+            key={idx}
+            onClick={() => {
+              setJustOpened(false);
+              setLb(idx);
+            }}
+            aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
+            aria-current={idx === index ? "true" : undefined}
+            className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
+              idx === index
+                ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
+                : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
+            }`}
+          >
+            <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+          </button>
+        ))}
+      </div>
+
+      {/* Dicas teclado */}
+      <p className="text-center text-white/45 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
+        {dict.keyboardHint}
+      </p>
+    </div>,
+    document.body,
   );
 }

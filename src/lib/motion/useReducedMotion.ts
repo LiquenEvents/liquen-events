@@ -9,16 +9,27 @@ import { useSyncExternalStore } from "react";
 // who ask for reduced motion get a calm, static experience with zero animation.
 const QUERY = "(prefers-reduced-motion: reduce)";
 
+// Cache the MediaQueryList at module scope. Every reveal primitive checks
+// reduced-motion in a synchronous pre-paint layout effect, once per instance —
+// and pages like /servicos mount dozens, on every navigation. Reusing one
+// MediaQueryList (instead of calling matchMedia N times per render) cuts that
+// repeated work from the destination-render path that a page transition waits on.
+let cachedMq: MediaQueryList | null = null;
+function mediaQuery(): MediaQueryList | null {
+  if (typeof window === "undefined" || !window.matchMedia) return null;
+  if (!cachedMq) cachedMq = window.matchMedia(QUERY);
+  return cachedMq;
+}
+
 function subscribe(callback: () => void): () => void {
-  if (typeof window === "undefined" || !window.matchMedia) return () => {};
-  const mq = window.matchMedia(QUERY);
+  const mq = mediaQuery();
+  if (!mq) return () => {};
   mq.addEventListener("change", callback);
   return () => mq.removeEventListener("change", callback);
 }
 
 function getSnapshot(): boolean {
-  if (typeof window === "undefined" || !window.matchMedia) return false;
-  return window.matchMedia(QUERY).matches;
+  return mediaQuery()?.matches ?? false;
 }
 
 export function useReducedMotion(): boolean {

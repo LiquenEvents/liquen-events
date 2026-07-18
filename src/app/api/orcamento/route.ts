@@ -4,21 +4,15 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, LOCATION_LABELS } from "@/lib/orca
 import { sendMail, esc } from "@/lib/mail";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
-import { createQuote, listQuotes, generateQuoteId } from "@/lib/quotes-store";
+import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quotePayloadSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
+import { eur0 as eur } from "@/lib/money";
 
 export const maxDuration = 30;
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
 
 const MONTHS_PT = [
   "jan",
@@ -211,7 +205,25 @@ export async function POST(request: NextRequest) {
       breakdown: PriceBreakdown;
     };
 
-    const id = generateQuoteId();
+    // Idempotency: the client sends a stable submissionId (persisted across a
+    // reload for the same unsent enquiry). Deriving a deterministic id from it
+    // means a retried POST — the response was lost and the visitor resubmitted
+    // — maps to the SAME quote instead of creating a duplicate lead and sending
+    // a duplicate email. A fresh random id is used when no submissionId is sent.
+    const rawSub = (body as Record<string, unknown> | null)?.submissionId;
+    const submissionId =
+      typeof rawSub === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(rawSub) ? rawSub : null;
+    const id = submissionId ? quoteIdFor(submissionId) : generateQuoteId();
+
+    if (submissionId) {
+      try {
+        if (await getQuote(id)) return NextResponse.json({ id, status: "ok" });
+      } catch (lookupErr) {
+        // A lookup failure must never block a genuine new lead — fall through
+        // and create it (a duplicate is far better than a dropped enquiry).
+        log.error("orcamento: verificação de idempotência falhou", lookupErr, { id });
+      }
+    }
 
     const quote: Quote = {
       ...form,
@@ -266,11 +278,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Partial success: the lead is safely in the store but the team's email
+    // didn't go out (e.g. SMTP unset/misconfigured in prod). The visitor still
+    // sees success — the lead isn't lost — but nobody was actively notified, so
+    // it can sit unseen in the dashboard. Log at ERROR so it reaches the alert
+    // fan-out (Sentry/webhook), turning a silent notification gap into a signal.
+    if (persisted && !emailed) {
+      log.error(
+        "orcamento: lead registada mas email à equipa NÃO enviado — verificar SMTP",
+        undefined,
+        { id },
+      );
+    }
+
     // Confirmation to the client, in the language they were browsing in (best-effort).
     try {
       const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
       const confirmation = buildClientConfirmation({ locale, name: form.name, referenceId: id });
-      await sendMail({ to: form.email, ...confirmation });
+      // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
+      // without a ceiling the endpoint could be abused to bombard a victim's
+      // inbox from Líquen's sender reputation (a mail-bomb amplifier). 5/day per
+      // address is far above any real client's needs; over it we skip the
+      // confirmation — the lead is already persisted and the team notified.
+      const emailKey = `confirm:${form.email.trim().toLowerCase()}`;
+      if ((await rateLimit(emailKey, 5, 24 * 60 * 60_000)).ok) {
+        await sendMail({ to: form.email, ...confirmation });
+      } else {
+        log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
+      }
     } catch (mailErr) {
       log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
     }

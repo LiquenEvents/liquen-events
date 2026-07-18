@@ -1,3 +1,4 @@
+import "server-only";
 import crypto from "node:crypto";
 
 /**
@@ -8,10 +9,7 @@ import crypto from "node:crypto";
 const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 function base32Decode(input: string): Buffer {
-  const clean = input
-    .replace(/=+$/g, "")
-    .toUpperCase()
-    .replace(/\s/g, "");
+  const clean = input.replace(/=+$/g, "").toUpperCase().replace(/\s/g, "");
   let bits = 0;
   let value = 0;
   const out: number[] = [];

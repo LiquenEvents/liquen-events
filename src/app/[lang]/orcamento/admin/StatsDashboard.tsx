@@ -3,14 +3,9 @@
 import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
+import { computeEventMetrics } from "@/lib/orcamento/dossier";
 import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
+import { eur0 as eur } from "@/lib/money";
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },
@@ -275,6 +270,47 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     }
     upcoming.sort((a, b) => a.date.localeCompare(b.date));
 
+    // ── Rentabilidade — margem sobre eventos ganhos (aceites) ──
+    // Usa computeEventMetrics (mesma matemática do Dossier) para que os números
+    // coincidam. Todos os valores são c/ IVA. Só entram eventos com valor
+    // contratado real (> 0).
+    let profContracted = 0,
+      profCosts = 0,
+      profMargin = 0,
+      profCount = 0;
+    const byTypeProfit: Record<
+      string,
+      { contracted: number; cost: number; margin: number; count: number }
+    > = {};
+    for (const q of filteredQuotes) {
+      if (q.status !== "aceite") continue;
+      const m = computeEventMetrics({ quote: q, proposal: null, contract: null, invoices: [] });
+      if (m.contracted <= 0) continue;
+      profContracted += m.contracted;
+      profCosts += m.supplierCosts;
+      profMargin += m.margin;
+      profCount++;
+      const label = eventTypeLabel(q);
+      const bucket =
+        byTypeProfit[label] ??
+        (byTypeProfit[label] = { contracted: 0, cost: 0, margin: 0, count: 0 });
+      bucket.contracted += m.contracted;
+      bucket.cost += m.supplierCosts;
+      bucket.margin += m.margin;
+      bucket.count++;
+    }
+    const profAvgMarginPct = profContracted > 0 ? (profMargin / profContracted) * 100 : 0;
+    const profByType = Object.entries(byTypeProfit)
+      .map(([label, b]) => ({
+        label,
+        contracted: b.contracted,
+        cost: b.cost,
+        margin: b.margin,
+        count: b.count,
+        marginPct: b.contracted > 0 ? (b.margin / b.contracted) * 100 : 0,
+      }))
+      .sort((a, b) => b.margin - a.margin);
+
     const accepted = byStatus["aceite"] ?? 0;
     const decided = accepted + (byStatus["rejeitado"] ?? 0);
     const conversion = decided > 0 ? Math.round((accepted / decided) * 100) : 0;
@@ -322,6 +358,15 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       avgTicket,
       upcoming: upcoming.slice(0, 8),
       hasPayments: received > 0 || outstanding > 0,
+      profitability: {
+        contracted: profContracted,
+        costs: profCosts,
+        margin: profMargin,
+        avgMarginPct: profAvgMarginPct,
+        count: profCount,
+        byType: profByType,
+      },
+      hasProfit: profCount > 0,
       months,
       hasRevenue: months.some((m) => m.revenue > 0),
       statusBars: (Object.keys(STATUS_META) as QuoteStatus[])
@@ -487,6 +532,84 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
           </Panel>
         </div>
       )}
+
+      {/* Rentabilidade */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-6">
+        <Panel title="Rentabilidade (eventos ganhos · c/ IVA)">
+          {stats.hasProfit ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Kpi
+                  value={eur(stats.profitability.contracted)}
+                  label="Receita contratada"
+                  accent
+                />
+                <Kpi value={eur(stats.profitability.costs)} label="Custo fornecedores" />
+                <Kpi value={eur(stats.profitability.margin)} label="Margem" accent />
+                <Kpi
+                  value={`${Math.round(stats.profitability.avgMarginPct)}%`}
+                  label="Margem média"
+                />
+              </div>
+              <p className="text-foreground/25 text-[10px] mt-4">
+                Valores c/ IVA · {stats.profitability.count} evento
+                {stats.profitability.count === 1 ? "" : "s"} ganho
+                {stats.profitability.count === 1 ? "" : "s"} com valor contratado.
+              </p>
+            </>
+          ) : (
+            <p className="text-foreground/25 text-xs">
+              Ainda sem eventos ganhos com valor contratado. A margem aparece assim que fechar a
+              primeira proposta.
+            </p>
+          )}
+        </Panel>
+
+        <Panel title="Margem por tipo de evento (c/ IVA)">
+          {stats.hasProfit ? (
+            <div className="flex flex-col gap-3">
+              {(() => {
+                const maxMargin = Math.max(1, ...stats.profitability.byType.map((r) => r.margin));
+                return stats.profitability.byType.map((row) => {
+                  const pct = Math.round(row.marginPct);
+                  const color = pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82";
+                  return (
+                    <div key={row.label}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-foreground/55 text-xs truncate max-w-[45%]">
+                          {row.label}
+                        </span>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-foreground/30 text-[10px] tabular-nums">
+                            {eur(row.margin)}
+                          </span>
+                          <span
+                            className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
+                            style={{ color }}
+                          >
+                            {pct}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${(Math.max(0, row.margin) / maxMargin) * 100}%`,
+                            background: color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          ) : (
+            <p className="text-foreground/25 text-xs">Sem propostas aceites ainda.</p>
+          )}
+        </Panel>
+      </div>
 
       {/* Trends */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1,21 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
-import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
-import KineticHeading from "@/components/KineticHeading";
-import RatingBadge from "@/components/RatingBadge";
 import HeroWebGL from "@/components/motion/HeroWebGL";
-import Reveal from "@/components/motion/Reveal";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { clientLogos } from "@/data";
-import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -38,55 +36,50 @@ export async function generateMetadata({
 const eyebrow =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
-const mosaicItems = [
-  {
-    src: "/imagens/EW1_1408.jpg",
-    alt: "Receção de evento corporativo num pátio em Évora",
-    label: "Corporativo",
-    cls: "col-span-5 row-span-2",
-  },
-  {
-    src: "/imagens/DaniGui_Preview20.jpg",
-    alt: "Casamento com decoração floral numa herdade do Alentejo",
-    label: "Casamento",
-    cls: "col-span-4 row-span-1",
-  },
-  {
-    src: "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-    alt: "Jantar de gala à luz de velas num evento no Alentejo",
-    label: "Gala",
-    cls: "col-span-3 row-span-1",
-  },
-  {
-    src: "/imagens/stephanie-mizio-558.jpg",
-    alt: "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
-    label: "Casamento",
-    cls: "col-span-4 row-span-1",
-  },
-  {
-    src: "/imagens/M&F0512.jpg",
-    alt: "Jantar de gala com mesa posta e velas",
-    label: "Jantar",
-    cls: "col-span-3 row-span-1",
-  },
-  {
-    src: "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
-    alt: "Gala corporativa num salão decorado à noite",
-    label: "Gala",
-    cls: "col-span-7 row-span-1",
-  },
-  {
-    src: "/imagens/hd-edited.jpg",
-    alt: "Evento institucional com palco e plateia",
-    label: "Institucional",
-    cls: "col-span-5 row-span-1",
-  },
+// The mosaic draws a fresh 7 from this pool on every entry to the page (see
+// RotatingPhotoGrid). Landscape event frames — corporate, weddings, galas.
+const MOSAIC_POOL = [
+  "/imagens/EW1_1408.jpg",
+  "/imagens/DaniGui_Preview20.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/stephanie-mizio-558.jpg",
+  "/imagens/M&F0512.jpg",
+  "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
+  "/imagens/hd-edited.jpg",
+  "/imagens/EW1_1330.jpg",
+  "/imagens/J&P-IMGL4769.jpg",
+  "/imagens/EW1_1404.jpg",
+  "/imagens/teresinhaeze-909.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+  "/imagens/DJI_20250913190635_0120_D.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+];
+
+// The mosaic is a 2-col grid below `md` and a 12-col grid from `md` (768px) up,
+// full-bleed (no max-width wrapper). So each cell's real rendered width is its
+// share of the viewport: on mobile 100vw when it spans both columns, else 50vw;
+// from md its column span as a fraction of 12 (span/12 of 100vw, no px cap).
+const MOSAIC_5 = "(max-width: 767px) 100vw, 42vw"; // md:col-span-5, wide on mobile
+const MOSAIC_7 = "(max-width: 767px) 100vw, 59vw"; // md:col-span-7, wide on mobile
+const MOSAIC_4 = "(max-width: 767px) 50vw, 34vw"; // md:col-span-4, one mobile column
+const MOSAIC_3 = "(max-width: 767px) 50vw, 25vw"; // md:col-span-3, one mobile column
+const MOSAIC_CELLS = [
+  { cls: "col-span-2 md:col-span-5 md:row-span-2", sizes: MOSAIC_5 },
+  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_4 },
+  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_3 },
+  { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_4 },
+  { cls: "md:col-span-3 md:row-span-1", sizes: MOSAIC_3 },
+  { cls: "col-span-2 md:col-span-7 md:row-span-1", sizes: MOSAIC_7 },
+  { cls: "col-span-2 md:col-span-5 md:row-span-1", sizes: MOSAIC_5 },
 ];
 
 export default async function ClientesPage({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const testimonials = t.clientes.testimonials;
+  const introImg = "/imagens/EW1_1404.jpg";
+  const wordsImg = "/imagens/stephanie-mizio-555.jpg";
+  const mosaicPool = MOSAIC_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   return (
     <>
       <BreadcrumbJsonLd
@@ -96,7 +89,9 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       />
 
       {/* ── HERO ── */}
-      <section className="relative min-h-[100svh] flex flex-col justify-end overflow-hidden">
+      {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed to
+          the very top behind the transparent navbar (no white strip / hairline). */}
+      <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/EW1_1393.jpg"
@@ -111,48 +106,34 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
         <HeroWebGL src="/imagens/EW1_1393.jpg" className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/25 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
+        {/* Two hero veils merged into one layer (former upper div listed first,
+            since multiple backgrounds paint first-listed on top). Same pixels,
+            one paint/composite pass. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(0,0,0,0.3), transparent), linear-gradient(to top, rgba(8,8,8,0.92), rgba(8,8,8,0.25), transparent)",
+          }}
+        />
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-20 lg:pb-28 pt-40">
+        {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
+            photograph owns the first screen. Still the page's single <h1>. */}
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
           <AnimateIn>
-            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center gap-3 mb-10">
-              <span className="w-8 h-px bg-gold flex-shrink-0" />
-              {t.clientes.heroEyebrow}
-            </p>
-          </AnimateIn>
-          <KineticHeading
-            className="text-white font-bold leading-[0.88] tracking-tight"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "var(--hero-display)" }}
-            lines={[
-              [{ text: t.clientes.heroTitleLine1 }],
-              [{ text: t.clientes.heroTitleMoss, moss: true }],
-            ]}
-          />
-          <AnimateIn delay={180}>
-            <div className="mt-10 border-l-2 border-moss/50 pl-6 max-w-md">
-              <p className="text-white/60 text-base leading-[1.8]">{t.clientes.heroLead}</p>
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {t.clientes.heroEyebrow}
+              </p>
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
+                {`${t.clientes.heroTitleLine1} ${t.clientes.heroTitleMoss}`}
+              </h1>
+              <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
+                {t.clientes.heroLead}
+              </p>
             </div>
           </AnimateIn>
-          <AnimateIn delay={260}>
-            <div className="mt-8">
-              <RatingBadge
-                label={t.common.reviewsLabel}
-                ptFormat={locale === "pt"}
-                starClassName="text-gold"
-                textClassName="text-white/75"
-              />
-            </div>
-          </AnimateIn>
-        </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2.5 pointer-events-none">
-          <span className="text-white/60 text-[8px] tracking-[0.45em] uppercase">
-            {t.clientes.scroll}
-          </span>
-          <div className="w-px h-12 bg-gradient-to-b from-white/30 to-transparent" />
         </div>
       </section>
 
@@ -160,37 +141,39 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       <ClientMarquee />
 
       {/* ── LEAD STATEMENT ── */}
-      <section className="py-28 lg:py-36 bg-surface border-b border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="grid lg:grid-cols-[1fr_auto] gap-16 lg:gap-24 items-end">
-            <AnimateIn>
-              <p
-                className="text-foreground/72 leading-[1.72]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 2.8vw, 36px)" }}
-              >
-                {t.clientes.leadPre}
-                <span className="text-moss">{t.clientes.leadMoss}</span>
-                {t.clientes.leadPost}
-              </p>
-            </AnimateIn>
-            <AnimateIn delay={100} className="hidden lg:block">
-              <div className="flex flex-col items-end gap-1.5 text-right min-w-[120px]">
-                <span
-                  aria-hidden="true"
-                  className="text-foreground/12 text-[9px] tracking-[0.45em] uppercase block"
-                >
-                  {t.clientes.desde}
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="text-foreground/10 font-bold leading-none"
-                  style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
-                >
-                  {SITE.founded}
-                </span>
-              </div>
-            </AnimateIn>
-          </div>
+      <section className="relative py-28 lg:py-36 overflow-hidden border-b border-foreground/8">
+        <Image
+          src={introImg}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(introImg)}
+        />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
+          }}
+        />
+        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
+          <AnimateIn>
+            {/* The wrapper's text-veil-shadow already carries the lift-off-photo
+                shadow, so the statement needs no inline duplicate. */}
+            <p
+              className="text-white/90 leading-[1.72]"
+              style={{
+                fontFamily: "var(--font-playfair)",
+                fontSize: "clamp(22px, 2.8vw, 36px)",
+              }}
+            >
+              {t.clientes.leadPre}
+              <span className="text-moss-light">{t.clientes.leadMoss}</span>
+              {t.clientes.leadPost}
+            </p>
+          </AnimateIn>
         </div>
       </section>
 
@@ -205,7 +188,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               </p>
               <h2
                 className="text-foreground font-bold leading-[1.05]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 3.8vw, 50px)" }}
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
               >
                 {t.clientes.logosTitle}
               </h2>
@@ -213,7 +196,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             <AnimateIn delay={80} className="hidden lg:block">
               <span
                 aria-hidden="true"
-                className="text-foreground/12 text-[9px] tracking-[0.4em] uppercase"
+                className="text-foreground/45 text-[9px] tracking-[0.4em] uppercase"
               >
                 {clientLogos.length} {t.clientes.clientesCount}
               </span>
@@ -225,84 +208,43 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
-      {/* ── FEATURED TESTIMONIAL (editorial split) ── */}
-      <section className="bg-surface border-b border-foreground/8 overflow-hidden">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-[1fr_45%] min-h-[600px]">
-            {/* Quote side */}
-            <AnimateIn className="flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-28">
-              <p className={`${eyebrow} mb-12`}>
-                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                {t.clientes.featuredEyebrow}
-              </p>
-              <span
-                className="text-moss/15 leading-[0.75] select-none block -mb-2"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(80px, 12vw, 160px)" }}
-                aria-hidden
-              >
-                &ldquo;
-              </span>
-              <blockquote
-                className="text-foreground/75 leading-[1.65] mt-4"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.2vw, 27px)" }}
-              >
-                {t.clientes.featuredQuote}
-              </blockquote>
-              <div className="mt-10 pt-7 border-t border-foreground/10 flex items-center gap-5">
-                <div className="w-8 h-px bg-gold flex-shrink-0" />
-                <div>
-                  <p className="text-foreground text-sm font-semibold tracking-wide">
-                    {t.clientes.featuredName}
-                  </p>
-                  <p className="text-moss text-[10px] mt-1 tracking-[0.2em] uppercase">
-                    {t.clientes.featuredRole}
-                  </p>
-                </div>
-              </div>
-            </AnimateIn>
-
-            {/* Photo side */}
-            <div className="relative min-h-[380px] lg:min-h-0">
-              <Image
-                src="/imagens/428708341-339551125742979-6565889301500133407-n.jpg"
-                alt={t.common.imageAlt.clientesDinner}
-                fill
-                sizes="(max-width: 1024px) 100vw, 45vw"
-                className="object-cover object-center"
-                {...blurFor("/imagens/428708341-339551125742979-6565889301500133407-n.jpg")}
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#080808] via-[#080808]/15 to-transparent lg:block hidden" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/30 to-transparent lg:hidden" />
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── TESTIMONIALS GRID ── */}
-      <section className="py-24 lg:py-28 bg-surface border-b border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      <section className="relative py-24 lg:py-28 overflow-hidden border-b border-foreground/8">
+        <Image
+          src={wordsImg}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(wordsImg)}
+        />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
+          }}
+        />
+        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-14">
             <h2
-              className="text-foreground font-bold leading-[1.05]"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.2vw, 42px)" }}
+              className="text-white font-bold leading-[1.05]"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
             >
               {t.clientes.gridTitle}
             </h2>
           </AnimateIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-foreground/[0.05]">
+          {/* Testemunhos planos — texto branco directamente sobre a foto+véu,
+              separados por réguas finas (a mesma linguagem do FAQ-sobre-foto do
+              contacto): sem cartões fumados nem aspas decorativas. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-16 border-b border-white/12">
             {testimonials.map((item, i) => (
               <AnimateIn key={item.name} delay={i * 55} className="h-full">
-                <figure className="h-full flex flex-col p-8 lg:p-10 bg-surface hover:bg-surface-raised/25 transition-colors duration-500">
-                  <span
-                    className="text-moss/20 text-5xl leading-none mb-5 select-none"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                    aria-hidden
-                  >
-                    &ldquo;
-                  </span>
+                <figure className="h-full flex flex-col py-9 lg:py-10 border-t border-white/12">
                   <blockquote
-                    className="text-foreground/72 leading-[1.72] flex-1"
+                    className="text-cream/85 leading-[1.72] flex-1"
                     style={{
                       fontFamily: "var(--font-playfair)",
                       fontSize: "clamp(16px, 1.7vw, 19px)",
@@ -310,11 +252,11 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                   >
                     {item.text}
                   </blockquote>
-                  <figcaption className="mt-8 pt-6 border-t border-foreground/8 flex items-center gap-4">
+                  <figcaption className="mt-8 flex items-center gap-4">
                     <div className="w-6 h-px bg-gold flex-shrink-0" />
                     <div>
-                      <p className="text-foreground text-sm font-semibold">{item.name}</p>
-                      <p className="text-moss text-[10px] mt-0.5 tracking-[0.18em] uppercase">
+                      <p className="text-white text-sm font-semibold">{item.name}</p>
+                      <p className="text-moss-light text-[10px] mt-0.5 tracking-[0.18em] uppercase">
                         {item.event}
                       </p>
                     </div>
@@ -327,6 +269,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── PHOTO MOSAIC ── */}
+      {/* O mosaico sangra de bordo a bordo (sem moldura max-w nem goteiras),
+          à maneira SpaceX; só o eyebrow mantém a grelha de conteúdo. */}
       <section className="py-20 lg:py-28 bg-surface border-b border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-10">
@@ -335,31 +279,14 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.mosaicEyebrow}
             </p>
           </AnimateIn>
-          <Reveal
-            as="div"
-            variant="mask"
-            stagger
-            className="grid grid-cols-12 gap-2 grid-rows-[210px_210px_230px]"
-          >
-            {mosaicItems.map((item, i) => (
-              <div key={i} className={`${item.cls} relative overflow-hidden group`}>
-                <Image
-                  src={item.src}
-                  alt={t.clientes.galleryAlt[i] ?? item.alt}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 40vw"
-                  className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                  {...blurFor(item.src)}
-                />
-                <div className="absolute inset-0 bg-black/25 group-hover:bg-black/5 transition-colors duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <span className="absolute bottom-4 left-4 text-white/0 group-hover:text-white/65 group-focus-within:text-white/65 transition-all duration-500 text-[9px] tracking-[0.42em] uppercase font-medium">
-                  {t.clientes.mosaicLabels[i] ?? item.label}
-                </span>
-              </div>
-            ))}
-          </Reveal>
         </div>
+        <RotatingPhotoGrid
+          cells={MOSAIC_CELLS}
+          pool={mosaicPool}
+          alt={t.common.imageAlt.clientesCorporate}
+          className="grid grid-cols-2 md:grid-cols-12 gap-0 auto-rows-[150px] md:auto-rows-auto md:grid-rows-[210px_210px_230px]"
+          imgClassName="transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+        />
       </section>
 
       {/* ── CTA with background photo ── */}
@@ -372,15 +299,20 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           className="object-cover object-center"
           {...blurFor("/imagens/DJI_20250913190635_0120_D.jpg")}
         />
-        <div className="absolute inset-0 bg-black/55" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-transparent to-[#080808]/45" />
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
+          }}
+        />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.clientes.ctaEyebrow}
-              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.88] tracking-tight mb-6"
@@ -392,19 +324,23 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             </h2>
           </AnimateIn>
           <AnimateIn delay={110}>
-            <p className="text-white/60 text-base leading-relaxed max-w-sm mb-14">
+            <p className="text-white/70 text-base leading-relaxed max-w-sm mb-14">
               {t.clientes.ctaText}
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <Magnetic strength={0.4}>
-              <Link
-                href={localizeHref("/contacto", locale)}
-                className="inline-flex items-center gap-3 px-11 py-5 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-[0.18em] uppercase shadow-xl shadow-black/30"
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <TrackedLink
+                href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "clientes" }}
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
-                {t.common.falarConnosco} →
+                {t.common.pedirOrcamento} →
+              </TrackedLink>
+              <Link href={localizeHref("/contacto", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
+                {t.common.falarConnosco}
               </Link>
-            </Magnetic>
+            </div>
           </AnimateIn>
         </div>
       </section>

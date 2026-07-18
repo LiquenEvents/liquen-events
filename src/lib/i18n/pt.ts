@@ -53,17 +53,18 @@ export const pt = {
     clientes: "Clientes",
     contacto: "Contacto",
     orcamento: "Orçamento",
-    pedirOrcamento: "Pedir Orçamento",
+    pedirOrcamento: "Pedir orçamento",
   },
 
   common: {
-    pedirOrcamento: "Pedir Orçamento",
+    pedirOrcamento: "Pedir orçamento",
     verGaleria: "Ver galeria",
     verServicos: "Ver serviços",
-    entrarContacto: "Entrar em Contacto",
+    entrarContacto: "Entrar em contacto",
     falarConnosco: "Falar connosco",
     voltarInicio: "Voltar ao início",
     abrirWhatsApp: "Abrir WhatsApp",
+    newWindow: "abre em nova janela",
     enviarEmail: "Enviar e-mail",
     contactWhatsApp: "Contactar pelo WhatsApp",
     clientsSay: "O que dizem os clientes",
@@ -104,7 +105,7 @@ export const pt = {
     ogLocale: "pt_PT",
     homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Decoração de eventos e casamentos em Évora: decoração e coordenação de casamentos, eventos corporativos e celebrações no Alentejo e em Portugal. Peça orçamento.",
+      "Decoração de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em Portugal. Do conceito ao último detalhe — peça orçamento.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
       "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
@@ -122,7 +123,7 @@ export const pt = {
       "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
     orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em menos de 24 horas úteis.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em 24 horas úteis.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -141,18 +142,18 @@ export const pt = {
   },
 
   home: {
-    eyebrow: "Decoração de eventos · Évora · Alentejo",
-    heroLines: [
-      { words: ["eternizamos"], moss: true },
-      { words: ["memórias."], moss: true },
-    ] as { words: string[]; moss?: boolean }[],
+    eyebrow: "Decoração de eventos",
+    heroLines: [{ words: ["Eternizamos"] }, { words: ["memórias"], moss: true }] as {
+      words: string[];
+      moss?: boolean;
+    }[],
     scroll: "Scroll",
     wallEyebrow: "O nosso trabalho",
-    wallTitle: "Momentos inesquecíveis",
+    wallTitle: "O que fica para sempre",
     servicesEyebrow: "O que fazemos",
     services: [
-      { tag: "Empresas", title: "Corporativos" },
       { tag: "Celebrações", title: "Casamentos" },
+      { tag: "Empresas", title: "Corporativos" },
       { tag: "Celebrações", title: "Privados" },
     ],
     ctaEyebrow: "Próximo passo",
@@ -165,12 +166,14 @@ export const pt = {
   sobre: {
     heroEyebrow: "Quem somos",
     heroTitlePre: "Sobre a ",
-    heroTitleMoss: "Líquen.",
+    heroTitleMoss: "Líquen",
     scroll: "Scroll",
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
     manifestoText: "Desde 2018 que transformamos espaços em experiências — em todo o Portugal.",
+    // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
+    manifestoImageCaption: "Évora · Alentejo",
     statementLead: "Não decoramos apenas espaços.",
     statementRest: " Desenhamos experiências que ficam para sempre.",
     founderEyebrow: "As pessoas",
@@ -233,7 +236,7 @@ export const pt = {
   clientes: {
     heroEyebrow: "Quem confia em nós",
     heroTitleLine1: "Os Nossos",
-    heroTitleMoss: "Clientes.",
+    heroTitleMoss: "Clientes",
     heroLead:
       "Empresas, instituições e famílias que nos escolheram para os seus momentos mais especiais — e que nos honram com a sua confiança.",
     scroll: "Scroll",
@@ -305,7 +308,7 @@ export const pt = {
       ctaTitleLine1: "Peça o seu",
       ctaTitleMoss: "orçamento.",
       ctaText:
-        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais ao lado.",
+        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais diretos.",
       ctaButton: "Pedir orçamento",
     },
     testimonialsEyebrow: "O que dizem os nossos clientes",
@@ -326,17 +329,16 @@ export const pt = {
     whatsappEyebrow: "Resposta imediata",
     whatsappTitleLine1: "Prefere falar",
     whatsappTitleLine2: "agora?",
-    whatsappText:
-      "Fale connosco diretamente pelo WhatsApp. Estamos disponíveis de segunda a sexta, das 9h às 20h.",
+    whatsappText: "Fale connosco diretamente pelo WhatsApp.",
     form: {
       heroEyebrow: "Fale connosco",
       heroTitleLine1: "Vamos criar algo",
-      heroTitleMoss: "extraordinário.",
+      heroTitleMoss: "extraordinário",
       infoEyebrow: "Encontre-nos",
       emailLabel: "E-mail",
       emailSub: "Respondemos em menos de 24 horas úteis",
       phoneLabel: "Telefone",
-      phoneSub: "Seg–Sex, 9h–20h",
+      phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
       locationValue: "Évora, Alentejo — em todo o Portugal",
       locationSub: "Reuniões presenciais disponíveis",
@@ -355,7 +357,6 @@ export const pt = {
         { value: "Outro", desc: "Evento personalizado à sua medida" },
       ],
       guestRanges: ["Até 30", "30–80", "80–150", "150–300", "300+"],
-      budgetRanges: ["< 5.000 €", "5.000–15.000 €", "15.000–30.000 €", "30.000 €+", "A definir"],
       step1Title1: "Que tipo de evento",
       step1Title2: "está a planear?",
       step1Sub: "Selecione a opção que melhor descreve o seu evento.",
@@ -387,7 +388,7 @@ export const pt = {
       enviando: "A enviar…",
       resposta24: "Resposta em 24h",
       errNome: "Indique o seu nome",
-      errEmail: "Email inválido",
+      errEmail: "E-mail inválido",
       error: "Não foi possível enviar. Tente novamente ou contacte-nos pelo WhatsApp.",
       successEyebrow: "Enviado com sucesso",
       successTitle1: "Mensagem",
@@ -430,11 +431,12 @@ export const pt = {
   },
 
   orcamento: {
-    back: "Líquen Events",
+    back: "Início",
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
     titleMoss: "a sua ideia",
     lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
+    processHint: "Pedido → Proposta em 24h → Reunião",
     eventTypeLabels: [
       "Casamento",
       "Corporativo",
@@ -445,32 +447,41 @@ export const pt = {
     ],
     labelTipo: "Tipo de evento",
     labelData: "Data do evento",
+    dateFlexibleLabel: "Data ainda a definir",
     labelPessoas: "Nº de pessoas",
+    labelLocal: "Local / região",
     labelNome: "Nome",
-    labelEmail: "Email",
+    labelEmail: "E-mail",
     labelTelefone: "Telefone",
     labelMensagem: "Mensagem",
     phPessoas: "Ex.: 120",
+    phLocal: "Ex.: Évora, Alentejo…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",
     phTelefone: "+351 9XX XXX XXX",
     phMensagem: "Conte-nos o que imagina para o seu evento — local, ambiente, detalhes especiais…",
     errNome: "Indique o seu nome",
-    errEmail: "Email inválido",
+    errEmail: "E-mail inválido",
     errTipo: "Selecione o tipo de evento.",
     enviar: "Enviar pedido",
     enviando: "A enviar…",
     ouWhatsApp: "ou pelo WhatsApp",
     error: "Não foi possível enviar. Tente novamente ou fale connosco pelo WhatsApp.",
-    requiredNote: "Os campos marcados com * são obrigatórios. Resposta em menos de 24 horas úteis.",
+    requiredNote: "Os campos marcados com * são obrigatórios.",
+    submitReassure: "Sem compromisso · Resposta em menos de 24 horas úteis.",
+    privacyPre: "Ao enviar, aceita a nossa ",
+    privacyLinkLabel: "Política de Privacidade",
+    privacyPost: ". Não partilhamos os seus dados.",
   },
 
   servicos: {
     heroEyebrow: "O que oferecemos",
-    heroTitle: ["Cada evento,", "uma história", "por contar."],
+    heroTitle: ["Cada evento,", "uma história", "por contar"],
     heroLead:
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
     nav: ["Celebrações", "Empresas"],
+    interludeEyebrow: "Líquen Events",
+    interludeTitle: "De Évora para todo o Portugal — mais de 100 eventos desde 2018.",
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
     philoEyebrow: "A nossa assinatura",
@@ -542,8 +553,8 @@ export const pt = {
     seoText:
       "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
     ctaEyebrow: "Próximo passo",
-    ctaTitleLine1: "Tem um evento",
-    ctaTitleMoss: "em mente?",
+    ctaTitleLine1: "Vamos dar vida",
+    ctaTitleMoss: "à sua ideia?",
     ctaText:
       "Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
     ctaGaleria: "Ver a galeria",
@@ -658,6 +669,93 @@ export const pt = {
       errorGeneric: "Erro. Tente novamente.",
       errorSuffix: "Em alternativa,",
       errorLink: "escreva-nos",
+    },
+    terms: {
+      toggle: "Ler os Termos e Condições",
+      checkboxLabel: "Li e aceito os Termos e Condições",
+      nameLabel: "Nome de quem aceita",
+      namePlaceholder: "O seu nome completo",
+      missing: "Para aceitar, confirme os termos e indique o seu nome.",
+    },
+  },
+
+  portal: {
+    title: "Portal do Cliente — Líquen Events",
+    eyebrow: "Portal do Cliente",
+    greeting: "Olá",
+    intro:
+      "Aqui reúne, num só lugar, tudo o que diz respeito ao seu evento connosco: a proposta, as condições, os pagamentos e os próximos passos.",
+    dateLocale: "pt-PT",
+    // Rótulos amigáveis por tipo de evento (o Portal só lê dados; a substituição
+    // é feita no servidor e enviada como texto simples).
+    eventTypes: {
+      casamentos: "Casamento",
+      batizados: "Batizado",
+      aniversarios: "Aniversário",
+      jantares_gala: "Jantar de Gala",
+      conferencias: "Conferência",
+      teambuilding: "Teambuilding",
+      lancamentos: "Lançamento de Produto",
+      jantares_empresa: "Jantar de Empresa",
+    },
+    eventFallbackEmpresa: "Evento Corporativo",
+    eventFallbackParticular: "Evento",
+    semData: "Data a definir",
+    semLocal: "Local a definir",
+    proposta: {
+      title: "Proposta",
+      statusLabel: "Estado",
+      status: {
+        rascunho: "Em preparação",
+        enviada: "Enviada — a aguardar a sua resposta",
+        aceite: "Aceite",
+        rejeitada: "Recusada",
+      },
+      totalLabel: "Total",
+      download: "Descarregar proposta (PDF)",
+      none: "Ainda não há proposta disponível. Estamos a prepará-la e avisamos assim que estiver pronta.",
+    },
+    contrato: {
+      title: "Contrato",
+      aceite: "Condições aceites em {date} por {name} (v{version}).",
+      download: "Descarregar contrato (PDF)",
+      pendingTitle: "Aceitação pendente",
+      pendingBody:
+        "Depois de rever a proposta, poderá aceitar as condições através do link que lhe enviámos por e-mail. Ficamos a aguardar.",
+    },
+    pagamentos: {
+      title: "Pagamentos",
+      intro:
+        "O pagamento é faseado: 30% de sinal para reservar a data e 70% de saldo antes do evento.",
+      scheduleTitle: "Plano previsto",
+      sinal: "Sinal (30%)",
+      saldo: "Saldo (70%)",
+      faturasTitle: "Faturas",
+      thNumero: "Nº",
+      thTipo: "Tipo",
+      thMontante: "Montante",
+      thEstado: "Estado",
+      kind: {
+        sinal: "Sinal",
+        saldo: "Saldo",
+        total: "Total",
+      },
+      estado: {
+        emitida: "Pendente",
+        paga: "Paga",
+        anulada: "Anulada",
+      },
+      emitidaEm: "Emitida a {date}",
+      pagaEm: "Paga a {date}",
+      venceEm: "Vence a {date}",
+      semTotal: "O plano de pagamentos fica disponível assim que a proposta estiver pronta.",
+      noInvoices:
+        "Ainda não emitimos faturas. Em cima fica o plano previsto; enviamos cada fatura assim que for emitida.",
+    },
+    proximos: {
+      title: "Próximos passos",
+      body: "Se tiver qualquer dúvida sobre a proposta, as condições ou os pagamentos, estamos aqui para ajudar. Basta responder ao nosso e-mail ou usar os contactos abaixo.",
+      contactTitle: "Fale connosco",
     },
   },
 

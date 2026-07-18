@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import TrackedLink from "@/components/TrackedLink";
 import FAQ from "./FAQ";
 import AnimateIn from "@/components/AnimateIn";
 import Image from "next/image";
@@ -8,12 +8,12 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import Parallax from "@/components/Parallax";
-import KineticHeading from "@/components/KineticHeading";
 import RatingBadge from "@/components/RatingBadge";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 export async function generateMetadata({
   params,
@@ -43,6 +43,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
   // Fundos de foto para os dois CTA (com véu por cima para manter o contraste).
   const orcamentoCtaImg = "/imagens/DaniGui_JantarFesta_130.jpg";
   const whatsappCtaImg = "/imagens/Natalia e Jonathan-198.jpg";
+  const stepsBgImg = "/imagens/stephanie-mizio-555.jpg";
   return (
     <>
       <BreadcrumbJsonLd
@@ -55,7 +56,12 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
       <FaqJsonLd faqs={t.contacto.faqs} />
 
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden" style={{ height: "65svh", minHeight: "420px" }}>
+      {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed to
+          the very top behind the transparent navbar (no white strip / hairline). */}
+      <section
+        className="relative -mt-24 overflow-hidden"
+        style={{ height: "65svh", minHeight: "420px" }}
+      >
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src={heroImg}
@@ -70,25 +76,26 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         {/* WebGL layer over the static hero (fades in when ready; absent under
             reduced motion / no-WebGL). */}
         <HeroWebGL src={heroImg} className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
-        <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-20">
+        {/* SpaceX-style: photo breathes; a small caption tucked bottom-left. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+        <div className="absolute inset-0 flex flex-col justify-end px-6 lg:px-16 pb-14 lg:pb-20">
           <div className="max-w-7xl mx-auto w-full">
-            <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/60 rounded-full flex-shrink-0" />
-              {tf.heroEyebrow}
-            </p>
-            <KineticHeading
-              className="text-cream font-bold leading-[0.88] tracking-tight"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 7.5vw, 100px)" }}
-              lines={[[{ text: tf.heroTitleLine1 }], [{ text: tf.heroTitleMoss, moss: true }]]}
-            />
-            <div className="mt-7">
-              <RatingBadge
-                label={t.common.reviewsLabel}
-                ptFormat={locale === "pt"}
-                starClassName="text-gold"
-                textClassName="text-cream/75"
-              />
+            <div className="max-w-md">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
+                {tf.heroEyebrow}
+              </p>
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
+                {tf.heroTitleLine1} {tf.heroTitleMoss}
+              </h1>
+              <div className="mt-4">
+                <RatingBadge
+                  label={t.common.reviewsLabel}
+                  ptFormat={locale === "pt"}
+                  starClassName="text-gold"
+                  textClassName="text-white/75"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -103,13 +110,13 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
             {/* ── Esquerda — canais diretos ── */}
-            <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-12 md:py-20 lg:pr-20">
-              <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
-                <span className="w-5 h-px bg-gold/50 rounded-full flex-shrink-0" />
+            <div className="border-b border-foreground/8 lg:border-b-0 lg:border-r py-14 lg:py-24 lg:pr-20">
+              <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase mb-12 flex items-center gap-3">
+                <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {tf.infoEyebrow}
               </p>
 
-              <div className="flex flex-col divide-y divide-foreground/8 mb-12">
+              <div className="flex flex-col divide-y divide-foreground/8 mb-10">
                 {[
                   {
                     label: tf.emailLabel,
@@ -130,8 +137,8 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     sub: tf.locationSub,
                   },
                 ].map((item) => (
-                  <div key={item.label} className="py-7">
-                    <p className="text-foreground/78 text-[10px] tracking-[0.45em] uppercase mb-2">
+                  <div key={item.label} className="py-6">
+                    <p className="text-foreground/55 text-[10px] tracking-[0.4em] uppercase mb-2.5">
                       {item.label}
                     </p>
                     {item.href ? (
@@ -147,7 +154,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     ) : (
                       <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
                     )}
-                    <p className="text-foreground/68 text-xs">{item.sub}</p>
+                    <p className="text-foreground/55 text-xs leading-relaxed">{item.sub}</p>
                   </div>
                 ))}
               </div>
@@ -157,17 +164,18 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-moss/40 hover:bg-moss/6 transition-all duration-300 group mb-3"
+                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/15 hover:border-foreground/40 transition-colors duration-300 group mb-3"
               >
                 <span className="text-moss flex-shrink-0">
                   <WhatsAppIcon className="w-4 h-4" />
                 </span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
+                <span className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 group-hover:text-foreground transition-colors">
                   {tf.whatsappLink}
+                  <span className="sr-only"> ({t.common.newWindow})</span>
                 </span>
                 <span
                   aria-hidden
-                  className="ml-auto text-foreground/40 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                  className="ml-auto text-foreground/35 group-hover:text-foreground/70 transition-colors duration-300 text-sm"
                 >
                   →
                 </span>
@@ -179,7 +187,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 href={SITE.googleBusiness}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 w-full px-6 py-4 rounded-sm border border-foreground/12 hover:border-gold/50 hover:bg-gold/[0.06] transition-all duration-300 group mb-12"
+                className="flex items-center gap-3 w-full px-6 py-4 border border-foreground/15 hover:border-foreground/40 transition-colors duration-300 group mb-12"
               >
                 <span className="flex-shrink-0" aria-hidden>
                   <svg viewBox="0 0 24 24" className="w-4 h-4">
@@ -201,19 +209,20 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     />
                   </svg>
                 </span>
-                <span className="text-[11px] tracking-[0.22em] uppercase text-foreground/68 group-hover:text-foreground/85 transition-colors">
+                <span className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 group-hover:text-foreground transition-colors">
                   {tf.googleLink}
+                  <span className="sr-only"> ({t.common.newWindow})</span>
                 </span>
                 <span
                   aria-hidden
-                  className="ml-auto text-foreground/40 group-hover:text-gold group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+                  className="ml-auto text-foreground/35 group-hover:text-foreground/70 transition-colors duration-300 text-sm"
                 >
                   →
                 </span>
               </a>
 
               {/* Redes */}
-              <div className="flex gap-7 mb-14">
+              <div className="flex gap-7">
                 {[
                   { label: "Instagram", href: SITE.instagram },
                   { label: "Facebook", href: SITE.facebook },
@@ -223,24 +232,12 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] tracking-[0.25em] uppercase text-foreground/68 hover:text-foreground/78 transition-colors border-b border-foreground/12 pb-0.5 hover:border-foreground/40"
+                    className="inline-flex items-center min-h-[24px] py-1.5 text-[11px] tracking-[0.25em] uppercase text-foreground/60 hover:text-foreground transition-colors border-b border-foreground/15 hover:border-foreground/40"
                   >
                     {s.label}
+                    <span className="sr-only"> ({t.common.newWindow})</span>
                   </a>
                 ))}
-              </div>
-
-              {/* Promise */}
-              <div className="border-l-2 border-moss/40 pl-7 py-2">
-                <p
-                  className="text-foreground/72 text-base leading-relaxed mb-4"
-                  style={{ fontFamily: "var(--font-playfair)" }}
-                >
-                  {tf.promise}
-                </p>
-                <p className="text-foreground/68 text-[10px] tracking-[0.3em] uppercase">
-                  {tf.promiseSign}
-                </p>
               </div>
             </div>
 
@@ -257,11 +254,13 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 sizes="(max-width: 1024px) 100vw, 60vw"
                 className="object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-br from-ink/85 via-ink/72 to-moss-dark/70" />
+              {/* Véu 100% neutro (sem tinte moss) — a foto lê-se como textura
+                  escura e o cream mantém o contraste AA. */}
+              <div className="absolute inset-0 bg-gradient-to-br from-ink/85 via-ink/72 to-[#0c0e0b]/70" />
               <AnimateIn>
                 <div className="relative">
                   <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
-                    <span className="w-5 h-px bg-gold rounded-full flex-shrink-0" />
+                    <span className="w-6 h-px bg-gold flex-shrink-0" />
                     {td.ctaEyebrow}
                   </p>
                   <h2
@@ -278,51 +277,16 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   <p className="text-cream/85 text-base leading-[1.85] max-w-md mb-12">
                     {td.ctaText}
                   </p>
-                  <Link
+                  <TrackedLink
                     href={localizeHref("/orcamento", locale)}
-                    className="inline-flex w-fit items-center gap-3 rounded-sm bg-cream px-8 py-4 text-[11px] font-medium uppercase tracking-[0.3em] text-ink transition-all duration-300 hover:bg-cream-dark"
+                    trackProps={{ source: "contacto" }}
+                    className={OUTLINE_LIGHT_BUTTON_CLASS}
                   >
                     {td.ctaButton} →
-                  </Link>
+                  </TrackedLink>
                 </div>
               </AnimateIn>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Depoimentos ── */}
-      <section className="py-16 sm:py-24 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-16 flex items-center gap-3">
-              <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
-              {t.contacto.testimonialsEyebrow}
-            </p>
-          </AnimateIn>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-foreground/[0.06]">
-            {t.testimonials.slice(1).map((item, i) => (
-              <AnimateIn key={item.name} delay={i * 80}>
-                <div className="bg-surface p-10 lg:p-12 flex flex-col gap-6 h-full">
-                  <span
-                    className="text-moss/30 text-4xl font-bold leading-none"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    &ldquo;
-                  </span>
-                  <p
-                    className="text-foreground/72 text-sm leading-[1.9] flex-1"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
-                    {item.quote}
-                  </p>
-                  <div>
-                    <p className="text-foreground text-sm font-semibold">{item.name}</p>
-                    <p className="text-moss text-xs mt-1 tracking-wide">{item.role}</p>
-                  </div>
-                </div>
-              </AnimateIn>
-            ))}
           </div>
         </div>
       </section>
@@ -361,73 +325,113 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         </AnimateIn>
       </section>
 
-      {/* ── O que acontece a seguir ── */}
-      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      {/* ── O que acontece a seguir — sobre foto de evento, com véu escuro ── */}
+      <section className="relative py-16 sm:py-28 overflow-hidden border-t border-foreground/8">
+        <Image
+          src={stepsBgImg}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor(stepsBgImg)}
+        />
+        {/* Lighter veil so the venue photo actually reads through — a moderate
+            uniform tint (white text spans the whole panel) plus a soft top/bottom
+            gradient for the eyebrow and final divider. */}
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to bottom, rgba(8,8,8,0.5), rgba(8,8,8,0.15), rgba(8,8,8,0.55)), linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35))",
+          }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
-            <p className="text-foreground/68 text-[10px] tracking-[0.48em] uppercase mb-20 flex items-center gap-3">
-              <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+            <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-14 flex items-center gap-3">
+              <span className="w-6 h-px bg-gold flex-shrink-0" />
               {t.contacto.nextEyebrow}
             </p>
           </AnimateIn>
           <div>
             {steps.map((p, i) => (
               <AnimateIn key={p.step} delay={i * 70}>
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-foreground/8">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-white/15">
                   <div className="lg:col-span-1 flex items-start gap-4">
-                    <span className="text-foreground/15 text-xs font-mono mt-1 tabular-nums">
+                    <span aria-hidden className="text-white/40 text-xs font-mono mt-1 tabular-nums">
                       {p.step}
                     </span>
                     <h3
-                      className="text-foreground text-lg font-bold"
+                      className="text-white text-lg font-bold"
                       style={{ fontFamily: "var(--font-playfair)" }}
                     >
                       {p.title}
                     </h3>
                   </div>
-                  <p className="lg:col-span-4 text-foreground/72 text-sm leading-relaxed max-w-xl">
+                  <p className="lg:col-span-4 text-white/75 text-sm leading-relaxed max-w-xl">
                     {p.desc}
                   </p>
                 </div>
               </AnimateIn>
             ))}
-            <div className="border-t border-foreground/8" />
+            <div className="border-t border-white/15" />
           </div>
         </div>
       </section>
 
-      {/* ── FAQ ── */}
-      <section className="py-16 sm:py-28 bg-surface border-t border-foreground/8">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+      {/* ── FAQ (image-backed, SpaceX-style: light text over a photo + veil) ── */}
+      <section className="relative py-16 sm:py-28 border-t border-white/10 overflow-hidden">
+        <Image
+          src="/imagens/EW1_1332.jpg"
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          {...blurFor("/imagens/EW1_1332.jpg")}
+        />
+        {/* Strong, near-flat veil — this section is text-heavy, so the photo
+            reads as a dark atmospheric texture while every question stays legible. */}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(11,13,10,0.86), rgba(11,13,10,0.9)), linear-gradient(to right, rgba(11,13,10,0.4), transparent 60%)",
+          }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-20 items-start">
-              <div className="lg:sticky" style={{ top: "6rem" }}>
-                <p className="text-foreground/72 text-xs tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
-                  <span className="w-6 h-px bg-gold rounded-full flex-shrink-0" />
+              <div className="text-veil-shadow lg:sticky" style={{ top: "6rem" }}>
+                <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
+                  <span className="w-6 h-px bg-gold flex-shrink-0" />
                   {t.contacto.faqEyebrow}
                 </p>
                 <h2
-                  className="text-foreground text-4xl lg:text-5xl font-bold leading-tight"
+                  className="text-white text-4xl lg:text-5xl font-bold leading-tight"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
                   {t.contacto.faqTitleLine1}
                   <br />
                   {t.contacto.faqTitleLine2}
                 </h2>
-                <p className="text-foreground/72 text-sm leading-relaxed mt-6 max-w-xs">
+                <p className="text-white/65 text-sm leading-relaxed mt-6 max-w-xs">
                   {t.contacto.faqSub}
                 </p>
               </div>
-              <FAQ />
+              <FAQ faqs={t.contacto.faqs} light />
             </div>
           </AnimateIn>
         </div>
       </section>
 
       {/* ── WhatsApp CTA ──
-          Fundo com foto de evento + tinta verde-escura por cima: mantém a
-          identidade da marca e garante o contraste AA do texto cream. */}
-      <section className="py-20 sm:py-32 bg-moss-dark relative overflow-hidden border-t border-moss/20">
+          Foto de evento com um escurecimento cinematográfico (preto) — o mesmo
+          tratamento das restantes secções finais do site, para a imagem
+          respirar em vez de ficar lavada de verde. Véu totalmente neutro (o
+          antigo brilho verde de canto saiu no redesign SpaceX); o texto cream
+          continua a garantir contraste AA sobre o véu escuro. */}
+      <section className="py-20 sm:py-32 bg-[#0c0e0b] relative overflow-hidden border-t border-white/10">
         <Image
           src={whatsappCtaImg}
           {...blurFor(whatsappCtaImg)}
@@ -437,18 +441,20 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           sizes="100vw"
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-moss-dark/88" />
+        {/* Text lives in the left column, so darken only the left and let the
+            photo read on the right (SpaceX-style — image breathes). */}
+        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0"
           style={{
-            background:
-              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(124, 133, 75,0.5) 0%, transparent 55%)",
+            backgroundImage:
+              "linear-gradient(to right, rgba(8,8,8,0.85), rgba(8,8,8,0.35), transparent), linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2))",
           }}
         />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
           <AnimateIn>
             <p className="text-cream/80 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
-              <span className="w-5 h-px bg-cream/45 rounded-full flex-shrink-0" />
+              <span className="w-5 h-px bg-cream/45 flex-shrink-0" />
               {t.contacto.whatsappEyebrow}
             </p>
             <h2
@@ -463,19 +469,19 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               {t.contacto.whatsappText}
             </p>
             <div className="flex flex-wrap gap-4">
+              {/* Par de ghosts brancos (idioma SpaceX): ambos preenchem a
+                  branco no hover com o texto a inverter para escuro — o ícone
+                  distingue o canal principal. */}
               <a
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-cream text-ink font-medium rounded-sm hover:bg-cream-dark transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
-                {t.common.abrirWhatsApp} →
+                {t.common.abrirWhatsApp} →<span className="sr-only"> ({t.common.newWindow})</span>
               </a>
-              <a
-                href={`mailto:${SITE.email}`}
-                className="inline-flex items-center gap-3 px-8 py-4 border border-cream/35 text-cream/85 font-medium rounded-sm hover:border-cream/60 hover:text-cream transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
-              >
+              <a href={`mailto:${SITE.email}`} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.enviarEmail}
               </a>
             </div>

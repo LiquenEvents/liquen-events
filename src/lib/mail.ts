@@ -1,3 +1,4 @@
+import "server-only";
 import nodemailer from "nodemailer";
 import { log } from "./logger";
 
@@ -32,6 +33,18 @@ function getTransport() {
 
 export const MAIL_TO = process.env.MAIL_TO ?? "liquen.alentejo@gmail.com";
 
+// Always present a NAMED sender ("Líquen Events <addr>") so the recipient sees
+// the brand, never a bare mailbox. MAIL_FROM wins when set (lets you move to a
+// custom domain + display name); a bare MAIL_FROM address still gets the brand
+// name; otherwise the SMTP user is wrapped with it. nodemailer MIME-encodes the
+// non-ASCII display name, so "Líquen" is safe in the header.
+const FROM_NAME = "Líquen Events";
+function fromAddress(): string {
+  const explicit = process.env.MAIL_FROM?.trim();
+  if (explicit) return explicit.includes("<") ? explicit : `${FROM_NAME} <${explicit}>`;
+  return `${FROM_NAME} <${process.env.SMTP_USER}>`;
+}
+
 interface Attachment {
   filename: string;
   content: Buffer | Uint8Array;
@@ -61,13 +74,18 @@ export async function sendMail({
 }: SendArgs): Promise<{ sent: boolean }> {
   const transport = getTransport();
   if (!transport) {
-    log.warn(
-      "mail: SMTP não configurado — email não enviado (defina SMTP_HOST, SMTP_USER e SMTP_PASS)",
-    );
+    // In production an unconfigured SMTP means real emails silently don't send —
+    // including the client's confirmation, whose caller doesn't inspect `sent`.
+    // Log at ERROR there so it reaches alerting rather than passing unnoticed;
+    // in dev it's an expected no-op, so a warning is enough.
+    const msg =
+      "mail: SMTP não configurado — email não enviado (defina SMTP_HOST, SMTP_USER e SMTP_PASS)";
+    if (process.env.NODE_ENV === "production") log.error(msg);
+    else log.warn(msg);
     return { sent: false };
   }
 
-  const from = process.env.MAIL_FROM ?? process.env.SMTP_USER!;
+  const from = fromAddress();
   const attach = attachments?.map((a) => ({
     filename: a.filename,
     content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content),

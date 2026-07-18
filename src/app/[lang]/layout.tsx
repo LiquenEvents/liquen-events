@@ -8,11 +8,11 @@ import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
 import Analytics from "@/components/Analytics";
+import LeadSourceCapture from "@/components/LeadSourceCapture";
 import PageTransition from "@/components/PageTransition";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import SmoothScroll from "@/components/motion/SmoothScroll";
-import FilmGrain from "@/components/motion/FilmGrain";
-import { getDictionary, htmlLang, normalizeLocale, LOCALES } from "@/lib/i18n";
+import { getDictionary, htmlLang, normalizeLocale, LOCALES, pickChromeDict } from "@/lib/i18n";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
 
 // Prerender both locales at build time. The locale now comes from the route
@@ -23,16 +23,45 @@ export function generateStaticParams() {
   return LOCALES.map((lang) => ({ lang }));
 }
 
+// Both faces stay VARIABLE (no `weight`): a single woff2 per family that
+// already covers every weight the design uses — Inter 300–700 (font-light
+// counters → font-bold) and Playfair 400–700 (400 nav menu / gallery captions /
+// faux-italic sign-off, 500 a gallery caption, 700 headings; the site never
+// renders any weight above 700 or below 300). Pinning discrete weights would be
+// a payload REGRESSION here: next/font emits one static file per weight for a
+// variable font, i.e. 5 files for Inter and 3 for Playfair instead of one each.
+// next/font already trims to the `wght` axis and, with `subsets: ["latin"]`,
+// to the Latin glyphs — which cover the PT/EN diacritics (ã õ ç é …) — so the
+// payload is already minimal.
+//
+// The CLS work is in the fallback wiring: display:"swap" keeps text visible
+// immediately (several heroes mask their title reveal, but body copy must never
+// be invisible → not "optional"); adjustFontFallback (default true, set
+// explicitly so it can't silently regress) size-adjusts the fallback metrics;
+// and the metric-near fallback stacks below mean the swap barely reflows the
+// large Playfair headings.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
+  adjustFontFallback: true,
+  fallback: [
+    "system-ui",
+    "-apple-system",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Arial",
+    "sans-serif",
+  ],
 });
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
   display: "swap",
+  adjustFontFallback: true,
+  fallback: ["Georgia", "Times New Roman", "Times", "serif"],
 });
 
 export async function generateMetadata({
@@ -77,6 +106,8 @@ export async function generateMetadata({
     openGraph: {
       type: "website",
       locale: t.meta.ogLocale,
+      // Tell Facebook/LinkedIn the other language exists (reciprocal signal).
+      alternateLocale: t.meta.ogLocale === "pt_PT" ? "en_GB" : "pt_PT",
       siteName: SITE.name,
       url: `${SITE.url}${canonical === "/" ? "" : canonical}`,
       title,
@@ -96,6 +127,14 @@ export async function generateMetadata({
       description,
       images: [SITE.ogImage],
     },
+    // iOS "Add to Home Screen": a standalone title + status-bar style, so an
+    // installed shortcut shows "Líquen" and branded chrome instead of the raw
+    // <title> and default bar.
+    appleWebApp: {
+      capable: true,
+      title: "Líquen",
+      statusBarStyle: "default",
+    },
     // Favicon/ícones gerados a partir de src/app/icon.png e apple-icon.png (logo Líquen).
     // Add GOOGLE_SITE_VERIFICATION in the environment to verify Search Console.
     verification: process.env.GOOGLE_SITE_VERIFICATION
@@ -105,7 +144,12 @@ export async function generateMetadata({
 }
 
 export const viewport: Viewport = {
-  themeColor: "#faf8f3",
+  // Brand cream in light; a deep moss for dark-mode UA chrome, instead of a flat
+  // white that reads as unconsidered.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f4ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#1b2119" },
+  ],
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
@@ -135,11 +179,12 @@ export default async function RootLayout({
       className={`${inter.variable} ${playfair.variable}`}
     >
       <body className="flex flex-col min-h-screen antialiased">
-        <LocaleProvider locale={locale} dict={t}>
+        <LocaleProvider locale={locale} dict={pickChromeDict(t)}>
           <SmoothScroll>
             {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
             <StructuredData locale={locale} />
             <Analytics />
+            <LeadSourceCapture />
             <a
               href="#conteudo"
               className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-white focus:rounded-md focus:text-sm"
@@ -154,7 +199,6 @@ export default async function RootLayout({
             </main>
             <Footer locale={locale} />
             <WhatsAppButton />
-            <FilmGrain />
           </SmoothScroll>
         </LocaleProvider>
       </body>

@@ -122,6 +122,7 @@ function createFakeSupabase() {
     private single = false;
     private returning = false;
     private orderBy: { col: string; asc: boolean } | null = null;
+    private lim: number | null = null;
     constructor(private table: string) {}
 
     select() {
@@ -154,6 +155,10 @@ function createFakeSupabase() {
     }
     order(col: string, opts: { ascending: boolean }) {
       this.orderBy = { col, asc: opts.ascending };
+      return this;
+    }
+    limit(n: number) {
+      this.lim = n;
       return this;
     }
     maybeSingle() {
@@ -199,6 +204,7 @@ function createFakeSupabase() {
         );
       }
       if (this.single) return { data: rows[0] ?? null, error: null };
+      if (this.lim !== null) rows = rows.slice(0, this.lim);
       return { data: rows, error: null };
     }
 

@@ -1,4 +1,5 @@
-import { randomBytes } from "node:crypto";
+import "server-only";
+import { randomBytes, createHmac } from "node:crypto";
 import type { Quote } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
@@ -13,6 +14,22 @@ export function generateQuoteId(): string {
   const now = Date.now().toString(36).toUpperCase();
   const rand = randomBytes(8).toString("hex").toUpperCase();
   return `LIQ-${now}-${rand}`;
+}
+
+/**
+ * Deterministic, unguessable id derived from a client-supplied submission id.
+ * A retried POST (the response was lost, the visitor resubmitted the same
+ * enquiry) carries the same submissionId → the same id → the route detects the
+ * existing quote and returns it instead of creating a duplicate lead + email.
+ *
+ * HMAC over a server-side key (not a plain hash) so the id can't be computed or
+ * enumerated from the submissionId alone — it stays as unguessable as the
+ * random ids the confirmation page relies on for its public GET-by-id.
+ */
+export function quoteIdFor(submissionId: string): string {
+  const key = process.env.SESSION_SECRET ?? process.env.ADMIN_SESSION_SECRET ?? "liquen-idem-dev";
+  const h = createHmac("sha256", key).update(`quote:${submissionId}`).digest("hex").toUpperCase();
+  return `LIQ-${h.slice(0, 6)}-${h.slice(6, 22)}`;
 }
 
 /**
