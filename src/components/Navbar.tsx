@@ -496,7 +496,7 @@ export default function Navbar() {
             // Three bar heights: a taller bar while the mobile menu is OPEN so it
             // can carry a prominent centred logo (the menu's pt clears it); the
             // compact 72px bar once the page is scrolled; the full 140px at rest.
-            isOpen ? "h-[120px]" : scrolled ? "h-[72px]" : "h-[140px]"
+            isOpen ? "h-[120px]" : scrolled ? "h-[76px]" : "h-[164px]"
           }`}
         >
           {/* Logo: horizontally centred on mobile (absolute, out of flow), and
@@ -508,9 +508,9 @@ export default function Navbar() {
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
-              width={210}
-              height={125}
-              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[80px] sm:h-[88px]" : scrolled ? "h-[46px] sm:h-[52px]" : "h-[100px] sm:h-[120px]"}`}
+              width={300}
+              height={179}
+              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[80px] sm:h-[88px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
             />
           </Link>
 
