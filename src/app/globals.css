@@ -63,6 +63,29 @@ body.admin-mode {
   --color-surface-raised: #f4f3f0;
   --color-surface-elevated: #ffffff;
   --color-foreground: #2a2620;
+  /* ── Back-office text-contrast tokens (WCAG 1.4.3) ──
+     The admin surface is pure white, so foreground (#2a2620) at a low alpha
+     silently drops informational text below 4.5:1. These three audited levels
+     mirror the public site's .eyebrow discipline (a legible micro-heading, not a
+     ghost). Use them for INFORMATIONAL text instead of arbitrary text-foreground/NN.
+       --bo-text        ~6.4:1  strong body info (values, emails, ids, dates)
+       --bo-text-muted  ~5.6:1  secondary info — still passes AA body text
+       --bo-text-faint  ~4.1:1  decorative-only micro-labels (≥3:1; never the sole
+                                carrier of information) */
+  --bo-text: rgba(42, 38, 32, 0.78);
+  --bo-text-muted: rgba(42, 38, 32, 0.7);
+  --bo-text-faint: rgba(42, 38, 32, 0.6);
+}
+/* Matching utilities so the tokens can be applied like the Tailwind text-* class
+   they replace. */
+body.admin-mode .bo-text {
+  color: var(--bo-text);
+}
+body.admin-mode .bo-text-muted {
+  color: var(--bo-text-muted);
+}
+body.admin-mode .bo-text-faint {
+  color: var(--bo-text-faint);
 }
 
 /* ── Selection ── */
@@ -700,9 +723,10 @@ body[data-menu-open] .whatsapp-fixed {
   outline: none;
   border-color: rgba(42, 38, 32, 0.75);
 }
-/* Eyebrow label used atop panels */
+/* Eyebrow label used atop panels — ~4.1:1 on white so the section it heads is
+   legible, not a ghost (WCAG 1.4.3; matches the public .eyebrow discipline). */
 .bo-eyebrow {
-  color: rgba(42, 38, 32, 0.35);
+  color: rgba(42, 38, 32, 0.6);
   font-size: 10px;
   letter-spacing: 0.3em;
   text-transform: uppercase;

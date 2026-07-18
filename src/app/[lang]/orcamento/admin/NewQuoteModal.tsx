@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import type { Quote, EventCategory } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
+import { useFocusTrap } from "./useFocusTrap";
 
 interface Props {
   open: boolean;
@@ -30,6 +31,8 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
   const { toast } = useToast();
   const [f, setF] = useState({ ...EMPTY });
   const [saving, setSaving] = useState(false);
+  // Trap Tab within the dialog + restore focus to the trigger on close.
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +88,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Novo pedido"

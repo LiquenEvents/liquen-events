@@ -22,6 +22,7 @@ import {
   downloadEventIcs,
 } from "./export";
 import { eventCountdown, randomId, eur } from "./util";
+import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import { NAV, type View } from "./nav";
 import {
@@ -120,8 +121,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [recentQuotes, setRecentQuotes] = useState<RecentQuote[]>([]);
+  // Below xl the detail panel is a modal slide-over (overlay + scrim); at xl+ it
+  // is an inline sticky column. Only the overlay should behave as a dialog (focus
+  // trap, aria-modal, scroll lock) — the inline panel must not trap focus.
+  const [isDetailOverlay, setIsDetailOverlay] = useState(false);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
+  // Focus trap for the mobile detail drawer — active only while it's the overlay.
+  const drawerRef = useFocusTrap<HTMLDivElement>(!!selected && isDetailOverlay);
   // Current locale, read from the path (/{lang}/orcamento/admin), to build the
   // deep link into a quote's full-screen Dossier route.
   const pathname = usePathname();
@@ -303,6 +310,29 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       document.body.style.overflow = prev;
     };
   }, [navOpen]);
+
+  // Track whether the detail panel is currently a modal overlay (below xl) so the
+  // dialog/focus-trap behaviour is gated to that state. matchMedia may be absent
+  // (SSR / jsdom) — guard so this stays a no-op there, defaulting to inline.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(max-width: 1279px)");
+    const update = () => setIsDetailOverlay(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // Lock background scroll while the detail drawer is open as a mobile overlay
+  // (mirrors the nav-drawer lock above). The inline xl panel never locks.
+  useEffect(() => {
+    if (!selected || !isDetailOverlay) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [selected, isDetailOverlay]);
 
   const paletteCommands: Command[] = useMemo(
     () => [
@@ -1252,6 +1282,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   ref={searchRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  aria-label="Procurar pedidos por nome, email, local ou ID"
                   placeholder="Procurar por nome, email, local, ID…  ( / )"
                   className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 shadow-sm transition-colors"
                 />
@@ -1283,7 +1314,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <select
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
-                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/55 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  aria-label="Filtrar por categoria"
+                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
                 >
                   <option value="all">Todas as categorias</option>
                   {CATEGORIES.map((c) => (
@@ -1295,7 +1327,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as typeof sort)}
-                  className="flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/55 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  aria-label="Ordenar pedidos"
+                  className="flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
                 >
                   <option value="recent">Mais recentes</option>
                   <option value="old">Mais antigos</option>
@@ -1425,6 +1458,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       const v = e.target.value as QuoteStatus;
                       if (v) applyBulkStatus(v);
                     }}
+                    aria-label="Marcar pedidos selecionados como"
                     className="bo-input px-2 py-1.5 text-xs text-foreground/70 disabled:opacity-50"
                   >
                     <option value="">{bulkBusy ? "A aplicar…" : "—"}</option>
@@ -1528,7 +1562,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   return (
                     <div key={q.id} className="relative">
                       <label
-                        className="absolute left-3.5 top-5 z-10 flex items-center"
+                        className="absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -1556,7 +1590,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               {q.name}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <p className="text-foreground/42 text-xs truncate">{q.email}</p>
+                              <p className="text-foreground/70 text-xs truncate">{q.email}</p>
                               {q.assignedTo && (
                                 <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
                                   {q.assignedTo}
@@ -1597,7 +1631,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 text-foreground/32 text-[10px]">
+                        <div className="flex items-center gap-3 text-foreground/70 text-[10px]">
                           <span>{cat?.label ?? "—"}</span>
                           {et && (
                             <>
@@ -1617,7 +1651,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   className={
                                     cd.tone === "today" || cd.tone === "soon"
                                       ? "text-[#b5654a] font-medium"
-                                      : "text-foreground/40"
+                                      : "text-foreground/70"
                                   }
                                 >
                                   {cd.label}
@@ -1644,7 +1678,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </div>
                         )}
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
-                          <span className="text-foreground/30 text-[10px] font-mono tracking-tight">
+                          <span className="text-foreground/70 text-[10px] font-mono tracking-tight">
                             {q.id}
                           </span>
                           <div className="flex items-center gap-3">
@@ -1653,12 +1687,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 {formatPrice(q.quotedPrice)}
                               </span>
                             ) : q.priceBreakdown?.total ? (
-                              <span className="text-foreground/30 text-xs">
+                              <span className="text-foreground/70 text-xs">
                                 ≈ {formatPrice(q.priceBreakdown.rangeMin)}–
                                 {formatPrice(q.priceBreakdown.rangeMax)}
                               </span>
                             ) : null}
-                            <span className="text-foreground/22 text-[10px]">
+                            <span className="text-foreground/70 text-[10px]">
                               {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
                                 day: "numeric",
                                 month: "short",
@@ -1686,14 +1720,23 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {selected ? (
                 <>
                   <div className="fixed inset-0 z-40 bg-black/50 xl:hidden" onClick={closeDetail} />
-                  <div className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-white xl:bg-white border-l xl:border border-foreground/[0.08] xl:rounded-xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-sm">
+                  <div
+                    ref={drawerRef}
+                    role={isDetailOverlay ? "dialog" : undefined}
+                    aria-modal={isDetailOverlay ? true : undefined}
+                    aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-white xl:bg-white border-l xl:border border-foreground/[0.08] xl:rounded-xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-sm"
+                  >
                     <div className="px-5 pt-4 border-b border-foreground/[0.07] sticky top-0 bg-white/90 backdrop-blur-sm z-10">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                          <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">
+                          <p className="text-foreground/70 text-[10px] tracking-[0.3em] uppercase mb-1">
                             {selected.id}
                           </p>
-                          <p className="text-foreground/70 text-sm font-medium truncate">
+                          <p
+                            id="detail-drawer-title"
+                            className="text-foreground/70 text-sm font-medium truncate"
+                          >
                             {selected.name}
                           </p>
                         </div>
@@ -1874,8 +1917,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           return (
                             <button
                               key={id}
+                              id={`detail-tab-${id}`}
                               role="tab"
                               aria-selected={active}
+                              aria-controls={`detail-panel-${id}`}
                               tabIndex={active ? 0 : -1}
                               onClick={() => setDetailTab(id)}
                               onKeyDown={(e) => {
@@ -1906,7 +1951,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                     <div className="p-5 flex flex-col gap-6">
                       {detailTab === "resumo" && (
-                        <>
+                        <div
+                          role="tabpanel"
+                          id="detail-panel-resumo"
+                          aria-labelledby="detail-tab-resumo"
+                          tabIndex={0}
+                          className="flex flex-col gap-6 focus:outline-none"
+                        >
                           {/* Snapshot — key facts at a glance */}
                           {(() => {
                             const revenue =
@@ -1949,7 +2000,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     >
                                       {c.v}
                                     </p>
-                                    <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+                                    <p className="text-foreground/60 text-[9px] tracking-[0.2em] uppercase mt-0.5">
                                       {c.l}
                                     </p>
                                   </div>
@@ -1994,7 +2045,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               <div className="flex items-center gap-2">
                                 <a
                                   href={`tel:${selected.phone}`}
-                                  className="text-foreground/50 text-xs hover:text-foreground/70"
+                                  className="text-foreground/70 text-xs hover:text-foreground/90"
                                 >
                                   {selected.phone}
                                 </a>
@@ -2019,10 +2070,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 )}
                               </div>
                               {selected.company && (
-                                <p className="text-foreground/35 text-xs">{selected.company}</p>
+                                <p className="text-foreground/70 text-xs">{selected.company}</p>
                               )}
                               {selected.nif && (
-                                <p className="text-foreground/25 text-xs">NIF: {selected.nif}</p>
+                                <p className="text-foreground/70 text-xs">NIF: {selected.nif}</p>
                               )}
                             </div>
                           </div>
@@ -2057,17 +2108,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
                               ].map(({ l, v }) => (
                                 <div key={l}>
-                                  <p className="text-foreground/20 text-[9px] tracking-wide uppercase mb-0.5">
+                                  <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
                                     {l}
                                   </p>
-                                  <p className="text-foreground/55 text-xs">{v ?? "—"}</p>
+                                  <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
                                 </div>
                               ))}
                             </div>
                             {/* Editable logistics */}
                             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-foreground/[0.06]">
                               <div>
-                                <label className="text-foreground/20 text-[9px] tracking-wide uppercase block mb-1">
+                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
                                   Data
                                 </label>
                                 <input
@@ -2089,7 +2140,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   })()}
                               </div>
                               <div>
-                                <label className="text-foreground/20 text-[9px] tracking-wide uppercase block mb-1">
+                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
                                   Convidados
                                 </label>
                                 <input
@@ -2101,7 +2152,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 />
                               </div>
                               <div className="col-span-2">
-                                <label className="text-foreground/20 text-[9px] tracking-wide uppercase block mb-1">
+                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
                                   Local
                                 </label>
                                 <input
@@ -2118,7 +2169,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           {selected.notes && (
                             <div>
                               <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                              <p className="text-foreground/45 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
+                              <p className="text-foreground/72 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
                                 {selected.notes}
                               </p>
                             </div>
@@ -2131,21 +2182,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
                                 {selected.priceBreakdown.addonsCost > 0 && (
                                   <div className="flex justify-between text-[10px]">
-                                    <span className="text-foreground/35">Extras</span>
-                                    <span className="text-foreground/50">
+                                    <span className="text-foreground/60">Extras</span>
+                                    <span className="text-foreground/72">
                                       {formatPrice(selected.priceBreakdown.addonsCost)}
                                     </span>
                                   </div>
                                 )}
                                 <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
-                                  <span className="text-foreground/35">Subtotal</span>
-                                  <span className="text-foreground/50">
+                                  <span className="text-foreground/60">Subtotal</span>
+                                  <span className="text-foreground/72">
                                     {formatPrice(selected.priceBreakdown.subtotal)}
                                   </span>
                                 </div>
                                 <div className="flex justify-between text-[10px]">
-                                  <span className="text-foreground/35">IVA 23%</span>
-                                  <span className="text-foreground/50">
+                                  <span className="text-foreground/60">IVA 23%</span>
+                                  <span className="text-foreground/72">
                                     {formatPrice(selected.priceBreakdown.iva)}
                                   </span>
                                 </div>
@@ -2187,7 +2238,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 }}
                               />
                               <div>
-                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
                                   Responsável
                                 </label>
                                 <input
@@ -2199,7 +2250,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 />
                               </div>
                               <div>
-                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
                                   Estado
                                 </label>
                                 <select
@@ -2216,7 +2267,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               </div>
                               {editStatus === "rejeitado" && (
                                 <div>
-                                  <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                  <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
                                     Motivo de perda
                                   </label>
                                   <textarea
@@ -2232,16 +2283,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 selected.lostReason &&
                                 editStatus !== "rejeitado" && (
                                   <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
-                                    <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/28 mb-1">
+                                    <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
                                       Motivo de perda anterior
                                     </p>
-                                    <p className="text-xs text-foreground/50">
+                                    <p className="text-xs text-foreground/72">
                                       {selected.lostReason}
                                     </p>
                                   </div>
                                 )}
                               <div>
-                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
                                   Preço Final Cotado (€ s/IVA)
                                 </label>
                                 <input
@@ -2253,7 +2304,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 />
                               </div>
                               <div>
-                                <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
                                   Notas Internas
                                 </label>
                                 <textarea
@@ -2282,11 +2333,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               </button>
                             </div>
                           </div>
-                        </>
+                        </div>
                       )}
 
                       {detailTab === "producao" && (
-                        <>
+                        <div
+                          role="tabpanel"
+                          id="detail-panel-producao"
+                          aria-labelledby="detail-tab-producao"
+                          tabIndex={0}
+                          className="flex flex-col gap-6 focus:outline-none"
+                        >
                           {/* Tasks linked to this event */}
                           <EventTasks
                             key={`tasks-${selected.id}`}
@@ -2343,11 +2400,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               setSelected((prev) => (prev ? { ...prev, guestList } : prev));
                             }}
                           />
-                        </>
+                        </div>
                       )}
 
                       {detailTab === "financeiro" && (
-                        <>
+                        <div
+                          role="tabpanel"
+                          id="detail-panel-financeiro"
+                          aria-labelledby="detail-tab-financeiro"
+                          tabIndex={0}
+                          className="flex flex-col gap-6 focus:outline-none"
+                        >
                           {/* Payments & invoicing */}
                           <PaymentsPanel
                             key={`pay-${selected.id}`}
@@ -2374,11 +2437,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               setSelected((prev) => (prev ? { ...prev, eventSuppliers } : prev));
                             }}
                           />
-                        </>
+                        </div>
                       )}
 
                       {detailTab === "comunicacao" && (
-                        <>
+                        <div
+                          role="tabpanel"
+                          id="detail-panel-comunicacao"
+                          aria-labelledby="detail-tab-comunicacao"
+                          tabIndex={0}
+                          className="flex flex-col gap-6 focus:outline-none"
+                        >
                           <ProposalStudio
                             key={`studio-${selected.id}`}
                             quote={selected}
@@ -2455,10 +2524,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             actor={userName}
                             onAddEntry={(entry) => appendActivity(selected.id, [entry])}
                           />
-                        </>
+                        </div>
                       )}
 
-                      <div className="text-foreground/18 text-[10px] text-center">
+                      <div className="text-foreground/70 text-[10px] text-center">
                         Submetido em{" "}
                         {new Date(selected.submittedAt).toLocaleString("pt-PT", {
                           day: "numeric",
