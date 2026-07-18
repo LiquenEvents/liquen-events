@@ -75,6 +75,7 @@ import { POST } from "./route";
 import { createProposalToken } from "@/lib/proposal-token";
 import { updateQuoteWith } from "@/lib/quotes-store";
 import { createContract, createContractIfAbsent } from "@/lib/contracts-store";
+import type { Contract } from "@/lib/contract-types";
 import { createInvoice } from "@/lib/invoices-store";
 
 /** The consent payload the accept path now requires (terms + signer name). */
@@ -197,7 +198,8 @@ describe("POST /api/proposta", () => {
     // helper reporta created:false. Não podemos então emitir um 2.º sinal.
     vi.mocked(createContractIfAbsent).mockResolvedValueOnce({
       created: false,
-      contract: { id: "winner", proposalId: "p8", status: "aceite" },
+      // Only `created:false` matters here; the contract fields are immaterial.
+      contract: { id: "winner", proposalId: "p8", status: "aceite" } as Contract,
     });
     const res = await POST(
       postReq({ token: createProposalToken("p8"), action: "aceitar", ...CONSENT }),

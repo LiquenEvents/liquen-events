@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
@@ -120,6 +122,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [recentQuotes, setRecentQuotes] = useState<RecentQuote[]>([]);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
+  // Current locale, read from the path (/{lang}/orcamento/admin), to build the
+  // deep link into a quote's full-screen Dossier route.
+  const pathname = usePathname();
+  const lang = pathname?.split("/").filter(Boolean)[0] || "pt";
 
   // Does the detail panel have edits (status/price/notes) not yet saved? Used to
   // warn before switching/closing a quote so work is never silently lost.
@@ -1774,6 +1780,28 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             </svg>
                             <span className="hidden sm:inline">Run-sheet</span>
                           </button>
+                          {/* Full-screen cockpit for this event — the one place
+                              that unifies proposta/contrato/faturas/produção. */}
+                          <Link
+                            href={`/${lang}/orcamento/admin/evento/${selected.id}`}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[#4d6350] text-[10px] tracking-[0.15em] uppercase rounded-lg bg-[#4d6350]/10 hover:bg-[#4d6350]/18 transition-colors font-medium"
+                            title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                            >
+                              <rect x="3" y="3" width="7" height="9" rx="1" />
+                              <rect x="14" y="3" width="7" height="5" rx="1" />
+                              <rect x="14" y="12" width="7" height="9" rx="1" />
+                              <rect x="3" y="16" width="7" height="5" rx="1" />
+                            </svg>
+                            <span className="hidden sm:inline">Abrir Dossier</span>
+                          </Link>
                           <button
                             onClick={() => printEventDossier(selected)}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
@@ -1794,7 +1822,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               />
                               <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
                             </svg>
-                            <span className="hidden sm:inline">Dossier</span>
+                            <span className="hidden sm:inline">Dossier PDF</span>
                           </button>
                           {selected.date && (
                             <button
