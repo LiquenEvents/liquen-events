@@ -19,20 +19,16 @@ const M = 48; // page margin
 
 // ── Brand palette ──
 const MOSS = rgb(0.388, 0.478, 0.373); // #637a5f
-const GOLD = rgb(0.839, 0.671, 0.227); // #d6ab3a
 const INK = rgb(0.165, 0.149, 0.125); // #2a2620
 const MUTED = rgb(0.42, 0.4, 0.36);
 const FAINT = rgb(0.55, 0.53, 0.49);
 const DARK = rgb(0.047, 0.055, 0.043); // #0c0e0b
 const LINE = rgb(0.886, 0.871, 0.835); // #e2ded5
-const WHITE = rgb(1, 1, 1);
 
 interface Fonts {
   reg: PDFFont;
   bold: PDFFont;
-  serif: PDFFont;
   serifIt: PDFFont;
-  serifBold: PDFFont;
 }
 
 /** Decode a base64 (optionally data:-prefixed) image and cover-crop it to the
@@ -86,9 +82,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
   const f: Fonts = {
     reg: await pdf.embedFont(StandardFonts.Helvetica),
     bold: await pdf.embedFont(StandardFonts.HelveticaBold),
-    serif: await pdf.embedFont(StandardFonts.TimesRoman),
     serifIt: await pdf.embedFont(StandardFonts.TimesRomanItalic),
-    serifBold: await pdf.embedFont(StandardFonts.TimesRomanBold),
   };
   const logoDark = await pdf.embedPng(Buffer.from(LOGO_DARK_PNG_B64, "base64"));
   const logoWhite = await pdf.embedPng(Buffer.from(LOGO_WHITE_PNG_B64, "base64"));
@@ -321,7 +315,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       ry -= 8;
       text(p, "Não incluído no orçamento:", rx, ry, { font: f.bold, size: 8.5, color: MUTED });
       ry -= 14;
-      ry = bullets(p, doc.naoIncluido, rx, ry, rW, f, 8.5);
+      bullets(p, doc.naoIncluido, rx, ry, rW, f, 8.5);
     }
   }
 
