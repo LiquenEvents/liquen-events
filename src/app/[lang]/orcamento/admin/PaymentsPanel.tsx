@@ -73,7 +73,16 @@ export default function PaymentsPanel({ quote, onChange }: Props) {
       const res = await fetch(`/api/orcamento/${quote.id}/fatura`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: p.kind, amount: p.amount, date: p.date, paid: p.paid, email }),
+        // `paymentId` é a chave de idempotência do livro de faturas: descarregar
+        // e depois enviar o mesmo pagamento reaproveita o mesmo número (FT AAAA/NNNN).
+        body: JSON.stringify({
+          paymentId: p.id,
+          kind: p.kind,
+          amount: p.amount,
+          date: p.date,
+          paid: p.paid,
+          email,
+        }),
       });
       const data = await res.json();
       if (data.pdfBase64 && !email) {
