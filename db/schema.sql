@@ -109,6 +109,35 @@ create table if not exists public.app_state (
   updated_at  timestamptz not null default now()
 );
 
+-- ── Modelos de email (transacionais, editáveis no back office) ──
+create table if not exists public.email_templates (
+  id          text primary key,          -- slug: proposta-enviada, sinal-recebido…
+  name        text not null,
+  subject     text not null,
+  body        text not null,             -- HTML com {merge} fields
+  updated_at  timestamptz not null default now()
+);
+
+-- ── Faturas (livro de faturação, numeração sequencial) ──────────
+create table if not exists public.invoices (
+  id           text primary key,
+  number       text not null,            -- FT 2026/0007
+  quote_id     text,
+  client_name  text,
+  client_email text,
+  kind         text not null default 'total',  -- sinal | saldo | total
+  amount       numeric not null default 0,     -- com IVA
+  vat_rate     numeric not null default 0.23,
+  issued_at    date,
+  due_at       date,
+  paid_at      date,
+  status       text not null default 'emitida', -- emitida | paga | anulada
+  note         text
+);
+
+create index if not exists invoices_quote_id_idx on public.invoices (quote_id);
+create index if not exists invoices_status_idx   on public.invoices (status);
+
 -- ── Restrições de integridade (CHECK) ───────────────────────────
 -- Garantem, na própria base de dados, que os campos de estado/tipo só
 -- aceitam os valores que a aplicação conhece e que os montantes não são
@@ -141,6 +170,21 @@ do $$ begin
     alter table public.calendar_events add constraint calendar_events_kind_chk
       check (kind in ('reuniao','evento','bloqueio','nota')) not valid;
   end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'invoices_status_chk') then
+    alter table public.invoices add constraint invoices_status_chk
+      check (status in ('emitida','paga','anulada')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'invoices_kind_chk') then
+    alter table public.invoices add constraint invoices_kind_chk
+      check (kind in ('sinal','saldo','total')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'invoices_amount_chk') then
+    alter table public.invoices add constraint invoices_amount_chk
+      check (amount >= 0 and vat_rate >= 0) not valid;
+  end if;
 end $$;
 
 -- ── Segurança ───────────────────────────────────────────────────
@@ -153,3 +197,5 @@ alter table public.suppliers enable row level security;
 alter table public.calendar_events enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.app_state enable row level security;
+alter table public.email_templates enable row level security;
+alter table public.invoices    enable row level security;
