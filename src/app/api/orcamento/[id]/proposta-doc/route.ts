@@ -14,9 +14,6 @@ import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n || 0);
-
 /** Best-effort parse of the studio's free-text total ("3.000,00 € + IVA",
  *  "14.700,00 €") into a number for the proposal record + accept notification. */
 function parseMoney(text: string | undefined): number {
