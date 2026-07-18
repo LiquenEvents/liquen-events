@@ -35,6 +35,10 @@ export default function PhotoWall({
 }) {
   const sectionRef = useRef<HTMLElement>(null);
   const [offscreen, setOffscreen] = useState(false);
+  // Gates loading of the heavy frames: false until the band is approaching, so
+  // the ~12 large photos don't download in parallel with the hero on first load
+  // (the band sits ~4 screens down). Flips true once near and stays true.
+  const [near, setNear] = useState(false);
 
   // How many frames the strip shows at once (duplicated for the seamless loop).
   const VISIBLE = Math.min(12, images.length);
@@ -63,6 +67,29 @@ export default function PhotoWall({
     const io = new IntersectionObserver(([entry]) => setOffscreen(!entry.isIntersecting), {
       rootMargin: "200px",
     });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  // One-shot "approaching" observer with a wide margin: start loading the frames
+  // ~1.4 screens before they're visible so they're crisp by the time the user
+  // arrives, WITHOUT competing with the hero on first paint. No IO (old browser)
+  // → load immediately (current behaviour). eslint: deliberate one-shot setState.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "1400px" },
+    );
     io.observe(el);
     return () => io.disconnect();
   }, []);
@@ -120,13 +147,14 @@ export default function PhotoWall({
                 fill
                 sizes="(max-width: 640px) 420px, (max-width: 1024px) 585px, 720px"
                 className="object-cover"
-                // Eager, not lazy: the marquee brings frames into view by a CSS
-                // translateX animation, which native lazy-loading (scroll-based)
-                // doesn't react to — so off-screen frames never loaded and the
-                // strip showed as a blurred smear. There are only 12 unique srcs
-                // (duplicated to 24, so the copies are cache hits), so eager-
-                // loading the ribbon is cheap and keeps the portfolio crisp.
-                loading="eager"
+                // Eager ONCE THE BAND IS NEAR, lazy before: the marquee brings
+                // frames into view by a CSS translateX animation, which native
+                // lazy-loading (scroll-based) doesn't react to — so eager keeps
+                // the ribbon crisp instead of a blurred smear. But eager on first
+                // paint made these ~12 large frames (4 screens down) compete with
+                // the hero LCP; gating on `near` defers them off the critical path
+                // while still loading them well before the user scrolls here.
+                loading={near ? "eager" : "lazy"}
                 placeholder={img.blurDataURL ? "blur" : undefined}
                 blurDataURL={img.blurDataURL}
               />

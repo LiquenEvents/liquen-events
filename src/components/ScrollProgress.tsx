@@ -22,9 +22,17 @@ export default function ScrollProgress() {
 
     let frame = 0;
     let last = -1;
+    // Cache the scrollable range. `scrollHeight` is a layout-derived read; doing
+    // it every scroll frame risks a forced reflow whenever something else dirtied
+    // layout between ticks. Measure it only when the page can actually change
+    // height (resize + a ResizeObserver on <body>) and keep the scroll hot path
+    // reading nothing but scrollTop.
+    let max = root.scrollHeight - root.clientHeight;
+    const measure = () => {
+      max = root.scrollHeight - root.clientHeight;
+    };
     const apply = () => {
       frame = 0;
-      const max = root.scrollHeight - root.clientHeight;
       const progress = max > 0 ? Math.min(root.scrollTop / max, 1) : 0;
       // Skip the DOM write when the value hasn't moved (e.g. resize ticks at the
       // same scroll position) so we don't re-trigger the transform/transition.
@@ -35,14 +43,29 @@ export default function ScrollProgress() {
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(apply);
     };
+    const onResize = () => {
+      measure();
+      schedule();
+    };
 
     apply();
     window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    // Content that changes page height without a resize event (images loading,
+    // the gallery appending tiles, accordions opening) keeps `max` fresh here.
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            measure();
+            schedule();
+          })
+        : null;
+    ro?.observe(document.body);
     return () => {
       if (frame) cancelAnimationFrame(frame);
       window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
+      window.removeEventListener("resize", onResize);
+      ro?.disconnect();
     };
   }, []);
 
