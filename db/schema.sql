@@ -109,6 +109,40 @@ create table if not exists public.app_state (
   updated_at  timestamptz not null default now()
 );
 
+-- ── Restrições de integridade (CHECK) ───────────────────────────
+-- Garantem, na própria base de dados, que os campos de estado/tipo só
+-- aceitam os valores que a aplicação conhece e que os montantes não são
+-- negativos — mesmo que algo escreva fora da app. Adicionadas de forma
+-- idempotente (só se ainda não existirem) e como NOT VALID, para nunca
+-- falharem numa instalação já existente com dados antigos: passam a ser
+-- aplicadas a partir da próxima escrita, sem varrer as linhas atuais.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'quotes_status_chk') then
+    alter table public.quotes add constraint quotes_status_chk
+      check (status in ('pendente','em_revisao','cotado','aceite','rejeitado')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'proposals_status_chk') then
+    alter table public.proposals add constraint proposals_status_chk
+      check (status in ('rascunho','enviada','aceite','rejeitada')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'proposals_amounts_chk') then
+    alter table public.proposals add constraint proposals_amounts_chk
+      check (vat_rate >= 0 and subtotal >= 0 and vat >= 0 and total >= 0) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'tasks_priority_chk') then
+    alter table public.tasks add constraint tasks_priority_chk
+      check (priority in ('baixa','normal','alta')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'calendar_events_kind_chk') then
+    alter table public.calendar_events add constraint calendar_events_kind_chk
+      check (kind in ('reuniao','evento','bloqueio','nota')) not valid;
+  end if;
+end $$;
+
 -- ── Segurança ───────────────────────────────────────────────────
 -- Ativamos RLS sem políticas públicas: só o servidor (service_role key,
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.
