@@ -34,6 +34,9 @@ import {
   Inbox,
   ProposalBuilder,
   ProposalStudio,
+  ProductionPlan,
+  EmailTemplates,
+  Faturas,
   ClientMessenger,
   EventChecklist,
   EventTimeline,
@@ -732,6 +735,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     estatisticas: "Estatísticas",
+    faturas: "Faturas",
+    "modelos-email": "Modelos de email",
     inbox: "Inbox",
   };
 
@@ -745,6 +750,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     estatisticas: "Métricas e desempenho",
+    faturas: "Livro de faturação e pagamentos",
+    "modelos-email": "Emails reutilizáveis da equipa",
     inbox: "Mensagens recebidas",
   };
 
@@ -1157,6 +1164,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "estatisticas" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <StatsDashboard quotes={activeQuotes} />
+            </div>
+          )}
+
+          {/* ── Faturas ── */}
+          {view === "faturas" && (
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+              <Faturas quotes={quotes} />
+            </div>
+          )}
+
+          {/* ── Modelos de email ── */}
+          {view === "modelos-email" && (
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+              <EmailTemplates />
             </div>
           )}
 
@@ -2213,6 +2234,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           {/* Production checklist */}
                           <EventChecklist
                             key={`cl-${selected.id}`}
+                            quote={selected}
+                            onChange={(checklist) => {
+                              setQuotes((prev) =>
+                                prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
+                              );
+                              setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                            }}
+                          />
+
+                          {/* Decor production plan (sourcing → strike) */}
+                          <ProductionPlan
+                            key={`prod-${selected.id}`}
                             quote={selected}
                             onChange={(checklist) => {
                               setQuotes((prev) =>

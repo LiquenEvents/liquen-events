@@ -1,0 +1,110 @@
+import "server-only";
+import { randomUUID } from "node:crypto";
+import { createRepository, type Mapper } from "./repository";
+import { getState, setState } from "./app-state";
+
+/**
+ * Invoicing ledger — numbered invoices (faturas) tied to the 30%/70% payment
+ * model. Persisted through the shared Repository (Supabase when configured,
+ * else the dev JSON file), exactly like proposals-store / tasks-store.
+ */
+export interface Invoice {
+  id: string;
+  number: string;
+  quoteId: string;
+  clientName: string;
+  clientEmail: string;
+  kind: "sinal" | "saldo" | "total";
+  amount: number; // com IVA, em €
+  vatRate: number; // ex.: 0.23
+  issuedAt: string; // yyyy-mm-dd (data de emissão)
+  dueAt?: string; // yyyy-mm-dd (vencimento)
+  paidAt?: string; // yyyy-mm-dd
+  status: "emitida" | "paga" | "anulada";
+  note?: string;
+}
+
+export const mapper: Mapper<Invoice> = {
+  table: "invoices",
+  fileName: "invoices.json",
+  getId: (i) => i.id,
+  toRow: (i) => ({
+    id: i.id,
+    number: i.number,
+    quote_id: i.quoteId,
+    client_name: i.clientName,
+    client_email: i.clientEmail,
+    kind: i.kind,
+    amount: i.amount,
+    vat_rate: i.vatRate,
+    issued_at: i.issuedAt,
+    due_at: i.dueAt || null,
+    paid_at: i.paidAt || null,
+    status: i.status,
+    note: i.note || null,
+  }),
+  fromRow: (r) => ({
+    id: String(r.id),
+    number: String(r.number ?? ""),
+    quoteId: String(r.quote_id ?? ""),
+    clientName: String(r.client_name ?? ""),
+    clientEmail: String(r.client_email ?? ""),
+    kind: (r.kind as Invoice["kind"]) ?? "total",
+    amount: Number(r.amount ?? 0),
+    vatRate: Number(r.vat_rate ?? 0.23),
+    issuedAt: String(r.issued_at ?? new Date().toISOString().slice(0, 10)),
+    dueAt: (r.due_at as string) ?? undefined,
+    paidAt: (r.paid_at as string) ?? undefined,
+    status: (r.status as Invoice["status"]) ?? "emitida",
+    note: (r.note as string) ?? undefined,
+  }),
+  order: { column: "issued_at", ascending: false },
+  fileCompare: (a, b) => {
+    const d = +new Date(b.issuedAt) - +new Date(a.issuedAt);
+    // Same day: keep the higher invoice number first (stable, human order).
+    return d !== 0 ? d : b.number.localeCompare(a.number);
+  },
+};
+
+const repo = createRepository(mapper);
+
+export const listInvoices = (): Promise<Invoice[]> => repo.list();
+export const getInvoice = (id: string): Promise<Invoice | null> => repo.get(id);
+export const listInvoicesForQuote = (quoteId: string): Promise<Invoice[]> =>
+  repo.where("quote_id", quoteId, (i) => i.quoteId === quoteId);
+export const createInvoice = (i: Invoice): Promise<void> => repo.create(i);
+export const updateInvoice = (id: string, patch: Partial<Invoice>): Promise<Invoice | null> =>
+  repo.update(id, patch);
+
+/** Convenience id generator so callers don't reach for crypto directly. */
+export const newInvoiceId = (): string => randomUUID();
+
+/**
+ * Atomic sequential invoice number, per year: `FT ${year}/${nnnn}` (zero-padded
+ * to 4 digits, e.g. "FT 2026/0007"). Best-effort read-increment-write against
+ * the shared app-state key/value store — the same primitive the inbox cron uses
+ * for its high-water mark. Not a hard mutex, but app-state is a single row and
+ * two near-simultaneous POSTs are the realistic worst case; the counter never
+ * goes backwards, so the practical failure mode is a skipped/duplicate number
+ * under a true race, never a lost or reused-then-clobbered sequence.
+ */
+export async function nextInvoiceNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const key = `invoice-seq-${year}`;
+  const current = (await getState<number>(key)) ?? 0;
+  const next = current + 1;
+  await setState(key, next);
+  return `FT ${year}/${String(next).padStart(4, "0")}`;
+}
+
+/**
+ * Split an event total into the 30% deposit (sinal) and 70% balance (saldo),
+ * rounded to cents. The saldo is derived by subtraction so the two parts always
+ * sum back to the exact total (no rounding drift).
+ */
+export function splitThirtySeventy(total: number): { sinal: number; saldo: number } {
+  const t = Math.max(0, total);
+  const sinal = Math.round(t * 0.3 * 100) / 100;
+  const saldo = Math.round((t - sinal) * 100) / 100;
+  return { sinal, saldo };
+}
