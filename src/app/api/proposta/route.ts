@@ -57,6 +57,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, status: proposal.status, already: true });
     }
 
+    // Effective revocation: only a live, still-open proposal can be answered.
+    // A signed link lives in the client's inbox for 14 days and is forwardable,
+    // so without this a draft (never really offered) or one the team superseded/
+    // withdrew in the back office (status moved off "enviada") could still be
+    // accepted at a stale price. Reject anything that isn't currently "enviada".
+    if (proposal.status !== "enviada") {
+      return NextResponse.json(
+        { error: "Esta proposta já não está disponível. Contacte-nos para uma atualizada." },
+        { status: 409 },
+      );
+    }
+    // Honour the proposal's own validity date — an expired offer is not bindable.
+    if (proposal.validUntil && Date.parse(proposal.validUntil) < Date.now()) {
+      return NextResponse.json(
+        { error: "Esta proposta expirou. Contacte-nos para uma atualizada." },
+        { status: 410 },
+      );
+    }
+
     const accepted = action === "aceitar";
     const newStatus = accepted ? "aceite" : "rejeitada";
     const respondedAt = new Date().toISOString();

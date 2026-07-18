@@ -301,7 +301,17 @@ export async function POST(request: NextRequest) {
     try {
       const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
       const confirmation = buildClientConfirmation({ locale, name: form.name, referenceId: id });
-      await sendMail({ to: form.email, ...confirmation });
+      // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
+      // without a ceiling the endpoint could be abused to bombard a victim's
+      // inbox from Líquen's sender reputation (a mail-bomb amplifier). 5/day per
+      // address is far above any real client's needs; over it we skip the
+      // confirmation — the lead is already persisted and the team notified.
+      const emailKey = `confirm:${form.email.trim().toLowerCase()}`;
+      if ((await rateLimit(emailKey, 5, 24 * 60 * 60_000)).ok) {
+        await sendMail({ to: form.email, ...confirmation });
+      } else {
+        log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
+      }
     } catch (mailErr) {
       log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
     }
