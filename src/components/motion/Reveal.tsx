@@ -32,7 +32,9 @@ type Variant = "rise" | "fade" | "mask";
  */
 
 // CSS equivalent of GSAP's `power3.out` (easeOutCubic).
-const EASE = "cubic-bezier(0.33, 1, 0.68, 1)";
+// The site's signature ease-out (matches --ease-out in globals.css) so scroll
+// reveals decelerate like every other motion on the page.
+const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 
 // All instances share observers instead of each spinning up its own. Instances
 // with the same trigger geometry (`start`) share ONE observer; each element
@@ -95,7 +97,9 @@ export default function Reveal({
   className,
   delay = 0,
   y = 42,
-  duration = 1.1,
+  // 0.75s (was 1.1s): the old default read as sluggish next to AnimateIn's 0.75s
+  // on the same page, so interior-page reveals felt slow. Now they match.
+  duration = 0.75,
   stagger,
   start = "top 85%",
 }: {

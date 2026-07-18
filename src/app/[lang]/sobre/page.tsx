@@ -194,7 +194,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           pool={gridPool}
           alt={t.common.imageAlt.sobreCelebration}
           className="grid grid-cols-2 lg:grid-cols-4 gap-0 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
-          imgClassName="transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+          imgClassName="transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
         />
       </section>
 

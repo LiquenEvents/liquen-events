@@ -69,7 +69,7 @@ export default function FAQ({
               role="region"
               aria-labelledby={`faq-q-${i}`}
               inert={!isOpen}
-              className={`grid transition-all duration-400 ease-in-out ${
+              className={`grid transition-[grid-template-rows,opacity] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isOpen ? "grid-rows-[1fr] opacity-100 pb-8" : "grid-rows-[0fr] opacity-0"
               }`}
             >

@@ -39,6 +39,11 @@
   --hero-display: clamp(48px, 10vw, 150px);
   --hero-section: clamp(46px, 9vw, 132px);
   --hero-detail: clamp(36px, 6vw, 84px);
+  /* One signature ease-out for the whole site — the dominant curve already used
+     by the route/reveal animations. Collapsing the two near-identical variants
+     (the old .ease-expo and Reveal's curve) onto it makes adjacent motion read
+     as one coherent system rather than three slightly different decelerations. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
@@ -203,7 +208,9 @@ body::before {
   background: currentColor;
   transform-origin: right;
   transform: scaleX(0);
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  /* 0.3s to match the color transition on the same links (was 0.45s, so the
+     underline lagged the colour by ~150ms). */
+  transition: transform 0.3s var(--ease-out);
 }
 .link-line:hover::after {
   transform-origin: left;
@@ -357,10 +364,11 @@ body::before {
   animation: footer-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-/* ── SpaceX signature easing — the fast-out/slow-settle expo curve their site
-   uses for hovers and reveals. Pair with a transition-* utility. ── */
+/* ── Signature easing utility — the fast-out/slow-settle curve used for hovers
+   and reveals. Now aliases the shared --ease-out token so the whole site shares
+   one deceleration. Pair with a transition-* utility. ── */
 .ease-expo {
-  transition-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+  transition-timing-function: var(--ease-out);
 }
 
 /* ── SpaceX display tracking — their big uppercase D-DIN headlines run at a
@@ -494,7 +502,7 @@ body[data-menu-open] .whatsapp-fixed {
   /* `backwards` (not `both`): applies the start state before the animation but
      does NOT leave a lingering transform afterwards — a persistent transform
      would create a containing block and break position:fixed overlays inside. */
-  animation: route-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: route-fade 0.42s var(--ease-out) backwards;
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
@@ -506,7 +514,9 @@ body[data-menu-open] .whatsapp-fixed {
   animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both vt-depart;
 }
 ::view-transition-new(.vt-page) {
-  animation: 480ms cubic-bezier(0.16, 1, 0.3, 1) 90ms both vt-arrive;
+  /* Shorter arrive (was 480ms + 90ms ≈ 570ms) so navigation feels immediate
+     rather than heavy. The old page still departs quickly (200ms). */
+  animation: 380ms var(--ease-out) 60ms both vt-arrive;
 }
 @keyframes vt-depart {
   to {
@@ -525,13 +535,13 @@ body[data-menu-open] .whatsapp-fixed {
   animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-left;
 }
 ::view-transition-new(.vt-page-fwd) {
-  animation: 500ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both vt-in-right;
+  animation: 400ms var(--ease-out) 60ms both vt-in-right;
 }
 ::view-transition-old(.vt-page-bwd) {
   animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-right;
 }
 ::view-transition-new(.vt-page-bwd) {
-  animation: 500ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both vt-in-left;
+  animation: 400ms var(--ease-out) 60ms both vt-in-left;
 }
 @keyframes vt-out-left {
   to {
