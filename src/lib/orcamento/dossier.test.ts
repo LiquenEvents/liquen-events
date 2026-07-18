@@ -224,6 +224,20 @@ describe("deriveStage", () => {
     // Accepted + sinal paid, event passed but unpaid saldo → still em_producao.
     expect(deriveStage(d, TODAY)).toBe("em_producao");
   });
+
+  it("day-of afternoon stays 'today' (semana_evento), NOT concluido", () => {
+    // Tarde do próprio dia do evento: o contador ainda diz 0, por isso o evento
+    // NÃO passou. Âncora a meio-dia disparava concluido cedo demais; a de fim do
+    // dia mantém-no na semana do evento até à meia-noite seguinte.
+    const afternoon = new Date("2026-07-18T15:00:00Z");
+    const d = data({
+      quote: makeQuote({ date: "2026-07-18" }),
+      proposal: makeProposal({ status: "aceite", total: 20000 }),
+      invoices: [invoice({ kind: "saldo", amount: 14000, status: "paga" })],
+    });
+    expect(countdownDays("2026-07-18", afternoon)).toBe(0);
+    expect(deriveStage(d, afternoon)).toBe("semana_evento");
+  });
 });
 
 describe("computeEventMetrics", () => {

@@ -138,7 +138,11 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
 
   const perdido = quote.status === "rejeitado" || proposal?.status === "rejeitada";
 
-  const eventPassed = !!quote.date && Date.parse(`${quote.date}T12:00:00`) < today.getTime();
+  // Ancorado ao FIM do dia do evento: a tarde do próprio dia continua a ser
+  // "hoje" (countdownDays === 0), não "já passou". Só a partir da meia-noite
+  // seguinte é que `eventPassed` fica verdadeiro — mantendo-o coerente com o
+  // contador (que só vira negativo no dia seguinte).
+  const eventPassed = !!quote.date && Date.parse(`${quote.date}T23:59:59`) < today.getTime();
 
   const contracted = contractedTotal(d);
   const ledgerPaid = ledgerPaidTotal(invoices);
