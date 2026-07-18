@@ -824,6 +824,15 @@ body:has([data-orcamento-mode]) .eyebrow {
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {
   background-color: #12160f;
+  /* Skip rendering off-screen tiles' contents (the <Image>) so a long gallery
+     doesn't keep hundreds of decoded layers laid out — the fix for the measured
+     scroll cost. Safe against the old "dark gap" regression BECAUSE the box
+     height here is fully determined by the inline `aspect-ratio` (not by the
+     skipped content): the reserved size is always correct, so nothing collapses.
+     `contain-intrinsic-size: auto` lets the browser remember the last real size
+     as a belt-and-braces fallback. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto;
 }
 
 /* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
