@@ -145,7 +145,7 @@ export default async function ServiceDetailPage({
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {svc.eyebrow}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {svc.title}
               </h1>
             </div>
@@ -226,7 +226,7 @@ export default async function ServiceDetailPage({
                     <span className="w-6 h-px bg-gold flex-shrink-0" />
                     {t.servicoDetalhe.viaturasEyebrow}
                   </p>
-                  <h2 className="text-white font-semibold uppercase tracking-[0.16em] text-[15px] sm:text-[17px] leading-snug">
+                  <h2 className="text-white font-semibold uppercase tracking-display text-[15px] sm:text-[17px] leading-snug">
                     {t.servicoDetalhe.viaturasTitle}
                   </h2>
                   <p className="mt-3 text-white/85 text-[12.5px] leading-[1.6] max-w-sm">
@@ -371,7 +371,7 @@ export default async function ServiceDetailPage({
                     </p>
                     {/* Uppercase caption treatment (matches the hero / band
                         titles) — reads cleaner than serif at card size. */}
-                    <h3 className="text-white font-semibold uppercase tracking-[0.12em] text-[14px] sm:text-[15px] leading-snug">
+                    <h3 className="text-white font-semibold uppercase tracking-display text-[14px] sm:text-[15px] leading-snug">
                       {r.title}
                     </h3>
                   </div>

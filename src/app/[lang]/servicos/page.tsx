@@ -161,7 +161,7 @@ function ServiceBand({
               {catNum}.{String(index + 1).padStart(2, "0")}
             </p>
             <h3
-              className="text-veil-shadow text-white font-bold uppercase tracking-tight leading-[0.95]"
+              className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
               style={{ fontSize: "clamp(28px, 4.5vw, 56px)" }}
             >
               {service.title}
@@ -259,7 +259,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {ts.heroEyebrow}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {ts.heroTitle.join(" ")}
               </h1>
               <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
@@ -314,17 +314,24 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               {ts.philoTitle}
             </h2>
           </AnimateIn>
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-12 border-t border-white/15 pt-14">
+          {/* Processo numerado (SpaceX-style): 01 / 02 / 03 em mono fino,
+              títulos em caixa alta com tracking-display e filetes hairline
+              (border-white/15) a separar cada passo — sem cantos arredondados,
+              sem floreados. Vertical no telemóvel, três colunas a partir de md. */}
+          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 border-t border-white/15">
             {ts.philoPillars.map((p, i) => (
               <AnimateIn key={p.title} delay={i * 90}>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[11px] tracking-[0.4em] text-moss-light mb-5">
+                <div
+                  className={`flex flex-col py-10 md:py-14 md:px-10 ${
+                    i === 0
+                      ? "md:pl-0"
+                      : "border-t border-white/15 md:border-t-0 md:border-l md:border-white/15"
+                  }`}
+                >
+                  <span className="font-mono text-[11px] tracking-[0.4em] text-moss-light mb-6">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <h3
-                    className="text-white font-bold text-xl lg:text-2xl mb-4"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
+                  <h3 className="text-white font-bold uppercase tracking-display text-lg lg:text-xl mb-4">
                     {p.title}
                   </h3>
                   <p className="text-white/75 text-[15px] leading-[1.75] max-w-xs">{p.text}</p>
@@ -371,7 +378,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                     {cat.subtitle}
                   </p>
                   <h2
-                    className="text-veil-shadow text-white font-bold uppercase tracking-tight leading-[0.95]"
+                    className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
                     style={{ fontSize: "clamp(32px, 5.5vw, 64px)" }}
                   >
                     {cat.label}

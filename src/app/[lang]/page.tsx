@@ -118,7 +118,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {t.home.eyebrow}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {t.home.heroLines.map((l) => l.words.join(" ")).join(" ")}
               </h1>
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -185,7 +185,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                   {s.tag}
                 </p>
                 <h2
-                  className="text-veil-shadow text-white font-bold uppercase tracking-tight leading-[0.95]"
+                  className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
                   style={{ fontSize: "clamp(36px, 6.5vw, 78px)" }}
                 >
                   {s.title}

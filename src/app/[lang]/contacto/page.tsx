@@ -85,7 +85,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {tf.heroEyebrow}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {tf.heroTitleLine1} {tf.heroTitleMoss}
               </h1>
               <div className="mt-4">

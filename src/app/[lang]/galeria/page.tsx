@@ -96,7 +96,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {t.galeria.headerLabel}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {t.galeria.headerTitle}
               </h1>
             </div>

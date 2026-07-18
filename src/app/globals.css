@@ -363,6 +363,15 @@ body::before {
   transition-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
 }
 
+/* ── SpaceX display tracking — their big uppercase D-DIN headlines run at a
+   slightly NEGATIVE letter-spacing (h1 ≈ -1px at 69px). Apply to the large
+   uppercase display titles (hero captions, chapter/band headlines) so the
+   caps pull together the way they do on spacex.com, instead of the airy
+   default. Small type keeps its own wide tracking. ── */
+.tracking-display {
+  letter-spacing: -0.02em;
+}
+
 /* ── Orçamento / Back-office full-screen mode ── */
 body:has([data-orcamento-mode]) footer,
 body:has([data-orcamento-mode]) .whatsapp-fixed,

@@ -13,6 +13,8 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
+import StatsBand from "@/components/StatsBand";
+import { clientLogos } from "@/data";
 
 export async function generateMetadata({
   params,
@@ -122,7 +124,9 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {t.sobre.heroEyebrow}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+              {/* SpaceX display tracking (.tracking-display, -0.02em) replaces the
+                  airy caption tracking so the caps pull together on the h1. */}
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {`${t.sobre.heroTitlePre}${t.sobre.heroTitleMoss}`}
               </h1>
             </div>
@@ -167,10 +171,41 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 className="object-cover"
                 {...blurFor("/imagens/DaniGui_Preview12.jpg")}
               />
+              {/* SpaceX chapter treatment on the full-bleed photo: a bottom-left
+                  scrim + corner caption (single gold dash + uppercase eyebrow),
+                  the same idiom as the home service chapters. */}
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/20 to-[#080808]/5"
+              />
+              <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8">
+                <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
+                  {t.sobre.manifestoImageCaption}
+                </p>
+              </div>
             </div>
           </AnimateIn>
         </div>
       </section>
+
+      {/* ── STATS BAND — banda de números à maneira das páginas de veículo da
+          SpaceX (numerais finos gigantes com count-up + etiquetas maiúsculas).
+          Só factos directamente sustentados pela cópia: +100 eventos ("Mais de
+          100 casamentos e celebrações"), "desde 2018" (→ anos de atividade,
+          2026−2018 = 8) e o total de logótipos de clientes (clientLogos.length).
+          Os valores vivem no código; só as etiquetas estão no dicionário.
+          (Deixámos cair um 4.º número de "distritos": afirmaria cobertura
+          executada nos 18 distritos, mais forte do que a cópia "todo o Portugal"
+          garante — três números verdadeiros valem mais do que quatro.) ── */}
+      <StatsBand
+        eyebrow={t.sobre.stats.eyebrow}
+        stats={[
+          { value: 100, suffix: "+", label: t.sobre.stats.eventosLabel },
+          { value: 8, label: t.sobre.stats.anosLabel },
+          { value: clientLogos.length, suffix: "+", label: t.sobre.stats.clientesLabel },
+        ]}
+      />
 
       {/* ── EDITORIAL PHOTO GRID ── */}
       <section className="bg-surface">
@@ -228,23 +263,33 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       {/* ── FOUNDER ── */}
       <section className="bg-surface border-t border-foreground/8">
         <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="relative flex items-center justify-center px-6 py-14 lg:py-0 min-h-[440px] lg:min-h-[560px]">
-            {/* Founder portrait uncovered with the same cinematic mask-wipe used
-                on the editorial grids, so it arrives instead of just being there. */}
-            <Reveal
-              as="div"
-              variant="mask"
-              className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden"
-            >
+          <div className="relative overflow-hidden min-h-[460px] lg:min-h-[620px]">
+            {/* Founder portrait as a full-bleed chapter panel (fills its column,
+                bleeding to the section edge) instead of a small centred frame —
+                uncovered with the same cinematic mask-wipe used on the editorial
+                grids, so it arrives instead of just being there. */}
+            <Reveal as="div" variant="mask" className="absolute inset-0">
               <Image
                 src="/imagens/catarina-gaspar.jpg"
                 alt={t.common.imageAlt.sobreFounder}
                 fill
-                sizes="(max-width: 1024px) 80vw, 340px"
-                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover object-center"
                 {...blurFor("/imagens/catarina-gaspar.jpg")}
               />
             </Reveal>
+            {/* Chapter scrim + bottom-left caption (gold dash + uppercase
+                eyebrow), matching the manifesto and home service chapters. */}
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-t from-[#080808]/80 via-[#080808]/15 to-transparent"
+            />
+            <div className="absolute inset-x-0 bottom-0 p-6 lg:p-10">
+              <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
+                <span className="w-8 h-px bg-gold flex-shrink-0" />
+                {t.sobre.founderRole}
+              </p>
+            </div>
           </div>
           <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
             <AnimateIn>

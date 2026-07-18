@@ -81,19 +81,10 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 {t.footer.sloganLine2}
               </p>
 
-              {/* Disponível badge */}
-              <div className="flex items-center gap-2.5 mb-9">
-                <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="footer-ping absolute inline-flex h-full w-full rounded-full bg-moss opacity-60" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-moss" />
-                </span>
-                <span className="text-[10px] tracking-[0.32em] uppercase text-foreground/72">
-                  {t.footer.disponivel}
-                </span>
-              </div>
-
-              {/* Social icons */}
-              <div className="flex items-center gap-5">
+              {/* Social icons — sem o antigo badge "disponível": nada de pontos
+                  a pulsar (idioma SpaceX = sem ornamentos animados). mb-9 passou
+                  para este bloco para manter o mesmo respiro abaixo do slogan. */}
+              <div className="flex items-center gap-5 mt-2">
                 {[
                   {
                     label: "Instagram",
@@ -213,10 +204,14 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 </a>
                 <span className="text-foreground/78">{t.footer.country}</span>
               </div>
+              {/* CTA no idioma SpaceX — filete quadrado que enche no hover com
+                  inversão de texto (o ground do footer é branco, por isso enche
+                  a foreground escura e o texto passa a claro), em vez do antigo
+                  hover que só tingia o traço de moss. */}
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}
                 trackProps={{ source: "footer" }}
-                className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/12 text-foreground/68 text-[11px] tracking-[0.25em] uppercase hover:border-moss/40 hover:text-moss transition-all duration-300"
+                className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/25 text-foreground/70 text-[11px] tracking-[0.25em] uppercase hover:bg-foreground hover:text-white hover:border-foreground transition-colors duration-300 ease-expo"
               >
                 {t.footer.pedirOrcamento} <span aria-hidden>→</span>
               </TrackedLink>

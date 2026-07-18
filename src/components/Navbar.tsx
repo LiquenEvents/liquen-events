@@ -554,11 +554,21 @@ export default function Navbar() {
             >
               {t.nav.contacto}
             </Link>
+            {/* CTA primária no idioma SpaceX — filete quadrado que enche no
+                hover em vez do bloco sólido moss. Sobre o hero (light) o traço
+                é branco e enche a branco (texto inverte para #0c0e0b); nas
+                páginas de topo claro o traço é moss e enche a moss (texto a
+                branco). Continua a ação principal: contorno mais firme que o
+                "Contacto" e enche por completo. */}
             <Magnetic strength={0.3}>
               <Link
                 href={localizeHref("/orcamento", locale)}
                 onClick={() => track("CTAClick", { source: "nav" })}
-                className="text-[11px] tracking-[0.2em] uppercase btn-shine bg-moss text-white px-5 py-2 hover:bg-moss-dark transition-all duration-300"
+                className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-colors duration-300 ease-expo ${
+                  light
+                    ? "border-white/70 text-white hover:bg-white hover:text-[#0c0e0b] hover:border-white"
+                    : "border-moss text-moss hover:bg-moss hover:text-white hover:border-moss"
+                }`}
               >
                 {t.nav.pedirOrcamento} <span aria-hidden>→</span>
               </Link>

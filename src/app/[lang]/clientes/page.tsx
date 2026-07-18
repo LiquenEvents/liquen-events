@@ -126,7 +126,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {t.clientes.heroEyebrow}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-[0.16em] text-[18px] sm:text-[21px] leading-snug">
+              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {`${t.clientes.heroTitleLine1} ${t.clientes.heroTitleMoss}`}
               </h1>
               <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
