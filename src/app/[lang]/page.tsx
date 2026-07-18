@@ -16,10 +16,13 @@ import { PRIMARY_BUTTON_DARK_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-
 // Each tile links to a distinct destination that matches its label
 // (Corporativos / Casamentos / Privados) — the first two deep-link to their
 // dedicated service pages, the third to the celebrations category.
+// Full-screen SpaceX-style chapters crop landscape (desktop viewport), so every
+// image here is a wide ~1.5:1 frame — EW1_1408 and JantarFesta_27 were portraits
+// that centre-cropped to a sliver, so they're swapped for landscape siblings.
 const serviceLinks = [
-  { image: "/imagens/EW1_1408.jpg", href: "/servicos/eventos-corporativos" },
+  { image: "/imagens/EW1_1332.jpg", href: "/servicos/eventos-corporativos" },
   { image: "/imagens/DaniGui_Preview20.jpg", href: "/servicos/casamentos" },
-  { image: "/imagens/DaniGui_JantarFesta_27.jpg", href: "/servicos#celebracoes" },
+  { image: "/imagens/DaniGui_JantarFesta_26.jpg", href: "/servicos#celebracoes" },
 ];
 
 // Curated set for the 3D photo wall + its flat-ribbon fallback. EVERY photo is
@@ -150,73 +153,55 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {/* ── Clients marquee ── */}
       <ClientMarquee />
 
-      {/* ── Services — minimal image tiles ── */}
-      <section className="py-20 lg:py-28 bg-surface">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <div className="flex items-end justify-between mb-10 lg:mb-14">
-              {/* Cabeçalho de secção (h2): dá à grelha de serviços um heading
-                  de nível 2, para os títulos dos cartões (h3) deixarem de
-                  saltar de h1 → h3. Estilo idêntico ao antigo <p> (o reset do
-                  Tailwind zera tamanho/margem dos headings). */}
-              <h2 className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3 font-normal">
-                <span className="w-8 h-px bg-gold/60 flex-shrink-0" />
-                {t.home.servicesEyebrow}
-              </h2>
-              <Link
-                href={localizeHref("/servicos", locale)}
-                className="group text-xs text-foreground/72 hover:text-moss transition-colors flex items-center gap-1.5"
-              >
-                {t.common.verServicos}
-                <span
-                  className="group-hover:translate-x-0.5 transition-transform inline-block"
-                  aria-hidden
+      {/* ── Serviços — capítulos SpaceX de ecrã inteiro ──
+          Cada serviço é um painel full-bleed (100vw) de altura quase-total,
+          empilhado verticalmente à maneira do spacex.com: fotografia a sangrar
+          de bordo a bordo, sem goteiras nem cantos redondos, com a legenda
+          (eyebrow + título maiúsculo + botão delineado) ancorada em baixo à
+          esquerda sobre um scrim. Os títulos são <h2> (h1 do herói → h2 por
+          capítulo), mantendo a hierarquia de headings. */}
+      {services.map((s) => (
+        <section key={s.title} className="relative h-[86vh] min-h-[560px] w-full overflow-hidden">
+          <Image
+            src={s.image}
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
+            {...blurFor(s.image)}
+          />
+          {/* A imagética da SpaceX é escura por natureza; as nossas fotos podem
+              ser claras, por isso um scrim inferior-esquerdo mantém a legenda
+              maiúscula legível sem depender de sombra no texto. */}
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/20 to-[#080808]/5"
+          />
+          <div className="absolute inset-x-0 bottom-0">
+            <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pb-[11vh] lg:pb-[13vh]">
+              <AnimateIn>
+                <p className="text-white/70 text-[11px] tracking-[0.4em] uppercase mb-4 flex items-center gap-3">
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
+                  {s.tag}
+                </p>
+                <h2
+                  className="text-veil-shadow text-white font-bold uppercase tracking-tight leading-[0.95]"
+                  style={{ fontSize: "clamp(36px, 6.5vw, 78px)" }}
                 >
-                  →
-                </span>
-              </Link>
-            </div>
-          </AnimateIn>
-          {/* Full-SpaceX tiles: the photograph carries each card. One light
-              bottom-gradient veil (matches the hero + /servicos panels), a small
-              tucked caption in the sans, and a single restrained hover — no tilt,
-              sheen or accent swaps. */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-            {services.map((s, i) => (
-              <AnimateIn key={s.title} delay={i * 90}>
+                  {s.title}
+                </h2>
                 <Link
                   href={localizeHref(s.href, locale)}
-                  className="group relative block overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
-                  style={{ aspectRatio: "3/4" }}
+                  className="mt-8 inline-flex items-center gap-3 border border-white/70 text-white text-[11px] tracking-[0.3em] uppercase px-8 py-3.5 hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 >
-                  <Image
-                    src={s.image}
-                    alt=""
-                    fill
-                    sizes="(max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 384px"
-                    className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                    {...blurFor(s.image)}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-5 lg:p-6">
-                    <p className="text-white/60 text-[10px] tracking-[0.4em] uppercase mb-2">
-                      {s.tag}
-                    </p>
-                    {/* Mobile: two-column tiles are only ~127px wide inside the
-                        padding, so the longest title ("Corporativos", 12 letters)
-                        overflowed the tile's overflow-hidden edge with the full
-                        0.16em tracking. Ease the size + tracking on small screens;
-                        restore the airy sizing from sm up where the tiles widen. */}
-                    <h3 className="text-white font-semibold uppercase tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[17px] leading-snug">
-                      {s.title}
-                    </h3>
-                  </div>
+                  {t.common.verServicos}
+                  <span aria-hidden>→</span>
                 </Link>
               </AnimateIn>
-            ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ))}
 
       {/* ── Gallery photo wall — 3D curved carousel (flat ribbon fallback) ── */}
       <PhotoWall
