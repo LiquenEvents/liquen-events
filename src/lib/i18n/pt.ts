@@ -173,15 +173,6 @@ export const pt = {
     manifestoText: "Desde 2018 que transformamos espaços em experiências — em todo o Portugal.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
     manifestoImageCaption: "Évora · Alentejo",
-    // Números-chave da banda SpaceX (StatsBand). Os valores vivem no código
-    // (factos verificáveis da cópia); aqui só as etiquetas.
-    stats: {
-      eyebrow: "Em números",
-      eventosLabel: "Eventos",
-      anosLabel: "Anos",
-      clientesLabel: "Clientes",
-      distritosLabel: "Distritos",
-    },
     statementLead: "Não decoramos apenas espaços.",
     statementRest: " Desenhamos experiências que ficam para sempre.",
     founderEyebrow: "As pessoas",

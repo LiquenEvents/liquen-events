@@ -14,7 +14,6 @@ import { clientLogos } from "@/data";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
-import StatsBand from "@/components/StatsBand";
 
 export async function generateMetadata({
   params,
@@ -289,20 +288,6 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           imgClassName="transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
         />
       </section>
-
-      {/* ── STATS ── */}
-      {/* Proof-in-numbers before the closing ask — reuses the exact three
-          truths (and the generic labels) from /sobre so there's no i18n churn:
-          100+ eventos, 8 anos (2018→2026, hardcoded — no Date()), and the live
-          client count. Reinforces trust on this client-proof page. */}
-      <StatsBand
-        eyebrow={t.sobre.stats.eyebrow}
-        stats={[
-          { value: 100, suffix: "+", label: t.sobre.stats.eventosLabel },
-          { value: 8, label: t.sobre.stats.anosLabel },
-          { value: clientLogos.length, suffix: "+", label: t.sobre.stats.clientesLabel },
-        ]}
-      />
 
       {/* ── CTA with background photo ── */}
       <section className="relative py-36 lg:py-52 overflow-hidden">

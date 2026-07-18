@@ -170,15 +170,6 @@ export const en: Dict = {
     manifestoText: "Since 2018 we've turned spaces into experiences — across Portugal.",
     // Corner caption (chapter idiom) over the manifesto photograph.
     manifestoImageCaption: "Évora · Alentejo",
-    // Key figures for the SpaceX stats band (StatsBand). Values live in code
-    // (verifiable facts from the copy); only the labels here.
-    stats: {
-      eyebrow: "By the numbers",
-      eventosLabel: "Events",
-      anosLabel: "Years",
-      clientesLabel: "Clients",
-      distritosLabel: "Districts",
-    },
     statementLead: "We don't just decorate spaces.",
     statementRest: " We design experiences that last forever.",
     founderEyebrow: "The people",

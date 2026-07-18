@@ -13,8 +13,6 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
-import StatsBand from "@/components/StatsBand";
-import { clientLogos } from "@/data";
 
 export async function generateMetadata({
   params,
@@ -188,24 +186,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           </AnimateIn>
         </div>
       </section>
-
-      {/* ── STATS BAND — banda de números à maneira das páginas de veículo da
-          SpaceX (numerais finos gigantes com count-up + etiquetas maiúsculas).
-          Só factos directamente sustentados pela cópia: +100 eventos ("Mais de
-          100 casamentos e celebrações"), "desde 2018" (→ anos de atividade,
-          2026−2018 = 8) e o total de logótipos de clientes (clientLogos.length).
-          Os valores vivem no código; só as etiquetas estão no dicionário.
-          (Deixámos cair um 4.º número de "distritos": afirmaria cobertura
-          executada nos 18 distritos, mais forte do que a cópia "todo o Portugal"
-          garante — três números verdadeiros valem mais do que quatro.) ── */}
-      <StatsBand
-        eyebrow={t.sobre.stats.eyebrow}
-        stats={[
-          { value: 100, suffix: "+", label: t.sobre.stats.eventosLabel },
-          { value: 8, label: t.sobre.stats.anosLabel },
-          { value: clientLogos.length, suffix: "+", label: t.sobre.stats.clientesLabel },
-        ]}
-      />
 
       {/* ── EDITORIAL PHOTO GRID ── */}
       <section className="bg-surface">
