@@ -4,19 +4,15 @@ import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
-import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
-import TitleReveal from "@/components/TitleReveal";
-import CountUp from "@/components/CountUp";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
 import ClientMarquee from "@/components/ClientMarquee";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { clientLogos } from "@/data";
-import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
-import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
@@ -60,16 +56,13 @@ const MOSAIC_POOL = [
 ];
 
 // The mosaic is a 2-col grid below `md` and a 12-col grid from `md` (768px) up,
-// inside the max-w-7xl (1280px) container with lg:px-16 padding. So each cell's
-// real rendered width is: on mobile 100vw when it spans both columns, else 50vw;
-// from md a fraction of the ~1152px content width matching its column span. The
-// old single value declared 100vw on mobile for EVERY cell — but four of them
-// only fill one of the two mobile columns (50vw), so they were fetched at ~2×.
-// Per-span sizes below; the fixed px is the capped column width past 1280px.
-const MOSAIC_5 = "(max-width: 767px) 100vw, (max-width: 1279px) 42vw, 448px"; // md:col-span-5, wide on mobile
-const MOSAIC_7 = "(max-width: 767px) 100vw, (max-width: 1279px) 58vw, 624px"; // md:col-span-7, wide on mobile
-const MOSAIC_4 = "(max-width: 767px) 50vw, (max-width: 1279px) 33vw, 360px"; // md:col-span-4, one mobile column
-const MOSAIC_3 = "(max-width: 767px) 50vw, (max-width: 1279px) 25vw, 272px"; // md:col-span-3, one mobile column
+// full-bleed (no max-width wrapper). So each cell's real rendered width is its
+// share of the viewport: on mobile 100vw when it spans both columns, else 50vw;
+// from md its column span as a fraction of 12 (span/12 of 100vw, no px cap).
+const MOSAIC_5 = "(max-width: 767px) 100vw, 42vw"; // md:col-span-5, wide on mobile
+const MOSAIC_7 = "(max-width: 767px) 100vw, 59vw"; // md:col-span-7, wide on mobile
+const MOSAIC_4 = "(max-width: 767px) 50vw, 34vw"; // md:col-span-4, one mobile column
+const MOSAIC_3 = "(max-width: 767px) 50vw, 25vw"; // md:col-span-3, one mobile column
 const MOSAIC_CELLS = [
   { cls: "col-span-2 md:col-span-5 md:row-span-2", sizes: MOSAIC_5 },
   { cls: "md:col-span-4 md:row-span-1", sizes: MOSAIC_4 },
@@ -166,43 +159,21 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           }}
         />
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="grid lg:grid-cols-[1fr_auto] gap-16 lg:gap-24 items-end">
-            <AnimateIn>
-              <p
-                className="text-white/90 leading-[1.72]"
-                style={{
-                  fontFamily: "var(--font-playfair)",
-                  fontSize: "clamp(22px, 2.8vw, 36px)",
-                  textShadow: "0 1px 24px rgba(8,8,8,0.6)",
-                }}
-              >
-                {t.clientes.leadPre}
-                <span className="text-moss-light">{t.clientes.leadMoss}</span>
-                {t.clientes.leadPost}
-              </p>
-            </AnimateIn>
-            <AnimateIn delay={100} className="hidden lg:block">
-              <div className="flex flex-col items-end gap-1.5 text-right min-w-[120px]">
-                <span
-                  aria-hidden="true"
-                  className="text-cream/55 text-[9px] tracking-[0.45em] uppercase block"
-                >
-                  {t.clientes.desde}
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="text-cream/45 font-bold leading-none"
-                  style={{ fontFamily: "var(--font-playfair)", fontSize: "72px" }}
-                >
-                  {/* The founding year climbs to 2018 on scroll-in. Counting from
-                      2000 keeps every intermediate frame a plausible year (only the
-                      last two digits move) — a quiet heritage flourish. Decorative
-                      (aria-hidden) and SSR/reduced-motion safe: shows 2018 at rest. */}
-                  <CountUp from={2000} to={Number(SITE.founded)} duration={1400} />
-                </span>
-              </div>
-            </AnimateIn>
-          </div>
+          <AnimateIn>
+            {/* The wrapper's text-veil-shadow already carries the lift-off-photo
+                shadow, so the statement needs no inline duplicate. */}
+            <p
+              className="text-white/90 leading-[1.72]"
+              style={{
+                fontFamily: "var(--font-playfair)",
+                fontSize: "clamp(22px, 2.8vw, 36px)",
+              }}
+            >
+              {t.clientes.leadPre}
+              <span className="text-moss-light">{t.clientes.leadMoss}</span>
+              {t.clientes.leadPost}
+            </p>
+          </AnimateIn>
         </div>
       </section>
 
@@ -265,17 +236,13 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             </h2>
           </AnimateIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/10">
+          {/* Testemunhos planos — texto branco directamente sobre a foto+véu,
+              separados por réguas finas (a mesma linguagem do FAQ-sobre-foto do
+              contacto): sem cartões fumados nem aspas decorativas. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-16 border-b border-white/12">
             {testimonials.map((item, i) => (
               <AnimateIn key={item.name} delay={i * 55} className="h-full">
-                <figure className="h-full flex flex-col p-8 lg:p-10 bg-[#0c0e0b]/55 backdrop-blur-sm hover:bg-[#0c0e0b]/70 transition-colors duration-500">
-                  <span
-                    className="text-moss-light/25 text-5xl leading-none mb-5 select-none"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                    aria-hidden
-                  >
-                    &ldquo;
-                  </span>
+                <figure className="h-full flex flex-col py-9 lg:py-10 border-t border-white/12">
                   <blockquote
                     className="text-cream/85 leading-[1.72] flex-1"
                     style={{
@@ -285,7 +252,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                   >
                     {item.text}
                   </blockquote>
-                  <figcaption className="mt-8 pt-6 border-t border-white/12 flex items-center gap-4">
+                  <figcaption className="mt-8 flex items-center gap-4">
                     <div className="w-6 h-px bg-gold flex-shrink-0" />
                     <div>
                       <p className="text-white text-sm font-semibold">{item.name}</p>
@@ -302,6 +269,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── PHOTO MOSAIC ── */}
+      {/* O mosaico sangra de bordo a bordo (sem moldura max-w nem goteiras),
+          à maneira SpaceX; só o eyebrow mantém a grelha de conteúdo. */}
       <section className="py-20 lg:py-28 bg-surface border-b border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-10">
@@ -310,14 +279,14 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.mosaicEyebrow}
             </p>
           </AnimateIn>
-          <RotatingPhotoGrid
-            cells={MOSAIC_CELLS}
-            pool={mosaicPool}
-            alt={t.common.imageAlt.clientesCorporate}
-            className="grid grid-cols-2 md:grid-cols-12 gap-2 auto-rows-[150px] md:auto-rows-auto md:grid-rows-[210px_210px_230px]"
-            imgClassName="transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-          />
         </div>
+        <RotatingPhotoGrid
+          cells={MOSAIC_CELLS}
+          pool={mosaicPool}
+          alt={t.common.imageAlt.clientesCorporate}
+          className="grid grid-cols-2 md:grid-cols-12 gap-0 auto-rows-[150px] md:auto-rows-auto md:grid-rows-[210px_210px_230px]"
+          imgClassName="transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+        />
       </section>
 
       {/* ── CTA with background photo ── */}
@@ -344,35 +313,30 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.clientes.ctaEyebrow}
-              <span className="w-8 h-px bg-gold" />
             </p>
+            <h2
+              className="text-white font-bold leading-[0.88] tracking-tight mb-6"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(50px, 9vw, 128px)" }}
+            >
+              {t.clientes.ctaTitleLine1}
+              <br />
+              {t.clientes.ctaTitleLine2}
+            </h2>
           </AnimateIn>
-          <h2
-            className="text-white font-bold leading-[0.88] tracking-tight mb-6"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(50px, 9vw, 128px)" }}
-          >
-            {/* Closing headline resolves word-by-word (the hero/logo-wall
-                signature) — matching the home & sobre CTAs so the site's big
-                finish reads the same everywhere. Reduced motion: words appear. */}
-            <TitleReveal text={t.clientes.ctaTitleLine1} as="span" className="block" />
-            <TitleReveal text={t.clientes.ctaTitleLine2} as="span" className="block" delay={220} />
-          </h2>
           <AnimateIn delay={110}>
             <p className="text-white/70 text-base leading-relaxed max-w-sm mb-14">
               {t.clientes.ctaText}
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <div className="flex flex-wrap items-center gap-4">
-              <Magnetic strength={0.4}>
-                <TrackedLink
-                  href={localizeHref("/orcamento", locale)}
-                  trackProps={{ source: "clientes" }}
-                  className={PRIMARY_BUTTON_DARK_CLASS}
-                >
-                  {t.common.pedirOrcamento} →
-                </TrackedLink>
-              </Magnetic>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <TrackedLink
+                href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "clientes" }}
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
+              >
+                {t.common.pedirOrcamento} →
+              </TrackedLink>
               <Link href={localizeHref("/contacto", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.falarConnosco}
               </Link>

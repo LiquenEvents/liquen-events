@@ -5,7 +5,6 @@ import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
-import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
@@ -13,7 +12,7 @@ import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd"
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService } from "@/lib/services-data";
 import { getDictionary, localizeHref, normalizeLocale } from "@/lib/i18n";
-import { PRIMARY_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import { PRIMARY_BUTTON_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
@@ -189,7 +188,9 @@ export default async function ServiceDetailPage({
               <ul className="flex flex-col gap-4">
                 {svc.includes.map((item) => (
                   <li key={item} className="flex items-start gap-3 text-foreground/72 text-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-moss mt-1.5 flex-shrink-0" />
+                    {/* Squared 1px gold dash — the site's marker vocabulary
+                        (same as the eyebrow dashes), centred on the first line. */}
+                    <span className="w-3 h-px bg-gold mt-2.5 flex-shrink-0" />
                     {item}
                   </li>
                 ))}
@@ -256,40 +257,41 @@ export default async function ServiceDetailPage({
             </h2>
           </AnimateIn>
         </div>
-        <div className="px-1.5">
-          <Reveal
-            as="div"
-            variant="mask"
-            stagger={0.08}
-            className="grid grid-cols-2 lg:grid-cols-6 gap-1.5 auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
-          >
-            {svc.gallery.map((src, i) => {
-              // Match the real column span (grid is 6-col at lg) so the wide
-              // feature tiles aren't served a 33vw candidate and upscaled.
-              const span = GALLERY_SPANS[i % GALLERY_SPANS.length];
-              const dvw = span.includes("col-span-4")
-                ? "67vw"
-                : span.includes("col-span-3")
-                  ? "50vw"
-                  : "33vw";
-              return (
-                <div key={i} className={`relative overflow-hidden group ${span}`}>
-                  <Image
-                    src={src}
-                    {...blurFor(src)}
-                    // Distinct alt per photo (base phrase + service + index) so
-                    // screen-reader users can tell the portfolio images apart
-                    // instead of hearing one identical string repeated.
-                    alt={`${t.servicoDetalhe.galleryAlt} — ${svc.title} ${i + 1}`}
-                    fill
-                    sizes={`(max-width: 1024px) 50vw, ${dvw}`}
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                </div>
-              );
-            })}
-          </Reveal>
-        </div>
+        {/* Full-bleed mosaic (no horizontal padding): the photos run edge to
+            edge, separated only by a 1px hairline of the surface showing
+            through — keeps tile boundaries legible where similar photos meet. */}
+        <Reveal
+          as="div"
+          variant="mask"
+          stagger={0.08}
+          className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
+        >
+          {svc.gallery.map((src, i) => {
+            // Match the real column span (grid is 6-col at lg) so the wide
+            // feature tiles aren't served a 33vw candidate and upscaled.
+            const span = GALLERY_SPANS[i % GALLERY_SPANS.length];
+            const dvw = span.includes("col-span-4")
+              ? "67vw"
+              : span.includes("col-span-3")
+                ? "50vw"
+                : "33vw";
+            return (
+              <div key={i} className={`relative overflow-hidden group ${span}`}>
+                <Image
+                  src={src}
+                  {...blurFor(src)}
+                  // Distinct alt per photo (base phrase + service + index) so
+                  // screen-reader users can tell the portfolio images apart
+                  // instead of hearing one identical string repeated.
+                  alt={`${t.servicoDetalhe.galleryAlt} — ${svc.title} ${i + 1}`}
+                  fill
+                  sizes={`(max-width: 1024px) 50vw, ${dvw}`}
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+              </div>
+            );
+          })}
+        </Reveal>
       </section>
 
       {/* ── FAQ (image-backed, SpaceX-style: light text over a photo + veil) ── */}
@@ -367,10 +369,9 @@ export default async function ServiceDetailPage({
                     <p className="text-white/60 text-[10px] tracking-[0.35em] uppercase mb-1.5">
                       {r.eyebrow}
                     </p>
-                    <h3
-                      className="text-cream text-xl font-bold"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
+                    {/* Uppercase caption treatment (matches the hero / band
+                        titles) — reads cleaner than serif at card size. */}
+                    <h3 className="text-white font-semibold uppercase tracking-[0.12em] text-[14px] sm:text-[15px] leading-snug">
                       {r.title}
                     </h3>
                   </div>
@@ -411,15 +412,13 @@ export default async function ServiceDetailPage({
               {t.servicoDetalhe.ctaTitle}
             </h2>
           </AnimateIn>
-          <Magnetic strength={0.4}>
-            <TrackedLink
-              href={localizeHref("/orcamento", locale)}
-              trackProps={{ source: "service-detail-cta", servico: slug }}
-              className={PRIMARY_BUTTON_DARK_CLASS}
-            >
-              {t.common.pedirOrcamento} <span aria-hidden>→</span>
-            </TrackedLink>
-          </Magnetic>
+          <TrackedLink
+            href={localizeHref("/orcamento", locale)}
+            trackProps={{ source: "service-detail-cta", servico: slug }}
+            className={OUTLINE_LIGHT_BUTTON_CLASS}
+          >
+            {t.common.pedirOrcamento} <span aria-hidden>→</span>
+          </TrackedLink>
         </div>
       </section>
     </>

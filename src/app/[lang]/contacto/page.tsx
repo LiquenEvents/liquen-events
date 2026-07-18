@@ -13,6 +13,7 @@ import HeroWebGL from "@/components/motion/HeroWebGL";
 import { waHref } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 export async function generateMetadata({
   params,
@@ -250,7 +251,9 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 sizes="(max-width: 1024px) 100vw, 60vw"
                 className="object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-br from-ink/85 via-ink/72 to-moss-dark/70" />
+              {/* Véu 100% neutro (sem tinte moss) — a foto lê-se como textura
+                  escura e o cream mantém o contraste AA. */}
+              <div className="absolute inset-0 bg-gradient-to-br from-ink/85 via-ink/72 to-[#0c0e0b]/70" />
               <AnimateIn>
                 <div className="relative">
                   <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-8 flex items-center gap-3">
@@ -274,7 +277,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   <TrackedLink
                     href={localizeHref("/orcamento", locale)}
                     trackProps={{ source: "contacto" }}
-                    className="inline-flex w-fit items-center gap-3 bg-cream px-8 py-4 text-[11px] font-medium uppercase tracking-[0.3em] text-ink transition-all duration-300 hover:bg-cream-dark"
+                    className={OUTLINE_LIGHT_BUTTON_CLASS}
                   >
                     {td.ctaButton} →
                   </TrackedLink>
@@ -422,9 +425,9 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
       {/* ── WhatsApp CTA ──
           Foto de evento com um escurecimento cinematográfico (preto) — o mesmo
           tratamento das restantes secções finais do site, para a imagem
-          respirar em vez de ficar lavada de verde. Um brilho verde muito subtil
-          no canto mantém o toque de marca; o texto cream continua a garantir
-          contraste AA sobre o véu escuro. */}
+          respirar em vez de ficar lavada de verde. Véu totalmente neutro (o
+          antigo brilho verde de canto saiu no redesign SpaceX); o texto cream
+          continua a garantir contraste AA sobre o véu escuro. */}
       <section className="py-20 sm:py-32 bg-[#0c0e0b] relative overflow-hidden border-t border-white/10">
         <Image
           src={whatsappCtaImg}
@@ -445,13 +448,6 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               "linear-gradient(to right, rgba(8,8,8,0.85), rgba(8,8,8,0.35), transparent), linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2))",
           }}
         />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 80% 80% at 105% 110%, rgba(99, 122, 95, 0.28) 0%, transparent 55%)",
-          }}
-        />
         <div className="max-w-7xl mx-auto px-6 lg:px-16 relative">
           <AnimateIn>
             <p className="text-cream/80 text-[10px] tracking-[0.5em] uppercase mb-10 flex items-center gap-3">
@@ -470,19 +466,19 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               {t.contacto.whatsappText}
             </p>
             <div className="flex flex-wrap gap-4">
+              {/* Par de ghosts brancos (idioma SpaceX): ambos preenchem a
+                  branco no hover com o texto a inverter para escuro — o ícone
+                  distingue o canal principal. */}
               <a
                 href={waHref(t.common.whatsappPrefill)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-cream text-ink font-medium hover:bg-cream-dark transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {t.common.abrirWhatsApp} →
               </a>
-              <a
-                href={`mailto:${SITE.email}`}
-                className="inline-flex items-center gap-3 px-8 py-4 border border-cream/35 text-cream/85 font-medium hover:border-cream/60 hover:text-cream transition-all duration-300 text-[11px] tracking-[0.3em] uppercase"
-              >
+              <a href={`mailto:${SITE.email}`} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.enviarEmail}
               </a>
             </div>

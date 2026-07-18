@@ -23,11 +23,13 @@ export const PRIMARY_BUTTON_CLASS = `${PRIMARY_BUTTON_BASE} shadow-lg shadow-mos
 export const PRIMARY_BUTTON_DARK_CLASS = `${PRIMARY_BUTTON_BASE} shadow-xl shadow-black/30`;
 
 // Cinematic outline button for full-bleed dark / image sections (the "SpaceX"
-// treatment): a crisp white hairline that inverts to a solid white fill on
-// hover. Single source of truth so every dark-section CTA — /servicos bands,
-// sobre, galeria, clientes — stays pixel-identical. Add `flex-shrink-0` inline
-// where the button sits in a flex row next to a heading.
+// treatment): a crisp white hairline that fills solid white on hover, text
+// inverting to near-black. Mirrors the home chapter buttons exactly — single
+// source of truth so every dark-section CTA — /servicos bands, sobre, galeria,
+// clientes — stays pixel-identical. Add `flex-shrink-0` inline where the
+// button sits in a flex row next to a heading.
 // `transition-colors` (not `transition-all`): hover only swaps background, text
 // and border colours — identical look, no whole-property-set evaluation.
+// `ease-expo` (globals.css) is SpaceX's signature cubic-bezier(0.19,1,0.22,1).
 export const OUTLINE_LIGHT_BUTTON_CLASS =
-  "inline-flex items-center gap-3 px-9 py-4 border border-white/35 text-white text-[11px] tracking-[0.28em] uppercase hover:bg-white hover:text-black hover:border-white transition-colors duration-300";
+  "inline-flex items-center gap-3 px-8 py-3.5 border border-white/70 text-white text-[11px] tracking-[0.3em] uppercase hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 ease-expo focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80";

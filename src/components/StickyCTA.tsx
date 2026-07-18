@@ -91,20 +91,20 @@ export default function StickyCTA() {
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
+      {/* Squared ghost chip in the site's SpaceX idiom: dark translucent
+          backing (backdrop blur kept — it floats over photos as well as paper)
+          with a white hairline that fills solid white on hover, text inverting
+          to near-black. */}
       <Link
         href={localizeHref("/orcamento", locale)}
         onClick={() => track("CTAClick", { source: "sticky" })}
-        className="group flex items-center gap-3 px-5 py-3 bg-surface-elevated/90 backdrop-blur-md border border-foreground/12 hover:border-moss/40 transition-all duration-300 shadow-2xl shadow-black/70 rounded-sm"
+        className="group flex items-center gap-3 px-6 py-3.5 bg-[#0c0e0b]/75 backdrop-blur-md border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
       >
-        <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-          <span className="footer-ping absolute inline-flex h-full w-full rounded-full bg-moss opacity-55" />
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-moss" />
-        </span>
-        <span className="text-[10px] tracking-[0.28em] uppercase text-foreground/68 group-hover:text-moss transition-colors duration-300">
+        <span className="text-[10px] tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
           {t.footer.pedirOrcamento}
         </span>
         <span
-          className="text-foreground/18 group-hover:text-moss/60 group-hover:translate-x-0.5 transition-all duration-300 text-sm"
+          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo text-sm"
           aria-hidden
         >
           →

@@ -357,6 +357,12 @@ body::before {
   animation: footer-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* ── SpaceX signature easing — the fast-out/slow-settle expo curve their site
+   uses for hovers and reveals. Pair with a transition-* utility. ── */
+.ease-expo {
+  transition-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
 /* ── Orçamento / Back-office full-screen mode ── */
 body:has([data-orcamento-mode]) footer,
 body:has([data-orcamento-mode]) .whatsapp-fixed,

@@ -4,14 +4,13 @@ import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
-import Magnetic from "@/components/motion/Magnetic";
 import Parallax from "@/components/Parallax";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
-import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
@@ -151,24 +150,28 @@ function ServiceBand({
           the bottom — where the number/title/description sit — darkens enough to
           keep the white text legible. No heavy full-panel veil. */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-      {/* Full-SpaceX: a small, discreet caption tucked in the corner so the
-          photograph carries the panel. Tiny mono index, compact uppercase
-          service name, a one-line description, and an understated link. */}
+      {/* SpaceX chapter caption (matches the home chapters): mono index as the
+          gold-dashed eyebrow, a big bold uppercase headline, a one-line
+          description, and the ghost outline button. */}
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-12 lg:pb-16">
         <AnimateIn>
-          <div className="max-w-sm">
-            <p className="text-white/55 font-mono text-[10px] tracking-[0.4em] mb-3">
+          <div className="max-w-2xl">
+            <p className="text-white/55 font-mono text-[10px] tracking-[0.4em] mb-3 flex items-center gap-3">
+              <span className="w-6 h-px bg-gold flex-shrink-0" />
               {catNum}.{String(index + 1).padStart(2, "0")}
             </p>
-            <h3 className="text-white font-semibold uppercase tracking-[0.16em] text-[15px] sm:text-[17px] leading-snug">
+            <h3
+              className="text-veil-shadow text-white font-bold uppercase tracking-tight leading-[0.95]"
+              style={{ fontSize: "clamp(28px, 4.5vw, 56px)" }}
+            >
               {service.title}
             </h3>
-            <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
+            <p className="mt-4 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
               {service.desc}
             </p>
             <Link
               href={localizeHref(`/servicos/${service.slug}`, locale)}
-              className="mt-5 inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
+              className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
             >
               {cta} <span aria-hidden>→</span>
             </Link>
@@ -265,7 +268,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}
                 trackProps={{ source: "services-hero" }}
-                className="mt-5 inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
+                className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </TrackedLink>
@@ -354,12 +357,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               />
             </Parallax>
             <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-            {/* Full-SpaceX: a small category caption tucked in the corner; the
-                photograph carries the panel. Slightly larger than a service band
-                to signal it opens a category. */}
+            {/* SpaceX chapter caption: gold-dashed eyebrow + big bold uppercase
+                headline + ghost outline button. Slightly larger than a service
+                band to signal it opens a category. */}
             <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
-                <div className="max-w-md">
+                <div className="max-w-2xl">
                   <p className="text-white/55 font-mono text-[10px] tracking-[0.4em] mb-4">
                     {cat.num}
                   </p>
@@ -367,10 +370,13 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                     <span className="w-6 h-px bg-gold flex-shrink-0" />
                     {cat.subtitle}
                   </p>
-                  <h2 className="text-white font-semibold uppercase tracking-[0.18em] text-[19px] sm:text-[22px] leading-snug">
+                  <h2
+                    className="text-veil-shadow text-white font-bold uppercase tracking-tight leading-[0.95]"
+                    style={{ fontSize: "clamp(32px, 5.5vw, 64px)" }}
+                  >
                     {cat.label}
                   </h2>
-                  <p className="mt-3 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
+                  <p className="mt-4 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
                     {cat.desc}
                   </p>
                   <Link
@@ -378,7 +384,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                       `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
                       locale,
                     )}
-                    className="mt-5 inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
+                    className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
                   >
                     {ts.verDetalhes} <span aria-hidden>→</span>
                   </Link>
@@ -407,7 +413,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           cells={EDITORIAL_CELLS}
           pool={editorialPool}
           alt={t.common.imageAlt.servicosEndOfDay}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-0 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
           imgClassName="transition-transform duration-[1.2s] ease-out group-hover:scale-105"
         />
       </section>
@@ -484,7 +490,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {ts.ctaEyebrow}
-              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"
@@ -500,15 +505,13 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           </AnimateIn>
           <AnimateIn delay={180}>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Magnetic strength={0.4}>
-                <TrackedLink
-                  href={localizeHref("/orcamento", locale)}
-                  trackProps={{ source: "services-cta" }}
-                  className={PRIMARY_BUTTON_DARK_CLASS}
-                >
-                  {t.common.pedirOrcamento} →
-                </TrackedLink>
-              </Magnetic>
+              <TrackedLink
+                href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "services-cta" }}
+                className={`inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
+              >
+                {t.common.pedirOrcamento} →
+              </TrackedLink>
               <Link href={localizeHref("/galeria", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {ts.ctaGaleria}
               </Link>

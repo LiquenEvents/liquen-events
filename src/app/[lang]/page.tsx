@@ -11,7 +11,7 @@ import PhotoWall from "@/components/motion/PhotoWall";
 import { PHOTOS } from "./galeria/photos-data";
 import { ratioFor } from "@/lib/image-meta";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
-import { PRIMARY_BUTTON_DARK_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 // Each tile links to a distinct destination that matches its label
 // (Corporativos / Casamentos / Privados) — the first two deep-link to their
@@ -240,7 +240,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.home.ctaEyebrow}
-              <span className="w-8 h-px bg-gold" />
             </p>
           </AnimateIn>
           <h2
@@ -265,7 +264,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}
                 trackProps={{ source: "home-cta" }}
-                className={PRIMARY_BUTTON_DARK_CLASS}
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </TrackedLink>

@@ -595,11 +595,13 @@ export default function GaleriaClient({
   return (
     <>
       {/* ── Filtros / vista de casamento ── */}
+      {/* A grelha é full-bleed (o wrapper max-w/px saiu da page), por isso o
+          chrome dos filtros leva aqui o seu próprio padding lateral. */}
       {collectionFilter ? (
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-8 px-3 sm:px-4 lg:px-6">
           <button
             onClick={() => switchCat("Todos")}
-            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs tracking-[0.12em] uppercase bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90 transition-all duration-300"
+            className="flex-shrink-0 flex min-h-[44px] items-center gap-1.5 border border-white/25 px-4 py-2 text-[11px] tracking-[0.2em] uppercase text-white/70 hover:border-white/60 hover:text-white transition-colors duration-300"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -626,23 +628,26 @@ export default function GaleriaClient({
       ) : (
         <div
           ref={filterScrollRef}
-          className={`flex gap-2 mb-8 overflow-x-auto pb-1 scrollbar-none${filtersOverflow ? " g-filter-fade" : ""}`}
+          className={`flex gap-2 mb-8 overflow-x-auto px-3 sm:px-4 lg:px-6 pb-1 scrollbar-none${filtersOverflow ? " g-filter-fade" : ""}`}
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
+          {/* Tabs fantasma quadradas (idioma SpaceX) — sobre o fundo escuro da
+              galeria o ghost é branco: contorno hairline inativo, preenchimento
+              branco sólido com texto escuro quando ativo. Sem sombras. */}
           {CATS.map((c) => (
             <button
               key={c}
               onClick={() => switchCat(c)}
               aria-pressed={cat === c}
-              className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 rounded-full text-xs tracking-[0.12em] uppercase transition-all duration-300 ${
+              className={`flex-shrink-0 flex min-h-[44px] items-center gap-2 border px-4 py-3 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                 cat === c
-                  ? "bg-moss-dark text-white shadow-lg shadow-moss/20"
-                  : "bg-white/8 text-white/60 hover:bg-white/15 hover:text-white/90"
+                  ? "border-white bg-white text-[#0c0e0b]"
+                  : "border-white/25 text-white/70 hover:border-white/60 hover:text-white"
               }`}
             >
               {dict.labels[c]}
               <span
-                className={`text-[10px] tabular-nums ${cat === c ? "text-cream/90" : "text-white/50"}`}
+                className={`text-[10px] tabular-nums ${cat === c ? "text-[#0c0e0b]/60" : "text-white/50"}`}
               >
                 {counts[c]}
               </span>
@@ -793,13 +798,14 @@ export default function GaleriaClient({
               <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
             </div>
           ) : (
-            // Fallback sem IntersectionObserver — botão manual.
+            // Fallback sem IntersectionObserver — botão manual (ghost quadrado,
+            // preenche a branco no hover como os CTA do idioma SpaceX).
             <button
               onClick={() => setShown((s) => Math.min(s + PAGE, pool.length))}
-              className="group flex items-center gap-3 rounded-full border border-white/15 px-10 py-3.5 text-xs uppercase tracking-[0.2em] text-white/60 transition-all duration-300 hover:border-white/40 hover:text-white/90"
+              className="group flex min-h-[44px] items-center gap-3 border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.3em] text-white transition-colors duration-300 hover:border-white hover:bg-white hover:text-[#0c0e0b]"
             >
               {dict.verMais}
-              <span className="text-white/55 transition-colors group-hover:text-moss-light">
+              <span className="text-white/55 transition-colors group-hover:text-[#0c0e0b]/70">
                 +{Math.min(PAGE, pool.length - shown)}
               </span>
             </button>

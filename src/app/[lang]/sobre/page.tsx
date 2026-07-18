@@ -8,11 +8,10 @@ import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
-import Magnetic from "@/components/motion/Magnetic";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
-import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
@@ -154,12 +153,17 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </p>
           </AnimateIn>
           <AnimateIn from="right" delay={120}>
-            <div className="relative aspect-[4/5] overflow-hidden">
+            {/* From lg the photo breaks out of the content frame and bleeds to
+                the right viewport edge (SpaceX full-bleed): the negative margin
+                cancels the container's centering slack + its 4rem padding. The
+                section's overflow-x-clip swallows the ~half-scrollbar of 100vw
+                overshoot, so nothing scrolls sideways. */}
+            <div className="relative aspect-[4/5] overflow-hidden lg:-mr-[calc((100vw_-_min(100vw,80rem))/2_+_4rem)]">
               <Image
                 src="/imagens/DaniGui_Preview12.jpg"
                 alt={t.common.imageAlt.sobrePortrait}
                 fill
-                sizes="(max-width: 1024px) 100vw, 45vw"
+                sizes="(max-width: 1024px) 100vw, 55vw"
                 className="object-cover"
                 {...blurFor("/imagens/DaniGui_Preview12.jpg")}
               />
@@ -174,7 +178,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           cells={GRID_CELLS}
           pool={gridPool}
           alt={t.common.imageAlt.sobreCelebration}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 p-1.5 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-0 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
           imgClassName="transition-transform duration-[1.2s] ease-out group-hover:scale-105"
         />
       </section>
@@ -230,7 +234,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <Reveal
               as="div"
               variant="mask"
-              className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden ring-1 ring-foreground/10"
+              className="relative w-full max-w-[340px] aspect-[3/4] overflow-hidden"
             >
               <Image
                 src="/imagens/catarina-gaspar.jpg"
@@ -290,7 +294,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.sobre.ctaEyebrow}
-              <span className="w-8 h-px bg-gold" />
             </p>
             <h2
               className="text-white font-bold leading-[0.9] tracking-tight mb-6"
@@ -307,16 +310,14 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </p>
           </AnimateIn>
           <AnimateIn delay={180}>
-            <div className="flex flex-wrap items-center gap-4">
-              <Magnetic strength={0.4}>
-                <TrackedLink
-                  href={localizeHref("/orcamento", locale)}
-                  trackProps={{ source: "sobre" }}
-                  className={PRIMARY_BUTTON_DARK_CLASS}
-                >
-                  {t.common.pedirOrcamento} →
-                </TrackedLink>
-              </Magnetic>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <TrackedLink
+                href={localizeHref("/orcamento", locale)}
+                trackProps={{ source: "sobre" }}
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
+              >
+                {t.common.pedirOrcamento} →
+              </TrackedLink>
               <Link href={localizeHref("/contacto", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.entrarContacto}
               </Link>

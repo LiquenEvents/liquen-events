@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
@@ -10,7 +9,7 @@ import { aspectFor } from "@/lib/image-meta";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
-import { OUTLINE_LIGHT_BUTTON_CLASS, PRIMARY_BUTTON_DARK_CLASS } from "@/lib/ui-classes";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
 import { interleaveByCollection } from "./interleave";
 
@@ -106,10 +105,11 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       </section>
 
       {/* ── Gallery (dark, immersive) ── */}
+      {/* Full-bleed (SpaceX-style): sem wrapper max-w/px — a masonry corre de
+          borda a borda, só com o gap-0.5 interno entre fotos. O chrome dos
+          filtros traz o seu próprio padding lateral (ver GaleriaClient). */}
       <section className="py-12 lg:py-16 bg-[#0b0b0b]">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-          <GaleriaClient photos={galleryPhotos} dict={t.galeria} />
-        </div>
+        <GaleriaClient photos={galleryPhotos} dict={t.galeria} />
       </section>
 
       {/* ── Instagram CTA ── */}
@@ -149,7 +149,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}
                 trackProps={{ source: "galeria" }}
-                className={PRIMARY_BUTTON_DARK_CLASS}
+                className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </TrackedLink>

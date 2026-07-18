@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 /**
  * Editorial photo strip — a large, continuously gliding film-strip of curated
@@ -86,7 +87,6 @@ export default function PhotoWall({
         <p className="text-cream/45 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
           <span className="w-6 h-px bg-gold/50" />
           {eyebrow}
-          <span className="w-6 h-px bg-gold/50" />
         </p>
         <h2
           id="photowall-heading"
@@ -112,7 +112,7 @@ export default function PhotoWall({
           {[...frames, ...frames].map((img, i) => (
             <div
               key={i}
-              className="relative h-[280px] sm:h-[390px] lg:h-[480px] w-[420px] sm:w-[585px] lg:w-[720px] flex-shrink-0 overflow-hidden rounded-lg"
+              className="relative h-[280px] sm:h-[390px] lg:h-[480px] w-[420px] sm:w-[585px] lg:w-[720px] flex-shrink-0 overflow-hidden"
             >
               <Image
                 src={img.src}
@@ -137,13 +137,13 @@ export default function PhotoWall({
 
       {/* ── CTA ── */}
       <div className="relative z-20 flex justify-center pt-10 sm:pt-12 pb-16 sm:pb-20 lg:pb-24">
-        <Link
-          href={href}
-          className="group inline-flex items-center gap-3 px-8 py-4 bg-white/6 border border-white/18 rounded-full text-cream/90 hover:text-cream hover:bg-white/12 hover:border-white/35 text-[11px] tracking-[0.3em] uppercase transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss/70"
-        >
+        {/* Unified ghost button (see ui-classes.ts): squared hairline that
+            fills white on hover. The arrow inherits the label colour so it
+            inverts to near-black along with the text. */}
+        <Link href={href} className={`group ${OUTLINE_LIGHT_BUTTON_CLASS}`}>
           {label}
           <span
-            className="text-cream/50 group-hover:translate-x-0.5 transition-transform duration-300"
+            className="group-hover:translate-x-0.5 transition-transform duration-300 ease-expo"
             aria-hidden
           >
             →

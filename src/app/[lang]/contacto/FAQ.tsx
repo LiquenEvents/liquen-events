@@ -23,9 +23,9 @@ export default function FAQ({
   const qClosed = light
     ? "text-white/75 group-hover:text-white/90"
     : "text-foreground/72 group-hover:text-foreground/80";
-  const iconOpen = light
-    ? "border-moss-light text-moss-light rotate-45"
-    : "border-moss text-moss rotate-45";
+  // Caixa quadrada (idioma SpaceX — sem rounded): em vez do antigo círculo com
+  // "+" a rodar 45°, o glifo alterna +/− (rodar um quadrado leria como losango).
+  const iconOpen = light ? "border-moss-light text-moss-light" : "border-moss text-moss";
   const iconClosed = light
     ? "border-white/25 text-white/70"
     : "border-foreground/15 text-foreground/72";
@@ -54,11 +54,11 @@ export default function FAQ({
               </span>
               <span
                 aria-hidden
-                className={`flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center text-xs transition-all duration-300 ${
+                className={`flex-shrink-0 w-5 h-5 border flex items-center justify-center text-xs transition-all duration-300 ${
                   isOpen ? iconOpen : iconClosed
                 }`}
               >
-                +
+                {isOpen ? "−" : "+"}
               </span>
             </button>
             {/* grid-rows 0fr→1fr animates height without a fixed max-height,
