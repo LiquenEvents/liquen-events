@@ -5,6 +5,7 @@ import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { eventCountdown, randomId } from "./util";
+import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
@@ -14,13 +15,6 @@ const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "aceite", label: "Ganhos", color: "#525a2f" },
   { id: "rejeitado", label: "Perdidos", color: "#5a5a55" },
 ];
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {

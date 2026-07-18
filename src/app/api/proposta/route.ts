@@ -15,15 +15,9 @@ import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
+import { eur } from "@/lib/money";
 
 export const runtime = "nodejs";
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
 
 /**
  * Public endpoint for a client to accept or decline a proposal via the signed

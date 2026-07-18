@@ -3,19 +3,9 @@ export function randomId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
-
-export const eur2 = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
+// Formatação de euros consolidada em `@/lib/money` (fonte única). Mantemos os
+// nomes locais `eur` (sem casas) e `eur2` (2 casas) para os importadores atuais.
+export { eur0 as eur, eur as eur2 } from "@/lib/money";
 
 /**
  * How far away an event date is, as a short PT label + a tone for colouring.

@@ -5,13 +5,7 @@ import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { downloadCsv, dateStamp } from "./export";
 import EmptyState from "./EmptyState";
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
+import { eur0 as eur } from "@/lib/money";
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },

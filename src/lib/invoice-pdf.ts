@@ -1,6 +1,7 @@
 import "server-only";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { SITE } from "@/lib/site";
+import { eur } from "@/lib/money";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
 const INK = rgb(0.1, 0.1, 0.1);
@@ -9,13 +10,6 @@ const LINE = rgb(0.85, 0.85, 0.85);
 
 const A4 = { w: 595.28, h: 841.89 };
 const MARGIN = 56;
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
 
 export interface InvoiceData {
   number: string;

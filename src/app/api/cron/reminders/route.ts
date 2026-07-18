@@ -5,6 +5,7 @@ import { listCalendarEvents } from "@/lib/calendar-store";
 import { sendPushToAll } from "@/lib/push";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
+import { eur0 as eur } from "@/lib/money";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,13 +39,6 @@ function authorized(req: NextRequest): boolean {
   const expected = createHash("sha256").update(`Bearer ${secret}`).digest();
   return timingSafeEqual(provided, expected);
 }
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
 
 export async function GET(request: NextRequest) {
   if (!authorized(request)) {

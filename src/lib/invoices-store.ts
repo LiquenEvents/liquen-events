@@ -76,6 +76,12 @@ export const createInvoice = (i: Invoice): Promise<void> => repo.create(i);
 export const updateInvoice = (id: string, patch: Partial<Invoice>): Promise<Invoice | null> =>
   repo.update(id, patch);
 
+/**
+ * O split 30/70 vive agora em `./money` (client-safe) — re-exportado aqui para
+ * que os importadores server-side existentes continuem a funcionar sem mudanças.
+ */
+export { splitThirtySeventy } from "./money";
+
 /** Convenience id generator so callers don't reach for crypto directly. */
 export const newInvoiceId = (): string => randomUUID();
 
@@ -95,16 +101,4 @@ export async function nextInvoiceNumber(): Promise<string> {
   const next = current + 1;
   await setState(key, next);
   return `FT ${year}/${String(next).padStart(4, "0")}`;
-}
-
-/**
- * Split an event total into the 30% deposit (sinal) and 70% balance (saldo),
- * rounded to cents. The saldo is derived by subtraction so the two parts always
- * sum back to the exact total (no rounding drift).
- */
-export function splitThirtySeventy(total: number): { sinal: number; saldo: number } {
-  const t = Math.max(0, total);
-  const sinal = Math.round(t * 0.3 * 100) / 100;
-  const saldo = Math.round((t - sinal) * 100) / 100;
-  return { sinal, saldo };
 }

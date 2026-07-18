@@ -1,4 +1,5 @@
 import type { Proposal, Quote } from "@/lib/orcamento/types";
+import { eur0 as eur } from "@/lib/money";
 
 /**
  * Rule-based follow-up detection for the back office. Pure and server-safe
@@ -29,13 +30,6 @@ const SEVERITY_RANK: Record<FollowUp["severity"], number> = {
   aviso: 1,
   info: 2,
 };
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
 
 /** UTC day key (yyyy-mm-dd) for an epoch millisecond value. */
 const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);

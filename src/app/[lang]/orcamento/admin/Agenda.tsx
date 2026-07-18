@@ -3,15 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
+import { eur0 as eur } from "@/lib/money";
 
 const DAYS_AHEAD = 14;
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {

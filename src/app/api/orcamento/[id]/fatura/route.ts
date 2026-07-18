@@ -5,6 +5,7 @@ import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
+import { eur } from "@/lib/money";
 
 export const runtime = "nodejs";
 
@@ -13,12 +14,6 @@ const KIND_LABEL: Record<string, string> = {
   pagamento: "Pagamento",
   saldo: "Saldo final",
 };
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });

@@ -9,6 +9,7 @@ import type { Invoice } from "@/lib/invoices-store";
 import { SkeletonList } from "./Skeleton";
 import EmptyState from "./EmptyState";
 import { eur2 } from "./util";
+import { splitThirtySeventy } from "@/lib/money";
 import { useToast } from "./Toast";
 
 type Status = Invoice["status"];
@@ -351,13 +352,8 @@ export default function Faturas({ quotes }: Props) {
           {mode === "split" && amount && parseFloat(amount) > 0 && (
             <p className="text-foreground/40 text-xs mt-3">
               Serão emitidas duas faturas: sinal{" "}
-              {eur2(Math.round(parseFloat(amount) * 0.3 * 100) / 100)} + saldo{" "}
-              {eur2(
-                Math.round(
-                  (parseFloat(amount) - Math.round(parseFloat(amount) * 0.3 * 100) / 100) * 100,
-                ) / 100,
-              )}
-              .
+              {eur2(splitThirtySeventy(parseFloat(amount)).sinal)} + saldo{" "}
+              {eur2(splitThirtySeventy(parseFloat(amount)).saldo)}.
             </p>
           )}
 

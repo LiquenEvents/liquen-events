@@ -5,6 +5,7 @@
  */
 import type { Quote } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
+import { eur0 } from "@/lib/money";
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {
@@ -379,12 +380,6 @@ export function printRunSheet(q: Quote): void {
     : "";
 
   // Financial summary for the day-of (what's contracted, paid and still due).
-  const eur0 = (n: number) =>
-    new Intl.NumberFormat("pt-PT", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0,
-    }).format(n || 0);
   const payments = (q.payments ?? [])
     .slice()
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -498,13 +493,6 @@ export function printEventDossier(q: Quote): void {
     aceite: "Aceite",
     rejeitado: "Rejeitado",
   };
-
-  const eur0 = (n: number) =>
-    new Intl.NumberFormat("pt-PT", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0,
-    }).format(n || 0);
 
   // ── Financial ──
   const contracted = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;

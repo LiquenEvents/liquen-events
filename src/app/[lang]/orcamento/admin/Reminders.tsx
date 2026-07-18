@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Quote, Task } from "@/lib/orcamento/types";
+import { eur0 } from "@/lib/money";
 
 interface Reminder {
   kind: "evento" | "pagamento" | "pedido" | "tarefa" | "seguimento";
@@ -66,7 +67,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
             urgent: !!eventSoon,
             quote: q,
             text: `${q.name} — pagamento em falta`,
-            sub: `Faltam ${new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(total - paid)}`,
+            sub: `Faltam ${eur0(total - paid)}`,
           });
         }
       }
