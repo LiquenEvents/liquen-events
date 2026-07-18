@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from "react";
 import Image from "next/image";
 import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
@@ -607,8 +607,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // "Arquivados" toggle on Pedidos and the command palette.
   const activeQuotes = useMemo(() => quotes.filter((q) => !q.archived), [quotes]);
 
+  // Keep the search input instant while the expensive filter+sort over all leads
+  // runs at lower priority: typing updates `search` immediately, but the O(n)
+  // filter/O(n log n) sort + list re-render key off the deferred value, so a
+  // keystroke never blocks on the whole-list recompute (janky at hundreds).
+  const deferredSearch = useDeferredValue(search);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     let list = quotes.filter((x) => (showArchived ? x.archived : !x.archived));
     if (!showArchived && filterStatus !== "all") {
       list = list.filter((x) => x.status === filterStatus);
@@ -674,7 +680,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     filterStatus,
     filterCategory,
     tagFilter,
-    search,
+    deferredSearch,
     sort,
     showArchived,
     mineOnly,
