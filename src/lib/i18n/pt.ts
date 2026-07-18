@@ -679,6 +679,85 @@ export const pt = {
     },
   },
 
+  portal: {
+    title: "Portal do Cliente — Líquen Events",
+    eyebrow: "Portal do Cliente",
+    greeting: "Olá",
+    intro:
+      "Aqui reúne, num só lugar, tudo o que diz respeito ao seu evento connosco: a proposta, as condições, os pagamentos e os próximos passos.",
+    dateLocale: "pt-PT",
+    // Rótulos amigáveis por tipo de evento (o Portal só lê dados; a substituição
+    // é feita no servidor e enviada como texto simples).
+    eventTypes: {
+      casamentos: "Casamento",
+      batizados: "Batizado",
+      aniversarios: "Aniversário",
+      jantares_gala: "Jantar de Gala",
+      conferencias: "Conferência",
+      teambuilding: "Teambuilding",
+      lancamentos: "Lançamento de Produto",
+      jantares_empresa: "Jantar de Empresa",
+    },
+    eventFallbackEmpresa: "Evento Corporativo",
+    eventFallbackParticular: "Evento",
+    semData: "Data a definir",
+    semLocal: "Local a definir",
+    proposta: {
+      title: "Proposta",
+      statusLabel: "Estado",
+      status: {
+        rascunho: "Em preparação",
+        enviada: "Enviada — a aguardar a sua resposta",
+        aceite: "Aceite",
+        rejeitada: "Recusada",
+      },
+      totalLabel: "Total",
+      download: "Descarregar proposta (PDF)",
+      none: "Ainda não há proposta disponível. Estamos a prepará-la e avisamos assim que estiver pronta.",
+    },
+    contrato: {
+      title: "Contrato",
+      aceite: "Condições aceites em {date} por {name} (v{version}).",
+      pendingTitle: "Aceitação pendente",
+      pendingBody:
+        "Depois de rever a proposta, poderá aceitar as condições através do link que lhe enviámos por e-mail. Ficamos a aguardar.",
+    },
+    pagamentos: {
+      title: "Pagamentos",
+      intro:
+        "O pagamento é faseado: 30% de sinal para reservar a data e 70% de saldo antes do evento.",
+      scheduleTitle: "Plano previsto",
+      sinal: "Sinal (30%)",
+      saldo: "Saldo (70%)",
+      faturasTitle: "Faturas",
+      thNumero: "Nº",
+      thTipo: "Tipo",
+      thMontante: "Montante",
+      thEstado: "Estado",
+      kind: {
+        sinal: "Sinal",
+        saldo: "Saldo",
+        total: "Total",
+      },
+      estado: {
+        emitida: "Pendente",
+        paga: "Paga",
+        anulada: "Anulada",
+      },
+      emitidaEm: "Emitida a {date}",
+      pagaEm: "Paga a {date}",
+      venceEm: "Vence a {date}",
+      semTotal: "O plano de pagamentos fica disponível assim que a proposta estiver pronta.",
+      noInvoices:
+        "Ainda não emitimos faturas. Em cima fica o plano previsto; enviamos cada fatura assim que for emitida.",
+    },
+    proximos: {
+      title: "Próximos passos",
+      body: "Se tiver qualquer dúvida sobre a proposta, as condições ou os pagamentos, estamos aqui para ajudar. Basta responder ao nosso e-mail ou usar os contactos abaixo.",
+      contactTitle: "Fale connosco",
+    },
+  },
+
   errors: {
     notFoundEyebrow: "Página não encontrada",
     notFoundTitle: "Este caminho não existe.",

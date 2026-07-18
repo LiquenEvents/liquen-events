@@ -667,6 +667,85 @@ export const en: Dict = {
     },
   },
 
+  portal: {
+    title: "Client Portal — Líquen Events",
+    eyebrow: "Client Portal",
+    greeting: "Hello",
+    intro:
+      "Here you'll find everything about your event with us in one place: the proposal, the terms, payments and next steps.",
+    dateLocale: "en-GB",
+    // Friendly labels per event type (the portal only reads data; substitution
+    // happens on the server and is sent down as plain text).
+    eventTypes: {
+      casamentos: "Wedding",
+      batizados: "Christening",
+      aniversarios: "Birthday",
+      jantares_gala: "Gala Dinner",
+      conferencias: "Conference",
+      teambuilding: "Team Building",
+      lancamentos: "Product Launch",
+      jantares_empresa: "Company Dinner",
+    },
+    eventFallbackEmpresa: "Corporate Event",
+    eventFallbackParticular: "Event",
+    semData: "Date to be confirmed",
+    semLocal: "Location to be confirmed",
+    proposta: {
+      title: "Proposal",
+      statusLabel: "Status",
+      status: {
+        rascunho: "In preparation",
+        enviada: "Sent — awaiting your response",
+        aceite: "Accepted",
+        rejeitada: "Declined",
+      },
+      totalLabel: "Total",
+      download: "Download proposal (PDF)",
+      none: "No proposal is available yet. We're preparing it and will let you know as soon as it's ready.",
+    },
+    contrato: {
+      title: "Contract",
+      aceite: "Terms accepted on {date} by {name} (v{version}).",
+      pendingTitle: "Acceptance pending",
+      pendingBody:
+        "Once you've reviewed the proposal, you can accept the terms through the link we sent you by email. We look forward to it.",
+    },
+    pagamentos: {
+      title: "Payments",
+      intro:
+        "Payment is staged: a 30% deposit to reserve the date and the 70% balance before the event.",
+      scheduleTitle: "Expected schedule",
+      sinal: "Deposit (30%)",
+      saldo: "Balance (70%)",
+      faturasTitle: "Invoices",
+      thNumero: "No.",
+      thTipo: "Type",
+      thMontante: "Amount",
+      thEstado: "Status",
+      kind: {
+        sinal: "Deposit",
+        saldo: "Balance",
+        total: "Total",
+      },
+      estado: {
+        emitida: "Pending",
+        paga: "Paid",
+        anulada: "Void",
+      },
+      emitidaEm: "Issued on {date}",
+      pagaEm: "Paid on {date}",
+      venceEm: "Due on {date}",
+      semTotal: "The payment schedule becomes available once the proposal is ready.",
+      noInvoices:
+        "We haven't issued any invoices yet. The expected schedule is shown above; we'll send each invoice as it's issued.",
+    },
+    proximos: {
+      title: "Next steps",
+      body: "If you have any questions about the proposal, the terms or payments, we're here to help. Just reply to our email or use the contacts below.",
+      contactTitle: "Get in touch",
+    },
+  },
+
   errors: {
     notFoundEyebrow: "Page not found",
     notFoundTitle: "This path doesn't exist.",

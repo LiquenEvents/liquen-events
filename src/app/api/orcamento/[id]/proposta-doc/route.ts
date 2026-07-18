@@ -5,8 +5,7 @@ import { type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
 import { isAuthed } from "@/lib/admin-auth";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal } from "@/lib/proposals-store";
-import { renderProposalDocPdf } from "@/lib/proposal-doc-pdf";
-import { fetchProposalImageBytes } from "@/lib/proposal-storage";
+import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
 import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
@@ -22,25 +21,6 @@ function parseMoney(text: string | undefined): number {
   if (!m) return 0;
   const norm = m[0].replace(/[.\s]/g, "").replace(",", ".");
   return Number.parseFloat(norm) || 0;
-}
-
-/** Replace every image reference (cover + mood boards) with inline base64 so the
- *  storage-agnostic generator can embed them. Missing images are dropped. */
-async function resolveImages(doc: ProposalDoc): Promise<ProposalDoc> {
-  const toB64 = async (ref: string): Promise<string | null> => {
-    const bytes = await fetchProposalImageBytes(ref);
-    return bytes ? bytes.toString("base64") : null;
-  };
-  const cover = (await Promise.all((doc.coverImages ?? []).map(toB64))).filter(
-    (s): s is string => !!s,
-  );
-  const moodBoards = await Promise.all(
-    (doc.moodBoards ?? []).map(async (mb) => ({
-      ...mb,
-      images: (await Promise.all(mb.images.map(toB64))).filter((s): s is string => !!s),
-    })),
-  );
-  return { ...doc, coverImages: cover, moodBoards };
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -68,9 +48,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // cancelamento) + event-token substitution so the UI only sends what varies.
     const doc = withProposalDefaults(raw);
 
-    const resolved = await resolveImages(doc);
-    const pdfBytes = await renderProposalDocPdf(resolved);
-    const pdfBuffer = Buffer.from(pdfBytes);
+    // Shared pipeline (resolve Storage images → render) — the exact same helper
+    // the public portal PDF route uses, so both emit an identical document.
+    const pdfBuffer = await renderStoredProposalDocPdf(doc);
 
     if (mode === "preview") {
       return new NextResponse(pdfBuffer, {
