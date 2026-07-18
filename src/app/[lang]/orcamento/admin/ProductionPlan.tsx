@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 import { randomId, eur2 } from "./util";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
-import { DECOR_PRODUCTION, buildProductionChecklist } from "@/lib/production-templates";
+import {
+  DECOR_PRODUCTION,
+  PRODUCTION_PHASE_SEP,
+  buildProductionPlanItems,
+} from "@/lib/production-templates";
 
 interface Props {
   quote: Quote;
@@ -16,8 +20,9 @@ const STATUS_LABEL: Record<EventSupplierStatus, { label: string; color: string }
   pago: { label: "Pago", color: "#4d6350" },
 };
 
-const SEP = " · ";
-const phaseLabel = (phase: string, task: string) => `${phase}${SEP}${task}`;
+// Separador + transform partilhados com o seed do servidor (production-templates),
+// para o plano gerado na UI e o gerado no aceite da proposta serem idênticos.
+const SEP = PRODUCTION_PHASE_SEP;
 
 /**
  * Decor production plan: a phased atelier timeline (Sourcing → Strike) stored
@@ -51,9 +56,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
 
   function applyPlan() {
     const existing = new Set(items.map((i) => i.label));
-    const additions = buildProductionChecklist()
-      .map((t) => ({ id: randomId(), label: phaseLabel(t.phase, t.label), done: false }))
-      .filter((t) => !existing.has(t.label));
+    const additions = buildProductionPlanItems(randomId, existing);
     if (additions.length === 0) return;
     persist([...items, ...additions]);
   }

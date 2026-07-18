@@ -176,6 +176,50 @@ describe("POST /api/proposta", () => {
     expect(createInvoice).not.toHaveBeenCalled();
   });
 
+  it("seeds the production plan (and event checklist) on an empty quote when accepted", async () => {
+    seedProposal("p6", { category: "particulares" });
+    const res = await POST(
+      postReq({ token: createProposalToken("p6"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    const quote = quotesDb.store.get("q-p6") as Record<string, unknown>;
+    // Production plan seeded, non-empty, each item prefixed with its phase.
+    const plan = quote.productionPlan as { label: string }[];
+    expect(Array.isArray(plan)).toBe(true);
+    expect(plan.length).toBeGreaterThan(0);
+    expect(plan.some((i) => i.label.startsWith("Sourcing · "))).toBe(true);
+    // Event checklist seeded from the canonical template too.
+    const checklist = quote.checklist as unknown[];
+    expect(Array.isArray(checklist)).toBe(true);
+    expect(checklist.length).toBeGreaterThan(0);
+    // A single system audit entry summarises the seed.
+    const log = quote.activityLog as { kind: string; actor: string }[];
+    expect(log.filter((e) => e.kind === "note_added" && e.actor === "Sistema")).toHaveLength(1);
+  });
+
+  it("does not re-seed a quote that already has a production plan (idempotent)", async () => {
+    seedProposal("p7", { category: "particulares" });
+    // Pre-existing, hand-built plan + checklist must survive untouched.
+    const existingPlan = [{ id: "keep-1", label: "Tarefa à mão", done: true }];
+    const existingChecklist = [{ id: "keep-2", label: "Item à mão", done: false }];
+    quotesDb.store.set("q-p7", {
+      id: "q-p7",
+      productionPlan: existingPlan,
+      checklist: existingChecklist,
+    });
+    const res = await POST(
+      postReq({ token: createProposalToken("p7"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    const quote = quotesDb.store.get("q-p7") as Record<string, unknown>;
+    // Neither field was overwritten or appended to.
+    expect(quote.productionPlan).toEqual(existingPlan);
+    expect(quote.checklist).toEqual(existingChecklist);
+    // No "Sistema" seed note was added (nothing to seed).
+    const log = (quote.activityLog ?? []) as { kind: string; actor: string }[];
+    expect(log.some((e) => e.actor === "Sistema")).toBe(false);
+  });
+
   it("declines a proposal: marks it rejeitada and the quote rejeitado", async () => {
     seedProposal("p4");
     const res = await POST(postReq({ token: createProposalToken("p4"), action: "recusar" }));

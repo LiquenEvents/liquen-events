@@ -3,7 +3,13 @@
  * production plan (checklist) with one click, from Sourcing through Strike.
  * Each phase carries concrete PT tasks; the flattened form tags every item with
  * its phase so the plan can be grouped and progress shown per phase.
+ *
+ * Client-safe (sem `server-only`): tanto o painel `ProductionPlan` como o
+ * endpoint de aceitação da proposta importam daqui, para o seed do servidor
+ * ficar byte-a-byte igual ao seed feito na UI.
  */
+
+import type { ChecklistItem } from "@/lib/orcamento/types";
 
 export interface ProductionPhase {
   key: string;
@@ -83,4 +89,31 @@ export function buildProductionChecklist(): {
       done: false,
     })),
   );
+}
+
+/** Separador entre a fase e a tarefa no label do item (ex.: "Sourcing · …").
+    Fonte única, para o agrupamento por fase e o seed nunca divergirem. */
+export const PRODUCTION_PHASE_SEP = " · ";
+
+/** Compõe o label de um item de produção com o prefixo da fase. */
+export const productionPhaseLabel = (phase: string, task: string) =>
+  `${phase}${PRODUCTION_PHASE_SEP}${task}`;
+
+/**
+ * Transforma o template de produção decor em `ChecklistItem[]` prontos a gravar
+ * (cada item prefixado com a sua fase). É a ÚNICA fonte deste transform: tanto o
+ * botão "Aplicar plano" na UI como o auto-seed no aceite da proposta chamam aqui,
+ * para um seed-servidor == seed-UI (sem drift).
+ *
+ * `makeId` gera o id de cada item (a UI passa o `randomId` do cliente; o servidor
+ * passa um gerador próprio). `existingLabels`, quando fornecido, filtra labels já
+ * presentes — reaplicar só acrescenta o que falta (idempotente).
+ */
+export function buildProductionPlanItems(
+  makeId: () => string,
+  existingLabels?: Set<string>,
+): ChecklistItem[] {
+  return buildProductionChecklist()
+    .map((t) => ({ id: makeId(), label: productionPhaseLabel(t.phase, t.label), done: false }))
+    .filter((t) => !existingLabels || !existingLabels.has(t.label));
 }

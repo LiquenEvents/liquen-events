@@ -11,6 +11,8 @@ import {
   nextInvoiceNumber,
   splitThirtySeventy,
 } from "@/lib/invoices-store";
+import { buildProductionPlanItems } from "@/lib/production-templates";
+import { checklistTemplate } from "@/lib/checklist-templates";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
@@ -177,6 +179,70 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         log.error("proposta: contrato/fatura de sinal falhou", e, { id: proposal.id });
+      }
+    }
+
+    // Auto-seed do lado da produção. Quando o cliente aceita, o separador Produção
+    // arrancava vazio e a equipa reconstruía tudo à mão de cada vez. Aqui pré-
+    // preenchemos o plano de produção decor e a checklist do evento a partir dos
+    // mesmos templates que a UI usa (production-templates / checklist-templates),
+    // para um seed-servidor == seed-UI. Passo SIBLING do contrato/sinal: best-effort
+    // e totalmente isolado (try/catch próprio) — nunca bloqueia nem falha a
+    // confirmação do cliente. Idempotente: só preenche campos vazios, por isso um
+    // retry (ou um segundo aceite) não volta a semear nem duplica itens.
+    if (accepted) {
+      try {
+        // Uma única mutação read-modify-write: lê o estado FRESCO do pedido lá
+        // dentro e só toca nos campos ainda vazios, para não pisar a mutação do
+        // status/contrato acima (que corre antes). Acrescenta UMA entrada de
+        // atividade a resumir o que foi semeado; se não houver nada a semear,
+        // devolve o pedido intacto (sem alteração, sem entrada).
+        await updateQuoteWith(proposal.quoteId, (quote) => {
+          const seededParts: string[] = [];
+
+          // 1) Plano de produção decor (campo próprio `productionPlan`). Nunca
+          //    sobrepõe um plano já existente — só semeia quando ausente/vazio.
+          let productionPlan = quote.productionPlan;
+          if (!productionPlan?.length) {
+            productionPlan = buildProductionPlanItems(() => randomBytes(4).toString("hex"));
+            seededParts.push(`plano de produção decor (${productionPlan.length} tarefas)`);
+          }
+
+          // 2) Checklist do evento (campo separado `checklist`, template canónico
+          //    por categoria). Só semeia se estiver vazia.
+          let checklist = quote.checklist;
+          if (!checklist?.length) {
+            checklist = checklistTemplate(quote.category).map((label) => ({
+              id: randomBytes(4).toString("hex"),
+              label,
+              done: false,
+            }));
+            seededParts.push(`checklist do evento (${checklist.length} itens)`);
+          }
+
+          // 3) Fornecedores: a proposta não expõe uma lista estruturada de
+          //    categorias que mapeie para EventSupplier (só line items em texto
+          //    livre), por isso NÃO pré-criamos fornecedores — seria adivinhar.
+
+          // Nada a semear (já tinha tudo): idempotente, devolve intacto.
+          if (seededParts.length === 0) return quote;
+
+          const entry = {
+            id: randomBytes(4).toString("hex"),
+            at: respondedAt,
+            kind: "note_added" as const,
+            actor: "Sistema",
+            summary: `Produção pré-preenchida no aceite: ${seededParts.join(" · ")}`,
+          };
+          return {
+            ...quote,
+            productionPlan,
+            checklist,
+            activityLog: [...(quote.activityLog ?? []), entry],
+          };
+        });
+      } catch (e) {
+        log.error("proposta: seed do plano de produção falhou", e, { id: proposal.quoteId });
       }
     }
 
