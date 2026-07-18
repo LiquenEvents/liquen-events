@@ -216,6 +216,23 @@ export class FileBackend<T> implements Backend<T> {
     await fs.writeFile(this.file, JSON.stringify(rows, null, 2));
   }
 
+  // The file backend is a DEV fallback only. In production it means Supabase is
+  // unconfigured (env.ts already flags this critical) — so a write would land in
+  // an ephemeral file that vanishes on the next deploy, i.e. silent data loss
+  // reported to the caller as success. Refuse the write loudly instead: the POST
+  // route then treats the lead as un-persisted and falls back to email + an
+  // honest error, and the miss reaches alerting via log.error. Reads still work.
+  private assertWritableInProd(): void {
+    if (process.env.NODE_ENV === "production") {
+      log.error(
+        "repository: gravação recusada — Supabase não configurado em produção; o fallback para ficheiro é volátil. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.",
+        undefined,
+        { file: this.m.fileName },
+      );
+      throw new Error("Persistence unavailable: Supabase not configured in production");
+    }
+  }
+
   async list(): Promise<T[]> {
     const all = await this.read();
     return this.m.fileCompare ? [...all].sort(this.m.fileCompare) : all;
@@ -231,6 +248,7 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async insert(entity: T): Promise<void> {
+    this.assertWritableInProd();
     return this.serialize(async () => {
       const all = await this.read();
       all.push(entity);
@@ -239,6 +257,7 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async persist(id: string, merged: T): Promise<void> {
+    this.assertWritableInProd();
     return this.serialize(async () => {
       const all = await this.read();
       const idx = all.findIndex((e) => this.m.getId(e) === id);
@@ -249,6 +268,7 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async remove(id: string): Promise<void> {
+    this.assertWritableInProd();
     return this.serialize(async () => {
       const all = await this.read();
       await this.write(all.filter((e) => this.m.getId(e) !== id));

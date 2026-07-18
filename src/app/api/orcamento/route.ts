@@ -4,7 +4,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, LOCATION_LABELS } from "@/lib/orca
 import { sendMail, esc } from "@/lib/mail";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
-import { createQuote, listQuotes, generateQuoteId } from "@/lib/quotes-store";
+import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
@@ -211,7 +211,25 @@ export async function POST(request: NextRequest) {
       breakdown: PriceBreakdown;
     };
 
-    const id = generateQuoteId();
+    // Idempotency: the client sends a stable submissionId (persisted across a
+    // reload for the same unsent enquiry). Deriving a deterministic id from it
+    // means a retried POST — the response was lost and the visitor resubmitted
+    // — maps to the SAME quote instead of creating a duplicate lead and sending
+    // a duplicate email. A fresh random id is used when no submissionId is sent.
+    const rawSub = (body as Record<string, unknown> | null)?.submissionId;
+    const submissionId =
+      typeof rawSub === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(rawSub) ? rawSub : null;
+    const id = submissionId ? quoteIdFor(submissionId) : generateQuoteId();
+
+    if (submissionId) {
+      try {
+        if (await getQuote(id)) return NextResponse.json({ id, status: "ok" });
+      } catch (lookupErr) {
+        // A lookup failure must never block a genuine new lead — fall through
+        // and create it (a duplicate is far better than a dropped enquiry).
+        log.error("orcamento: verificação de idempotência falhou", lookupErr, { id });
+      }
+    }
 
     const quote: Quote = {
       ...form,

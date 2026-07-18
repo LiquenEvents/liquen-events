@@ -29,6 +29,29 @@ type Cat = "empresas" | "particulares" | null;
 // they typed. Stored on the visitor's own device; cleared on a successful send.
 const DRAFT_KEY = "liquen-orcamento-draft";
 
+// A stable id for THIS enquiry, so a retried submit (lost response → resubmit,
+// even across a reload) is deduplicated server-side into one lead + one email
+// instead of two. It survives reloads (localStorage) and is regenerated only
+// after a successful send.
+const SUBMISSION_KEY = "liquen-orcamento-sid";
+function ensureSubmissionId(): string {
+  try {
+    let sid = localStorage.getItem(SUBMISSION_KEY);
+    if (!sid) {
+      sid =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem(SUBMISSION_KEY, sid);
+    }
+    return sid;
+  } catch {
+    // No localStorage (private mode / blocked): fall back to a per-call id — no
+    // cross-reload dedup, but the request still carries a valid submissionId.
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
 interface EventOption {
   label: string;
   category: Cat;
@@ -242,7 +265,9 @@ export default function OrcamentoForm({
         headers: { "Content-Type": "application/json" },
         // O honeypot segue no payload para o servidor também poder descartar
         // bots que preencham o campo (a guarda no cliente é contornável).
-        body: JSON.stringify({ form, website }),
+        // submissionId torna o envio idempotente (reenvio após resposta perdida
+        // = um só lead + um só email).
+        body: JSON.stringify({ form, website, submissionId: ensureSubmissionId() }),
         signal: controller.signal,
       });
       const json = await res.json().catch(() => null);
@@ -269,6 +294,9 @@ export default function OrcamentoForm({
       submittedRef.current = true;
       try {
         localStorage.removeItem(DRAFT_KEY);
+        // Retire this enquiry's idempotency id so a genuinely NEW enquiry later
+        // gets a fresh one (and doesn't dedup against the just-sent lead).
+        localStorage.removeItem(SUBMISSION_KEY);
       } catch {
         /* ignora */
       }

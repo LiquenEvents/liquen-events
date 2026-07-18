@@ -62,9 +62,14 @@ export async function sendMail({
 }: SendArgs): Promise<{ sent: boolean }> {
   const transport = getTransport();
   if (!transport) {
-    log.warn(
-      "mail: SMTP não configurado — email não enviado (defina SMTP_HOST, SMTP_USER e SMTP_PASS)",
-    );
+    // In production an unconfigured SMTP means real emails silently don't send —
+    // including the client's confirmation, whose caller doesn't inspect `sent`.
+    // Log at ERROR there so it reaches alerting rather than passing unnoticed;
+    // in dev it's an expected no-op, so a warning is enough.
+    const msg =
+      "mail: SMTP não configurado — email não enviado (defina SMTP_HOST, SMTP_USER e SMTP_PASS)";
+    if (process.env.NODE_ENV === "production") log.error(msg);
+    else log.warn(msg);
     return { sent: false };
   }
 

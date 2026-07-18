@@ -108,3 +108,16 @@ describe("proposal-token — signed accept links", () => {
     });
   });
 });
+
+describe("quoteIdFor — idempotency id", () => {
+  it("is deterministic for the same submission id", async () => {
+    const { quoteIdFor } = await import("./quotes-store");
+    expect(quoteIdFor("sub-abc")).toBe(quoteIdFor("sub-abc"));
+  });
+
+  it("differs across submission ids and looks like a quote reference", async () => {
+    const { quoteIdFor } = await import("./quotes-store");
+    expect(quoteIdFor("sub-abc")).not.toBe(quoteIdFor("sub-xyz"));
+    expect(quoteIdFor("sub-abc")).toMatch(/^LIQ-[0-9A-F]{6}-[0-9A-F]{16}$/);
+  });
+});

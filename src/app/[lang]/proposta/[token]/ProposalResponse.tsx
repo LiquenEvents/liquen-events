@@ -30,18 +30,28 @@ export default function ProposalResponse({ token, initialStatus, clientEmail, pr
     if (action === "aceitar" && !window.confirm(tp.confirmAceitar)) return;
     setSending(action);
     setError(null);
+    // Abort a hung request instead of spinning "A aceitar…" forever on a stalled
+    // connection. This is a client COMMITMENT (accept/decline a proposal), so a
+    // silent infinite spinner is the worst failure mode — mirror the quote
+    // form's guard so the visitor gets an error + a way to reach us.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
     try {
       const res = await fetch("/api/proposta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, action }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || tp.errorFallback);
       setStatus(data.status === "aceite" ? "aceite" : "rejeitada");
     } catch (e) {
-      setError(e instanceof Error ? e.message : tp.errorGeneric);
+      // A timeout/abort has no server message → fall back to the generic retry
+      // copy instead of surfacing a raw "AbortError" string.
+      setError(e instanceof Error && e.name !== "AbortError" ? e.message : tp.errorGeneric);
     } finally {
+      clearTimeout(timeout);
       setSending(null);
     }
   }
