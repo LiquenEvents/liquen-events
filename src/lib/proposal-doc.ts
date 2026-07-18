@@ -8,9 +8,21 @@
  * standard wording; the back office overrides only what changes per event.
  */
 
+import { round2 } from "@/lib/money";
+
 /** A single reference image in a mood board (base64-encoded JPEG or PNG bytes,
  *  with or without a `data:` prefix — the renderer sniffs the format). */
 export type ImageData = string;
+
+/** Taxa de IVA por omissão (23% — taxa normal em Portugal continental). */
+export const DEFAULT_VAT_RATE = 0.23;
+
+/** Dias de validade por omissão de uma proposta enviada. */
+export const DEFAULT_VALID_DAYS = 30;
+
+/** Como interpretar o `totalAmount`: já COM IVA ("incluido") ou o IVA acresce
+ *  ao valor indicado ("acrescer", i.e. "+ IVA"). */
+export type VatMode = "incluido" | "acrescer";
 
 export interface MoodBoard {
   /** Elegant serif title, e.g. "Decoração Cerimónia". */
@@ -90,6 +102,23 @@ export interface ProposalDoc {
   totalEstimatedText?: string; // "[Valor Total]" / "12.500,00 €"
   budgetNote?: string; // "Os valores são estimativas e podem ser ajustados…"
 
+  // ── Total ESTRUTURADO (fonte de verdade do dinheiro quando presente) ──
+  // O texto livre acima (`totalText`/`totalEstimatedText`) é só para DISPLAY no
+  // PDF; estes campos é que determinam a matemática (base/IVA/total) a jusante,
+  // eliminando a ambiguidade "3.000,00 €" (com IVA?) vs "3.000,00 € + IVA".
+  /** Valor introduzido pelo estúdio. Interpretação depende de `totalVatMode`. */
+  totalAmount?: number;
+  /** Se `totalAmount` já inclui IVA ("incluido") ou o IVA acresce ("acrescer"). */
+  totalVatMode?: VatMode;
+  /** Taxa de IVA aplicável (por omissão {@link DEFAULT_VAT_RATE}). */
+  vatRate?: number;
+
+  // ── Validade da proposta ──
+  /** Data explícita de validade (yyyy-mm-dd). Tem prioridade sobre `validUntilDays`. */
+  validUntil?: string;
+  /** Nº de dias de validade a contar do envio (por omissão {@link DEFAULT_VALID_DAYS}). */
+  validUntilDays?: number;
+
   // ── Cover (two flanking photos around the dark logo panel) ──
   coverImages: ImageData[];
 
@@ -157,6 +186,96 @@ export const DEFAULT_CANCELAMENTO: string[] = [
   "Se o cancelamento do evento ocorrer após as 14h do oitavo dia útil antes da data do evento, a Líquen Events terá direito a receber o montante total estipulado para o evento, acrescido de IVA, sendo a denúncia, em qualquer um dos casos, apenas válida se for efetuada por escrito, por email, valendo para tal a data e hora de receção do mesmo.",
   "Para qualquer eventual conflito recorrer-se-á ao Centro de Arbitragem de Conflitos de Consumo de Lisboa.",
 ];
+
+/** Extrai o primeiro número monetário de texto livre pt-PT
+ *  ("3.000,00 € + IVA" → 3000; "14.700,00 €" → 14700). Só isto — a
+ *  interpretação do IVA fica a cargo de {@link resolveProposalMoney}. */
+export function parseMoneyText(text: string | undefined): number {
+  if (!text) return 0;
+  const m = text.match(/\d[\d.\s]*(?:,\d{1,2})?/);
+  if (!m) return 0;
+  const norm = m[0].replace(/[.\s]/g, "").replace(",", ".");
+  return Number.parseFloat(norm) || 0;
+}
+
+/** Deteta, em texto livre, uma anotação do tipo "+ IVA" / "acresce IVA" /
+ *  "IVA não incluído" ⇒ o valor é LÍQUIDO (modo "acrescer"). Caso contrário
+ *  assume-se que o valor já inclui IVA. Case-insensitive e tolerante a acentos. */
+export function detectVatMode(text: string | undefined): VatMode {
+  if (!text) return "incluido";
+  const t = text.toLowerCase();
+  // "+ iva", "mais iva", "acresce (o) iva", "iva não/nao incluido/incluído".
+  if (/\+\s*iva|mais\s+iva|acresce\s+(?:o\s+)?iva|iva\s+n[aã]o\s+inclu/.test(t)) {
+    return "acrescer";
+  }
+  return "incluido";
+}
+
+/** Resultado desdobrado do total de uma proposta, sempre coerente:
+ *  `gross = base + vat` e `vat = round2(base * vatRate)`. */
+export interface ProposalMoney {
+  /** Base tributável (sem IVA). */
+  base: number;
+  /** Montante de IVA. */
+  vat: number;
+  /** Total COM IVA — é este que alimenta `Proposal.total` e o split 30/70. */
+  gross: number;
+  vatRate: number;
+  mode: VatMode;
+}
+
+/**
+ * Resolve o dinheiro de uma proposta para um total BRUTO (com IVA) coerente.
+ *
+ * Fonte de verdade: os campos ESTRUTURADOS (`totalAmount`/`totalVatMode`).
+ * Retrocompatibilidade: se `totalAmount` estiver ausente, extrai o número do
+ * texto livre e, se `totalVatMode` também faltar, deteta o "+ IVA" no texto.
+ *
+ *  - modo "acrescer": `amount` é a BASE ⇒ `vat = base*taxa`, `gross = base+vat`.
+ *  - modo "incluido": `amount` é o BRUTO ⇒ `base = gross/(1+taxa)`, `vat = gross-base`.
+ */
+export function resolveProposalMoney(
+  doc: Pick<
+    ProposalDoc,
+    "totalAmount" | "totalVatMode" | "vatRate" | "totalText" | "totalEstimatedText"
+  >,
+): ProposalMoney {
+  const vatRate =
+    typeof doc.vatRate === "number" && doc.vatRate >= 0 ? doc.vatRate : DEFAULT_VAT_RATE;
+  const text = doc.totalText || doc.totalEstimatedText;
+  const amount =
+    typeof doc.totalAmount === "number" && doc.totalAmount > 0
+      ? doc.totalAmount
+      : parseMoneyText(text);
+  const mode: VatMode = doc.totalVatMode ?? detectVatMode(text);
+
+  if (mode === "acrescer") {
+    const base = round2(amount);
+    const vat = round2(base * vatRate);
+    return { base, vat, gross: round2(base + vat), vatRate, mode };
+  }
+  const gross = round2(amount);
+  const base = round2(gross / (1 + vatRate));
+  const vat = round2(gross - base);
+  return { base, vat, gross, vatRate, mode };
+}
+
+/** Data de validade (yyyy-mm-dd) de uma proposta: honra uma `validUntil`
+ *  explícita no doc, senão hoje + `validUntilDays` (por omissão
+ *  {@link DEFAULT_VALID_DAYS}). `from` é injetável para testes. */
+export function resolveValidUntil(
+  doc: Pick<ProposalDoc, "validUntil" | "validUntilDays">,
+  from: Date = new Date(),
+): string {
+  if (doc.validUntil && /^\d{4}-\d{2}-\d{2}$/.test(doc.validUntil)) return doc.validUntil;
+  const days =
+    typeof doc.validUntilDays === "number" && doc.validUntilDays > 0
+      ? Math.floor(doc.validUntilDays)
+      : DEFAULT_VALID_DAYS;
+  const d = new Date(from);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 /** Fills the fixed-text defaults into a partial doc, substituting the
  *  event-specific tokens in the general conditions. */

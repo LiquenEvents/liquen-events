@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import type { Proposal } from "@/lib/orcamento/types";
-import { type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
+import {
+  type ProposalDoc,
+  withProposalDefaults,
+  resolveProposalMoney,
+  resolveValidUntil,
+} from "@/lib/proposal-doc";
 import { isAuthed } from "@/lib/admin-auth";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal } from "@/lib/proposals-store";
@@ -12,16 +17,6 @@ import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
-
-/** Best-effort parse of the studio's free-text total ("3.000,00 € + IVA",
- *  "14.700,00 €") into a number for the proposal record + accept notification. */
-function parseMoney(text: string | undefined): number {
-  if (!text) return 0;
-  const m = text.match(/\d[\d.\s]*(?:,\d{1,2})?/);
-  if (!m) return 0;
-  const norm = m[0].replace(/[.\s]/g, "").replace(",", ".");
-  return Number.parseFloat(norm) || 0;
-}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) {
@@ -62,7 +57,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // ── Send ──
-    const total = parseMoney(doc.totalText || doc.totalEstimatedText);
+    // Resolve o total ESTRUTURADO para um bruto (com IVA) coerente. O
+    // `total` guardado é sempre o BRUTO, para que splitThirtySeventy(total)
+    // devolva o sinal correto e o invoice-pdf (base = amount/(1+IVA)) fique
+    // consistente. Se a proposta dizia "+ IVA", o valor é grossed-up aqui.
+    const money = resolveProposalMoney(doc);
+    // Validade: honra uma data explícita no doc, senão hoje + validUntilDays
+    // (30 por omissão) — o /proposta recusa aceitar uma proposta expirada.
+    const validUntil = resolveValidUntil(doc);
     const proposal: Proposal = {
       id: randomUUID(),
       quoteId: id,
@@ -70,10 +72,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       clientEmail: quote.email,
       currency: "EUR",
       lineItems: [],
-      vatRate: 0.23,
-      subtotal: total,
-      vat: 0,
-      total,
+      vatRate: money.vatRate,
+      subtotal: money.base,
+      vat: money.vat,
+      total: money.gross,
+      validUntil,
       status: "enviada",
       createdAt: new Date().toISOString(),
       sentAt: new Date().toISOString(),
@@ -126,7 +129,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
 
     try {
-      await updateQuote(id, { status: "cotado", quotedPrice: total });
+      await updateQuote(id, { status: "cotado", quotedPrice: money.gross });
     } catch (e) {
       log.error("proposta-doc: actualizar pedido falhou", e);
     }

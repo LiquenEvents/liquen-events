@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "./Toast";
-import { withProposalDefaults } from "@/lib/proposal-doc";
+import {
+  withProposalDefaults,
+  resolveProposalMoney,
+  detectVatMode,
+  parseMoneyText,
+  DEFAULT_VALID_DAYS,
+  type VatMode,
+} from "@/lib/proposal-doc";
+import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 
 /**
@@ -115,6 +123,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
 
   const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
+  // Free-typed mirror of the structured total, so pt-PT formatting ("3.000,00")
+  // survives keystrokes. Parsed into `doc.totalAmount` (the money source of truth).
+  const [totalInput, setTotalInput] = useState<string>("");
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [refEdited, setRefEdited] = useState(false);
@@ -129,7 +140,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") setDoc((d) => ({ ...d, ...parsed }));
+        if (parsed && typeof parsed === "object") {
+          setDoc((d) => ({ ...d, ...parsed }));
+          if (typeof parsed.totalAmount === "number") setTotalInput(String(parsed.totalAmount));
+        }
       }
       const rawMeta = localStorage.getItem(SIDE_KEY);
       if (rawMeta) {
@@ -169,11 +183,57 @@ export default function ProposalStudio({ quote, onSent }: Props) {
 
   const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
 
+  // ── Total estruturado + IVA ──
+  // O modo efetivo: explícito no doc, senão detetado a partir do texto livre
+  // (retrocompatibilidade com propostas antigas só com "3.000,00 € + IVA").
+  const vatMode: VatMode =
+    doc.totalVatMode ?? detectVatMode(doc.totalText || doc.totalEstimatedText);
+
+  /** Compõe o texto de DISPLAY do PDF a partir do valor + modo estruturados,
+   *  no formato do estúdio ("3.000,00 € + IVA" ou "3.000,00 €"). */
+  function composeTotalText(amount: number | undefined, mode: VatMode): string {
+    if (amount == null || !(amount > 0)) return "";
+    return mode === "acrescer" ? `${eur(amount)} + IVA` : eur(amount);
+  }
+
+  /** Escreve o valor + modo estruturados e sincroniza o texto de display do
+   *  template ativo (totalText p/ Decoração, totalEstimatedText p/ Organização). */
+  function writeTotal(amount: number | undefined, mode: VatMode) {
+    const text = composeTotalText(amount, mode);
+    patch(
+      doc.template === "organizacao"
+        ? { totalAmount: amount, totalVatMode: mode, totalEstimatedText: text }
+        : { totalAmount: amount, totalVatMode: mode, totalText: text },
+    );
+  }
+
+  function onTotalInput(raw: string) {
+    setTotalInput(raw);
+    const n = parseMoneyText(raw);
+    writeTotal(raw.trim() === "" ? undefined : n, vatMode);
+  }
+
+  function setVatMode(mode: VatMode) {
+    writeTotal(doc.totalAmount, mode);
+  }
+
+  // Split 30/70 sobre o BRUTO — o que o estúdio vê é o que será faturado.
+  const money = resolveProposalMoney(doc);
+  const split = splitThirtySeventy(money.gross);
+
   function setTemplate(t: "decoracao" | "organizacao") {
-    patch({
-      template: t,
-      headerTitle:
-        t === "organizacao" ? "Proposta de orçamento para Organização de Casamento" : undefined,
+    setDoc((d) => {
+      // Recompõe o texto de display do total para o campo do template ativo, para
+      // que o PDF nunca fique com o total em branco após uma troca de template.
+      const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
+      const text = composeTotalText(d.totalAmount, mode);
+      return {
+        ...d,
+        template: t,
+        headerTitle:
+          t === "organizacao" ? "Proposta de orçamento para Organização de Casamento" : undefined,
+        ...(t === "organizacao" ? { totalEstimatedText: text } : { totalText: text }),
+      };
     });
   }
 
@@ -185,6 +245,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       /* ignore */
     }
     setDoc(initialDoc(quote));
+    setTotalInput("");
     setAssetUrls({});
     setRefEdited(false);
     setConfirmSend(false);
@@ -840,14 +901,6 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   placeholder="Valor Total Decoração"
                 />
               </Labeled>
-              <Labeled label="Valor total">
-                <input
-                  className={INPUT}
-                  value={doc.totalText}
-                  onChange={(e) => patch({ totalText: e.target.value })}
-                  placeholder="3.000,00 € + IVA"
-                />
-              </Labeled>
             </div>
           </>
         ) : (
@@ -889,14 +942,6 @@ export default function ProposalStudio({ quote, onSent }: Props) {
               </button>
             </div>
             <div className="flex flex-col gap-3">
-              <Labeled label="Valor total estimado">
-                <input
-                  className={INPUT}
-                  value={doc.totalEstimatedText ?? ""}
-                  onChange={(e) => patch({ totalEstimatedText: e.target.value })}
-                  placeholder="12.500,00 €"
-                />
-              </Labeled>
               <Labeled label="Nota do orçamento">
                 <textarea
                   rows={2}
@@ -908,6 +953,74 @@ export default function ProposalStudio({ quote, onSent }: Props) {
               </Labeled>
             </div>
           </>
+        )}
+      </Section>
+
+      {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
+          de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
+          texto do PDF é composto a partir daqui. */}
+      <Section title="Total, IVA e validade">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Labeled
+            label={vatMode === "acrescer" ? "Valor (base, sem IVA)" : "Valor total (com IVA)"}
+          >
+            <input
+              className={INPUT}
+              inputMode="decimal"
+              value={totalInput}
+              onChange={(e) => onTotalInput(e.target.value)}
+              placeholder="3000"
+              aria-label="Valor total"
+            />
+          </Labeled>
+          <div>
+            <span className={LABEL}>IVA</span>
+            <div className="inline-flex gap-1 p-1 rounded-xl bg-foreground/[0.04]">
+              {(
+                [
+                  ["incluido", "IVA incluído"],
+                  ["acrescer", "+ IVA (acresce)"],
+                ] as const
+              ).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setVatMode(m)}
+                  aria-pressed={vatMode === m}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] tracking-[0.12em] uppercase transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
+                    vatMode === m
+                      ? "bg-white text-foreground/70 shadow-sm"
+                      : "text-foreground/35 hover:text-foreground/55"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Labeled label="Validade (dias)">
+            <input
+              className={INPUT}
+              type="number"
+              min={1}
+              value={doc.validUntilDays ?? ""}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value, 10);
+                patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
+              }}
+              placeholder={String(DEFAULT_VALID_DAYS)}
+              aria-label="Dias de validade"
+            />
+          </Labeled>
+        </div>
+        {/* Prévia do desdobramento — o que será efetivamente faturado. */}
+        {money.gross > 0 && (
+          <p className="mt-3 text-[11px] leading-relaxed text-foreground/45">
+            Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
+            <span className="text-foreground/65">Total {eur(money.gross)}</span>
+            <br />
+            Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
+          </p>
         )}
       </Section>
 
