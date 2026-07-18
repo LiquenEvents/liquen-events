@@ -11,7 +11,6 @@ import { pageMetadata } from "@/lib/page-metadata";
 import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
-import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -87,37 +86,6 @@ const categoryMeta = [
   },
 ];
 
-// Full-bleed editorial photo grid (mirrors the Sobre page rhythm). Draws a
-// fresh 6 from this pool on every entry to the page (see RotatingPhotoGrid) —
-// all landscape frames so any lands cleanly in a wide or narrow cell.
-const EDITORIAL_POOL = [
-  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-  "/imagens/DJI_20250913190635_0120_D.jpg",
-  "/imagens/20_10_2025_0407.jpg",
-  "/imagens/stephanie-mizio-555.jpg",
-  "/imagens/DaniGui_Adois_61.jpg",
-  "/imagens/hd-edited.jpg",
-  "/imagens/EW1_1330.jpg",
-  "/imagens/J&P-IMGL4769.jpg",
-  "/imagens/EW1_1408.jpg",
-  "/imagens/teresinhaeze-909.jpg",
-  "/imagens/DaniGui_JantarFesta_26.jpg",
-  "/imagens/matilde-e-tomas0654-1.jpg",
-  "/imagens/stephanie-mizio-760.jpg",
-];
-
-const ED_WIDE = "(max-width: 1024px) 100vw, 50vw";
-const ED_NARROW = "(max-width: 1024px) 50vw, 25vw";
-const EDITORIAL_CELLS = [
-  { cls: "col-span-2 row-span-2", sizes: ED_WIDE },
-  { cls: "col-span-2", sizes: ED_WIDE },
-  { cls: "col-span-1", sizes: ED_NARROW },
-  { cls: "col-span-1", sizes: ED_NARROW },
-  { cls: "col-span-2", sizes: ED_WIDE },
-  { cls: "col-span-2", sizes: ED_WIDE },
-];
-
 /* ── Full-screen service band — one image, one service (SpaceX-style) ── */
 function ServiceBand({
   service,
@@ -186,10 +154,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
   const ts = t.servicos;
-  const editorialPool = EDITORIAL_POOL.map((src) => ({
-    src,
-    blurDataURL: blurFor(src).blurDataURL,
-  }));
   const categories: Category[] = categoryMeta.map((m, ci) => {
     const ct = ts.categories[ci];
     return {
@@ -413,17 +377,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           ))}
         </div>
       ))}
-
-      {/* ── Editorial photo grid (full-bleed) ── */}
-      <section className="bg-surface border-t border-foreground/8">
-        <RotatingPhotoGrid
-          cells={EDITORIAL_CELLS}
-          pool={editorialPool}
-          alt={t.common.imageAlt.servicosEndOfDay}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-0 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
-          imgClassName="transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-        />
-      </section>
 
       {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}
       <section
