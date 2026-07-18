@@ -4,6 +4,7 @@ import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
+import Reveal from "@/components/motion/Reveal";
 import { blurFor } from "@/lib/blur";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
@@ -174,14 +175,21 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           capítulo), mantendo a hierarquia de headings. */}
       {services.map((s, i, arr) => (
         <section key={s.title} className="relative h-[86svh] min-h-[560px] w-full overflow-hidden">
-          <Image
-            src={s.image}
-            alt=""
-            fill
-            sizes="100vw"
-            className="object-cover object-center"
-            {...blurFor(s.image)}
-          />
+          {/* The photograph is UNVEILED as the chapter enters — a bottom-up clip
+              mask (the same cinematic wipe used on the editorial images in /sobre)
+              instead of a hard cut. One-shot, compositor-driven (clip-path +
+              transform), and reduced-motion-safe (Reveal renders the finished
+              state). start="top 92%" so it completes before the panel centres. */}
+          <Reveal as="div" variant="mask" className="absolute inset-0" start="top 92%">
+            <Image
+              src={s.image}
+              alt=""
+              fill
+              sizes="100vw"
+              className="object-cover object-center"
+              {...blurFor(s.image)}
+            />
+          </Reveal>
           {/* A imagética da SpaceX é escura por natureza; as nossas fotos podem
               ser claras, por isso um scrim inferior-esquerdo mantém a legenda
               maiúscula legível sem depender de sombra no texto. */}
@@ -191,7 +199,10 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           />
           <div className="absolute inset-x-0 bottom-0">
             <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pb-[11svh] lg:pb-[13svh]">
-              <AnimateIn>
+              {/* The caption composes itself in a 3-beat cadence (gold eyebrow →
+                  title → CTA) rather than appearing as one block — a small
+                  stagger reads as "authored" without feeling slow. */}
+              <Reveal as="div" stagger={0.08} start="top 92%">
                 <p className="text-white/70 text-[11px] tracking-[0.4em] uppercase mb-4 flex items-center gap-3">
                   <span className="w-8 h-px bg-gold flex-shrink-0" />
                   {s.tag}
@@ -209,7 +220,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                   {t.common.verServicos}
                   <span aria-hidden>→</span>
                 </Link>
-              </AnimateIn>
+              </Reveal>
             </div>
           </div>
           {/* Seta ao estilo SpaceX ancorada ao centro-baixo, pulsando (fadeBounce
