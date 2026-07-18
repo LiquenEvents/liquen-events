@@ -149,6 +149,12 @@ export default function Parallax({ children, className = "", speed = 0.12 }: Pro
     const el = ref.current;
     if (!el) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    // Skip parallax on touch devices: translating a viewport-sized image layer
+    // every scroll frame competes with the touch-scroll thread on mid-range
+    // phones — exactly where "not fluid" shows. The parent has scale headroom
+    // (hero-settle), so with parallax off the image simply sits static. Desktop
+    // (pointer:fine) keeps the depth effect.
+    if (window.matchMedia?.("(pointer: coarse)").matches) return;
 
     const item: Item = { el, speed, top: 0, height: 0, shift: 0, active: false };
     items.add(item);

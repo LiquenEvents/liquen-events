@@ -36,6 +36,9 @@ export default function PhotoWall({
 }) {
   const sectionRef = useRef<HTMLElement>(null);
   const [offscreen, setOffscreen] = useState(false);
+  // Also stop the transform loop when the tab is backgrounded — the off-screen
+  // observer only covers scroll, not tab-hidden, so a hidden tab kept compositing.
+  const [tabHidden, setTabHidden] = useState(false);
   // Gates loading of the heavy frames: false until the band is approaching, so
   // the ~12 large photos don't download in parallel with the hero on first load
   // (the band sits ~4 screens down). Flips true once near and stays true.
@@ -49,7 +52,7 @@ export default function PhotoWall({
   const [frames, setFrames] = useState<WallImage[]>(() => images.slice(0, VISIBLE));
 
   useEffect(() => {
-    // Deferred to idle: the reshuffle forces a second render of the 24 tiles, so
+    // Deferred to idle: the reshuffle forces a second render of the tiles, so
     // keep it out of the hydration burst. First paint already shows the
     // deterministic leading slice; the re-sample ("a fresh cut each visit") is
     // cosmetic. Math.random only runs client-side, so no hydration mismatch.
@@ -59,7 +62,13 @@ export default function PhotoWall({
         const j = Math.floor(Math.random() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
       }
-      setFrames(pool.slice(0, VISIBLE));
+      // Show fewer frames on phones: the strip is one composited layer whose
+      // width = count × ~420px, duplicated ×2 — halving the count on mobile
+      // roughly halves the layer width and decoded-texture memory on mid-range
+      // devices. Computed here (post-mount) so SSR stays deterministic.
+      const mobile = window.matchMedia?.("(max-width: 640px)").matches;
+      const count = Math.min(mobile ? 6 : VISIBLE, images.length);
+      setFrames(pool.slice(0, count));
     });
   }, [images, VISIBLE]);
 
@@ -71,6 +80,13 @@ export default function PhotoWall({
     });
     io.observe(el);
     return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onVis = () => setTabHidden(document.hidden);
+    onVis();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
   // One-shot "approaching" observer with a wide margin: start loading the frames
@@ -135,7 +151,7 @@ export default function PhotoWall({
             brisker glide for the big photo strip — the class still supplies the
             keyframes, hover/off-screen pause, and reduced-motion `none`. */}
         <div
-          className={`flex gap-2.5 animate-marquee w-max${offscreen ? " marquee-paused" : ""}`}
+          className={`flex gap-2.5 animate-marquee w-max${offscreen || tabHidden ? " marquee-paused" : ""}`}
           style={{ animationDuration: "22s" }}
         >
           {[...frames, ...frames].map((img, i) => (

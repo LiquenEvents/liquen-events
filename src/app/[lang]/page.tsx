@@ -173,7 +173,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           esquerda sobre um scrim. Os títulos são <h2> (h1 do herói → h2 por
           capítulo), mantendo a hierarquia de headings. */}
       {services.map((s, i, arr) => (
-        <section key={s.title} className="relative h-[86vh] min-h-[560px] w-full overflow-hidden">
+        <section key={s.title} className="relative h-[86svh] min-h-[560px] w-full overflow-hidden">
           <Image
             src={s.image}
             alt=""
@@ -190,7 +190,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/20 to-[#080808]/5"
           />
           <div className="absolute inset-x-0 bottom-0">
-            <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pb-[11vh] lg:pb-[13vh]">
+            <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pb-[11svh] lg:pb-[13svh]">
               <AnimateIn>
                 <p className="text-white/70 text-[11px] tracking-[0.4em] uppercase mb-4 flex items-center gap-3">
                   <span className="w-8 h-px bg-gold flex-shrink-0" />
