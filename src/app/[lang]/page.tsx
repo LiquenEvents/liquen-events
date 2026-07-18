@@ -113,15 +113,27 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             photograph owns the first screen. Still the page's single <h1>. */}
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
           <AnimateIn>
-            <div className="max-w-md">
-              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
+            <div className="max-w-2xl">
+              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
                 <span className="w-6 h-px bg-gold flex-shrink-0" />
                 {t.home.eyebrow}
               </p>
-              <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
-                {t.home.heroLines.map((l) => l.words.join(" ")).join(" ")}
+              {/* The site's emotional promise leads in the WARM voice — mixed-case
+                  Playfair, large — not a small uppercase spec label. The moss
+                  highlight on the closing word (flagged in the dictionary) is
+                  honoured here; it was previously flattened away. Kept bottom-left
+                  and photo-first so the SpaceX composition still holds. */}
+              <h1
+                className="text-white font-bold leading-[0.95] tracking-tight"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 7vw, 88px)" }}
+              >
+                {t.home.heroLines.map((l, i) => (
+                  <span key={i} className={`block ${l.moss ? "text-moss" : ""}`}>
+                    {l.words.join(" ")}
+                  </span>
+                ))}
               </h1>
-              <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <TrackedLink
                   href={localizeHref("/orcamento", locale)}
                   trackProps={{ source: "hero" }}
