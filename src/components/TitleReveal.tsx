@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { observeOnceInView } from "@/lib/motion/observeInView";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
 interface Props {
   text: string;
@@ -34,7 +35,7 @@ export default function TitleReveal({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    if (prefersReducedMotion()) {
       setVisible(true);
       return;
     }

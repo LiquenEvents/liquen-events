@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
 /**
  * Subtle scroll parallax, engineered so NATIVE scrolling never pays for it:
@@ -148,7 +149,7 @@ export default function Parallax({ children, className = "", speed = 0.12 }: Pro
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (prefersReducedMotion()) return;
     // Skip parallax on touch devices: translating a viewport-sized image layer
     // every scroll frame competes with the touch-scroll thread on mid-range
     // phones — exactly where "not fluid" shows. The parent has scale headroom

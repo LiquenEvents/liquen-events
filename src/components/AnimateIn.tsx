@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
 interface Props {
   children: React.ReactNode;
@@ -9,6 +10,14 @@ interface Props {
   delay?: number;
   from?: "bottom" | "left" | "right" | "fade" | "clip";
 }
+
+const TRANSFORMS: Record<string, string> = {
+  bottom: "translateY(28px)",
+  left: "translateX(-28px)",
+  right: "translateX(28px)",
+  fade: "none",
+  clip: "translateY(16px)",
+};
 
 // AnimateIn is rendered dozens of times per page. Instead of each instance
 // spinning up its OWN IntersectionObserver, they all share a SINGLE module-level
@@ -56,51 +65,52 @@ function unobserveReveal(el: Element) {
 
 export default function AnimateIn({ children, className = "", delay = 0, from = "bottom" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  // Start VISIBLE so the server HTML — and anyone whose JS fails or is disabled —
-  // always sees the content (previously the SSR markup was opacity:0, leaving it
-  // permanently invisible without JS). The layout effect re-hides it before the
-  // first paint to play the scroll reveal, so there's no flash.
-  const [visible, setVisible] = useState(true);
 
+  // Hide/reveal by writing inline styles DIRECTLY on the node — no React state,
+  // so a page with dozens of instances doesn't run N synchronous re-renders in
+  // the pre-paint commit (which is exactly the work a View-Transition arrival
+  // waits on, and read as "stutter"). Mirrors motion/Reveal. SSR renders the
+  // element in its natural visible state, so no-JS / reduced-motion visitors
+  // always see the content; the pre-paint layout effect re-hides it, so there's
+  // no flash.
   useIsomorphicLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Reduced motion (and no IntersectionObserver): leave it visible, no reveal.
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    setVisible(false); // hide synchronously, before paint
-    observeReveal(el, () => setVisible(true));
+    if (prefersReducedMotion()) return; // leave visible, no reveal
+
+    const isClip = from === "clip";
+    const easing = `cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`;
+
+    // Hide synchronously, before paint.
+    if (isClip) {
+      el.style.clipPath = "inset(0 0 100% 0)";
+      el.style.transform = TRANSFORMS.clip;
+      el.style.willChange = "transform, clip-path";
+    } else {
+      el.style.opacity = "0";
+      el.style.transform = TRANSFORMS[from];
+      el.style.willChange = "opacity, transform";
+    }
+
+    const reveal = () => {
+      el.style.transition = isClip
+        ? `transform 0.75s ${easing}, clip-path 0.75s ${easing}`
+        : `opacity 0.75s ${easing}, transform 0.75s ${easing}`;
+      el.style.transform = "none";
+      if (isClip) el.style.clipPath = "inset(0 0 0% 0)";
+      else el.style.opacity = "1";
+      const done = () => {
+        el.style.willChange = ""; // drop the compositor hint once settled
+        el.removeEventListener("transitionend", done);
+      };
+      el.addEventListener("transitionend", done);
+    };
+    observeReveal(el, reveal);
     return () => unobserveReveal(el);
-  }, []);
-
-  const transforms: Record<string, string> = {
-    bottom: "translateY(28px)",
-    left: "translateX(-28px)",
-    right: "translateX(28px)",
-    fade: "none",
-    clip: "translateY(16px)",
-  };
-
-  const isClip = from === "clip";
-  const easing = `cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`;
+  }, [from, delay]);
 
   return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: visible ? 1 : isClip ? 1 : 0,
-        transform: visible ? "none" : transforms[from],
-        clipPath: isClip ? (visible ? "inset(0 0 0% 0)" : "inset(0 0 100% 0)") : undefined,
-        transition: isClip
-          ? `transform 0.75s ${easing}, clip-path 0.75s ${easing}`
-          : `opacity 0.75s ${easing}, transform 0.75s ${easing}`,
-        // Only hint the compositor while the element is armed (hidden, waiting to
-        // reveal). Once revealed — and under reduced motion / no-JS, where it's
-        // permanently visible and never animates — drop the hint so we don't pin
-        // a compositor layer forever on dozens of instances per page.
-        willChange: visible ? undefined : isClip ? "transform, clip-path" : "opacity, transform",
-      }}
-    >
+    <div ref={ref} className={className}>
       {children}
     </div>
   );

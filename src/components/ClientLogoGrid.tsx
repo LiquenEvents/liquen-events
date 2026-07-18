@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import { logoHeight, logoDimsFor } from "@/lib/logo";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
 interface Client {
   name: string;
@@ -81,7 +82,7 @@ export default function ClientLogoGrid({ clients }: { clients: Client[] }) {
     if (!el) return;
     // Respect reduced-motion and no-IO environments: leave the grid unarmed,
     // i.e. permanently visible with no reveal.
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (prefersReducedMotion()) return;
     if (!("IntersectionObserver" in window)) return;
 
     el.classList.add("cl-armed"); // hide (synchronously, before paint) to reveal
