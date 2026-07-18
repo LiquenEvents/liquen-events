@@ -16,7 +16,7 @@ export const maxDuration = 60;
  * summary to the team's devices:
  *   · events happening in the next 3 days
  *   · payments due (or overdue) within 7 days
- *   · quotes still awaiting a first reply for 2+ days
+ *   · quotes still awaiting a first reply for 24h+
  *   · follow-ups due today or overdue
  *
  * Protected by CRON_SECRET: the caller must send it as a Bearer token (never a
@@ -93,13 +93,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Quotes awaiting a first reply for 2+ days
-    const twoDaysAgo = Date.now() - 2 * 864e5;
+    // 3. Quotes awaiting a first reply for 24h+. The site promises a reply
+    //    "within 24 business hours" in several places, so the safety-net digest
+    //    must flag a lead once it crosses that line — not wait a second day.
+    const oneDayAgo = Date.now() - 864e5;
     const awaiting = quotes.filter(
       (q) =>
         (q.status === "pendente" || q.status === "em_revisao") &&
         !(q.messages && q.messages.length > 0) &&
-        new Date(q.submittedAt).getTime() < twoDaysAgo,
+        new Date(q.submittedAt).getTime() < oneDayAgo,
     ).length;
 
     // 4. Follow-ups due today or overdue (active deals only)
