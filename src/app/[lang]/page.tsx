@@ -160,7 +160,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           (eyebrow + título maiúsculo + botão delineado) ancorada em baixo à
           esquerda sobre um scrim. Os títulos são <h2> (h1 do herói → h2 por
           capítulo), mantendo a hierarquia de headings. */}
-      {services.map((s) => (
+      {services.map((s, i, arr) => (
         <section key={s.title} className="relative h-[86vh] min-h-[560px] w-full overflow-hidden">
           <Image
             src={s.image}
@@ -200,6 +200,26 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               </AnimateIn>
             </div>
           </div>
+          {/* Seta ao estilo SpaceX ancorada ao centro-baixo, pulsando (fadeBounce
+              via .scroll-chevron; respeita prefers-reduced-motion). Decorativa e
+              sem captura de ponteiro. Omitida no último capítulo — nada de
+              relevante fica logo abaixo antes do photo wall. */}
+          {i < arr.length - 1 && (
+            <svg
+              aria-hidden
+              width="28"
+              height="18"
+              viewBox="0 0 28 22"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="scroll-chevron absolute bottom-6 left-1/2 -translate-x-1/2 z-10 text-white/70 pointer-events-none"
+            >
+              <path d="M2 5 L14 17 L26 5" />
+            </svg>
+          )}
         </section>
       ))}
 

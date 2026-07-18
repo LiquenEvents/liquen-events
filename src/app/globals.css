@@ -372,6 +372,33 @@ body::before {
   letter-spacing: -0.02em;
 }
 
+/* ── SpaceX scroll chevron — the bottom-of-panel down-arrow that pulses in
+   once, holds, then repeats (their `fadeBounce`, ~5s loop). Pinned near the
+   bottom-centre of a full-screen chapter. Gated off under reduced motion. ── */
+@keyframes scroll-chevron {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.scroll-chevron {
+  animation: scroll-chevron 5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-chevron {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 /* ── Orçamento / Back-office full-screen mode ── */
 body:has([data-orcamento-mode]) footer,
 body:has([data-orcamento-mode]) .whatsapp-fixed,

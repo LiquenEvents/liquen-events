@@ -180,20 +180,30 @@ export default async function ServiceDetailPage({
             </div>
           </AnimateIn>
           <AnimateIn delay={120}>
-            <div className="border border-foreground/10 p-8">
-              <p className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-6 flex items-center gap-3">
+            {/* SpaceX-style hairline SPEC LIST (not a boxed card): each includes-
+                item is a ruled row divided by a 1px foreground hairline. Phrases
+                stay sentence case — uppercasing the long PT descriptions reads
+                shouty — but sit against the eyebrow's uppercase spec label. */}
+            <div>
+              <p className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-2 flex items-center gap-3">
                 <span className="w-8 h-px bg-gold flex-shrink-0" />
                 {t.servicoDetalhe.includesTitle}
               </p>
-              <ul className="flex flex-col gap-4">
+              <ul className="flex flex-col">
                 {svc.includes.map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-foreground/72 text-sm">
+                  <li
+                    key={item}
+                    className="flex items-start gap-4 border-t border-foreground/12 py-3.5 text-foreground/75 text-sm leading-[1.6]"
+                  >
                     {/* Squared 1px gold dash — the site's marker vocabulary
-                        (same as the eyebrow dashes), centred on the first line. */}
-                    <span className="w-3 h-px bg-gold mt-2.5 flex-shrink-0" />
-                    {item}
+                        (same as the eyebrow dashes), centred on the first line.
+                        min-w-0 lets long PT phrases wrap instead of clipping. */}
+                    <span className="w-3 h-px bg-gold mt-[0.7em] flex-shrink-0" />
+                    <span className="min-w-0">{item}</span>
                   </li>
                 ))}
+                {/* Closing hairline — bookends the ruled list (matches the FAQ). */}
+                <li aria-hidden className="border-t border-foreground/12" />
               </ul>
             </div>
           </AnimateIn>

@@ -369,9 +369,16 @@ export default function Navbar() {
     pathname === "/servicos" ||
     pathname === "/galeria" ||
     pathname.startsWith("/servicos/");
-  // O overlay do menu mobile é escuro — com ele aberto o traço do botão e os
-  // textos da barra precisam do tratamento claro, seja qual for a página.
-  const light = (!scrolled && overDarkHero) || isOpen;
+  // Scrim de legibilidade — SÓ sobre o hero escuro no topo (barra transparente)
+  // ou com o menu aberto. Uma vez em scroll a barra ganha fundo sólido próprio,
+  // pelo que o gradiente deixaria apenas uma sombra a sangrar para o conteúdo.
+  const showScrim = (!scrolled && overDarkHero) || isOpen;
+  // Tratamento claro (texto/traços brancos) da barra. Precisa dele em três
+  // estados escuros: sobre o hero escuro no topo, com o menu mobile aberto, e
+  // AGORA também em scroll — a barra passa a ter fundo escuro sólido (#0c0e0b),
+  // por isso os links (que alternam via `light`) têm de ficar brancos para
+  // continuarem legíveis sobre esse fundo em vez do moss (invisível no escuro).
+  const light = scrolled || overDarkHero || isOpen;
 
   const navTypes = (href: string) => [
     orderIdx(href) >= orderIdx(pathname) ? "nav-forward" : "nav-back",
@@ -456,26 +463,27 @@ export default function Navbar() {
     <nav
       data-public-nav
       aria-label={t.nav.primaryLabel}
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ${
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ease-expo ${
         // NB: nada de "translate-y-0" no estado visível — QUALQUER transform no
         // nav cria um containing block e prenderia o overlay fixed inset-0 do
         // menu mobile à altura da barra em vez do viewport inteiro.
         hidden && !isOpen ? "-translate-y-full" : ""
       } ${
-        // Fundo quase sólido (90%) em vez de translúcido + backdrop-blur: um
-        // backdrop-filter num elemento fixo obriga o browser a voltar a
-        // desfocar o conteúdo por trás da barra a CADA frame de scroll — um
-        // custo real em dispositivos mais fracos. A 90% de opacidade o aspeto é
-        // praticamente igual, mas o scroll deixa de o pagar. (Bónus: sem
-        // backdrop-filter também desaparece o containing-block que prendia o
-        // overlay fixed do menu mobile.)
+        // Barra sólida escura ao estilo spacex.com: fundo #0c0e0b a 95% + filete
+        // branco ténue em baixo. SEM backdrop-blur de propósito — um
+        // backdrop-filter num elemento fixo obriga o browser a voltar a desfocar
+        // o conteúdo por trás da barra a CADA frame de scroll (custo real em
+        // dispositivos fracos) e, pior, cria um containing-block que prenderia o
+        // overlay `fixed inset-0` do menu mobile à altura da barra em vez do
+        // viewport. A 95% de opacidade o fundo já é praticamente sólido, pelo que
+        // o blur seria impercetível — o efeito visual mantém-se sem esses custos.
         scrolled
-          ? "bg-surface/90 border-b border-foreground/8 shadow-sm shadow-black/5"
+          ? "bg-[#0c0e0b]/95 border-b border-white/10 shadow-sm shadow-black/20"
           : "bg-transparent border-b border-transparent"
       }`}
     >
       {/* Legibility scrim — only over dark hero images, fades to nothing */}
-      {light && (
+      {showScrim && (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 via-black/15 to-transparent"
