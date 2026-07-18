@@ -230,7 +230,7 @@ const MobileMenu = memo(function MobileMenu({
         // margin:auto centers only when the list fits and collapses to a normal
         // top-aligned, fully-scrollable start when it doesn't — so the first link
         // is never stranded above an unreachable overflow on short/landscape.
-        className="relative flex-1 min-h-0 flex flex-col px-8 pt-24 pb-6 overflow-y-auto overscroll-contain"
+        className="relative flex-1 min-h-0 flex flex-col px-8 pt-32 pb-6 overflow-y-auto overscroll-contain"
       >
         <div className="m-auto w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
@@ -488,10 +488,10 @@ export default function Navbar() {
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 xl:px-16">
         <div
           className={`relative flex items-center justify-between transition-[height] duration-500 ${
-            // Compact the bar (and shrink the logo) whenever the mobile menu is
-            // open too — the small centred logo then clears the menu's first
-            // link instead of colliding with it.
-            scrolled || isOpen ? "h-[72px]" : "h-[140px]"
+            // Three bar heights: a taller bar while the mobile menu is OPEN so it
+            // can carry a prominent centred logo (the menu's pt clears it); the
+            // compact 72px bar once the page is scrolled; the full 140px at rest.
+            isOpen ? "h-[120px]" : scrolled ? "h-[72px]" : "h-[140px]"
           }`}
         >
           {/* Logo: horizontally centred on mobile (absolute, out of flow), and
@@ -505,7 +505,7 @@ export default function Navbar() {
               alt="Líquen Events"
               width={210}
               height={125}
-              className={`object-contain w-auto transition-[height] duration-500 ${scrolled || isOpen ? "h-[46px] sm:h-[52px]" : "h-[100px] sm:h-[120px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[80px] sm:h-[88px]" : scrolled ? "h-[46px] sm:h-[52px]" : "h-[100px] sm:h-[120px]"}`}
             />
           </Link>
 
