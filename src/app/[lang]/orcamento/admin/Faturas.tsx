@@ -154,8 +154,18 @@ export default function Faturas({ quotes }: Props) {
         toast(data.error || "Não foi possível atualizar", "error");
         return;
       }
-      setInvoices((prev) => prev.map((i) => (i.id === inv.id ? (data as Invoice) : i)));
-      toast(status === "paga" ? "Fatura marcada como paga" : "Fatura anulada", "success");
+      // O PATCH pode devolver um saldo emitido automaticamente (quando se marca
+      // um sinal como pago). Separamo-lo do próprio registo atualizado.
+      const { saldoAutoIssued, ...updated } = data as Invoice & { saldoAutoIssued?: Invoice };
+      setInvoices((prev) => {
+        const next = prev.map((i) => (i.id === inv.id ? (updated as Invoice) : i));
+        return saldoAutoIssued ? [saldoAutoIssued, ...next] : next;
+      });
+      if (saldoAutoIssued) {
+        toast(`Sinal pago · saldo ${saldoAutoIssued.number} emitido automaticamente`, "success");
+      } else {
+        toast(status === "paga" ? "Fatura marcada como paga" : "Fatura anulada", "success");
+      }
     } catch {
       toast("Erro de rede ao atualizar", "error");
     } finally {
