@@ -276,4 +276,8 @@ export interface Proposal {
   sentAt?: string;
   /** When the client accepted/declined via the public link. */
   respondedAt?: string;
+  /** Rich multi-page proposal document (Proposal Studio). Stored so the studio
+   *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
+   *  not bytes. Optional — legacy line-item proposals don't set it. */
+  doc?: import("@/lib/proposal-doc").ProposalDoc;
 }

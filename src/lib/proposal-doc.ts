@@ -1,5 +1,3 @@
-import "server-only";
-
 /**
  * Rich, multi-page proposal DOCUMENT model — mirrors the studio's real
  * landscape "PO Decoração" proposal (cover → apresentação → serviços →
