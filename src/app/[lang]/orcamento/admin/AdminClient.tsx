@@ -37,6 +37,8 @@ import {
   ProductionPlan,
   EmailTemplates,
   Faturas,
+  Inventario,
+  Seguimentos,
   ClientMessenger,
   EventChecklist,
   EventTimeline,
@@ -734,6 +736,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     propostas: "Propostas",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
+    inventario: "Inventário",
+    seguimentos: "Seguimentos",
     estatisticas: "Estatísticas",
     faturas: "Faturas",
     "modelos-email": "Modelos de email",
@@ -749,6 +753,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     propostas: "Todas as propostas enviadas",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
+    inventario: "Adereços e materiais de decoração",
+    seguimentos: "Seguimentos automáticos a fazer",
     estatisticas: "Métricas e desempenho",
     faturas: "Livro de faturação e pagamentos",
     "modelos-email": "Emails reutilizáveis da equipa",
@@ -1164,6 +1170,25 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "estatisticas" && (
             <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
               <StatsDashboard quotes={activeQuotes} />
+            </div>
+          )}
+
+          {/* ── Inventário ── */}
+          {view === "inventario" && (
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+              <Inventario />
+            </div>
+          )}
+
+          {/* ── Seguimentos automáticos ── */}
+          {view === "seguimentos" && (
+            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+              <Seguimentos
+                onOpenQuote={(id) => {
+                  const q = quotes.find((x) => x.id === id);
+                  if (q) openQuote(q);
+                }}
+              />
             </div>
           )}
 

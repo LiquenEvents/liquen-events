@@ -138,6 +138,21 @@ create table if not exists public.invoices (
 create index if not exists invoices_quote_id_idx on public.invoices (quote_id);
 create index if not exists invoices_status_idx   on public.invoices (status);
 
+-- ── Inventário de adereços / materiais de decoração ─────────────
+create table if not exists public.inventory_items (
+  id          text primary key,
+  name        text not null,
+  category    text not null default 'Outro',
+  quantity    integer not null default 0,
+  unit        text,
+  condition   text not null default 'bom',   -- novo | bom | usado | danificado
+  location    text,
+  notes       text,
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists inventory_category_idx on public.inventory_items (category);
+
 -- ── Restrições de integridade (CHECK) ───────────────────────────
 -- Garantem, na própria base de dados, que os campos de estado/tipo só
 -- aceitam os valores que a aplicação conhece e que os montantes não são
@@ -185,6 +200,11 @@ do $$ begin
     alter table public.invoices add constraint invoices_amount_chk
       check (amount >= 0 and vat_rate >= 0) not valid;
   end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'inventory_condition_chk') then
+    alter table public.inventory_items add constraint inventory_condition_chk
+      check (condition in ('novo','bom','usado','danificado')) not valid;
+  end if;
 end $$;
 
 -- ── Segurança ───────────────────────────────────────────────────
@@ -199,3 +219,4 @@ alter table public.push_subscriptions enable row level security;
 alter table public.app_state enable row level security;
 alter table public.email_templates enable row level security;
 alter table public.invoices    enable row level security;
+alter table public.inventory_items enable row level security;
