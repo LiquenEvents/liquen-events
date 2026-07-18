@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
+import { onIdle } from "@/lib/onIdle";
 
 // The WebGL layer is client-only (ssr: false) and split into its own chunk, so
 // the OGL runtime never ships in the initial payload and never blocks the LCP
@@ -33,7 +34,11 @@ export default function HeroWebGL({ src, className }: { src: string; className?:
   // Decided after mount (navigator/matchMedia are client-only); the still hero
   // shows meanwhile, so a first-paint of `null` here is the intended state.
   const [welcome, setWelcome] = useState(false);
-  useEffect(() => setWelcome(heavyEffectsWelcome()), []);
+  // Defer the capability check to browser idle, so the dynamic OGL import and
+  // HeroCanvas's shader/context init don't land as one big main-thread task
+  // during the post-navigation hydration burst (measured ~1.2s on desktop
+  // /servicos). The static hero is already the LCP and shows meanwhile.
+  useEffect(() => onIdle(() => setWelcome(heavyEffectsWelcome())), []);
   if (reduced || !welcome) return null;
   return <HeroCanvas src={src} className={className} />;
 }

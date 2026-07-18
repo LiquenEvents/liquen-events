@@ -22,6 +22,11 @@ export default function TestimonialsCarousel({
   // >5s auto-advancing carousel must be pausable.
   const [interacting, setInteracting] = useState(false);
   const [docHidden, setDocHidden] = useState(false);
+  // Also pause autoplay while the carousel is scrolled off-screen: it's below
+  // the fold on the pages that use it, so without this the 6s timer + its fade
+  // re-renders run during scroll-critical time for a component nobody can see.
+  const [onScreen, setOnScreen] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
   // Persistent user control (WCAG 2.2.2) — always-available pause, independent of
   // hover/focus. Reduced-motion stops autoplay entirely.
   const [userPaused, setUserPaused] = useState(false);
@@ -69,7 +74,20 @@ export default function TestimonialsCarousel({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
-  const paused = interacting || docHidden || userPaused || reduced;
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setOnScreen(true); // no IO → don't permanently pause
+      return;
+    }
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), {
+      rootMargin: "200px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const paused = interacting || docHidden || userPaused || reduced || !onScreen;
 
   useEffect(() => {
     if (paused) return;
@@ -87,6 +105,7 @@ export default function TestimonialsCarousel({
 
   return (
     <section
+      ref={sectionRef}
       className="relative py-20 lg:py-32 bg-surface border-t border-foreground/6 overflow-hidden"
       onMouseEnter={() => setInteracting(true)}
       onMouseLeave={() => setInteracting(false)}

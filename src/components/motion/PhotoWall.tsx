@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import { onIdle } from "@/lib/onIdle";
 
 /**
  * Editorial photo strip — a large, continuously gliding film-strip of curated
@@ -48,17 +49,18 @@ export default function PhotoWall({
   const [frames, setFrames] = useState<WallImage[]>(() => images.slice(0, VISIBLE));
 
   useEffect(() => {
-    // Fisher–Yates over a copy; Math.random only runs client-side (post-hydration).
-    const pool = images.slice();
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    // Intentional post-hydration setState: the shuffle MUST run only on the
-    // client (Math.random can't touch the SSR render without a hydration
-    // mismatch), so a one-shot re-sample after mount is exactly right here.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFrames(pool.slice(0, VISIBLE));
+    // Deferred to idle: the reshuffle forces a second render of the 24 tiles, so
+    // keep it out of the hydration burst. First paint already shows the
+    // deterministic leading slice; the re-sample ("a fresh cut each visit") is
+    // cosmetic. Math.random only runs client-side, so no hydration mismatch.
+    return onIdle(() => {
+      const pool = images.slice();
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      setFrames(pool.slice(0, VISIBLE));
+    });
   }, [images, VISIBLE]);
 
   useEffect(() => {
