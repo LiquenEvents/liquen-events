@@ -101,8 +101,22 @@ export default function Faturas({ quotes }: Props) {
     () => quoteInvoices.find((i) => i.kind === "sinal" && i.status !== "anulada"),
     [quoteInvoices],
   );
+  const existingSaldo = useMemo(
+    () => quoteInvoices.find((i) => i.kind === "saldo" && i.status !== "anulada"),
+    [quoteInvoices],
+  );
   // O split emitiria um novo sinal — bloqueá-lo quando já existe um.
   const splitBlocked = mode === "split" && !!existingSinal;
+  // Modo single: um Tipo=Sinal/Saldo repetido duplicaria a fatura (o servidor
+  // recusa com 409, mas avisamos e bloqueamos já na UI). `total` fica livre.
+  const dupSingle =
+    mode === "single" && kind === "sinal"
+      ? existingSinal
+      : mode === "single" && kind === "saldo"
+        ? existingSaldo
+        : undefined;
+  const singleBlocked = mode === "single" && !!dupSingle;
+  const emitBlocked = splitBlocked || singleBlocked;
 
   async function submit() {
     if (!clientName.trim()) {
@@ -116,6 +130,10 @@ export default function Faturas({ quotes }: Props) {
     }
     if (splitBlocked && existingSinal) {
       toast(`Este evento já tem sinal (${existingSinal.number})`, "error");
+      return;
+    }
+    if (singleBlocked && dupSingle) {
+      toast(`Este evento já tem ${kind} (${dupSingle.number})`, "error");
       return;
     }
     setSubmitting(true);
@@ -391,6 +409,11 @@ export default function Faturas({ quotes }: Props) {
               Este evento já tem um sinal emitido ({existingSinal.number}). Para não faturar o sinal
               duas vezes, use “Fatura única” (só o saldo) em vez do split.
             </p>
+          ) : singleBlocked && dupSingle ? (
+            <p className="text-[#b5654a] text-xs mt-3">
+              Este evento já tem uma fatura de {kind} ({dupSingle.number}). Para não a faturar duas
+              vezes, escolha outro tipo ou anule a existente primeiro.
+            </p>
           ) : (
             mode === "split" &&
             amount &&
@@ -412,8 +435,14 @@ export default function Faturas({ quotes }: Props) {
             </button>
             <button
               onClick={submit}
-              disabled={submitting || splitBlocked}
-              title={splitBlocked ? "Este evento já tem um sinal emitido" : undefined}
+              disabled={submitting || emitBlocked}
+              title={
+                splitBlocked
+                  ? "Este evento já tem um sinal emitido"
+                  : singleBlocked
+                    ? `Este evento já tem uma fatura de ${kind}`
+                    : undefined
+              }
               className="px-4 py-2 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] transition-colors disabled:opacity-40"
             >
               {submitting ? "A emitir…" : "Emitir"}

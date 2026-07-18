@@ -111,6 +111,23 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 8750 });
   });
 
+  it("carries the sinal's own vatRate into the auto-saldo, not a hardcoded 0.23 (FIX 4)", async () => {
+    // Proposta a 6% ⇒ o sinal foi faturado a 0.06; o saldo tem de espelhar isso.
+    seedSinal("s-vat", { vatRate: 0.06 });
+    const { req, params } = patchReq("s-vat", { status: "paga" });
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", vatRate: 0.06 });
+  });
+
+  it("defaults the auto-saldo vatRate to 0.23 when the sinal has none", async () => {
+    seedSinal("s-novat", { vatRate: undefined });
+    const { req, params } = patchReq("s-novat", { status: "paga" });
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", vatRate: 0.23 });
+  });
+
   it("is idempotent: no second saldo when one already exists for the quote", async () => {
     seedSinal("s3");
     // A saldo already sits in the ledger for this quote.

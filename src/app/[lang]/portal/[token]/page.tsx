@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
-import { getProposalByQuote } from "@/lib/proposals-store";
-import { getContractByProposal } from "@/lib/contracts-store";
+import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
+import { getAcceptedContractByQuote, getContractByProposal } from "@/lib/contracts-store";
 import { listInvoicesForQuote, splitThirtySeventy } from "@/lib/invoices-store";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import type { EventType, Quote } from "@/lib/orcamento/types";
@@ -58,12 +58,22 @@ export default async function PortalPage({
   const quote = await getQuote(claim.quoteId);
   if (!quote) notFound();
 
-  // The portal shows the quote's current (newest) proposal, its contract and its
-  // invoices. Each read is independent, so fan them out. The proposal must come
-  // first — the contract lookup keys off it.
-  const proposal = await getProposalByQuote(quote.id);
+  // A fonte de verdade do portal é a proposta ACEITE, não a mais RECENTE: depois
+  // do aceite a equipa pode rascunhar uma revisão da proposta, e o portal tem de
+  // continuar a refletir aquilo que o cliente aceitou (estado, total, bloco do
+  // contrato, agenda 30/70). Resolvemos via o contrato aceite do pedido → a sua
+  // proposta. Só quando não há aceite (proposta ainda em aberto) é que caímos na
+  // mais recente (`getProposalByQuote`) e no seu contrato por proposta.
+  const acceptedContract = await getAcceptedContractByQuote(quote.id);
+  const proposal = acceptedContract
+    ? await getProposal(acceptedContract.proposalId)
+    : await getProposalByQuote(quote.id);
   const [contract, invoices] = await Promise.all([
-    proposal ? getContractByProposal(proposal.id) : Promise.resolve(null),
+    acceptedContract
+      ? Promise.resolve(acceptedContract)
+      : proposal
+        ? getContractByProposal(proposal.id)
+        : Promise.resolve(null),
     listInvoicesForQuote(quote.id),
   ]);
 

@@ -2,6 +2,7 @@ import "server-only";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { Proposal } from "@/lib/orcamento/types";
 import { SITE } from "@/lib/site";
+import { winAnsiSafe } from "@/lib/pdf-text";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
 const INK = rgb(0.1, 0.1, 0.1);
@@ -36,13 +37,15 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
   const right = A4.w - MARGIN;
   let y = A4.h - MARGIN;
 
+  // Sanitiza no ponto de desenho: campos como clientName/eventType/notes vêm do
+  // cliente e podem ter caracteres que o WinAnsi/Helvetica não codifica (→ 500).
   const text = (
     s: string,
     x: number,
     yy: number,
     opts: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) =>
-    page.drawText(s, {
+    page.drawText(winAnsiSafe(s), {
       x,
       y: yy,
       font: opts.font ?? font,
@@ -56,9 +59,10 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
     yy: number,
     opts: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) => {
+    const safe = winAnsiSafe(s);
     const f = opts.font ?? font;
     const size = opts.size ?? 10;
-    text(s, xRight - f.widthOfTextAtSize(s, size), yy, opts);
+    text(safe, xRight - f.widthOfTextAtSize(safe, size), yy, opts);
   };
 
   const hr = (yy: number) =>
@@ -116,9 +120,11 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
 
   for (const item of p.lineItems) {
     const lineTotal = item.qty * item.unitPrice;
-    // wrap description to ~ colQty width
+    // wrap description to ~ colQty width. Sanitiza ANTES de medir/quebrar: a
+    // descrição é texto do cliente e `widthOfTextAtSize` também lança em glifos
+    // que o WinAnsi não codifica.
     const maxWidth = colQty - colDesc - 20;
-    const words = (item.description || "").split(/\s+/);
+    const words = winAnsiSafe(item.description || "").split(/\s+/);
     let line = "";
     const lines: string[] = [];
     for (const w of words) {
@@ -174,7 +180,8 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
   if (p.notes) {
     text("NOTAS", MARGIN, y, { font: bold, size: 8, color: MUTED });
     y -= 14;
-    for (const raw of p.notes.split("\n")) {
+    // Sanitiza as notas do cliente antes de medir/quebrar (ver descrição acima).
+    for (const raw of winAnsiSafe(p.notes).split("\n")) {
       const words = raw.split(/\s+/);
       let line = "";
       const maxWidth = right - MARGIN;

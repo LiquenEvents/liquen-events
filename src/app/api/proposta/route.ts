@@ -10,6 +10,7 @@ import {
   newInvoiceId,
   nextInvoiceNumber,
   splitThirtySeventy,
+  isUniqueViolation,
 } from "@/lib/invoices-store";
 import { buildProductionPlanItems } from "@/lib/production-templates";
 import { checklistTemplate } from "@/lib/checklist-templates";
@@ -147,19 +148,33 @@ export async function POST(request: NextRequest) {
           // 30% sinal — confirms the reservation of the date.
           const { sinal } = splitThirtySeventy(proposal.total);
           const invoiceNumber = await nextInvoiceNumber();
-          await createInvoice({
-            id: newInvoiceId(),
-            number: invoiceNumber,
-            quoteId: proposal.quoteId,
-            clientName: proposal.clientName,
-            clientEmail: proposal.clientEmail,
-            kind: "sinal",
-            amount: sinal,
-            vatRate: 0.23,
-            issuedAt: new Date().toISOString().slice(0, 10),
-            status: "emitida",
-            note: "Sinal 30% — reserva de data (aceitação da proposta)",
-          });
+          try {
+            await createInvoice({
+              id: newInvoiceId(),
+              number: invoiceNumber,
+              quoteId: proposal.quoteId,
+              clientName: proposal.clientName,
+              clientEmail: proposal.clientEmail,
+              kind: "sinal",
+              amount: sinal,
+              // Carrega a taxa de IVA REAL da proposta (podem ser 6%/13%/23%),
+              // não um 0,23 fixo. Fallback 0,23 quando a proposta não a traz.
+              vatRate: typeof proposal.vatRate === "number" ? proposal.vatRate : 0.23,
+              issuedAt: new Date().toISOString().slice(0, 10),
+              status: "emitida",
+              note: "Sinal 30% — reserva de data (aceitação da proposta)",
+            });
+          } catch (err) {
+            // Backstop de unicidade: se um sinal (não anulado) já existir para o
+            // pedido (ex.: emitido à mão em /faturas antes do aceite), o índice
+            // parcial único (invoices_one_active_sinal_uk) faz este insert falhar.
+            // Tratamos como "já emitido" — o aceite/contrato mantêm-se, não há 2.º
+            // sinal. Um erro genuíno propaga para o catch externo (best-effort).
+            if (!isUniqueViolation(err)) throw err;
+            log.warn("proposta: sinal já existente para o pedido (unicidade ignorada)", {
+              quoteId: proposal.quoteId,
+            });
+          }
 
           // Leave a trace in the quote's audit trail (separate from the client's
           // status_change entry above) so the team sees the contract + invoice.

@@ -11,6 +11,7 @@ import sharp from "sharp";
 import { SITE } from "@/lib/site";
 import type { ProposalDoc, MoodBoard } from "@/lib/proposal-doc";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
+import { winAnsiSafe } from "@/lib/pdf-text";
 
 // ── Landscape A4 ──
 const W = 841.89;
@@ -58,7 +59,10 @@ async function coverImage(
   }
 }
 
-function wrap(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
+function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
+  // Sanitiza para WinAnsi antes de medir/quebrar — descrições e notas do
+  // documento podem trazer caracteres que a Helvetica não codifica.
+  const text = winAnsiSafe(rawText);
   const out: string[] = [];
   for (const paragraph of text.split("\n")) {
     const words = paragraph.split(/\s+/).filter(Boolean);
@@ -87,13 +91,22 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
   const logoDark = await pdf.embedPng(Buffer.from(LOGO_DARK_PNG_B64, "base64"));
   const logoWhite = await pdf.embedPng(Buffer.from(LOGO_WHITE_PNG_B64, "base64"));
 
+  // Sanitiza no ponto de desenho: campos do documento (nomes, descrições…) podem
+  // conter caracteres que o WinAnsi/Helvetica não codifica (→ drawText lança).
   const text = (
     p: PDFPage,
     s: string,
     x: number,
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
-  ) => p.drawText(s, { x, y, font: o.font ?? f.reg, size: o.size ?? 10, color: o.color ?? INK });
+  ) =>
+    p.drawText(winAnsiSafe(s), {
+      x,
+      y,
+      font: o.font ?? f.reg,
+      size: o.size ?? 10,
+      color: o.color ?? INK,
+    });
 
   const textRight = (
     p: PDFPage,
@@ -102,10 +115,11 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) => {
+    const safe = winAnsiSafe(s);
     const fn = o.font ?? f.reg;
     const sz = o.size ?? 10;
-    p.drawText(s, {
-      x: xR - fn.widthOfTextAtSize(s, sz),
+    p.drawText(safe, {
+      x: xR - fn.widthOfTextAtSize(safe, sz),
       y,
       font: fn,
       size: sz,
@@ -194,7 +208,9 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       for (const it of g.items) {
         p.drawCircle({ x: M + 12, y: y + 3, size: 1.4, color: INK });
         if (it.desc) {
-          const lab = `${it.label}: `;
+          // Sanitiza aqui também: `lab` é medido diretamente com
+          // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
+          const lab = winAnsiSafe(`${it.label}: `);
           text(p, lab, M + 24, y, { font: f.bold, size: descSize });
           const dx = M + 24 + f.bold.widthOfTextAtSize(lab, descSize);
           const lines = wrap(f.reg, it.desc, descSize, W - M - dx);

@@ -7,6 +7,7 @@ import {
   nextInvoiceNumber,
   newInvoiceId,
   splitThirtySeventy,
+  isUniqueViolation,
   type Invoice,
 } from "@/lib/invoices-store";
 import { log } from "@/lib/logger";
@@ -101,8 +102,22 @@ export async function POST(request: NextRequest) {
       const { sinal, saldo } = splitThirtySeventy(total);
       const sinalInv = await build("sinal", sinal);
       const saldoInv = await build("saldo", saldo);
-      await createInvoice(sinalInv);
-      await createInvoice(saldoInv);
+      try {
+        await createInvoice(sinalInv);
+        await createInvoice(saldoInv);
+      } catch (err) {
+        // Backstop de corrida: entre a verificação acima e estes inserts, uma
+        // emissão concorrente pode ter criado o sinal/saldo — os índices parciais
+        // únicos (db/schema.sql) fazem o insert falhar. Tratamos como duplicado
+        // (409) em vez de 500, coerente com a guarda de duplicação acima.
+        if (isUniqueViolation(err)) {
+          return NextResponse.json(
+            { error: "Já existe uma fatura de sinal/saldo para este evento." },
+            { status: 409 },
+          );
+        }
+        throw err;
+      }
       return NextResponse.json({ invoices: [sinalInv, saldoInv] }, { status: 201 });
     }
 
@@ -112,8 +127,37 @@ export async function POST(request: NextRequest) {
     const kind: Invoice["kind"] = ["sinal", "saldo", "total"].includes(body.kind)
       ? body.kind
       : "total";
+
+    // Mesma guarda de duplicação do ramo split, agora também no modo single: se o
+    // operador escolher Tipo=Sinal/Saldo e já existir uma fatura desse tipo (não
+    // anulada) para o evento, recusamos — sem esta guarda, o modo single mintava
+    // um sinal/saldo duplicado que o split já bloqueia. `total` fica livre.
+    if (quoteId && (kind === "sinal" || kind === "saldo")) {
+      const active = (await listInvoicesForQuote(quoteId)).filter((i) => i.status !== "anulada");
+      const dup = active.find((i) => i.kind === kind);
+      if (dup) {
+        return NextResponse.json(
+          { error: `Já existe uma fatura de ${kind} para este evento (${dup.number}).` },
+          { status: 409 },
+        );
+      }
+    }
+
     const invoice = await build(kind, amount);
-    await createInvoice(invoice);
+    try {
+      await createInvoice(invoice);
+    } catch (err) {
+      // Backstop de corrida: entre a verificação acima e este insert, uma emissão
+      // concorrente pode ter criado o sinal/saldo — o índice parcial único
+      // (db/schema.sql) fá-lo falhar aqui. Tratamos como duplicado (409), não 500.
+      if ((kind === "sinal" || kind === "saldo") && isUniqueViolation(err)) {
+        return NextResponse.json(
+          { error: `Já existe uma fatura de ${kind} para este evento.` },
+          { status: 409 },
+        );
+      }
+      throw err;
+    }
     return NextResponse.json({ invoices: [invoice] }, { status: 201 });
   } catch (err) {
     log.error("faturas POST falhou", err);

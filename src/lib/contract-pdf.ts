@@ -10,6 +10,7 @@ import {
 import { SITE } from "@/lib/site";
 import { LOGO_DARK_PNG_B64 } from "@/lib/proposal-assets";
 import type { Contract } from "@/lib/contract-types";
+import { winAnsiSafe } from "@/lib/pdf-text";
 
 /**
  * Gera o PDF do contrato — a prova em papel do aceite dos Termos & Condições.
@@ -36,8 +37,12 @@ const MUTED = rgb(0.45, 0.45, 0.45);
 const LINE = rgb(0.85, 0.85, 0.85);
 const GOLD = rgb(0.71, 0.4, 0.29);
 
-/** Quebra um parágrafo em linhas que cabem em `maxWidth` (respeita \n internos). */
-function wrap(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
+/** Quebra um parágrafo em linhas que cabem em `maxWidth` (respeita \n internos).
+ *  Sanitiza para WinAnsi antes de medir/quebrar — o snapshot dos termos e afins
+ *  podem conter caracteres que a Helvetica não codifica (`widthOfTextAtSize` e
+ *  `drawText` lançariam). */
+function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
+  const text = winAnsiSafe(rawText);
   const out: string[] = [];
   for (const paragraph of text.split("\n")) {
     const words = paragraph.split(/\s+/).filter(Boolean);
@@ -105,13 +110,22 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   let page: PDFPage = doc.addPage([A4.w, A4.h]);
   let y = A4.h - MARGIN;
 
+  // Sanitiza no ponto de desenho: clientName/acceptedName vêm do cliente e podem
+  // conter caracteres que a Helvetica/WinAnsi não codifica (→ 500). `tr` sanitiza
+  // antes de medir a largura para o alinhamento à direita ficar correto.
   const text = (
     s: string,
     x: number,
     yy: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) =>
-    page.drawText(s, { x, y: yy, font: o.font ?? font, size: o.size ?? 10, color: o.color ?? INK });
+    page.drawText(winAnsiSafe(s), {
+      x,
+      y: yy,
+      font: o.font ?? font,
+      size: o.size ?? 10,
+      color: o.color ?? INK,
+    });
 
   const tr = (
     s: string,
@@ -119,9 +133,10 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
     yy: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) => {
+    const safe = winAnsiSafe(s);
     const f = o.font ?? font;
     const size = o.size ?? 10;
-    text(s, xr - f.widthOfTextAtSize(s, size), yy, o);
+    text(safe, xr - f.widthOfTextAtSize(safe, size), yy, o);
   };
 
   const hr = (yy: number) =>

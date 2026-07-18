@@ -138,6 +138,29 @@ create table if not exists public.invoices (
 create index if not exists invoices_quote_id_idx on public.invoices (quote_id);
 create index if not exists invoices_status_idx   on public.invoices (status);
 
+-- Backstop de unicidade sinal/saldo (defesa em profundidade sobre a app) ──────
+-- Invariante: no máximo UMA fatura de sinal e UMA de saldo NÃO anuladas por
+-- pedido. A app já verifica-e-recusa antes de inserir, mas duas emissões
+-- concorrentes (dois sinal→paga em simultâneo a auto-emitir o saldo, ou o
+-- operador a emitir à mão no mesmo instante) passam ambas a verificação e
+-- inserem — TOCTOU. Estes índices parciais únicos fecham a janela na própria
+-- base de dados: só uma linha vence, a outra apanha uma violação de unicidade
+-- (23505) que a app trata como "já emitido" (ver isUniqueViolation +
+-- maybeAutoIssueSaldo + rota /faturas). As faturas anuladas ficam FORA do índice
+-- (status <> 'anulada'), para permitir reemitir um saldo/sinal fresco depois de
+-- anular o anterior. Os quote_id nulos (faturas manuais sem pedido) não colidem.
+--
+-- ⚠️ OPERACIONAL: numa instalação que já acumulou sinais/saldos duplicados do
+-- bug antigo, a CRIAÇÃO destes índices FALHA. É preciso reconciliar primeiro
+-- (anular os duplicados, deixando um único ativo por tipo/pedido) e só depois
+-- correr este ficheiro.
+create unique index if not exists invoices_one_active_sinal_uk
+  on public.invoices (quote_id)
+  where kind = 'sinal' and status <> 'anulada';
+create unique index if not exists invoices_one_active_saldo_uk
+  on public.invoices (quote_id)
+  where kind = 'saldo' and status <> 'anulada';
+
 -- ── Contador atómico de numeração de faturas (por ano) ──────────
 -- A numeração fiscal portuguesa tem de ser única e estritamente sequencial.
 -- Fazer o incremento na aplicação (ler → +1 → gravar, com um `await` no meio)

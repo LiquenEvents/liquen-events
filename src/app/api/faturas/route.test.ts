@@ -104,3 +104,46 @@ describe("POST /api/faturas — split path duplicate-sinal guard", () => {
     expect(createInvoice).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("POST /api/faturas — single-invoice duplicate-sinal/saldo guard (FIX 1)", () => {
+  it("rejects a single Tipo=Sinal when a non-anulada sinal already exists", async () => {
+    seedInvoice({ kind: "sinal", number: "FT 2026/0001", status: "emitida" });
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "sinal" }));
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("Já existe uma fatura de sinal");
+    expect(json.error).toContain("FT 2026/0001"); // surfaces the existing number
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects a single Tipo=Saldo when a non-anulada saldo already exists", async () => {
+    seedInvoice({ kind: "saldo", number: "FT 2026/0007", status: "paga" });
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 7000, kind: "saldo" }));
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("Já existe uma fatura de saldo");
+    expect(json.error).toContain("FT 2026/0007");
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("issues a single sinal when the only prior one is anulada (guard ignores anulada)", async () => {
+    seedInvoice({ kind: "sinal", number: "FT 2026/0001", status: "anulada" });
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "sinal" }));
+    expect(res.status).toBe(201);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("never blocks a single Tipo=Total even when a sinal/saldo exists", async () => {
+    seedInvoice({ kind: "sinal", number: "FT 2026/0001", status: "emitida" });
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 9000, kind: "total" }));
+    expect(res.status).toBe(201);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not block a single sinal when no quoteId is provided (guard is per-event)", async () => {
+    seedInvoice({ kind: "sinal", quoteId: "q-1", status: "emitida" });
+    const res = await POST(req({ clientName: "Ana", amount: 3000, kind: "sinal" }));
+    expect(res.status).toBe(201);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+});

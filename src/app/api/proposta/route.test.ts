@@ -180,6 +180,28 @@ describe("POST /api/proposta", () => {
     );
   });
 
+  it("carries the proposal's vatRate into the auto-sinal, not a hardcoded 0.23 (FIX 4)", async () => {
+    seedProposal("p-vat", { vatRate: 0.13 });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-vat"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "sinal", vatRate: 0.13 }),
+    );
+  });
+
+  it("defaults the auto-sinal vatRate to 0.23 when the proposal carries none", async () => {
+    seedProposal("p-novat"); // seedProposal doesn't set vatRate
+    const res = await POST(
+      postReq({ token: createProposalToken("p-novat"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "sinal", vatRate: 0.23 }),
+    );
+  });
+
   it("does not duplicate the contract/invoice when one already exists for the proposal", async () => {
     seedProposal("p3b");
     contractsDb.existing = { id: "existing", proposalId: "p3b", status: "aceite" };

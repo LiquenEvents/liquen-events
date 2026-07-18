@@ -8,6 +8,7 @@ import {
   newInvoiceId,
   nextInvoiceNumber,
   splitThirtySeventy,
+  isUniqueViolation,
   type Invoice,
 } from "@/lib/invoices-store";
 import { getProposalByQuote } from "@/lib/proposals-store";
@@ -85,13 +86,30 @@ async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
       clientEmail: sinal.clientEmail,
       kind: "saldo",
       amount,
-      vatRate: 0.23,
+      // O saldo espelha a taxa de IVA do SINAL que já faturou (as propostas
+      // podem ser a 6%/13%/23%), não um 0,23 fixo. Fallback 0,23 se ausente.
+      vatRate: typeof sinal.vatRate === "number" ? sinal.vatRate : 0.23,
       issuedAt,
       dueAt,
       status: "emitida",
       note: "Saldo 70% — remanescente após sinal",
     };
-    await createInvoice(saldo);
+    try {
+      await createInvoice(saldo);
+    } catch (err) {
+      // Backstop TOCTOU: dois sinal→paga concorrentes podem ambos passar a
+      // verificação de idempotência acima e cada um tentar criar um saldo. O
+      // índice parcial único (invoices_one_active_saldo_uk, db/schema.sql) deixa
+      // só um vencer; o outro apanha a violação de unicidade — tratamo-la como
+      // "saldo já emitido" (não é erro): não duplicamos nem falhamos o PATCH.
+      if (isUniqueViolation(err)) {
+        log.warn("faturas: saldo já emitido por liquidação concorrente (unicidade ignorada)", {
+          quoteId: sinal.quoteId,
+        });
+        return null;
+      }
+      throw err; // erro genuíno → engolido pelo catch externo (best-effort)
+    }
     return saldo;
   } catch (err) {
     log.error("faturas: emissão automática do saldo falhou", err, { quoteId: sinal.quoteId });
