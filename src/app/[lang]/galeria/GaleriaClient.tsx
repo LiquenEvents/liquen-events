@@ -194,29 +194,6 @@ export default function GaleriaClient({
     [],
   );
   const [fading, setFading] = useState(false);
-  // Right-edge fade on the filter pill row, only while it actually
-  // overflows — hints "more categories, swipe" without permanently
-  // clipping the last pill on wide viewports where everything fits.
-  const [filtersOverflow, setFiltersOverflow] = useState(false);
-  const filterScrollRef = useRef<HTMLDivElement>(null);
-  // O fade de overflow é uma dica visual, não crítica → mede em idle (evita um
-  // ResizeObserver na main thread durante a hidratação).
-  useEffect(() => {
-    let disconnect = () => {};
-    const cancel = onIdle(() => {
-      const el = filterScrollRef.current;
-      if (!el) return;
-      const check = () => setFiltersOverflow(el.scrollWidth - el.clientWidth > 4);
-      check();
-      const ro = new ResizeObserver(check);
-      ro.observe(el);
-      disconnect = () => ro.disconnect();
-    });
-    return () => {
-      cancel();
-      disconnect();
-    };
-  }, []);
   const [lb, setLb] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   // A fechar? Enquanto true o lightbox corre o fade+scale de saída (lb-closing)
@@ -579,19 +556,6 @@ export default function GaleriaClient({
     [photos, pool, lb, close],
   );
 
-  // One pass over the pool (386 photos), memoized on `photos` — the old form
-  // re-filtered the whole array once per category on every render (scroll,
-  // hover, lightbox open all triggered it).
-  const counts = useMemo(() => {
-    const acc = Object.fromEntries(CATS.map((c) => [c, 0])) as Record<Cat, number>;
-    for (const p of photos) {
-      const label = p.label as Cat;
-      if (label in acc) acc[label] += 1;
-    }
-    acc.Todos = photos.length;
-    return acc;
-  }, [photos]);
-
   return (
     <>
       {/* ── Filtros / vista de casamento ── */}
@@ -626,34 +590,11 @@ export default function GaleriaClient({
           </div>
         </div>
       ) : (
-        <div
-          ref={filterScrollRef}
-          className={`flex gap-2 mb-8 overflow-x-auto px-3 sm:px-4 lg:px-6 pb-1 scrollbar-none${filtersOverflow ? " g-filter-fade" : ""}`}
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
-          {/* Tabs fantasma quadradas (idioma SpaceX) — sobre o fundo escuro da
-              galeria o ghost é branco: contorno hairline inativo, preenchimento
-              branco sólido com texto escuro quando ativo. Sem sombras. */}
-          {CATS.map((c) => (
-            <button
-              key={c}
-              onClick={() => switchCat(c)}
-              aria-pressed={cat === c}
-              className={`flex-shrink-0 flex min-h-[44px] items-center gap-2 border px-4 py-3 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
-                cat === c
-                  ? "border-white bg-white text-[#0c0e0b]"
-                  : "border-white/25 text-white/70 hover:border-white/60 hover:text-white"
-              }`}
-            >
-              {dict.labels[c]}
-              <span
-                className={`text-[10px] tabular-nums ${cat === c ? "text-[#0c0e0b]/60" : "text-white/50"}`}
-              >
-                {counts[c]}
-              </span>
-            </button>
-          ))}
-        </div>
+        /* Barra de categorias removida a pedido — a galeria mostra todas as
+           fotos numa só grelha, sem chrome de filtros. (A vista de coleção
+           acima, com o chip "voltar à galeria", mantém-se para o deep-link a
+           um casamento específico.) */
+        <div className="mb-2" />
       )}
 
       {/* ── Grid ── */}
