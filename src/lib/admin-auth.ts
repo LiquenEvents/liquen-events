@@ -180,13 +180,31 @@ export async function verifyCredentials(
 }
 
 // --- Sessions -------------------------------------------------------------
+// Domain-separate the session-signing key from every other HMAC derived from
+// the SAME base secret — notably the public proposal-link tokens
+// (src/lib/proposal-token.ts), which a client holds in a plain URL for 14 days.
+// Without separation, a proposal token verified as a valid admin session cookie:
+// both were signed with the identical key and body construction, with no claim
+// distinguishing them. Signing sessions with a labelled sub-key makes a proposal
+// signature cryptographically unable to satisfy readSession, independent of the
+// payload shape. (Proposal tokens keep signing with the raw base secret, so
+// already-sent accept links keep working; only the session key moves.)
+function sessionKey(): Buffer {
+  return createHmac("sha256", sessionSecret()).update("liquen.admin-session.v1").digest();
+}
+
 function sign(body: string): string {
-  return createHmac("sha256", sessionSecret()).update(body).digest("base64url");
+  return createHmac("sha256", sessionKey()).update(body).digest("base64url");
 }
 
 /** Mint a signed, expiring session token for the given user name. */
 export function createSession(name: string): string {
-  const payload = { sub: name.slice(0, 40), exp: Date.now() + SESSION_TTL_MS, v: sessionVersion() };
+  const payload = {
+    typ: "session",
+    sub: name.slice(0, 40),
+    exp: Date.now() + SESSION_TTL_MS,
+    v: sessionVersion(),
+  };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(body)}`;
 }
@@ -204,6 +222,12 @@ export function readSession(token: string | undefined | null): { name: string } 
 
   try {
     const payload = JSON.parse(Buffer.from(body, "base64url").toString());
+    // Only an admin-session token is a session. This is a second, independent
+    // guard on top of the domain-separated signing key: a token of any other
+    // kind must never be honoured here even if it were signed with this key.
+    // (Sessions minted before this claim existed lack `typ` and are refused —
+    // a one-time re-login, the deliberate cost of closing the bypass.)
+    if (payload.typ !== "session") return null;
     if (typeof payload.exp !== "number" || Date.now() > payload.exp) return null;
     // Revoked generation? Tokens minted before the claim existed are "1".
     if (String(payload.v ?? "1") !== sessionVersion()) return null;

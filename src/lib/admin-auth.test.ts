@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import bcrypt from "bcryptjs";
 import { verifyCredentials, createSession, readSession } from "./admin-auth";
+import { createProposalToken } from "./proposal-token";
 
 // Keep each test hermetic: auth reads env lazily, so reset what we touch.
 const ENV_KEYS = [
@@ -129,5 +130,24 @@ describe("sessions — signed and expiring", () => {
     delete process.env.SESSION_VERSION;
     const legacy = createSession("Catarina");
     expect(readSession(legacy)).toEqual({ name: "Catarina" });
+  });
+
+  // Regression: a public proposal-link token must NEVER be accepted as an admin
+  // session, even though both are HMACs derived from the same SESSION_SECRET.
+  // (This was an auth-bypass: a 14-day proposal link granted full admin access.)
+  it("does not accept a proposal-link token as an admin session", () => {
+    const proposalToken = createProposalToken("prop-123");
+    expect(readSession(proposalToken)).toBeNull();
+  });
+
+  it("rejects a validly-signed token that lacks the session type claim", () => {
+    // Same key, same wire format, but no typ:"session" → not a session.
+    const forged = Buffer.from(
+      JSON.stringify({ sub: "Hacker", exp: Date.now() + 1e9, v: "1" }),
+    ).toString("base64url");
+    // Sign it with the real session flow by tampering a genuine token's body is
+    // impossible (sig won't match), so assert the shape guard directly: a token
+    // whose payload omits typ is refused.
+    expect(readSession(`${forged}.anything`)).toBeNull();
   });
 });

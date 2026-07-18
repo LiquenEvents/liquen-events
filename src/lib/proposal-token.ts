@@ -5,10 +5,16 @@ import { log } from "./logger";
 /**
  * Signed, expiring tokens for the public "accept your proposal online" links.
  *
- * Same proven design as the admin session (src/lib/admin-auth.ts): an HMAC over
- * a base64url payload `{ pid, exp }`. The token is tamper-proof and unguessable,
- * so a client can only ever act on the exact proposal the link was minted for —
- * there's no id enumeration and no way to forge an acceptance.
+ * Same wire format as the admin session (src/lib/admin-auth.ts): an HMAC over a
+ * base64url payload. The token is tamper-proof and unguessable, so a client can
+ * only ever act on the exact proposal the link was minted for — no id
+ * enumeration, no way to forge an acceptance.
+ *
+ * Domain separation: the payload carries `typ: "proposal"`, and the admin
+ * session signs with a *derived* key while these tokens sign with the raw base
+ * secret. Together this ensures a proposal link — which lives in a client's URL
+ * for 14 days — can NEVER be replayed as an admin session cookie (and vice
+ * versa), even though both are derived from the same SESSION_SECRET.
  */
 // 14 days — comfortably past a normal decision window while keeping the
 // exposure window of a forwarded link short. The state-changing action is
@@ -51,7 +57,7 @@ function sign(body: string): string {
 
 /** Mint a tamper-proof link token for a proposal. */
 export function createProposalToken(proposalId: string): string {
-  const payload = { pid: proposalId, exp: Date.now() + TTL_MS };
+  const payload = { typ: "proposal", pid: proposalId, exp: Date.now() + TTL_MS };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(body)}`;
 }
@@ -69,6 +75,11 @@ export function readProposalToken(token: string | undefined | null): { proposalI
 
   try {
     const payload = JSON.parse(Buffer.from(body, "base64url").toString());
+    // A token that declares a different kind (e.g. an admin session,
+    // typ:"session") is never a proposal link — refuse it. Tokens minted before
+    // this claim existed carry no `typ`; still accept those so already-sent
+    // 14-day accept links keep working.
+    if (payload.typ !== undefined && payload.typ !== "proposal") return null;
     if (typeof payload.exp !== "number" || Date.now() > payload.exp) return null;
     if (typeof payload.pid !== "string" || !payload.pid) return null;
     return { proposalId: payload.pid };
