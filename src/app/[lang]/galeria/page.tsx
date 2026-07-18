@@ -160,6 +160,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
                 className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 @liquen.events <span aria-hidden>→</span>
+                <span className="sr-only"> ({t.common.newWindow})</span>
               </a>
             </div>
           </AnimateIn>

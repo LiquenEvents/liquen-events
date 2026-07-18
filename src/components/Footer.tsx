@@ -129,7 +129,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={s.label}
+                    aria-label={`${s.label} (${t.common.newWindow})`}
                     className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
                   >
                     {s.icon}
@@ -141,7 +141,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   href={WHATSAPP_HREF}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="WhatsApp"
+                  aria-label={`WhatsApp (${t.common.newWindow})`}
                   className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
                 >
                   <WhatsAppIcon className="w-[18px] h-[18px]" />

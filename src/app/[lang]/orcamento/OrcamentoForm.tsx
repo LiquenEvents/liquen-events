@@ -720,6 +720,7 @@ export default function OrcamentoForm({
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {to.ouWhatsApp}
+                <span className="sr-only"> ({t.common.newWindow})</span>
               </a>
             </div>
 

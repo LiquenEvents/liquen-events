@@ -320,7 +320,7 @@ const MobileMenu = memo(function MobileMenu({
               href={SITE.instagram}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Instagram"
+              aria-label={`Instagram (${t.common.newWindow})`}
               className="inline-flex h-11 w-11 items-center justify-center text-white/40 hover:text-white transition-colors"
             >
               <IconInstagram />
@@ -329,7 +329,7 @@ const MobileMenu = memo(function MobileMenu({
               href={SITE.facebook}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Facebook"
+              aria-label={`Facebook (${t.common.newWindow})`}
               className="inline-flex h-11 w-11 items-center justify-center text-white/40 hover:text-white transition-colors"
             >
               <IconFacebook />

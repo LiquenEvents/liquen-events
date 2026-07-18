@@ -171,6 +171,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 </span>
                 <span className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 group-hover:text-foreground transition-colors">
                   {tf.whatsappLink}
+                  <span className="sr-only"> ({t.common.newWindow})</span>
                 </span>
                 <span
                   aria-hidden
@@ -210,6 +211,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 </span>
                 <span className="text-[11px] tracking-[0.25em] uppercase text-foreground/60 group-hover:text-foreground transition-colors">
                   {tf.googleLink}
+                  <span className="sr-only"> ({t.common.newWindow})</span>
                 </span>
                 <span
                   aria-hidden
@@ -233,6 +235,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     className="inline-flex items-center min-h-[24px] py-1.5 text-[11px] tracking-[0.25em] uppercase text-foreground/60 hover:text-foreground transition-colors border-b border-foreground/15 hover:border-foreground/40"
                   >
                     {s.label}
+                    <span className="sr-only"> ({t.common.newWindow})</span>
                   </a>
                 ))}
               </div>
@@ -476,7 +479,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 className={OUTLINE_LIGHT_BUTTON_CLASS}
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
-                {t.common.abrirWhatsApp} →
+                {t.common.abrirWhatsApp} →<span className="sr-only"> ({t.common.newWindow})</span>
               </a>
               <a href={`mailto:${SITE.email}`} className={OUTLINE_LIGHT_BUTTON_CLASS}>
                 {t.common.enviarEmail}

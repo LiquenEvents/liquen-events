@@ -67,7 +67,7 @@ export default function WhatsAppButton() {
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track("WhatsAppClick", { source: "float" })}
-      aria-label={t.common.contactWhatsApp}
+      aria-label={`${t.common.contactWhatsApp} (${t.common.newWindow})`}
       // Invisible during the 1.5s reveal delay / at the footer — keep it out of
       // the tab order and a11y tree until it's actually shown (WCAG 2.4.3).
       inert={!show}

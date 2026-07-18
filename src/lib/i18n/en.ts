@@ -64,6 +64,7 @@ export const en: Dict = {
     falarConnosco: "Talk to us",
     voltarInicio: "Back to home",
     abrirWhatsApp: "Open WhatsApp",
+    newWindow: "opens in a new window",
     enviarEmail: "Send e-mail",
     contactWhatsApp: "Contact us on WhatsApp",
     clientsSay: "What our clients say",

@@ -64,6 +64,7 @@ export const pt = {
     falarConnosco: "Falar connosco",
     voltarInicio: "Voltar ao início",
     abrirWhatsApp: "Abrir WhatsApp",
+    newWindow: "abre em nova janela",
     enviarEmail: "Enviar e-mail",
     contactWhatsApp: "Contactar pelo WhatsApp",
     clientsSay: "O que dizem os clientes",

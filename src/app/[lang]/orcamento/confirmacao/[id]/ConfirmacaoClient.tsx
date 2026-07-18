@@ -49,7 +49,7 @@ export default function ConfirmacaoClient({
 }) {
   // locale comes from the site-wide chrome context; the confirmacao namespace
   // is passed in from this route's server page.
-  const { locale } = useTranslations();
+  const { locale, t } = useTranslations();
   const tc = confirmacao;
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -528,6 +528,7 @@ export default function ConfirmacaoClient({
                     className={cls}
                   >
                     {inner}
+                    <span className="sr-only"> ({t.common.newWindow})</span>
                   </a>
                 ) : (
                   <Link key={c.label} href={c.href} className={cls}>
