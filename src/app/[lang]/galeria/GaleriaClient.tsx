@@ -45,6 +45,12 @@ function blurProps(p: Photo) {
 }
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
+// Fewer tiles on the FIRST paint than each subsequent page: React hydrating the
+// initial grid is a synchronous burst (measured up to a ~1s main-thread freeze
+// on a 6×-throttled phone when navigating into /galeria). A smaller first mount
+// cuts that freeze; the infinite-scroll append (in a yieldable startTransition)
+// fills the rest within a frame. Same value SSR + client → no hydration mismatch.
+const INITIAL_PAGE = 12;
 
 // URL-hash slugs for each category, so a filtered view is shareable &
 // bookmarkable (e.g. /galeria#casamentos) and survives the back button.
@@ -180,7 +186,7 @@ export default function GaleriaClient({
   // Non-null = "ver este casamento" mode: browsing one couple's full story
   // (in shoot order, no interleaving) instead of a category grid.
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
-  const [shown, setShown] = useState(PAGE);
+  const [shown, setShown] = useState(INITIAL_PAGE);
   // Per-visit arrangement seed. Empty on SSR + first client render (so hydration
   // matches); a random value is set once on mount, re-rolling the interleave so
   // every fresh entry to the gallery lays out differently. It never changes

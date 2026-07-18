@@ -95,6 +95,15 @@ body.admin-mode {
     0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
 }
+/* Windows High Contrast / forced-colors mode strips box-shadows, so the ring
+   above disappears and keyboard focus becomes invisible. Restore a real system
+   outline there (CanvasText adapts to the user's chosen contrast theme). */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
 
 /* ── Smooth scroll ── */
 html {
