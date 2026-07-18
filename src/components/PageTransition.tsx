@@ -1,7 +1,7 @@
 "use client";
 
 import { usePublicPathname } from "@/lib/use-public-pathname";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ViewTransition } from "./vt";
 
 /**
@@ -22,12 +22,27 @@ export default function PageTransition({ children }: { children: React.ReactNode
   const pathname = usePublicPathname();
   const [entryPath] = useState(pathname);
 
+  // Whether the BROWSER supports the View Transitions API. React's ViewTransition
+  // export exists regardless of browser, so on Safari < 18 (export present, but
+  // no document.startViewTransition) the VT path silently hard-cut navigations —
+  // the .route-fade fallback never ran. Assume capable for SSR + first render
+  // (so hydration matches — the majority path is unchanged), then correct after
+  // mount; only a non-supporting browser flips to the CSS fallback.
+  const [vtCapable, setVtCapable] = useState(true);
+  useEffect(() => {
+    setVtCapable(
+      typeof document !== "undefined" &&
+        typeof (document as Document & { startViewTransition?: unknown }).startViewTransition ===
+          "function",
+    );
+  }, []);
+
   // Admin/orçamento run full-screen; don't animate their heavy surfaces.
   if (pathname.startsWith("/orcamento")) return <>{children}</>;
 
   const isNavigation = pathname !== entryPath;
 
-  if (!ViewTransition) {
+  if (!ViewTransition || !vtCapable) {
     return (
       <div key={pathname} className={isNavigation ? "route-fade" : undefined}>
         {children}
