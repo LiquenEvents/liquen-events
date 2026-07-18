@@ -45,6 +45,9 @@ export default function Faturas({ quotes }: Props) {
   const [filter, setFilter] = useState<Status | "all">("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // Faturas já existentes do evento escolhido — para avisar/impedir um duplo
+  // sinal (o aceite da proposta pode já ter emitido o par 30/70).
+  const [quoteInvoices, setQuoteInvoices] = useState<Invoice[]>([]);
 
   // ── New-invoice form state ──
   const [mode, setMode] = useState<"single" | "split">("split");
@@ -71,7 +74,7 @@ export default function Faturas({ quotes }: Props) {
     })();
   }, [toast]);
 
-  function onPickQuote(id: string) {
+  async function onPickQuote(id: string) {
     setQuoteId(id);
     const q = quotes?.find((x) => x.id === id);
     if (q) {
@@ -80,7 +83,26 @@ export default function Faturas({ quotes }: Props) {
       const total = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;
       if (total > 0) setAmount(String(total));
     }
+    // Carregar o que já foi faturado a este evento, para bloquear um 2.º sinal.
+    setQuoteInvoices([]);
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/faturas?quoteId=${encodeURIComponent(id)}`, {
+        cache: "no-store",
+      });
+      if (res.ok) setQuoteInvoices(await res.json());
+    } catch {
+      // Silencioso — o servidor volta a validar na emissão (guarda de duplo sinal).
+    }
   }
+
+  // Sinal/saldo não anulados já emitidos para o evento escolhido.
+  const existingSinal = useMemo(
+    () => quoteInvoices.find((i) => i.kind === "sinal" && i.status !== "anulada"),
+    [quoteInvoices],
+  );
+  // O split emitiria um novo sinal — bloqueá-lo quando já existe um.
+  const splitBlocked = mode === "split" && !!existingSinal;
 
   async function submit() {
     if (!clientName.trim()) {
@@ -90,6 +112,10 @@ export default function Faturas({ quotes }: Props) {
     const value = parseFloat(amount);
     if (!value || value <= 0) {
       toast("Indique um valor válido", "error");
+      return;
+    }
+    if (splitBlocked && existingSinal) {
+      toast(`Este evento já tem sinal (${existingSinal.number})`, "error");
       return;
     }
     setSubmitting(true);
@@ -134,6 +160,7 @@ export default function Faturas({ quotes }: Props) {
       setClientEmail("");
       setAmount("");
       setDueAt("");
+      setQuoteInvoices([]);
     } catch {
       toast("Erro de rede ao criar a fatura", "error");
     } finally {
@@ -259,7 +286,7 @@ export default function Faturas({ quotes }: Props) {
                 </span>
                 <select
                   value={quoteId}
-                  onChange={(e) => onPickQuote(e.target.value)}
+                  onChange={(e) => void onPickQuote(e.target.value)}
                   className="bo-input px-2.5 py-2 text-xs text-foreground/70"
                 >
                   <option value="">— Escolher para preencher —</option>
@@ -359,12 +386,21 @@ export default function Faturas({ quotes }: Props) {
             </label>
           </div>
 
-          {mode === "split" && amount && parseFloat(amount) > 0 && (
-            <p className="text-foreground/40 text-xs mt-3">
-              Serão emitidas duas faturas: sinal{" "}
-              {eur2(splitThirtySeventy(parseFloat(amount)).sinal)} + saldo{" "}
-              {eur2(splitThirtySeventy(parseFloat(amount)).saldo)}.
+          {splitBlocked && existingSinal ? (
+            <p className="text-[#b5654a] text-xs mt-3">
+              Este evento já tem um sinal emitido ({existingSinal.number}). Para não faturar o sinal
+              duas vezes, use “Fatura única” (só o saldo) em vez do split.
             </p>
+          ) : (
+            mode === "split" &&
+            amount &&
+            parseFloat(amount) > 0 && (
+              <p className="text-foreground/40 text-xs mt-3">
+                Serão emitidas duas faturas: sinal{" "}
+                {eur2(splitThirtySeventy(parseFloat(amount)).sinal)} + saldo{" "}
+                {eur2(splitThirtySeventy(parseFloat(amount)).saldo)}.
+              </p>
+            )
           )}
 
           <div className="flex justify-end gap-2 mt-4">
@@ -376,7 +412,8 @@ export default function Faturas({ quotes }: Props) {
             </button>
             <button
               onClick={submit}
-              disabled={submitting}
+              disabled={submitting || splitBlocked}
+              title={splitBlocked ? "Este evento já tem um sinal emitido" : undefined}
               className="px-4 py-2 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] transition-colors disabled:opacity-40"
             >
               {submitting ? "A emitir…" : "Emitir"}

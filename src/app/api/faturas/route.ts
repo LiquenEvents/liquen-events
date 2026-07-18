@@ -75,6 +75,29 @@ export async function POST(request: NextRequest) {
     if (body.split) {
       const total = num(body.total ?? body.amount);
       if (total <= 0) return NextResponse.json({ error: "Total inválido" }, { status: 400 });
+
+      // Guarda contra duplo sinal: o fluxo de aceitação da proposta já auto-emite
+      // o par sinal+saldo. Se este evento já tem uma fatura de sinal (ou saldo)
+      // não anulada no livro, recusamos — evita cobrar o sinal duas vezes por
+      // engano do operador. A UI já avisa, mas o servidor é a última linha.
+      if (quoteId) {
+        const active = (await listInvoicesForQuote(quoteId)).filter((i) => i.status !== "anulada");
+        const dupSinal = active.find((i) => i.kind === "sinal");
+        if (dupSinal) {
+          return NextResponse.json(
+            { error: `Já existe uma fatura de sinal para este evento (${dupSinal.number}).` },
+            { status: 409 },
+          );
+        }
+        const dupSaldo = active.find((i) => i.kind === "saldo");
+        if (dupSaldo) {
+          return NextResponse.json(
+            { error: `Já existe uma fatura de saldo para este evento (${dupSaldo.number}).` },
+            { status: 409 },
+          );
+        }
+      }
+
       const { sinal, saldo } = splitThirtySeventy(total);
       const sinalInv = await build("sinal", sinal);
       const saldoInv = await build("saldo", saldo);

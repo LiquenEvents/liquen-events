@@ -2,6 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { createRepository, type Mapper } from "./repository";
 import { getState, setState } from "./app-state";
+import { getSupabase } from "./supabase";
+import { log } from "./logger";
 
 /**
  * Invoicing ledger — numbered invoices (faturas) tied to the 30%/70% payment
@@ -86,16 +88,52 @@ export { splitThirtySeventy } from "./money";
 export const newInvoiceId = (): string => randomUUID();
 
 /**
- * Atomic sequential invoice number, per year: `FT ${year}/${nnnn}` (zero-padded
- * to 4 digits, e.g. "FT 2026/0007"). Best-effort read-increment-write against
- * the shared app-state key/value store — the same primitive the inbox cron uses
- * for its high-water mark. Not a hard mutex, but app-state is a single row and
- * two near-simultaneous POSTs are the realistic worst case; the counter never
- * goes backwards, so the practical failure mode is a skipped/duplicate number
- * under a true race, never a lost or reused-then-clobbered sequence.
+ * Sequential invoice number, per year: `FT ${year}/${nnnn}` (zero-padded to 4
+ * digits, e.g. "FT 2026/0007"). Portuguese fiscal numbering must be unique and
+ * strictly sequential, so the increment has to be race-free.
+ *
+ * Preferred path (Supabase configured): a single atomic SQL statement —
+ * `next_invoice_seq(year)` does an upsert-and-return (`n = n + 1 … returning n`).
+ * The Postgres row lock serializes concurrent issuances, so two near-simultaneous
+ * POSTs each get a distinct, consecutive `n` — never a duplicate or skipped FT.
+ *
+ * Fallback path (dev/file mode, OR the RPC errored — e.g. an install that hasn't
+ * run the migration yet): the historical best-effort read-increment-write over
+ * the shared app-state store. Not a hard mutex, but app-state is a single row and
+ * two simultaneous POSTs are the realistic worst case; the counter never goes
+ * backwards, so the practical failure mode is a skipped/duplicate number under a
+ * true race, never a reused-then-clobbered sequence. Keeping this fallback means
+ * nothing breaks before `db/schema.sql` (the invoice_counters + function) is run.
+ *
+ * The FT string format and the per-year reset are identical on both paths.
  */
 export async function nextInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();
+
+  // ── Preferred: atomic DB counter (race-free) ──
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      const { data, error } = await sb.rpc("next_invoice_seq", { p_year: year });
+      if (error) throw error;
+      const n = Number(data);
+      if (Number.isFinite(n) && n > 0) {
+        return `FT ${year}/${String(n).padStart(4, "0")}`;
+      }
+      throw new Error(`next_invoice_seq devolveu um valor inesperado: ${JSON.stringify(data)}`);
+    } catch (err) {
+      // Graceful degradation: uma instalação que ainda não correu a migração
+      // (função inexistente) não pode ficar sem numerar. Registamos e caímos
+      // para o contador em app_state — o exato comportamento pré-migração.
+      log.error(
+        "nextInvoiceNumber: RPC next_invoice_seq falhou — a usar o contador app_state (correu db/schema.sql?)",
+        err,
+        { year },
+      );
+    }
+  }
+
+  // ── Fallback: read-increment-write over app-state (dev / pré-migração) ──
   const key = `invoice-seq-${year}`;
   const current = (await getState<number>(key)) ?? 0;
   const next = current + 1;

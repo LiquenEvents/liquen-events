@@ -138,6 +138,32 @@ create table if not exists public.invoices (
 create index if not exists invoices_quote_id_idx on public.invoices (quote_id);
 create index if not exists invoices_status_idx   on public.invoices (status);
 
+-- ── Contador atómico de numeração de faturas (por ano) ──────────
+-- A numeração fiscal portuguesa tem de ser única e estritamente sequencial.
+-- Fazer o incremento na aplicação (ler → +1 → gravar, com um `await` no meio)
+-- é uma corrida: duas emissões em simultâneo leem o mesmo valor e ambas gravam
+-- n+1, produzindo um FT duplicado/saltado. Delegamos o incremento à base de
+-- dados. Uma linha por ano — o reset anual fica embutido na chave.
+create table if not exists public.invoice_counters (
+  year  int primary key,
+  n     int not null default 0
+);
+
+-- Devolve, de forma atómica, o próximo número de sequência para o ano dado.
+-- `insert … on conflict … do update … returning` é UMA só instrução: o lock de
+-- linha do Postgres serializa emissões concorrentes, cada uma recebe um `n`
+-- distinto e consecutivo, nunca o mesmo. A aplicação formata depois `FT AAAA/NNNN`.
+-- Idempotente (create or replace) — seguro correr o ficheiro as vezes que forem.
+create or replace function public.next_invoice_seq(p_year int)
+returns int
+language sql
+as $$
+  insert into public.invoice_counters (year, n)
+  values (p_year, 1)
+  on conflict (year) do update set n = public.invoice_counters.n + 1
+  returning n;
+$$;
+
 -- ── Inventário de adereços / materiais de decoração ─────────────
 create table if not exists public.inventory_items (
   id          text primary key,
@@ -253,5 +279,6 @@ alter table public.push_subscriptions enable row level security;
 alter table public.app_state enable row level security;
 alter table public.email_templates enable row level security;
 alter table public.invoices    enable row level security;
+alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
 alter table public.contracts enable row level security;
