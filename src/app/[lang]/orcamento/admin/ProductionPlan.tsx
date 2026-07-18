@@ -7,7 +7,7 @@ import { DECOR_PRODUCTION, buildProductionChecklist } from "@/lib/production-tem
 
 interface Props {
   quote: Quote;
-  onChange?: (checklist: ChecklistItem[]) => void;
+  onChange?: (productionPlan: ChecklistItem[]) => void;
 }
 
 const STATUS_LABEL: Record<EventSupplierStatus, { label: string; color: string }> = {
@@ -20,14 +20,18 @@ const SEP = " · ";
 const phaseLabel = (phase: string, task: string) => `${phase}${SEP}${task}`;
 
 /**
- * Decor production plan: a phased atelier timeline (Sourcing → Strike) layered
- * onto the quote's checklist. One click seeds the phase tasks as ChecklistItems
- * (prefixed with the phase), each toggle PATCHes /api/orcamento/:id like the
- * event checklist. Suppliers booked in Custos are surfaced read-only so the
+ * Decor production plan: a phased atelier timeline (Sourcing → Strike) stored
+ * in the quote's own `productionPlan` field (separado do `checklist` do evento,
+ * para os dois painéis não se sobreporem). One click seeds the phase tasks as
+ * ChecklistItems (prefixed with the phase), each toggle PATCHes
+ * /api/orcamento/:id. Suppliers booked in Custos are surfaced read-only so the
  * per-event supplier assignment is visible from the production view.
  */
 export default function ProductionPlan({ quote, onChange }: Props) {
-  const [items, setItems] = useState<ChecklistItem[]>(quote.checklist ?? []);
+  // Novo campo dedicado: default [] quando ausente. Sem migração de dados — em
+  // orçamentos antigos, itens de produção que tenham ficado gravados em
+  // `checklist` permanecem lá intactos até serem re-aplicados aqui.
+  const [items, setItems] = useState<ChecklistItem[]>(quote.productionPlan ?? []);
   const suppliers = quote.eventSuppliers ?? [];
 
   async function persist(next: ChecklistItem[]) {
@@ -37,7 +41,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       const res = await fetch(`/api/orcamento/${quote.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ checklist: next }),
+        body: JSON.stringify({ productionPlan: next }),
       });
       if (!res.ok) throw new Error(String(res.status));
     } catch {
@@ -58,7 +62,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     persist(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
   }
 
-  // Group the checklist by production phase via the label prefix.
+  // Group the production plan by phase via the label prefix.
   const grouped = useMemo(
     () =>
       DECOR_PRODUCTION.map((phase) => {

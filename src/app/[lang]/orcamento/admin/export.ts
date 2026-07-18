@@ -365,6 +365,19 @@ export function printRunSheet(q: Quote): void {
         .join("")
     : `<li class="empty">Sem checklist definida.</li>`;
 
+  // Plano de produção decor — campo próprio (productionPlan). Só o mostramos
+  // quando tem itens, para não poluir run-sheets de eventos sem plano decor.
+  const production = q.productionPlan ?? [];
+  const productionBlock = production.length
+    ? `<h2>Plano de produção decor</h2>
+       <ul>${production
+         .map(
+           (c) =>
+             `<li class="${c.done ? "done" : ""}"><span class="box">${c.done ? "✓" : ""}</span>${escapeHtml(c.label)}</li>`,
+         )
+         .join("")}</ul>`
+    : "";
+
   // Financial summary for the day-of (what's contracted, paid and still due).
   const eur0 = (n: number) =>
     new Intl.NumberFormat("pt-PT", {
@@ -441,6 +454,7 @@ export function printRunSheet(q: Quote): void {
     <table><tbody>${timelineRows}</tbody></table>
     <h2>Checklist de produção</h2>
     <ul>${checklistRows}</ul>
+    ${productionBlock}
     ${financeBlock}
     ${q.notes ? `<h2>Notas do cliente</h2><div class="notes">${escapeHtml(q.notes)}</div>` : ""}
     ${q.adminNotes ? `<h2>Notas internas</h2><div class="notes">${escapeHtml(q.adminNotes)}</div>` : ""}
@@ -577,6 +591,21 @@ export function printEventDossier(q: Quote): void {
     }
   </section>`;
 
+  // Plano de produção decor — campo próprio (productionPlan), à parte do
+  // checklist do evento. Secção só surge quando há plano seeded.
+  const production = q.productionPlan ?? [];
+  const sectionProduction = production.length
+    ? `<section>
+        <h2>Plano de produção decor (${production.filter((c) => c.done).length}/${production.length})</h2>
+        <ul>${production
+          .map(
+            (c) =>
+              `<li class="${c.done ? "done" : ""}"><span class="box">${c.done ? "✓" : ""}</span>${escapeHtml(c.label)}</li>`,
+          )
+          .join("")}</ul>
+      </section>`
+    : "";
+
   const guests = (q.guestList ?? []).slice().sort((a, b) => a.name.localeCompare(b.name));
   const gConfirmed = guests
     .filter((g) => g.rsvp === "confirmado")
@@ -671,6 +700,7 @@ export function printEventDossier(q: Quote): void {
   ${sectionSuppliers}
   ${sectionTimeline}
   ${sectionChecklist}
+  ${sectionProduction}
   ${sectionGuests}
 
   ${q.notes ? `<section><h2>Notas do cliente</h2><div class="notes">${escapeHtml(q.notes)}</div></section>` : ""}

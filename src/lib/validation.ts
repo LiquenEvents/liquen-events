@@ -163,6 +163,7 @@ export const quoteUpdateSchema = z
     quotedPrice: z.number().finite().min(0).max(10_000_000).nullish(),
     adminNotes: trimmed(20000).nullish(),
     checklist: z.array(checklistItemSchema).max(500),
+    productionPlan: z.array(checklistItemSchema).max(500),
     payments: z.array(paymentSchema).max(500),
     timeline: z.array(timelineItemSchema).max(500),
     eventSuppliers: z.array(eventSupplierSchema).max(500),

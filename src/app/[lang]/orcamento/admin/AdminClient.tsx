@@ -2272,11 +2272,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <ProductionPlan
                             key={`prod-${selected.id}`}
                             quote={selected}
-                            onChange={(checklist) => {
+                            onChange={(productionPlan) => {
                               setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
+                                prev.map((q) =>
+                                  q.id === selected.id ? { ...q, productionPlan } : q,
+                                ),
                               );
-                              setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                              setSelected((prev) => (prev ? { ...prev, productionPlan } : prev));
                             }}
                           />
 

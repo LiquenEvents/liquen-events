@@ -87,6 +87,21 @@ describe("quoteUpdateSchema — admin PATCH values", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("accepts checklist and productionPlan as separate item arrays", () => {
+    const r = quoteUpdateSchema.safeParse({
+      checklist: [{ id: "c1", label: "Confirmar catering", done: false }],
+      productionPlan: [{ id: "p1", label: "Sourcing · Encomendar flores", done: true }],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects a malformed productionPlan item", () => {
+    const r = quoteUpdateSchema.safeParse({
+      productionPlan: [{ id: "p1", label: "Sourcing", done: "sim" }],
+    });
+    expect(r.success).toBe(false);
+  });
 });
 
 describe("quoteFormSchema", () => {

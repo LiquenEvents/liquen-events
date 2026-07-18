@@ -198,7 +198,14 @@ export interface Quote extends QuoteFormData {
   adminNotes?: string;
   lastUpdated?: string;
   messages?: QuoteMessage[];
+  /** Event/logistics checklist (EventChecklist) — geral do evento, gerado a
+      partir de `checklistTemplate`. NÃO confundir com `productionPlan`. */
   checklist?: ChecklistItem[];
+  /** Plano de produção decor (ProductionPlan) — fases de atelier do sourcing ao
+      strike, cada item prefixado com a fase. Campo próprio para não colidir com
+      `checklist`: os dois painéis vivem lado a lado no separador Produção e
+      partilhar o mesmo campo levava a perda de dados. */
+  productionPlan?: ChecklistItem[];
   payments?: Payment[];
   timeline?: TimelineItem[];
   eventSuppliers?: EventSupplier[];
