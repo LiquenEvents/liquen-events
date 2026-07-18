@@ -535,9 +535,14 @@ body[data-menu-open] .whatsapp-fixed {
   }
 }
 @keyframes vt-arrive {
+  /* Pure fade — no translateY. The incoming page's own reveals (AnimateIn /
+     Reveal) already rise the hero caption ~28px; when the whole route ALSO rose
+     22px at a different duration the two stacked and read "mushy" at the moment
+     the new page should feel crisp. The fade now hands off cleanly to the
+     on-page rise. (Directional vt-page-fwd/bwd keep their translateX — different
+     axis, no clash.) */
   from {
     opacity: 0;
-    transform: translateY(22px);
   }
 }
 

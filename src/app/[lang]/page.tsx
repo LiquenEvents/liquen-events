@@ -3,7 +3,6 @@ import Image from "next/image";
 import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
-import TitleReveal from "@/components/TitleReveal";
 import Reveal from "@/components/motion/Reveal";
 import { blurFor } from "@/lib/blur";
 import ClientMarquee from "@/components/ClientMarquee";
@@ -180,7 +179,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               instead of a hard cut. One-shot, compositor-driven (clip-path +
               transform), and reduced-motion-safe (Reveal renders the finished
               state). start="top 92%" so it completes before the panel centres. */}
-          <Reveal as="div" variant="mask" className="absolute inset-0" start="top 92%">
+          <Reveal as="div" variant="mask" className="absolute inset-0" start="top 82%">
             <Image
               src={s.image}
               alt=""
@@ -285,18 +284,18 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               {t.home.ctaEyebrow}
             </p>
           </AnimateIn>
-          <h2
-            className="text-white font-bold leading-[0.9] tracking-tight mb-6"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 116px)" }}
-          >
-            <TitleReveal text={t.home.ctaTitleLine1} as="span" className="block" />
-            <TitleReveal
-              text={t.home.ctaTitleLine2}
-              as="span"
-              className="block text-moss"
-              delay={220}
-            />
-          </h2>
+          {/* Block rise (not word-by-word): the finale now speaks the same
+              headline dialect as the hero and chapters, so the journey resolves
+              calmly instead of escalating into a fussy per-word reveal at the end. */}
+          <AnimateIn>
+            <h2
+              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 116px)" }}
+            >
+              <span className="block">{t.home.ctaTitleLine1}</span>
+              <span className="block text-moss">{t.home.ctaTitleLine2}</span>
+            </h2>
+          </AnimateIn>
           <AnimateIn delay={110}>
             <p className="text-white/70 text-base leading-relaxed max-w-md mb-12">
               {t.home.ctaText}
