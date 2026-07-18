@@ -2352,6 +2352,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <PaymentsPanel
                             key={`pay-${selected.id}`}
                             quote={selected}
+                            showLedger
                             onChange={(payments) => {
                               setQuotes((prev) =>
                                 prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),

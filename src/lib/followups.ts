@@ -126,9 +126,86 @@ export function computeFollowUps(input: {
     }
   }
 
-  // Sort by severity, then by dueness (most days first) as a tie-breaker.
-  return out.sort(
+  return sortFollowUps(out);
+}
+
+/** Ordena por severidade (urgente → aviso → info) e, em empate, por antiguidade
+    (mais dias primeiro). Extraído para ser reutilizado ao fundir os follow-ups
+    do livro de faturas com os informais na rota. */
+export function sortFollowUps(list: FollowUp[]): FollowUp[] {
+  return [...list].sort(
     (a, b) =>
       SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.duenessDays - a.duenessDays,
   );
+}
+
+/**
+ * Subconjunto serializável de `Invoice` (invoices-store, server-only) de que
+ * este módulo *puro* precisa. Definido aqui para não arrastar o store — a rota
+ * passa as faturas reais, que são um superconjunto desta forma.
+ */
+export interface InvoiceLike {
+  id: string;
+  number: string;
+  quoteId: string;
+  amount: number;
+  status: "emitida" | "paga" | "anulada";
+  dueAt?: string; // yyyy-mm-dd (vencimento)
+}
+
+/**
+ * Faturas do livro por liquidar cujo vencimento já passou → follow-ups de
+ * "pagamento em atraso". O livro é a fonte de verdade financeira (ver Dossier):
+ * só conta `status === "emitida"` com `dueAt` no passado (uma `paga` ou
+ * `anulada` nunca gera lembrete). Ignora faturas de eventos arquivados, tal como
+ * as restantes regras baseadas em orçamentos. Puro — recebe `now`.
+ */
+export function computeInvoiceFollowUps(input: {
+  invoices: InvoiceLike[];
+  quotes: Quote[];
+  now: number;
+}): FollowUp[] {
+  const { invoices, quotes, now } = input;
+  const todayKey = dayKey(now);
+  const todayMs = parseDay(todayKey);
+  const byId = new Map(quotes.map((q) => [q.id, q]));
+  const out: FollowUp[] = [];
+
+  for (const inv of invoices) {
+    if (inv.status !== "emitida" || !inv.dueAt || inv.dueAt >= todayKey) continue;
+    const q = byId.get(inv.quoteId);
+    if (q?.archived) continue; // não perseguir faturas de leads arquivados
+    const days = Math.floor((todayMs - parseDay(inv.dueAt)) / DAY);
+    out.push({
+      id: `inv-${inv.id}`,
+      kind: "pagamento_em_atraso",
+      quoteId: inv.quoteId,
+      clientName: q?.name || "Cliente",
+      summary: `Fatura ${inv.number} (${eur(inv.amount)}) por liquidar há ${days} dias`,
+      duenessDays: days,
+      severity: days > 7 ? "urgente" : "aviso",
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Funde os follow-ups já calculados (`base`, que inclui os pagamentos informais)
+ * com os do livro de faturas, sem duplicar: quando um evento tem uma fatura em
+ * atraso *e* um pagamento informal em atraso, prevalece o do livro (a verdade) —
+ * o item informal desse evento é descartado. Reordena o resultado. Puro.
+ */
+export function withInvoiceFollowUps(input: {
+  base: FollowUp[];
+  invoices: InvoiceLike[];
+  quotes: Quote[];
+  now: number;
+}): FollowUp[] {
+  const ledger = computeInvoiceFollowUps(input);
+  const ledgerQuoteIds = new Set(ledger.map((f) => f.quoteId));
+  const deduped = input.base.filter(
+    (f) => !(f.kind === "pagamento_em_atraso" && ledgerQuoteIds.has(f.quoteId)),
+  );
+  return sortFollowUps([...deduped, ...ledger]);
 }

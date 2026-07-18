@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import type { Proposal, Quote } from "@/lib/orcamento/types";
-import { computeFollowUps, type FollowUp } from "./followups";
+import {
+  computeFollowUps,
+  computeInvoiceFollowUps,
+  withInvoiceFollowUps,
+  type FollowUp,
+  type InvoiceLike,
+} from "./followups";
 
 // Fixed reference point so the rules are fully deterministic.
 const NOW = Date.parse("2026-07-18T12:00:00Z");
@@ -187,5 +193,112 @@ describe("computeFollowUps", () => {
     // Within the two avisos, higher dueness (6-day proposal) comes before the 2-day payment.
     const avisos = fs.filter((f) => f.severity === "aviso");
     expect(avisos[0].duenessDays).toBeGreaterThanOrEqual(avisos[1].duenessDays);
+  });
+});
+
+// Fatura do livro (invoices-store) reduzida ao que o helper puro consome.
+const invoice = (i: Partial<InvoiceLike>): InvoiceLike => ({
+  id: "inv1",
+  number: "FT 2026/0001",
+  quoteId: "q1",
+  amount: 1000,
+  status: "emitida",
+  ...i,
+});
+
+describe("computeInvoiceFollowUps", () => {
+  it("flags an emitida invoice whose dueAt is in the past", () => {
+    const fs = computeInvoiceFollowUps({
+      invoices: [invoice({ status: "emitida", dueAt: dayKey(-4) })],
+      quotes: [quote({})],
+      now: NOW,
+    });
+    expect(kinds(fs)).toEqual(["pagamento_em_atraso"]);
+    expect(fs[0].id).toBe("inv-inv1");
+    expect(fs[0].duenessDays).toBe(4);
+    expect(fs[0].severity).toBe("aviso");
+    expect(fs[0].summary).toContain("FT 2026/0001");
+  });
+
+  it("escalates an invoice overdue by more than 7 days to urgente", () => {
+    const fs = computeInvoiceFollowUps({
+      invoices: [invoice({ status: "emitida", dueAt: dayKey(-9) })],
+      quotes: [quote({})],
+      now: NOW,
+    });
+    expect(fs[0].severity).toBe("urgente");
+  });
+
+  it("does not flag paid, cancelled, future-due, or undated invoices", () => {
+    const fs = computeInvoiceFollowUps({
+      invoices: [
+        invoice({ id: "a", status: "paga", dueAt: dayKey(-4) }),
+        invoice({ id: "b", status: "anulada", dueAt: dayKey(-4) }),
+        invoice({ id: "c", status: "emitida", dueAt: dayKey(5) }),
+        invoice({ id: "d", status: "emitida", dueAt: undefined }),
+      ],
+      quotes: [quote({})],
+      now: NOW,
+    });
+    expect(fs).toHaveLength(0);
+  });
+
+  it("ignores invoices of archived quotes", () => {
+    const fs = computeInvoiceFollowUps({
+      invoices: [invoice({ status: "emitida", dueAt: dayKey(-4) })],
+      quotes: [quote({ archived: true })],
+      now: NOW,
+    });
+    expect(fs).toHaveLength(0);
+  });
+});
+
+describe("withInvoiceFollowUps", () => {
+  it("merges overdue invoices into the base list and sorts by severity", () => {
+    const base = computeFollowUps({
+      quotes: [quote({ id: "q-evt", name: "Evento", status: "aceite", date: dayKey(5) })],
+      proposals: [],
+      now: NOW,
+    });
+    const merged = withInvoiceFollowUps({
+      base,
+      invoices: [invoice({ quoteId: "q-x", status: "emitida", dueAt: dayKey(-9) })],
+      quotes: [
+        quote({ id: "q-evt", name: "Evento", status: "aceite", date: dayKey(5) }),
+        quote({ id: "q-x", name: "Atrasado" }),
+      ],
+      now: NOW,
+    });
+    // urgente (fatura) antes de info (evento).
+    expect(merged.map((f) => f.kind)).toEqual(["pagamento_em_atraso", "semana_evento"]);
+    expect(merged[0].severity).toBe("urgente");
+  });
+
+  it("does not double-count: prefers the ledger overdue over the informal one for the same quote", () => {
+    const base = computeFollowUps({
+      quotes: [
+        quote({
+          id: "q1",
+          status: "aceite",
+          date: dayKey(60),
+          payments: [{ id: "pay1", kind: "sinal", amount: 300, date: dayKey(-3), paid: false }],
+        }),
+      ],
+      proposals: [],
+      now: NOW,
+    });
+    // O informal sozinho gera exatamente um item.
+    expect(kinds(base)).toEqual(["pagamento_em_atraso"]);
+
+    const merged = withInvoiceFollowUps({
+      base,
+      invoices: [invoice({ quoteId: "q1", status: "emitida", dueAt: dayKey(-3) })],
+      quotes: [quote({ id: "q1", status: "aceite", date: dayKey(60) })],
+      now: NOW,
+    });
+    // Continua a haver só UM atraso para o evento — o do livro (id inv-…).
+    const overdue = merged.filter((f) => f.kind === "pagamento_em_atraso");
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].id).toBe("inv-inv1");
   });
 });
