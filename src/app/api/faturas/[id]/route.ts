@@ -15,10 +15,9 @@ import {
 import { getProposalByQuote } from "@/lib/proposals-store";
 import { round2 } from "@/lib/money";
 import { log } from "@/lib/logger";
+import { invoiceUpdateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
 
 export const runtime = "nodejs";
-
-const VALID_STATUS: Invoice["status"][] = ["emitida", "paga", "anulada"];
 
 /** Dias de vencimento por omissão do saldo. Ver `maybeAutoIssueSaldo`. */
 const SALDO_DUE_DAYS = 30;
@@ -167,13 +166,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const prior = await getInvoice(id);
     if (!prior) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
 
-    const body = await request.json();
+    // ── Input validation (400 before mutating) ── malformed JSON, a non-object
+    // body, an unknown status or a wrong-typed date now get a clean 400 instead
+    // of a 500 (the old `"status" in body` threw on a non-object body).
+    const read = await readJsonBody(request);
+    if (!read.ok) {
+      return NextResponse.json(
+        { error: "Corpo do pedido inválido (JSON malformado)." },
+        { status: 400 },
+      );
+    }
+    const valid = validateBody(invoiceUpdateSchema, read.body);
+    if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 });
+    const body = valid.data;
     const patch: Partial<Invoice> = {};
 
     if ("status" in body) {
-      if (!VALID_STATUS.includes(body.status)) {
-        return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
-      }
       patch.status = body.status;
       // Keep paidAt in lockstep with the status unless the caller set it
       // explicitly: marking paga stamps today, un-paying (or annulling) clears it.

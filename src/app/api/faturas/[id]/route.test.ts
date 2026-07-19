@@ -58,6 +58,19 @@ function patchReq(
   return { req, params: Promise.resolve({ id }) };
 }
 
+// Raw-body variant so we can send malformed JSON / non-object bodies.
+function rawPatchReq(
+  id: string,
+  raw: string,
+): { req: NextRequest; params: Promise<{ id: string }> } {
+  const req = new Request(`https://liquen.test/api/faturas/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: raw,
+  }) as unknown as NextRequest;
+  return { req, params: Promise.resolve({ id }) };
+}
+
 function seedSinal(id: string, over: Record<string, unknown> = {}) {
   invoicesDb.store.set(id, {
     id,
@@ -270,6 +283,67 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     // The sinal is still marked paid; no saldo attached because creation failed.
     expect(json).toMatchObject({ id: "s6", status: "paga" });
     expect(json.saldoAutoIssued).toBeUndefined();
+  });
+});
+
+describe("PATCH /api/faturas/[id] — input validation (400s, never 500 / bad data)", () => {
+  it("rejects malformed JSON with 400 (not 500)", async () => {
+    seedSinal("v1");
+    const { req, params } = rawPatchReq("v1", "{ not json");
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    // The invoice is untouched.
+    expect(invoicesDb.store.get("v1")?.status).toBe("emitida");
+  });
+
+  it("rejects a non-object body (null) with 400 instead of 500", async () => {
+    // Regression: the old `\"status\" in body` threw a TypeError on a non-object
+    // body, surfacing as a 500. It must now be a clean 400.
+    seedSinal("v2");
+    const { req, params } = rawPatchReq("v2", "null");
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Corpo do pedido inválido.");
+  });
+
+  it("rejects an unknown status with 400 (message preserved)", async () => {
+    seedSinal("v3");
+    const { req, params } = patchReq("v3", { status: "pago_talvez" });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Estado inválido");
+    expect(invoicesDb.store.get("v3")?.status).toBe("emitida");
+  });
+
+  it("rejects a wrong-typed date field with 400", async () => {
+    seedSinal("v4");
+    const { req, params } = patchReq("v4", { paidAt: 20260101 });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+  });
+
+  it("404s before parsing the body when the invoice does not exist", async () => {
+    const { req, params } = rawPatchReq("missing", "not even json");
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(404);
+  });
+
+  it("still clears a date by sending an empty string (behavior preserved)", async () => {
+    seedSinal("v5", { dueAt: "2026-08-01" });
+    const { req, params } = patchReq("v5", { dueAt: "" });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(invoicesDb.store.get("v5")?.dueAt).toBeUndefined();
+  });
+
+  it("accepts an empty patch body ({}) and leaves the invoice unchanged", async () => {
+    seedSinal("v6");
+    const { req, params } = patchReq("v6", {});
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(invoicesDb.store.get("v6")?.status).toBe("emitida");
   });
 });
 

@@ -40,6 +40,15 @@ function req(body: unknown): NextRequest {
   }) as unknown as NextRequest;
 }
 
+// Raw-body variant so we can send malformed JSON / non-object bodies.
+function rawReq(raw: string): NextRequest {
+  return new Request("https://liquen.test/api/faturas", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: raw,
+  }) as unknown as NextRequest;
+}
+
 function seedInvoice(over: Record<string, unknown>) {
   ledger.rows.push({
     id: `seed-${ledger.rows.length + 1}`,
@@ -144,6 +153,71 @@ describe("POST /api/faturas — single-invoice duplicate-sinal/saldo guard (FIX 
     seedInvoice({ kind: "sinal", quoteId: "q-1", status: "emitida" });
     const res = await POST(req({ clientName: "Ana", amount: 3000, kind: "sinal" }));
     expect(res.status).toBe(201);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("POST /api/faturas — input validation (400s, never 500 / bad data)", () => {
+  it("rejects malformed JSON with 400 (not 500)", async () => {
+    const res = await POST(rawReq("{ not valid json"));
+    expect(res.status).toBe(400);
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-object body (null) with 400", async () => {
+    const res = await POST(rawReq("null"));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Corpo do pedido inválido.");
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects a primitive body (a bare string) with 400", async () => {
+    const res = await POST(rawReq('"hello"'));
+    expect(res.status).toBe(400);
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects an array body with 400", async () => {
+    const res = await POST(rawReq("[1,2,3]"));
+    expect(res.status).toBe(400);
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown kind with 400 (instead of silently defaulting)", async () => {
+    const res = await POST(req({ clientName: "Ana", amount: 3000, kind: "garbage" }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Tipo de fatura inválido.");
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects an out-of-range vatRate with 400", async () => {
+    const res = await POST(req({ clientName: "Ana", amount: 3000, vatRate: 5 }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Taxa de IVA inválida.");
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects an object where a scalar text field is expected (no [object Object] in the book)", async () => {
+    const res = await POST(req({ clientName: { evil: true }, amount: 3000 }));
+    expect(res.status).toBe(400);
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("still 400s the empty-client case via the route guard (message preserved)", async () => {
+    const res = await POST(req({ amount: 3000 }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Cliente obrigatório");
+  });
+
+  it("keeps accepting a numeric string amount (coercion preserved)", async () => {
+    const res = await POST(req({ clientName: "Ana", amount: "3000", kind: "total" }));
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.invoices[0].amount).toBe(3000);
     expect(createInvoice).toHaveBeenCalledTimes(1);
   });
 });
