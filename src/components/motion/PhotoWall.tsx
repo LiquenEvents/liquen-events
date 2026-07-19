@@ -32,7 +32,7 @@ export default function PhotoWall({
   images: WallImage[];
   href: string;
   label: string;
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
 }) {
   const sectionRef = useRef<HTMLElement>(null);
@@ -131,10 +131,12 @@ export default function PhotoWall({
       {/* ── Editorial header — a modest rise-in so it isn't the one dead,
           static headline amid the page's authored motion. ── */}
       <AnimateIn className="relative z-20 max-w-7xl mx-auto px-6 lg:px-16 pt-16 sm:pt-20 lg:pt-28 text-center">
-        <p className="text-cream/45 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
-          <span className="w-6 h-px bg-gold/50" />
-          {eyebrow}
-        </p>
+        {eyebrow && (
+          <p className="text-cream/45 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
+            <span className="w-6 h-px bg-gold/50" />
+            {eyebrow}
+          </p>
+        )}
         <h2
           id="photowall-heading"
           className="text-cream font-bold leading-[0.95] tracking-tight"

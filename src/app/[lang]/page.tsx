@@ -114,10 +114,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
           <AnimateIn>
             <div className="max-w-2xl">
-              <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-4 flex items-center gap-3">
-                <span className="w-6 h-px bg-gold flex-shrink-0" />
-                {t.home.eyebrow}
-              </p>
               {/* The site's emotional promise leads in the WARM voice — mixed-case
                   Playfair, large — not a small uppercase spec label. The moss
                   highlight on the closing word (flagged in the dictionary) is
@@ -202,10 +198,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                   title → CTA) rather than appearing as one block — a small
                   stagger reads as "authored" without feeling slow. */}
               <Reveal as="div" stagger={0.08} start="top 92%">
-                <p className="text-white/70 text-[11px] tracking-[0.4em] uppercase mb-4 flex items-center gap-3">
-                  <span className="w-8 h-px bg-gold flex-shrink-0" />
-                  {s.tag}
-                </p>
                 <h2
                   className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
                   style={{ fontSize: "clamp(36px, 6.5vw, 78px)" }}
@@ -250,7 +242,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         images={wallPool.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }))}
         href={localizeHref("/galeria", locale)}
         label={t.common.verGaleria}
-        eyebrow={t.home.wallEyebrow}
         title={t.home.wallTitle}
       />
 
