@@ -277,7 +277,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 type="button"
                 onClick={() => printRunSheet(quote)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                title="Imprimir run-sheet do evento (cronograma e checklist do dia)"
+                title="Imprimir o guião do dia (cronograma e checklist do evento)"
               >
                 <svg
                   width="13"
@@ -294,7 +294,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   />
                   <rect x="6" y="14" width="12" height="7" rx="1" />
                 </svg>
-                <span className="hidden sm:inline">Run-sheet</span>
+                <span className="hidden sm:inline">Guião do dia</span>
               </button>
 
               {/* .ics — só quando o evento tem data (buildEventIcs devolve null

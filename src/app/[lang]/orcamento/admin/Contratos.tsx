@@ -336,11 +336,11 @@ export default function Contratos() {
                               </div>
                             </div>
                             <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-1.5">
-                              Termos aceites (snapshot)
+                              Termos aceites (cópia guardada)
                             </p>
                             <div className="max-h-72 overflow-y-auto rounded-lg border border-foreground/10 bg-white p-4">
                               <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-foreground/60">
-                                {c.termsSnapshot || "Sem snapshot de termos guardado."}
+                                {c.termsSnapshot || "Sem cópia dos termos guardada."}
                               </pre>
                             </div>
                           </td>

@@ -153,7 +153,7 @@ export default function Inbox() {
             onClick={load}
             className="px-3 py-1.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
           >
-            {loading ? "…" : "Actualizar"}
+            {loading ? "…" : "Atualizar"}
           </button>
         </div>
         <div className="flex items-center gap-2 mb-3">
@@ -291,7 +291,7 @@ export default function Inbox() {
           </div>
         ) : (
           <div className="hidden lg:flex items-center justify-center border border-dashed border-foreground/12 rounded-xl text-foreground/22 text-sm h-40 bg-foreground/[0.015]">
-            Seleccione uma mensagem
+            Selecione uma mensagem
           </div>
         )}
       </div>

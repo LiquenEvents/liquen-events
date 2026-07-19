@@ -407,7 +407,7 @@ export function printRunSheet(q: Quote): void {
       : "";
 
   win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8" />
-  <title>Run-sheet — ${escapeHtml(q.name)} — ${q.id}</title>
+  <title>Guião do dia — ${escapeHtml(q.name)} — ${q.id}</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; margin: 0; padding: 40px; }
@@ -436,7 +436,7 @@ export function printRunSheet(q: Quote): void {
   </style></head><body>
     <div class="head">
       <div>
-        <div class="brand">Líquen Events · Run-sheet</div>
+        <div class="brand">Líquen Events · Guião do dia</div>
         <h1>${escapeHtml(q.name)}</h1>
         <div class="sub">${dateStr}</div>
       </div>

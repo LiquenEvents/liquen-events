@@ -181,7 +181,7 @@ export default function GuestList({ quote, onChange }: Props) {
                   className="bo-input w-12 px-1.5 py-1 text-xs text-foreground/70 text-center"
                   aria-label={`Pessoas no grupo ${g.name}`}
                 />
-                pax
+                convidados
               </label>
               <button
                 onClick={() => cycle(g)}
@@ -221,7 +221,7 @@ export default function GuestList({ quote, onChange }: Props) {
           value={party}
           onChange={(e) => setParty(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="pax"
+          placeholder="convidados"
           className="bo-input w-14 px-2 py-1.5 text-xs text-foreground/70 text-center"
           aria-label="Número de pessoas"
         />
