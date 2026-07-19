@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
-import { getProposalByQuote } from "@/lib/proposals-store";
+import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
+import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
 import { log } from "@/lib/logger";
 
@@ -16,6 +17,11 @@ export const runtime = "nodejs";
  * 404 (never 403/401) for any miss — bad/expired token, unknown quote, no
  * proposal, or a legacy line-item proposal without a stored `doc` — so a link
  * never reveals whether an id exists.
+ *
+ * Source of truth mirrors the portal page (page.tsx): the ACCEPTED proposal
+ * (resolved via the accepted contract), not merely the newest one. After
+ * acceptance the team may draft a revision; the client must still download the
+ * exact document they agreed to — never a later internal draft.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -27,7 +33,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     const quote = await getQuote(claim.quoteId);
     if (!quote) return new NextResponse(null, { status: 404 });
 
-    const proposal = await getProposalByQuote(quote.id);
+    // Accepted-first: a client who accepted proposal A must download A, even if
+    // a newer draft B now exists. Only fall back to the newest when nothing has
+    // been accepted yet (proposal still open).
+    const acceptedContract = await getAcceptedContractByQuote(quote.id);
+    const proposal = acceptedContract
+      ? await getProposal(acceptedContract.proposalId)
+      : await getProposalByQuote(quote.id);
     if (!proposal?.doc) return new NextResponse(null, { status: 404 });
 
     const pdf = await renderStoredProposalDocPdf(proposal.doc);

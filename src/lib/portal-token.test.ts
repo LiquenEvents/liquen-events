@@ -54,6 +54,15 @@ describe("portal-token — signed client portal links", () => {
     expect(readPortalToken(undefined)).toBeNull();
   });
 
+  // A minted token is exactly `body.sig` (base64url has no "."), so a token
+  // carrying extra "."-segments is malformed/tampered and must be refused —
+  // never silently accepted by ignoring the trailing junk.
+  it("rejects an otherwise-valid token with a trailing extra segment", () => {
+    const token = createPortalToken("LIQ-ABC-123");
+    expect(readPortalToken(`${token}.garbage`)).toBeNull();
+    expect(readPortalToken(`${token}.`)).toBeNull();
+  });
+
   it("rejects a token signed with a different secret", () => {
     const token = createPortalToken("LIQ-ABC-123");
     process.env.SESSION_SECRET = "a-totally-different-secret-987654321";
