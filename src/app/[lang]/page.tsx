@@ -7,9 +7,6 @@ import Reveal from "@/components/motion/Reveal";
 import { blurFor } from "@/lib/blur";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
-import PhotoWall from "@/components/motion/PhotoWall";
-import { PHOTOS } from "./galeria/photos-data";
-import { ratioFor } from "@/lib/image-meta";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
@@ -24,52 +21,6 @@ const serviceLinks = [
   { image: "/imagens/EW1_1332.jpg", href: "/servicos/eventos-corporativos" },
   { image: "/imagens/DaniGui_JantarFesta_26.jpg", href: "/servicos#celebracoes" },
 ];
-
-// Curated set for the 3D photo wall + its flat-ribbon fallback. EVERY photo is
-// landscape (~1.5:1) to match the carousel's frames — the old set was half
-// portraits, which the 1.5:1 plane cropped into thin slices (looked cheap).
-// Wedding-led with two aerials interleaved for scale/drama.
-const ribbon = [
-  "/imagens/DaniGui_Preview12.jpg",
-  "/imagens/J&P-DJI_20250628174247_0187_D.jpg",
-  "/imagens/ines-goncalo-282.jpg",
-  "/imagens/DaniGui_JantarFesta_26.jpg",
-  "/imagens/M&F0678.jpg",
-  "/imagens/J&P-4B6A1405.jpg",
-  "/imagens/DJI_20250913190635_0120_D.jpg",
-  "/imagens/DaniGui_Preview79.jpg",
-  "/imagens/stephanie-mizio-834.jpg",
-  "/imagens/J&P-IMGL4767.jpg",
-  "/imagens/DaniGui_JantarFesta_48.jpg",
-  "/imagens/ines-goncalo-421.jpg",
-];
-
-// Landscape-only pool for the photo wall. The 12 curated frames above are the
-// spine; we widen the pool with a spread of landscape gallery photos (filtered
-// to ≥1.4:1 so the wide frames never crop to a sliver) so PhotoWall can shuffle
-// and sample a fresh cut on every visit. Blur placeholders are ~150 B each, so
-// this ~30-image pool adds only a few KB to the flight payload.
-const WALL_RATIO_MIN = 1.4;
-// Even spread across a category so the pool doesn't cluster on one photo series.
-function spreadPick(arr: string[], n: number): string[] {
-  if (arr.length <= n) return arr;
-  const step = arr.length / n;
-  return Array.from({ length: n }, (_, i) => arr[Math.floor(i * step)]);
-}
-const landscapeByLabel = (label: string, n: number) =>
-  spreadPick(
-    PHOTOS.filter((p) => p.label === label && ratioFor(p.src) >= WALL_RATIO_MIN).map((p) => p.src),
-    n,
-  );
-const wallPool = Array.from(
-  new Set([
-    ...ribbon,
-    ...landscapeByLabel("Casamento", 12),
-    ...landscapeByLabel("Corporativo", 5),
-    ...landscapeByLabel("Evento", 4),
-    ...landscapeByLabel("Aéreo", 2),
-  ]),
-);
 
 export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
@@ -236,14 +187,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           )}
         </section>
       ))}
-
-      {/* ── Gallery photo wall — 3D curved carousel (flat ribbon fallback) ── */}
-      <PhotoWall
-        images={wallPool.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }))}
-        href={localizeHref("/galeria", locale)}
-        label={t.common.verGaleria}
-        title={t.home.wallTitle}
-      />
 
       {/* ── CTA — full-screen closing panel (matches /servicos) ── */}
       <section
