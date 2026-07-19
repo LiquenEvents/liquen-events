@@ -59,7 +59,7 @@ export function renderPreview(source: string, vars: Record<string, string> = EXA
 const MARKER_RE = /<!--\s*liquen:simple:v1:([A-Za-z0-9+/=]*)\s*-->/;
 
 /** UTF-8 → base64. Uses only web-standard globals (works in Node 18+ and browsers). */
-function toBase64(text: string): string {
+export function toBase64(text: string): string {
   const bytes = new TextEncoder().encode(text);
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
@@ -67,7 +67,7 @@ function toBase64(text: string): string {
 }
 
 /** base64 → UTF-8. */
-function fromBase64(b64: string): string {
+export function fromBase64(b64: string): string {
   const bin = atob(b64);
   const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);

@@ -3,13 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
+import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
 import {
-  buildSimpleEmailHtml,
   extractSimpleText,
   htmlToPlainText,
   insertToken,
   renderPreview,
 } from "@/lib/email-template-format";
+import {
+  buildRichEmailHtml,
+  docFromPlainText,
+  emptyRichDoc,
+  extractRichDoc,
+  type RichDoc,
+} from "@/lib/email-rich-format";
 
 interface EmailTemplate {
   key: string;
@@ -37,9 +44,15 @@ const DESCRIPTIONS: Record<string, string> = {
   agradecimento: "Enviado depois do evento, a agradecer ao cliente.",
 };
 
-type Field = "subject" | "simple" | "advanced";
+type Mode = "visual" | "advanced";
+type Field = "subject" | "visual" | "advanced";
 
 const inputCls = "bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22";
+
+/** The body as stored/sent, given the current editor state. */
+function computeBody(mode: Mode, doc: RichDoc, html: string): string {
+  return mode === "advanced" ? html : buildRichEmailHtml(doc);
+}
 
 export default function EmailTemplates() {
   const { toast } = useToast();
@@ -49,19 +62,21 @@ export default function EmailTemplates() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
 
-  // Editor draft. `simpleText` holds the plain-language body (modo simples);
-  // `htmlBody` holds the raw HTML (HTML avançado). Only one is "active" at a
-  // time, decided by `advanced`.
+  // Editor draft. `doc` is the visual (WYSIWYG) document model; `htmlBody` is the
+  // hand-written HTML of the secondary "HTML avançado" escape hatch. `mode`
+  // decides which is active. `baselineBody` is the stored/last-saved body used
+  // for the dirty check (so re-opening a template is never falsely "dirty").
   const [subject, setSubject] = useState("");
-  const [simpleText, setSimpleText] = useState("");
+  const [doc, setDoc] = useState<RichDoc>(emptyRichDoc);
   const [htmlBody, setHtmlBody] = useState("");
-  const [advanced, setAdvanced] = useState(false);
+  const [mode, setMode] = useState<Mode>("visual");
+  const [baselineBody, setBaselineBody] = useState("");
 
   const subjectRef = useRef<HTMLInputElement>(null);
-  const simpleRef = useRef<HTMLTextAreaElement>(null);
   const advancedRef = useRef<HTMLTextAreaElement>(null);
-  // Which editable last held focus — the merge buttons insert into this one.
-  const activeFieldRef = useRef<Field>("simple");
+  const editorRef = useRef<RichEmailEditorHandle>(null);
+  // Which editable last held focus — the merge chips insert into this one.
+  const activeFieldRef = useRef<Field>("visual");
 
   useEffect(() => {
     (async () => {
@@ -86,20 +101,32 @@ export default function EmailTemplates() {
   function selectInto(t: EmailTemplate) {
     setSelectedKey(t.key);
     setSubject(t.subject);
+    setHtmlBody(t.body);
+
+    const rich = extractRichDoc(t.body);
+    if (rich) {
+      // Already a visual template — restore the model exactly.
+      setDoc(rich);
+      setMode("visual");
+      setBaselineBody(computeBody("visual", rich, t.body));
+      activeFieldRef.current = "visual";
+      return;
+    }
     const simple = extractSimpleText(t.body);
     if (simple !== null) {
-      // A modo-simples template: open in the friendly editor.
-      setAdvanced(false);
-      setSimpleText(simple);
-      setHtmlBody(t.body);
-      activeFieldRef.current = "simple";
-    } else {
-      // Hand-written HTML: open in advanced mode so nothing gets mangled.
-      setAdvanced(true);
-      setHtmlBody(t.body);
-      setSimpleText("");
-      activeFieldRef.current = "advanced";
+      // Older "modo simples" template — open its paragraphs in the visual editor.
+      const converted = docFromPlainText(simple);
+      setDoc(converted);
+      setMode("visual");
+      setBaselineBody(computeBody("visual", converted, t.body));
+      activeFieldRef.current = "visual";
+      return;
     }
+    // Hand-written HTML — open the advanced escape hatch so nothing is mangled.
+    setDoc(emptyRichDoc());
+    setMode("advanced");
+    setBaselineBody(t.body);
+    activeFieldRef.current = "advanced";
   }
 
   const selected = useMemo(
@@ -107,13 +134,11 @@ export default function EmailTemplates() {
     [templates, selectedKey],
   );
 
-  // The body as it will be stored/sent, regardless of which editor is open.
-  const effectiveBody = advanced ? htmlBody : buildSimpleEmailHtml(simpleText);
+  const effectiveBody = computeBody(mode, doc, htmlBody);
+  const dirty = selected ? subject !== selected.subject || effectiveBody !== baselineBody : false;
 
-  const dirty = selected ? subject !== selected.subject || effectiveBody !== selected.body : false;
-
-  // Live preview: subject + body with example merge values, exactly as the
-  // send path resolves them.
+  // Live preview: subject + body with example merge values, exactly as the send
+  // path resolves them.
   const previewSubject = renderPreview(subject);
   const previewSrcDoc = useMemo(() => {
     const rendered = renderPreview(effectiveBody);
@@ -123,13 +148,14 @@ export default function EmailTemplates() {
   function insertMerge(field: string) {
     const token = `{${field}}`;
     const which = activeFieldRef.current;
+    if (which === "visual") {
+      editorRef.current?.insertToken(token);
+      return;
+    }
     const target =
-      which === "subject"
-        ? { ref: subjectRef, value: subject, set: setSubject }
-        : which === "advanced"
-          ? { ref: advancedRef, value: htmlBody, set: setHtmlBody }
-          : { ref: simpleRef, value: simpleText, set: setSimpleText };
-
+      which === "advanced"
+        ? { ref: advancedRef, value: htmlBody, set: setHtmlBody }
+        : { ref: subjectRef, value: subject, set: setSubject };
     const el = target.ref.current;
     if (!el) {
       target.set(target.value + token);
@@ -145,30 +171,36 @@ export default function EmailTemplates() {
     });
   }
 
-  function toggleAdvanced() {
-    if (!advanced) {
-      // simple → advanced: hand the operator the generated HTML to tweak.
-      setHtmlBody(buildSimpleEmailHtml(simpleText));
-      setAdvanced(true);
-      activeFieldRef.current = "advanced";
+  /** Switch to the hand-HTML escape hatch, seeding it with the current body. */
+  function switchToAdvanced() {
+    setHtmlBody(computeBody("visual", doc, htmlBody));
+    setMode("advanced");
+    activeFieldRef.current = "advanced";
+  }
+
+  /** Return to the visual editor, recovering the model when possible. */
+  function switchToVisual() {
+    const rich = extractRichDoc(htmlBody);
+    if (rich) {
+      setDoc(rich);
+      setMode("visual");
+      activeFieldRef.current = "visual";
       return;
     }
-    // advanced → simple.
-    const recovered = extractSimpleText(htmlBody);
-    if (recovered !== null) {
-      setSimpleText(recovered);
-      setAdvanced(false);
-      activeFieldRef.current = "simple";
+    const simple = extractSimpleText(htmlBody);
+    if (simple !== null) {
+      setDoc(docFromPlainText(simple));
+      setMode("visual");
+      activeFieldRef.current = "visual";
       return;
     }
-    // Hand-written HTML has no recoverable text — converting replaces it.
     const ok = window.confirm(
-      "Este modelo tem HTML personalizado. Ao mudar para o modo simples, o HTML é convertido em texto e a formatação avançada perde-se. Continuar?",
+      "Este HTML foi escrito à mão. Ao voltar ao editor visual, a formatação avançada é convertida em texto simples e pode perder-se. Continuar?",
     );
     if (!ok) return;
-    setSimpleText(htmlToPlainText(htmlBody));
-    setAdvanced(false);
-    activeFieldRef.current = "simple";
+    setDoc(docFromPlainText(htmlToPlainText(htmlBody)));
+    setMode("visual");
+    activeFieldRef.current = "visual";
   }
 
   async function save() {
@@ -179,6 +211,7 @@ export default function EmailTemplates() {
     }
     setSaving(true);
     try {
+      const body = effectiveBody;
       const res = await fetch("/api/email-templates", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -186,7 +219,7 @@ export default function EmailTemplates() {
           key: selected.key,
           name: selected.name,
           subject: subject.trim(),
-          body: effectiveBody,
+          body,
         }),
       });
       if (!res.ok) {
@@ -195,6 +228,7 @@ export default function EmailTemplates() {
       }
       const saved: EmailTemplate = await res.json();
       setTemplates((prev) => prev.map((t) => (t.key === saved.key ? saved : t)));
+      setBaselineBody(saved.body);
       setSavedKey(saved.key);
       toast("Modelo guardado.", "success");
     } catch {
@@ -275,8 +309,11 @@ export default function EmailTemplates() {
             </div>
 
             {/* Subject */}
-            <label className="bo-eyebrow block mb-1.5">Assunto</label>
+            <label htmlFor="et-subject" className="bo-eyebrow block mb-1.5">
+              Assunto
+            </label>
             <input
+              id="et-subject"
               ref={subjectRef}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -292,6 +329,9 @@ export default function EmailTemplates() {
                 <button
                   key={f.key}
                   type="button"
+                  // Keep the editor's selection when clicking a chip so the token
+                  // lands at the caret rather than the field losing focus first.
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMerge(f.key)}
                   title={f.hint}
                   className="px-2.5 py-1 rounded-md text-[11px] bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/20 transition-colors"
@@ -305,21 +345,43 @@ export default function EmailTemplates() {
               campo é substituído pelos dados reais.
             </p>
 
-            {/* Body — simple vs advanced */}
+            {/* Body */}
             <div className="flex items-center justify-between mb-1.5">
               <label className="bo-eyebrow">Mensagem</label>
-              <label className="flex items-center gap-2 text-[11px] text-foreground/45 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={advanced}
-                  onChange={toggleAdvanced}
-                  className="accent-[#4d6350]"
-                />
-                HTML avançado
-              </label>
+              {mode === "visual" ? (
+                <button
+                  type="button"
+                  onClick={switchToAdvanced}
+                  className="text-[11px] text-foreground/35 hover:text-foreground/60 underline underline-offset-2"
+                >
+                  HTML avançado
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={switchToVisual}
+                  className="text-[11px] text-[#4d6350] hover:text-[#415440] underline underline-offset-2"
+                >
+                  ← Voltar ao editor visual
+                </button>
+              )}
             </div>
 
-            {advanced ? (
+            {mode === "visual" ? (
+              <>
+                <RichEmailEditor
+                  key={`${selectedKey}:visual`}
+                  ref={editorRef}
+                  initialDoc={doc}
+                  onChange={setDoc}
+                  onFocus={() => (activeFieldRef.current = "visual")}
+                />
+                <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
+                  Escreva e formate a mensagem com a barra acima. Use os botões dos dados do cliente
+                  para inserir campos. À direita vê exatamente como o cliente a recebe.
+                </p>
+              </>
+            ) : (
               <>
                 <textarea
                   ref={advancedRef}
@@ -330,27 +392,12 @@ export default function EmailTemplates() {
                   rows={16}
                   placeholder="<div>…</div>"
                   className={`${inputCls} w-full font-mono !text-xs leading-relaxed resize-y`}
+                  aria-label="HTML do email"
                 />
                 <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
-                  Modo para quem sabe HTML. Os campos entre chavetas (ex.:{" "}
+                  Modo secundário para quem sabe HTML. Os campos entre chavetas (ex.:{" "}
                   <span className="font-mono text-foreground/55">{"{nome}"}</span>) são substituídos
                   no envio. À direita vê como fica.
-                </p>
-              </>
-            ) : (
-              <>
-                <textarea
-                  ref={simpleRef}
-                  value={simpleText}
-                  onChange={(e) => setSimpleText(e.target.value)}
-                  onFocus={() => (activeFieldRef.current = "simple")}
-                  rows={14}
-                  placeholder={"Olá {nome},\n\nEscreva aqui a sua mensagem…"}
-                  className={`${inputCls} w-full text-sm leading-relaxed resize-y`}
-                />
-                <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
-                  Escreva a sua mensagem. Separe parágrafos com uma linha em branco e use os botões
-                  acima para inserir dados do cliente. À direita vê como fica.
                 </p>
               </>
             )}
