@@ -141,17 +141,30 @@ export function buildSimpleEmailHtml(text: string): string {
  * confirmation in the UI.
  */
 export function htmlToPlainText(html: string): string {
-  return html
+  // Turn line-break / block-closing tags into newlines up front.
+  let s = html
     .replace(MARKER_RE, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<\s*(br|hr)\s*\/?>/gi, "\n")
-    .replace(/<\/\s*(p|div|h[1-6]|li|tr)\s*>/gi, "\n\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<\/\s*(p|div|h[1-6]|li|tr)\s*>/gi, "\n\n");
+  // Strip comments + any remaining tags in a fixpoint loop: a single pass can
+  // be defeated by crafted/overlapping sequences (e.g. `<scr<script>ipt>` or a
+  // nested `<!-- <!-- -->`), so repeat until the string stops changing.
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "");
+  } while (s !== prev);
+  // Decode the handful of entities we emit. `&amp;` is decoded LAST so an
+  // encoded entity like `&amp;lt;` resolves to the literal text `&lt;` and can
+  // never be double-unescaped into a `<` (no re-introduced markup).
+  s = s
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
+    .replace(/&#3?9;/g, "'")
+    .replace(/&amp;/g, "&");
+  return s
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
