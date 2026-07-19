@@ -75,6 +75,82 @@ body.admin-mode {
   --bo-text: rgba(42, 38, 32, 0.78);
   --bo-text-muted: rgba(42, 38, 32, 0.7);
   --bo-text-faint: rgba(42, 38, 32, 0.6);
+
+  /* ── ChatGPT-app design system (back office only) ──────────────────────────
+     One calm, modern surface language shared by every admin screen. Scoped to
+     .admin-mode so the public marketing site is never touched. The tokens below
+     feed the shared `.bo-*` primitives; the base type rules make the working UI
+     read like ChatGPT's clean sans (Inter, already loaded via next/font) with
+     generous line-height, while big display headings keep Playfair (identity).
+
+     ── Neutral surfaces (low-contrast but AA) ── */
+  --bo-surface: #ffffff; /* card / panel face */
+  --bo-surface-sunken: #f7f6f4; /* insets, list stripes, code wells */
+  --bo-surface-hover: rgba(42, 38, 32, 0.035); /* row / item hover wash */
+  --bo-tint-accent: rgba(99, 122, 95, 0.1); /* soft moss call-out fill */
+
+  /* ── Hairline borders & control boundaries ── */
+  --bo-hairline: rgba(42, 38, 32, 0.08); /* card / divider hairline */
+  --bo-hairline-strong: rgba(42, 38, 32, 0.14); /* clearer separator */
+  /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
+  --bo-control-border: rgba(42, 38, 32, 0.5);
+
+  /* ── Rounded radii — chips → controls → cards (rounded-lg/xl/2xl) ── */
+  --bo-radius-sm: 0.625rem; /* 10px — inner chips / pills */
+  --bo-radius: 0.75rem; /* 12px — inputs, buttons, segmented */
+  --bo-radius-lg: 1rem; /* 16px — cards & panels */
+
+  /* ── Soft shadows ── */
+  --bo-shadow-sm: 0 1px 2px rgba(42, 38, 32, 0.04); /* resting surfaces */
+  --bo-shadow:
+    0 1px 2px rgba(42, 38, 32, 0.05), 0 8px 24px -12px rgba(42, 38, 32, 0.12); /* elevated */
+
+  /* ── Single accent: Líquen moss ── */
+  --bo-accent: #4c6350; /* moss-dark — primary actions / active states */
+  --bo-accent-ring: rgba(76, 99, 80, 0.16); /* focus / active soft ring */
+
+  /* ── Type scale (documented reference for the whole back office). Sizes the
+     screens already reach for via Tailwind, unified here into one calm ramp.
+        caption 12/1.5 · label 13 caps · body 15/1.6 · lead 17/1.6
+        title 20 · display via Playfair (font-display) ── */
+  --bo-fs-caption: 0.75rem;
+  --bo-fs-label: 0.8125rem;
+  --bo-fs-body: 0.9375rem;
+  --bo-fs-lead: 1.0625rem;
+  --bo-fs-title: 1.25rem;
+  --bo-lh-tight: 1.3;
+  --bo-lh-body: 1.6;
+  --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
+
+  /* Clean, modern UI sans for all working admin text — Inter first (loaded),
+     then a system-ui stack so there is never a network dependency. Big display
+     headings opt into Playfair via `font-display`. */
+  font-family:
+    var(--font-inter),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  line-height: var(--bo-lh-body);
+  letter-spacing: -0.006em; /* whisper-tight; calmer, more contemporary */
+}
+
+/* Admin UI text breathes: generous line-height on flowing copy, and the modern
+   sans tightening on the working (non-display) headings so labels/titles read
+   crisp like ChatGPT's. Playfair display titles keep their natural tracking. */
+body.admin-mode :is(h1, h2, h3, h4):not(.font-display) {
+  letter-spacing: var(--bo-tracking-tight);
+}
+
+/* Moss is the single admin accent — even the text selection picks it up instead
+   of the site-wide gold. */
+body.admin-mode ::selection {
+  background: rgba(99, 122, 95, 0.22);
+  color: #2a2620;
 }
 /* Matching utilities so the tokens can be applied like the Tailwind text-* class
    they replace. */
@@ -704,33 +780,39 @@ body[data-menu-open] .whatsapp-fixed {
    shadow, forest-green (#1b2119) for dark accents and #4d6350 for the green
    call-outs. These classes keep that language consistent across every view. */
 .bo-card {
-  background: #ffffff;
-  border: 1px solid rgba(42, 38, 32, 0.08);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 2px rgba(42, 38, 32, 0.04);
+  background: var(--bo-surface, #ffffff);
+  border: 1px solid var(--bo-hairline, rgba(42, 38, 32, 0.08));
+  /* Roomier corners (rounded-2xl) — the calm container the redesign leans on. */
+  border-radius: var(--bo-radius-lg, 1rem);
+  box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
 }
 /* Input / select fields inside the back office */
 .bo-input {
   width: 100%;
-  background: #ffffff;
+  background: var(--bo-surface, #ffffff);
   /* ≥3:1 non-text contrast so the field boundary is identifiable (WCAG 1.4.11). */
-  border: 1px solid rgba(42, 38, 32, 0.5);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 2px rgba(42, 38, 32, 0.04);
+  border: 1px solid var(--bo-control-border, rgba(42, 38, 32, 0.5));
+  border-radius: var(--bo-radius, 0.75rem);
+  box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
+  /* Keep the focus transition to border only: the global :focus-visible moss
+     ring stays the keyboard focus indicator (not overridden here). */
   transition: border-color 0.2s ease;
 }
 .bo-input:focus {
   outline: none;
-  border-color: rgba(42, 38, 32, 0.75);
+  /* Active field borders adopt the single moss accent. */
+  border-color: var(--bo-accent, #4c6350);
 }
-/* Eyebrow label used atop panels — ~4.1:1 on white so the section it heads is
-   legible, not a ghost (WCAG 1.4.3; matches the public .eyebrow discipline). */
+/* Eyebrow label used atop panels and as the Field <label> — bumped to ~5:1 on
+   white (0.66 alpha) so it clears AA as a real label, with a calmer, more
+   contemporary tracking than the old wide-spaced micro-caps (WCAG 1.4.3). */
 .bo-eyebrow {
-  color: rgba(42, 38, 32, 0.6);
-  font-size: 10px;
-  letter-spacing: 0.3em;
+  color: rgba(42, 38, 32, 0.66);
+  font-size: 0.6875rem; /* 11px — a touch more legible than 10px */
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 /* Skeleton loader — a soft shimmering placeholder block. Used while a view or
