@@ -642,6 +642,46 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }
 
+  // Permanently delete every selected pedido (hard delete, not archive). One
+  // confirm covers the whole batch; each id is DELETEd, then the successful
+  // ones are dropped from local state and the selection is cleared.
+  async function deleteSelected() {
+    const ids = [...selectedIds];
+    if (ids.length === 0 || bulkBusy) return;
+    if (
+      !window.confirm(
+        `Apagar ${ids.length} pedidos definitivamente? Esta ação não pode ser anulada.`,
+      )
+    )
+      return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/orcamento/${id}`, { method: "DELETE" })
+            .then((r) => (r.ok ? id : null))
+            .catch(() => null),
+        ),
+      );
+      const removed = new Set(results.filter((x): x is string => x !== null));
+      if (removed.size > 0) {
+        setQuotes((prev) => prev.filter((q) => !removed.has(q.id)));
+        setSelected((prev) => (prev && removed.has(prev.id) ? null : prev));
+      }
+      const ok = removed.size;
+      const failed = ids.length - ok;
+      toast(
+        failed === 0
+          ? `${ok} pedido${ok !== 1 ? "s" : ""} apagado${ok !== 1 ? "s" : ""}`
+          : `${ok} apagado(s), ${failed} falhou(ram)`,
+        failed === 0 ? "success" : "error",
+      );
+      setSelectedIds(new Set());
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const archivedCount = useMemo(() => quotes.filter((q) => q.archived).length, [quotes]);
 
   // Archived quotes are soft-deleted: keep them out of the analytical surfaces
@@ -1495,6 +1535,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     </a>
                   );
                 })()}
+                {/* Hard delete for the whole selection — restrained terracotta,
+                    always behind a single confirm; disabled while a batch runs. */}
+                <button
+                  onClick={deleteSelected}
+                  disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#b5654a]/25 text-[#b5654a]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#b5654a]/10 hover:text-[#b5654a] transition-colors shadow-sm disabled:opacity-50"
+                >
+                  Apagar ({selectedIds.size})
+                </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}
                   className="ml-auto text-foreground/40 text-xs hover:text-foreground/70 transition-colors"
@@ -1782,6 +1831,47 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             <span className="hidden sm:inline">
                               {selected.archived ? "Restaurar" : "Arquivar"}
                             </span>
+                          </button>
+                          {/* Hard delete — irreversible, so it stays visually
+                              restrained (muted terracotta on hover) and always
+                              behind a confirm. Archiving above is the reversible
+                              option; this permanently removes the pedido. */}
+                          <button
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
+                                )
+                              )
+                                return;
+                              try {
+                                const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                  method: "DELETE",
+                                });
+                                if (!res.ok) throw new Error("delete failed");
+                                setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
+                                setSelected(null);
+                                toast("Pedido apagado", "success");
+                              } catch {
+                                toast("Não foi possível apagar o pedido", "error");
+                              }
+                            }}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] tracking-[0.15em] uppercase rounded-lg text-foreground/35 hover:text-[#b5654a] hover:bg-[#b5654a]/10 transition-colors"
+                            title="Apagar pedido definitivamente"
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+                            </svg>
+                            <span className="hidden sm:inline">Apagar</span>
                           </button>
                           <button
                             onClick={() => duplicateQuote(selected)}

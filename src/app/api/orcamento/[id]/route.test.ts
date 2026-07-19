@@ -42,9 +42,14 @@ const store = vi.hoisted(() => ({
       : null,
   ),
   update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
+  remove: vi.fn(async (_id: string) => {}),
 }));
 const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
-vi.mock("@/lib/quotes-store", () => ({ getQuote: store.get, updateQuote: store.update }));
+vi.mock("@/lib/quotes-store", () => ({
+  getQuote: store.get,
+  updateQuote: store.update,
+  deleteQuote: store.remove,
+}));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(async () => rl.result),
@@ -52,10 +57,10 @@ vi.mock("@/lib/rate-limit", () => ({
   sweep: () => {},
 }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, DELETE } from "./route";
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-function req(method: "GET" | "PATCH", body?: unknown): NextRequest {
+function req(method: "GET" | "PATCH" | "DELETE", body?: unknown): NextRequest {
   return new Request("https://liquen.test/api/orcamento/LIQ-1", {
     method,
     headers: { "Content-Type": "application/json" },
@@ -125,5 +130,21 @@ describe("PATCH /api/orcamento/[id]", () => {
       ctx("LIQ-1"),
     );
     expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 5000 });
+  });
+});
+
+describe("DELETE /api/orcamento/[id]", () => {
+  it("requires authentication", async () => {
+    const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
+    expect(res.status).toBe(401);
+    expect(store.remove).not.toHaveBeenCalled();
+  });
+
+  it("hard-deletes the quote for an authenticated admin", async () => {
+    authed.ok = true;
+    const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(store.remove).toHaveBeenCalledWith("LIQ-1");
   });
 });

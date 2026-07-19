@@ -3,6 +3,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import {
   getInvoice,
   updateInvoice,
+  deleteInvoice,
   listInvoicesForQuote,
   createInvoice,
   newInvoiceId,
@@ -221,6 +222,39 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(updated);
   } catch (err) {
     log.error("faturas PATCH falhou", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+/**
+ * Remoção definitiva de uma fatura do livro.
+ *
+ * REGRA FISCAL (só anuladas): uma fatura só pode ser apagada se já estiver
+ * `anulada`. Uma fatura viva (emitida/paga) nunca se apaga — anula-se primeiro
+ * (PATCH → anulada) e só depois se remove. Assim uma fatura ativa nunca
+ * desaparece por engano. As falhas na numeração sequencial são aceitáveis
+ * apenas para linhas anuladas (a integridade da sequência fiscal mantém-se: o
+ * número já estava fora de circulação antes de a linha ser removida).
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const { id } = await params;
+  try {
+    const invoice = await getInvoice(id);
+    if (!invoice) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
+    if (invoice.status !== "anulada") {
+      return NextResponse.json(
+        { error: "Só é possível apagar faturas anuladas. Anule a fatura primeiro." },
+        { status: 409 },
+      );
+    }
+    await deleteInvoice(id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    log.error("faturas DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

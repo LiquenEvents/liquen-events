@@ -5,7 +5,8 @@ import type { NextRequest } from "next/server";
 const invoicesDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 const proposalsDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 
-vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
+const authState = vi.hoisted(() => ({ authed: true }));
+vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
 
 vi.mock("@/lib/invoices-store", () => ({
   getInvoice: vi.fn(async (id: string) => invoicesDb.store.get(id) ?? null),
@@ -21,6 +22,9 @@ vi.mock("@/lib/invoices-store", () => ({
   ),
   createInvoice: vi.fn(async (i: Record<string, unknown>) => {
     invoicesDb.store.set(i.id as string, i);
+  }),
+  deleteInvoice: vi.fn(async (id: string) => {
+    invoicesDb.store.delete(id);
   }),
   newInvoiceId: vi.fn(() => `inv-${invoicesDb.store.size + 1}`),
   nextInvoiceNumber: vi.fn(async () => "FT 2026/0002"),
@@ -39,8 +43,8 @@ vi.mock("@/lib/money", () => ({ round2: (n: number) => Math.round(n * 100) / 100
 
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
-import { PATCH } from "./route";
-import { createInvoice, listInvoicesForQuote } from "@/lib/invoices-store";
+import { PATCH, DELETE } from "./route";
+import { createInvoice, listInvoicesForQuote, deleteInvoice } from "@/lib/invoices-store";
 
 function patchReq(
   id: string,
@@ -70,9 +74,17 @@ function seedSinal(id: string, over: Record<string, unknown> = {}) {
   });
 }
 
+function delReq(id: string): { req: NextRequest; params: Promise<{ id: string }> } {
+  const req = new Request(`https://liquen.test/api/faturas/${id}`, {
+    method: "DELETE",
+  }) as unknown as NextRequest;
+  return { req, params: Promise.resolve({ id }) };
+}
+
 beforeEach(() => {
   invoicesDb.store.clear();
   proposalsDb.store.clear();
+  authState.authed = true;
   vi.clearAllMocks();
 });
 
@@ -258,5 +270,53 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     // The sinal is still marked paid; no saldo attached because creation failed.
     expect(json).toMatchObject({ id: "s6", status: "paga" });
     expect(json.saldoAutoIssued).toBeUndefined();
+  });
+});
+
+describe("DELETE /api/faturas/[id] — apagar só faturas anuladas", () => {
+  it("returns 401 without auth (and never touches the store)", async () => {
+    authState.authed = false;
+    seedSinal("d0", { status: "anulada" });
+    const { req, params } = delReq("d0");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(401);
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the invoice does not exist", async () => {
+    const { req, params } = delReq("missing");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(404);
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when the invoice is not anulada (fiscal guard)", async () => {
+    seedSinal("d1"); // status emitida
+    const { req, params } = delReq("d1");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe("Só é possível apagar faturas anuladas. Anule a fatura primeiro.");
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete a paga invoice too (only anulada is deletable)", async () => {
+    seedSinal("d2", { status: "paga", paidAt: "2026-07-05" });
+    const { req, params } = delReq("d2");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("deletes an anulada invoice: 200 + deleteInvoice called", async () => {
+    seedSinal("d3", { status: "anulada" });
+    const { req, params } = delReq("d3");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({ ok: true });
+    expect(deleteInvoice).toHaveBeenCalledTimes(1);
+    expect(deleteInvoice).toHaveBeenCalledWith("d3");
+    expect(invoicesDb.store.has("d3")).toBe(false);
   });
 });

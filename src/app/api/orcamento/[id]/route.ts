@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Quote } from "@/lib/orcamento/types";
-import { getQuote, updateQuote } from "@/lib/quotes-store";
+import { getQuote, updateQuote, deleteQuote } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quoteUpdateSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
+
+// The store is server-only and reaches for node:crypto — pin the Node runtime.
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -107,6 +110,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(updated);
   } catch (err) {
     log.error("orcamento PATCH falhou", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+// Hard delete — for junk/test leads. This is deliberately distinct from
+// archiving (PATCH { archived: true }), a reversible soft-delete that keeps the
+// record. Deleting only removes the quote itself: related invoices and
+// contracts are fiscal records and are intentionally left untouched. (Draft
+// proposals are left too — proposals-store exposes no clean delete helper.)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!isAuthed(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  try {
+    await deleteQuote(id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    log.error("orcamento DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

@@ -77,6 +77,9 @@ export const listInvoicesForQuote = (quoteId: string): Promise<Invoice[]> =>
 export const createInvoice = (i: Invoice): Promise<void> => repo.create(i);
 export const updateInvoice = (id: string, patch: Partial<Invoice>): Promise<Invoice | null> =>
   repo.update(id, patch);
+// Remoção definitiva de uma fatura do livro. A guarda fiscal (só faturas
+// `anulada` podem ser apagadas) vive na rota — o store apenas expõe a operação.
+export const deleteInvoice = (id: string): Promise<void> => repo.remove(id);
 
 /**
  * O split 30/70 vive agora em `./money` (client-safe) — re-exportado aqui para

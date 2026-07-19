@@ -218,6 +218,34 @@ export default function Faturas({ quotes }: Props) {
     }
   }
 
+  // Apagar definitivamente uma fatura — só permitido quando já está anulada
+  // (a guarda fiscal vive também no servidor, que devolve 409 caso contrário).
+  // Anula-se primeiro, depois apaga-se: uma fatura viva nunca se apaga por engano.
+  async function remove(inv: Invoice) {
+    if (
+      !window.confirm(
+        `Apagar definitivamente a fatura ${inv.number}? Esta ação não pode ser anulada.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(inv.id);
+    try {
+      const res = await fetch(`/api/faturas/${inv.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "Não foi possível apagar", "error");
+        return;
+      }
+      setInvoices((prev) => prev.filter((i) => i.id !== inv.id));
+      toast("Fatura apagada", "success");
+    } catch {
+      toast("Erro de rede ao apagar", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const filtered = useMemo(
     () => (filter === "all" ? invoices : invoices.filter((i) => i.status === filter)),
     [invoices, filter],
@@ -587,6 +615,17 @@ export default function Faturas({ quotes }: Props) {
                           <span className="text-foreground/30 text-[10px]">
                             Pago {fmtDate(i.paidAt)}
                           </span>
+                        )}
+                        {/* Apagar — só para faturas já anuladas (segurança fiscal:
+                            anula-se primeiro, depois apaga-se). */}
+                        {i.status === "anulada" && (
+                          <button
+                            onClick={() => remove(i)}
+                            disabled={busy === i.id}
+                            className="px-2.5 py-1 rounded-lg text-[10px] tracking-[0.08em] uppercase font-medium bg-foreground/[0.05] text-foreground/40 hover:text-[#b5654a] hover:bg-[#b5654a]/[0.08] transition-colors disabled:opacity-40"
+                          >
+                            Apagar
+                          </button>
                         )}
                       </div>
                     </td>
