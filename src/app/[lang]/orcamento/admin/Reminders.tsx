@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Quote, Task } from "@/lib/orcamento/types";
 import { eur0 } from "@/lib/money";
+import { Card } from "./ui";
 
 interface Reminder {
   kind: "evento" | "pagamento" | "pedido" | "tarefa" | "seguimento";
@@ -211,34 +212,39 @@ export default function Reminders({ quotes, onOpen }: Props) {
   };
 
   return (
-    <div className="bo-card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+    <Card padding="none" className="overflow-hidden">
+      <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
         <p className="bo-eyebrow">Lembretes</p>
         <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
           {reminders.length}
         </span>
       </div>
-      <div className="divide-y divide-foreground/[0.06] max-h-[340px] overflow-y-auto">
+      <ul className="divide-y divide-foreground/[0.06] max-h-[340px] overflow-y-auto">
         {reminders.map((r, i) => (
-          <button
-            key={i}
-            onClick={() => r.quote && onOpen(r.quote)}
-            disabled={!r.quote}
-            className={`w-full text-left px-5 py-3 flex items-center gap-3 transition-colors ${r.quote ? "hover:bg-foreground/[0.02] cursor-pointer" : "cursor-default"}`}
-          >
-            <span style={{ color: r.urgent ? "#b5654a" : "#9aa36a" }}>{icon(r.kind)}</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-foreground/68 text-xs truncate font-medium">{r.text}</p>
-              <p
-                className={`text-[10px] truncate ${r.urgent ? "text-[#b5654a]" : "text-foreground/30"}`}
-              >
-                {r.sub}
-              </p>
-            </div>
-            {r.urgent && <span className="w-1.5 h-1.5 rounded-full bg-[#b5654a] shrink-0" />}
-          </button>
+          <li key={i}>
+            <button
+              onClick={() => r.quote && onOpen(r.quote)}
+              disabled={!r.quote}
+              className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 motion-safe:transition-colors ${r.quote ? "hover:bg-foreground/[0.02] cursor-pointer" : "cursor-default"}`}
+            >
+              <span style={{ color: r.urgent ? "#b5654a" : "#9aa36a" }}>{icon(r.kind)}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-foreground/70 text-xs truncate font-medium">{r.text}</p>
+                <p
+                  className={`text-[10px] truncate ${r.urgent ? "text-[#b5654a]" : "text-foreground/40"}`}
+                >
+                  {r.sub}
+                </p>
+              </div>
+              {r.urgent && (
+                <span className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0 bg-[#b5654a]/12 text-[#b5654a]">
+                  Urgente
+                </span>
+              )}
+            </button>
+          </li>
         ))}
-      </div>
-    </div>
+      </ul>
+    </Card>
   );
 }

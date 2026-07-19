@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { eur0 as eur } from "@/lib/money";
+import { Card, EmptyState } from "./ui";
 
 const DAYS_AHEAD = 14;
 
@@ -160,14 +161,14 @@ export default function Agenda({ quotes, onOpen }: Props) {
   }
 
   return (
-    <div className="bo-card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+    <Card padding="none" className="overflow-hidden">
+      <div className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
         <p className="bo-eyebrow">Agenda · próximos {DAYS_AHEAD} dias</p>
         <div className="flex items-center gap-3">
           {(["evento", "agenda", "tarefa", "pagamento", "seguimento"] as ItemKind[]).map((k) => (
             <span
               key={k}
-              className="hidden sm:flex items-center gap-1.5 text-foreground/30 text-[9px] uppercase tracking-wider"
+              className="hidden sm:flex items-center gap-1.5 text-foreground/40 text-[9px] uppercase tracking-wider"
             >
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: KIND_COLOR[k] }} />
               {KIND_LABEL[k]}
@@ -178,14 +179,29 @@ export default function Agenda({ quotes, onOpen }: Props) {
 
       <div className="max-h-[420px] overflow-y-auto">
         {days.length === 0 ? (
-          <p className="text-foreground/25 text-sm text-center py-12">
-            Nada agendado para os próximos {DAYS_AHEAD} dias.
-          </p>
+          <EmptyState
+            icon={
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="17" rx="2" />
+                <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+              </svg>
+            }
+            title="Agenda tranquila"
+            description={`Nada agendado para os próximos ${DAYS_AHEAD} dias. Os eventos, tarefas e pagamentos aparecem aqui à medida que se aproximam.`}
+          />
         ) : (
           days.map((key) => (
             <div key={key} className="border-b border-foreground/[0.06] last:border-0">
               <p
-                className={`px-5 pt-3 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayKey ? "text-[#4d6350]" : "text-foreground/35"}`}
+                className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayKey ? "text-[#4d6350]" : "text-foreground/40"}`}
               >
                 {dayLabel(key)}
               </p>
@@ -196,21 +212,21 @@ export default function Agenda({ quotes, onOpen }: Props) {
                     <Wrap
                       key={i}
                       onClick={it.onClick}
-                      className={`w-full text-left px-5 py-2 flex items-center gap-3 ${it.onClick ? "hover:bg-foreground/[0.02] transition-colors cursor-pointer" : ""}`}
+                      className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.onClick ? "hover:bg-foreground/[0.02] motion-safe:transition-colors cursor-pointer" : ""}`}
                     >
                       <span
                         className="w-1.5 h-1.5 rounded-full shrink-0"
                         style={{ background: it.color }}
                       />
                       {it.time && (
-                        <span className="text-foreground/40 text-[11px] tabular-nums shrink-0 w-10">
+                        <span className="text-foreground/45 text-[11px] tabular-nums shrink-0 w-10">
                           {it.time}
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="text-foreground/70 text-sm truncate">{it.title}</p>
                         {it.sub && (
-                          <p className="text-foreground/30 text-[11px] truncate capitalize">
+                          <p className="text-foreground/40 text-[11px] truncate capitalize">
                             {it.sub}
                           </p>
                         )}
@@ -229,6 +245,6 @@ export default function Agenda({ quotes, onOpen }: Props) {
           ))
         )}
       </div>
-    </div>
+    </Card>
   );
 }
