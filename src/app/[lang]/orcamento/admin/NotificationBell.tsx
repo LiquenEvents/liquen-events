@@ -3,6 +3,28 @@
 import { useEffect, useState } from "react";
 import { useToast } from "./Toast";
 import { log } from "@/lib/logger";
+import { Button } from "./ui";
+
+function BellIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      <path
+        d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 type State = "unsupported" | "unconfigured" | "default" | "granted" | "denied" | "loading";
 
@@ -86,7 +108,10 @@ export default function NotificationBell() {
 
   if (state === "granted") {
     return (
-      <button
+      <Button
+        variant="subtle"
+        size="sm"
+        iconLeft={<BellIcon />}
         onClick={async () => {
           try {
             const res = await fetch("/api/cron/reminders", { cache: "no-store" });
@@ -101,31 +126,18 @@ export default function NotificationBell() {
             toast("Não foi possível enviar", "error");
           }
         }}
-        className="flex items-center gap-2 px-3 py-2 text-[#4d6350] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#4d6350]/8 transition-colors"
         title="Notificações ativas — clique para enviar o resumo agora"
       >
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        >
-          <path
-            d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" />
-        </svg>
         <span className="hidden sm:inline">Ativas</span>
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
+    <Button
+      variant="secondary"
+      size="sm"
+      iconLeft={<BellIcon />}
       onClick={enable}
       disabled={state === "denied"}
       title={
@@ -133,26 +145,10 @@ export default function NotificationBell() {
           ? "Notificações bloqueadas no navegador"
           : "Ativar notificações neste dispositivo"
       }
-      className="flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      >
-        <path
-          d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" />
-      </svg>
       <span className="hidden sm:inline">
         {state === "denied" ? "Bloqueadas" : "Ativar notificações"}
       </span>
-    </button>
+    </Button>
   );
 }

@@ -134,28 +134,29 @@ export default function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-start justify-center pt-[12vh] px-4"
+      className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12vh]"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm" />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Pesquisar e navegar"
-        className="relative w-full max-w-lg bg-white border border-foreground/10 rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white shadow-[0_24px_60px_-12px_rgba(27,33,25,0.35)]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-foreground/8">
+        <div className="flex items-center gap-3 border-b border-foreground/[0.07] px-4 py-3.5">
           <svg
-            className="text-foreground/30"
-            width="16"
-            height="16"
+            className="shrink-0 text-foreground/40"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
+            aria-hidden="true"
           >
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" strokeLinecap="round" />
@@ -165,25 +166,28 @@ export default function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Pesquisar ou navegar…"
-            className="flex-1 bg-transparent text-foreground/80 text-sm placeholder-foreground/25 focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] text-foreground/90 placeholder-foreground/35 focus:outline-none"
           />
-          <kbd className="text-[9px] text-foreground/30 border border-foreground/12 rounded px-1.5 py-0.5 tracking-wider">
+          <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5 text-[10px] tracking-wider text-foreground/45">
             ESC
           </kbd>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto py-2">
+        <div className="max-h-[52vh] overflow-y-auto p-2">
           {results.length === 0 && (
-            <p className="text-foreground/25 text-sm text-center py-8">Sem resultados.</p>
+            <p className="py-10 text-center text-sm text-foreground/45">
+              Sem resultados para “{query.trim()}”.
+            </p>
           )}
           {groups.map((g) => (
-            <div key={g.name} className="mb-1">
-              <p className="px-4 py-1.5 text-foreground/22 text-[9px] tracking-[0.3em] uppercase">
+            <div key={g.name} className="mb-1 last:mb-0">
+              <p className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
                 {g.name}
               </p>
               {g.items.map((c) => {
                 flatIndex++;
                 const idx = flatIndex;
+                const isActive = active === idx;
                 return (
                   <button
                     key={c.id}
@@ -192,19 +196,63 @@ export default function CommandPalette({
                       c.run();
                       onClose();
                     }}
-                    className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-colors ${
-                      active === idx ? "bg-[#4d6350]/12" : "hover:bg-foreground/[0.04]"
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left motion-safe:transition-colors ${
+                      isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-foreground/[0.04]"
                     }`}
                   >
                     <span
-                      className={`text-sm ${active === idx ? "text-[#4d6350] font-medium" : "text-foreground/65"}`}
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                        isActive
+                          ? "bg-[#4d6350]/[0.16] text-[#4d6350]"
+                          : "bg-foreground/[0.05] text-foreground/40"
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {c.hint ? (
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                        >
+                          <circle cx="12" cy="8" r="3.2" />
+                          <path d="M5.5 19a6.5 6.5 0 0 1 13 0" strokeLinecap="round" />
+                        </svg>
+                      ) : (
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                        >
+                          <path
+                            d="M5 12h14M13 6l6 6-6 6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 truncate text-sm ${
+                        isActive ? "font-medium text-[#4d6350]" : "text-foreground/75"
+                      }`}
                     >
                       {c.label}
                     </span>
                     {c.hint && (
-                      <span className="text-foreground/25 text-xs truncate max-w-[180px]">
+                      <span className="max-w-[180px] shrink-0 truncate text-xs text-foreground/40">
                         {c.hint}
                       </span>
+                    )}
+                    {isActive && (
+                      <kbd className="shrink-0 rounded-md border border-[#4d6350]/25 px-1.5 py-0.5 text-[10px] text-[#4d6350]">
+                        ↵
+                      </kbd>
                     )}
                   </button>
                 );
@@ -213,12 +261,15 @@ export default function CommandPalette({
           ))}
         </div>
 
-        <div className="flex items-center gap-4 px-4 py-2.5 border-t border-foreground/8 text-foreground/25 text-[10px]">
+        <div className="flex items-center gap-4 border-t border-foreground/[0.07] px-4 py-2.5 text-[11px] text-foreground/45">
           <span className="flex items-center gap-1.5">
-            <kbd className="border border-foreground/12 rounded px-1">↑↓</kbd> navegar
+            <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5">↑↓</kbd> navegar
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="border border-foreground/12 rounded px-1">↵</kbd> abrir
+            <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5">↵</kbd> abrir
+          </span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5">esc</kbd> fechar
           </span>
         </div>
       </div>
