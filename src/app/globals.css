@@ -122,6 +122,14 @@ body.admin-mode {
   --bo-lh-body: 1.6;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
+  /* ChatGPT-clean titles: the back office drops the Playfair serif entirely.
+     Redefining the font variable INSIDE .admin-mode means both the `font-display`
+     class and any inline `var(--font-playfair)` resolve to the modern UI sans —
+     the public marketing site (outside .admin-mode) keeps Playfair untouched. */
+  --font-playfair:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
   /* Clean, modern UI sans for all working admin text — Inter first (loaded),
      then a system-ui stack so there is never a network dependency. Big display
      headings opt into Playfair via `font-display`. */
@@ -142,7 +150,8 @@ body.admin-mode {
 /* Admin UI text breathes: generous line-height on flowing copy, and the modern
    sans tightening on the working (non-display) headings so labels/titles read
    crisp like ChatGPT's. Playfair display titles keep their natural tracking. */
-body.admin-mode :is(h1, h2, h3, h4):not(.font-display) {
+body.admin-mode :is(h1, h2, h3, h4),
+body.admin-mode .font-display {
   letter-spacing: var(--bo-tracking-tight);
 }
 
