@@ -72,14 +72,18 @@ async function login(page: Page): Promise<boolean> {
 // The main destinations the smoke walks: sidebar label to click, and the page
 // heading (H1) the header must show once the view is active. Labels come from
 // nav.tsx; headings from AdminClient's VIEW_TITLES.
+// The always-visible core sidebar items (the rest live under a collapsed "Mais"
+// group). Walking the core covers the daily-use screens without depending on the
+// disclosure state. `nav` is the sidebar label; `heading` is the H1 the sticky
+// header shows for that view (AdminClient's VIEW_TITLES).
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
-  { nav: /^Pipeline$/, heading: /^Pipeline$/ },
-  { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
+  { nav: /^Propostas$/, heading: /^Propostas$/ },
   { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Contratos$/, heading: /^Contratos$/ },
   { nav: /^Mensagens$/, heading: /^Inbox$/ },
+  { nav: /^Calendário$/, heading: /^Calendário$/ },
 ];
 
 test.describe("Back office — smoke", () => {
