@@ -423,8 +423,8 @@ export default function OrcamentoForm({
                 doesn't read the title twice on desktop. */}
             <p
               aria-hidden
-              className="text-cream font-bold leading-[0.92] tracking-tight mb-8"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 4vw, 68px)" }}
+              className="text-cream font-bold uppercase tracking-display leading-[0.92] mb-8"
+              style={{ fontSize: "clamp(40px, 4vw, 68px)" }}
             >
               {to.titleLine1}
               <br />
@@ -454,8 +454,8 @@ export default function OrcamentoForm({
               desktop (where the left panel shows the display title). Always in
               the a11y tree, so heading navigation works at every breakpoint. */}
           <h1
-            className="lg:sr-only text-foreground font-bold leading-[0.95] tracking-tight mb-6"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(34px, 9vw, 52px)" }}
+            className="lg:sr-only text-foreground font-bold uppercase tracking-display leading-[0.95] mb-6"
+            style={{ fontSize: "clamp(34px, 9vw, 52px)" }}
           >
             {to.titleLine1} <span className="text-moss">{to.titleMoss}</span>
           </h1>

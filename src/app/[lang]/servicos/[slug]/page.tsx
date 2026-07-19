@@ -345,10 +345,7 @@ export default async function ServiceDetailPage({
             <Reveal as="div" stagger={0.08} className="text-veil-shadow flex flex-col">
               {svc.faqs.map((f) => (
                 <div key={f.q} className="border-t border-white/12 py-7">
-                  <h3
-                    className="text-white text-base mb-3"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
+                  <h3 className="text-white text-base font-bold uppercase tracking-display mb-3">
                     {f.q}
                   </h3>
                   <p className="text-white/80 text-sm leading-[1.9]">{f.a}</p>

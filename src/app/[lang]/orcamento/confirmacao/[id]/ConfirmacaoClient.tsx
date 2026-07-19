@@ -320,8 +320,8 @@ export default function ConfirmacaoClient({
             <h1
               ref={h1Ref}
               tabIndex={-1}
-              className="text-foreground font-bold leading-[0.92] mb-7 focus:outline-none"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 5.4vw, 72px)" }}
+              className="text-foreground font-bold uppercase tracking-display leading-[0.92] mb-7 focus:outline-none"
+              style={{ fontSize: "clamp(40px, 5.4vw, 72px)" }}
             >
               {tc.titleLine1}
               <br />
@@ -482,10 +482,7 @@ export default function ConfirmacaoClient({
             <div className="flex items-center gap-3 mb-6">
               <span className="w-6 h-px bg-gold/60 shrink-0" />
               <div>
-                <p
-                  className="text-foreground/85 text-lg leading-tight"
-                  style={{ fontFamily: "var(--font-playfair)" }}
-                >
+                <p className="text-foreground/85 text-lg font-bold uppercase tracking-display leading-tight">
                   {tc.whileTitle}
                 </p>
                 <p className="text-foreground/72 text-[13px] mt-0.5">{tc.whileLead}</p>

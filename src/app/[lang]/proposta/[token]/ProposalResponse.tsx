@@ -94,8 +94,8 @@ export default function ProposalResponse({ token, initialStatus, clientEmail, pr
               ✓
             </div>
             <p
-              className="text-foreground/85 font-bold mb-2"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 26px)" }}
+              className="text-foreground/85 font-bold uppercase tracking-display mb-2"
+              style={{ fontSize: "clamp(20px, 3vw, 26px)" }}
             >
               {tp.aceiteTitle}
             </p>
@@ -104,8 +104,8 @@ export default function ProposalResponse({ token, initialStatus, clientEmail, pr
         ) : (
           <>
             <p
-              className="text-foreground/80 font-bold mb-2"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(19px, 3vw, 24px)" }}
+              className="text-foreground/80 font-bold uppercase tracking-display mb-2"
+              style={{ fontSize: "clamp(19px, 3vw, 24px)" }}
             >
               {tp.rejeitadaTitle}
             </p>

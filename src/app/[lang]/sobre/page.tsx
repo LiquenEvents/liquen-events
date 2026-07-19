@@ -170,8 +170,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         <div className="text-veil-shadow relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
             <p
-              className="text-cream font-bold leading-[1.12] max-w-4xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 4.5vw, 64px)" }}
+              className="text-cream font-bold uppercase tracking-display leading-[1.12] max-w-4xl"
+              style={{ fontSize: "clamp(26px, 4.5vw, 64px)" }}
             >
               <TitleReveal text={t.sobre.statementLead} as="span" step={50} />{" "}
               <TitleReveal
@@ -224,8 +224,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 {t.sobre.founderEyebrow}
               </p>
               <p
-                className="text-foreground/78 leading-[1.5]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3vw, 38px)" }}
+                className="text-foreground/78 font-bold uppercase tracking-display leading-[1.25]"
+                style={{ fontSize: "clamp(22px, 3vw, 38px)" }}
               >
                 {t.sobre.founderQuote}
               </p>

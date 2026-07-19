@@ -163,9 +163,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             {/* The wrapper's text-veil-shadow already carries the lift-off-photo
                 shadow, so the statement needs no inline duplicate. */}
             <p
-              className="text-white/90 leading-[1.72]"
+              className="text-white/90 font-bold uppercase tracking-display leading-[1.4]"
               style={{
-                fontFamily: "var(--font-playfair)",
                 fontSize: "clamp(22px, 2.8vw, 36px)",
               }}
             >
@@ -244,9 +243,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               <AnimateIn key={item.name} delay={i * 55} className="h-full">
                 <figure className="h-full flex flex-col py-9 lg:py-10 border-t border-white/12">
                   <blockquote
-                    className="text-cream/85 leading-[1.72] flex-1"
+                    className="text-cream/85 uppercase tracking-display leading-[1.55] flex-1"
                     style={{
-                      fontFamily: "var(--font-playfair)",
                       fontSize: "clamp(16px, 1.7vw, 19px)",
                     }}
                   >
