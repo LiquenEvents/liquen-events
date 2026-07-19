@@ -15,8 +15,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
+  // Parse defensively: a malformed or non-object JSON body must yield a clean
+  // 400, not an uncaught 500 (an unguarded request.json() throws on bad JSON,
+  // and a null/scalar body then blows up the property reads below with a
+  // TypeError). Mirrors the public POST and the [id] PATCH route.
+  const b = await request.json().catch(() => null);
+  if (!b || typeof b !== "object" || Array.isArray(b)) {
+    return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+  }
+
   try {
-    const b = await request.json();
     // Bound every free-text field (defense-in-depth against storage abuse), the
     // same way the public quote schema does — admin-only, but still validated.
     const str = (v: unknown, max: number) => String(v ?? "").slice(0, max);
@@ -24,6 +32,26 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json({ error: "O nome é obrigatório." }, { status: 400 });
     }
+
+    // Price mirrors the bounds the public schema and admin PATCH enforce (finite,
+    // 0..10M). A non-numeric entry ("abc" → NaN) or an out-of-range value must
+    // never reach the store, or it corrupts revenue maths, exports and the
+    // jsonb blob (NaN serialises to null silently). Absent/empty → undefined.
+    const money = (v: unknown): number | undefined => {
+      if (v === undefined || v === null || v === "") return undefined;
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(Math.max(n, 0), 10_000_000) : undefined;
+    };
+    // Only a real QuoteStatus may be persisted — an arbitrary string would break
+    // the admin list's status filters and the pipeline stats.
+    const STATUSES: readonly Quote["status"][] = [
+      "pendente",
+      "em_revisao",
+      "cotado",
+      "aceite",
+      "rejeitado",
+    ];
+    const status: Quote["status"] = STATUSES.includes(b.status) ? b.status : "em_revisao";
 
     const id = generateQuoteId();
     const quote: Quote = {
@@ -35,7 +63,7 @@ export async function POST(request: NextRequest) {
       endDate: "",
       location: str(b.location, 200),
       locationType: "lisboa",
-      guests: Math.min(Math.max(Number(b.guests) || 0, 0), 100000),
+      guests: Math.min(Math.max(Math.floor(Number(b.guests) || 0), 0), 100000),
       duration: 4,
       isMultiDay: false,
       packageTier: "completo",
@@ -54,7 +82,7 @@ export async function POST(request: NextRequest) {
       // Quote meta
       id,
       submittedAt: new Date().toISOString(),
-      status: b.status ?? "em_revisao",
+      status,
       priceBreakdown: {
         basePrice: 0,
         guestCost: 0,
@@ -71,7 +99,7 @@ export async function POST(request: NextRequest) {
         rangeMax: 0,
         isEstimate: true,
       },
-      quotedPrice: b.quotedPrice ? Number(b.quotedPrice) : undefined,
+      quotedPrice: money(b.quotedPrice),
     };
 
     await createQuote(quote);

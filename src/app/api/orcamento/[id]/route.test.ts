@@ -132,6 +132,25 @@ describe("PATCH /api/orcamento/[id]", () => {
     expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 5000 });
   });
 
+  it("drops non-allowlisted privileged fields (deep mass-assignment guard)", async () => {
+    authed.ok = true;
+    await PATCH(
+      req("PATCH", {
+        status: "cotado",
+        // None of these may be client-writable: identity, submission time, the
+        // computed price breakdown, personal contact data, the reference id.
+        submittedAt: "1999-01-01T00:00:00.000Z",
+        priceBreakdown: { total: 0 },
+        name: "Attacker",
+        phone: "000",
+        id: "evil",
+        lastUpdated: "spoofed",
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado" });
+  });
+
   it("returns 400 (not an uncaught 500) for a malformed JSON body", async () => {
     authed.ok = true;
     const bad = new Request("https://liquen.test/api/orcamento/LIQ-1", {
