@@ -142,6 +142,12 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
   // "hoje" (countdownDays === 0), não "já passou". Só a partir da meia-noite
   // seguinte é que `eventPassed` fica verdadeiro — mantendo-o coerente com o
   // contador (que só vira negativo no dia seguinte).
+  // TODO(qa): assume `quote.date` = "yyyy-mm-dd". Se algum dia trouxer componente
+  // horária (ex.: ISO completo — o schema/rota manual não o proíbem), a
+  // concatenação `${quote.date}T23:59:59` fica inválida → NaN → eventPassed=false,
+  // e um evento já passado nunca chega a "concluido". `countdownDays` já trata os
+  // dois formatos (length<=10); alinhar aqui exige decidir a semântica de "fim do
+  // dia" para um datetime, por isso fica como nota em vez de alteração especulativa.
   const eventPassed = !!quote.date && Date.parse(`${quote.date}T23:59:59`) < today.getTime();
 
   const contracted = contractedTotal(d);

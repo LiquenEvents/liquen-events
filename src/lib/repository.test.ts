@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
@@ -349,5 +349,135 @@ describe("store mappers round-trip through toRow → DB → fromRow", () => {
     const row = mapper.toRow(quote);
     expect(row).toMatchObject({ id: "Q1", status: "pendente", name: "Ana", email: "a@x.pt" });
     expect(mapper.fromRow(row)).toEqual(quote);
+  });
+
+  it("proposals", async () => {
+    const { mapper } = await import("./proposals-store");
+    const proposal = {
+      id: "prop1",
+      quoteId: "Q1",
+      clientName: "Ana",
+      clientEmail: "ana@x.pt",
+      currency: "EUR",
+      lineItems: [{ description: "Decoração", qty: 2, unitPrice: 500 }],
+      vatRate: 0.23,
+      subtotal: 1000,
+      vat: 230,
+      total: 1230,
+      validUntil: "2026-08-01",
+      notes: "Nota",
+      status: "enviada" as const,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      sentAt: "2026-01-02T00:00:00.000Z",
+      respondedAt: "2026-01-03T00:00:00.000Z",
+    };
+    // toRow deliberately omits created_at (DB-defaulted) — mirror the DB adding it.
+    const row = { ...mapper.toRow(proposal as any), created_at: proposal.createdAt };
+    expect(mapper.fromRow(row)).toEqual(proposal);
+  });
+
+  it("proposals: empty optionals round-trip to undefined (not null)", async () => {
+    const { mapper } = await import("./proposals-store");
+    const row = {
+      ...mapper.toRow({
+        id: "prop2",
+        quoteId: "Q1",
+        clientName: "Ana",
+        clientEmail: "ana@x.pt",
+        currency: "EUR",
+        lineItems: [],
+        vatRate: 0.23,
+        subtotal: 0,
+        vat: 0,
+        total: 0,
+        validUntil: "",
+        notes: "",
+        status: "rascunho",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      } as any),
+      created_at: "2026-01-01T00:00:00.000Z",
+    };
+    const back = mapper.fromRow(row);
+    expect(back.validUntil).toBeUndefined();
+    expect(back.notes).toBeUndefined();
+    expect(back.sentAt).toBeUndefined();
+    expect(back.respondedAt).toBeUndefined();
+  });
+
+  it("contracts", async () => {
+    const { mapper } = await import("./contracts-store");
+    const contract = {
+      id: "c1",
+      quoteId: "Q1",
+      proposalId: "prop1",
+      clientName: "Ana",
+      clientEmail: "ana@x.pt",
+      termsVersion: "v1",
+      termsSnapshot: "Os termos acordados…",
+      status: "aceite" as const,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      acceptedAt: "2026-01-01T10:00:00.000Z",
+      acceptedName: "Ana",
+      acceptedIp: "1.2.3.4",
+    };
+    expect(mapper.fromRow(mapper.toRow(contract as any))).toEqual(contract);
+  });
+
+  it("inventory items", async () => {
+    const { mapper } = await import("./inventory-store");
+    const item = {
+      id: "it1",
+      name: "Vaso de vidro",
+      category: "Vasos e Jarras",
+      quantity: 12,
+      unit: "un",
+      condition: "bom" as const,
+      location: "Armazém A",
+      notes: "Frágil",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    expect(mapper.fromRow(mapper.toRow(item as any))).toEqual(item);
+  });
+});
+
+// ── FileBackend refuses writes in production (assertWritableInProd) ─────────
+// The file fallback is DEV-only: in production it means Supabase is unconfigured
+// and a write would land in an ephemeral file that vanishes on redeploy (silent
+// data loss reported as success). The backend must refuse writes loudly while
+// keeping reads working.
+describe("FileBackend.assertWritableInProd", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "repo-prod-"));
+  });
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    if (dir) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  it("refuses insert/persist/remove in production but still allows reads", async () => {
+    // Seed a row while NOT in production so reads have something to return.
+    const dev = new FileBackend<Widget>(widgetMapper, dir);
+    await dev.insert(widget({ id: "w1", name: "Alpha" }));
+
+    vi.stubEnv("NODE_ENV", "production");
+    const prod = new FileBackend<Widget>(widgetMapper, dir);
+
+    const msg = /Persistence unavailable/;
+    await expect(prod.insert(widget({ id: "w2" }))).rejects.toThrow(msg);
+    await expect(prod.persist("w1", widget({ id: "w1", name: "Beta" }))).rejects.toThrow(msg);
+    await expect(prod.remove("w1")).rejects.toThrow(msg);
+
+    // Reads keep working, and no mutation leaked through.
+    expect((await prod.get("w1"))?.name).toBe("Alpha");
+    expect((await prod.list()).map((w) => w.id)).toEqual(["w1"]);
+  });
+
+  it("allows writes when NODE_ENV is not production", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const dev = new FileBackend<Widget>(widgetMapper, dir);
+    await expect(dev.insert(widget({ id: "w9" }))).resolves.toBeUndefined();
+    expect((await dev.get("w9"))?.id).toBe("w9");
   });
 });

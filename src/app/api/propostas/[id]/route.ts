@@ -9,7 +9,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    const body = await request.json();
+    // Malformed or non-object body → 400, not a 500. `null`/primitives would
+    // otherwise blow up the `"status" in body` check with a TypeError.
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+    }
     const VALID_STATUS = ["rascunho", "enviada", "aceite", "rejeitada"];
     if ("status" in body && !VALID_STATUS.includes(body.status)) {
       return NextResponse.json({ error: "Estado inválido" }, { status: 400 });

@@ -63,7 +63,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const { id } = await params;
-  const body = await request.json();
+  // Parse defensively: a malformed or non-object JSON body must yield a clean
+  // 400, not an uncaught throw (this parse sits outside the try below, so an
+  // unguarded request.json() would surface as a 500). `null`/numbers/strings
+  // also break the `key in body` check further down with a TypeError.
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+  }
 
   const allowed: (keyof Quote)[] = [
     "status",

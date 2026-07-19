@@ -131,6 +131,32 @@ describe("PATCH /api/orcamento/[id]", () => {
     );
     expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 5000 });
   });
+
+  it("returns 400 (not an uncaught 500) for a malformed JSON body", async () => {
+    authed.ok = true;
+    const bad = new Request("https://liquen.test/api/orcamento/LIQ-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json{",
+    }) as unknown as NextRequest;
+    const res = await PATCH(bad, ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a non-object JSON body (null) instead of crashing on `in`", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", null), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid status value with 400", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", { status: "not_a_status" }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/orcamento/[id]", () => {
