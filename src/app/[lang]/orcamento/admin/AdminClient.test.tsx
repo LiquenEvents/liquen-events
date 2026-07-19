@@ -120,10 +120,17 @@ function renderAdmin(quotes: Quote[]) {
 
 // The desktop sidebar (an <aside>, role "complementary") and the mobile bottom
 // bar both carry nav buttons; jsdom applies no CSS so neither is hidden. Scope
-// nav clicks to the sidebar to keep the button label unambiguous.
+// nav clicks to the sidebar to keep the button label unambiguous. Secondary
+// destinations now live behind a collapsed "Mais" group, so expand it first
+// when the wanted entry isn't in the always-visible core list.
 function navTo(label: RegExp) {
   const sidebar = screen.getByRole("complementary");
-  fireEvent.click(within(sidebar).getByRole("button", { name: label }));
+  let btn = within(sidebar).queryByRole("button", { name: label });
+  if (!btn) {
+    fireEvent.click(within(sidebar).getByRole("button", { name: /^Mais$/ }));
+    btn = within(sidebar).getByRole("button", { name: label });
+  }
+  fireEvent.click(btn);
 }
 
 beforeEach(() => {

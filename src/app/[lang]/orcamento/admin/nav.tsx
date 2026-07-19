@@ -24,20 +24,35 @@ export type View =
   | "inbox";
 
 /**
- * Sidebar section grouping. Purely a display concern for the desktop rail — the
- * calm, ChatGPT-like sidebar reads better when the 15 destinations are gathered
- * under a few faint section labels. `NAV` stays the single source of truth for
- * ids / labels / icons and for every other consumer (command palette, mobile
- * bar); groups only decide how the rail lays them out. Every `View` id appears
- * in exactly one group.
+ * Sidebar split for the calm, ChatGPT-like rail. Only the owner's DAILY CORE
+ * stays visible at all times (`CORE_NAV`); everything else is tucked into a
+ * collapsible "Mais" group at the bottom (`MORE_NAV`), collapsed by default, so
+ * a newcomer sees a short, legible list instead of 15 destinations at once.
+ *
+ * `NAV` stays the single source of truth for ids / labels / icons and for every
+ * other consumer (command palette, mobile bar); these arrays only decide what
+ * the rail shows up-front vs. behind the disclosure. Together they cover every
+ * `View` id exactly once — nothing is ever unreachable.
  */
-export const NAV_GROUPS: { label: string; ids: View[] }[] = [
-  { label: "Geral", ids: ["overview", "pedidos", "kanban", "calendario", "clientes"] },
-  { label: "Comercial", ids: ["propostas", "contratos", "faturas", "seguimentos"] },
-  {
-    label: "Gestão",
-    ids: ["tarefas", "fornecedores", "inventario", "modelos-email", "inbox", "estatisticas"],
-  },
+export const CORE_NAV: View[] = [
+  "overview",
+  "pedidos",
+  "propostas",
+  "faturas",
+  "contratos",
+  "inbox",
+  "calendario",
+];
+
+export const MORE_NAV: View[] = [
+  "kanban",
+  "clientes",
+  "tarefas",
+  "fornecedores",
+  "inventario",
+  "seguimentos",
+  "estatisticas",
+  "modelos-email",
 ];
 
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [

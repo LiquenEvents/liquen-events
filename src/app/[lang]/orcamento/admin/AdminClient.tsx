@@ -25,8 +25,8 @@ import {
 import { eventCountdown, randomId, eur } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
-import LifecycleStepper from "./LifecycleStepper";
-import { NAV, NAV_GROUPS, type View } from "./nav";
+import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
+import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
 import { Button, Card, SectionCard } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
@@ -89,6 +89,55 @@ function shortRef(id: string): string {
   return id.length > 10 ? `${id.slice(0, 8)}…${last4}` : id;
 }
 
+// The single "next action" surfaced on the calm pedido detail — derived from
+// where the request sits in its lifecycle, so a newcomer always sees the one
+// sensible thing to do next. It routes into the (otherwise tucked-away) advanced
+// workspace at the relevant tool tab; every tab stays reachable regardless.
+type DetailTab = "resumo" | "producao" | "financeiro" | "comunicacao";
+function detailNextAction(quote: Quote): { label: string; hint: string; tab: DetailTab } {
+  const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote);
+  if (perdido)
+    return { label: "Reabrir pedido", hint: "Voltar a colocar em revisão", tab: "resumo" };
+  if (allDone)
+    return {
+      label: "Rever produção do evento",
+      hint: "Guião, checklist e convidados",
+      tab: "producao",
+    };
+  switch (currentIndex) {
+    case 0:
+      return {
+        label: "Enviar proposta",
+        hint: "Criar e enviar a proposta ao cliente",
+        tab: "comunicacao",
+      };
+    case 1:
+      return {
+        label: "Acompanhar proposta",
+        hint: "Mensagens e registo de atividade",
+        tab: "comunicacao",
+      };
+    case 2:
+      return {
+        label: "Registar pagamento",
+        hint: "Sinal, faturação e custos do evento",
+        tab: "financeiro",
+      };
+    case 3:
+      return {
+        label: "Planear produção",
+        hint: "Checklist, plano de decoração e guião",
+        tab: "producao",
+      };
+    default:
+      return {
+        label: "Preparar o dia do evento",
+        hint: "Timeline, convidados e checklist",
+        tab: "producao",
+      };
+  }
+}
+
 // Single-key destinations for the "g then <key>" navigation chord.
 const VIEW_KEYS: Record<string, View> = {
   o: "overview",
@@ -135,9 +184,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // Comunicação tab shows one proposal tool by default (ProposalStudio); the
   // simpler price-table tool (ProposalBuilder) stays collapsed behind a link.
   const [showBuilder, setShowBuilder] = useState(false);
+  // Progressive disclosure on the pedido detail: the default view is calm
+  // essentials only; the heavy tools (management form + Produção/Financeiro/
+  // Comunicação tabs) stay tucked behind this "Mostrar mais" disclosure.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
+  // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
+  const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -452,6 +507,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditGuests(String(q.guests ?? ""));
     setEditLocation(q.location ?? "");
     setDetailTab("resumo");
+    setAdvancedOpen(false);
   }
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
@@ -490,6 +546,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditGuests(String(data.quote.guests ?? ""));
       setEditLocation(data.quote.location ?? "");
       setDetailTab("resumo");
+      setAdvancedOpen(false);
       toast("Pedido duplicado — defina a nova data", "success");
     } catch {
       toast("Não foi possível duplicar o pedido", "error");
@@ -841,6 +898,46 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   const todayKey = new Date().toISOString().slice(0, 10);
 
+  // One sidebar destination — shared by the always-visible core list and the
+  // collapsible "Mais" group so both render identically.
+  function renderNavItem(id: View) {
+    const item = NAV.find((n) => n.id === id)!;
+    const active = view === id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => {
+          setView(item.id);
+          setNavOpen(false);
+        }}
+        aria-current={active ? "page" : undefined}
+        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
+          active
+            ? "bg-[#4d6350] text-white shadow-sm"
+            : "text-white/45 hover:text-white/85 hover:bg-white/[0.05]"
+        }`}
+      >
+        <span
+          className={`shrink-0 motion-safe:transition-colors duration-150 ${
+            active ? "text-white" : "text-white/35 group-hover:text-white/70"
+          }`}
+        >
+          {item.icon}
+        </span>
+        <span className="truncate">{item.label}</span>
+        {item.id === "pedidos" && pendingCount > 0 && (
+          <span
+            className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
+              active ? "bg-white/20 text-white" : "bg-[#4d6350]/70 text-white/90"
+            }`}
+          >
+            {pendingCount}
+          </span>
+        )}
+      </button>
+    );
+  }
+
   function statusBadge(status: QuoteStatus) {
     const s = STATUS_OPTIONS.find((o) => o.id === status);
     return (
@@ -948,56 +1045,63 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           </div>
           <div className="mx-4 h-px bg-white/[0.06] mb-1" />
 
-          {/* Nav — quiet, ChatGPT-like rail: faint section labels, muted idle
-              items, a rounded moss pill on the active destination. */}
+          {/* Nav — quiet, ChatGPT-like rail: a short core list always visible,
+              everything else tucked into a collapsed "Mais" group so a newcomer
+              sees few things at once. The group auto-opens when a "Mais" view is
+              active, so the current item (and its aria-current) is never hidden. */}
           <nav
             aria-label="Navegação do back office"
-            className="flex-1 px-3 py-4 flex flex-col gap-5 overflow-y-auto"
+            className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
           >
-            {NAV_GROUPS.map((group) => (
-              <div key={group.label} className="flex flex-col gap-0.5">
-                <p className="px-3 pb-1 text-[9px] tracking-[0.22em] uppercase font-medium text-white/22">
-                  {group.label}
-                </p>
-                {group.ids.map((id) => {
-                  const item = NAV.find((n) => n.id === id)!;
-                  const active = view === id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setView(item.id);
-                        setNavOpen(false);
-                      }}
-                      aria-current={active ? "page" : undefined}
-                      className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
-                        active
-                          ? "bg-[#4d6350] text-white shadow-sm"
-                          : "text-white/45 hover:text-white/85 hover:bg-white/[0.05]"
-                      }`}
-                    >
-                      <span
-                        className={`shrink-0 motion-safe:transition-colors duration-150 ${
-                          active ? "text-white" : "text-white/35 group-hover:text-white/70"
-                        }`}
+            {CORE_NAV.map((id) => renderNavItem(id))}
+
+            {/* "Mais" — secondary destinations, collapsed by default. */}
+            {(() => {
+              const activeInMore = MORE_NAV.includes(view);
+              const expanded = moreNavOpen || activeInMore;
+              return (
+                <div className="mt-3 pt-3 border-t border-white/[0.06] flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMoreNavOpen((o) => !o)}
+                    aria-expanded={expanded}
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-white/45 hover:text-white/85 hover:bg-white/[0.05] motion-safe:transition-colors duration-150"
+                  >
+                    <span className="shrink-0 text-white/35 group-hover:text-white/70">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
                       >
-                        {item.icon}
-                      </span>
-                      <span className="truncate">{item.label}</span>
-                      {item.id === "pedidos" && pendingCount > 0 && (
-                        <span
-                          className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
-                            active ? "bg-white/20 text-white" : "bg-[#4d6350]/70 text-white/90"
-                          }`}
-                        >
-                          {pendingCount}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
+                        <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                        <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                      </svg>
+                    </span>
+                    <span className="truncate">Mais</span>
+                    <svg
+                      className={`ml-auto shrink-0 text-white/30 motion-safe:transition-transform duration-200 ${
+                        expanded ? "rotate-180" : ""
+                      }`}
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    >
+                      <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {expanded && (
+                    <div className="flex flex-col gap-1">{MORE_NAV.map(renderNavItem)}</div>
+                  )}
+                </div>
+              );
+            })()}
           </nav>
 
           {/* User */}
@@ -1099,10 +1203,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           <div className="flex items-stretch">
             {(
               [
-                { id: "overview", label: "Visão Geral" },
+                { id: "overview", label: "Início" },
                 { id: "pedidos", label: "Pedidos" },
-                { id: "kanban", label: "Pipeline" },
-                { id: "calendario", label: "Calendário" },
+                { id: "propostas", label: "Propostas" },
+                { id: "inbox", label: "Mensagens" },
               ] as const
             ).map((item) => {
               const navItem = NAV.find((n) => n.id === item.id)!;
@@ -1111,7 +1215,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <button
                   key={item.id}
                   onClick={() => setView(item.id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-3 px-1 transition-colors ${
+                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
                     isActive ? "text-[#8aad85]" : "text-white/32"
                   }`}
                 >
@@ -1131,8 +1235,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             })}
             <button
               onClick={() => setNavOpen(true)}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 px-1 transition-colors ${
-                !["overview", "pedidos", "kanban", "calendario"].includes(view)
+              aria-label="Mais destinos"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
+                !["overview", "pedidos", "propostas", "inbox"].includes(view)
                   ? "text-[#8aad85]"
                   : "text-white/32"
               }`}
@@ -1900,64 +2005,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             </span>
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {/* Reversible archive — kept visible as a primary action. */}
-                          <Button
-                            variant={selected.archived ? "subtle" : "secondary"}
-                            size="sm"
-                            onClick={async () => {
-                              const next = !selected.archived;
-                              const confirm_ =
-                                !next ||
-                                window.confirm(
-                                  `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
-                                );
-                              if (!confirm_) return;
-                              const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ archived: next }),
-                              });
-                              if (res.ok) {
-                                const updated = await res.json();
-                                setQuotes((prev) =>
-                                  prev.map((q) => (q.id === updated.id ? updated : q)),
-                                );
-                                setSelected(updated);
-                                toast(next ? "Pedido arquivado" : "Pedido restaurado", "success");
-                              }
-                            }}
-                            title={selected.archived ? "Restaurar pedido" : "Arquivar pedido"}
-                            iconLeft={
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.7"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                aria-hidden="true"
-                              >
-                                <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
-                              </svg>
-                            }
-                          >
-                            <span className="hidden sm:inline">
-                              {selected.archived ? "Restaurar" : "Arquivar"}
-                            </span>
-                          </Button>
+                        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                           {/* Full-screen cockpit for this event — the one place that
                               unifies proposta/contrato/faturas/produção. Primary. */}
                           <Link
                             href={`/${lang}/orcamento/admin/evento/${selected.id}`}
-                            className="inline-flex h-8 items-center gap-2 rounded-xl bg-[#4d6350]/10 px-3 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16]"
+                            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16]"
                             title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                           >
                             <svg
-                              width="14"
-                              height="14"
+                              width="15"
+                              height="15"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
@@ -1971,8 +2029,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             </svg>
                             <span className="hidden sm:inline">Dossier</span>
                           </Link>
-                          {/* Secondary / print actions tucked into an overflow menu
-                              so the header stays calm. */}
+                          {/* Every secondary / destructive / print action tucked into
+                              one calm overflow menu so the header stays uncluttered. */}
                           <MoreMenu
                             items={[
                               {
@@ -1991,6 +2049,52 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   >
                                     <rect x="9" y="9" width="11" height="11" rx="2" />
                                     <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                                  </svg>
+                                ),
+                              },
+                              {
+                                label: selected.archived ? "Restaurar pedido" : "Arquivar pedido",
+                                hint: selected.archived
+                                  ? "Voltar a mostrar na lista principal"
+                                  : "Ocultar da lista principal (reversível)",
+                                onClick: async () => {
+                                  const next = !selected.archived;
+                                  const confirm_ =
+                                    !next ||
+                                    window.confirm(
+                                      `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
+                                    );
+                                  if (!confirm_) return;
+                                  const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ archived: next }),
+                                  });
+                                  if (res.ok) {
+                                    const updated = await res.json();
+                                    setQuotes((prev) =>
+                                      prev.map((q) => (q.id === updated.id ? updated : q)),
+                                    );
+                                    setSelected(updated);
+                                    toast(
+                                      next ? "Pedido arquivado" : "Pedido restaurado",
+                                      "success",
+                                    );
+                                  }
+                                },
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
                                   </svg>
                                 ),
                               },
@@ -2065,52 +2169,46 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     },
                                   ]
                                 : []),
+                              {
+                                label: "Apagar pedido",
+                                hint: "Ação definitiva — não pode ser anulada",
+                                onClick: async () => {
+                                  if (
+                                    !window.confirm(
+                                      "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
+                                    )
+                                  )
+                                    return;
+                                  try {
+                                    const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                      method: "DELETE",
+                                    });
+                                    if (!res.ok) throw new Error("delete failed");
+                                    setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
+                                    setSelected(null);
+                                    toast("Pedido apagado", "success");
+                                  } catch {
+                                    toast("Não foi possível apagar o pedido", "error");
+                                  }
+                                },
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+                                  </svg>
+                                ),
+                              },
                             ]}
                           />
-                          {/* Destructive action — separated from the rest and behind
-                              a confirm. */}
-                          <span className="mx-0.5 h-6 w-px bg-foreground/10" aria-hidden="true" />
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={async () => {
-                              if (
-                                !window.confirm(
-                                  "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
-                                )
-                              )
-                                return;
-                              try {
-                                const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                  method: "DELETE",
-                                });
-                                if (!res.ok) throw new Error("delete failed");
-                                setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
-                                setSelected(null);
-                                toast("Pedido apagado", "success");
-                              } catch {
-                                toast("Não foi possível apagar o pedido", "error");
-                              }
-                            }}
-                            title="Apagar pedido definitivamente"
-                            iconLeft={
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.7"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                aria-hidden="true"
-                              >
-                                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
-                              </svg>
-                            }
-                          >
-                            <span className="hidden sm:inline">Apagar</span>
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2133,513 +2231,686 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </Button>
                         </div>
                       </div>
-                      {/* Section tabs — keep the workspace navigable. Arrow keys
-                          move between tabs (WAI-ARIA tablist pattern). */}
-                      <div
-                        role="tablist"
-                        aria-label="Secções do pedido"
-                        className="mt-5 flex gap-1 overflow-x-auto"
-                      >
-                        {(
-                          [
-                            ["resumo", "Resumo"],
-                            ["producao", "Produção"],
-                            ["financeiro", "Financeiro"],
-                            ["comunicacao", "Comunicação"],
-                          ] as const
-                        ).map(([id, label], i, arr) => {
-                          const active = detailTab === id;
-                          return (
-                            <button
-                              key={id}
-                              id={`detail-tab-${id}`}
-                              role="tab"
-                              aria-selected={active}
-                              aria-controls={`detail-panel-${id}`}
-                              tabIndex={active ? 0 : -1}
-                              onClick={() => setDetailTab(id)}
-                              onKeyDown={(e) => {
-                                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-                                e.preventDefault();
-                                const dir = e.key === "ArrowRight" ? 1 : -1;
-                                const next = arr[(i + dir + arr.length) % arr.length][0];
-                                setDetailTab(next);
-                                // Move focus to the newly-selected tab (roving tabindex).
-                                const tabs =
-                                  e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                                    '[role="tab"]',
-                                  );
-                                tabs?.[(i + dir + arr.length) % arr.length]?.focus();
-                              }}
-                              className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
-                                active
-                                  ? "border-[#4d6350] text-foreground/85"
-                                  : "border-transparent text-foreground/40 hover:text-foreground/65"
-                              }`}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
                     </div>
 
-                    <div className="px-5 py-6 sm:px-7 sm:py-8">
-                      {/* Ciclo de vida — prominente no topo do espaço de trabalho,
-                          para se ver logo em que fase o pedido está. */}
-                      <div className="mb-8">
-                        <LifecycleStepper quote={selected} />
-                      </div>
-                      <div className="grid grid-cols-1 gap-8 2xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:items-start">
-                        {/* Coluna principal — as ferramentas do separador ativo */}
-                        <div className="flex min-w-0 flex-col gap-6">
-                          {detailTab === "resumo" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-resumo"
-                              aria-labelledby="detail-tab-resumo"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Snapshot e contacto vivem agora na barra de contexto
-                              persistente (à direita em ecrãs largos), visível em
-                              todos os separadores. */}
-                              {/* Event */}
-                              <div>
-                                <p className="bo-eyebrow mb-3">Evento</p>
-                                {/* Read-only facts */}
-                                <div className="grid grid-cols-2 gap-2 mb-3">
-                                  {[
-                                    {
-                                      l: "Tipo",
-                                      v: CATEGORIES.find((c) => c.id === selected.category)?.label,
-                                    },
-                                    {
-                                      l: "Sub-tipo",
-                                      v:
-                                        selected.category && selected.eventType
-                                          ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
-                                              (e) => e.id === selected.eventType,
-                                            )?.label
-                                          : null,
-                                    },
-                                    {
-                                      l: "Pacote",
-                                      v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
-                                    },
-                                    {
-                                      l: "Duração",
-                                      v: selected.duration ? `${selected.duration}h` : "—",
-                                    },
-                                    { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
-                                  ].map(({ l, v }) => (
-                                    <div key={l}>
-                                      <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
-                                        {l}
-                                      </p>
-                                      <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                                {/* Editable logistics */}
-                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-foreground/[0.06]">
-                                  <div>
-                                    <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                      Data
-                                    </label>
-                                    <input
-                                      type="date"
-                                      value={editDate}
-                                      onChange={(e) => setEditDate(e.target.value)}
-                                      className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                    />
-                                    {editDate &&
-                                      (() => {
-                                        const cd = eventCountdown(editDate);
-                                        return cd ? (
-                                          <p
-                                            className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
-                                          >
-                                            {cd.label}
-                                          </p>
-                                        ) : null;
-                                      })()}
-                                  </div>
-                                  <div>
-                                    <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                      Convidados
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      value={editGuests}
-                                      onChange={(e) => setEditGuests(e.target.value)}
-                                      className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                    />
-                                  </div>
-                                  <div className="col-span-2">
-                                    <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                      Local
-                                    </label>
-                                    <input
-                                      value={editLocation}
-                                      onChange={(e) => setEditLocation(e.target.value)}
-                                      placeholder="Local do evento…"
-                                      className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
+                    {/* Detalhe calmo: por defeito só o essencial (quem, quanto, em
+                        que fase, e a próxima ação). As ferramentas pesadas ficam
+                        atrás da revelação "Mostrar mais" mais abaixo. */}
+                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
+                      {/* Ciclo de vida — em que fase está o pedido, num relance. */}
+                      <LifecycleStepper quote={selected} />
 
-                              {/* Client notes */}
-                              {selected.notes && (
-                                <div>
-                                  <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                                  <p className="text-foreground/72 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
-                                    {selected.notes}
-                                  </p>
+                      {/* Snapshot — valor, estado e evento. */}
+                      <Card padding="sm">
+                        {(() => {
+                          const revenue =
+                            selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
+                          const costs = (selected.eventSuppliers ?? []).reduce(
+                            (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
+                            0,
+                          );
+                          const margin = revenue - costs;
+                          const cd = eventCountdown(selected.date);
+                          return (
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                              <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                  Estado
+                                </span>
+                                <span>{statusBadge(selected.status)}</span>
+                              </div>
+                              <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                  Valor
+                                </span>
+                                <span className="text-sm font-semibold text-foreground/80">
+                                  {revenue ? formatPrice(revenue) : "—"}
+                                </span>
+                              </div>
+                              {costs > 0 && (
+                                <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                  <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                    Margem
+                                  </span>
+                                  <span
+                                    className={`text-sm font-semibold ${margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"}`}
+                                  >
+                                    {formatPrice(margin)}
+                                  </span>
                                 </div>
                               )}
+                              {cd && (
+                                <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                  <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                    Evento
+                                  </span>
+                                  <span
+                                    className={`text-sm font-semibold ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/80"}`}
+                                  >
+                                    {cd.label}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </Card>
 
-                              {/* Estimate */}
-                              {selected.priceBreakdown && (
+                      {/* Próxima ação — o único passo seguinte, em destaque. Abre a
+                          ferramenta certa dentro da área avançada. */}
+                      {(() => {
+                        const na = detailNextAction(selected);
+                        const reopen = deriveRequestLifecycle(selected).perdido;
+                        return (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (reopen) setEditStatus("em_revisao");
+                                setDetailTab(na.tab);
+                                setAdvancedOpen(true);
+                              }}
+                              className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white shadow-sm motion-safe:transition-colors hover:bg-[#415440]"
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
+                                  Próxima ação
+                                </span>
+                                <span className="mt-0.5 block text-sm font-semibold">
+                                  {na.label}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-white/70">
+                                  {na.hint}
+                                </span>
+                              </span>
+                              <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                                className="shrink-0 text-white/80"
+                              >
+                                <path d="M5 12h14M13 6l6 6-6 6" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Contacto — como falar com o cliente. */}
+                      <SectionCard eyebrow="Contacto" padding="sm">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`mailto:${selected.email}`}
+                              className="truncate text-xs text-[#4d6350] hover:underline"
+                            >
+                              {selected.email}
+                            </a>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard?.writeText(selected.email);
+                                toast("Email copiado", "success");
+                              }}
+                              className="shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
+                              title="Copiar email"
+                              aria-label="Copiar email"
+                            >
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                              >
+                                <rect x="9" y="9" width="11" height="11" rx="2" />
+                                <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`tel:${selected.phone}`}
+                              className="text-xs text-foreground/70 hover:text-foreground/90"
+                            >
+                              {selected.phone}
+                            </a>
+                            {selected.phone && (
+                              <a
+                                href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80"
+                                title="Abrir conversa no WhatsApp"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
+                                </svg>
+                                WhatsApp
+                              </a>
+                            )}
+                          </div>
+                          {selected.company && (
+                            <p className="text-xs text-foreground/70">{selected.company}</p>
+                          )}
+                          {selected.nif && (
+                            <p className="text-xs text-foreground/70">NIF: {selected.nif}</p>
+                          )}
+                        </div>
+                      </SectionCard>
+
+                      {/* Notas do cliente — contexto imediato, se existirem. */}
+                      {selected.notes && (
+                        <div>
+                          <p className="bo-eyebrow mb-2">Notas do Cliente</p>
+                          <p className="rounded-lg bg-foreground/[0.04] p-3 text-xs leading-relaxed text-foreground/72">
+                            {selected.notes}
+                          </p>
+                        </div>
+                      )}
+
+                      <p className="text-[10px] text-foreground/50">
+                        Submetido em{" "}
+                        {new Date(selected.submittedAt).toLocaleString("pt-PT", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+
+                      {/* ── Área avançada — gestão e ferramentas, escondida por
+                          defeito para manter a vista calma. Tudo continua acessível. */}
+                      <div className="border-t border-foreground/[0.08] pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setAdvancedOpen((o) => !o)}
+                          aria-expanded={advancedOpen}
+                          aria-controls="detail-advanced"
+                          className="flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.14em] text-foreground/50 motion-safe:transition-colors hover:bg-foreground/[0.04] hover:text-foreground/75"
+                        >
+                          <svg
+                            className={`shrink-0 motion-safe:transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""}`}
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          >
+                            <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          {advancedOpen
+                            ? "Ocultar gestão e ferramentas"
+                            : "Mostrar mais — gestão e ferramentas"}
+                        </button>
+                      </div>
+
+                      {advancedOpen && (
+                        <div id="detail-advanced" className="flex flex-col gap-6">
+                          {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
+                              tablist pattern). */}
+                          <div
+                            role="tablist"
+                            aria-label="Secções do pedido"
+                            className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
+                          >
+                            {(
+                              [
+                                ["resumo", "Gestão"],
+                                ["producao", "Produção"],
+                                ["financeiro", "Financeiro"],
+                                ["comunicacao", "Comunicação"],
+                              ] as const
+                            ).map(([id, label], i, arr) => {
+                              const active = detailTab === id;
+                              return (
+                                <button
+                                  key={id}
+                                  id={`detail-tab-${id}`}
+                                  role="tab"
+                                  aria-selected={active}
+                                  aria-controls={`detail-panel-${id}`}
+                                  tabIndex={active ? 0 : -1}
+                                  onClick={() => setDetailTab(id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                                    e.preventDefault();
+                                    const dir = e.key === "ArrowRight" ? 1 : -1;
+                                    const next = arr[(i + dir + arr.length) % arr.length][0];
+                                    setDetailTab(next);
+                                    const tabs =
+                                      e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                                        '[role="tab"]',
+                                      );
+                                    tabs?.[(i + dir + arr.length) % arr.length]?.focus();
+                                  }}
+                                  className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                    active
+                                      ? "border-[#4d6350] text-foreground/85"
+                                      : "border-transparent text-foreground/40 hover:text-foreground/65"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Coluna única — as ferramentas do separador ativo */}
+                          <div className="flex min-w-0 flex-col gap-6">
+                            {detailTab === "resumo" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-resumo"
+                                aria-labelledby="detail-tab-resumo"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                {/* Event */}
                                 <div>
-                                  <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
-                                  <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
-                                    {selected.priceBreakdown.addonsCost > 0 && (
-                                      <div className="flex justify-between text-[10px]">
-                                        <span className="text-foreground/60">Extras</span>
+                                  <p className="bo-eyebrow mb-3">Evento</p>
+                                  {/* Read-only facts */}
+                                  <div className="grid grid-cols-2 gap-2 mb-3">
+                                    {[
+                                      {
+                                        l: "Tipo",
+                                        v: CATEGORIES.find((c) => c.id === selected.category)
+                                          ?.label,
+                                      },
+                                      {
+                                        l: "Sub-tipo",
+                                        v:
+                                          selected.category && selected.eventType
+                                            ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
+                                                (e) => e.id === selected.eventType,
+                                              )?.label
+                                            : null,
+                                      },
+                                      {
+                                        l: "Pacote",
+                                        v: PACKAGES.find((p) => p.id === selected.packageTier)
+                                          ?.label,
+                                      },
+                                      {
+                                        l: "Duração",
+                                        v: selected.duration ? `${selected.duration}h` : "—",
+                                      },
+                                      {
+                                        l: "Extras",
+                                        v: `${selected.addons?.length ?? 0} serviços`,
+                                      },
+                                    ].map(({ l, v }) => (
+                                      <div key={l}>
+                                        <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
+                                          {l}
+                                        </p>
+                                        <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {/* Editable logistics */}
+                                  <div className="grid grid-cols-1 gap-2 pt-2 border-t border-foreground/[0.06] sm:grid-cols-2">
+                                    <div>
+                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                        Data
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={editDate}
+                                        onChange={(e) => setEditDate(e.target.value)}
+                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                      />
+                                      {editDate &&
+                                        (() => {
+                                          const cd = eventCountdown(editDate);
+                                          return cd ? (
+                                            <p
+                                              className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
+                                            >
+                                              {cd.label}
+                                            </p>
+                                          ) : null;
+                                        })()}
+                                    </div>
+                                    <div>
+                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                        Convidados
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={editGuests}
+                                        onChange={(e) => setEditGuests(e.target.value)}
+                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                      />
+                                    </div>
+                                    <div className="col-span-2">
+                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                        Local
+                                      </label>
+                                      <input
+                                        value={editLocation}
+                                        onChange={(e) => setEditLocation(e.target.value)}
+                                        placeholder="Local do evento…"
+                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Estimate */}
+                                {selected.priceBreakdown && (
+                                  <div>
+                                    <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
+                                    <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
+                                      {selected.priceBreakdown.addonsCost > 0 && (
+                                        <div className="flex justify-between text-[10px]">
+                                          <span className="text-foreground/60">Extras</span>
+                                          <span className="text-foreground/72">
+                                            {formatPrice(selected.priceBreakdown.addonsCost)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
+                                        <span className="text-foreground/60">Subtotal</span>
                                         <span className="text-foreground/72">
-                                          {formatPrice(selected.priceBreakdown.addonsCost)}
+                                          {formatPrice(selected.priceBreakdown.subtotal)}
                                         </span>
                                       </div>
-                                    )}
-                                    <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
-                                      <span className="text-foreground/60">Subtotal</span>
-                                      <span className="text-foreground/72">
-                                        {formatPrice(selected.priceBreakdown.subtotal)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between text-[10px]">
-                                      <span className="text-foreground/60">IVA 23%</span>
-                                      <span className="text-foreground/72">
-                                        {formatPrice(selected.priceBreakdown.iva)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
-                                      <span className="text-foreground/60">Total</span>
-                                      <span className="text-[#4d6350] font-semibold">
-                                        {formatPrice(selected.priceBreakdown.total)}
-                                      </span>
+                                      <div className="flex justify-between text-[10px]">
+                                        <span className="text-foreground/60">IVA 23%</span>
+                                        <span className="text-foreground/72">
+                                          {formatPrice(selected.priceBreakdown.iva)}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
+                                        <span className="text-foreground/60">Total</span>
+                                        <span className="text-[#4d6350] font-semibold">
+                                          {formatPrice(selected.priceBreakdown.total)}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
 
-                              {/* Admin actions */}
-                              <div className="border-t border-foreground/10 pt-5">
-                                <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
-                                <div className="flex flex-col gap-4">
-                                  <TagsField
-                                    key={`tags-${selected.id}`}
-                                    quote={selected}
-                                    suggestions={allTags}
-                                    onChange={(tags) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, tags } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) => (prev ? { ...prev, tags } : prev));
-                                    }}
-                                  />
-                                  <FollowUpField
-                                    key={`fu-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(followUpAt) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, followUpAt } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev ? { ...prev, followUpAt } : prev,
-                                      );
-                                    }}
-                                  />
-                                  <div>
-                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                      Responsável
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={editAssigned}
-                                      onChange={(e) => setEditAssigned(e.target.value)}
-                                      placeholder="Nome do membro da equipa…"
-                                      className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                {/* Admin actions */}
+                                <div className="border-t border-foreground/10 pt-5">
+                                  <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
+                                  <div className="flex flex-col gap-4">
+                                    <TagsField
+                                      key={`tags-${selected.id}`}
+                                      quote={selected}
+                                      suggestions={allTags}
+                                      onChange={(tags) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, tags } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) => (prev ? { ...prev, tags } : prev));
+                                      }}
                                     />
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                      Estado
-                                    </label>
-                                    <select
-                                      value={editStatus}
-                                      onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                                      className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                    >
-                                      {STATUS_OPTIONS.map((s) => (
-                                        <option key={s.id} value={s.id}>
-                                          {s.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  {editStatus === "rejeitado" && (
+                                    <FollowUpField
+                                      key={`fu-${selected.id}`}
+                                      quote={selected}
+                                      onChange={(followUpAt) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, followUpAt } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev ? { ...prev, followUpAt } : prev,
+                                        );
+                                      }}
+                                    />
                                     <div>
                                       <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Motivo de perda
+                                        Responsável
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editAssigned}
+                                        onChange={(e) => setEditAssigned(e.target.value)}
+                                        placeholder="Nome do membro da equipa…"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Estado
+                                      </label>
+                                      <select
+                                        value={editStatus}
+                                        onChange={(e) =>
+                                          setEditStatus(e.target.value as QuoteStatus)
+                                        }
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      >
+                                        {STATUS_OPTIONS.map((s) => (
+                                          <option key={s.id} value={s.id}>
+                                            {s.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    {editStatus === "rejeitado" && (
+                                      <div>
+                                        <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                          Motivo de perda
+                                        </label>
+                                        <textarea
+                                          rows={2}
+                                          value={editLostReason}
+                                          onChange={(e) => setEditLostReason(e.target.value)}
+                                          placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                          className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                        />
+                                      </div>
+                                    )}
+                                    {selected.status === "rejeitado" &&
+                                      selected.lostReason &&
+                                      editStatus !== "rejeitado" && (
+                                        <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
+                                          <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
+                                            Motivo de perda anterior
+                                          </p>
+                                          <p className="text-xs text-foreground/72">
+                                            {selected.lostReason}
+                                          </p>
+                                        </div>
+                                      )}
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Preço final (sem IVA) €
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={editPrice}
+                                        onChange={(e) => setEditPrice(e.target.value)}
+                                        placeholder="Ex: 12500"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Notas Internas
                                       </label>
                                       <textarea
-                                        rows={2}
-                                        value={editLostReason}
-                                        onChange={(e) => setEditLostReason(e.target.value)}
-                                        placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                        rows={3}
+                                        value={editNotes}
+                                        onChange={(e) => setEditNotes(e.target.value)}
+                                        placeholder="Notas internas sobre este pedido…"
                                         className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
                                       />
                                     </div>
-                                  )}
-                                  {selected.status === "rejeitado" &&
-                                    selected.lostReason &&
-                                    editStatus !== "rejeitado" && (
-                                      <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
-                                        <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
-                                          Motivo de perda anterior
-                                        </p>
-                                        <p className="text-xs text-foreground/72">
-                                          {selected.lostReason}
-                                        </p>
-                                      </div>
+                                    {isDirty && !saving && (
+                                      <p
+                                        role="status"
+                                        className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
+                                      >
+                                        <span className="w-1 h-1 rounded-full bg-gold/80" />
+                                        Alterações por guardar
+                                      </p>
                                     )}
-                                  <div>
-                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                      Preço final (sem IVA) €
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={editPrice}
-                                      onChange={(e) => setEditPrice(e.target.value)}
-                                      placeholder="Ex: 12500"
-                                      className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                      Notas Internas
-                                    </label>
-                                    <textarea
-                                      rows={3}
-                                      value={editNotes}
-                                      onChange={(e) => setEditNotes(e.target.value)}
-                                      placeholder="Notas internas sobre este pedido…"
-                                      className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                    />
-                                  </div>
-                                  {isDirty && !saving && (
-                                    <p
-                                      role="status"
-                                      className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
+                                    <button
+                                      onClick={saveChanges}
+                                      disabled={saving || !isDirty}
+                                      className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
                                     >
-                                      <span className="w-1 h-1 rounded-full bg-gold/80" />
-                                      Alterações por guardar
-                                    </p>
-                                  )}
-                                  <button
-                                    onClick={saveChanges}
-                                    disabled={saving || !isDirty}
-                                    className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
-                                  >
-                                    {saving ? "A guardar…" : "Guardar Alterações →"}
-                                  </button>
+                                      {saving ? "A guardar…" : "Guardar Alterações →"}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
-                          {detailTab === "producao" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-producao"
-                              aria-labelledby="detail-tab-producao"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Tasks linked to this event */}
-                              <EventTasks
-                                key={`tasks-${selected.id}`}
-                                quote={selected}
-                                userName={userName}
-                              />
-
-                              {/* Production checklist */}
-                              <EventChecklist
-                                key={`cl-${selected.id}`}
-                                quote={selected}
-                                onChange={(checklist) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, checklist } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                                }}
-                              />
-
-                              {/* Decor production plan (sourcing → strike) */}
-                              <ProductionPlan
-                                key={`prod-${selected.id}`}
-                                quote={selected}
-                                onChange={(productionPlan) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, productionPlan } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) =>
-                                    prev ? { ...prev, productionPlan } : prev,
-                                  );
-                                }}
-                              />
-
-                              {/* Day-of run sheet */}
-                              <EventTimeline
-                                key={`tl-${selected.id}`}
-                                quote={selected}
-                                onChange={(timeline) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, timeline } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                                }}
-                              />
-
-                              {/* Guest list / RSVP */}
-                              <GuestList
-                                key={`guests-${selected.id}`}
-                                quote={selected}
-                                onChange={(guestList) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, guestList } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          {detailTab === "financeiro" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-financeiro"
-                              aria-labelledby="detail-tab-financeiro"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Payments & invoicing */}
-                              <PaymentsPanel
-                                key={`pay-${selected.id}`}
-                                quote={selected}
-                                showLedger
-                                onChange={(payments) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, payments } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                                }}
-                              />
-
-                              {/* Suppliers booked for this event + budget vs actual cost */}
-                              <EventCosts
-                                key={`costs-${selected.id}`}
-                                quote={selected}
-                                onChange={(eventSuppliers) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) =>
-                                    prev ? { ...prev, eventSuppliers } : prev,
-                                  );
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          {detailTab === "comunicacao" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-comunicacao"
-                              aria-labelledby="detail-tab-comunicacao"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              <p className="text-foreground/50 text-[11px] leading-relaxed">
-                                Crie e envie a proposta ao cliente. Comece por aqui.
-                              </p>
-                              <ProposalStudio
-                                key={`studio-${selected.id}`}
-                                quote={selected}
-                                onSent={() => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) =>
-                                    prev ? { ...prev, status: "cotado" } : prev,
-                                  );
-                                  setEditStatus("cotado");
-                                  appendActivity(selected.id, [
-                                    {
-                                      id: randomId(),
-                                      at: new Date().toISOString(),
-                                      kind: "proposal_sent",
-                                      actor: userName,
-                                      summary: "Proposta enviada ao cliente (Studio)",
-                                    },
-                                  ]);
-                                }}
-                              />
-                              {!showBuilder ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setShowBuilder(true)}
-                                  className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
-                                >
-                                  Outra forma de propor (tabela de preços simples)
-                                </button>
-                              ) : (
-                                <ProposalBuilder
+                            {detailTab === "producao" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-producao"
+                                aria-labelledby="detail-tab-producao"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                {/* Tasks linked to this event */}
+                                <EventTasks
+                                  key={`tasks-${selected.id}`}
                                   quote={selected}
-                                  onSent={(total) => {
+                                  userName={userName}
+                                />
+
+                                {/* Production checklist */}
+                                <EventChecklist
+                                  key={`cl-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(checklist) => {
                                     setQuotes((prev) =>
                                       prev.map((q) =>
-                                        q.id === selected.id
-                                          ? { ...q, status: "cotado", quotedPrice: total }
-                                          : q,
+                                        q.id === selected.id ? { ...q, checklist } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                                  }}
+                                />
+
+                                {/* Decor production plan (sourcing → strike) */}
+                                <ProductionPlan
+                                  key={`prod-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(productionPlan) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, productionPlan } : q,
                                       ),
                                     );
                                     setSelected((prev) =>
-                                      prev
-                                        ? { ...prev, status: "cotado", quotedPrice: total }
-                                        : prev,
+                                      prev ? { ...prev, productionPlan } : prev,
+                                    );
+                                  }}
+                                />
+
+                                {/* Day-of run sheet */}
+                                <EventTimeline
+                                  key={`tl-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(timeline) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, timeline } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                                  }}
+                                />
+
+                                {/* Guest list / RSVP */}
+                                <GuestList
+                                  key={`guests-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(guestList) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, guestList } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {detailTab === "financeiro" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-financeiro"
+                                aria-labelledby="detail-tab-financeiro"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                {/* Payments & invoicing */}
+                                <PaymentsPanel
+                                  key={`pay-${selected.id}`}
+                                  quote={selected}
+                                  showLedger
+                                  onChange={(payments) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, payments } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                                  }}
+                                />
+
+                                {/* Suppliers booked for this event + budget vs actual cost */}
+                                <EventCosts
+                                  key={`costs-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(eventSuppliers) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, eventSuppliers } : prev,
+                                    );
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {detailTab === "comunicacao" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-comunicacao"
+                                aria-labelledby="detail-tab-comunicacao"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                <p className="text-foreground/50 text-[11px] leading-relaxed">
+                                  Crie e envie a proposta ao cliente. Comece por aqui.
+                                </p>
+                                <ProposalStudio
+                                  key={`studio-${selected.id}`}
+                                  quote={selected}
+                                  onSent={() => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, status: "cotado" } : prev,
                                     );
                                     setEditStatus("cotado");
                                     appendActivity(selected.id, [
@@ -2648,186 +2919,84 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                         at: new Date().toISOString(),
                                         kind: "proposal_sent",
                                         actor: userName,
-                                        summary: `Proposta enviada — ${eur(total)}`,
+                                        summary: "Proposta enviada ao cliente (Studio)",
                                       },
                                     ]);
                                   }}
                                 />
-                              )}
-
-                              <ClientMessenger
-                                key={selected.id}
-                                quote={selected}
-                                onSent={(messages) => {
-                                  const prev_count = selected.messages?.length ?? 0;
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, messages } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                                  if (messages.length > prev_count) {
-                                    appendActivity(selected.id, [
-                                      {
-                                        id: randomId(),
-                                        at: new Date().toISOString(),
-                                        kind: "message_sent",
-                                        actor: userName,
-                                        summary: "Mensagem enviada ao cliente",
-                                      },
-                                    ]);
-                                  }
-                                }}
-                              />
-
-                              <ActivityLog
-                                quote={selected}
-                                actor={userName}
-                                onAddEntry={(entry) => appendActivity(selected.id, [entry])}
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Barra de contexto — persistente em todos os separadores:
-                            quem é o cliente, quanto vale, como o contactar. Fixa em
-                            ecrãs muito largos; empilha por baixo abaixo de 2xl. */}
-                        <aside
-                          aria-label="Contexto do pedido"
-                          className="flex min-w-0 flex-col gap-5 2xl:sticky 2xl:top-6"
-                        >
-                          {/* Snapshot — factos-chave num relance */}
-                          <Card padding="sm">
-                            <p className="bo-eyebrow mb-3">Resumo</p>
-                            {(() => {
-                              const revenue =
-                                selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
-                              const costs = (selected.eventSuppliers ?? []).reduce(
-                                (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
-                                0,
-                              );
-                              const margin = revenue - costs;
-                              const cd = eventCountdown(selected.date);
-                              const cells: { l: string; v: string; tone?: string }[] = [
-                                { l: "Valor", v: revenue ? formatPrice(revenue) : "—" },
-                              ];
-                              if (costs > 0)
-                                cells.push({
-                                  l: "Margem",
-                                  v: formatPrice(margin),
-                                  tone: margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]",
-                                });
-                              if (cd)
-                                cells.push({
-                                  l: "Evento",
-                                  v: cd.label,
-                                  tone:
-                                    cd.tone === "soon" || cd.tone === "today"
-                                      ? "text-[#b5654a]"
-                                      : undefined,
-                                });
-                              return (
-                                <div className="grid grid-cols-1 gap-2">
-                                  {cells.map((c) => (
-                                    <div
-                                      key={c.l}
-                                      className="flex items-center justify-between rounded-lg bg-foreground/[0.04] px-3 py-2.5"
-                                    >
-                                      <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
-                                        {c.l}
-                                      </span>
-                                      <span
-                                        className={`text-sm font-semibold ${c.tone ?? "text-foreground/80"}`}
-                                      >
-                                        {c.v}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })()}
-                          </Card>
-
-                          {/* Contacto */}
-                          <SectionCard eyebrow="Contacto" padding="sm">
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-2">
-                                <a
-                                  href={`mailto:${selected.email}`}
-                                  className="text-[#4d6350] text-xs hover:underline truncate"
-                                >
-                                  {selected.email}
-                                </a>
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard?.writeText(selected.email);
-                                    toast("Email copiado", "success");
-                                  }}
-                                  className="text-foreground/25 hover:text-foreground/55 transition-colors shrink-0"
-                                  title="Copiar email"
-                                  aria-label="Copiar email"
-                                >
-                                  <svg
-                                    width="12"
-                                    height="12"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
+                                {!showBuilder ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowBuilder(true)}
+                                    className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
                                   >
-                                    <rect x="9" y="9" width="11" height="11" rx="2" />
-                                    <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
-                                  </svg>
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <a
-                                  href={`tel:${selected.phone}`}
-                                  className="text-foreground/70 text-xs hover:text-foreground/90"
-                                >
-                                  {selected.phone}
-                                </a>
-                                {selected.phone && (
-                                  <a
-                                    href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-80 transition-opacity shrink-0"
-                                    title="Abrir conversa no WhatsApp"
-                                  >
-                                    <svg
-                                      width="12"
-                                      height="12"
-                                      viewBox="0 0 24 24"
-                                      fill="currentColor"
-                                    >
-                                      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
-                                    </svg>
-                                    WhatsApp
-                                  </a>
+                                    Outra forma de propor (tabela de preços simples)
+                                  </button>
+                                ) : (
+                                  <ProposalBuilder
+                                    quote={selected}
+                                    onSent={(total) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id
+                                            ? { ...q, status: "cotado", quotedPrice: total }
+                                            : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev
+                                          ? { ...prev, status: "cotado", quotedPrice: total }
+                                          : prev,
+                                      );
+                                      setEditStatus("cotado");
+                                      appendActivity(selected.id, [
+                                        {
+                                          id: randomId(),
+                                          at: new Date().toISOString(),
+                                          kind: "proposal_sent",
+                                          actor: userName,
+                                          summary: `Proposta enviada — ${eur(total)}`,
+                                        },
+                                      ]);
+                                    }}
+                                  />
                                 )}
-                              </div>
-                              {selected.company && (
-                                <p className="text-foreground/70 text-xs">{selected.company}</p>
-                              )}
-                              {selected.nif && (
-                                <p className="text-foreground/70 text-xs">NIF: {selected.nif}</p>
-                              )}
-                            </div>
-                          </SectionCard>
 
-                          <p className="px-1 text-[10px] text-foreground/50">
-                            Submetido em{" "}
-                            {new Date(selected.submittedAt).toLocaleString("pt-PT", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </p>
-                        </aside>
-                      </div>
+                                <ClientMessenger
+                                  key={selected.id}
+                                  quote={selected}
+                                  onSent={(messages) => {
+                                    const prev_count = selected.messages?.length ?? 0;
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, messages } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                    if (messages.length > prev_count) {
+                                      appendActivity(selected.id, [
+                                        {
+                                          id: randomId(),
+                                          at: new Date().toISOString(),
+                                          kind: "message_sent",
+                                          actor: userName,
+                                          summary: "Mensagem enviada ao cliente",
+                                        },
+                                      ]);
+                                    }
+                                  }}
+                                />
+
+                                <ActivityLog
+                                  quote={selected}
+                                  actor={userName}
+                                  onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
