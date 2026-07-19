@@ -12,6 +12,7 @@ import {
 } from "@/lib/proposal-doc";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
+import { Button, Card, Field, Segmented } from "./ui";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -21,13 +22,11 @@ import type { Quote } from "@/lib/orcamento/types";
 type StudioDoc = Parameters<typeof withProposalDefaults>[0];
 
 // ── Shared styling (matches ProposalBuilder / PaymentsPanel) ──
-const LABEL = "block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2";
-const INPUT = "bo-input w-full px-3 py-2 text-sm text-foreground/70";
-const INPUT_SM = "bo-input w-full min-w-0 px-2.5 py-2 text-xs text-foreground/75";
+const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-foreground/85";
 const ADD_BTN =
-  "text-[10px] tracking-[0.2em] uppercase text-[#4d6350]/70 hover:text-[#4d6350] transition-colors";
+  "inline-flex items-center gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors";
 const REMOVE_BTN =
-  "text-foreground/25 hover:text-[#b5654a] transition-colors text-sm leading-none shrink-0";
+  "text-foreground/30 hover:text-[#8a2a22] transition-colors text-base leading-none shrink-0";
 
 const PT_MONTHS = [
   "janeiro",
@@ -497,113 +496,87 @@ export default function ProposalStudio({ quote, onSent }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-4">
-        <p className="bo-eyebrow">Estúdio de Propostas (PDF)</p>
-        <button
-          type="button"
-          onClick={clearDraft}
-          className="text-[10px] tracking-[0.15em] uppercase text-foreground/30 hover:text-[#b5654a] transition-colors"
-        >
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <p className="bo-eyebrow">Estúdio de propostas (PDF)</p>
+          <p className="mt-2 text-sm leading-relaxed text-foreground/55">
+            Monte aqui a proposta em PDF para o cliente. Preencha de cima para baixo; pode
+            pré-visualizar antes de enviar.
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={clearDraft} className="shrink-0">
           Limpar rascunho
-        </button>
+        </Button>
       </div>
 
-      <p className="mb-5 text-[11px] leading-relaxed text-foreground/45">
-        Monte aqui a proposta em PDF para o cliente. Preencha de cima para baixo; pode
-        pré-visualizar antes de enviar.
-      </p>
-
       {/* Template selector */}
-      <div className="inline-flex gap-1 p-1 rounded-xl bg-foreground/[0.04] mb-6">
-        {(["decoracao", "organizacao"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTemplate(t)}
-            aria-pressed={doc.template === t || (t === "decoracao" && isDeco)}
-            className={`px-4 py-1.5 rounded-lg text-[10px] tracking-[0.15em] uppercase transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
-              (t === "decoracao") === isDeco
-                ? "bg-white text-foreground/70 shadow-sm"
-                : "text-foreground/35 hover:text-foreground/55"
-            }`}
-          >
-            {t === "decoracao" ? "Decoração" : "Organização"}
-          </button>
-        ))}
+      <div className="mb-4">
+        <Segmented
+          ariaLabel="Modelo da proposta"
+          value={isDeco ? "decoracao" : "organizacao"}
+          onChange={setTemplate}
+          options={[
+            { value: "decoracao", label: "Decoração" },
+            { value: "organizacao", label: "Organização" },
+          ]}
+        />
       </div>
 
       {/* Event fields */}
       <Section title="Evento">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Labeled label="Clientes">
-            <input
-              className={INPUT}
-              value={doc.clientNames}
-              onChange={(e) => patch({ clientNames: e.target.value })}
-              placeholder="Maria & Zé"
-            />
-          </Labeled>
-          <Labeled label="Tipo de evento">
-            <input
-              className={INPUT}
-              value={doc.eventType}
-              onChange={(e) => patch({ eventType: e.target.value })}
-              placeholder="Casamento"
-            />
-          </Labeled>
-          <Labeled label="Data">
-            <input
-              className={INPUT}
-              value={doc.eventDate}
-              onChange={(e) => patch({ eventDate: e.target.value })}
-              placeholder="12 de setembro de 2026"
-            />
-          </Labeled>
-          <Labeled label="Local">
-            <input
-              className={INPUT}
-              value={doc.location}
-              onChange={(e) => patch({ location: e.target.value })}
-              placeholder="Monte da Oliveirinha, Évora"
-            />
-          </Labeled>
-          <Labeled label="Convidados">
-            <input
-              className={INPUT}
-              value={doc.guests}
-              onChange={(e) => patch({ guests: e.target.value })}
-              placeholder="150 pax"
-            />
-          </Labeled>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field
+            label="Clientes"
+            value={doc.clientNames}
+            onChange={(e) => patch({ clientNames: e.target.value })}
+            placeholder="Maria & Zé"
+          />
+          <Field
+            label="Tipo de evento"
+            value={doc.eventType}
+            onChange={(e) => patch({ eventType: e.target.value })}
+            placeholder="Casamento"
+          />
+          <Field
+            label="Data"
+            value={doc.eventDate}
+            onChange={(e) => patch({ eventDate: e.target.value })}
+            placeholder="12 de setembro de 2026"
+          />
+          <Field
+            label="Local"
+            value={doc.location}
+            onChange={(e) => patch({ location: e.target.value })}
+            placeholder="Monte da Oliveirinha, Évora"
+          />
+          <Field
+            label="Convidados"
+            value={doc.guests}
+            onChange={(e) => patch({ guests: e.target.value })}
+            placeholder="150 pax"
+          />
           {isDeco && (
             <>
-              <Labeled label="Cerimónia">
-                <input
-                  className={INPUT}
-                  value={doc.ceremony ?? ""}
-                  onChange={(e) => patch({ ceremony: e.target.value })}
-                  placeholder="Civil, simbólica"
-                />
-              </Labeled>
-              <Labeled label="Hora">
-                <input
-                  className={INPUT}
-                  value={doc.time ?? ""}
-                  onChange={(e) => patch({ time: e.target.value })}
-                  placeholder="A definir"
-                />
-              </Labeled>
+              <Field
+                label="Cerimónia"
+                value={doc.ceremony ?? ""}
+                onChange={(e) => patch({ ceremony: e.target.value })}
+                placeholder="Civil, simbólica"
+              />
+              <Field
+                label="Hora"
+                value={doc.time ?? ""}
+                onChange={(e) => patch({ time: e.target.value })}
+                placeholder="A definir"
+              />
             </>
           )}
         </div>
 
         {/* Reference (advanced) */}
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-2">
-            <label htmlFor="studio-ref" className={`${LABEL} mb-0`}>
-              Título interno (opcional)
-            </label>
-            {refEdited && (
+        <div className="mt-4">
+          {refEdited && (
+            <div className="mb-1.5 flex justify-end">
               <button
                 type="button"
                 onClick={() => {
@@ -614,21 +587,17 @@ export default function ProposalStudio({ quote, onSent }: Props) {
               >
                 ↺ Automática
               </button>
-            )}
-          </div>
-          <input
-            id="studio-ref"
-            className={INPUT}
+            </div>
+          )}
+          <Field
+            label="Título interno (opcional)"
             value={doc.ref}
             onChange={(e) => {
               setRefEdited(true);
               patch({ ref: e.target.value });
             }}
+            hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
           />
-          <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/40">
-            sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da
-            proposta.
-          </p>
         </div>
       </Section>
 
@@ -669,7 +638,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           {doc.serviceGroups.map((g, gi) => (
             <div
               key={gi}
-              className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] p-3"
+              className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
             >
               <div className="flex items-center gap-2 mb-2">
                 <input
@@ -745,14 +714,14 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       {/* Mood boards — decoracao only */}
       {isDeco && (
         <Section title="Mood boards">
-          <p className="-mt-1 mb-3 text-[11px] leading-relaxed text-foreground/40">
+          <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
             grupos de imagens de inspiração para o cliente
           </p>
           <div className="flex flex-col gap-3">
             {doc.moodBoards.map((b, bi) => (
               <div
                 key={bi}
-                className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] p-3"
+                className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <input
@@ -819,7 +788,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
             {(doc.cronograma ?? []).map((ph, pi) => (
               <div
                 key={pi}
-                className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] p-3"
+                className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <input
@@ -905,15 +874,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                 + Adicionar item
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Labeled label="Rótulo do total">
-                <input
-                  className={INPUT}
-                  value={doc.totalLabel}
-                  onChange={(e) => patch({ totalLabel: e.target.value })}
-                  placeholder="Valor Total Decoração"
-                />
-              </Labeled>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Rótulo do total"
+                value={doc.totalLabel}
+                onChange={(e) => patch({ totalLabel: e.target.value })}
+                placeholder="Valor Total Decoração"
+              />
             </div>
           </>
         ) : (
@@ -955,15 +922,15 @@ export default function ProposalStudio({ quote, onSent }: Props) {
               </button>
             </div>
             <div className="flex flex-col gap-3">
-              <Labeled label="Nota do orçamento">
-                <textarea
-                  rows={2}
-                  className={`${INPUT} resize-none`}
-                  value={doc.budgetNote ?? ""}
-                  onChange={(e) => patch({ budgetNote: e.target.value })}
-                  placeholder="Os valores são estimativas e podem ser ajustados…"
-                />
-              </Labeled>
+              <Field
+                as="textarea"
+                label="Nota do orçamento"
+                rows={2}
+                className="resize-none"
+                value={doc.budgetNote ?? ""}
+                onChange={(e) => patch({ budgetNote: e.target.value })}
+                placeholder="Os valores são estimativas e podem ser ajustados…"
+              />
             </div>
           </>
         )}
@@ -973,67 +940,48 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
       <Section title="Total, IVA e validade">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Labeled
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field
             label={vatMode === "acrescer" ? "Valor (base, sem IVA)" : "Valor total (com IVA)"}
-          >
-            <input
-              className={INPUT}
-              inputMode="decimal"
-              value={totalInput}
-              onChange={(e) => onTotalInput(e.target.value)}
-              placeholder="3000"
-              aria-label="Valor total"
+            inputMode="decimal"
+            value={totalInput}
+            onChange={(e) => onTotalInput(e.target.value)}
+            placeholder="3000"
+            aria-label="Valor total"
+          />
+          <div className="flex flex-col gap-1.5">
+            <span className="bo-eyebrow">IVA</span>
+            <Segmented
+              ariaLabel="Modo de IVA"
+              value={vatMode}
+              onChange={setVatMode}
+              options={[
+                { value: "incluido", label: "IVA incluído" },
+                { value: "acrescer", label: "+ IVA (acresce)" },
+              ]}
             />
-          </Labeled>
-          <div>
-            <span className={LABEL}>IVA</span>
-            <div className="inline-flex gap-1 p-1 rounded-xl bg-foreground/[0.04]">
-              {(
-                [
-                  ["incluido", "IVA incluído"],
-                  ["acrescer", "+ IVA (acresce)"],
-                ] as const
-              ).map(([m, label]) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setVatMode(m)}
-                  aria-pressed={vatMode === m}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] tracking-[0.12em] uppercase transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
-                    vatMode === m
-                      ? "bg-white text-foreground/70 shadow-sm"
-                      : "text-foreground/35 hover:text-foreground/55"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/40">
+            <p className="text-xs leading-relaxed text-foreground/45">
               «+ IVA» soma o IVA ao valor; «incluído» já o contém.
             </p>
           </div>
-          <Labeled label="Validade (dias)">
-            <input
-              className={INPUT}
-              type="number"
-              min={1}
-              value={doc.validUntilDays ?? ""}
-              onChange={(e) => {
-                const n = Number.parseInt(e.target.value, 10);
-                patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
-              }}
-              placeholder={String(DEFAULT_VALID_DAYS)}
-              aria-label="Dias de validade"
-            />
-          </Labeled>
+          <Field
+            label="Validade (dias)"
+            type="number"
+            min={1}
+            value={doc.validUntilDays ?? ""}
+            onChange={(e) => {
+              const n = Number.parseInt(e.target.value, 10);
+              patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
+            }}
+            placeholder={String(DEFAULT_VALID_DAYS)}
+            aria-label="Dias de validade"
+          />
         </div>
         {/* Prévia do desdobramento — o que será efetivamente faturado. */}
         {money.gross > 0 && (
-          <p className="mt-3 text-[11px] leading-relaxed text-foreground/45">
+          <p className="mt-4 text-xs leading-relaxed text-foreground/55">
             Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
-            <span className="text-foreground/65">Total {eur(money.gross)}</span>
+            <span className="text-foreground/80">Total {eur(money.gross)}</span>
             <br />
             Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
           </p>
@@ -1041,59 +989,43 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       </Section>
 
       {/* Actions */}
-      <div className="sticky bottom-0 -mx-1 mt-6 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/85 px-1 py-3 backdrop-blur">
-        <button
-          type="button"
+      <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/85 px-1 py-3 backdrop-blur">
+        <Button
+          variant="secondary"
           onClick={preview}
           disabled={busy !== null}
-          className={`px-4 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase transition-colors shadow-sm ${
-            busy !== null
-              ? "bg-white/60 text-foreground/30 cursor-not-allowed border border-foreground/[0.08]"
-              : "bg-white border border-foreground/[0.12] text-foreground/55 hover:text-foreground/75"
-          }`}
+          loading={busy === "preview"}
         >
           {busy === "preview" ? "A gerar…" : "Pré-visualizar"}
-        </button>
+        </Button>
 
         {confirmSend ? (
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-foreground/50">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-foreground/60">
               Enviar para {quote.email || "o cliente"}?
             </span>
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={send}
               disabled={busy !== null}
-              className={`px-4 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase transition-colors ${
-                busy !== null
-                  ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
-                  : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
-              }`}
+              loading={busy === "send"}
             >
               {busy === "send" ? "A enviar…" : "Confirmar"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmSend(false)}
-              className="text-[10px] tracking-[0.15em] uppercase text-foreground/35 hover:text-foreground/60"
-            >
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmSend(false)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => setConfirmSend(true)}
             disabled={busy !== null || !canSend}
             title={canSend ? undefined : "Preencha clientes e referência."}
-            className={`px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase transition-colors ${
-              busy !== null || !canSend
-                ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
-                : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
-            }`}
+            iconRight={<span aria-hidden="true">→</span>}
           >
-            Gerar e enviar ao cliente →
-          </button>
+            Gerar e enviar ao cliente
+          </Button>
         )}
       </div>
     </div>
@@ -1104,19 +1036,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6">
-      <p className="text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-3">{title}</p>
+    <Card className="mb-4">
+      <h3 className="font-display text-base leading-tight text-foreground/90 mb-4">{title}</h3>
       {children}
-    </div>
-  );
-}
-
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className={LABEL}>{label}</span>
-      {children}
-    </label>
+    </Card>
   );
 }
 
