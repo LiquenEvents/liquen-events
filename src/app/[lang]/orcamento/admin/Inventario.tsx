@@ -5,6 +5,7 @@ import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
+import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 
 type Condition = PropItem["condition"];
 
@@ -24,6 +25,20 @@ const CONDITION_CHIP: Record<Condition, { bg: string; text: string }> = {
   usado: { bg: "#f6efe1", text: "#8a6d2f" },
   danificado: { bg: "#f6e6df", text: "#a03a1a" },
 };
+
+const PlusIcon = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+  </svg>
+);
 
 interface FormState {
   name: string;
@@ -244,151 +259,172 @@ export default function Inventario() {
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-        <div className="relative flex-1 max-w-md">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-          </svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Procurar item…"
-            className="bo-input pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-        </div>
-        <select
-          value={cond}
-          onChange={(e) => setCond(e.target.value as "Todos" | Condition)}
-          className="bo-input px-3 py-2.5 text-sm text-foreground/60 sm:w-44"
-        >
-          <option value="Todos">Todos os estados</option>
-          {CONDITIONS.map((c) => (
-            <option key={c} value={c}>
-              {CONDITION_LABEL[c]}
-            </option>
-          ))}
-        </select>
-        {items.length > 0 && (
-          <button
-            onClick={exportCsv}
-            className="px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm shrink-0"
-            title="Exportar inventário para CSV"
-          >
-            Exportar
-          </button>
-        )}
-        <button
-          onClick={() => setAdding(!adding)}
-          className="px-4 py-2.5 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm shrink-0"
-        >
-          {adding ? "Cancelar" : "+ Novo item"}
-        </button>
-      </div>
+      <Toolbar
+        className="mb-6"
+        start={
+          <>
+            <div className="relative w-full max-w-md sm:w-72">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+              </svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Procurar item…"
+                aria-label="Procurar itens do inventário"
+                className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
+              />
+            </div>
+            <select
+              value={cond}
+              onChange={(e) => setCond(e.target.value as "Todos" | Condition)}
+              aria-label="Filtrar por estado"
+              className="bo-input px-3 py-2.5 text-sm text-foreground/70 sm:w-44"
+            >
+              <option value="Todos">Todos os estados</option>
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>
+                  {CONDITION_LABEL[c]}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+        end={
+          <>
+            {items.length > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={exportCsv}
+                title="Exportar inventário para CSV"
+              >
+                Exportar
+              </Button>
+            )}
+            <Button
+              variant={adding ? "secondary" : "primary"}
+              size="sm"
+              iconLeft={adding ? undefined : PlusIcon}
+              onClick={() => setAdding(!adding)}
+            >
+              {adding ? "Cancelar" : "Novo item"}
+            </Button>
+          </>
+        }
+      />
 
       {/* Add form */}
       {adding && (
-        <div className="bo-card p-4 mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Nome *"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <select
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            className="bo-input px-3 py-2 text-sm text-foreground/60"
-          >
-            {PROP_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min={0}
-            value={form.quantity}
-            onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-            placeholder="Quantidade"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <input
-            value={form.unit}
-            onChange={(e) => setForm({ ...form, unit: e.target.value })}
-            placeholder="Unidade (ex.: un., m, par)"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <select
-            value={form.condition}
-            onChange={(e) => setForm({ ...form, condition: e.target.value as Condition })}
-            className="bo-input px-3 py-2 text-sm text-foreground/60"
-          >
-            {CONDITIONS.map((c) => (
-              <option key={c} value={c}>
-                {CONDITION_LABEL[c]}
-              </option>
-            ))}
-          </select>
-          <input
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-            placeholder="Localização (ex.: Armazém A, prateleira 3)"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <input
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="Notas"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22 sm:col-span-2"
-          />
-          <button
-            onClick={add}
-            disabled={!form.name.trim() || saving}
-            className="sm:col-span-2 py-2.5 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors disabled:opacity-40"
-          >
-            {saving ? "A guardar…" : "Guardar item"}
-          </button>
-        </div>
+        <Card padding="sm" className="mb-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field
+              label="Nome"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Nome do item"
+            />
+            <Field
+              as="select"
+              label="Categoria"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            >
+              {PROP_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Field>
+            <Field
+              label="Quantidade"
+              type="number"
+              min={0}
+              value={form.quantity}
+              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+              placeholder="Quantidade"
+            />
+            <Field
+              label="Unidade"
+              value={form.unit}
+              onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              placeholder="Ex.: un., m, par"
+            />
+            <Field
+              as="select"
+              label="Estado"
+              value={form.condition}
+              onChange={(e) => setForm({ ...form, condition: e.target.value as Condition })}
+            >
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>
+                  {CONDITION_LABEL[c]}
+                </option>
+              ))}
+            </Field>
+            <Field
+              label="Localização"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              placeholder="Ex.: Armazém A, prateleira 3"
+            />
+            <Field
+              containerClassName="sm:col-span-2"
+              label="Notas"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Notas"
+            />
+          </div>
+          <div className="mt-5 flex justify-end">
+            <Button onClick={add} loading={saving} disabled={!form.name.trim() || saving}>
+              Guardar item
+            </Button>
+          </div>
+        </Card>
       )}
 
       {/* Category chips */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrar por categoria">
         {cats.map((c) => (
-          <button
+          <Button
             key={c}
+            size="sm"
+            variant={cat === c ? "subtle" : "ghost"}
+            aria-pressed={cat === c}
             onClick={() => setCat(c)}
-            className={`px-3 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${cat === c ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
           >
             {c}
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Category totals */}
       {!loading && filtered.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="mb-6 flex flex-wrap gap-2">
           {totals.map(([c, t]) => (
             <span
               key={c}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-foreground/[0.04] text-[11px] text-foreground/50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground/[0.04] px-2.5 py-1 text-[11px] text-foreground/50"
             >
-              <span className="text-foreground/70 font-medium">{c}</span>
+              <span className="font-medium text-foreground/70">{c}</span>
               <span className="text-foreground/35">
                 {t.items} {t.items === 1 ? "item" : "itens"} · {t.qty} un.
               </span>
             </span>
           ))}
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#eef1e6] text-[11px] text-[#525a2f] font-medium">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#eef1e6] px-2.5 py-1 text-[11px] font-medium text-[#525a2f]">
             Total: {filtered.length} {filtered.length === 1 ? "item" : "itens"} · {totalQty} un.
           </span>
         </div>
@@ -396,27 +432,56 @@ export default function Inventario() {
 
       {/* Table */}
       {loading ? (
-        <p className="bo-eyebrow text-foreground/30 py-8 text-center">A carregar inventário…</p>
+        <Card>
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="bo-skeleton h-9 w-full" aria-hidden />
+            ))}
+          </div>
+          <p className="sr-only">A carregar inventário…</p>
+        </Card>
       ) : filtered.length === 0 ? (
-        <div className="bo-card p-10 text-center">
-          <p className="text-foreground/60 text-sm font-medium mb-1">
-            {items.length === 0 ? "Sem itens no inventário" : "Nenhum item encontrado"}
-          </p>
-          <p className="text-foreground/35 text-xs">
-            {items.length === 0
-              ? "Registe aqui os adereços e materiais de decoração do estúdio."
-              : "Tente outra pesquisa, categoria ou estado."}
-          </p>
-        </div>
+        <Card padding="none">
+          <EmptyState
+            icon={
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                  strokeLinejoin="round"
+                />
+                <path d="M3.27 6.96 12 12l8.73-5.04M12 22V12" strokeLinecap="round" />
+              </svg>
+            }
+            title={items.length === 0 ? "Sem itens no inventário" : "Nenhum item encontrado"}
+            description={
+              items.length === 0
+                ? "Registe aqui os adereços e materiais de decoração do estúdio."
+                : "Tente outra pesquisa, categoria ou estado."
+            }
+            action={
+              items.length === 0
+                ? { label: "Adicionar item", onClick: () => setAdding(true) }
+                : undefined
+            }
+          />
+        </Card>
       ) : (
-        <div className="bo-card overflow-x-auto">
+        <Card padding="none" className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-foreground/[0.08]">
                 {["Nome", "Categoria", "Qtd", "Estado", "Localização", ""].map((h, idx) => (
                   <th
                     key={h || "acoes"}
-                    className={`bo-eyebrow text-foreground/35 font-medium px-4 py-3 ${idx === 2 ? "text-right" : "text-left"} ${idx === 5 ? "text-right" : ""}`}
+                    className={`bo-eyebrow text-foreground/35 font-medium px-4 py-3.5 ${idx === 2 ? "text-right" : "text-left"} ${idx === 5 ? "text-right" : ""}`}
                   >
                     {idx === 5 ? "Ações" : h}
                   </th>
@@ -435,14 +500,16 @@ export default function Inventario() {
                         value={editForm.name}
                         onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                         placeholder="Nome *"
-                        className="bo-input px-2 py-1.5 text-sm text-foreground/70 w-full"
+                        aria-label="Nome"
+                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
                       />
                     </td>
                     <td className="px-4 py-2">
                       <select
                         value={editForm.category}
                         onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                        className="bo-input px-2 py-1.5 text-sm text-foreground/60 w-full"
+                        aria-label="Categoria"
+                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
                       >
                         {PROP_CATEGORIES.map((c) => (
                           <option key={c} value={c}>
@@ -457,7 +524,8 @@ export default function Inventario() {
                         min={0}
                         value={editForm.quantity}
                         onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-                        className="bo-input px-2 py-1.5 text-sm text-foreground/70 w-20 text-right"
+                        aria-label="Quantidade"
+                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-20 text-right"
                       />
                     </td>
                     <td className="px-4 py-2">
@@ -466,7 +534,8 @@ export default function Inventario() {
                         onChange={(e) =>
                           setEditForm({ ...editForm, condition: e.target.value as Condition })
                         }
-                        className="bo-input px-2 py-1.5 text-sm text-foreground/60 w-full"
+                        aria-label="Estado"
+                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
                       >
                         {CONDITIONS.map((c) => (
                           <option key={c} value={c}>
@@ -480,75 +549,87 @@ export default function Inventario() {
                         value={editForm.location}
                         onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
                         placeholder="Localização"
-                        className="bo-input px-2 py-1.5 text-sm text-foreground/70 w-full"
+                        aria-label="Localização"
+                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
                       />
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        <Button
+                          size="sm"
                           onClick={() => saveEdit(i.id)}
+                          loading={saving}
                           disabled={!editForm.name.trim() || saving}
-                          className="px-3 py-1.5 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors disabled:opacity-40"
                         >
-                          {saving ? "…" : "Guardar"}
-                        </button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="text-foreground/40 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors"
-                        >
+                          Guardar
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
                           Cancelar
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   <tr
                     key={i.id}
-                    className="group border-b border-foreground/[0.06] hover:bg-foreground/[0.015] transition-colors"
+                    className="group border-b border-foreground/[0.06] motion-safe:transition-colors hover:bg-foreground/[0.015]"
                   >
-                    <td className="px-4 py-3">
-                      <p className="text-foreground/78 font-medium">{i.name}</p>
+                    <td className="px-4 py-3.5">
+                      <p className="text-foreground/80 font-medium">{i.name}</p>
                       {i.notes && (
-                        <p className="text-foreground/35 text-xs mt-0.5 line-clamp-1">{i.notes}</p>
+                        <p className="text-foreground/40 text-xs mt-0.5 line-clamp-1">{i.notes}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-[#4d6350]/70 text-[11px] tracking-[0.1em] uppercase">
+                    <td className="px-4 py-3.5 text-[#4d6350]/70 text-[11px] tracking-[0.1em] uppercase">
                       {i.category}
                     </td>
-                    <td className="px-4 py-3 text-right text-foreground/70 tabular-nums whitespace-nowrap">
+                    <td className="px-4 py-3.5 text-right text-foreground/70 tabular-nums whitespace-nowrap">
                       {i.quantity}
                       {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <ConditionChip condition={i.condition} />
                     </td>
-                    <td className="px-4 py-3 text-foreground/45">{i.location || "—"}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 text-foreground/50">{i.location || "—"}</td>
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => startEdit(i)}
-                          className="text-foreground/20 hover:text-[#4d6350] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                          className="text-foreground/25 hover:text-[#4d6350] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                           aria-label="Editar"
                         >
                           <svg
-                            width="13"
-                            height="13"
+                            width="14"
+                            height="14"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="1.8"
                             strokeLinecap="round"
                             strokeLinejoin="round"
+                            aria-hidden="true"
                           >
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
                           </svg>
                         </button>
                         <button
                           onClick={() => remove(i.id)}
-                          className="text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all text-base leading-none px-1"
+                          className="text-foreground/25 hover:text-[#8a2a22] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                           aria-label="Remover"
                         >
-                          ×
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
                         </button>
                       </div>
                     </td>
@@ -557,7 +638,7 @@ export default function Inventario() {
               )}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   );

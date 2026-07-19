@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { randomId } from "./util";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
+import { Button, Field, EmptyState } from "./ui";
 
 interface Props {
   quote: Quote;
@@ -58,81 +59,117 @@ export default function EventTimeline({ quote, onChange }: Props) {
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-4">
+    <section className="border-t border-foreground/10 pt-6">
+      <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Cronograma do Dia</p>
         {items.length > 0 && (
-          <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
-            {items.length} momentos
+          <span className="shrink-0 rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+            {items.length} {items.length === 1 ? "momento" : "momentos"}
           </span>
         )}
       </div>
 
       {items.length === 0 ? (
-        <button
-          onClick={seed}
-          className="w-full py-2.5 rounded-xl border border-dashed border-foreground/15 text-foreground/40 text-[11px] tracking-[0.2em] uppercase hover:border-[#4d6350]/40 hover:text-[#4d6350] transition-colors"
-        >
-          + Gerar cronograma-base
-        </button>
+        <EmptyState
+          className="px-4 py-10"
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+          }
+          title="Guião do dia por preencher"
+          description="Gere um cronograma-base para um dia de evento típico e adapte os momentos a este evento."
+          action={{ label: "Gerar cronograma-base", onClick: seed }}
+        />
       ) : (
-        <div className="relative pl-1 mb-4">
+        <div className="relative mb-5 pl-1">
           {/* vertical line */}
-          <div className="absolute left-[3.25rem] top-2 bottom-2 w-px bg-foreground/10" />
-          <div className="flex flex-col">
+          <div className="absolute left-[3.25rem] top-3 bottom-3 w-px bg-foreground/10" />
+          <ul className="flex flex-col">
             {items.map((i) => (
-              <div key={i.id} className="group relative flex items-start gap-3 py-2">
-                <span className="w-12 shrink-0 text-right text-[#4d6350] text-xs font-semibold tabular-nums pt-0.5">
+              <li
+                key={i.id}
+                className="group relative flex items-start gap-3 rounded-xl py-2.5 pr-1 hover:bg-foreground/[0.02]"
+              >
+                <span className="w-12 shrink-0 pt-0.5 text-right text-xs font-semibold tabular-nums text-[#4d6350]">
                   {i.time}
                 </span>
-                <span className="relative z-10 mt-1.5 w-2 h-2 rounded-full bg-[#4d6350] shrink-0 ring-4 ring-white" />
+                <span className="relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#4d6350] ring-4 ring-white" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground/70 text-sm leading-snug">{i.title}</p>
-                  {i.owner && <p className="text-foreground/30 text-[10px] mt-0.5">{i.owner}</p>}
+                  <p className="text-sm leading-snug text-foreground/80">{i.title}</p>
+                  {i.owner && <p className="mt-0.5 text-xs text-foreground/45">{i.owner}</p>}
                 </div>
                 <button
                   onClick={() => remove(i.id)}
-                  className="text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all shrink-0"
-                  aria-label="Remover"
+                  className="shrink-0 rounded-md p-1 text-foreground/25 opacity-0 hover:text-[#8a2a22] focus-visible:opacity-100 motion-safe:transition-all group-hover:opacity-100"
+                  aria-label={`Remover ${i.time} ${i.title}`}
                 >
-                  ×
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
                 </button>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
 
       {/* Add row */}
-      <div className="flex gap-2">
-        <input
+      <div className="flex flex-wrap items-end gap-2">
+        <Field
+          as="input"
           type="time"
+          label="Hora"
+          hideLabel
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-[88px]"
+          className="px-2.5"
+          containerClassName="w-[104px]"
         />
-        <input
+        <Field
+          as="input"
+          label="Momento"
+          hideLabel
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Momento…"
-          className="bo-input flex-1 px-3 py-1.5 text-xs text-foreground/70 placeholder-foreground/22"
+          containerClassName="min-w-[8rem] flex-1"
         />
-        <input
+        <Field
+          as="input"
+          label="Responsável"
+          hideLabel
           value={owner}
           onChange={(e) => setOwner(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Resp."
-          className="bo-input w-20 px-2 py-1.5 text-xs text-foreground/70 placeholder-foreground/22"
+          containerClassName="w-24"
         />
-        <button
-          onClick={add}
-          disabled={!title.trim() || !time}
-          className="px-3.5 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-xs hover:bg-[#2a3227] transition-colors disabled:opacity-40"
-        >
-          +
-        </button>
+        <Button variant="primary" onClick={add} disabled={!title.trim() || !time}>
+          Adicionar
+        </Button>
       </div>
-    </div>
+    </section>
   );
 }

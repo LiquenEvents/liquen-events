@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FollowUp } from "@/lib/followups";
 import { useToast } from "./Toast";
+import { Button, Card, EmptyState } from "./ui";
 
 interface Props {
   /** Optional: open the originating quote/pedido when a row's action is clicked. */
@@ -73,60 +74,82 @@ export default function FollowUps({ onOpenQuote }: Props) {
   })).filter((g) => g.rows.length > 0);
 
   return (
-    <div className="bo-card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+    <Card padding="none" className="overflow-hidden">
+      <div className="flex items-center justify-between border-b border-foreground/[0.07] px-5 sm:px-6 py-4">
         <p className="bo-eyebrow">Seguimentos automáticos</p>
-        <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
+        <span className="rounded-full bg-[#1b2119] px-2 py-0.5 text-[10px] tabular-nums text-white/80">
           {items.length}
         </span>
       </div>
 
       {loading ? (
-        <div className="px-5 py-10">
+        <div className="px-5 sm:px-6 py-10">
           <div className="bo-skeleton h-2.5 w-40 mb-4" aria-hidden />
           <div className="bo-skeleton h-9 w-full" aria-hidden />
+          <p className="sr-only">A carregar seguimentos…</p>
         </div>
       ) : groups.length === 0 ? (
-        <p className="text-foreground/25 text-sm text-center py-12">
-          Sem seguimentos pendentes. Tudo em dia.
-        </p>
+        <EmptyState
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              aria-hidden="true"
+            >
+              <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+          }
+          title="Tudo em dia"
+          description="Não há seguimentos pendentes. Quando uma proposta, pagamento ou lead precisar de atenção, aparece aqui."
+        />
       ) : (
         <div className="max-h-[460px] overflow-y-auto">
           {groups.map(({ sev, rows }) => (
             <div key={sev} className="border-b border-foreground/[0.06] last:border-0">
-              <div className="flex items-center gap-2 px-5 pt-3 pb-1.5">
+              <div className="flex items-center gap-2 px-5 sm:px-6 pt-3.5 pb-1.5">
                 <span
-                  className="w-1.5 h-1.5 rounded-full"
+                  className="h-1.5 w-1.5 rounded-full"
                   style={{ background: SEVERITY_COLOR[sev] }}
+                  aria-hidden="true"
                 />
-                <p className="text-[10px] tracking-[0.2em] uppercase font-medium text-foreground/35">
+                <p className="text-[10px] tracking-[0.2em] uppercase font-medium text-foreground/40">
                   {SEVERITY_LABEL[sev]}
                 </p>
-                <span className="text-[10px] tabular-nums text-foreground/25">{rows.length}</span>
+                <span className="text-[10px] tabular-nums text-foreground/30">{rows.length}</span>
               </div>
               <div className="pb-2 divide-y divide-foreground/[0.05]">
                 {rows.map((f) => {
                   const color = SEVERITY_COLOR[f.severity];
                   return (
-                    <div key={f.id} className="px-5 py-3 flex items-center gap-3">
+                    <div
+                      key={f.id}
+                      className="flex items-center gap-3 px-5 sm:px-6 py-3 motion-safe:transition-colors hover:bg-foreground/[0.02]"
+                    >
                       <span
-                        className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0"
+                        className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] tracking-[0.12em] uppercase"
                         style={{ background: `${color}1f`, color }}
                       >
                         {KIND_LABEL[f.kind]}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-foreground/70 text-sm truncate">{f.clientName}</p>
-                        <p className="text-foreground/35 text-[11px] truncate">
+                        <p className="truncate text-sm text-foreground/75">{f.clientName}</p>
+                        <p className="truncate text-[11px] text-foreground/40">
                           {f.summary} · {duenessLabel(f)}
                         </p>
                       </div>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
                         onClick={() => onOpenQuote?.(f.quoteId)}
-                        className="text-[11px] text-foreground/50 hover:text-foreground/80 transition-colors shrink-0 underline decoration-foreground/20 underline-offset-2"
                       >
                         Abrir pedido
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
@@ -135,6 +158,6 @@ export default function FollowUps({ onOpenQuote }: Props) {
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Quote, ActivityEntry, ActivityKind } from "@/lib/orcamento/types";
 import { randomId } from "./util";
+import { Button, Field } from "./ui";
 
 const KIND_META: Record<ActivityKind, { label: string; color: string; d: string }> = {
   created: {
@@ -133,43 +134,61 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
       <div className="flex items-center justify-between mb-4">
         <p className="bo-eyebrow">Histórico de Atividade</p>
         {onAddEntry && mode === null && (
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setMode("call")}
-              className="flex items-center gap-1 text-[#b5894a] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-70 transition-opacity"
               title="Registar chamada telefónica"
+              iconLeft={
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d={KIND_META.call_logged.d} />
+                </svg>
+              }
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d={KIND_META.call_logged.d} />
-              </svg>
               Chamada
-            </button>
-            <span className="text-foreground/15">|</span>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setMode("note")}
-              className="text-foreground/40 text-[10px] tracking-[0.1em] uppercase font-medium hover:text-[#4d6350] transition-colors"
+              iconLeft={
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              }
             >
-              + Nota
-            </button>
+              Nota
+            </Button>
           </div>
         )}
       </div>
 
       {mode !== null && (
-        <div className="mb-4 p-3 rounded-xl border border-dashed border-foreground/15 bg-foreground/[0.02]">
-          <p className="text-[10px] tracking-[0.15em] uppercase text-foreground/35 mb-2">
-            {mode === "call" ? "Registar chamada" : "Adicionar nota"}
-          </p>
-          <textarea
+        <div className="mb-4 rounded-2xl border border-dashed border-foreground/15 bg-foreground/[0.02] p-4">
+          <Field
+            as="textarea"
+            label={mode === "call" ? "Registar chamada" : "Adicionar nota"}
             autoFocus
             rows={3}
             value={text}
@@ -186,29 +205,31 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
                 ? "Ex.: Ligação às 14h — cliente pediu proposta com DJ incluído, orçamento até €3k..."
                 : "Ex.: Email de acompanhamento enviado. Cliente viaja até dia 15..."
             }
-            className="w-full bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+            className="resize-none"
           />
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-foreground/22 text-[10px]">
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[10px] text-foreground/30">
               Ctrl+Enter para guardar · Esc para cancelar
             </span>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setMode(null);
                   setText("");
                 }}
-                className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
               >
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button
+                size="sm"
                 onClick={submitEntry}
+                loading={saving}
                 disabled={!text.trim() || saving}
-                className="px-3 py-1 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors disabled:opacity-40"
               >
-                {saving ? "A guardar…" : "Guardar"}
-              </button>
+                Guardar
+              </Button>
             </div>
           </div>
         </div>
