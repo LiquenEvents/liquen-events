@@ -23,10 +23,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    const body = await request.json();
+    // Malformed or non-object body → 400, not a 500. `null`/primitives/arrays
+    // would otherwise blow up the `key in body` check with a TypeError.
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+    }
+    const source = body as Record<string, unknown>;
     const picked: Record<string, unknown> = {};
     for (const key of ALLOWED) {
-      if (key in body) picked[key] = body[key];
+      if (key in source) picked[key] = source[key];
     }
     const parsed = taskUpdateSchema.safeParse(picked);
     if (!parsed.success) {

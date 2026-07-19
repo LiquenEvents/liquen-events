@@ -20,6 +20,16 @@ function req(method: "PATCH" | "DELETE", body?: unknown): NextRequest {
   }) as unknown as NextRequest;
 }
 
+// A request whose body is a raw (already-serialized) string — lets us send
+// malformed JSON or non-object JSON without JSON.stringify wrapping it.
+function rawReq(raw: string): NextRequest {
+  return new Request("https://liquen.test/api/tarefas/t1", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: raw,
+  }) as unknown as NextRequest;
+}
+
 beforeEach(() => {
   authed.ok = false;
   vi.clearAllMocks();
@@ -58,5 +68,30 @@ describe("/api/tarefas/[id]", () => {
     const res = await PATCH(req("PATCH", { priority: "urgente" }), ctx("t1"));
     expect(res.status).toBe(400);
     expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-object JSON body with 400 (not a 500)", async () => {
+    authed.ok = true;
+    // `"key" in body` blows up with a TypeError on a primitive/null body — that
+    // must surface as a clean 400, never a 500.
+    for (const raw of ['"just a string"', "42", "null", "[1,2,3]"]) {
+      const res = await PATCH(rawReq(raw), ctx("t1"));
+      expect(res.status).toBe(400);
+    }
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed JSON body with 400 (not a 500)", async () => {
+    authed.ok = true;
+    const res = await PATCH(rawReq("{ not valid json "), ctx("t1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the task does not exist", async () => {
+    authed.ok = true;
+    store.update.mockResolvedValueOnce(null as unknown as { id: string });
+    const res = await PATCH(req("PATCH", { done: true }), ctx("ghost"));
+    expect(res.status).toBe(404);
   });
 });

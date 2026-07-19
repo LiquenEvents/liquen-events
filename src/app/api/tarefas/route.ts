@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
-    // Validate + bound the same way the PATCH path does.
-    const parsed = taskUpdateSchema.safeParse(await request.json());
+    // Validate + bound the same way the PATCH path does. Malformed JSON →
+    // safeParse(null) fails → a clean 400, never a 500 from a thrown parse.
+    const body = await request.json().catch(() => null);
+    const parsed = taskUpdateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
     }

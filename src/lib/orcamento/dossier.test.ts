@@ -190,6 +190,19 @@ describe("deriveStage", () => {
     expect(deriveStage(d, TODAY)).toBe("concluido");
   });
 
+  it("concluido: event passed even when the date carries a time component", () => {
+    // `quote.date` normally is "yyyy-mm-dd", but the manual/import routes don't
+    // forbid a full ISO datetime. End-of-day semantics must still apply so a past
+    // event reaches concluido (regression: `${date}T23:59:59` on a datetime → NaN
+    // → eventPassed=false → stuck one stage back).
+    const d = data({
+      quote: makeQuote({ date: "2026-07-01T18:30:00Z" }),
+      proposal: makeProposal({ status: "aceite", total: 20000 }),
+      invoices: [invoice({ kind: "saldo", amount: 14000, status: "paga" })],
+    });
+    expect(deriveStage(d, TODAY)).toBe("concluido");
+  });
+
   it("concluido: event passed and ledgerPaid >= contracted total", () => {
     const d = data({
       quote: makeQuote({ date: "2026-07-01" }),

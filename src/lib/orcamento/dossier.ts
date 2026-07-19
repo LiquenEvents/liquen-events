@@ -142,13 +142,13 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
   // "hoje" (countdownDays === 0), não "já passou". Só a partir da meia-noite
   // seguinte é que `eventPassed` fica verdadeiro — mantendo-o coerente com o
   // contador (que só vira negativo no dia seguinte).
-  // TODO(qa): assume `quote.date` = "yyyy-mm-dd". Se algum dia trouxer componente
-  // horária (ex.: ISO completo — o schema/rota manual não o proíbem), a
-  // concatenação `${quote.date}T23:59:59` fica inválida → NaN → eventPassed=false,
-  // e um evento já passado nunca chega a "concluido". `countdownDays` já trata os
-  // dois formatos (length<=10); alinhar aqui exige decidir a semântica de "fim do
-  // dia" para um datetime, por isso fica como nota em vez de alteração especulativa.
-  const eventPassed = !!quote.date && Date.parse(`${quote.date}T23:59:59`) < today.getTime();
+  // `quote.date` costuma ser "yyyy-mm-dd", mas a rota manual/importação não proíbe
+  // um ISO completo com componente horária. Tomamos sempre a porção da DATA (10
+  // primeiros carateres) e ancoramos ao fim desse dia, tal como `countdownDays`
+  // normaliza os dois formatos — assim um datetime já não produz NaN nem deixa um
+  // evento passado preso uma fase atrás.
+  const eventDayEnd = quote.date ? Date.parse(`${quote.date.slice(0, 10)}T23:59:59`) : NaN;
+  const eventPassed = !Number.isNaN(eventDayEnd) && eventDayEnd < today.getTime();
 
   const contracted = contractedTotal(d);
   const ledgerPaid = ledgerPaidTotal(invoices);
