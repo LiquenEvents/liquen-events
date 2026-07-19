@@ -911,15 +911,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
+        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
           active
-            ? "bg-[#4d6350] text-white shadow-sm"
-            : "text-white/45 hover:text-white/85 hover:bg-white/[0.05]"
+            ? "bg-[var(--bo-tint-accent)] text-[var(--bo-accent)]"
+            : "text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
         }`}
       >
         <span
           className={`shrink-0 motion-safe:transition-colors duration-150 ${
-            active ? "text-white" : "text-white/35 group-hover:text-white/70"
+            active
+              ? "text-[var(--bo-accent)]"
+              : "text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
           }`}
         >
           {item.icon}
@@ -928,7 +930,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         {item.id === "pedidos" && pendingCount > 0 && (
           <span
             className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
-              active ? "bg-white/20 text-white" : "bg-[#4d6350]/70 text-white/90"
+              active
+                ? "bg-[var(--bo-accent)] text-white"
+                : "bg-[var(--bo-surface-hover)] text-[var(--bo-text-muted)]"
             }`}
           >
             {pendingCount}
@@ -1009,13 +1013,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         />
         {/* ── Sidebar ── */}
         <aside
-          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#1b2119] flex flex-col border-r border-white/[0.06] shadow-2xl lg:shadow-none motion-safe:transition-transform duration-300 ${
+          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
             navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
         >
           {/* Mobile close */}
           <button
-            className="lg:hidden absolute top-5 right-4 w-8 h-8 flex items-center justify-center text-white/35 hover:text-white/70 rounded-lg hover:bg-white/8 transition-colors"
+            className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
             onClick={() => setNavOpen(false)}
             aria-label="Fechar menu"
           >
@@ -1031,19 +1035,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </svg>
           </button>
 
-          {/* Brand — official Líquen wordmark (white lockup for the dark sidebar) */}
-          <div className="px-5 pt-7 pb-5 flex flex-col items-center text-center">
+          {/* Brand — small, quiet Líquen lockup for the light rail. */}
+          <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center">
             <Image
-              src="/logo-liquen-branco.png"
+              src="/logo-liquen.png"
               alt="Líquen Events"
               width={300}
               height={179}
               preload
-              className="h-20 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
-            <p className="text-white/25 text-[9px] tracking-[0.35em] uppercase mt-3">Back Office</p>
+            <span className="text-[var(--bo-text-faint)] text-[9px] tracking-[0.3em] uppercase mt-2">
+              Back Office
+            </span>
           </div>
-          <div className="mx-4 h-px bg-white/[0.06] mb-1" />
 
           {/* Nav — quiet, ChatGPT-like rail: a short core list always visible,
               everything else tucked into a collapsed "Mais" group so a newcomer
@@ -1060,14 +1065,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               const activeInMore = MORE_NAV.includes(view);
               const expanded = moreNavOpen || activeInMore;
               return (
-                <div className="mt-3 pt-3 border-t border-white/[0.06] flex flex-col gap-1">
+                <div className="mt-3 pt-3 border-t border-[var(--bo-hairline)] flex flex-col gap-1">
                   <button
                     type="button"
                     onClick={() => setMoreNavOpen((o) => !o)}
                     aria-expanded={expanded}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-white/45 hover:text-white/85 hover:bg-white/[0.05] motion-safe:transition-colors duration-150"
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
                   >
-                    <span className="shrink-0 text-white/35 group-hover:text-white/70">
+                    <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
                       <svg
                         width="16"
                         height="16"
@@ -1083,7 +1088,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     </span>
                     <span className="truncate">Mais</span>
                     <svg
-                      className={`ml-auto shrink-0 text-white/30 motion-safe:transition-transform duration-200 ${
+                      className={`ml-auto shrink-0 text-[var(--bo-text-faint)] motion-safe:transition-transform duration-200 ${
                         expanded ? "rotate-180" : ""
                       }`}
                       width="14"
@@ -1105,20 +1110,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           </nav>
 
           {/* User */}
-          <div className="px-2.5 pb-5 pt-3 border-t border-white/[0.07]">
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.06] mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#4d6350] flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-white/10">
+          <div className="px-2.5 pb-5 pt-3 border-t border-[var(--bo-hairline)]">
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bo-surface-hover)] mb-2">
+              <div className="w-8 h-8 rounded-full bg-[var(--bo-accent)] flex items-center justify-center text-white text-xs font-bold shrink-0">
                 {userName.slice(0, 1).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-white/80 text-xs font-medium truncate">{userName}</p>
-                <p className="text-white/30 text-[10px] truncate">Administração</p>
+                <p className="text-[var(--bo-text)] text-xs font-medium truncate">{userName}</p>
+                <p className="text-[var(--bo-text-faint)] text-[10px] truncate">Administração</p>
               </div>
             </div>
             <div className="flex gap-1">
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Atalhos de teclado"
               >
                 <svg
@@ -1139,7 +1144,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a
                 href="/api/backup"
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Exportar backup"
               >
                 <svg
@@ -1160,7 +1165,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </a>
               <button
                 onClick={logout}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Terminar sessão"
               >
                 <svg
@@ -1195,7 +1200,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             Hidden while a quote detail drawer is open: it's a focused, modal
             surface, so the tab bar would only overlap its footer and distract. */}
         <nav
-          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1b2119] border-t border-white/[0.07] transition-transform duration-300 ${
+          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--bo-surface)] border-t border-[var(--bo-hairline)] transition-transform duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -1216,11 +1221,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   key={item.id}
                   onClick={() => setView(item.id)}
                   className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
-                    isActive ? "text-[#8aad85]" : "text-white/32"
+                    isActive ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-faint)]"
                   }`}
                 >
                   {item.id === "pedidos" && pendingCount > 0 && (
-                    <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[#637a5f]" />
+                    <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
                   )}
                   <span
                     className={`transition-transform duration-150 ${isActive ? "scale-110" : ""}`}
@@ -1238,8 +1243,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               aria-label="Mais destinos"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
                 !["overview", "pedidos", "propostas", "inbox"].includes(view)
-                  ? "text-[#8aad85]"
-                  : "text-white/32"
+                  ? "text-[var(--bo-accent)]"
+                  : "text-[var(--bo-text-faint)]"
               }`}
             >
               <svg
@@ -1262,7 +1267,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         {/* ── Main ── */}
         <div className="flex-1 min-w-0 flex flex-col pb-16 lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-foreground/[0.06]">
+          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)]">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
               <div className="min-w-0">
                 <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
