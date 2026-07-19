@@ -62,12 +62,22 @@ const LIST_PAGE_SIZE = 50;
 // user opens ships its JS, keeping the back-office's initial load lean.
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
-  { id: "pendente", label: "Pendente", color: "bg-foreground/10 text-foreground/50" },
-  { id: "em_revisao", label: "Em Revisão", color: "bg-moss/15 text-moss" },
-  { id: "cotado", label: "Cotado", color: "bg-moss/25 text-moss" },
-  { id: "aceite", label: "Aceite", color: "bg-moss/35 text-moss" },
-  { id: "rejeitado", label: "Rejeitado", color: "bg-foreground/8 text-foreground/30" },
+  { id: "pendente", label: "Novo", color: "bg-foreground/10 text-foreground/50" },
+  { id: "em_revisao", label: "Em revisão", color: "bg-moss/15 text-moss" },
+  { id: "cotado", label: "Proposta enviada", color: "bg-moss/25 text-moss" },
+  { id: "aceite", label: "Ganho", color: "bg-moss/35 text-moss" },
+  { id: "rejeitado", label: "Perdido", color: "bg-foreground/8 text-foreground/30" },
 ];
+
+// Short, human-readable form of the long internal id (e.g.
+// "LIQ-MRR1L78R-438B649E86343C27" → "LIQ-MRR1L78R…C27"). The full id stays
+// available via title/tooltip; this is only for display.
+function shortRef(id: string): string {
+  const parts = id.split("-");
+  const last4 = id.slice(-4);
+  if (parts.length >= 2) return `${parts[0]}-${parts[1]}…${last4}`;
+  return id.length > 10 ? `${id.slice(0, 8)}…${last4}` : id;
+}
 
 // Single-key destinations for the "g then <key>" navigation chord.
 const VIEW_KEYS: Record<string, View> = {
@@ -112,6 +122,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [detailTab, setDetailTab] = useState<"resumo" | "producao" | "financeiro" | "comunicacao">(
     "resumo",
   );
+  // Comunicação tab shows one proposal tool by default (ProposalStudio); the
+  // simpler price-table tool (ProposalBuilder) stays collapsed behind a link.
+  const [showBuilder, setShowBuilder] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
@@ -825,7 +838,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const VIEW_SUB: Record<View, string> = {
     overview: "O resumo do seu dia",
     pedidos: "Pedidos de orçamento recebidos",
-    kanban: "Arraste entre estados",
+    kanban: "Arraste os pedidos entre fases",
     clientes: "Histórico por cliente",
     calendario: "Os seus eventos no tempo",
     propostas: "Todas as propostas enviadas",
@@ -1031,10 +1044,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           <div className="flex items-stretch">
             {(
               [
-                { id: "overview", label: "Início" },
+                { id: "overview", label: "Visão Geral" },
                 { id: "pedidos", label: "Pedidos" },
                 { id: "kanban", label: "Pipeline" },
-                { id: "calendario", label: "Agenda" },
+                { id: "calendario", label: "Calendário" },
               ] as const
             ).map((item) => {
               const navItem = NAV.find((n) => n.id === item.id)!;
@@ -1127,7 +1140,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                aria-label="Actualizar pedidos"
+                aria-label="Atualizar pedidos"
                 className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
               >
                 <svg
@@ -1149,9 +1162,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     strokeLinejoin="round"
                   />
                 </svg>
-                <span className="hidden sm:inline">
-                  {refreshing ? "A actualizar" : "Actualizar"}
-                </span>
+                <span className="hidden sm:inline">{refreshing ? "A atualizar" : "Atualizar"}</span>
               </button>
               <button
                 onClick={() => setNewQuoteOpen(true)}
@@ -1349,7 +1360,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <circle cx="12" cy="8" r="4" />
                     <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                   </svg>
-                  Meus
+                  Atribuídos a mim
                 </button>
                 <select
                   value={filterCategory}
@@ -1373,7 +1384,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   <option value="recent">Mais recentes</option>
                   <option value="old">Mais antigos</option>
                   <option value="value">Maior valor</option>
-                  <option value="followup">Seguir primeiro</option>
+                  <option value="followup">Seguimentos primeiro</option>
                   <option value="eventdate">Data do evento</option>
                 </select>
                 <button
@@ -1689,7 +1700,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             </>
                           )}
                           <span className="w-px h-2.5 bg-foreground/12" />
-                          <span>{q.guests} pax</span>
+                          <span>{q.guests} convidados</span>
                           {(() => {
                             const cd = eventCountdown(q.date);
                             if (!cd || cd.tone === "past") return null;
@@ -1727,8 +1738,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </div>
                         )}
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
-                          <span className="text-foreground/70 text-[10px] font-mono tracking-tight">
-                            {q.id}
+                          <span
+                            className="text-foreground/40 text-[9px] font-mono tracking-tight"
+                            title={q.id}
+                          >
+                            Ref. {shortRef(q.id)}
                           </span>
                           <div className="flex items-center gap-3">
                             {q.quotedPrice ? (
@@ -1779,14 +1793,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <div className="px-5 pt-4 border-b border-foreground/[0.07] sticky top-0 bg-white/90 backdrop-blur-sm z-10">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                          <p className="text-foreground/70 text-[10px] tracking-[0.3em] uppercase mb-1">
-                            {selected.id}
-                          </p>
                           <p
                             id="detail-drawer-title"
-                            className="text-foreground/70 text-sm font-medium truncate"
+                            className="text-foreground/85 text-base font-semibold truncate"
                           >
                             {selected.name}
+                          </p>
+                          <p
+                            className="text-foreground/40 text-[10px] font-mono tracking-tight mt-0.5"
+                            title={selected.id}
+                          >
+                            Ref. {shortRef(selected.id)}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -1911,7 +1928,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               />
                               <rect x="6" y="14" width="12" height="7" rx="1" />
                             </svg>
-                            <span className="hidden sm:inline">Run-sheet</span>
+                            <span className="hidden sm:inline">Guião do dia</span>
                           </button>
                           {/* Full-screen cockpit for this event — the one place
                               that unifies proposta/contrato/faturas/produção. */}
@@ -2383,7 +2400,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 )}
                               <div>
                                 <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Preço Final Cotado (€ s/IVA)
+                                  Preço final (sem IVA) €
                                 </label>
                                 <input
                                   type="number"
@@ -2538,6 +2555,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           tabIndex={0}
                           className="flex flex-col gap-6 focus:outline-none"
                         >
+                          <p className="text-foreground/50 text-[11px] leading-relaxed">
+                            Crie e envie a proposta ao cliente. Comece por aqui.
+                          </p>
                           <ProposalStudio
                             key={`studio-${selected.id}`}
                             quote={selected}
@@ -2560,31 +2580,41 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               ]);
                             }}
                           />
-                          <ProposalBuilder
-                            quote={selected}
-                            onSent={(total) => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id
-                                    ? { ...q, status: "cotado", quotedPrice: total }
-                                    : q,
-                                ),
-                              );
-                              setSelected((prev) =>
-                                prev ? { ...prev, status: "cotado", quotedPrice: total } : prev,
-                              );
-                              setEditStatus("cotado");
-                              appendActivity(selected.id, [
-                                {
-                                  id: randomId(),
-                                  at: new Date().toISOString(),
-                                  kind: "proposal_sent",
-                                  actor: userName,
-                                  summary: `Proposta enviada — ${eur(total)}`,
-                                },
-                              ]);
-                            }}
-                          />
+                          {!showBuilder ? (
+                            <button
+                              type="button"
+                              onClick={() => setShowBuilder(true)}
+                              className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
+                            >
+                              Outra forma de propor (tabela de preços simples)
+                            </button>
+                          ) : (
+                            <ProposalBuilder
+                              quote={selected}
+                              onSent={(total) => {
+                                setQuotes((prev) =>
+                                  prev.map((q) =>
+                                    q.id === selected.id
+                                      ? { ...q, status: "cotado", quotedPrice: total }
+                                      : q,
+                                  ),
+                                );
+                                setSelected((prev) =>
+                                  prev ? { ...prev, status: "cotado", quotedPrice: total } : prev,
+                                );
+                                setEditStatus("cotado");
+                                appendActivity(selected.id, [
+                                  {
+                                    id: randomId(),
+                                    at: new Date().toISOString(),
+                                    kind: "proposal_sent",
+                                    actor: userName,
+                                    summary: `Proposta enviada — ${eur(total)}`,
+                                  },
+                                ]);
+                              }}
+                            />
+                          )}
 
                           <ClientMessenger
                             key={selected.id}
@@ -2645,7 +2675,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <rect x="9" y="3" width="6" height="4" rx="1" />
                     <path d="M9 12h6M9 16h4" strokeLinecap="round" />
                   </svg>
-                  Seleccione um pedido para ver detalhes
+                  Selecione um pedido para ver detalhes
                 </div>
               )}
             </div>

@@ -603,7 +603,14 @@ export default function Faturas({ quotes }: Props) {
                               ✓ Paga
                             </button>
                             <button
-                              onClick={() => setStatus(i, "anulada")}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Anular a fatura ${i.number}? Deixa de contar para o total.`,
+                                  )
+                                )
+                                  setStatus(i, "anulada");
+                              }}
                               disabled={busy === i.id}
                               className="px-2.5 py-1 rounded-lg text-[10px] tracking-[0.08em] uppercase font-medium bg-foreground/[0.05] text-foreground/40 hover:text-[#b5654a] hover:bg-[#b5654a]/[0.08] transition-colors disabled:opacity-40"
                             >

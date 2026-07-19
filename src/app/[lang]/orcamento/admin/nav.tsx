@@ -273,7 +273,7 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   },
   {
     id: "inbox",
-    label: "Inbox",
+    label: "Mensagens",
     icon: (
       <svg
         width="16"

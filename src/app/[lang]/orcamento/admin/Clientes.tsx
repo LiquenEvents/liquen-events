@@ -401,7 +401,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
                               )}
                             </div>
                             <p className="text-foreground/55 text-xs truncate">
-                              {eventTypeLabel(q)} · {q.guests} pax
+                              {eventTypeLabel(q)} · {q.guests} convidados
                               {q.date
                                 ? ` · ${new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`
                                 : ""}

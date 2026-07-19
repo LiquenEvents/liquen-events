@@ -10,8 +10,8 @@ import type { ActivityEntry } from "@/lib/orcamento/types";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Novos", color: "#8a8a82" },
-  { id: "em_revisao", label: "Em Revisão", color: "#9aa36a" },
-  { id: "cotado", label: "Proposta Enviada", color: "#7c854b" },
+  { id: "em_revisao", label: "Em revisão", color: "#9aa36a" },
+  { id: "cotado", label: "Proposta enviada", color: "#7c854b" },
   { id: "aceite", label: "Ganhos", color: "#525a2f" },
   { id: "rejeitado", label: "Perdidos", color: "#5a5a55" },
 ];
@@ -124,7 +124,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
       {/* Pipeline summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { v: String(summary.active), l: "Leads ativos" },
+          { v: String(summary.active), l: "Pedidos ativos" },
           { v: eur(summary.proposta), l: "Em proposta" },
           { v: eur(summary.ganho), l: "Ganho", dark: true },
           { v: `${summary.winRate}%`, l: "Taxa de conversão" },
@@ -228,7 +228,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                             {q.name}
                           </p>
                           <p className="text-foreground/45 text-[11px] truncate mt-0.5">
-                            {eventTypeLabel(q)} · {q.guests} pax
+                            {eventTypeLabel(q)} · {q.guests} convidados
                           </p>
                         </div>
                         {q.followUpAt && q.followUpAt <= todayKey && (

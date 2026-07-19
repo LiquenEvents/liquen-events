@@ -182,8 +182,9 @@ describe("AdminClient shell", () => {
     renderAdmin([quote]);
 
     navTo(/Pedidos/);
-    // Before opening, the id shows once (the list row); no detail drawer yet.
-    expect(screen.getAllByText("LQ-042")).toHaveLength(1);
+    // Before opening, the id shows once (the list row, as a shortened "Ref.");
+    // no detail drawer yet.
+    expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
 
     // The list row is a button labelled by the client's name.
@@ -192,12 +193,12 @@ describe("AdminClient shell", () => {
     // The detail drawer is now open: its close control exists and the id is
     // echoed a second time inside the panel header.
     expect(screen.getByRole("button", { name: "Fechar" })).toBeInTheDocument();
-    expect(screen.getAllByText("LQ-042")).toHaveLength(2);
+    expect(screen.getAllByText(/LQ-042/)).toHaveLength(2);
 
     // Closing the drawer tears it down again.
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("LQ-042")).toHaveLength(1);
+    expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
   });
 
   it("tracks bulk selection via the row checkboxes", () => {

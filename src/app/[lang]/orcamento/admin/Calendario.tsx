@@ -398,7 +398,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   <div className="min-w-0">
                     <p className="text-foreground/65 text-xs font-medium truncate">{q.name}</p>
                     <p className="text-foreground/30 text-[11px] truncate">
-                      {eventTypeLabel(q)} · {q.guests} pax
+                      {eventTypeLabel(q)} · {q.guests} convidados
                     </p>
                   </div>
                 </div>

@@ -82,7 +82,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
         items.push({
           date: q.date,
           title: q.name,
-          sub: `${eventTypeLabel(q)} · ${q.guests} pax`,
+          sub: `${eventTypeLabel(q)} · ${q.guests} convidados`,
           kind: "evento",
           color: "#7c854b",
           onClick: () => onOpen(q),

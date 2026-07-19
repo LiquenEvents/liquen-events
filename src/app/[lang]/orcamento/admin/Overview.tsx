@@ -8,11 +8,11 @@ import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
-  pendente: { label: "Pendente", color: "#8a8a82" },
-  em_revisao: { label: "Em Revisão", color: "#9aa36a" },
-  cotado: { label: "Cotado", color: "#7c854b" },
-  aceite: { label: "Aceite", color: "#525a2f" },
-  rejeitado: { label: "Rejeitado", color: "#5a5a55" },
+  pendente: { label: "Novo", color: "#8a8a82" },
+  em_revisao: { label: "Em revisão", color: "#9aa36a" },
+  cotado: { label: "Proposta enviada", color: "#7c854b" },
+  aceite: { label: "Ganho", color: "#525a2f" },
+  rejeitado: { label: "Perdido", color: "#5a5a55" },
 };
 
 // Order the pipeline reads as a funnel: new leads → qualified → quoted → won.
@@ -402,7 +402,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                   month: "long",
                 })}
                 {data.nextEvent.location ? ` · ${data.nextEvent.location}` : ""}
-                {data.nextEvent.guests ? ` · ${data.nextEvent.guests} pax` : ""}
+                {data.nextEvent.guests ? ` · ${data.nextEvent.guests} convidados` : ""}
               </p>
             </div>
             <div className="shrink-0 text-right">
@@ -421,7 +421,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 {data.nextEventDays === 0 ? "hoje" : `${data.nextEventDays}d`}
               </p>
               <p className="text-foreground/25 text-[10px] tracking-[0.15em] uppercase mt-0.5">
-                {data.nextEvent.status === "aceite" ? "confirmado" : "cotado"}
+                {STATUS_META[data.nextEvent.status].label}
               </p>
             </div>
           </div>
@@ -636,7 +636,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         {/* Funnel */}
         <div className="bo-card p-5">
           <div className="flex items-center justify-between mb-5">
-            <p className="bo-eyebrow">Pipeline comercial</p>
+            <p className="bo-eyebrow">Fases dos pedidos</p>
             <button
               onClick={() => onGo("kanban")}
               className="text-[#637a5f]/70 hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors"
@@ -777,7 +777,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 <div className="min-w-0">
                   <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
                   <p className="text-foreground/30 text-xs truncate mt-0.5">
-                    {eventTypeLabel(q)} · {q.guests} pax
+                    {eventTypeLabel(q)} · {q.guests} convidados
                   </p>
                 </div>
                 <div className="text-right shrink-0">
