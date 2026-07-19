@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
+import { Card, Field, Button, EmptyState } from "@/app/[lang]/orcamento/admin/ui";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -177,130 +178,150 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
 
   if (result) {
     return (
-      <div className="border-t border-foreground/10 pt-5">
-        <p className="bo-eyebrow mb-4">Proposta</p>
-        <div className="rounded-xl border border-[#4d6350]/30 bg-[#4d6350]/[0.07] p-4">
-          <p className="text-[#4d6350] text-sm font-semibold mb-1">
-            ✓ Proposta criada — {eur(result.total)}
-          </p>
-          <p className="text-foreground/45 text-xs mb-4">
-            {result.emailed
+      <Card padding="none">
+        <EmptyState
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden="true"
+            >
+              <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          }
+          title={`Proposta criada — ${eur(result.total)}`}
+          description={
+            result.emailed
               ? `Enviada por e-mail para ${quote.email}.`
-              : "Gerada (e-mail não configurado — descarregue e envie manualmente)."}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <a
-              href={result.pdfUrl}
-              download={`Proposta-Liquen-${quote.id}.pdf`}
-              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors"
-            >
-              Descarregar PDF
-            </a>
-            <button
-              onClick={() => setResult(null)}
-              className="px-4 py-2 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-foreground/65 transition-colors shadow-sm"
-            >
-              Nova proposta
-            </button>
-          </div>
-        </div>
-      </div>
+              : "Gerada (e-mail não configurado — descarregue e envie manualmente)."
+          }
+          action={{
+            label: "Descarregar PDF",
+            onClick: () => {
+              const a = document.createElement("a");
+              a.href = result.pdfUrl;
+              a.download = `Proposta-Liquen-${quote.id}.pdf`;
+              a.click();
+            },
+          }}
+          secondaryAction={{ label: "Nova proposta", onClick: () => setResult(null) }}
+        />
+      </Card>
     );
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-3">
-        <p className="bo-eyebrow">Criar &amp; Enviar Proposta (PDF)</p>
+    <Card>
+      <div className="mb-5">
+        <p className="bo-eyebrow mb-1.5">Proposta</p>
+        <h3 className="font-display text-lg leading-tight text-foreground/90">
+          Criar e enviar proposta (PDF)
+        </h3>
+        <p className="mt-1.5 text-sm leading-relaxed text-foreground/55">
+          Componha as linhas, defina o IVA e envie o PDF ao cliente.
+        </p>
       </div>
 
       {/* Template shortcuts */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        <button
-          onClick={() => applyTemplate("single")}
-          className="px-2.5 py-1 rounded-lg text-[9px] tracking-[0.1em] uppercase font-medium bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65 transition-colors"
-        >
+      <div className="flex flex-wrap gap-2 mb-5">
+        <Button variant="ghost" size="sm" onClick={() => applyTemplate("single")}>
           Pacote único
-        </button>
+        </Button>
         {quote.priceBreakdown && (
-          <button
-            onClick={() => applyTemplate("breakdown")}
-            className="px-2.5 py-1 rounded-lg text-[9px] tracking-[0.1em] uppercase font-medium bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65 transition-colors"
-          >
+          <Button variant="ghost" size="sm" onClick={() => applyTemplate("breakdown")}>
             Por componentes
-          </button>
+          </Button>
         )}
         {hasLastItems && (
-          <button
+          <Button
+            variant="subtle"
+            size="sm"
             onClick={() => applyTemplate("last")}
-            className="px-2.5 py-1 rounded-lg text-[9px] tracking-[0.1em] uppercase font-medium bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18 transition-colors"
+            iconLeft={<span aria-hidden="true">↺</span>}
           >
-            ↺ Última proposta
-          </button>
+            Última proposta
+          </Button>
         )}
       </div>
 
       {/* Line items */}
-      <div className="flex flex-col gap-2 mb-3">
-        <div className="flex gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+      <div className="flex flex-col gap-2 mb-2">
+        <div className="flex gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-foreground/55">
           <span className="flex-1">Descrição</span>
-          <span className="w-10 text-center">Qt</span>
-          <span className="w-20 text-right">Unit. €</span>
-          <span className="w-5" />
+          <span className="w-16 text-center">Qt.</span>
+          <span className="w-24 text-right">Unit. €</span>
+          <span className="w-10" />
         </div>
         {items.map((it, i) => (
           <div key={i} className="flex gap-2 items-center">
-            <input
+            <Field
+              hideLabel
+              label={`Descrição da linha ${i + 1}`}
+              containerClassName="flex-1 min-w-0"
               value={it.description}
               onChange={(e) => update(i, { description: e.target.value })}
-              placeholder="Ex: Decoração floral"
-              className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+              placeholder="Ex.: Decoração floral"
             />
-            <input
+            <Field
+              hideLabel
+              label={`Quantidade da linha ${i + 1}`}
+              containerClassName="w-16"
               type="number"
-              value={it.qty}
               min={1}
+              value={it.qty}
               onChange={(e) => update(i, { qty: Number(e.target.value) })}
-              className="bo-input w-10 px-1.5 py-2 text-xs text-foreground/75 text-center"
+              className="text-center"
             />
-            <input
+            <Field
+              hideLabel
+              label={`Preço unitário da linha ${i + 1}`}
+              containerClassName="w-24"
               type="number"
-              value={it.unitPrice}
               min={0}
+              value={it.unitPrice}
               onChange={(e) => update(i, { unitPrice: Number(e.target.value) })}
-              className="bo-input w-20 px-2 py-2 text-xs text-foreground/75 text-right"
+              className="text-right"
             />
-            <button
+            <Button
+              variant="ghost"
               onClick={() => removeRow(i)}
               disabled={items.length === 1}
-              className="w-5 text-foreground/25 hover:text-foreground/60 disabled:opacity-20 disabled:cursor-not-allowed text-sm"
               aria-label="Remover linha"
+              className="h-10 w-10 shrink-0 px-0 text-lg"
             >
               ×
-            </button>
+            </Button>
           </div>
         ))}
       </div>
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={addRow}
-        className="text-[10px] tracking-[0.2em] uppercase text-[#4d6350]/70 hover:text-[#4d6350] transition-colors mb-5"
+        iconLeft={<span aria-hidden="true">+</span>}
+        className="mt-2 mb-5 text-[#4d6350] hover:text-[#415440]"
       >
-        + Adicionar linha
-      </button>
+        Adicionar linha
+      </Button>
 
       {/* Totals */}
-      <div className="rounded-xl bg-foreground/[0.04] p-3 flex flex-col gap-1.5 mb-5">
-        <div className="flex justify-between text-[11px]">
-          <span className="text-foreground/35">Subtotal</span>
-          <span className="text-foreground/55">{eur(subtotal)}</span>
+      <div className="rounded-xl bg-foreground/[0.035] p-4 flex flex-col gap-2 mb-5">
+        <div className="flex justify-between text-sm">
+          <span className="text-foreground/55">Subtotal</span>
+          <span className="text-foreground/75">{eur(subtotal)}</span>
         </div>
-        <div className="flex justify-between text-[11px] items-center">
-          <span className="text-foreground/35 flex items-center gap-2">
+        <div className="flex justify-between text-sm items-center">
+          <span className="text-foreground/55 flex items-center gap-2">
             IVA
             <select
+              aria-label="Taxa de IVA"
               value={vatRate}
               onChange={(e) => setVatRate(Number(e.target.value))}
-              className="bg-white border border-foreground/[0.12] rounded-md px-1 py-0.5 text-[10px] text-foreground/60 focus:outline-none"
+              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-foreground/70 shadow-[0_1px_2px_rgba(42,38,32,0.04)] focus:outline-none focus:border-foreground/40"
             >
               <option value={0.23}>23%</option>
               <option value={0.13}>13%</option>
@@ -308,54 +329,55 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
               <option value={0}>0%</option>
             </select>
           </span>
-          <span className="text-foreground/55">{eur(vat)}</span>
+          <span className="text-foreground/75">{eur(vat)}</span>
         </div>
-        <div className="flex justify-between text-sm font-medium pt-1.5 border-t border-foreground/8">
-          <span className="text-foreground/65">Total</span>
+        <div className="flex justify-between text-base font-medium pt-2 border-t border-foreground/10">
+          <span className="text-foreground/75">Total</span>
           <span className="text-[#4d6350] font-semibold">{eur(total)}</span>
         </div>
       </div>
 
       {/* Validity + notes */}
-      <div className="flex flex-col gap-3 mb-5">
-        <div>
-          <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-            Válida até
-          </label>
-          <input
-            type="date"
-            value={validUntil}
-            onChange={(e) => setValidUntil(e.target.value)}
-            className="bo-input px-3 py-2 text-sm text-foreground/70"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
-            Notas (no PDF)
-          </label>
-          <textarea
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Condições, observações, o que está incluído…"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-          />
-        </div>
+      <div className="flex flex-col gap-4 mb-5">
+        <Field
+          label="Válida até"
+          type="date"
+          value={validUntil}
+          onChange={(e) => setValidUntil(e.target.value)}
+        />
+        <Field
+          as="textarea"
+          label="Notas (no PDF)"
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Condições, observações, o que está incluído…"
+          className="resize-none"
+        />
       </div>
 
-      {error && <p className="text-[#b5654a] text-xs mb-4">{error}</p>}
+      {error && (
+        <p
+          role="alert"
+          aria-live="assertive"
+          className="mb-4 flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22]"
+        >
+          <span aria-hidden="true">⚠</span>
+          <span>{error}</span>
+        </p>
+      )}
 
-      <button
+      <Button
+        variant="primary"
+        size="lg"
+        fullWidth
         onClick={send}
-        disabled={sending || subtotal <= 0}
-        className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${
-          sending || subtotal <= 0
-            ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
-            : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
-        }`}
+        loading={sending}
+        disabled={subtotal <= 0}
+        iconRight={<span aria-hidden="true">→</span>}
       >
-        {sending ? "A gerar e enviar…" : "Gerar PDF & Enviar ao Cliente →"}
-      </button>
-    </div>
+        {sending ? "A gerar e enviar…" : "Gerar PDF e enviar ao cliente"}
+      </Button>
+    </Card>
   );
 }
