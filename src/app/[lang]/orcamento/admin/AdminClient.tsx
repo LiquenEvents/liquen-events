@@ -25,6 +25,7 @@ import {
 import { eventCountdown, randomId, eur } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
+import LifecycleStepper from "./LifecycleStepper";
 import { NAV, type View } from "./nav";
 import {
   Overview,
@@ -2030,6 +2031,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </button>
                         </div>
                       </div>
+                      {/* Ciclo de vida do pedido — mostra logo ao abrir em que
+                          fase o trabalho está, antes das ferramentas por separador. */}
+                      <LifecycleStepper quote={selected} />
                       {/* Section tabs — keep the long panel navigable.
                           Arrow keys move between tabs (WAI-ARIA tablist pattern). */}
                       <div
