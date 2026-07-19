@@ -231,6 +231,25 @@ create index if not exists contracts_proposal_id_idx on public.contracts (propos
 -- colidem entre si no Postgres, por isso um contrato sem proposta não é bloqueado.
 create unique index if not exists contracts_proposal_id_uk on public.contracts (proposal_id);
 
+-- ── Sobreposição local do Inbox (ligações CRM, etiquetas, arquivo) ──
+-- Camada de anotação PRÓPRIA sobre os emails, chaveada pelo Message-ID (chave
+-- durável — o uid IMAP não é estável). NÃO toca na caixa de correio: o Gmail não
+-- persiste keywords personalizadas de forma fiável, e "arquivar"/"apagar" aqui
+-- significam ESCONDER (preencher `archived_at`), NUNCA um expunge no IMAP.
+-- A coluna `id` guarda o Message-ID (o Repository endereça as linhas por `id`).
+create table if not exists public.message_links (
+  id           text primary key,          -- Message-ID do email (chave durável)
+  quote_id     text references public.quotes (id) on delete set null,
+  proposal_id  uuid references public.proposals (id) on delete set null,
+  labels       jsonb not null default '[]'::jsonb,
+  pinned       boolean not null default false,
+  archived_at  timestamptz,               -- arquivo = esconder; nunca um delete real
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz
+);
+
+create index if not exists message_links_quote_id_idx on public.message_links (quote_id);
+
 -- ── Restrições de integridade (CHECK) ───────────────────────────
 -- Garantem, na própria base de dados, que os campos de estado/tipo só
 -- aceitam os valores que a aplicação conhece e que os montantes não são
@@ -305,3 +324,4 @@ alter table public.invoices    enable row level security;
 alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
 alter table public.contracts enable row level security;
+alter table public.message_links enable row level security;
