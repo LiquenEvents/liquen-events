@@ -26,11 +26,14 @@ vi.mock("@/lib/invoices-store", () => ({
     const sinal = Math.round(total * 0.3 * 100) / 100;
     return { sinal, saldo: Math.round((total - sinal) * 100) / 100 };
   },
+  // Mirror the real recogniser so the route's 409 backstop branch is exercised.
+  isUniqueViolation: (err: unknown) =>
+    !!err && typeof err === "object" && (err as { code?: string }).code === "23505",
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { POST } from "./route";
-import { createInvoice } from "@/lib/invoices-store";
+import { createInvoice, nextInvoiceNumber } from "@/lib/invoices-store";
 
 function req(body: unknown): NextRequest {
   return new Request("https://liquen.test/api/faturas", {
@@ -112,6 +115,47 @@ describe("POST /api/faturas — split path duplicate-sinal guard", () => {
     expect(res.status).toBe(201);
     expect(createInvoice).toHaveBeenCalledTimes(2);
   });
+
+  it("rejects a split with a non-positive total (400 Total inválido, nothing created)", async () => {
+    for (const total of [0, -100]) {
+      vi.clearAllMocks();
+      const res = await POST(req({ split: true, clientName: "Ana", total }));
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Total inválido");
+      expect(createInvoice).not.toHaveBeenCalled();
+    }
+  });
+
+  it("assigns two DISTINCT consecutive numbers to the sinal and saldo", async () => {
+    const res = await POST(req({ split: true, quoteId: "q-1", clientName: "Ana", total: 10000 }));
+    const json = await res.json();
+    const [sinal, saldo] = json.invoices;
+    expect(sinal.number).toBe("FT 2026/0001");
+    expect(saldo.number).toBe("FT 2026/0002");
+    expect(sinal.number).not.toBe(saldo.number);
+    expect(sinal.amount).toBe(3000);
+    expect(saldo.amount).toBe(7000);
+    expect(nextInvoiceNumber).toHaveBeenCalledTimes(2);
+  });
+
+  it("clamps a huge split total to the 1e8 ceiling before splitting", async () => {
+    const res = await POST(req({ split: true, clientName: "Ana", total: 999_999_999 }));
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.invoices[0].amount).toBe(30_000_000); // 30% of the 1e8 clamp
+    expect(json.invoices[1].amount).toBe(70_000_000);
+  });
+
+  it("maps a Postgres unique-violation on the split insert to 409 (race backstop, not 500)", async () => {
+    vi.mocked(createInvoice).mockRejectedValueOnce(
+      Object.assign(new Error("dup"), { code: "23505" }),
+    );
+    const res = await POST(req({ split: true, quoteId: "q-1", clientName: "Ana", total: 10000 }));
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("Já existe uma fatura de sinal/saldo");
+  });
 });
 
 describe("POST /api/faturas — single-invoice duplicate-sinal/saldo guard (FIX 1)", () => {
@@ -154,6 +198,48 @@ describe("POST /api/faturas — single-invoice duplicate-sinal/saldo guard (FIX 
     const res = await POST(req({ clientName: "Ana", amount: 3000, kind: "sinal" }));
     expect(res.status).toBe(201);
     expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a negative single amount (clamped to 0 → 400 Valor inválido)", async () => {
+    const res = await POST(req({ clientName: "Ana", amount: -500, kind: "total" }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Valor inválido");
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("defaults vatRate to 0.23 when absent and carries a provided rate", async () => {
+    const a = await POST(req({ clientName: "Ana", amount: 1000, kind: "total" }));
+    expect((await a.json()).invoices[0].vatRate).toBe(0.23);
+
+    const b = await POST(req({ clientName: "Ana", amount: 1000, kind: "total", vatRate: 0.06 }));
+    expect((await b.json()).invoices[0].vatRate).toBe(0.06);
+  });
+
+  it("clamps a huge single amount to the 1e8 ceiling", async () => {
+    const res = await POST(req({ clientName: "Ana", amount: 5_000_000_000, kind: "total" }));
+    const json = await res.json();
+    expect(json.invoices[0].amount).toBe(100_000_000);
+  });
+
+  it("maps a unique-violation on a single sinal insert to 409 (not 500)", async () => {
+    vi.mocked(createInvoice).mockRejectedValueOnce(
+      Object.assign(new Error("dup"), { code: "23505" }),
+    );
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "sinal" }));
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("Já existe uma fatura de sinal");
+  });
+
+  it("a unique-violation on a single TOTAL insert is NOT masked as 409 (re-thrown → 500)", async () => {
+    // O backstop 409 só se aplica a sinal/saldo (têm índice único). Um total não
+    // tem, por isso um erro de unicidade improvável não deve ser mascarado.
+    vi.mocked(createInvoice).mockRejectedValueOnce(
+      Object.assign(new Error("dup"), { code: "23505" }),
+    );
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(500);
   });
 });
 

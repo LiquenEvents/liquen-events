@@ -53,6 +53,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const invoiceKind = PAYMENT_TO_INVOICE_KIND[paymentKind] ?? "total";
     const vatRate =
       typeof body.vatRate === "number" ? Math.min(Math.max(body.vatRate, 0), 1) : 0.23;
+    // TODO(qa): `issuedAt` (e, quando `paid`, o `paidAt` derivado) NÃO é validado
+    // ao formato yyyy-mm-dd aqui (a rota /faturas fá-lo). Um `date` malformado do
+    // painel é persistido tal-e-qual e depois alimenta `new Date(date+"T12:00:00")`
+    // no PDF → "Invalid Date". É admin-only, por isso deixo nota em vez de mudar
+    // comportamento; a corrigir com a mesma coerção yyyy-mm-dd de /faturas.
     const issuedAt = clean(body.date, 40) || new Date().toISOString().slice(0, 10);
     const paid = !!body.paid;
     const email = !!body.email;
@@ -83,11 +88,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // fallback continua alcançável mesmo com `paymentRef` presente (marcador OU
     // espécie+valor), para reaproveitar um documento anterior sem marcador.
     const ledger = await listInvoicesForQuote(id);
+    // Só reaproveitamos faturas ATIVAS: uma fatura `anulada` (voided) nunca volta
+    // à vida. Os índices parciais únicos (invoices_one_active_{sinal,saldo}_uk)
+    // excluem as anuladas de propósito, exatamente para permitir reemitir uma
+    // fresca depois de anular a anterior — coerente com a rota /faturas e com
+    // maybeAutoIssueSaldo. Sem este filtro, reaproveitar uma anulada por espécie
+    // (sinal/saldo) ou por espécie+valor (total) ressuscitava um documento fiscal
+    // anulado para `paga`, ou casava com o anulado ignorando o ativo existente.
+    const activeLedger = ledger.filter((inv) => inv.status !== "anulada");
     const isSinalOrSaldo = invoiceKind === "sinal" || invoiceKind === "saldo";
     let invoice =
       (isSinalOrSaldo
-        ? ledger.find((inv) => inv.kind === invoiceKind)
-        : ledger.find(
+        ? activeLedger.find((inv) => inv.kind === invoiceKind)
+        : activeLedger.find(
             (inv) =>
               (!!paymentRef && (inv.note ?? "").includes(paymentRef)) ||
               (inv.kind === invoiceKind && inv.amount === amount),

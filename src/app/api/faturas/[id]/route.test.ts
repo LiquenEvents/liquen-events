@@ -205,6 +205,40 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     expect(invoicesDb.store.get("saldo-8")?.status).toBe("anulada");
   });
 
+  it("annuls an unpaid auto-saldo when the sinal is ANULLED from paga (paga→anulada) (#41)", async () => {
+    seedSinal("s8b", { status: "paga", paidAt: "2026-07-05" });
+    invoicesDb.store.set("saldo-8b", {
+      id: "saldo-8b",
+      quoteId: "q-s8b",
+      kind: "saldo",
+      amount: 8750,
+      status: "emitida",
+    });
+    const { req, params } = patchReq("s8b", { status: "anulada" }); // paga → anulada
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAnnulled).toMatchObject({ id: "saldo-8b", status: "anulada" });
+    expect(invoicesDb.store.get("saldo-8b")?.status).toBe("anulada");
+    // Anular o sinal também limpa o seu paidAt.
+    expect(invoicesDb.store.get("s8b")?.paidAt).toBeUndefined();
+  });
+
+  it("does NOT annul any saldo when a sinal is annulled directly from emitida (no paga→ transition)", async () => {
+    seedSinal("s8c", { status: "emitida" });
+    invoicesDb.store.set("saldo-8c", {
+      id: "saldo-8c",
+      quoteId: "q-s8c",
+      kind: "saldo",
+      amount: 8750,
+      status: "emitida",
+    });
+    const { req, params } = patchReq("s8c", { status: "anulada" }); // emitida → anulada
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAnnulled).toBeUndefined();
+    expect(invoicesDb.store.get("saldo-8c")?.status).toBe("emitida");
+  });
+
   it("does NOT annul a saldo that is already paga when the sinal is reverted (#41)", async () => {
     seedSinal("s9", { status: "paga", paidAt: "2026-07-05" });
     invoicesDb.store.set("saldo-9", {

@@ -170,6 +170,98 @@ describe("POST /api/orcamento/[id]/fatura", () => {
     expect(ledger.rows).toHaveLength(1);
   });
 
+  it("does NOT resurrect an anulada sinal — mints a fresh one instead (fiscal: a voided doc stays voided)", async () => {
+    // Um sinal foi ANULADO (voided). O painel emite depois o recibo do sinal.
+    // Reaproveitar/ressuscitar a fatura anulada para `paga` é uma violação de
+    // integridade fiscal: um documento anulado nunca volta à vida. Deve ser
+    // cunhado um NOVO sinal (novo número), coerente com o índice parcial único
+    // (anuladas ficam FORA) e com a rota /faturas.
+    ledger.rows.push({
+      id: "voided-sinal",
+      number: "FT 2026/0001",
+      quoteId: "LIQ-1",
+      kind: "sinal",
+      amount: 3750,
+      status: "anulada",
+      note: "Sinal 30% (anulado)",
+    });
+
+    const res = await POST(
+      req({ paymentId: "pay-9", kind: "sinal", amount: 3750, date: "2026-07-18", paid: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+
+    // Uma fatura NOVA foi cunhada (novo número + createInvoice); a anulada
+    // permanece anulada e intocada, não foi reaproveitada nem ressuscitada.
+    expect(nextInvoiceNumber).toHaveBeenCalledTimes(1);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+    const voided = ledger.rows.find((r) => r.id === "voided-sinal");
+    expect(voided?.status).toBe("anulada");
+    expect(ledger.rows).toHaveLength(2);
+    // A linha nova é distinta da anulada e ficou `paga`.
+    const minted = ledger.rows.find((r) => r.id !== "voided-sinal");
+    expect(minted?.status).toBe("paga");
+  });
+
+  it("reuses the ACTIVE sinal even when an older anulada sinal also exists", async () => {
+    // Cenário misto: um sinal antigo anulado + um sinal ativo (reemitido). O
+    // recibo tem de casar com o ATIVO, nunca com o anulado (ordem no ledger).
+    ledger.rows.push({
+      id: "old-voided",
+      number: "FT 2026/0001",
+      quoteId: "LIQ-1",
+      kind: "sinal",
+      amount: 3750,
+      status: "anulada",
+    });
+    ledger.rows.push({
+      id: "active-sinal",
+      number: "FT 2026/0005",
+      quoteId: "LIQ-1",
+      kind: "sinal",
+      amount: 3750,
+      status: "emitida",
+    });
+
+    const res = await POST(
+      req({ paymentId: "pay-a", kind: "sinal", amount: 3750, date: "2026-07-18", paid: true }),
+      ctx("LIQ-1"),
+    );
+    const json = await res.json();
+    // Reaproveita o ativo (0005), não cunha nem ressuscita nada.
+    expect(json.number).toBe("FT 2026/0005");
+    expect(createInvoice).not.toHaveBeenCalled();
+    expect(nextInvoiceNumber).not.toHaveBeenCalled();
+    expect(ledger.rows.find((r) => r.id === "active-sinal")?.status).toBe("paga");
+    expect(ledger.rows.find((r) => r.id === "old-voided")?.status).toBe("anulada");
+  });
+
+  it("does NOT resurrect an anulada total invoice matched by amount — mints a fresh one", async () => {
+    // Fallback de dedup por espécie+valor no ramo total/pagamento: não deve casar
+    // com uma fatura anulada de igual valor e trazê-la de volta a `paga`.
+    ledger.rows.push({
+      id: "voided-total",
+      number: "FT 2026/0001",
+      quoteId: "LIQ-1",
+      kind: "total",
+      amount: 1230,
+      status: "anulada",
+      note: "Pagamento (anulado)",
+    });
+
+    const res = await POST(
+      req({ kind: "pagamento", amount: 1230, date: "2026-07-18", paid: true }),
+      ctx("LIQ-1"),
+    );
+    await res.json();
+    expect(nextInvoiceNumber).toHaveBeenCalledTimes(1);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+    expect(ledger.rows).toHaveLength(2);
+    expect(ledger.rows.find((r) => r.id === "voided-total")?.status).toBe("anulada");
+  });
+
   it("rejects a non-positive amount with 400 and never touches the ledger", async () => {
     const res = await POST(req({ paymentId: "p-0", kind: "sinal", amount: 0 }), ctx("LIQ-1"));
     expect(res.status).toBe(400);
