@@ -12,7 +12,6 @@ import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
-import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -34,54 +33,12 @@ export async function generateMetadata({
   });
 }
 
-// The editorial wall draws a fresh 6 from this pool on every entry to the page
-// (see RotatingPhotoGrid). All landscape event frames, so they read well in
-// either a wide or a narrow cell.
-const GRID_POOL = [
-  "/imagens/J&A-68.jpg",
-  "/imagens/matilde-e-tomas0654-1.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-  "/imagens/ines-goncalo-252.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-  "/imagens/stephanie-mizio-555.jpg",
-  "/imagens/DJI_20250913190635_0120_D.jpg",
-  "/imagens/teresinhaeze-909.jpg",
-  "/imagens/EW1_1330.jpg",
-  "/imagens/J&P-IMGL4769.jpg",
-  "/imagens/hd-edited.jpg",
-  "/imagens/EW1_1408.jpg",
-  "/imagens/20_10_2025_0407.jpg",
-  "/imagens/DaniGui_JantarFesta_26.jpg",
-];
-
-// The grid is 2-col below `lg` and 4-col from `lg` (1024px) up, full-bleed (no
-// max-width wrapper). So a col-span-2 cell is the full row on mobile (100vw) and
-// half the row from lg (50vw); a col-span-1 cell is 50vw on mobile and 25vw from
-// lg. The old values declared 50vw for wide cells on mobile (they render 100vw,
-// so the browser under-fetched and upscaled) and switched at 768px instead of
-// the real 1024px column breakpoint.
-const WIDE_SIZES = "(max-width: 1024px) 100vw, 50vw";
-const NARROW_SIZES = "(max-width: 1024px) 50vw, 25vw";
-// Fixed cell layout (spans + the right `sizes` per cell); whichever photo lands
-// in a cell, the shape stays the same.
-const GRID_CELLS = [
-  { cls: "col-span-2 row-span-2", sizes: WIDE_SIZES },
-  { cls: "col-span-2", sizes: WIDE_SIZES },
-  { cls: "col-span-1", sizes: NARROW_SIZES },
-  { cls: "col-span-1", sizes: NARROW_SIZES },
-  { cls: "col-span-2", sizes: WIDE_SIZES },
-  { cls: "col-span-2", sizes: WIDE_SIZES },
-];
-
 const eyebrowDark =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 export default async function SobrePage({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
-  // Enrich the wall's pool with blur placeholders server-side (keeps blur-map
-  // out of the client bundle); the client picks a random 6 per visit.
-  const gridPool = GRID_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   return (
     <>
       <BreadcrumbJsonLd
@@ -185,17 +142,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </div>
           </AnimateIn>
         </div>
-      </section>
-
-      {/* ── EDITORIAL PHOTO GRID ── */}
-      <section className="bg-surface">
-        <RotatingPhotoGrid
-          cells={GRID_CELLS}
-          pool={gridPool}
-          alt={t.common.imageAlt.sobreCelebration}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-0 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
-          imgClassName="transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
-        />
       </section>
 
       {/* ── CINEMATIC STATEMENT ── */}
