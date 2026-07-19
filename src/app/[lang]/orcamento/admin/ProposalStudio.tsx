@@ -73,7 +73,7 @@ function formatEventDate(d?: string): string {
 
 function buildRef(d: StudioDoc): string {
   const tpl = d.template === "organizacao" ? "Organização" : "Decoração";
-  return `PO ${tpl} ${d.eventType} ${d.clientNames} · ${d.eventDate}`.replace(/\s+/g, " ").trim();
+  return `${tpl} ${d.eventType} ${d.clientNames} · ${d.eventDate}`.replace(/\s+/g, " ").trim();
 }
 
 function initialDoc(quote: Quote): StudioDoc {
@@ -238,6 +238,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   function clearDraft() {
+    if (!window.confirm("Limpar todo o rascunho da proposta? Não pode ser anulado.")) return;
     try {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(SIDE_KEY);
@@ -507,6 +508,11 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         </button>
       </div>
 
+      <p className="mb-5 text-[11px] leading-relaxed text-foreground/45">
+        Monte aqui a proposta em PDF para o cliente. Preencha de cima para baixo; pode
+        pré-visualizar antes de enviar.
+      </p>
+
       {/* Template selector */}
       <div className="inline-flex gap-1 p-1 rounded-xl bg-foreground/[0.04] mb-6">
         {(["decoracao", "organizacao"] as const).map((t) => (
@@ -595,7 +601,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         <div className="mt-3">
           <div className="flex items-center justify-between mb-2">
             <label htmlFor="studio-ref" className={`${LABEL} mb-0`}>
-              Referência (cabeçalho)
+              Título interno (opcional)
             </label>
             {refEdited && (
               <button
@@ -619,6 +625,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
               patch({ ref: e.target.value });
             }}
           />
+          <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/40">
+            sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da
+            proposta.
+          </p>
         </div>
       </Section>
 
@@ -667,7 +677,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   value={g.letter ?? ""}
                   onChange={(e) => updateGroup(gi, { letter: e.target.value })}
                   placeholder="a)"
-                  aria-label="Marcador"
+                  aria-label="Letra do grupo (a, b, c…)"
                 />
                 <input
                   className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
@@ -735,6 +745,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       {/* Mood boards — decoracao only */}
       {isDeco && (
         <Section title="Mood boards">
+          <p className="-mt-1 mb-3 text-[11px] leading-relaxed text-foreground/40">
+            grupos de imagens de inspiração para o cliente
+          </p>
           <div className="flex flex-col gap-3">
             {doc.moodBoards.map((b, bi) => (
               <div
@@ -997,6 +1010,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                 </button>
               ))}
             </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/40">
+              «+ IVA» soma o IVA ao valor; «incluído» já o contém.
+            </p>
           </div>
           <Labeled label="Validade (dias)">
             <input
