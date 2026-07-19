@@ -26,7 +26,7 @@ import { eventCountdown, randomId, eur } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper from "./LifecycleStepper";
-import { NAV, type View } from "./nav";
+import { NAV, NAV_GROUPS, type View } from "./nav";
 import { Button, Card, SectionCard } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
@@ -61,6 +61,12 @@ import {
 
 // Quantos pedidos a lista renderiza de cada vez ("Mostrar mais" carrega o resto).
 const LIST_PAGE_SIZE = 50;
+
+// Shared content shell for the main column: a comfortable centred max-width with
+// consistent horizontal padding + vertical rhythm, so screens stay readable
+// instead of sprawling edge-to-edge on wide monitors. The top bar aligns to the
+// same measure. `view-in` (the enter animation) is appended per view.
+const VIEW_WRAP = "mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10 py-6 lg:py-10";
 
 // Code-split views + detail-panel tools live in ./lazy — only the view the
 // user opens ships its JS, keeping the back-office's initial load lean.
@@ -906,7 +912,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         />
         {/* ── Sidebar ── */}
         <aside
-          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#1b2119] flex flex-col transition-transform duration-300 shadow-2xl lg:shadow-none ${
+          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#1b2119] flex flex-col border-r border-white/[0.06] shadow-2xl lg:shadow-none motion-safe:transition-transform duration-300 ${
             navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
         >
@@ -929,49 +935,68 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           </button>
 
           {/* Brand — official Líquen wordmark (white lockup for the dark sidebar) */}
-          <div className="px-5 pt-8 pb-5 flex flex-col items-center text-center">
+          <div className="px-5 pt-7 pb-5 flex flex-col items-center text-center">
             <Image
               src="/logo-liquen-branco.png"
               alt="Líquen Events"
               width={300}
               height={179}
               preload
-              className="h-24 w-auto object-contain"
+              className="h-20 w-auto object-contain"
             />
             <p className="text-white/25 text-[9px] tracking-[0.35em] uppercase mt-3">Back Office</p>
           </div>
-          <div className="mx-4 h-px bg-white/[0.07] mb-1" />
+          <div className="mx-4 h-px bg-white/[0.06] mb-1" />
 
-          {/* Nav */}
-          <nav className="flex-1 px-2.5 py-3 flex flex-col gap-0.5 overflow-y-auto">
-            {NAV.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setView(item.id);
-                  setNavOpen(false);
-                }}
-                aria-current={view === item.id ? "page" : undefined}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[11px] tracking-[0.08em] uppercase font-medium transition-all duration-150 ${
-                  view === item.id
-                    ? "bg-white/12 text-white"
-                    : "text-white/38 hover:text-white/80 hover:bg-white/[0.06]"
-                }`}
-              >
-                <span
-                  className={`shrink-0 transition-colors duration-150 ${
-                    view === item.id ? "text-[#8aad85]" : "text-white/28 group-hover:text-white/60"
-                  }`}
-                >
-                  {item.icon}
-                </span>
-                <span className="truncate">{item.label}</span>
-                {item.id === "pedidos" && pendingCount > 0 && (
-                  <span className="ml-auto min-w-[18px] text-center text-[9px] bg-[#4d6350] text-white/90 rounded-full px-1.5 py-0.5 tabular-nums leading-none">
-                    {pendingCount}
-                  </span>
-                )}
-              </button>
+          {/* Nav — quiet, ChatGPT-like rail: faint section labels, muted idle
+              items, a rounded moss pill on the active destination. */}
+          <nav
+            aria-label="Navegação do back office"
+            className="flex-1 px-3 py-4 flex flex-col gap-5 overflow-y-auto"
+          >
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label} className="flex flex-col gap-0.5">
+                <p className="px-3 pb-1 text-[9px] tracking-[0.22em] uppercase font-medium text-white/22">
+                  {group.label}
+                </p>
+                {group.ids.map((id) => {
+                  const item = NAV.find((n) => n.id === id)!;
+                  const active = view === id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setView(item.id);
+                        setNavOpen(false);
+                      }}
+                      aria-current={active ? "page" : undefined}
+                      className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
+                        active
+                          ? "bg-[#4d6350] text-white shadow-sm"
+                          : "text-white/45 hover:text-white/85 hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <span
+                        className={`shrink-0 motion-safe:transition-colors duration-150 ${
+                          active ? "text-white" : "text-white/35 group-hover:text-white/70"
+                        }`}
+                      >
+                        {item.icon}
+                      </span>
+                      <span className="truncate">{item.label}</span>
+                      {item.id === "pedidos" && pendingCount > 0 && (
+                        <span
+                          className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
+                            active ? "bg-white/20 text-white" : "bg-[#4d6350]/70 text-white/90"
+                          }`}
+                        >
+                          {pendingCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </nav>
 
@@ -1132,114 +1157,121 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         {/* ── Main ── */}
         <div className="flex-1 min-w-0 flex flex-col pb-16 lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
-            <div className="min-w-0">
-              <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
-                {VIEW_SUB[view]}
-              </p>
-              <h1
-                className="text-foreground/88 font-bold leading-none"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.6vw, 30px)" }}
-              >
-                {VIEW_TITLES[view]}
-              </h1>
-            </div>
-            <div className="ml-auto flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setAjudaOpen(true)}
-                aria-label="Ajuda e glossário"
-                title="Ajuda e glossário"
-                className="w-9 h-9 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-foreground/[0.06]">
+            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
+              <div className="min-w-0">
+                <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
+                  {VIEW_SUB[view]}
+                </p>
+                <h1
+                  className="text-foreground/88 font-bold leading-none"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(20px, 2.6vw, 30px)",
+                  }}
                 >
-                  <circle cx="12" cy="12" r="9" />
-                  <path
-                    d="M9.4 9a2.6 2.6 0 1 1 3.4 2.5c-.7.3-1.3.9-1.3 1.7v.3"
-                    strokeLinecap="round"
-                  />
-                  <path d="M12 17h.01" strokeLinecap="round" />
-                </svg>
-              </button>
-              <NotificationBell />
-              <button
-                onClick={() => setPaletteOpen(true)}
-                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-foreground/60 transition-colors"
-                title="Pesquisar (Ctrl K)"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+                  {VIEW_TITLES[view]}
+                </h1>
+              </div>
+              <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <button
+                  onClick={() => setAjudaOpen(true)}
+                  aria-label="Ajuda e glossário"
+                  title="Ajuda e glossário"
+                  className="w-9 h-9 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-                </svg>
-                <span className="hidden md:inline">Pesquisar</span>
-                <kbd className="text-[8px] border border-foreground/12 rounded px-1 py-0.5 ml-0.5">
-                  ⌘K
-                </kbd>
-              </button>
-              <button
-                onClick={refresh}
-                disabled={refreshing}
-                aria-label="Atualizar pedidos"
-                className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className={
-                    refreshing
-                      ? "animate-spin"
-                      : "group-hover:rotate-180 transition-transform duration-500"
-                  }
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path
+                      d="M9.4 9a2.6 2.6 0 1 1 3.4 2.5c-.7.3-1.3.9-1.3 1.7v.3"
+                      strokeLinecap="round"
+                    />
+                    <path d="M12 17h.01" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <NotificationBell />
+                <button
+                  onClick={() => setPaletteOpen(true)}
+                  className="hidden sm:flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-foreground/60 transition-colors"
+                  title="Pesquisar (Ctrl K)"
                 >
-                  <path
-                    d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="hidden sm:inline">{refreshing ? "A atualizar" : "Atualizar"}</span>
-              </button>
-              <button
-                onClick={() => setNewQuoteOpen(true)}
-                aria-label="Novo pedido"
-                className="flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
-                title="Criar pedido manualmente"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                  </svg>
+                  <span className="hidden md:inline">Pesquisar</span>
+                  <kbd className="text-[8px] border border-foreground/12 rounded px-1 py-0.5 ml-0.5">
+                    ⌘K
+                  </kbd>
+                </button>
+                <button
+                  onClick={refresh}
+                  disabled={refreshing}
+                  aria-label="Atualizar pedidos"
+                  className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
                 >
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                </svg>
-                <span className="hidden sm:inline">Novo</span>
-              </button>
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className={
+                      refreshing
+                        ? "animate-spin"
+                        : "group-hover:rotate-180 transition-transform duration-500"
+                    }
+                  >
+                    <path
+                      d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {refreshing ? "A atualizar" : "Atualizar"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setNewQuoteOpen(true)}
+                  aria-label="Novo pedido"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
+                  title="Criar pedido manualmente"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                  >
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                  </svg>
+                  <span className="hidden sm:inline">Novo</span>
+                </button>
+              </div>
             </div>
           </header>
 
           {/* ── Overview ── */}
           {view === "overview" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Overview
                 quotes={activeQuotes}
                 userName={userName}
@@ -1253,7 +1285,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Pipeline (Kanban) ── */}
           {view === "kanban" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Kanban
                 quotes={activeQuotes}
                 onOpen={openQuote}
@@ -1268,21 +1300,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Clientes ── */}
           {view === "clientes" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Clientes quotes={activeQuotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Calendário ── */}
           {view === "calendario" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Calendario quotes={activeQuotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Propostas ── */}
           {view === "propostas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Propostas
                 quotes={quotes}
                 onOpenQuote={openQuote}
@@ -1296,35 +1328,35 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Tarefas ── */}
           {view === "tarefas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Tarefas defaultAssignee={userName} />
             </div>
           )}
 
           {/* ── Fornecedores ── */}
           {view === "fornecedores" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Fornecedores />
             </div>
           )}
 
           {/* ── Estatísticas ── */}
           {view === "estatisticas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <StatsDashboard quotes={activeQuotes} />
             </div>
           )}
 
           {/* ── Inventário ── */}
           {view === "inventario" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Inventario />
             </div>
           )}
 
           {/* ── Seguimentos automáticos ── */}
           {view === "seguimentos" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Seguimentos
                 onOpenQuote={(id) => {
                   const q = quotes.find((x) => x.id === id);
@@ -1336,36 +1368,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Faturas ── */}
           {view === "faturas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Faturas quotes={quotes} />
             </div>
           )}
 
           {/* ── Contratos ── */}
           {view === "contratos" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Contratos />
             </div>
           )}
 
           {/* ── Modelos de email ── */}
           {view === "modelos-email" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <EmailTemplates />
             </div>
           )}
 
           {/* ── Inbox ── */}
           {view === "inbox" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Inbox />
             </div>
           )}
 
           {/* ── Pedidos ── */}
-          <div
-            className={`px-4 sm:px-6 lg:px-12 py-6 lg:py-12 ${view === "pedidos" ? "view-in" : "hidden"}`}
-          >
+          <div className={`${VIEW_WRAP} ${view === "pedidos" ? "view-in" : "hidden"}`}>
             {/* Controls */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
               <div className="relative flex-1 max-w-md">

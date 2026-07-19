@@ -23,6 +23,23 @@ export type View =
   | "modelos-email"
   | "inbox";
 
+/**
+ * Sidebar section grouping. Purely a display concern for the desktop rail — the
+ * calm, ChatGPT-like sidebar reads better when the 15 destinations are gathered
+ * under a few faint section labels. `NAV` stays the single source of truth for
+ * ids / labels / icons and for every other consumer (command palette, mobile
+ * bar); groups only decide how the rail lays them out. Every `View` id appears
+ * in exactly one group.
+ */
+export const NAV_GROUPS: { label: string; ids: View[] }[] = [
+  { label: "Geral", ids: ["overview", "pedidos", "kanban", "calendario", "clientes"] },
+  { label: "Comercial", ids: ["propostas", "contratos", "faturas", "seguimentos"] },
+  {
+    label: "Gestão",
+    ids: ["tarefas", "fornecedores", "inventario", "modelos-email", "inbox", "estatisticas"],
+  },
+];
+
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
     id: "overview",
