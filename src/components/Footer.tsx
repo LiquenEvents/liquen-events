@@ -35,6 +35,7 @@ const STRIP_CELLS = [
 // the money pages keyword-anchored internal links from every page's footer.
 const serviceSlugs = [
   "casamentos",
+  "aluguer-de-viaturas-classicas",
   "eventos-corporativos",
   "festas-e-aniversarios",
   "jantares-de-gala",

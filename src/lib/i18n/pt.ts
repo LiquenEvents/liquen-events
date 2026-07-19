@@ -508,7 +508,11 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial, com uma decoração à vossa medida e o dia coordenado ao pormenor, para só terem de o viver.",
+            desc: "O vosso dia mais especial — coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
+          },
+          {
+            title: "Aluguer de Viaturas Clássicas",
+            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
           },
           {
             title: "Batizados & Comunhões",
@@ -780,6 +784,7 @@ export const pt = {
     servicosTitulo: "Serviços",
     serviceLinks: [
       "Decoração de Casamentos",
+      "Aluguer de Viaturas Clássicas",
       "Eventos Corporativos",
       "Festas e Aniversários",
       "Jantares de Gala",

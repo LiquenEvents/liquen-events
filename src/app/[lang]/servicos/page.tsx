@@ -67,6 +67,7 @@ const categoryMeta = [
     band: "/imagens/DaniGui_Preview20.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
+      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/M&F0678.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
       { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },

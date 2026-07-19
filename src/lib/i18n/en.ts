@@ -497,7 +497,11 @@ export const en: Dict = {
         services: [
           {
             title: "Weddings",
-            desc: "Your most special day, with bespoke decoration and the day coordinated down to the last detail, so you can simply live it.",
+            desc: "Your most special day — coordination, decoration, photography and catering. We handle it all so you can simply live it.",
+          },
+          {
+            title: "Classic Car Rental",
+            desc: "Classic cars with a driver for a dream arrival — from the bride's entrance to guest transport.",
           },
           {
             title: "Christenings & Communions",
@@ -768,6 +772,7 @@ export const en: Dict = {
     servicosTitulo: "Services",
     serviceLinks: [
       "Wedding Decoration",
+      "Classic Car Rental",
       "Corporate Events",
       "Parties & Celebrations",
       "Gala Dinners",
