@@ -187,8 +187,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                 {t.clientes.logosEyebrow}
               </p>
               <h2
-                className="text-foreground font-bold leading-[1.05]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
+                className="text-foreground font-bold uppercase tracking-display leading-[1.05]"
+                style={{ fontSize: "clamp(28px, 3.4vw, 44px)" }}
               >
                 {t.clientes.logosTitle}
               </h2>
@@ -229,8 +229,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-14">
             <h2
-              className="text-white font-bold leading-[1.05]"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[1.05]"
+              style={{ fontSize: "clamp(28px, 3.4vw, 44px)" }}
             >
               {t.clientes.gridTitle}
             </h2>
@@ -315,8 +315,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.ctaEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[0.88] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(50px, 9vw, 128px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.88] mb-6"
+              style={{ fontSize: "clamp(50px, 9vw, 128px)" }}
             >
               {t.clientes.ctaTitleLine1}
               <br />

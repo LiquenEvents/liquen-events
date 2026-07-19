@@ -263,8 +263,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               {ts.philoEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[1.05] tracking-tight max-w-3xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 52px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[1.05] max-w-3xl"
+              style={{ fontSize: "clamp(28px, 4vw, 52px)" }}
             >
               {ts.philoTitle}
             </h2>
@@ -381,8 +381,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {ts.seoEyebrow}
               </p>
               <h2
-                className="text-cream font-bold leading-[1.04] mb-7 max-w-3xl"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(32px, 5vw, 76px)" }}
+                className="text-cream font-bold uppercase tracking-display leading-[1.04] mb-7 max-w-3xl"
+                style={{ fontSize: "clamp(32px, 5vw, 76px)" }}
               >
                 {ts.seoTitle}
               </h2>
@@ -423,8 +423,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               {ts.ctaEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 110px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
+              style={{ fontSize: "clamp(44px, 8vw, 110px)" }}
             >
               {ts.ctaTitleLine1}
               <br />

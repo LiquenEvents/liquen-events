@@ -65,14 +65,14 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
           <AnimateIn>
             <div className="max-w-2xl">
-              {/* The site's emotional promise leads in the WARM voice — mixed-case
-                  Playfair, large — not a small uppercase spec label. The moss
-                  highlight on the closing word (flagged in the dictionary) is
-                  honoured here; it was previously flattened away. Kept bottom-left
-                  and photo-first so the SpaceX composition still holds. */}
+              {/* The site's emotional promise, in the SpaceX display lettering:
+                  big uppercase sans with tight (tracking-display) spacing. The
+                  moss highlight on the closing word (flagged in the dictionary)
+                  is honoured here. Kept bottom-left and photo-first so the SpaceX
+                  composition still holds. */}
               <h1
-                className="text-white font-bold leading-[0.95] tracking-tight"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 7vw, 88px)" }}
+                className="text-white font-bold uppercase tracking-display leading-[0.95]"
+                style={{ fontSize: "clamp(40px, 7vw, 88px)" }}
               >
                 {t.home.heroLines.map((l, i) => (
                   <span key={i} className={`block ${l.moss ? "text-moss" : ""}`}>
@@ -223,8 +223,8 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               calmly instead of escalating into a fussy per-word reveal at the end. */}
           <AnimateIn>
             <h2
-              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 116px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
+              style={{ fontSize: "clamp(44px, 8vw, 116px)" }}
             >
               <span className="block">{t.home.ctaTitleLine1}</span>
               <span className="block text-moss">{t.home.ctaTitleLine2}</span>

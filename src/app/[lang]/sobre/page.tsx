@@ -100,8 +100,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               {t.sobre.manifestoEyebrow}
             </p>
             <h2
-              className="text-foreground font-bold leading-[1.05]"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(32px, 5vw, 68px)" }}
+              className="text-foreground font-bold uppercase tracking-display leading-[1.05]"
+              style={{ fontSize: "clamp(32px, 5vw, 68px)" }}
             >
               {t.sobre.manifestoTitleLine1}
               <br />
@@ -267,8 +267,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               {t.sobre.ctaEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 7vw, 96px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
+              style={{ fontSize: "clamp(40px, 7vw, 96px)" }}
             >
               {t.sobre.ctaTitleLine1}
               <br />

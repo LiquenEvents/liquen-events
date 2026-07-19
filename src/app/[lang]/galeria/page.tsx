@@ -136,10 +136,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               <span className="w-5 h-px bg-gold flex-shrink-0" />
               {t.galeria.instaEyebrow}
             </p>
-            <h2
-              className="text-white text-4xl lg:text-5xl font-bold mb-5"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
+            <h2 className="text-white text-4xl lg:text-5xl font-bold uppercase tracking-display mb-5">
               {t.galeria.instaTitle}
             </h2>
             <p className="text-white/70 text-sm leading-relaxed mb-10 max-w-md">

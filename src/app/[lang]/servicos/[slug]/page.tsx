@@ -270,8 +270,8 @@ export default async function ServiceDetailPage({
           </AnimateIn>
           <AnimateIn delay={80}>
             <h2
-              className="text-foreground font-bold leading-[1.05] tracking-tight mt-5"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.8vw, 52px)" }}
+              className="text-foreground font-bold uppercase tracking-display leading-[1.05] mt-5"
+              style={{ fontSize: "clamp(28px, 3.8vw, 52px)" }}
             >
               {t.servicoDetalhe.galleryTitle}
             </h2>
@@ -426,8 +426,8 @@ export default async function ServiceDetailPage({
         <div className="text-veil-shadow relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <h2
-              className="text-white font-bold leading-[0.95] mb-12 max-w-2xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5.5vw, 76px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.95] mb-12 max-w-2xl"
+              style={{ fontSize: "clamp(36px, 5.5vw, 76px)" }}
             >
               {t.servicoDetalhe.ctaTitle}
             </h2>
