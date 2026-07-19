@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
-import { getProposal, updateProposal } from "@/lib/proposals-store";
+import { getProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { updateQuoteWith } from "@/lib/quotes-store";
 import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
 import { TERMS_VERSION, DEFAULT_TERMS, termsToPlainText } from "@/lib/contract-terms";
@@ -74,14 +74,58 @@ export async function POST(request: NextRequest) {
       );
     }
     // Honour the proposal's own validity date — an expired offer is not bindable.
-    if (proposal.validUntil && Date.parse(proposal.validUntil) < Date.now()) {
-      return NextResponse.json(
-        { error: "Esta proposta expirou. Contacte-nos para uma atualizada." },
-        { status: 410 },
-      );
+    // `validUntil` is a date ("yyyy-mm-dd") and "válida até X" means through the
+    // WHOLE of day X, so anchor to the end of that day (23:59:59), exactly like
+    // the Dossier's countdown/eventPassed. Anchoring to the bare date parsed to
+    // midnight UTC, which wrongly rejected an accept made any time on the last
+    // valid day (and even earlier in timezones ahead of UTC).
+    if (proposal.validUntil) {
+      const expiresAt = Date.parse(`${proposal.validUntil.slice(0, 10)}T23:59:59`);
+      if (!Number.isNaN(expiresAt) && expiresAt < Date.now()) {
+        return NextResponse.json(
+          { error: "Esta proposta expirou. Contacte-nos para uma atualizada." },
+          { status: 410 },
+        );
+      }
     }
 
     const accepted = action === "aceitar";
+
+    // Guard against accepting a SUPERSEDED proposal. Creating a revised proposal
+    // does not withdraw the previous one (both stay "enviada"), and the old signed
+    // link lives on in the client's inbox. Accepting it would bind Líquen to the
+    // stale (often cheaper) price and, worse, could mint a 2nd contract for a quote
+    // whose newer proposal was already accepted. So an accept only stands for the
+    // NEWEST offered proposal: if any sibling that was actually sent (status is not
+    // a never-offered "rascunho") is newer, this link is stale. Declining a stale
+    // proposal stays harmless, so the guard only gates acceptance.
+    if (accepted) {
+      try {
+        const siblings = await listProposalsForQuote(proposal.quoteId);
+        const mine = Date.parse(proposal.createdAt);
+        const superseded = siblings.some(
+          (p) =>
+            p.id !== proposal.id &&
+            p.status !== "rascunho" &&
+            !Number.isNaN(Date.parse(p.createdAt)) &&
+            (Number.isNaN(mine) || Date.parse(p.createdAt) > mine),
+        );
+        if (superseded) {
+          return NextResponse.json(
+            {
+              error:
+                "Existe uma proposta mais recente para este evento. Use o link mais recente ou contacte-nos.",
+            },
+            { status: 409 },
+          );
+        }
+      } catch (e) {
+        // A lookup failure must not block a legitimate accept — log and proceed.
+        log.error("proposta: verificação de proposta mais recente falhou", e, {
+          id: proposal.quoteId,
+        });
+      }
+    }
     // Accepting is a binding commitment, so it must carry an explicit agreement
     // to the Termos & Condições plus the name of who is accepting (the signature
     // recorded in the contract). Declining requires neither.

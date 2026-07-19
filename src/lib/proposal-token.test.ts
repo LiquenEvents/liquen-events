@@ -87,6 +87,14 @@ describe("proposal-token — signed accept links", () => {
     expect(readProposalToken(b)).toEqual({ proposalId: "prop-B" });
   });
 
+  it("rejects a validly-signed token whose body is not valid JSON", () => {
+    // Assinatura correta, mas o corpo (base64url) não é JSON — a desserialização
+    // rebenta e tem de devolver null em vez de propagar.
+    const body = Buffer.from("nao-e-json{{").toString("base64url");
+    const sig = createHmac("sha256", process.env.SESSION_SECRET!).update(body).digest("base64url");
+    expect(readProposalToken(`${body}.${sig}`)).toBeNull();
+  });
+
   // Domain separation: an admin session token must NOT read as a proposal token
   // (the session signs with a derived key AND declares typ:"session").
   it("does not accept an admin session token as a proposal link", () => {

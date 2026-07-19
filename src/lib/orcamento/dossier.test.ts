@@ -238,6 +238,17 @@ describe("deriveStage", () => {
     expect(deriveStage(d, TODAY)).toBe("em_producao");
   });
 
+  it("accepted + sinal paid but no event date → em_producao (dateless quote)", () => {
+    // Sem `quote.date`: eventPassed=false e countdownDays=null, por isso a semana
+    // do evento nunca dispara e a fase assenta em em_producao.
+    const d = data({
+      quote: makeQuote({ date: "" }),
+      proposal: makeProposal({ status: "aceite" }),
+      invoices: [invoice({ kind: "sinal", status: "paga" })],
+    });
+    expect(deriveStage(d, TODAY)).toBe("em_producao");
+  });
+
   it("day-of afternoon stays 'today' (semana_evento), NOT concluido", () => {
     // Tarde do próprio dia do evento: o contador ainda diz 0, por isso o evento
     // NÃO passou. Âncora a meio-dia disparava concluido cedo demais; a de fim do
@@ -290,6 +301,33 @@ describe("computeEventMetrics", () => {
     expect(m.countdownDays).toBe(7);
     expect(m.rsvpConfirmed).toBe(6);
     expect(m.rsvpTotal).toBe(9);
+  });
+
+  it("treats a supplier with neither actual nor estimated cost as 0, and counts party-less/zero guests safely", () => {
+    const d = data({
+      quote: makeQuote({
+        eventSuppliers: [
+          {
+            id: "s0",
+            name: "Sem custo",
+            category: "outro",
+            estimatedCost: 0,
+            status: "contactado",
+          },
+        ],
+        guestList: [
+          { id: "g0", name: "Sem party", party: 0, rsvp: "confirmado" },
+          { id: "g1", name: "Confirmado", party: 2, rsvp: "confirmado" },
+        ],
+        priceBreakdown: undefined as never,
+        quotedPrice: 5000,
+      }),
+    });
+    const m = computeEventMetrics(d, TODAY);
+    expect(m.supplierCosts).toBe(0);
+    expect(m.margin).toBe(5000);
+    expect(m.rsvpTotal).toBe(2); // 0 + 2
+    expect(m.rsvpConfirmed).toBe(2); // party 0 contributes nothing
   });
 
   it("excludes anulada invoices from ledgerIssued; pctPaid is 0 when nothing contracted", () => {

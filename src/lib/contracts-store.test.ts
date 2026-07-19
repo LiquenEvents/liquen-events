@@ -39,9 +39,13 @@ vi.mock("./repository", () => ({
 }));
 
 import {
+  mapper,
   createContractIfAbsent,
   getContractByProposal,
   getAcceptedContractByQuote,
+  listContracts,
+  getContract,
+  updateContract,
 } from "./contracts-store";
 
 function contract(over: Partial<Contract> = {}): Contract {
@@ -130,5 +134,77 @@ describe("getAcceptedContractByQuote", () => {
 
   it("returns null for a quote with no contracts", async () => {
     expect(await getAcceptedContractByQuote("q-none")).toBeNull();
+  });
+});
+
+describe("CRUD delegation", () => {
+  it("lists, gets and updates a stored contract", async () => {
+    repoState.rows = [contract({ id: "c1", proposalId: "prop1", status: "pendente" })];
+    expect(await listContracts()).toHaveLength(1);
+    expect((await getContract("c1"))?.id).toBe("c1");
+    const updated = await updateContract("c1", { status: "aceite", acceptedName: "Rui" });
+    expect(updated).toMatchObject({ status: "aceite", acceptedName: "Rui" });
+    expect((await getContract("c1"))?.status).toBe("aceite");
+  });
+
+  it("update returns null for an unknown id", async () => {
+    expect(await updateContract("ghost", { status: "aceite" })).toBeNull();
+  });
+});
+
+/**
+ * The camelCase↔snake_case mapper is the bug-prone seam (per repository.ts).
+ * The tests above mock the Repository, so exercise the mapper directly here:
+ * a full round-trip, empty optionals (null↔undefined), and row-missing defaults.
+ */
+describe("mapper (row ↔ domain)", () => {
+  it("round-trips every field (with created_at added back by the DB)", () => {
+    const c = contract({
+      id: "c9",
+      quoteId: "q9",
+      proposalId: "p9",
+      clientName: "Ana",
+      clientEmail: "ana@x.pt",
+      termsVersion: "v3",
+      termsSnapshot: "Texto dos termos",
+      status: "aceite",
+      createdAt: "2026-05-01T08:00:00.000Z",
+      acceptedAt: "2026-05-01T08:00:00.000Z",
+      acceptedName: "Ana",
+      acceptedIp: "9.9.9.9",
+    });
+    const row = mapper.toRow(c);
+    expect(mapper.fromRow(row)).toEqual(c);
+  });
+
+  it("persists empty optionals as null and reads them back as undefined", () => {
+    const row = mapper.toRow(
+      contract({
+        id: "c10",
+        status: "pendente",
+        acceptedAt: undefined,
+        acceptedName: undefined,
+        acceptedIp: undefined,
+      }),
+    );
+    expect(row.accepted_at).toBeNull();
+    expect(row.accepted_name).toBeNull();
+    expect(row.accepted_ip).toBeNull();
+    const back = mapper.fromRow(row);
+    expect(back.acceptedAt).toBeUndefined();
+    expect(back.acceptedName).toBeUndefined();
+    expect(back.acceptedIp).toBeUndefined();
+  });
+
+  it("defaults a sparse row: status 'pendente', empty strings, a createdAt fallback", () => {
+    const back = mapper.fromRow({ id: "c11" });
+    expect(back.id).toBe("c11");
+    expect(back.status).toBe("pendente");
+    expect(back.quoteId).toBe("");
+    expect(back.proposalId).toBe("");
+    expect(back.clientName).toBe("");
+    expect(back.termsVersion).toBe("");
+    expect(back.createdAt).toBeTruthy();
+    expect(back.acceptedAt).toBeUndefined();
   });
 });
