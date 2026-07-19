@@ -11,6 +11,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/d
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
+import AjudaGlossario from "./AjudaGlossario";
 import NewQuoteModal from "./NewQuoteModal";
 import NotificationBell from "./NotificationBell";
 import {
@@ -131,6 +132,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [ajudaOpen, setAjudaOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [recentQuotes, setRecentQuotes] = useState<RecentQuote[]>([]);
@@ -297,7 +299,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // Escape dismisses the open drawer/nav — but only when no modal is capturing
   // it (the palette / new-quote / shortcuts dialogs handle their own Escape).
   useEffect(() => {
-    if (paletteOpen || newQuoteOpen || shortcutsOpen) return;
+    if (paletteOpen || newQuoteOpen || shortcutsOpen || ajudaOpen) return;
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (navOpen) setNavOpen(false);
@@ -312,7 +314,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [paletteOpen, newQuoteOpen, shortcutsOpen, navOpen, selected]);
+  }, [paletteOpen, newQuoteOpen, shortcutsOpen, ajudaOpen, navOpen, selected]);
 
   // Lock background scroll while the mobile nav drawer is open.
   useEffect(() => {
@@ -857,6 +859,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     <>
       <div className="min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        <AjudaGlossario open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
         <CommandPalette
           open={paletteOpen}
           onClose={() => setPaletteOpen(false)}
@@ -1115,6 +1118,28 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </h1>
             </div>
             <div className="ml-auto flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setAjudaOpen(true)}
+                aria-label="Ajuda e glossário"
+                title="Ajuda e glossário"
+                className="w-9 h-9 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path
+                    d="M9.4 9a2.6 2.6 0 1 1 3.4 2.5c-.7.3-1.3.9-1.3 1.7v.3"
+                    strokeLinecap="round"
+                  />
+                  <path d="M12 17h.01" strokeLinecap="round" />
+                </svg>
+              </button>
               <NotificationBell />
               <button
                 onClick={() => setPaletteOpen(true)}
@@ -1911,7 +1936,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <button
                             onClick={() => printRunSheet(selected)}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                            title="Imprimir run-sheet do evento"
+                            title="Imprimir o guião do dia"
                           >
                             <svg
                               width="13"
