@@ -2,90 +2,12 @@
 
 import { useEffect } from "react";
 import { useFocusTrap } from "./useFocusTrap";
+import { LIFECYCLE, GLOSSARY } from "./glossario-data";
 
 interface Props {
   open: boolean;
   onClose: () => void;
 }
-
-// O percurso que cada trabalho faz, do primeiro contacto até ao dia do evento.
-// Uma frase simples por etapa — para que os nomes do menu se sintam como um só
-// processo, e não como separadores soltos.
-const LIFECYCLE: { step: string; desc: string }[] = [
-  {
-    step: "Pedido",
-    desc: "Alguém pede um orçamento. É a primeira conversa: quem é, que evento quer, para quando e para quantas pessoas.",
-  },
-  {
-    step: "Proposta",
-    desc: "Respondemos com uma sugestão de serviços e um preço. É o nosso “aqui está o que propomos, por este valor”.",
-  },
-  {
-    step: "Contrato",
-    desc: "O cliente aceita as condições por escrito. A partir daqui o evento está confirmado e reservamos a data.",
-  },
-  {
-    step: "Fatura (sinal + saldo)",
-    desc: "O pagamento costuma ser em duas partes: o sinal, para garantir a reserva, e o saldo, o resto, perto do evento.",
-  },
-  {
-    step: "Evento",
-    desc: "O grande dia. Tudo o que preparámos acontece — e no fim fica o registo para o histórico do cliente.",
-  },
-];
-
-// Vocabulário do dia a dia, em linguagem simples. Os nomes coincidem com os que
-// aparecem nos ecrãs (menu, estados dos pedidos, botões).
-const GLOSSARY: { term: string; def: string }[] = [
-  {
-    term: "Pedido",
-    def: "Um contacto de alguém que quer um orçamento. Cada pedido tem um estado que mostra em que ponto está: Novo, Em revisão, Proposta enviada, Ganho ou Perdido.",
-  },
-  {
-    term: "Proposta",
-    def: "O documento que enviamos ao cliente com os serviços sugeridos e o preço. É a nossa resposta a um pedido.",
-  },
-  {
-    term: "Cotado / Proposta enviada",
-    def: "O estado de um pedido a quem já mandámos uma proposta e estamos à espera de resposta. Nos ecrãs aparece como “Proposta enviada”.",
-  },
-  {
-    term: "Contrato",
-    def: "O acordo em que o cliente aceita as condições. Quando está aceite, o evento fica confirmado.",
-  },
-  {
-    term: "Sinal",
-    def: "A primeira parte do pagamento (habitualmente 30%), paga no início para reservar a data. Sem sinal, a data não fica garantida.",
-  },
-  {
-    term: "Saldo",
-    def: "O resto do pagamento (habitualmente 70%), pago mais perto do evento. Sinal + saldo = valor total.",
-  },
-  {
-    term: "Fatura",
-    def: "O documento oficial que pede um pagamento ao cliente. Pode ser do sinal, do saldo, ou uma fatura única com o valor todo.",
-  },
-  {
-    term: "Recibo",
-    def: "O comprovativo de que um pagamento já foi feito. A fatura pede; o recibo confirma que recebemos.",
-  },
-  {
-    term: "Dossier",
-    def: "A vista completa de um evento, tudo num só sítio: contacto, proposta, contrato, faturas e produção. É o “processo” do evento.",
-  },
-  {
-    term: "Seguimento",
-    def: "Um lembrete para voltar a falar com o cliente numa certa data — por exemplo, para não deixar uma proposta sem resposta. Se a data já passou, aparece “em atraso”.",
-  },
-  {
-    term: "Pipeline",
-    def: "O quadro que mostra todos os pedidos organizados por fase, em colunas. Serve para ver, num relance, em que ponto está cada trabalho.",
-  },
-  {
-    term: "Convidados",
-    def: "As pessoas que vão ao evento. O número de convidados influencia o espaço, a comida e o preço.",
-  },
-];
 
 /**
  * Ajuda de entrada para quem começa: explica o percurso de um trabalho
@@ -132,6 +54,17 @@ export default function AjudaGlossario({ open, onClose }: Props) {
         </div>
 
         <div className="px-6 py-6 max-h-[72vh] overflow-y-auto">
+          {/* ── Boas-vindas ── */}
+          <p className="text-foreground/55 text-sm leading-relaxed mb-6">
+            Bem-vindo(a). Esta janela explica, em poucas palavras, como funciona o back-office e o
+            que significa cada termo que vai encontrar. Pode voltar aqui sempre que precisar — abre
+            com o botão “?” no topo ou com a tecla{" "}
+            <kbd className="text-[10px] text-foreground/55 bg-foreground/[0.06] border border-foreground/12 rounded px-1.5 py-0.5 leading-none">
+              ?
+            </kbd>
+            . Feche com Escape ou clicando fora.
+          </p>
+
           {/* ── Como funciona ── */}
           <section>
             <p className="text-foreground/30 text-[10px] tracking-[0.25em] uppercase mb-1">
@@ -160,8 +93,12 @@ export default function AjudaGlossario({ open, onClose }: Props) {
 
           {/* ── Glossário ── */}
           <section>
-            <p className="text-foreground/30 text-[10px] tracking-[0.25em] uppercase mb-4">
+            <p className="text-foreground/30 text-[10px] tracking-[0.25em] uppercase mb-1">
               Glossário — o que significa cada palavra
+            </p>
+            <p className="text-foreground/45 text-sm mb-4">
+              As palavras aparecem pela ordem do percurso acima. São exatamente os nomes que vai ver
+              no menu, nos estados dos pedidos e nos botões.
             </p>
             <dl className="flex flex-col gap-4">
               {GLOSSARY.map((it) => (
