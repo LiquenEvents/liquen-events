@@ -95,12 +95,12 @@ export default function Contratos() {
       [
         "Cliente",
         "E-mail",
-        "Ref. pedido",
-        "Ref. proposta",
+        "Pedido",
+        "Proposta",
         "Estado",
         "Criado em",
         "Aceite em",
-        "Assinado por",
+        "Aceite por",
         "Versão dos termos",
       ],
       ...filtered.map((c) => [
@@ -122,6 +122,12 @@ export default function Contratos() {
 
   return (
     <div>
+      {/* One calm line saying what this screen is for */}
+      <p className="mb-6 text-sm leading-relaxed text-foreground/55">
+        Cada contrato é a prova de que o cliente aceitou a proposta. Aparecem aqui automaticamente,
+        com a data e o nome de quem aceitou.
+      </p>
+
       {/* Toolbar */}
       <Toolbar
         className="mb-6"
@@ -155,9 +161,9 @@ export default function Contratos() {
               variant="secondary"
               size="sm"
               onClick={exportCsv}
-              title="Exportar contratos para CSV"
+              title="Guarda a lista dos contratos num ficheiro que abre no Excel"
             >
-              Exportar CSV
+              Exportar lista
             </Button>
           ) : undefined
         }
@@ -191,7 +197,8 @@ export default function Contratos() {
         </div>
         {aceites > 0 && (
           <span className="ml-auto self-center text-xs text-foreground/40">
-            {aceites} {aceites === 1 ? "aceitação" : "aceitações"} · termos v{TERMS_VERSION} atual
+            {aceites} {aceites === 1 ? "contrato aceite" : "contratos aceites"} · versão atual dos
+            termos: {TERMS_VERSION}
           </span>
         )}
       </div>
@@ -228,10 +235,10 @@ export default function Contratos() {
               <thead>
                 <tr className="border-b border-foreground/[0.08] text-foreground/40">
                   <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Ref. pedido</th>
+                  <th className="bo-eyebrow px-4 py-3.5 text-left">Pedido</th>
                   <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
                   <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite em</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Assinado por</th>
+                  <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite por</th>
                   <th className="bo-eyebrow px-4 py-3.5 text-left">Termos</th>
                   <th className="bo-eyebrow px-4 py-3.5 text-right">Contrato</th>
                 </tr>
@@ -272,7 +279,7 @@ export default function Contratos() {
                           {c.acceptedName || "—"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-foreground/45">
-                          v{c.termsVersion}
+                          Versão {c.termsVersion}
                         </td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="inline-flex items-center justify-end gap-1.5">
@@ -303,7 +310,7 @@ export default function Contratos() {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-4">
                               <div>
                                 <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  Ref. proposta
+                                  Proposta
                                 </p>
                                 <p className="text-foreground/60 font-mono text-[11px] break-all">
                                   {c.proposalId || "—"}
@@ -319,12 +326,12 @@ export default function Contratos() {
                                 <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
                                   Versão dos termos
                                 </p>
-                                <p className="text-foreground/60">v{c.termsVersion}</p>
+                                <p className="text-foreground/60">Versão {c.termsVersion}</p>
                               </div>
                               {/* IP é dado de auditoria — discreto, não em destaque. */}
                               <div>
                                 <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  IP (auditoria)
+                                  IP de quem aceitou
                                 </p>
                                 <p className="text-foreground/45 font-mono text-[11px] break-all">
                                   {c.acceptedIp || "—"}

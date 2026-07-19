@@ -278,7 +278,7 @@ export default function Inbox() {
     async (item: InboxItemEnriched) => {
       if (
         !window.confirm(
-          `Arquivar o e-mail de ${item.from}? Fica escondido, mas pode desarquivar a qualquer momento.`,
+          `Arquivar o e-mail de ${item.from}?\n\nFica escondido da caixa de entrada, mas não é apagado — pode voltar a mostrá-lo a qualquer momento no separador "Arquivo".`,
         )
       )
         return;
@@ -298,9 +298,13 @@ export default function Inbox() {
 
   const unarchive = useCallback(
     async (messageId: string) => {
-      const link = await overlay(messageId, { archived: false }, "Não foi possível desarquivar.");
+      const link = await overlay(
+        messageId,
+        { archived: false },
+        "Não foi possível tirar do arquivo.",
+      );
       if (link) {
-        toast("E-mail desarquivado.", "success");
+        toast("E-mail de volta na caixa de entrada.", "success");
         setUndo((u) => (u?.messageId === messageId ? null : u));
       }
     },
@@ -650,15 +654,15 @@ function EmptyList({ filter, hasAny }: { filter: InboxFilter; hasAny: boolean })
     porler: { title: "Tudo lido", desc: "Não há mensagens por ler. Bom trabalho." },
     estrela: {
       title: "Sem estrelas",
-      desc: "Marque um e-mail com estrela para o guardar aqui.",
+      desc: "Toque na estrela de um e-mail para o guardar aqui, à mão para consultar depois.",
     },
     ligados: {
-      title: "Nenhum e-mail ligado",
-      desc: "Associe um e-mail a um pedido para o ver nesta lista.",
+      title: "Nenhum e-mail ligado a um pedido",
+      desc: "Ao abrir um e-mail pode ligá-lo ao pedido do cliente. Esses aparecem aqui, juntos.",
     },
     arquivo: {
       title: "Arquivo vazio",
-      desc: "Os e-mails que arquivar ficam guardados aqui — nunca são apagados.",
+      desc: "Os e-mails que arquivar ficam guardados aqui — escondidos da caixa de entrada, mas nunca apagados.",
     },
   };
   const c = copy[filter];

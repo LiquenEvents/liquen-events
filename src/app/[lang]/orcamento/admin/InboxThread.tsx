@@ -166,11 +166,16 @@ export default function InboxThread({
             variant="ghost"
             size="sm"
             onClick={onToggleSeen}
+            title={
+              seen
+                ? "Voltar a marcar como não lido (fica em destaque na lista)"
+                : "Marcar como já lido"
+            }
             iconLeft={
               seen ? <IconMail className="h-4 w-4" /> : <IconMailOpen className="h-4 w-4" />
             }
           >
-            {seen ? "Marcar não lido" : "Marcar lido"}
+            {seen ? "Marcar como não lido" : "Marcar como lido"}
           </Button>
 
           {canOverlay && (
@@ -180,9 +185,12 @@ export default function InboxThread({
                 size="sm"
                 onClick={() => onSetPinned(!pinned)}
                 aria-pressed={pinned}
+                title={
+                  pinned ? "Tirar do topo da lista" : "Manter este e-mail sempre no topo da lista"
+                }
                 iconLeft={<IconPin className="h-4 w-4" filled={pinned} />}
               >
-                {pinned ? "Desafixar" : "Fixar"}
+                {pinned ? "Tirar do topo" : "Fixar no topo"}
               </Button>
 
               <LabelMenu labels={labels} onToggle={onToggleLabel} />
@@ -192,15 +200,17 @@ export default function InboxThread({
                   variant="subtle"
                   size="sm"
                   onClick={onUnarchive}
+                  title="Trazer de volta para a caixa de entrada"
                   iconLeft={<IconArchive className="h-4 w-4" />}
                 >
-                  Desarquivar
+                  Tirar do arquivo
                 </Button>
               ) : (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onArchive}
+                  title="Esconder da caixa de entrada. Não apaga nada — pode voltar a mostrá-lo quando quiser"
                   iconLeft={<IconArchive className="h-4 w-4" />}
                 >
                   Arquivar
@@ -212,8 +222,8 @@ export default function InboxThread({
 
         {!canOverlay && (
           <p className="border-t border-foreground/[0.06] px-5 py-2.5 text-[11px] leading-relaxed text-foreground/40">
-            Este e-mail não traz um Message-ID, por isso não é possível etiquetar, fixar, arquivar
-            ou ligá-lo a um pedido.
+            Este e-mail chegou sem a marca que o identifica, por isso não é possível pôr etiquetas,
+            fixá-lo no topo, arquivá-lo nem ligá-lo a um pedido. Pode na mesma lê-lo e responder.
           </p>
         )}
       </div>
@@ -231,11 +241,20 @@ export default function InboxThread({
               </div>
               <div className="flex items-center gap-1.5">
                 <Link href={`/${lang}/orcamento/admin/evento/${link.quoteId}`}>
-                  <Button variant="secondary" size="sm">
-                    Abrir dossier
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    title="Ir para a ficha completa deste pedido"
+                  >
+                    Abrir o pedido
                   </Button>
                 </Link>
-                <Button variant="ghost" size="sm" onClick={() => onLinkQuote(null)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onLinkQuote(null)}
+                  title="Deixar de ligar este e-mail ao pedido"
+                >
                   Desligar
                 </Button>
               </div>
@@ -322,6 +341,7 @@ function LabelMenu({ labels, onToggle }: { labels: string[]; onToggle: (label: s
         size="sm"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        title="Juntar etiquetas para organizar e encontrar mais depressa"
         iconLeft={<IconTag className="h-4 w-4" />}
       >
         Etiquetas
@@ -330,7 +350,10 @@ function LabelMenu({ labels, onToggle }: { labels: string[]; onToggle: (label: s
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
           <div className="absolute left-0 top-full z-20 mt-1 w-60 rounded-xl border border-foreground/10 bg-white p-3 shadow-xl shadow-black/10">
-            <p className="bo-eyebrow mb-2">Etiquetas</p>
+            <p className="bo-eyebrow mb-1">Etiquetas</p>
+            <p className="mb-2.5 text-[11px] leading-relaxed text-foreground/45">
+              Toque numa para juntar ou tirar. Ajudam a organizar e a encontrar e-mails depois.
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {Array.from(new Set([...SUGGESTED_LABELS, ...labels])).map((l) => {
                 const active = labels.includes(l);
@@ -367,7 +390,7 @@ function LabelMenu({ labels, onToggle }: { labels: string[]; onToggle: (label: s
                 className="bo-input flex-1 px-2.5 py-1.5 text-xs text-foreground/80"
               />
               <Button type="submit" variant="subtle" size="sm" disabled={!custom.trim()}>
-                Juntar
+                Adicionar
               </Button>
             </form>
           </div>
@@ -405,13 +428,16 @@ function AssociatePicker({
 
   return (
     <div>
-      <p className="bo-eyebrow mb-2 flex items-center gap-1.5">
-        <IconLink className="h-3.5 w-3.5" /> Associar a um pedido
+      <p className="bo-eyebrow mb-1 flex items-center gap-1.5">
+        <IconLink className="h-3.5 w-3.5" /> Ligar a um pedido
+      </p>
+      <p className="mb-2 text-[11px] leading-relaxed text-foreground/45">
+        Junte este e-mail ao pedido do cliente para ter tudo no mesmo sítio.
       </p>
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Procurar cliente, email ou ID do pedido…"
+        placeholder="Escreva o nome ou o email do cliente…"
         className="bo-input mb-2 px-3 py-2 text-sm text-foreground/80"
       />
       {matches.length > 0 ? (
@@ -443,7 +469,7 @@ function AssociatePicker({
       )}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-foreground/[0.06] pt-3">
         <p className="text-[11px] leading-relaxed text-foreground/45">
-          Remetente sem pedido? Crie um a partir deste e-mail.
+          É um contacto novo? Crie já um pedido com os dados deste e-mail.
         </p>
         <Button
           variant="primary"
@@ -451,7 +477,11 @@ function AssociatePicker({
           loading={creating}
           onClick={onCreate}
           iconLeft={!creating ? <IconPlusDoc className="h-4 w-4" /> : undefined}
-          title={defaultQuery ? `Criar pedido para ${defaultQuery}` : undefined}
+          title={
+            defaultQuery
+              ? `Criar um novo pedido já ligado a ${defaultQuery}`
+              : "Criar um novo pedido com os dados deste e-mail"
+          }
         >
           Criar pedido
         </Button>

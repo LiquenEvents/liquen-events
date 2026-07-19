@@ -18,7 +18,7 @@ const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "#8a8a82" },
   enviada: { label: "Enviada", color: "#9aa36a" },
   aceite: { label: "Aceite", color: "#525a2f" },
-  rejeitada: { label: "Rejeitada", color: "#5a5a55" },
+  rejeitada: { label: "Recusada", color: "#5a5a55" },
 };
 
 function expiryInfo(
@@ -26,10 +26,11 @@ function expiryInfo(
 ): { label: string; tone: "ok" | "soon" | "expired" } | null {
   if (!validUntil) return null;
   const days = Math.round((new Date(validUntil + "T12:00:00").getTime() - Date.now()) / 86400000);
-  if (days < 0) return { label: "Expirada", tone: "expired" };
-  if (days === 0) return { label: "Expira hoje", tone: "soon" };
-  if (days <= 5) return { label: `Expira em ${days}d`, tone: "soon" };
-  return { label: `Válida ${days}d`, tone: "ok" };
+  if (days < 0) return { label: "Prazo terminado", tone: "expired" };
+  if (days === 0) return { label: "Termina hoje", tone: "soon" };
+  if (days === 1) return { label: "Termina amanhã", tone: "soon" };
+  if (days <= 5) return { label: `Termina em ${days} dias`, tone: "soon" };
+  return { label: `Válida mais ${days} dias`, tone: "ok" };
 }
 
 interface Props {
@@ -133,13 +134,18 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
 
   return (
     <div className="flex flex-col gap-6">
+      {/* One calm line saying what this screen is for */}
+      <p className="text-sm leading-relaxed text-foreground/55">
+        Aqui vê as propostas que enviou aos clientes e acompanha quais foram aceites.
+      </p>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { v: String(proposals.length), l: "Propostas", accent: true },
-          { v: eur(totalSent), l: "Valor proposto", accent: false },
-          { v: eur(totalWon), l: "Valor ganho", accent: true },
-          { v: `${acceptRate}%`, l: "Taxa de aceitação", accent: false },
+          { v: eur(totalSent), l: "Valor enviado aos clientes", accent: false },
+          { v: eur(totalWon), l: "Valor já ganho", accent: true },
+          { v: `${acceptRate}%`, l: "Propostas aceites", accent: false },
         ].map((k) => (
           <Card
             key={k.l}
@@ -261,10 +267,10 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                       )}
                     </div>
                     <p className="text-foreground/45 text-xs">
-                      {p.clientEmail} · {p.lineItems.length} linha
-                      {p.lineItems.length !== 1 ? "s" : ""}
+                      {p.clientEmail} · {p.lineItems.length}{" "}
+                      {p.lineItems.length !== 1 ? "itens" : "item"}
                       {p.sentAt &&
-                        ` · enviada ${new Date(p.sentAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`}
+                        ` · enviada a ${new Date(p.sentAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`}
                     </p>
                   </div>
 
@@ -283,6 +289,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                             size="sm"
                             disabled={busy}
                             onClick={() => updateStatus(p.id, "aceite")}
+                            title="O cliente aceitou: fecha o negócio e marca o pedido como ganho"
                             iconLeft={
                               <svg
                                 width="13"
@@ -308,6 +315,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                             size="sm"
                             disabled={busy}
                             onClick={() => updateStatus(p.id, "rejeitada")}
+                            title="O cliente não avançou com esta proposta"
                           >
                             Recusar
                           </Button>
@@ -318,10 +326,10 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                           variant="ghost"
                           size="sm"
                           onClick={() => onOpenQuote(linkedQuote)}
-                          title="Abrir pedido associado"
+                          title="Abrir o pedido deste cliente"
                           iconRight={<span aria-hidden="true">→</span>}
                         >
-                          Pedido
+                          Ver pedido
                         </Button>
                       )}
                     </div>

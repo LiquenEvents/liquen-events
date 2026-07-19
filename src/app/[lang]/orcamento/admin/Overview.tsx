@@ -292,7 +292,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       icon: <path d="M12 5v14M5 12h14" strokeLinecap="round" />,
     },
     {
-      label: "Pipeline",
+      label: "Fases dos pedidos",
       onClick: () => onGo("kanban"),
       icon: (
         <>
@@ -529,8 +529,8 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
           },
           {
             v: eur(data.pipeline),
-            l: "Em proposta",
-            hint: "propostas enviadas",
+            l: "Valor em propostas",
+            hint: "enviadas, à espera de resposta",
             go: () => onGo("kanban"),
           },
           {
@@ -779,7 +779,12 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             })}
           </div>
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-foreground/[0.07]">
-            <span className="text-foreground/35 text-xs">Taxa de conversão</span>
+            <span className="text-foreground/35 text-xs">
+              Pedidos que acabam em evento
+              <span className="block text-foreground/25 text-[10px]">
+                de cada 100 decididos, quantos ganhou
+              </span>
+            </span>
             <span className="text-foreground/75 text-sm font-semibold tabular-nums">
               {data.conversion}%
             </span>
@@ -789,7 +794,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         {/* Financial pulse */}
         <div className="bo-card p-5">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="bo-eyebrow">Pulso financeiro</h3>
+            <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
             <button
               onClick={onGoStats}
               className={`text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
@@ -845,7 +850,12 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             </p>
           )}
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-foreground/[0.07]">
-            <span className="text-foreground/35 text-xs">Ticket médio (ganho)</span>
+            <span className="text-foreground/35 text-xs">
+              Valor médio por evento ganho
+              <span className="block text-foreground/25 text-[10px]">
+                quanto vale, em média, cada pedido fechado
+              </span>
+            </span>
             <span className="text-foreground/75 text-sm font-semibold tabular-nums">
               {eur(data.avgTicket)}
             </span>

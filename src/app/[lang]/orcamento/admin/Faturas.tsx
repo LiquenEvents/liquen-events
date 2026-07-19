@@ -285,8 +285,9 @@ export default function Faturas({ quotes }: Props) {
             variant="subtle"
             onClick={() => setStatus(i, "paga")}
             disabled={busy === i.id}
+            title="Já recebeu o pagamento desta fatura"
           >
-            Marcar paga
+            Marcar como paga
           </Button>
           <Button
             size="sm"
@@ -296,6 +297,7 @@ export default function Faturas({ quotes }: Props) {
                 setStatus(i, "anulada");
             }}
             disabled={busy === i.id}
+            title="Cancelar esta fatura (deixa de contar para os totais)"
           >
             Anular
           </Button>
@@ -370,7 +372,7 @@ export default function Faturas({ quotes }: Props) {
           {/* Mode toggle */}
           <div className="mb-6">
             <Segmented
-              ariaLabel="Tipo de emissão"
+              ariaLabel="Como quer faturar"
               value={mode}
               onChange={setMode}
               options={[
@@ -378,6 +380,11 @@ export default function Faturas({ quotes }: Props) {
                 { value: "single", label: "Fatura única" },
               ]}
             />
+            <p className="mt-2.5 text-xs leading-relaxed text-foreground/50">
+              {mode === "split"
+                ? "Cria duas faturas de uma vez: o sinal (entrada de 30% agora) e o saldo (os 70% restantes)."
+                : "Cria só uma fatura — pode ser o total, só o sinal ou só o saldo."}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
