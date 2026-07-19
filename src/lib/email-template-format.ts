@@ -146,10 +146,8 @@ export function htmlToPlainText(html: string): string {
     .replace(MARKER_RE, "")
     .replace(/<\s*(br|hr)\s*\/?>/gi, "\n")
     .replace(/<\/\s*(p|div|h[1-6]|li|tr)\s*>/gi, "\n\n");
-  // Decode the handful of entities we emit FIRST — `&amp;` LAST so `&amp;lt;`
-  // becomes the literal text `&lt;`, never a second-level `<`. Decoding before
-  // the strip means any *encoded* markup (`&lt;script&gt;`) turns into a real
-  // tag that the loop below removes, instead of surviving as text.
+  // Decode the handful of entities we emit — `&amp;` LAST so `&amp;lt;`
+  // stays the literal text `&lt;` instead of collapsing to a real `<`.
   s = s
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
@@ -157,20 +155,41 @@ export function htmlToPlainText(html: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&");
-  // Strip comments + tags in a fixpoint loop (defeats crafted/overlapping
-  // sequences like `<scr<script>ipt>`), then remove any leftover stray angle
-  // brackets (an unclosed `<!--` or `<foo`) so the result can NEVER contain
-  // markup — this is plain text for a textarea, not HTML.
-  let prev: string;
-  do {
-    prev = s;
-    s = s.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "");
-  } while (s !== prev);
+  // Remove every `<…>` span by scanning, NOT by a "strip the tag" regex.
+  // Walking `<` → next `>` can't be defeated by nested/overlapping sequences
+  // the way a single global regex can (e.g. `<scr<script>ipt>`), and it leaves
+  // no markup behind — this is plain text for a textarea, never HTML.
+  s = stripAngleSpans(s);
+  // Belt-and-braces: drop any stray angle bracket (e.g. a lone `>` with no
+  // preceding `<`) so the result is guaranteed to contain no `<` or `>`.
   s = s.replace(/[<>]/g, "");
   return s
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+/**
+ * Remove every `<…>` span, including an unclosed trailing `<…`, by scanning
+ * for the next `<` and skipping to its matching `>`. Deliberately NOT a regex:
+ * a character scan can't be bypassed by crafted/overlapping tags, so the
+ * output is guaranteed free of angle-bracket markup.
+ */
+function stripAngleSpans(input: string): string {
+  let out = "";
+  let i = 0;
+  while (i < input.length) {
+    const lt = input.indexOf("<", i);
+    if (lt === -1) {
+      out += input.slice(i);
+      break;
+    }
+    out += input.slice(i, lt);
+    const gt = input.indexOf(">", lt + 1);
+    if (gt === -1) break; // unclosed tag: drop the remainder
+    i = gt + 1;
+  }
+  return out;
 }
 
 /**
