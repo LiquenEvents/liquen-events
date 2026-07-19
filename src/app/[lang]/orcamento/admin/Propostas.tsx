@@ -268,61 +268,63 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                     </p>
                   </div>
 
-                  {/* Value */}
-                  <p className="text-foreground/90 text-sm font-semibold shrink-0 tabular-nums">
-                    {eur(p.total)}
-                  </p>
+                  {/* Value + actions — share one row on phones, split out on desktop */}
+                  <div className="flex items-center justify-between gap-3 sm:contents">
+                    <p className="text-foreground/90 text-sm font-semibold shrink-0 tabular-nums">
+                      {eur(p.total)}
+                    </p>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    {p.status === "enviada" && (
-                      <>
-                        <Button
-                          variant="subtle"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() => updateStatus(p.id, "aceite")}
-                          iconLeft={
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              aria-hidden="true"
-                            >
-                              <path
-                                d="M2 6l2.5 2.5L10 3"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          }
-                        >
-                          Aceitar
-                        </Button>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      {p.status === "enviada" && (
+                        <>
+                          <Button
+                            variant="subtle"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => updateStatus(p.id, "aceite")}
+                            iconLeft={
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  d="M2 6l2.5 2.5L10 3"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            }
+                          >
+                            Aceitar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => updateStatus(p.id, "rejeitada")}
+                          >
+                            Recusar
+                          </Button>
+                        </>
+                      )}
+                      {linkedQuote && onOpenQuote && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          disabled={busy}
-                          onClick={() => updateStatus(p.id, "rejeitada")}
+                          onClick={() => onOpenQuote(linkedQuote)}
+                          title="Abrir pedido associado"
+                          iconRight={<span aria-hidden="true">→</span>}
                         >
-                          Recusar
+                          Pedido
                         </Button>
-                      </>
-                    )}
-                    {linkedQuote && onOpenQuote && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onOpenQuote(linkedQuote)}
-                        title="Abrir pedido associado"
-                        iconRight={<span aria-hidden="true">→</span>}
-                      >
-                        Pedido
-                      </Button>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               );

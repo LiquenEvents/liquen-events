@@ -323,5 +323,5 @@ export function IconPlusDoc({ className }: IconProps) {
 
 /** Tiny inline row used to keep the reading-pane meta tidy. */
 export function MetaLine({ children }: { children: ReactNode }) {
-  return <p className="text-xs leading-relaxed text-foreground/45">{children}</p>;
+  return <p className="break-words text-xs leading-relaxed text-foreground/45">{children}</p>;
 }

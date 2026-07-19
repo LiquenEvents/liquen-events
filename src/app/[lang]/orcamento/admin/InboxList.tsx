@@ -76,7 +76,7 @@ export default function InboxList({
                 onClick={() => onToggleStar(m)}
                 aria-pressed={starred}
                 aria-label={starred ? "Retirar estrela" : "Marcar com estrela"}
-                className={`mt-0.5 shrink-0 rounded-md p-0.5 transition-colors ${
+                className={`-my-1 -ml-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
                   starred
                     ? "text-[#c19a3e] hover:text-[#a9852f]"
                     : "text-foreground/25 hover:text-foreground/50"

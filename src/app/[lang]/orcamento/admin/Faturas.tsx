@@ -262,6 +262,58 @@ export default function Faturas({ quotes }: Props) {
     }
   }
 
+  // Shared bits used by both the desktop table and the mobile card list, so the
+  // two layouts can never drift apart.
+  const statusBadge = (i: Invoice) => (
+    <span
+      className="inline-block rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
+      style={{
+        background: `${STATUS_META[i.status].color}18`,
+        color: STATUS_META[i.status].color,
+      }}
+    >
+      {STATUS_META[i.status].label}
+    </span>
+  );
+
+  const rowActions = (i: Invoice) => (
+    <>
+      {i.status === "emitida" && (
+        <>
+          <Button
+            size="sm"
+            variant="subtle"
+            onClick={() => setStatus(i, "paga")}
+            disabled={busy === i.id}
+          >
+            Marcar paga
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (window.confirm(`Anular a fatura ${i.number}? Deixa de contar para o total.`))
+                setStatus(i, "anulada");
+            }}
+            disabled={busy === i.id}
+          >
+            Anular
+          </Button>
+        </>
+      )}
+      {i.status === "paga" && (
+        <span className="text-xs text-foreground/40">Pago {fmtDate(i.paidAt)}</span>
+      )}
+      {/* Apagar — só para faturas já anuladas (segurança fiscal:
+          anula-se primeiro, depois apaga-se). */}
+      {i.status === "anulada" && (
+        <Button size="sm" variant="ghost" onClick={() => remove(i)} disabled={busy === i.id}>
+          Apagar
+        </Button>
+      )}
+    </>
+  );
+
   const filtered = useMemo(
     () => (filter === "all" ? invoices : invoices.filter((i) => i.status === filter)),
     [invoices, filter],
@@ -306,7 +358,7 @@ export default function Faturas({ quotes }: Props) {
           variant={showForm ? "secondary" : "primary"}
           iconLeft={showForm ? undefined : PlusIcon}
           onClick={() => setShowForm((s) => !s)}
-          className="shrink-0"
+          className="w-full shrink-0 sm:w-auto"
         >
           {showForm ? "Fechar" : "Nova fatura"}
         </Button>
@@ -501,111 +553,88 @@ export default function Faturas({ quotes }: Props) {
             }
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-foreground/[0.08] text-foreground/40">
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Nº</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Tipo</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-right">Valor</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Emitida</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Vencimento</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-foreground/[0.06]">
-                {filtered.map((i) => (
-                  <tr
-                    key={i.id}
-                    className={`transition-colors hover:bg-foreground/[0.02] ${i.status === "anulada" ? "opacity-55" : ""}`}
-                  >
-                    <td className="whitespace-nowrap px-4 py-3.5 font-medium tabular-nums text-foreground/70">
-                      {i.number}
-                    </td>
-                    <td
-                      className="max-w-[180px] truncate px-4 py-3.5 text-foreground/70"
-                      title={i.clientName}
-                    >
-                      {i.clientName || "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
-                      {KIND_LABEL[i.kind]}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-foreground/80">
-                      {eur2(i.amount)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
-                      {fmtDate(i.issuedAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
-                      {fmtDate(i.dueAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3.5">
-                      <span
-                        className="rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
-                        style={{
-                          background: `${STATUS_META[i.status].color}18`,
-                          color: STATUS_META[i.status].color,
-                        }}
-                      >
-                        {STATUS_META[i.status].label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {i.status === "emitida" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="subtle"
-                              onClick={() => setStatus(i, "paga")}
-                              disabled={busy === i.id}
-                            >
-                              Marcar paga
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    `Anular a fatura ${i.number}? Deixa de contar para o total.`,
-                                  )
-                                )
-                                  setStatus(i, "anulada");
-                              }}
-                              disabled={busy === i.id}
-                            >
-                              Anular
-                            </Button>
-                          </>
-                        )}
-                        {i.status === "paga" && (
-                          <span className="text-xs text-foreground/40">
-                            Pago {fmtDate(i.paidAt)}
-                          </span>
-                        )}
-                        {/* Apagar — só para faturas já anuladas (segurança fiscal:
-                            anula-se primeiro, depois apaga-se). */}
-                        {i.status === "anulada" && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => remove(i)}
-                            disabled={busy === i.id}
-                          >
-                            Apagar
-                          </Button>
-                        )}
-                      </div>
-                    </td>
+          <>
+            {/* Mobile: one calm card per invoice (no horizontal scroll) */}
+            <ul className="divide-y divide-foreground/[0.06] md:hidden">
+              {filtered.map((i) => (
+                <li key={i.id} className={`p-4 ${i.status === "anulada" ? "opacity-55" : ""}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground/80" title={i.clientName}>
+                        {i.clientName || "—"}
+                      </p>
+                      <p className="mt-0.5 text-xs tabular-nums text-foreground/45">
+                        {i.number} · {KIND_LABEL[i.kind]}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-base font-semibold tabular-nums text-foreground/80">
+                        {eur2(i.amount)}
+                      </p>
+                      <div className="mt-1">{statusBadge(i)}</div>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-foreground/45">
+                    Emitida {fmtDate(i.issuedAt)}
+                    {i.dueAt && <> · vence {fmtDate(i.dueAt)}</>}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">{rowActions(i)}</div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop: the full ledger table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-foreground/[0.08] text-foreground/40">
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Nº</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Tipo</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-right">Valor</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Emitida</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Vencimento</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-right">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-foreground/[0.06]">
+                  {filtered.map((i) => (
+                    <tr
+                      key={i.id}
+                      className={`transition-colors hover:bg-foreground/[0.02] ${i.status === "anulada" ? "opacity-55" : ""}`}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3.5 font-medium tabular-nums text-foreground/70">
+                        {i.number}
+                      </td>
+                      <td
+                        className="max-w-[180px] truncate px-4 py-3.5 text-foreground/70"
+                        title={i.clientName}
+                      >
+                        {i.clientName || "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
+                        {KIND_LABEL[i.kind]}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-foreground/80">
+                        {eur2(i.amount)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
+                        {fmtDate(i.issuedAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
+                        {fmtDate(i.dueAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5">{statusBadge(i)}</td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-end gap-1.5">{rowActions(i)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
     </div>

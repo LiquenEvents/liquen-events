@@ -467,6 +467,15 @@ export default function Inbox() {
 
   const selectedItem = selectedUid != null ? items.find((m) => m.uid === selectedUid) : undefined;
 
+  // On phones the two panes collapse to a single view: the list, or — once a
+  // message is opened — the thread full-screen with a "‹ Voltar". A message is
+  // only ever opened by tapping a row, so a live selection means "show thread".
+  const threadOpenMobile = selectedUid != null;
+  const closeThread = () => {
+    setSelectedUid(null);
+    setOpenMsg(null);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* Undo banner after archiving */}
@@ -492,8 +501,8 @@ export default function Inbox() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_460px]">
-        {/* ── Master list ── */}
-        <div className="min-w-0">
+        {/* ── Master list — hidden on phones while a thread is open ── */}
+        <div className={`min-w-0 ${threadOpenMobile ? "hidden lg:block" : ""}`}>
           {/* Search + refresh */}
           <div className="mb-3 flex items-center gap-2">
             <div className="relative flex-1">
@@ -572,8 +581,23 @@ export default function Inbox() {
           </div>
         </div>
 
-        {/* ── Reading pane ── */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        {/* ── Reading pane — full-screen on phones, hidden until a thread opens ── */}
+        <div
+          className={`lg:sticky lg:top-6 lg:self-start ${
+            threadOpenMobile ? "" : "hidden lg:block"
+          }`}
+        >
+          {/* Phone-only back affordance to return to the list */}
+          <button
+            type="button"
+            onClick={closeThread}
+            className="mb-3 inline-flex min-h-[44px] items-center gap-1 rounded-xl px-3 text-sm font-medium text-[#4d6350] transition-colors hover:bg-[#4d6350]/[0.08] lg:hidden"
+          >
+            <span aria-hidden className="text-base leading-none">
+              ‹
+            </span>
+            Voltar
+          </button>
           <InboxThread
             message={openMsg}
             link={openLink}

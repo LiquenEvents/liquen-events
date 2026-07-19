@@ -125,7 +125,7 @@ export default function InboxThread({
       <div className="rounded-2xl border border-foreground/[0.08] bg-white shadow-[0_1px_2px_rgba(42,38,32,0.04)]">
         <div className="border-b border-foreground/[0.07] px-5 py-4">
           <div className="flex items-start justify-between gap-3">
-            <h2 className="font-display text-lg leading-tight text-foreground/90">
+            <h2 className="min-w-0 break-words font-display text-lg leading-tight text-foreground/90">
               {message.subject}
             </h2>
             <button
@@ -254,7 +254,7 @@ export default function InboxThread({
 
       {/* Body */}
       <div className="rounded-2xl border border-foreground/[0.08] bg-white p-5 shadow-[0_1px_2px_rgba(42,38,32,0.04)]">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/70">
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/70">
           {message.text || "(sem conteúdo de texto)"}
         </p>
       </div>
