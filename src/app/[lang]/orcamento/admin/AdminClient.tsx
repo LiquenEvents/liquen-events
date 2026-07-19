@@ -27,6 +27,8 @@ import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper from "./LifecycleStepper";
 import { NAV, type View } from "./nav";
+import { Button, Card, SectionCard } from "./ui";
+import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
   Kanban,
@@ -145,6 +147,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const searchRef = useRef<HTMLInputElement>(null);
   // Focus trap for the mobile detail drawer — active only while it's the overlay.
   const drawerRef = useFocusTrap<HTMLDivElement>(!!selected && isDetailOverlay);
+  // Focus management for the inline (desktop, non-overlay) detail workspace. The
+  // mobile overlay already traps + restores focus via useFocusTrap; for the inline
+  // panel we manually move focus to the panel heading on open and hand it back to
+  // the element that opened it on close, so keyboard users are never stranded.
+  const detailTitleRef = useRef<HTMLHeadingElement>(null);
+  const detailOpenerRef = useRef<HTMLElement | null>(null);
   // Current locale, read from the path (/{lang}/orcamento/admin), to build the
   // deep link into a quote's full-screen Dossier route.
   const pathname = usePathname();
@@ -350,6 +358,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     };
   }, [selected, isDetailOverlay]);
 
+  // Inline (desktop) detail: move focus into the workspace heading when a pedido
+  // opens and restore it to the opener when it closes. Skipped while the panel is
+  // the mobile overlay, where useFocusTrap owns focus instead.
+  useEffect(() => {
+    if (!selected || isDetailOverlay) return;
+    const opener = detailOpenerRef.current;
+    // Defer to after paint so the heading exists and layout has settled.
+    const id = requestAnimationFrame(() => detailTitleRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      opener?.focus?.();
+    };
+  }, [selected, isDetailOverlay]);
+
   const paletteCommands: Command[] = useMemo(
     () => [
       {
@@ -399,6 +421,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   function openQuote(q: Quote) {
     if (!discardGuard()) return;
+    // Remember who opened the detail so focus can return there on close.
+    if (typeof document !== "undefined") {
+      detailOpenerRef.current = document.activeElement as HTMLElement | null;
+    }
     setView("pedidos");
     setSelected(q);
     // Track in recently-viewed list (localStorage)
@@ -1590,9 +1616,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </div>
             )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_440px] gap-8">
+            {/* When a pedido is open, the list collapses to a slim rail and the
+                detail takes over the remaining width as a spacious workspace.
+                With nothing selected the list spreads full-width. */}
+            <div
+              className={`grid grid-cols-1 gap-8 ${
+                selected ? "xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]" : "xl:grid-cols-1"
+              }`}
+            >
               {/* List */}
-              <div className="flex flex-col gap-3">
+              <div className="flex min-w-0 flex-col gap-3">
                 {filtered.length === 0 && (
                   <div className="bo-card">
                     <EmptyState
@@ -1814,26 +1847,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     role={isDetailOverlay ? "dialog" : undefined}
                     aria-modal={isDetailOverlay ? true : undefined}
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-white xl:bg-white border-l xl:border border-foreground/[0.08] xl:rounded-xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-sm"
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
                   >
-                    <div className="px-5 pt-4 border-b border-foreground/[0.07] sticky top-0 bg-white/90 backdrop-blur-sm z-10">
-                      <div className="flex items-center justify-between">
+                    <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white/95 px-5 pt-5 backdrop-blur-sm sm:px-7">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p
+                          <h2
                             id="detail-drawer-title"
-                            className="text-foreground/85 text-base font-semibold truncate"
+                            ref={detailTitleRef}
+                            tabIndex={-1}
+                            className="truncate font-display text-xl leading-tight text-foreground/90 focus:outline-none sm:text-2xl"
                           >
                             {selected.name}
-                          </p>
-                          <p
-                            className="text-foreground/40 text-[10px] font-mono tracking-tight mt-0.5"
-                            title={selected.id}
-                          >
-                            Ref. {shortRef(selected.id)}
-                          </p>
+                          </h2>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+                            {statusBadge(selected.status)}
+                            <span
+                              className="font-mono text-[10px] tracking-tight text-foreground/40"
+                              title={selected.id}
+                            >
+                              Ref. {shortRef(selected.id)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
+                        <div className="flex shrink-0 items-center gap-2">
+                          {/* Reversible archive — kept visible as a primary action. */}
+                          <Button
+                            variant={selected.archived ? "subtle" : "secondary"}
+                            size="sm"
                             onClick={async () => {
                               const next = !selected.archived;
                               const confirm_ =
@@ -1856,30 +1897,152 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 toast(next ? "Pedido arquivado" : "Pedido restaurado", "success");
                               }
                             }}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] tracking-[0.15em] uppercase rounded-lg transition-colors ${selected.archived ? "text-[#4d6350] bg-[#4d6350]/10" : "text-foreground/35 hover:text-foreground/55 hover:bg-foreground/[0.06]"}`}
                             title={selected.archived ? "Restaurar pedido" : "Arquivar pedido"}
+                            iconLeft={
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.7"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
+                              </svg>
+                            }
+                          >
+                            <span className="hidden sm:inline">
+                              {selected.archived ? "Restaurar" : "Arquivar"}
+                            </span>
+                          </Button>
+                          {/* Full-screen cockpit for this event — the one place that
+                              unifies proposta/contrato/faturas/produção. Primary. */}
+                          <Link
+                            href={`/${lang}/orcamento/admin/evento/${selected.id}`}
+                            className="inline-flex h-8 items-center gap-2 rounded-xl bg-[#4d6350]/10 px-3 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16]"
+                            title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                           >
                             <svg
-                              width="13"
-                              height="13"
+                              width="14"
+                              height="14"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
                               strokeWidth="1.7"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
+                              aria-hidden="true"
                             >
-                              <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
+                              <rect x="3" y="3" width="7" height="9" rx="1" />
+                              <rect x="14" y="3" width="7" height="5" rx="1" />
+                              <rect x="14" y="12" width="7" height="9" rx="1" />
+                              <rect x="3" y="16" width="7" height="5" rx="1" />
                             </svg>
-                            <span className="hidden sm:inline">
-                              {selected.archived ? "Restaurar" : "Arquivar"}
-                            </span>
-                          </button>
-                          {/* Hard delete — irreversible, so it stays visually
-                              restrained (muted terracotta on hover) and always
-                              behind a confirm. Archiving above is the reversible
-                              option; this permanently removes the pedido. */}
-                          <button
+                            <span className="hidden sm:inline">Dossier</span>
+                          </Link>
+                          {/* Secondary / print actions tucked into an overflow menu
+                              so the header stays calm. */}
+                          <MoreMenu
+                            items={[
+                              {
+                                label: "Duplicar pedido",
+                                hint: "Clonar para um cliente recorrente",
+                                onClick: () => duplicateQuote(selected),
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    aria-hidden="true"
+                                  >
+                                    <rect x="9" y="9" width="11" height="11" rx="2" />
+                                    <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                                  </svg>
+                                ),
+                              },
+                              {
+                                label: "Guião do dia",
+                                hint: "Imprimir a folha de operações",
+                                onClick: () => printRunSheet(selected),
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                    <rect x="6" y="14" width="12" height="7" rx="1" />
+                                  </svg>
+                                ),
+                              },
+                              {
+                                label: "Dossier PDF",
+                                hint: "Imprimir o dossier completo do evento",
+                                onClick: () => printEventDossier(selected),
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                    <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
+                                  </svg>
+                                ),
+                              },
+                              ...(selected.date
+                                ? [
+                                    {
+                                      label: "Adicionar ao calendário",
+                                      hint: "Descarregar .ics (Google/Apple/Outlook)",
+                                      onClick: () => downloadEventIcs(selected),
+                                      icon: (
+                                        <svg
+                                          width="16"
+                                          height="16"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="1.7"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          aria-hidden="true"
+                                        >
+                                          <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                                          <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
+                                        </svg>
+                                      ),
+                                    },
+                                  ]
+                                : []),
+                            ]}
+                          />
+                          {/* Destructive action — separated from the rest and behind
+                              a confirm. */}
+                          <span className="mx-0.5 h-6 w-px bg-foreground/10" aria-hidden="true" />
+                          <Button
+                            variant="danger"
+                            size="sm"
                             onClick={async () => {
                               if (
                                 !window.confirm(
@@ -1899,147 +2062,53 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 toast("Não foi possível apagar o pedido", "error");
                               }
                             }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] tracking-[0.15em] uppercase rounded-lg text-foreground/35 hover:text-[#b5654a] hover:bg-[#b5654a]/10 transition-colors"
                             title="Apagar pedido definitivamente"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
-                            </svg>
-                            <span className="hidden sm:inline">Apagar</span>
-                          </button>
-                          <button
-                            onClick={() => duplicateQuote(selected)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                            title="Duplicar este pedido (cliente recorrente)"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                            >
-                              <rect x="9" y="9" width="11" height="11" rx="2" />
-                              <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
-                            </svg>
-                            <span className="hidden sm:inline">Duplicar</span>
-                          </button>
-                          <button
-                            onClick={() => printRunSheet(selected)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                            title="Imprimir o guião do dia"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                            >
-                              <path
-                                d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <rect x="6" y="14" width="12" height="7" rx="1" />
-                            </svg>
-                            <span className="hidden sm:inline">Guião do dia</span>
-                          </button>
-                          {/* Full-screen cockpit for this event — the one place
-                              that unifies proposta/contrato/faturas/produção. */}
-                          <Link
-                            href={`/${lang}/orcamento/admin/evento/${selected.id}`}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[#4d6350] text-[10px] tracking-[0.15em] uppercase rounded-lg bg-[#4d6350]/10 hover:bg-[#4d6350]/18 transition-colors font-medium"
-                            title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                            >
-                              <rect x="3" y="3" width="7" height="9" rx="1" />
-                              <rect x="14" y="3" width="7" height="5" rx="1" />
-                              <rect x="14" y="12" width="7" height="9" rx="1" />
-                              <rect x="3" y="16" width="7" height="5" rx="1" />
-                            </svg>
-                            <span className="hidden sm:inline">Abrir Dossier</span>
-                          </Link>
-                          <button
-                            onClick={() => printEventDossier(selected)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                            title="Imprimir dossier completo do evento (contacto, financeiro, cronograma, convidados)"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                            >
-                              <path
-                                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
-                            </svg>
-                            <span className="hidden sm:inline">Dossier PDF</span>
-                          </button>
-                          {selected.date && (
-                            <button
-                              onClick={() => downloadEventIcs(selected)}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                              title="Descarregar .ics para adicionar ao seu calendário (Google/Apple/Outlook)"
-                            >
+                            iconLeft={
                               <svg
-                                width="13"
-                                height="13"
+                                width="14"
+                                height="14"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
                                 strokeWidth="1.7"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
+                                aria-hidden="true"
                               >
-                                <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-                                <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
+                                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
                               </svg>
-                              <span className="hidden sm:inline">.ics</span>
-                            </button>
-                          )}
-                          <button
-                            onClick={closeDetail}
-                            className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors px-1"
-                            aria-label="Fechar"
+                            }
                           >
-                            ×
-                          </button>
+                            <span className="hidden sm:inline">Apagar</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={closeDetail}
+                            aria-label="Fechar"
+                            className="px-2"
+                          >
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M18 6 6 18M6 6l12 12" />
+                            </svg>
+                          </Button>
                         </div>
                       </div>
-                      {/* Ciclo de vida do pedido — mostra logo ao abrir em que
-                          fase o trabalho está, antes das ferramentas por separador. */}
-                      <LifecycleStepper quote={selected} />
-                      {/* Section tabs — keep the long panel navigable.
-                          Arrow keys move between tabs (WAI-ARIA tablist pattern). */}
+                      {/* Section tabs — keep the workspace navigable. Arrow keys
+                          move between tabs (WAI-ARIA tablist pattern). */}
                       <div
                         role="tablist"
                         aria-label="Secções do pedido"
-                        className="flex gap-1 mt-3"
+                        className="mt-5 flex gap-1 overflow-x-auto"
                       >
                         {(
                           [
@@ -2072,10 +2141,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   );
                                 tabs?.[(i + dir + arr.length) % arr.length]?.focus();
                               }}
-                              className={`flex-1 px-1 py-2 text-[10px] tracking-[0.08em] uppercase font-medium border-b-2 transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] rounded-t ${
+                              className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
                                 active
-                                  ? "border-[#4d6350] text-foreground/80"
-                                  : "border-transparent text-foreground/35 hover:text-foreground/60"
+                                  ? "border-[#4d6350] text-foreground/85"
+                                  : "border-transparent text-foreground/40 hover:text-foreground/65"
                               }`}
                             >
                               {label}
@@ -2085,69 +2154,572 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       </div>
                     </div>
 
-                    <div className="p-5 flex flex-col gap-6">
-                      {detailTab === "resumo" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-resumo"
-                          aria-labelledby="detail-tab-resumo"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          {/* Snapshot — key facts at a glance */}
-                          {(() => {
-                            const revenue =
-                              selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
-                            const costs = (selected.eventSuppliers ?? []).reduce(
-                              (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
-                              0,
-                            );
-                            const margin = revenue - costs;
-                            const cd = eventCountdown(selected.date);
-                            const cells: { l: string; v: string; tone?: string }[] = [
-                              { l: "Valor", v: revenue ? formatPrice(revenue) : "—" },
-                            ];
-                            if (costs > 0)
-                              cells.push({
-                                l: "Margem",
-                                v: formatPrice(margin),
-                                tone: margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]",
-                              });
-                            if (cd)
-                              cells.push({
-                                l: "Evento",
-                                v: cd.label,
-                                tone:
-                                  cd.tone === "soon" || cd.tone === "today"
-                                    ? "text-[#b5654a]"
-                                    : undefined,
-                              });
-                            return (
-                              <div
-                                className={`grid gap-2 ${cells.length === 3 ? "grid-cols-3" : cells.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}
-                              >
-                                {cells.map((c) => (
-                                  <div
-                                    key={c.l}
-                                    className="bg-foreground/[0.04] rounded-lg p-2.5 text-center"
-                                  >
-                                    <p
-                                      className={`text-sm font-semibold ${c.tone ?? "text-foreground/72"}`}
-                                    >
-                                      {c.v}
-                                    </p>
-                                    <p className="text-foreground/60 text-[9px] tracking-[0.2em] uppercase mt-0.5">
-                                      {c.l}
-                                    </p>
+                    <div className="px-5 py-6 sm:px-7 sm:py-8">
+                      {/* Ciclo de vida — prominente no topo do espaço de trabalho,
+                          para se ver logo em que fase o pedido está. */}
+                      <div className="mb-8">
+                        <LifecycleStepper quote={selected} />
+                      </div>
+                      <div className="grid grid-cols-1 gap-8 2xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:items-start">
+                        {/* Coluna principal — as ferramentas do separador ativo */}
+                        <div className="flex min-w-0 flex-col gap-6">
+                          {detailTab === "resumo" && (
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-resumo"
+                              aria-labelledby="detail-tab-resumo"
+                              tabIndex={0}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Snapshot e contacto vivem agora na barra de contexto
+                              persistente (à direita em ecrãs largos), visível em
+                              todos os separadores. */}
+                              {/* Event */}
+                              <div>
+                                <p className="bo-eyebrow mb-3">Evento</p>
+                                {/* Read-only facts */}
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                  {[
+                                    {
+                                      l: "Tipo",
+                                      v: CATEGORIES.find((c) => c.id === selected.category)?.label,
+                                    },
+                                    {
+                                      l: "Sub-tipo",
+                                      v:
+                                        selected.category && selected.eventType
+                                          ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
+                                              (e) => e.id === selected.eventType,
+                                            )?.label
+                                          : null,
+                                    },
+                                    {
+                                      l: "Pacote",
+                                      v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
+                                    },
+                                    {
+                                      l: "Duração",
+                                      v: selected.duration ? `${selected.duration}h` : "—",
+                                    },
+                                    { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
+                                  ].map(({ l, v }) => (
+                                    <div key={l}>
+                                      <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
+                                        {l}
+                                      </p>
+                                      <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                                {/* Editable logistics */}
+                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-foreground/[0.06]">
+                                  <div>
+                                    <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                      Data
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={editDate}
+                                      onChange={(e) => setEditDate(e.target.value)}
+                                      className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                    />
+                                    {editDate &&
+                                      (() => {
+                                        const cd = eventCountdown(editDate);
+                                        return cd ? (
+                                          <p
+                                            className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
+                                          >
+                                            {cd.label}
+                                          </p>
+                                        ) : null;
+                                      })()}
                                   </div>
-                                ))}
+                                  <div>
+                                    <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                      Convidados
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={editGuests}
+                                      onChange={(e) => setEditGuests(e.target.value)}
+                                      className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                      Local
+                                    </label>
+                                    <input
+                                      value={editLocation}
+                                      onChange={(e) => setEditLocation(e.target.value)}
+                                      placeholder="Local do evento…"
+                                      className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                    />
+                                  </div>
+                                </div>
                               </div>
-                            );
-                          })()}
 
-                          {/* Contact */}
-                          <div>
-                            <p className="bo-eyebrow mb-3">Contacto</p>
+                              {/* Client notes */}
+                              {selected.notes && (
+                                <div>
+                                  <p className="bo-eyebrow mb-2">Notas do Cliente</p>
+                                  <p className="text-foreground/72 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
+                                    {selected.notes}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Estimate */}
+                              {selected.priceBreakdown && (
+                                <div>
+                                  <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
+                                  <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
+                                    {selected.priceBreakdown.addonsCost > 0 && (
+                                      <div className="flex justify-between text-[10px]">
+                                        <span className="text-foreground/60">Extras</span>
+                                        <span className="text-foreground/72">
+                                          {formatPrice(selected.priceBreakdown.addonsCost)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
+                                      <span className="text-foreground/60">Subtotal</span>
+                                      <span className="text-foreground/72">
+                                        {formatPrice(selected.priceBreakdown.subtotal)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-[10px]">
+                                      <span className="text-foreground/60">IVA 23%</span>
+                                      <span className="text-foreground/72">
+                                        {formatPrice(selected.priceBreakdown.iva)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
+                                      <span className="text-foreground/60">Total</span>
+                                      <span className="text-[#4d6350] font-semibold">
+                                        {formatPrice(selected.priceBreakdown.total)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Admin actions */}
+                              <div className="border-t border-foreground/10 pt-5">
+                                <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
+                                <div className="flex flex-col gap-4">
+                                  <TagsField
+                                    key={`tags-${selected.id}`}
+                                    quote={selected}
+                                    suggestions={allTags}
+                                    onChange={(tags) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, tags } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) => (prev ? { ...prev, tags } : prev));
+                                    }}
+                                  />
+                                  <FollowUpField
+                                    key={`fu-${selected.id}`}
+                                    quote={selected}
+                                    onChange={(followUpAt) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, followUpAt } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev ? { ...prev, followUpAt } : prev,
+                                      );
+                                    }}
+                                  />
+                                  <div>
+                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                      Responsável
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editAssigned}
+                                      onChange={(e) => setEditAssigned(e.target.value)}
+                                      placeholder="Nome do membro da equipa…"
+                                      className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                      Estado
+                                    </label>
+                                    <select
+                                      value={editStatus}
+                                      onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
+                                      className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                    >
+                                      {STATUS_OPTIONS.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                          {s.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  {editStatus === "rejeitado" && (
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Motivo de perda
+                                      </label>
+                                      <textarea
+                                        rows={2}
+                                        value={editLostReason}
+                                        onChange={(e) => setEditLostReason(e.target.value)}
+                                        placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                      />
+                                    </div>
+                                  )}
+                                  {selected.status === "rejeitado" &&
+                                    selected.lostReason &&
+                                    editStatus !== "rejeitado" && (
+                                      <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
+                                        <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
+                                          Motivo de perda anterior
+                                        </p>
+                                        <p className="text-xs text-foreground/72">
+                                          {selected.lostReason}
+                                        </p>
+                                      </div>
+                                    )}
+                                  <div>
+                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                      Preço final (sem IVA) €
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editPrice}
+                                      onChange={(e) => setEditPrice(e.target.value)}
+                                      placeholder="Ex: 12500"
+                                      className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                      Notas Internas
+                                    </label>
+                                    <textarea
+                                      rows={3}
+                                      value={editNotes}
+                                      onChange={(e) => setEditNotes(e.target.value)}
+                                      placeholder="Notas internas sobre este pedido…"
+                                      className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                    />
+                                  </div>
+                                  {isDirty && !saving && (
+                                    <p
+                                      role="status"
+                                      className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
+                                    >
+                                      <span className="w-1 h-1 rounded-full bg-gold/80" />
+                                      Alterações por guardar
+                                    </p>
+                                  )}
+                                  <button
+                                    onClick={saveChanges}
+                                    disabled={saving || !isDirty}
+                                    className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
+                                  >
+                                    {saving ? "A guardar…" : "Guardar Alterações →"}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {detailTab === "producao" && (
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-producao"
+                              aria-labelledby="detail-tab-producao"
+                              tabIndex={0}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Tasks linked to this event */}
+                              <EventTasks
+                                key={`tasks-${selected.id}`}
+                                quote={selected}
+                                userName={userName}
+                              />
+
+                              {/* Production checklist */}
+                              <EventChecklist
+                                key={`cl-${selected.id}`}
+                                quote={selected}
+                                onChange={(checklist) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, checklist } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                                }}
+                              />
+
+                              {/* Decor production plan (sourcing → strike) */}
+                              <ProductionPlan
+                                key={`prod-${selected.id}`}
+                                quote={selected}
+                                onChange={(productionPlan) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, productionPlan } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) =>
+                                    prev ? { ...prev, productionPlan } : prev,
+                                  );
+                                }}
+                              />
+
+                              {/* Day-of run sheet */}
+                              <EventTimeline
+                                key={`tl-${selected.id}`}
+                                quote={selected}
+                                onChange={(timeline) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, timeline } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                                }}
+                              />
+
+                              {/* Guest list / RSVP */}
+                              <GuestList
+                                key={`guests-${selected.id}`}
+                                quote={selected}
+                                onChange={(guestList) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, guestList } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {detailTab === "financeiro" && (
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-financeiro"
+                              aria-labelledby="detail-tab-financeiro"
+                              tabIndex={0}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Payments & invoicing */}
+                              <PaymentsPanel
+                                key={`pay-${selected.id}`}
+                                quote={selected}
+                                showLedger
+                                onChange={(payments) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, payments } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                                }}
+                              />
+
+                              {/* Suppliers booked for this event + budget vs actual cost */}
+                              <EventCosts
+                                key={`costs-${selected.id}`}
+                                quote={selected}
+                                onChange={(eventSuppliers) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) =>
+                                    prev ? { ...prev, eventSuppliers } : prev,
+                                  );
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {detailTab === "comunicacao" && (
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-comunicacao"
+                              aria-labelledby="detail-tab-comunicacao"
+                              tabIndex={0}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              <p className="text-foreground/50 text-[11px] leading-relaxed">
+                                Crie e envie a proposta ao cliente. Comece por aqui.
+                              </p>
+                              <ProposalStudio
+                                key={`studio-${selected.id}`}
+                                quote={selected}
+                                onSent={() => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) =>
+                                    prev ? { ...prev, status: "cotado" } : prev,
+                                  );
+                                  setEditStatus("cotado");
+                                  appendActivity(selected.id, [
+                                    {
+                                      id: randomId(),
+                                      at: new Date().toISOString(),
+                                      kind: "proposal_sent",
+                                      actor: userName,
+                                      summary: "Proposta enviada ao cliente (Studio)",
+                                    },
+                                  ]);
+                                }}
+                              />
+                              {!showBuilder ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowBuilder(true)}
+                                  className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
+                                >
+                                  Outra forma de propor (tabela de preços simples)
+                                </button>
+                              ) : (
+                                <ProposalBuilder
+                                  quote={selected}
+                                  onSent={(total) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id
+                                          ? { ...q, status: "cotado", quotedPrice: total }
+                                          : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev
+                                        ? { ...prev, status: "cotado", quotedPrice: total }
+                                        : prev,
+                                    );
+                                    setEditStatus("cotado");
+                                    appendActivity(selected.id, [
+                                      {
+                                        id: randomId(),
+                                        at: new Date().toISOString(),
+                                        kind: "proposal_sent",
+                                        actor: userName,
+                                        summary: `Proposta enviada — ${eur(total)}`,
+                                      },
+                                    ]);
+                                  }}
+                                />
+                              )}
+
+                              <ClientMessenger
+                                key={selected.id}
+                                quote={selected}
+                                onSent={(messages) => {
+                                  const prev_count = selected.messages?.length ?? 0;
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, messages } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                  if (messages.length > prev_count) {
+                                    appendActivity(selected.id, [
+                                      {
+                                        id: randomId(),
+                                        at: new Date().toISOString(),
+                                        kind: "message_sent",
+                                        actor: userName,
+                                        summary: "Mensagem enviada ao cliente",
+                                      },
+                                    ]);
+                                  }
+                                }}
+                              />
+
+                              <ActivityLog
+                                quote={selected}
+                                actor={userName}
+                                onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Barra de contexto — persistente em todos os separadores:
+                            quem é o cliente, quanto vale, como o contactar. Fixa em
+                            ecrãs muito largos; empilha por baixo abaixo de 2xl. */}
+                        <aside
+                          aria-label="Contexto do pedido"
+                          className="flex min-w-0 flex-col gap-5 2xl:sticky 2xl:top-6"
+                        >
+                          {/* Snapshot — factos-chave num relance */}
+                          <Card padding="sm">
+                            <p className="bo-eyebrow mb-3">Resumo</p>
+                            {(() => {
+                              const revenue =
+                                selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
+                              const costs = (selected.eventSuppliers ?? []).reduce(
+                                (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
+                                0,
+                              );
+                              const margin = revenue - costs;
+                              const cd = eventCountdown(selected.date);
+                              const cells: { l: string; v: string; tone?: string }[] = [
+                                { l: "Valor", v: revenue ? formatPrice(revenue) : "—" },
+                              ];
+                              if (costs > 0)
+                                cells.push({
+                                  l: "Margem",
+                                  v: formatPrice(margin),
+                                  tone: margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]",
+                                });
+                              if (cd)
+                                cells.push({
+                                  l: "Evento",
+                                  v: cd.label,
+                                  tone:
+                                    cd.tone === "soon" || cd.tone === "today"
+                                      ? "text-[#b5654a]"
+                                      : undefined,
+                                });
+                              return (
+                                <div className="grid grid-cols-1 gap-2">
+                                  {cells.map((c) => (
+                                    <div
+                                      key={c.l}
+                                      className="flex items-center justify-between rounded-lg bg-foreground/[0.04] px-3 py-2.5"
+                                    >
+                                      <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                        {c.l}
+                                      </span>
+                                      <span
+                                        className={`text-sm font-semibold ${c.tone ?? "text-foreground/80"}`}
+                                      >
+                                        {c.v}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </Card>
+
+                          {/* Contacto */}
+                          <SectionCard eyebrow="Contacto" padding="sm">
                             <div className="flex flex-col gap-1.5">
                               <div className="flex items-center gap-2">
                                 <a
@@ -2212,501 +2784,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 <p className="text-foreground/70 text-xs">NIF: {selected.nif}</p>
                               )}
                             </div>
-                          </div>
+                          </SectionCard>
 
-                          {/* Event */}
-                          <div>
-                            <p className="bo-eyebrow mb-3">Evento</p>
-                            {/* Read-only facts */}
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                              {[
-                                {
-                                  l: "Tipo",
-                                  v: CATEGORIES.find((c) => c.id === selected.category)?.label,
-                                },
-                                {
-                                  l: "Sub-tipo",
-                                  v:
-                                    selected.category && selected.eventType
-                                      ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
-                                          (e) => e.id === selected.eventType,
-                                        )?.label
-                                      : null,
-                                },
-                                {
-                                  l: "Pacote",
-                                  v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
-                                },
-                                {
-                                  l: "Duração",
-                                  v: selected.duration ? `${selected.duration}h` : "—",
-                                },
-                                { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
-                              ].map(({ l, v }) => (
-                                <div key={l}>
-                                  <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
-                                    {l}
-                                  </p>
-                                  <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
-                                </div>
-                              ))}
-                            </div>
-                            {/* Editable logistics */}
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-foreground/[0.06]">
-                              <div>
-                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                  Data
-                                </label>
-                                <input
-                                  type="date"
-                                  value={editDate}
-                                  onChange={(e) => setEditDate(e.target.value)}
-                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                />
-                                {editDate &&
-                                  (() => {
-                                    const cd = eventCountdown(editDate);
-                                    return cd ? (
-                                      <p
-                                        className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
-                                      >
-                                        {cd.label}
-                                      </p>
-                                    ) : null;
-                                  })()}
-                              </div>
-                              <div>
-                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                  Convidados
-                                </label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={editGuests}
-                                  onChange={(e) => setEditGuests(e.target.value)}
-                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                  Local
-                                </label>
-                                <input
-                                  value={editLocation}
-                                  onChange={(e) => setEditLocation(e.target.value)}
-                                  placeholder="Local do evento…"
-                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Client notes */}
-                          {selected.notes && (
-                            <div>
-                              <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                              <p className="text-foreground/72 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
-                                {selected.notes}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Estimate */}
-                          {selected.priceBreakdown && (
-                            <div>
-                              <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
-                              <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
-                                {selected.priceBreakdown.addonsCost > 0 && (
-                                  <div className="flex justify-between text-[10px]">
-                                    <span className="text-foreground/60">Extras</span>
-                                    <span className="text-foreground/72">
-                                      {formatPrice(selected.priceBreakdown.addonsCost)}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
-                                  <span className="text-foreground/60">Subtotal</span>
-                                  <span className="text-foreground/72">
-                                    {formatPrice(selected.priceBreakdown.subtotal)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-[10px]">
-                                  <span className="text-foreground/60">IVA 23%</span>
-                                  <span className="text-foreground/72">
-                                    {formatPrice(selected.priceBreakdown.iva)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
-                                  <span className="text-foreground/60">Total</span>
-                                  <span className="text-[#4d6350] font-semibold">
-                                    {formatPrice(selected.priceBreakdown.total)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Admin actions */}
-                          <div className="border-t border-foreground/10 pt-5">
-                            <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
-                            <div className="flex flex-col gap-4">
-                              <TagsField
-                                key={`tags-${selected.id}`}
-                                quote={selected}
-                                suggestions={allTags}
-                                onChange={(tags) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) => (q.id === selected.id ? { ...q, tags } : q)),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, tags } : prev));
-                                }}
-                              />
-                              <FollowUpField
-                                key={`fu-${selected.id}`}
-                                quote={selected}
-                                onChange={(followUpAt) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, followUpAt } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, followUpAt } : prev));
-                                }}
-                              />
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Responsável
-                                </label>
-                                <input
-                                  type="text"
-                                  value={editAssigned}
-                                  onChange={(e) => setEditAssigned(e.target.value)}
-                                  placeholder="Nome do membro da equipa…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Estado
-                                </label>
-                                <select
-                                  value={editStatus}
-                                  onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                >
-                                  {STATUS_OPTIONS.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              {editStatus === "rejeitado" && (
-                                <div>
-                                  <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                    Motivo de perda
-                                  </label>
-                                  <textarea
-                                    rows={2}
-                                    value={editLostReason}
-                                    onChange={(e) => setEditLostReason(e.target.value)}
-                                    placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
-                                    className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                  />
-                                </div>
-                              )}
-                              {selected.status === "rejeitado" &&
-                                selected.lostReason &&
-                                editStatus !== "rejeitado" && (
-                                  <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
-                                    <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
-                                      Motivo de perda anterior
-                                    </p>
-                                    <p className="text-xs text-foreground/72">
-                                      {selected.lostReason}
-                                    </p>
-                                  </div>
-                                )}
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Preço final (sem IVA) €
-                                </label>
-                                <input
-                                  type="number"
-                                  value={editPrice}
-                                  onChange={(e) => setEditPrice(e.target.value)}
-                                  placeholder="Ex: 12500"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Notas Internas
-                                </label>
-                                <textarea
-                                  rows={3}
-                                  value={editNotes}
-                                  onChange={(e) => setEditNotes(e.target.value)}
-                                  placeholder="Notas internas sobre este pedido…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                />
-                              </div>
-                              {isDirty && !saving && (
-                                <p
-                                  role="status"
-                                  className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
-                                >
-                                  <span className="w-1 h-1 rounded-full bg-gold/80" />
-                                  Alterações por guardar
-                                </p>
-                              )}
-                              <button
-                                onClick={saveChanges}
-                                disabled={saving || !isDirty}
-                                className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
-                              >
-                                {saving ? "A guardar…" : "Guardar Alterações →"}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {detailTab === "producao" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-producao"
-                          aria-labelledby="detail-tab-producao"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          {/* Tasks linked to this event */}
-                          <EventTasks
-                            key={`tasks-${selected.id}`}
-                            quote={selected}
-                            userName={userName}
-                          />
-
-                          {/* Production checklist */}
-                          <EventChecklist
-                            key={`cl-${selected.id}`}
-                            quote={selected}
-                            onChange={(checklist) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                            }}
-                          />
-
-                          {/* Decor production plan (sourcing → strike) */}
-                          <ProductionPlan
-                            key={`prod-${selected.id}`}
-                            quote={selected}
-                            onChange={(productionPlan) => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id ? { ...q, productionPlan } : q,
-                                ),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, productionPlan } : prev));
-                            }}
-                          />
-
-                          {/* Day-of run sheet */}
-                          <EventTimeline
-                            key={`tl-${selected.id}`}
-                            quote={selected}
-                            onChange={(timeline) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, timeline } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                            }}
-                          />
-
-                          {/* Guest list / RSVP */}
-                          <GuestList
-                            key={`guests-${selected.id}`}
-                            quote={selected}
-                            onChange={(guestList) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, guestList } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {detailTab === "financeiro" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-financeiro"
-                          aria-labelledby="detail-tab-financeiro"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          {/* Payments & invoicing */}
-                          <PaymentsPanel
-                            key={`pay-${selected.id}`}
-                            quote={selected}
-                            showLedger
-                            onChange={(payments) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                            }}
-                          />
-
-                          {/* Suppliers booked for this event + budget vs actual cost */}
-                          <EventCosts
-                            key={`costs-${selected.id}`}
-                            quote={selected}
-                            onChange={(eventSuppliers) => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                ),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, eventSuppliers } : prev));
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {detailTab === "comunicacao" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-comunicacao"
-                          aria-labelledby="detail-tab-comunicacao"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          <p className="text-foreground/50 text-[11px] leading-relaxed">
-                            Crie e envie a proposta ao cliente. Comece por aqui.
+                          <p className="px-1 text-[10px] text-foreground/50">
+                            Submetido em{" "}
+                            {new Date(selected.submittedAt).toLocaleString("pt-PT", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </p>
-                          <ProposalStudio
-                            key={`studio-${selected.id}`}
-                            quote={selected}
-                            onSent={() => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                ),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, status: "cotado" } : prev));
-                              setEditStatus("cotado");
-                              appendActivity(selected.id, [
-                                {
-                                  id: randomId(),
-                                  at: new Date().toISOString(),
-                                  kind: "proposal_sent",
-                                  actor: userName,
-                                  summary: "Proposta enviada ao cliente (Studio)",
-                                },
-                              ]);
-                            }}
-                          />
-                          {!showBuilder ? (
-                            <button
-                              type="button"
-                              onClick={() => setShowBuilder(true)}
-                              className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
-                            >
-                              Outra forma de propor (tabela de preços simples)
-                            </button>
-                          ) : (
-                            <ProposalBuilder
-                              quote={selected}
-                              onSent={(total) => {
-                                setQuotes((prev) =>
-                                  prev.map((q) =>
-                                    q.id === selected.id
-                                      ? { ...q, status: "cotado", quotedPrice: total }
-                                      : q,
-                                  ),
-                                );
-                                setSelected((prev) =>
-                                  prev ? { ...prev, status: "cotado", quotedPrice: total } : prev,
-                                );
-                                setEditStatus("cotado");
-                                appendActivity(selected.id, [
-                                  {
-                                    id: randomId(),
-                                    at: new Date().toISOString(),
-                                    kind: "proposal_sent",
-                                    actor: userName,
-                                    summary: `Proposta enviada — ${eur(total)}`,
-                                  },
-                                ]);
-                              }}
-                            />
-                          )}
-
-                          <ClientMessenger
-                            key={selected.id}
-                            quote={selected}
-                            onSent={(messages) => {
-                              const prev_count = selected.messages?.length ?? 0;
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                              if (messages.length > prev_count) {
-                                appendActivity(selected.id, [
-                                  {
-                                    id: randomId(),
-                                    at: new Date().toISOString(),
-                                    kind: "message_sent",
-                                    actor: userName,
-                                    summary: "Mensagem enviada ao cliente",
-                                  },
-                                ]);
-                              }
-                            }}
-                          />
-
-                          <ActivityLog
-                            quote={selected}
-                            actor={userName}
-                            onAddEntry={(entry) => appendActivity(selected.id, [entry])}
-                          />
-                        </div>
-                      )}
-
-                      <div className="text-foreground/70 text-[10px] text-center">
-                        Submetido em{" "}
-                        {new Date(selected.submittedAt).toLocaleString("pt-PT", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        </aside>
                       </div>
                     </div>
                   </div>
                 </>
-              ) : (
-                <div className="hidden xl:flex flex-col items-center justify-center gap-3 border border-dashed border-foreground/12 rounded-xl text-foreground/22 text-sm bg-foreground/[0.015]">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    className="text-foreground/15"
-                  >
-                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-                    <rect x="9" y="3" width="6" height="4" rx="1" />
-                    <path d="M9 12h6M9 16h4" strokeLinecap="round" />
-                  </svg>
-                  Selecione um pedido para ver detalhes
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
