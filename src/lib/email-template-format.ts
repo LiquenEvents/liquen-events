@@ -146,24 +146,27 @@ export function htmlToPlainText(html: string): string {
     .replace(MARKER_RE, "")
     .replace(/<\s*(br|hr)\s*\/?>/gi, "\n")
     .replace(/<\/\s*(p|div|h[1-6]|li|tr)\s*>/gi, "\n\n");
-  // Strip comments + any remaining tags in a fixpoint loop: a single pass can
-  // be defeated by crafted/overlapping sequences (e.g. `<scr<script>ipt>` or a
-  // nested `<!-- <!-- -->`), so repeat until the string stops changing.
-  let prev: string;
-  do {
-    prev = s;
-    s = s.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "");
-  } while (s !== prev);
-  // Decode the handful of entities we emit. `&amp;` is decoded LAST so an
-  // encoded entity like `&amp;lt;` resolves to the literal text `&lt;` and can
-  // never be double-unescaped into a `<` (no re-introduced markup).
+  // Decode the handful of entities we emit FIRST — `&amp;` LAST so `&amp;lt;`
+  // becomes the literal text `&lt;`, never a second-level `<`. Decoding before
+  // the strip means any *encoded* markup (`&lt;script&gt;`) turns into a real
+  // tag that the loop below removes, instead of surviving as text.
   s = s
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#3?9;/g, "'")
+    .replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&");
+  // Strip comments + tags in a fixpoint loop (defeats crafted/overlapping
+  // sequences like `<scr<script>ipt>`), then remove any leftover stray angle
+  // brackets (an unclosed `<!--` or `<foo`) so the result can NEVER contain
+  // markup — this is plain text for a textarea, not HTML.
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "");
+  } while (s !== prev);
+  s = s.replace(/[<>]/g, "");
   return s
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
