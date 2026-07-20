@@ -18,6 +18,9 @@ export function eventCountdown(
   const todayKey = new Date().toISOString().slice(0, 10);
   const ms = new Date(date + "T12:00:00").getTime() - new Date(todayKey + "T12:00:00").getTime();
   const days = Math.round(ms / 86400000);
+  // An unparseable date yields NaN days; treat it like "no date" instead of
+  // rendering a "faltam NaN meses" label in the UI.
+  if (Number.isNaN(days)) return null;
   if (days === 0) return { label: "Hoje", tone: "today" };
   if (days === 1) return { label: "Amanhã", tone: "soon" };
   if (days < 0)
