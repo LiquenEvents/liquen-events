@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { randomId, eur2 } from "./util";
-import { Button } from "./ui";
+import { Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
 import {
   DECOR_PRODUCTION,
@@ -95,10 +95,11 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       </div>
 
       {!seeded ? (
-        <p className="text-foreground/50 text-sm leading-relaxed mb-2">
-          Aplique o plano para gerar as tarefas de atelier — do sourcing das flores à desmontagem no
-          local.
-        </p>
+        <EmptyState
+          className="px-4 py-10"
+          title="Plano de produção por gerar"
+          description="Use “Aplicar plano de produção” para gerar as tarefas de atelier — do sourcing das flores à desmontagem no local."
+        />
       ) : (
         <div className="flex flex-col gap-4 mb-4">
           {grouped.map(({ phase, phaseItems, done }) => {
