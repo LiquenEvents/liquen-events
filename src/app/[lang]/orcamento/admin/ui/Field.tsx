@@ -88,7 +88,10 @@ export function Field(props: FieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = cn(hint ? hintId : undefined, error ? errorId : undefined) || undefined;
+  // Only reference the hint node when it is actually rendered below (the hint is
+  // suppressed while an error is shown), so aria-describedby never dangles.
+  const describedBy =
+    cn(hint && !error ? hintId : undefined, error ? errorId : undefined) || undefined;
 
   const controlClass = cn(
     CONTROL,
