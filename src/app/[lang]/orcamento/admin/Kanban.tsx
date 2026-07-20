@@ -10,11 +10,11 @@ import type { ActivityEntry } from "@/lib/orcamento/types";
 import { Card } from "./ui";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
-  { id: "pendente", label: "Novos", color: "#8a8a82" },
+  { id: "pendente", label: "Novo", color: "#8a8a82" },
   { id: "em_revisao", label: "Em revisão", color: "#9aa36a" },
   { id: "cotado", label: "Proposta enviada", color: "#7c854b" },
-  { id: "aceite", label: "Ganhos", color: "#525a2f" },
-  { id: "rejeitado", label: "Perdidos", color: "#5a5a55" },
+  { id: "aceite", label: "Ganho", color: "#525a2f" },
+  { id: "rejeitado", label: "Perdido", color: "#5a5a55" },
 ];
 
 function eventTypeLabel(q: Quote): string {

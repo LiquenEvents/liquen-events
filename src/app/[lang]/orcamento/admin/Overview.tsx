@@ -17,10 +17,10 @@ const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
 
 // Order the pipeline reads as a funnel: new leads → qualified → quoted → won.
 const FUNNEL: { id: QuoteStatus; label: string }[] = [
-  { id: "pendente", label: "Novos" },
+  { id: "pendente", label: "Novo" },
   { id: "em_revisao", label: "Em revisão" },
   { id: "cotado", label: "Proposta enviada" },
-  { id: "aceite", label: "Ganhos" },
+  { id: "aceite", label: "Ganho" },
 ];
 
 // Shared keyboard focus ring — moss on the white back-office surface. Kept in one

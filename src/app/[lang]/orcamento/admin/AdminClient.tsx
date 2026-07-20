@@ -968,7 +968,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Faturas",
     contratos: "Contratos",
     "modelos-email": "Modelos de email",
-    inbox: "Inbox",
+    inbox: "Mensagens",
   };
 
   const VIEW_SUB: Record<View, string> = {
@@ -1208,7 +1208,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           <div className="flex items-stretch">
             {(
               [
-                { id: "overview", label: "Início" },
+                { id: "overview", label: "Visão Geral" },
                 { id: "pedidos", label: "Pedidos" },
                 { id: "propostas", label: "Propostas" },
                 { id: "inbox", label: "Mensagens" },
