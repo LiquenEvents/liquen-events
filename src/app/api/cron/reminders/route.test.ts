@@ -179,7 +179,7 @@ describe("GET /api/cron/reminders — digest logic (clock pinned 2026-07-20)", (
         submittedAt: "2026-07-20T09:00:00.000Z",
       },
     ];
-    const res = await GET(req());
+    await GET(req());
     const push = (sendPushToAll as unknown as { mock: { calls: unknown[][] } }).mock
       .calls[0][0] as {
       body: string;
@@ -192,7 +192,7 @@ describe("GET /api/cron/reminders — digest logic (clock pinned 2026-07-20)", (
       { id: "a", name: "Ativo", followUpAt: "2026-07-20", status: "pendente" }, // due today
       { id: "b", name: "Fechado", followUpAt: "2026-07-10", status: "aceite" }, // closed → ignored
     ];
-    const res = await GET(req());
+    await GET(req());
     const push = (sendPushToAll as unknown as { mock: { calls: unknown[][] } }).mock
       .calls[0][0] as {
       body: string;

@@ -3,7 +3,10 @@ import { portalPath } from "./portal-link";
 import { createPortalToken } from "./portal-token";
 
 describe("portal-link — portalPath", () => {
-  const TOKEN = "eyJ0eXAiOiJwb3J0YWwifQ.abc-DEF_123";
+  // Low-entropy, obviously-fake placeholder (a realistic JWT-shaped string trips
+  // secret scanners like gitleaks). The token's only role here is to be embedded
+  // verbatim in the path; a real minted token is exercised separately below.
+  const TOKEN = "portal-test-token";
 
   it("builds the pt path by default", () => {
     expect(portalPath(TOKEN)).toBe(`/pt/portal/${TOKEN}`);
