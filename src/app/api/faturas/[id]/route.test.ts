@@ -185,6 +185,21 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 8750 });
   });
 
+  it("bills the EXACT saldo (total − sinal) for a non-integer proposal total — no lost cent", async () => {
+    // Total de cêntimo ímpar: €10000,01 ⇒ sinal €3000,00, saldo exacto €7000,01.
+    // O fallback sinal/3×7 daria €7000,00 (1 cêntimo a menos); como a proposta é
+    // coerente com o sinal faturado, o saldo tem de fechar o total ao cêntimo.
+    seedSinal("s-odd", { amount: 3000 }); // 30% de 10000,01
+    proposalsDb.store.set("q-s-odd", { total: 10000.01 });
+
+    const { req, params } = patchReq("s-odd", { status: "paga" });
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 7000.01 });
+    // sinal 3000,00 + saldo 7000,01 = 10000,01 (o total acordado), ao cêntimo.
+    expect(Math.round((3000 + json.saldoAutoIssued.amount) * 100)).toBe(1_000_001);
+  });
+
   it("annuls an unpaid auto-saldo when the sinal is reverted from paga (#41)", async () => {
     seedSinal("s8", { status: "paga", paidAt: "2026-07-05" });
     // Saldo órfão auto-emitido, ainda por pagar.

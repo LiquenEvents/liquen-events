@@ -42,27 +42,33 @@ async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
     const existing = await listInvoicesForQuote(sinal.quoteId);
     if (existing.some((i) => i.kind === "saldo" && i.status !== "anulada")) return null;
 
-    // 2. Valor do saldo — a fonte de verdade é o SINAL EFECTIVAMENTE FATURADO,
-    //    não a proposta. `getProposalByQuote` devolve a proposta mais RECENTE, que
-    //    pode ter sido revista após o aceite; usá-la daria um saldo incoerente com
-    //    o sinal já cobrado (ex.: sinal €3000 de €10000 + saldo €8400 de uma
-    //    proposta revista para €12000). Como o sinal é 30%, o saldo é sinal/3×7 —
-    //    e as duas parcelas fecham sempre o mesmo total acordado.
-    const amount = round2((sinal.amount / 3) * 7);
-
-    // Verificação de sanidade (só observabilidade): se existir uma proposta e o
-    // seu saldo 70% divergir do valor derivado do sinal, registamos — indício de
-    // proposta revista após o aceite, a reconciliar manualmente. O valor faturado
-    // continua a ser o derivado do sinal; a proposta NUNCA o sobrepõe.
+    // 2. Valor do saldo. Regra fiscal: sinal + saldo têm de FECHAR ao cêntimo o
+    //    total acordado. A fonte de verdade é o SINAL EFECTIVAMENTE FATURADO — a
+    //    proposta mais recente pode ter sido revista após o aceite e NUNCA
+    //    sobrepõe o sinal já cobrado.
+    //
+    //    Preferimos o saldo EXACTO `total − sinal` (via splitThirtySeventy) quando
+    //    existe uma proposta cujo sinal 30% ainda BATE CERTO com o sinal faturado
+    //    (i.e. não foi revista): isso fecha o total ao cêntimo mesmo em totais NÃO
+    //    inteiros (ex.: €1000,01 → sinal €300,00 + saldo €700,01). O fallback
+    //    `sinal/3×7` só perde 1 cêntimo em totais de cêntimo ímpar; para totais em
+    //    euros inteiros (o que o pipeline de propostas emite) é idêntico, por isso
+    //    o fluxo normal não muda. Se a proposta divergir (revista após aceite, o
+    //    seu 30% ≠ sinal), mantemos o valor derivado do sinal e só registamos — a
+    //    proposta nunca o sobrepõe.
+    let amount = round2((sinal.amount / 3) * 7);
     try {
       const proposal = await getProposalByQuote(sinal.quoteId);
       if (proposal && proposal.total > 0) {
-        const fromProposal = splitThirtySeventy(proposal.total).saldo;
-        if (fromProposal !== amount) {
+        const split = splitThirtySeventy(proposal.total);
+        if (Math.abs(split.sinal - sinal.amount) < 0.005) {
+          // Proposta coerente com o sinal → saldo exacto = total − sinal.
+          amount = split.saldo;
+        } else {
           log.warn("faturas: saldo derivado do sinal diverge da proposta mais recente", {
             quoteId: sinal.quoteId,
             fromSinal: amount,
-            fromProposal,
+            fromProposal: split.saldo,
           });
         }
       }
