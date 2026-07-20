@@ -66,6 +66,14 @@ export const GLOSSARY: GlossaryEntry[] = [
     def: "Um contacto de alguém que quer um orçamento. Cada pedido tem um estado que mostra em que ponto está: Novo, Em revisão, Proposta enviada, Ganho ou Perdido.",
   },
   {
+    term: "Novo",
+    def: "O estado de um pedido acabado de chegar, que ainda ninguém tratou. É o ponto de partida de todos os pedidos.",
+  },
+  {
+    term: "Em revisão",
+    def: "O estado de um pedido que estamos a analisar — a preparar a proposta ou a confirmar detalhes. Ainda não enviámos nada ao cliente.",
+  },
+  {
     term: "Pipeline",
     def: "O quadro que mostra todos os pedidos organizados por fase, em colunas (do primeiro contacto ao evento concluído). Serve para ver, num relance, em que ponto está cada trabalho. Também lhe chamamos “quadro”.",
   },
@@ -102,6 +110,10 @@ export const GLOSSARY: GlossaryEntry[] = [
     def: "O resto do pagamento (habitualmente 70%), pago mais perto do evento. Sinal + saldo = valor total.",
   },
   {
+    term: "IVA",
+    def: "O imposto que acresce ao valor dos serviços e é entregue ao Estado (em Portugal, normalmente 23%). Um preço «sem IVA» ainda não o inclui e vai subir quando o IVA for somado; um preço «com IVA» já é o valor final que o cliente paga.",
+  },
+  {
     term: "Fatura",
     def: "O documento oficial que pede um pagamento ao cliente. Pode ser do sinal, do saldo, ou uma fatura única com o valor todo. Cada fatura fica emitida, paga ou anulada.",
   },
@@ -115,11 +127,11 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "Convidados",
-    def: "As pessoas que vão ao evento. O número de convidados influencia o espaço, a comida e o preço; a lista de convidados serve para gerir presenças (RSVP).",
+    def: "As pessoas que vão ao evento. O número de convidados influencia o espaço, a comida e o preço; a lista de convidados serve para acompanhar quem confirma que vem.",
   },
   {
     term: "Dossier",
-    def: "A vista completa de um evento, tudo num só sítio: contacto, proposta, contrato, faturas e produção. É o “processo” do evento e a fonte de verdade financeira.",
+    def: "A vista completa de um evento (o “Dossier do evento”), com tudo num só sítio: contacto, proposta, contrato, faturas e produção. É o “processo” do evento e onde as contas ficam certas.",
   },
   {
     term: "Guião do dia",
@@ -128,6 +140,14 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: "Seguimento",
     def: "Um lembrete para voltar a falar com o cliente numa certa data — por exemplo, para não deixar uma proposta sem resposta. Se a data já passou, aparece “em atraso”. No menu está em “Seguimentos”.",
+  },
+  {
+    term: "Arquivar",
+    def: "Guardar um pedido de lado para deixar de o ver na lista principal, sem o apagar. Fica escondido mas continua tudo lá — pode voltar a mostrá-lo com “Restaurar” quando quiser.",
+  },
+  {
+    term: "Apagar",
+    def: "Eliminar um pedido (ou uma fatura) em definitivo. Ao contrário de arquivar, esta ação não pode ser anulada, por isso pedimos sempre confirmação antes.",
   },
   {
     term: "Portal do cliente",
