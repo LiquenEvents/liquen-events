@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 async function upsert(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const key = String(body?.key ?? "").trim();
     if (!key) return NextResponse.json({ error: "Chave obrigatória" }, { status: 400 });
 

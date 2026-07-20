@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const name = str(body?.name, 120);
     if (!name) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
 
