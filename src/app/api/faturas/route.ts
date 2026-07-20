@@ -21,7 +21,10 @@ const clean = (v: unknown, max: number) =>
     .replace(/[\r\n]+/g, " ")
     .trim()
     .slice(0, max);
-const num = (v: unknown) => Math.min(Math.max(Number(v) || 0, 0), 100_000_000);
+// Clamp to a sane range AND round to cents — a manually-issued invoice must never
+// carry a fractional-cent amount into the fiscal ledger (e.g. 100.567 → 100.57).
+const num = (v: unknown) =>
+  Math.round(Math.min(Math.max(Number(v) || 0, 0), 100_000_000) * 100) / 100;
 const date = (v: unknown) => {
   const s = clean(v, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
