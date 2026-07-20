@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { promises as fsp, rmSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import type { NextRequest } from "next/server";
 
 /**
@@ -90,7 +88,7 @@ import { PATCH as faturaPATCH } from "@/app/api/faturas/[id]/route";
 // ── Real stores (assertions read genuine persisted state) ──
 import { getQuote, deleteQuote } from "@/lib/quotes-store";
 import { getProposal, listProposalsForQuote } from "@/lib/proposals-store";
-import { listInvoicesForQuote, listInvoices, type Invoice } from "@/lib/invoices-store";
+import { listInvoicesForQuote, type Invoice } from "@/lib/invoices-store";
 import { listContracts } from "@/lib/contracts-store";
 import { createProposalToken } from "@/lib/proposal-token";
 
