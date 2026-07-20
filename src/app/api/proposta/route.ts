@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
-import { updateQuoteWith } from "@/lib/quotes-store";
+import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
 import { TERMS_VERSION, DEFAULT_TERMS, termsToPlainText } from "@/lib/contract-terms";
 import {
@@ -132,6 +132,23 @@ export async function POST(request: NextRequest) {
     const acceptedName = typeof body?.acceptedName === "string" ? body.acceptedName.trim() : "";
     if (accepted && (body?.acceptedTerms !== true || !acceptedName)) {
       return NextResponse.json({ error: "É necessário aceitar as condições." }, { status: 400 });
+    }
+
+    // Data-integrity guard: an accept mints a contract AND a 30% sinal invoice,
+    // both anchored to `proposal.quoteId`. If the parent quote was hard-deleted in
+    // the back office after the signed link went out, those fiscal records would be
+    // minted against a quoteId with no parent quote — orphan, untraceable in the
+    // ledger. Confirm the quote still exists before minting anything; if it's gone,
+    // refuse cleanly and create NOTHING (no proposal flip, no contract, no invoice).
+    // Only gate acceptance: declining creates no fiscal records, so it stays allowed.
+    if (accepted) {
+      const parentQuote = await getQuote(proposal.quoteId);
+      if (!parentQuote) {
+        return NextResponse.json(
+          { error: "Este evento já não está disponível. Contacte-nos para retomar." },
+          { status: 409 },
+        );
+      }
     }
 
     const newStatus = accepted ? "aceite" : "rejeitada";

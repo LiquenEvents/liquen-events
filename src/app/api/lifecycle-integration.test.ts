@@ -315,7 +315,7 @@ describe("cross-route guards & negative paths", () => {
     expect(activeSaldo(await listInvoicesForQuote(quoteId))).toHaveLength(0);
   });
 
-  it("negative: accepting a proposal whose quote was deleted still records the acceptance without crashing", async () => {
+  it("negative: accepting a proposal whose quote was hard-deleted is refused (409), minting nothing", async () => {
     const quoteId = await createQuote();
     const { proposalId } = await sendProposal(
       quoteId,
@@ -327,11 +327,12 @@ describe("cross-route guards & negative paths", () => {
     expect(await getQuote(quoteId)).toBeNull();
 
     const res = await acceptProposal(proposalId);
-    // Best-effort: the acceptance is still recorded (proposal + contract) rather
-    // than 500-ing on the missing quote.
-    expect(res.status).toBe(200);
-    expect((await getProposal(proposalId))!.status).toBe("aceite");
-    expect((await listContracts()).filter((c) => c.proposalId === proposalId)).toHaveLength(1);
+    // The accept path guards on the parent quote's existence: without a live quote
+    // it refuses (409) instead of minting an orphan contract + sinal invoice.
+    expect(res.status).toBe(409);
+    expect((await getProposal(proposalId))!.status).toBe("enviada"); // not flipped to aceite
+    expect((await listContracts()).filter((c) => c.proposalId === proposalId)).toHaveLength(0);
+    expect(await listInvoicesForQuote(quoteId)).toHaveLength(0); // no sinal minted
   });
 
   it("negative: a tampered accept token is rejected (401) and mutates nothing", async () => {

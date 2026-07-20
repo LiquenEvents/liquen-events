@@ -93,15 +93,20 @@ function postReq(body: unknown): NextRequest {
 }
 
 function seedProposal(id: string, over: Record<string, unknown> = {}) {
+  const quoteId = typeof over.quoteId === "string" ? over.quoteId : `q-${id}`;
   proposalsDb.store.set(id, {
     id,
-    quoteId: `q-${id}`,
+    quoteId,
     clientName: "Cliente Teste",
     clientEmail: "cliente@example.com",
     total: 12500,
     status: "enviada",
     ...over,
   });
+  // A live proposal always has a parent quote — model that by default so the
+  // accept path's parent-quote existence guard sees a real quote. Tests that
+  // need the quote GONE (hard-delete) remove it explicitly after seeding.
+  if (!quotesDb.store.has(quoteId)) quotesDb.store.set(quoteId, { id: quoteId });
 }
 
 beforeEach(() => {
@@ -181,6 +186,43 @@ describe("POST /api/proposta", () => {
     expect(createInvoice).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "sinal", amount: 3750 }),
     );
+  });
+
+  it("with the parent quote present, a normal accept mints EXACTLY one contract + one sinal (guard doesn't regress the happy path)", async () => {
+    seedProposal("p-ok");
+    expect(quotesDb.store.has("q-p-ok")).toBe(true); // parent quote is live
+    const res = await POST(
+      postReq({ token: createProposalToken("p-ok"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-ok")?.status).toBe("aceite");
+    // Exactly one of each fiscal record — no duplicates introduced by the guard.
+    expect(createContract).toHaveBeenCalledTimes(1);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+    expect(createInvoice).toHaveBeenCalledWith(expect.objectContaining({ kind: "sinal" }));
+  });
+
+  it("refuses to accept a proposal whose parent quote was hard-deleted (409) and mints NOTHING", async () => {
+    // Data-integrity bug: the back office hard-deletes the quote after the signed
+    // link was sent; the client then clicks accept. The contract and the 30% sinal
+    // invoice both carry proposal.quoteId, so minting them here would create fiscal
+    // records anchored to a quoteId with no parent quote — untraceable in the ledger.
+    // The accept must refuse and mint nothing.
+    seedProposal("p-orphan");
+    quotesDb.store.delete("q-p-orphan"); // parent quote vanished (hard delete)
+    expect(quotesDb.store.has("q-p-orphan")).toBe(false);
+
+    const res = await POST(
+      postReq({ token: createProposalToken("p-orphan"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(409);
+    // Nothing fiscal was minted against the orphan quoteId…
+    expect(createContractIfAbsent).not.toHaveBeenCalled();
+    expect(createContract).not.toHaveBeenCalled();
+    expect(createInvoice).not.toHaveBeenCalled();
+    // …and the proposal itself was not flipped to "aceite" (guard returns first).
+    expect(proposalsDb.store.get("p-orphan")?.status).toBe("enviada");
+    expect(updateQuoteWith).not.toHaveBeenCalled();
   });
 
   it("carries the proposal's vatRate into the auto-sinal, not a hardcoded 0.23 (FIX 4)", async () => {
