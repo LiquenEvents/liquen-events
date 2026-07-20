@@ -82,7 +82,7 @@ const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Propostas$/, heading: /^Propostas$/ },
   { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Contratos$/, heading: /^Contratos$/ },
-  { nav: /^Mensagens$/, heading: /^Inbox$/ },
+  { nav: /^Mensagens$/, heading: /^Mensagens$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
 ];
 
