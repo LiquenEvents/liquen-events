@@ -42,10 +42,12 @@ export const SERVICES: ServiceDetail[] = [
       "Com uma equipa experiente e dedicada, proporcionamos um planeamento personalizado, assessoria e coordenação no dia, em herdades e quintas do Alentejo e em todo o Portugal, para que possa viver plenamente o seu momento especial, sem preocupações.",
     ],
     includes: [
-      "Coordenação de casamento",
-      "Reportagem de fotografia e vídeo",
-      "Decoração",
-      "Catering",
+      "Conceito e design de decoração",
+      "Decoração floral e cenografia",
+      "Styling e mesa posta",
+      "Ambiente e iluminação",
+      "Articulação de fornecedores (catering, fotografia, vídeo)",
+      "Coordenação no dia",
     ],
     gallery: [
       "/imagens/DaniGui_Preview20.jpg",
@@ -80,12 +82,18 @@ export const SERVICES: ServiceDetail[] = [
       "aluguer de carros de época",
       "viatura clássica casamento Alentejo",
     ],
-    hero: "/imagens/M&F0678.jpg",
+    hero: "/imagens/viaturas-classicas.jpg",
     intro: [
       "Na Líquen Events disponibilizamos um serviço exclusivo de aluguer de viaturas para casamentos, com uma seleção de carros clássicos que trazem elegância e sofisticação ao seu dia especial. Seja para a chegada triunfante da noiva, seja para o transporte dos noivos e dos convidados, cada detalhe é cuidadosamente planeado para proporcionar uma experiência confortável e memorável.",
       "Com motoristas experientes e um serviço de alta qualidade, asseguramos um transporte pontual e sem preocupações, acrescentando um toque de glamour ao seu casamento.",
     ],
-    includes: ["Aluguer de viaturas clássicas", "Iluminação decorativa"],
+    includes: [
+      "Viatura clássica com motorista",
+      "Decoração floral da viatura",
+      "Chegada da noiva e transporte dos noivos",
+      "Planeamento do percurso e logística",
+      "Disponível em todo o Portugal",
+    ],
     gallery: [
       "/imagens/M&F0512.jpg",
       "/imagens/stephanie-mizio-760.jpg",
@@ -179,19 +187,30 @@ export const SERVICES: ServiceDetail[] = [
       "Garantimos que cada celebração seja única e memorável. De festas de aniversário a celebrações íntimas, criamos experiências personalizadas, com atenção ao ambiente, à decoração e ao entretenimento, sempre adaptadas ao seu estilo e às suas preferências.",
       "Com uma abordagem criativa e uma equipa dedicada, tratamos de todos os detalhes — da escolha do local ao catering, até à coordenação do evento —, permitindo-lhe desfrutar do momento sem preocupações. Transformamos a sua visão numa festa exclusiva e inesquecível.",
     ],
-    includes: ["Aniversários", "Despedidas de solteiro", "Comunhões", "Batizados"],
+    includes: [
+      "Conceito e tema da festa",
+      "Decoração e cenografia do espaço",
+      "Flores e styling de mesa",
+      "Ambiente e iluminação",
+      "Articulação de fornecedores (catering, animação)",
+      "Coordenação no dia",
+    ],
     gallery: [
+      "/imagens/DaniGui_JantarFesta_1.jpg",
+      "/imagens/DaniGui_JantarFesta_3.jpg",
       "/imagens/DaniGui_JantarFesta_11.jpg",
-      "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg",
-      "/imagens/DaniGui_JantarFesta_26.jpg",
-      "/imagens/DaniGui_JantarFesta_27.jpg",
-      "/imagens/DaniGui_JantarFesta_6.jpg",
-      "/imagens/DaniGui_JantarFesta_17.jpg",
+      "/imagens/DaniGui_JantarFesta_14.jpg",
+      "/imagens/DaniGui_JantarFesta_15.jpg",
+      "/imagens/DaniGui_JantarFesta_18.jpg",
     ],
     faqs: [
       {
-        q: "Organizam festas pequenas e íntimas?",
-        a: "Sim. Adaptamo-nos a qualquer dimensão — de celebrações familiares íntimas a grandes festas — sempre com o mesmo cuidado.",
+        q: "Fazem festas de aniversário temáticas?",
+        a: "Sim. Desenhamos o conceito e a decoração à volta do tema que imaginar — de aniversários infantis a festas de adulto —, sempre à medida.",
+      },
+      {
+        q: "Com quanto tempo devo reservar a decoração da festa?",
+        a: "Quanto mais cedo melhor para garantir a data, mas conseguimos entrar mais perto do dia, consoante a disponibilidade e a dimensão da festa.",
       },
     ],
     related: ["casamentos", "jantares-de-gala"],
@@ -216,10 +235,10 @@ export const SERVICES: ServiceDetail[] = [
     ],
     includes: [
       "Mesa posta e decoração premium",
-      "Chef convidado e menu de autor",
-      "Harmonização de vinhos",
-      "Cenografia e iluminação",
-      "Animação e entretenimento",
+      "Cenografia e iluminação de autor",
+      "Design floral e styling",
+      "Articulação de chef, menu e harmonização de vinhos",
+      "Articulação de animação e entretenimento",
       "Coordenação integral do evento",
     ],
     gallery: [
@@ -230,7 +249,16 @@ export const SERVICES: ServiceDetail[] = [
       "/imagens/M&F0512.jpg",
       "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg",
     ],
-    faqs: [],
+    faqs: [
+      {
+        q: "A Líquen trata do catering e do chef?",
+        a: "A Líquen faz a decoração e a cenografia; o catering, o chef e a harmonização de vinhos são assegurados pelos nossos parceiros, que articulamos e coordenamos por si.",
+      },
+      {
+        q: "Fazem jantares de gala no espaço à escolha do cliente?",
+        a: "Sim. Adaptamos o conceito e a cenografia ao espaço que escolher — de palácios e herdades a hotéis —, em Lisboa e em todo o Portugal.",
+      },
+    ],
     related: ["eventos-corporativos", "casamentos"],
   },
   {
@@ -260,17 +288,21 @@ export const SERVICES: ServiceDetail[] = [
       "Coordenação no dia",
     ],
     gallery: [
-      "/imagens/DaniGui_JantarFesta_11.jpg",
-      "/imagens/DaniGui_JantarFesta_17.jpg",
       "/imagens/DaniGui_JantarFesta_6.jpg",
-      "/imagens/DaniGui_JantarFesta_27.jpg",
-      "/imagens/DaniGui_JantarFesta_130.jpg",
-      "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg",
+      "/imagens/DaniGui_JantarFesta_17.jpg",
+      "/imagens/DaniGui_JantarFesta_24.jpg",
+      "/imagens/DaniGui_JantarFesta_39.jpg",
+      "/imagens/DaniGui_JantarFesta_41.jpg",
+      "/imagens/DaniGui_JantarFesta_48.jpg",
     ],
     faqs: [
       {
-        q: "Organizam celebrações pequenas e íntimas?",
-        a: "Sim. Adaptamo-nos a qualquer dimensão — de reuniões familiares íntimas a grandes celebrações — sempre com a mesma atenção ao detalhe.",
+        q: "Decoram o batizado na cerimónia e no almoço de família?",
+        a: "Sim. Tratamos da decoração tanto no momento da cerimónia como no almoço ou jantar, com um conceito coerente entre os dois espaços.",
+      },
+      {
+        q: "Fazem batizados e comunhões fora do Alentejo?",
+        a: "Sim. Decoramos estas celebrações em todo o Portugal, em articulação com os fornecedores de cada região.",
       },
     ],
     related: ["festas-e-aniversarios", "casamentos"],
@@ -288,7 +320,7 @@ export const SERVICES: ServiceDetail[] = [
       "produção de conferências Lisboa",
       "eventos corporativos Portugal",
     ],
-    hero: "/imagens/EW1_1332.jpg",
+    hero: "/imagens/EW1_1330.jpg",
     intro: [
       "Uma conferência é a montra da sua marca. A Líquen Events cria a cenografia e a produção de conferências e congressos em Lisboa e em todo o Portugal — do palco à sinalética, com o rigor que um evento profissional exige.",
       "Cuidamos do conceito visual, da iluminação e do audiovisual à coordenação no local, para que a sua equipa se foque apenas no conteúdo e nos resultados.",
@@ -386,14 +418,23 @@ export const SERVICES: ServiceDetail[] = [
       "Coordenação e produção no local",
     ],
     gallery: [
-      "/imagens/EW1_1404.jpg",
-      "/imagens/EW1_1332.jpg",
-      "/imagens/EW1_1398.jpg",
-      "/imagens/EW1_1330.jpg",
+      "/imagens/EW1_1405.jpg",
       "/imagens/EW1_1408.jpg",
+      "/imagens/20_10_2025_0295.jpg",
+      "/imagens/20_10_2025_0358.jpg",
+      "/imagens/EW1_1330.jpg",
       "/imagens/hd-edited.jpg",
     ],
-    faqs: [],
+    faqs: [
+      {
+        q: "Fazem lançamentos de produto em Lisboa e no Porto?",
+        a: "Sim. Produzimos lançamentos e eventos de marca em Lisboa, no Porto e em todo o Portugal, com equipa e fornecedores em cada região.",
+      },
+      {
+        q: "Conseguem cenografia fiel à identidade da marca?",
+        a: "Sim. Partimos do manual da marca — cores, materiais e tom — para desenhar um ambiente coerente com a identidade, do conceito à montagem.",
+      },
+    ],
     related: ["eventos-corporativos", "conferencias-e-congressos"],
   },
   {
@@ -462,7 +503,14 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "We turn your wedding into a truly unforgettable day. We take care of every detail — from choosing the perfect venue to elegant decoration and the complete organisation of the ceremony and reception — making sure everything reflects your personality and style.",
       "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the Alentejo and all of Portugal, so you can fully live your special moment, worry-free.",
     ],
-    includes: ["Wedding coordination", "Photo and video coverage", "Decoration", "Catering"],
+    includes: [
+      "Decoration concept and design",
+      "Floral decoration and scenography",
+      "Styling and table settings",
+      "Atmosphere and lighting",
+      "Supplier liaison (catering, photography, video)",
+      "Day-of coordination",
+    ],
     faqs: [
       {
         q: "How far in advance should I hire decoration and coordination?",
@@ -471,6 +519,34 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       {
         q: "Do you do weddings outside the Alentejo?",
         a: "Yes. We decorate and coordinate weddings throughout mainland Portugal and the islands, working with each region's suppliers.",
+      },
+    ],
+  },
+  "aluguer-de-viaturas-classicas": {
+    eyebrow: "Exclusive Service",
+    title: "Classic Car Hire for Weddings",
+    metaTitle: "Classic Car Hire for Weddings",
+    metaDescription:
+      "Classic car hire for weddings in the Alentejo and across Portugal — vintage cars with a driver for the bride's arrival and transport for the couple and guests.",
+    intro: [
+      "At Líquen Events we offer an exclusive wedding car hire service, with a selection of classic cars that bring elegance and sophistication to your special day. Whether for the bride's grand arrival or transport for the couple and guests, every detail is carefully planned for a comfortable, memorable experience.",
+      "With experienced drivers and a high-quality service, we ensure punctual, worry-free transport, adding a touch of glamour to your wedding.",
+    ],
+    includes: [
+      "Classic car with driver",
+      "Floral decoration of the car",
+      "Bride's arrival and transport for the couple",
+      "Route planning and logistics",
+      "Available across Portugal",
+    ],
+    faqs: [
+      {
+        q: "Do the cars come with a driver?",
+        a: "Yes. Every classic car comes with an experienced driver, so all you have to do is enjoy the ride.",
+      },
+      {
+        q: "Is hire available outside the Alentejo?",
+        a: "Yes. We take the cars to weddings throughout mainland Portugal, subject to availability and logistics planning.",
       },
     ],
   },
@@ -512,11 +588,22 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "We make sure every celebration is unique and memorable. From birthday parties to intimate gatherings, we create personalised experiences with care for atmosphere, decoration and entertainment, always tailored to your style and preferences.",
       "With a creative approach and a dedicated team, we handle every detail — from choosing the venue to catering and coordinating the event — so you can simply enjoy the moment. We turn your vision into an exclusive, unforgettable celebration.",
     ],
-    includes: ["Birthdays", "Hen and stag parties", "Communions", "Christenings"],
+    includes: [
+      "Party concept and theme",
+      "Space decoration and scenography",
+      "Flowers and table styling",
+      "Atmosphere and lighting",
+      "Supplier liaison (catering, entertainment)",
+      "Day-of coordination",
+    ],
     faqs: [
       {
-        q: "Do you organise small, intimate parties?",
-        a: "Yes. We adapt to any size — from intimate family celebrations to large parties — always with the same care.",
+        q: "Do you do themed birthday parties?",
+        a: "Yes. We design the concept and decoration around whatever theme you imagine — from children's birthdays to grown-up parties — always bespoke.",
+      },
+      {
+        q: "How far in advance should I book the party decoration?",
+        a: "The earlier the better to secure the date, but we can come on board closer to the day, depending on availability and the size of the party.",
       },
     ],
   },
@@ -532,13 +619,22 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     ],
     includes: [
       "Premium table settings and décor",
-      "Guest chef and signature menu",
-      "Wine pairing",
-      "Scenography and lighting",
-      "Entertainment and performances",
+      "Signature scenography and lighting",
+      "Floral design and styling",
+      "Chef, menu and wine-pairing liaison",
+      "Entertainment and performance liaison",
       "End-to-end event coordination",
     ],
-    faqs: [],
+    faqs: [
+      {
+        q: "Does Líquen handle catering and the chef?",
+        a: "Líquen creates the decoration and scenography; catering, the chef and wine pairing are provided by our partners, whom we liaise with and coordinate on your behalf.",
+      },
+      {
+        q: "Do you do gala dinners at a venue of the client's choice?",
+        a: "Yes. We adapt the concept and scenography to whatever venue you choose — from palaces and estates to hotels — in Lisbon and across Portugal.",
+      },
+    ],
   },
   "batizados-e-comunhoes": {
     eyebrow: "Family Celebrations",
@@ -560,8 +656,12 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     ],
     faqs: [
       {
-        q: "Do you organise small, intimate celebrations?",
-        a: "Yes. We adapt to any size — from intimate family gatherings to large celebrations — always with the same attention to detail.",
+        q: "Do you decorate both the ceremony and the family lunch?",
+        a: "Yes. We handle the decoration both at the ceremony and at the lunch or dinner, with a concept that stays coherent across both spaces.",
+      },
+      {
+        q: "Do you do christenings and communions outside the Alentejo?",
+        a: "Yes. We decorate these celebrations across Portugal, working with each region's suppliers.",
       },
     ],
   },
@@ -633,7 +733,16 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Signage and event identity",
       "On-site coordination and production",
     ],
-    faqs: [],
+    faqs: [
+      {
+        q: "Do you do product launches in Lisbon and Porto?",
+        a: "Yes. We produce launches and brand events in Lisbon, Porto and across Portugal, with a team and suppliers in each region.",
+      },
+      {
+        q: "Can you make the scenography true to our brand identity?",
+        a: "Yes. We start from your brand guidelines — colours, materials and tone — to design an environment coherent with your identity, from concept to build.",
+      },
+    ],
   },
   "jantares-de-empresa": {
     eyebrow: "For Companies",
