@@ -534,6 +534,10 @@ export const pt = {
         desc: "Elevamos a imagem da sua marca através de eventos que transformam equipas e celebram conquistas.",
         services: [
           {
+            title: "Eventos Corporativos",
+            desc: "Decoração e cenografia à medida da sua marca — de conferências e lançamentos a jantares de empresa.",
+          },
+          {
             title: "Conferências & Congressos",
             desc: "Organização completa de conferências empresariais, da logística ao audiovisual.",
           },

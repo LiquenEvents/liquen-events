@@ -66,7 +66,7 @@ const categoryMeta = [
     band: "/imagens/DaniGui_Preview20.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
-      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/M&F0678.jpg" },
+      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
       { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
@@ -78,9 +78,10 @@ const categoryMeta = [
     layout: "mosaic-right" as const,
     band: "/imagens/EW1_1333.jpg",
     services: [
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1405.jpg" },
       { slug: "conferencias-e-congressos", image: "/imagens/EW1_1332.jpg" },
       { slug: "teambuilding", image: "/imagens/EW1_1330.jpg" },
-      { slug: "lancamentos-de-produto", image: "/imagens/DaniGui_JantarFesta_130.jpg" },
+      { slug: "lancamentos-de-produto", image: "/imagens/EW1_1428.jpg" },
       { slug: "jantares-de-empresa", image: "/imagens/EW1_1404.jpg" },
     ],
   },
@@ -103,7 +104,7 @@ function ServiceBand({
       <Parallax speed={0.12} className="absolute inset-0">
         <Image
           src={service.image}
-          alt=""
+          alt={service.title}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -308,7 +309,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <Parallax speed={0.12} className="absolute inset-0">
               <Image
                 src={cat.band}
-                alt=""
+                alt={cat.label}
                 fill
                 sizes="100vw"
                 className="object-cover object-center"

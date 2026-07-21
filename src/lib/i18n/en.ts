@@ -523,6 +523,10 @@ export const en: Dict = {
         desc: "We elevate your brand's image through events that transform teams and celebrate achievements.",
         services: [
           {
+            title: "Corporate Events",
+            desc: "Decoration and scenography tailored to your brand — from conferences and launches to company dinners.",
+          },
+          {
             title: "Conferences & Congresses",
             desc: "Full organisation of corporate conferences, from logistics to audiovisual.",
           },

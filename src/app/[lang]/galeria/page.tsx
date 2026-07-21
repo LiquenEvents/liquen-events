@@ -99,6 +99,9 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {t.galeria.headerTitle}
               </h1>
+              <p className="mt-3 text-white/75 text-[12.5px] leading-[1.6] max-w-sm">
+                {t.galeria.headerDesc}
+              </p>
             </div>
           </AnimateIn>
         </div>
