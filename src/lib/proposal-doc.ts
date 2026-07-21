@@ -268,10 +268,13 @@ export function resolveValidUntil(
   from: Date = new Date(),
 ): string {
   if (doc.validUntil && /^\d{4}-\d{2}-\d{2}$/.test(doc.validUntil)) return doc.validUntil;
-  const days =
-    typeof doc.validUntilDays === "number" && doc.validUntilDays > 0
-      ? Math.floor(doc.validUntilDays)
-      : DEFAULT_VALID_DAYS;
+  // Floor BEFORE the positivity check: a fraction < 1 (e.g. 0.5) must fall back
+  // to the default like an integer 0 — never collapse to a same-day (0-day)
+  // validity, which /proposta's end-of-day expiry would treat as valid only on
+  // the day of sending.
+  const flooredDays =
+    typeof doc.validUntilDays === "number" ? Math.floor(doc.validUntilDays) : Number.NaN;
+  const days = flooredDays > 0 ? flooredDays : DEFAULT_VALID_DAYS;
   const d = new Date(from);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
