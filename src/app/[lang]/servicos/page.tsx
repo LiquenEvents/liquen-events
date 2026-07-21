@@ -69,7 +69,6 @@ const categoryMeta = [
       { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
-      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
     ],
   },
   {
@@ -77,13 +76,7 @@ const categoryMeta = [
     num: "02",
     layout: "mosaic-right" as const,
     band: "/imagens/EW1_1333.jpg",
-    services: [
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1405.jpg" },
-      { slug: "conferencias-e-congressos", image: "/imagens/EW1_1332.jpg" },
-      { slug: "teambuilding", image: "/imagens/EW1_1330.jpg" },
-      { slug: "lancamentos-de-produto", image: "/imagens/EW1_1428.jpg" },
-      { slug: "jantares-de-empresa", image: "/imagens/EW1_1404.jpg" },
-    ],
+    services: [{ slug: "eventos-corporativos", image: "/imagens/EW1_1405.jpg" }],
   },
 ];
 
@@ -331,8 +324,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <AnimateIn>
                 <div className="max-w-2xl">
                   <h2
-                    className="text-veil-shadow text-white font-light uppercase tracking-display leading-[1.25] max-w-xl"
-                    style={{ fontSize: "clamp(19px, 2.6vw, 34px)" }}
+                    className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[1.05]"
+                    style={{ fontSize: "clamp(28px, 3.4vw, 44px)" }}
                   >
                     {cat.desc}
                   </h2>
