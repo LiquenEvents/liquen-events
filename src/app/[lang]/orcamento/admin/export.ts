@@ -150,12 +150,24 @@ function icsText(s: string): string {
 export function buildEventIcs(q: Quote, now: Date = new Date()): string | null {
   if (!q.date) return null;
 
+  // `date`/`endDate` are free-form text (validation only trims to 20 chars — see
+  // quoteFormSchema), so "a definir", a full ISO timestamp, etc. can reach here.
+  // Accept only a plain calendar date; anything else is treated like "no date"
+  // rather than emitting a malformed VALUE=DATE or throwing a RangeError out of
+  // `.toISOString()` on an Invalid Date (which would crash the .ics download).
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const day = (iso: string) => iso.replace(/-/g, "");
-  // DTEND is exclusive for all-day events: day after the last event day.
-  const lastDay = q.endDate && q.endDate >= q.date ? q.endDate : q.date;
-  const end = new Date(lastDay + "T12:00:00");
-  end.setDate(end.getDate() + 1);
-  const dtEnd = end.toISOString().slice(0, 10).replace(/-/g, "");
+  if (!DATE_RE.test(q.date)) return null;
+
+  // DTEND is exclusive for all-day events: the day after the last event day.
+  const lastDay = q.endDate && DATE_RE.test(q.endDate) && q.endDate >= q.date ? q.endDate : q.date;
+  // UTC arithmetic keeps the +1-day rollover timezone-independent (parsing the
+  // day as local noon could shift the ISO date in far-offset zones) while still
+  // normalising month/year boundaries (Jan 31 → Feb 1, Dec 31 → Jan 1).
+  const dtEnd = new Date(Date.parse(lastDay + "T00:00:00Z") + 86_400_000)
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, "");
   const stamp = now
     .toISOString()
     .replace(/[-:]/g, "")
