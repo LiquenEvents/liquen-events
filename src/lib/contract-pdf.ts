@@ -41,10 +41,15 @@ const GOLD = rgb(0.71, 0.4, 0.29);
  *  Sanitiza para WinAnsi antes de medir/quebrar — o snapshot dos termos e afins
  *  podem conter caracteres que a Helvetica não codifica (`widthOfTextAtSize` e
  *  `drawText` lançariam). */
-function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
-  const text = winAnsiSafe(rawText);
+export function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
   const out: string[] = [];
-  for (const paragraph of text.split("\n")) {
+  // Split on the RAW text's newlines FIRST: `winAnsiSafe` maps "\n" (a control
+  // char) to "?", so sanitising before splitting would erase every internal
+  // break — the "respeita \n internos" contract could never hold. Sanitise each
+  // paragraph after the split instead (a stored snapshot with a multi-line body
+  // then renders each line on its own row, not joined by a stray "?").
+  for (const rawParagraph of rawText.split("\n")) {
+    const paragraph = winAnsiSafe(rawParagraph);
     const words = paragraph.split(/\s+/).filter(Boolean);
     if (words.length === 0) {
       out.push("");
