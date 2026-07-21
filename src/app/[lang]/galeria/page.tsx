@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
@@ -153,6 +154,12 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </TrackedLink>
+              {/* Interlink to the services hub — moves a visitor browsing the
+                  portfolio toward the offering, and gives crawlers a keyworded
+                  path from /galeria into /servicos. */}
+              <Link href={localizeHref("/servicos", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
+                {t.common.verServicos} <span aria-hidden>→</span>
+              </Link>
               <a
                 href="https://www.instagram.com/liquen.events"
                 target="_blank"

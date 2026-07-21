@@ -131,6 +131,10 @@ function ServiceBand({
             </p>
             <Link
               href={localizeHref(`/servicos/${service.slug}`, locale)}
+              // Specific accessible name so the link's purpose is clear out of
+              // context (screen-reader link list) and the anchor text carries the
+              // service keyword for SEO — the visible label stays minimal.
+              aria-label={`${cta} — ${service.title}`}
               className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
             >
               {cta} <span aria-hidden>→</span>
@@ -337,6 +341,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                       `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
                       locale,
                     )}
+                    // Category-specific accessible name (visible label stays
+                    // minimal) so the link's target is clear out of context.
+                    aria-label={`${ts.verDetalhes} — ${cat.label}`}
                     className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
                   >
                     {ts.verDetalhes} <span aria-hidden>→</span>
