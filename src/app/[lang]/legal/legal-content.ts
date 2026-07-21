@@ -40,7 +40,11 @@ function privacyPt(): LegalDoc {
         heading: "2. Que dados recolhemos",
         body: [
           "Dados que nos fornece diretamente ao preencher o formulário de contacto ou de pedido de orçamento: nome, e-mail, telefone, tipo e data do evento, número de convidados, orçamento aproximado e a mensagem que nos enviar.",
+          "Dados de aceitação de propostas e contratação: se aceitar uma proposta através da ligação que lhe enviamos, registamos o nome indicado por quem aceita, a data e hora e o endereço IP, como prova da aceitação dos Termos e Condições.",
+          "Dados de faturação e pagamentos do seu evento (valores, faturas de sinal e de saldo e o estado dos pagamentos), acessíveis na sua área de cliente e conservados para cumprimento das obrigações fiscais.",
+          "Origem da visita: se chegar ao site através de uma ligação com parâmetros de campanha (UTM) ou a partir de outro site, podemos registar essa proveniência, associada ao pedido, para percebermos como nos encontrou.",
           "Dados técnicos recolhidos automaticamente e de forma agregada para segurança e estatística: endereço IP (de forma efémera, para limitação de abusos) e informação básica do pedido. Utilizamos estatísticas de visita sem cookies e sem identificação individual.",
+          "Rascunho do formulário: para não perder o que escreve, o formulário de pedido de orçamento guarda temporariamente as suas respostas no armazenamento local do navegador (localStorage), apenas no seu dispositivo. Pode limpá-lo a qualquer momento nas definições do navegador; não é enviado enquanto não submeter o pedido.",
         ],
       },
       {
@@ -159,7 +163,11 @@ function privacyEn(): LegalDoc {
         heading: "2. What data we collect",
         body: [
           "Data you provide directly when filling in the contact or quote-request form: name, e-mail, phone, event type and date, number of guests, approximate budget and the message you send us.",
+          "Proposal-acceptance and contracting data: if you accept a proposal through the link we send you, we record the name given by whoever accepts, the date and time and the IP address, as proof of acceptance of the Terms and Conditions.",
+          "Billing and payment data for your event (amounts, deposit and balance invoices and payment status), available in your client area and retained to meet tax obligations.",
+          "Visit source: if you reach the site via a link carrying campaign parameters (UTM) or from another website, we may record that origin, linked to your request, to understand how you found us.",
           "Technical data collected automatically and in aggregate for security and statistics: IP address (ephemerally, for abuse limiting) and basic request information. We use cookieless visit statistics with no individual identification.",
+          "Form draft: so you don't lose what you type, the quote-request form temporarily saves your answers in the browser's local storage (localStorage), on your device only. You can clear it at any time in your browser settings; nothing is sent until you submit the request.",
         ],
       },
       {
