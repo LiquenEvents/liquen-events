@@ -331,11 +331,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <AnimateIn>
                 <div className="max-w-2xl">
                   <h2
-                    className="text-veil-shadow text-white font-bold leading-[1.15]"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(26px, 4vw, 48px)",
-                    }}
+                    className="text-veil-shadow text-white font-light uppercase tracking-display leading-[1.25] max-w-xl"
+                    style={{ fontSize: "clamp(19px, 2.6vw, 34px)" }}
                   >
                     {cat.desc}
                   </h2>
