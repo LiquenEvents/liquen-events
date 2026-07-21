@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Quote } from "@/lib/orcamento/types";
-import { getQuote, updateQuote } from "@/lib/quotes-store";
+import { getQuote, updateQuote, deleteQuote } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quoteUpdateSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
+
+// The store is server-only and reaches for node:crypto — pin the Node runtime.
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -60,7 +63,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const { id } = await params;
-  const body = await request.json();
+  // Parse defensively: a malformed or non-object JSON body must yield a clean
+  // 400, not an uncaught throw (this parse sits outside the try below, so an
+  // unguarded request.json() would surface as a 500). `null`/numbers/strings
+  // also break the `key in body` check further down with a TypeError.
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+  }
 
   const allowed: (keyof Quote)[] = [
     "status",
@@ -107,6 +117,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(updated);
   } catch (err) {
     log.error("orcamento PATCH falhou", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+// Hard delete — for junk/test leads. This is deliberately distinct from
+// archiving (PATCH { archived: true }), a reversible soft-delete that keeps the
+// record. Deleting only removes the quote itself: related invoices and
+// contracts are fiscal records and are intentionally left untouched. (Draft
+// proposals are left too — proposals-store exposes no clean delete helper.)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!isAuthed(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  try {
+    await deleteQuote(id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    log.error("orcamento DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

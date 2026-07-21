@@ -8,20 +8,26 @@ import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
-  pendente: { label: "Pendente", color: "#8a8a82" },
-  em_revisao: { label: "Em Revisão", color: "#9aa36a" },
-  cotado: { label: "Cotado", color: "#7c854b" },
-  aceite: { label: "Aceite", color: "#525a2f" },
-  rejeitado: { label: "Rejeitado", color: "#5a5a55" },
+  pendente: { label: "Novo", color: "#8a8a82" },
+  em_revisao: { label: "Em revisão", color: "#9aa36a" },
+  cotado: { label: "Proposta enviada", color: "#7c854b" },
+  aceite: { label: "Ganho", color: "#525a2f" },
+  rejeitado: { label: "Perdido", color: "#5a5a55" },
 };
 
 // Order the pipeline reads as a funnel: new leads → qualified → quoted → won.
 const FUNNEL: { id: QuoteStatus; label: string }[] = [
-  { id: "pendente", label: "Novos" },
+  { id: "pendente", label: "Novo" },
   { id: "em_revisao", label: "Em revisão" },
   { id: "cotado", label: "Proposta enviada" },
-  { id: "aceite", label: "Ganhos" },
+  { id: "aceite", label: "Ganho" },
 ];
+
+// Shared keyboard focus ring — moss on the white back-office surface. Kept in one
+// place so every interactive card/button in the dashboard picks up the same
+// visible focus state (WCAG 2.4.7).
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {
@@ -48,6 +54,7 @@ function Delta({ now, prev }: { now: number; prev: number }) {
   if (pct === 0) return null;
   return (
     <span
+      aria-label={`${up ? "a subir" : "a descer"} ${Math.abs(pct)}% face ao mês anterior`}
       className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
         up ? "text-[#8aad85]" : "text-[#c08457]"
       }`}
@@ -59,6 +66,7 @@ function Delta({ now, prev }: { now: number; prev: number }) {
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
+        aria-hidden="true"
       >
         {up ? (
           <path
@@ -181,6 +189,12 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     const avgTicket = accepted > 0 ? won / accepted : 0;
     const billed = received + outstanding;
 
+    // Active pipeline = everything not yet won/lost. Pending review = the leads
+    // still waiting on us to send a proposal (Novo + Em revisão).
+    const active =
+      (byStatus["pendente"] ?? 0) + (byStatus["em_revisao"] ?? 0) + (byStatus["cotado"] ?? 0);
+    const pendingReview = (byStatus["pendente"] ?? 0) + (byStatus["em_revisao"] ?? 0);
+
     return {
       thisMonth,
       lastMonth,
@@ -201,6 +215,8 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       recent,
       conversion,
       avgTicket,
+      active,
+      pendingReview,
       total: quotes.length,
       byStatus,
       funnelMax: Math.max(1, ...FUNNEL.map((f) => byStatus[f.id] ?? 0)),
@@ -276,7 +292,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       icon: <path d="M12 5v14M5 12h14" strokeLinecap="round" />,
     },
     {
-      label: "Pipeline",
+      label: "Fases dos pedidos",
       onClick: () => onGo("kanban"),
       icon: (
         <>
@@ -311,17 +327,82 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     },
   ];
 
+  const dateLabel = new Date().toLocaleDateString("pt-PT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  // Warm onboarding state — a fresh back office with no pedidos yet. Instead of a
+  // grid of empty cards, greet the user and point them at their first action.
+  if (quotes.length === 0) {
+    return (
+      <div className="flex flex-col gap-7">
+        <div>
+          <p className="text-foreground/30 text-[10px] tracking-[0.4em] uppercase mb-2">
+            {dateLabel}
+          </p>
+          <h2
+            className="text-foreground font-bold"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
+          >
+            {greeting}, {userName}.
+          </h2>
+        </div>
+        <div className="bo-card p-8 sm:p-12 text-center flex flex-col items-center">
+          <span
+            className="flex items-center justify-center w-14 h-14 rounded-2xl mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
+            aria-hidden="true"
+          >
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+            >
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+          </span>
+          <h3
+            className="text-foreground/80 font-bold text-xl mb-2"
+            style={{ fontFamily: "var(--font-playfair)" }}
+          >
+            Ainda sem pedidos por aqui.
+          </h3>
+          <p className="text-foreground/45 text-sm max-w-sm leading-relaxed mb-6">
+            Este é o seu ponto de partida. Assim que registar o primeiro pedido, a Visão Geral
+            enche-se de vida — eventos, propostas e receita, tudo num só olhar.
+          </p>
+          <button
+            onClick={onNew}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+            >
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+            Criar o primeiro pedido
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-7">
       {/* Greeting + quick actions */}
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
         <div>
           <p className="text-foreground/30 text-[10px] tracking-[0.4em] uppercase mb-2">
-            {new Date().toLocaleDateString("pt-PT", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}
+            {dateLabel}
           </p>
           <h2
             className="text-foreground font-bold"
@@ -336,7 +417,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             <button
               key={a.label}
               onClick={a.onClick}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[10px] tracking-[0.12em] uppercase font-medium transition-colors ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm"
                   : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 shadow-sm"
@@ -362,7 +443,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       {data.nextEvent && data.nextEventDays !== null && data.nextEventDays <= 30 && (
         <button
           onClick={() => onOpen(data.nextEvent!)}
-          className={`w-full text-left rounded-2xl p-5 border transition-all hover:shadow-md ${
+          className={`w-full text-left rounded-2xl p-5 border transition-all motion-reduce:transition-none hover:shadow-md ${FOCUS_RING} ${
             data.nextEventDays <= 3
               ? "bg-[#b5654a]/[0.07] border-[#b5654a]/25 hover:border-[#b5654a]/40"
               : data.nextEventDays <= 7
@@ -402,7 +483,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                   month: "long",
                 })}
                 {data.nextEvent.location ? ` · ${data.nextEvent.location}` : ""}
-                {data.nextEvent.guests ? ` · ${data.nextEvent.guests} pax` : ""}
+                {data.nextEvent.guests ? ` · ${data.nextEvent.guests} convidados` : ""}
               </p>
             </div>
             <div className="shrink-0 text-right">
@@ -421,28 +502,47 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 {data.nextEventDays === 0 ? "hoje" : `${data.nextEventDays}d`}
               </p>
               <p className="text-foreground/25 text-[10px] tracking-[0.15em] uppercase mt-0.5">
-                {data.nextEvent.status === "aceite" ? "confirmado" : "cotado"}
+                {STATUS_META[data.nextEvent.status].label}
               </p>
             </div>
           </div>
         </button>
       )}
 
-      {/* KPI row — each card is a shortcut to the relevant view */}
+      {/* KPI hero strip — the four-or-five numbers that matter most at a glance.
+          Each card is a shortcut into the view that acts on it. Labels are written
+          for a newcomer, with a one-line helper spelling out what each means. */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { v: String(data.total), l: "Pedidos totais", dark: true, go: () => onGo("pedidos") },
           {
-            v: String(data.thisMonth),
-            l: "Este mês",
-            delta: { now: data.thisMonth, prev: data.lastMonth },
+            v: String(data.active),
+            l: "Pedidos ativos",
+            hint: "ainda em aberto",
+            dark: true,
             go: () => onGo("pedidos"),
           },
-          { v: eur(data.pipeline), l: "Em proposta", go: () => onGo("kanban") },
-          { v: eur(data.outstanding), l: "A receber", go: onGoStats },
+          {
+            v: String(data.pendingReview),
+            l: "Por responder",
+            hint: "aguardam proposta",
+            go: () => onGo("pedidos"),
+          },
+          {
+            v: eur(data.pipeline),
+            l: "Valor em propostas",
+            hint: "enviadas, à espera de resposta",
+            go: () => onGo("kanban"),
+          },
+          {
+            v: String(data.eventsThisWeek),
+            l: "Próximos 7 dias",
+            hint: "eventos agendados",
+            go: () => onGo("calendario"),
+          },
           {
             v: eur(data.won),
-            l: "Ganho",
+            l: "Receita ganha",
+            hint: "propostas fechadas",
             dark: true,
             delta: { now: data.wonThisMonth, prev: data.wonLastMonth },
             go: onGoStats,
@@ -451,7 +551,8 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
           <button
             key={k.l}
             onClick={k.go}
-            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-all ${
+            aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
+            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-all duration-200 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 ${FOCUS_RING} ${
               k.dark
                 ? "bg-[#1b2119] border-[#2d3829] hover:border-[#3d4a37]"
                 : "bg-white border-foreground/[0.08] shadow-sm hover:shadow-md hover:border-foreground/15"
@@ -476,9 +577,14 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
               {k.delta && <Delta now={k.delta.now} prev={k.delta.prev} />}
             </div>
             <p
-              className={`text-[9px] tracking-[0.25em] uppercase relative ${k.dark ? "text-white/30" : "text-foreground/30"}`}
+              className={`text-[9px] tracking-[0.25em] uppercase relative font-medium ${k.dark ? "text-white/45" : "text-foreground/45"}`}
             >
               {k.l}
+            </p>
+            <p
+              className={`text-[10px] mt-1 relative leading-tight ${k.dark ? "text-white/25" : "text-foreground/28"}`}
+            >
+              {k.hint}
             </p>
           </button>
         ))}
@@ -487,14 +593,14 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       {/* Meta mensal de receita */}
       <div className="bo-card p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="bo-eyebrow">Meta de receita — este mês</p>
+          <h3 className="bo-eyebrow">Meta de receita — este mês</h3>
           {!editingGoal && (
             <button
               onClick={() => {
                 setGoalInput(goal > 0 ? String(goal) : "");
                 setEditingGoal(true);
               }}
-              className="text-foreground/30 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors"
+              className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               {goal > 0 ? "Editar meta" : "Definir meta"}
             </button>
@@ -567,7 +673,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             )}
           </>
         ) : (
-          <p className="text-foreground/25 text-xs py-1">
+          <p className="text-foreground/40 text-xs py-1">
             Defina uma meta mensal para acompanhar o progresso de receita.
           </p>
         )}
@@ -576,11 +682,11 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       {/* Notas da equipa */}
       <div className="bo-card p-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="bo-eyebrow">Notas da equipa</p>
+          <h3 className="bo-eyebrow">Notas da equipa</h3>
           {!editingNotes && (
             <button
               onClick={() => setEditingNotes(true)}
-              className="text-foreground/30 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors"
+              className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               {teamNotes ? "Editar" : "Adicionar nota"}
             </button>
@@ -619,7 +725,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             {teamNotes}
           </p>
         ) : (
-          <p className="text-foreground/22 text-xs">
+          <p className="text-foreground/40 text-xs">
             Sem notas. Clique em &ldquo;Adicionar nota&rdquo; para começar.
           </p>
         )}
@@ -636,10 +742,10 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         {/* Funnel */}
         <div className="bo-card p-5">
           <div className="flex items-center justify-between mb-5">
-            <p className="bo-eyebrow">Pipeline comercial</p>
+            <h3 className="bo-eyebrow">Fases dos pedidos</h3>
             <button
               onClick={() => onGo("kanban")}
-              className="text-[#637a5f]/70 hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors"
+              className={`text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               Abrir →
             </button>
@@ -673,7 +779,12 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             })}
           </div>
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-foreground/[0.07]">
-            <span className="text-foreground/35 text-xs">Taxa de conversão</span>
+            <span className="text-foreground/35 text-xs">
+              Pedidos que acabam em evento
+              <span className="block text-foreground/25 text-[10px]">
+                de cada 100 decididos, quantos ganhou
+              </span>
+            </span>
             <span className="text-foreground/75 text-sm font-semibold tabular-nums">
               {data.conversion}%
             </span>
@@ -683,10 +794,10 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         {/* Financial pulse */}
         <div className="bo-card p-5">
           <div className="flex items-center justify-between mb-5">
-            <p className="bo-eyebrow">Pulso financeiro</p>
+            <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
             <button
               onClick={onGoStats}
-              className="text-[#637a5f]/70 hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors"
+              className={`text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               Ver tudo →
             </button>
@@ -733,10 +844,18 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
               </div>
             </>
           ) : (
-            <p className="text-foreground/25 text-xs">Ainda sem pagamentos registados.</p>
+            <p className="text-foreground/40 text-xs leading-relaxed">
+              Ainda sem pagamentos registados. Assim que registar o primeiro, o recebido e o que
+              falta receber aparecem aqui.
+            </p>
           )}
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-foreground/[0.07]">
-            <span className="text-foreground/35 text-xs">Ticket médio (ganho)</span>
+            <span className="text-foreground/35 text-xs">
+              Valor médio por evento ganho
+              <span className="block text-foreground/25 text-[10px]">
+                quanto vale, em média, cada pedido fechado
+              </span>
+            </span>
             <span className="text-foreground/75 text-sm font-semibold tabular-nums">
               {eur(data.avgTicket)}
             </span>
@@ -748,7 +867,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
         <div className="bo-card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
-            <p className="bo-eyebrow">Precisam de atenção</p>
+            <h3 className="bo-eyebrow">Precisam de atenção</h3>
             <div className="flex items-center gap-2">
               {data.staleCount > 0 && (
                 <span className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-semibold">
@@ -764,20 +883,24 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
           </div>
           <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
             {data.needAction.length === 0 && (
-              <p className="text-foreground/25 text-sm text-center py-12">
-                Sem pedidos pendentes. ✓
-              </p>
+              <div className="text-center py-12 px-6">
+                <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
+                <p className="text-foreground/35 text-xs mt-1.5 leading-relaxed">
+                  Não há pedidos à espera de si. Bom trabalho — aproveite para preparar os próximos
+                  eventos.
+                </p>
+              </div>
             )}
             {data.needAction.slice(0, 8).map(({ q, daysSince, isStale }) => (
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors flex items-center justify-between gap-3"
+                className={`w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
               >
                 <div className="min-w-0">
                   <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
                   <p className="text-foreground/30 text-xs truncate mt-0.5">
-                    {eventTypeLabel(q)} · {q.guests} pax
+                    {eventTypeLabel(q)} · {q.guests} convidados
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -804,24 +927,26 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         </div>
 
         <div className="bo-card overflow-hidden">
-          <p className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">
+          <h3 className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">
             Atividade recente
-          </p>
+          </h3>
           <div className="divide-y divide-foreground/[0.06]">
             {data.recent.map((q) => (
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors flex items-center justify-between gap-3"
+                className={`w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
               >
                 <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
-                <span className="text-foreground/22 text-[10px] shrink-0">
+                <span className="text-foreground/30 text-[10px] shrink-0">
                   {timeAgo(q.submittedAt)}
                 </span>
               </button>
             ))}
             {data.recent.length === 0 && (
-              <p className="text-foreground/25 text-sm text-center py-10">Sem atividade.</p>
+              <p className="text-foreground/35 text-sm text-center py-10">
+                Ainda sem movimentos por aqui.
+              </p>
             )}
           </div>
         </div>

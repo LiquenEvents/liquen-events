@@ -72,6 +72,8 @@ export const en: Dict = {
     testemunhoLabel: "Testimonial",
     pausar: "Pause testimonial rotation",
     retomar: "Resume testimonial rotation",
+    pausarLogos: "Pause logo marquee",
+    retomarLogos: "Resume logo marquee",
     whatsappPrefill: "Hi, I'd like to know more about your event decoration services.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
@@ -497,7 +499,11 @@ export const en: Dict = {
         services: [
           {
             title: "Weddings",
-            desc: "Your most special day, with bespoke decoration and the day coordinated down to the last detail, so you can simply live it.",
+            desc: "Your most special day — coordination, decoration, photography and catering. We handle it all so you can simply live it.",
+          },
+          {
+            title: "Classic Car Rental",
+            desc: "Classic cars with a driver for a dream arrival — from the bride's entrance to guest transport.",
           },
           {
             title: "Christenings & Communions",
@@ -518,6 +524,10 @@ export const en: Dict = {
         subtitle: "For companies",
         desc: "We elevate your brand's image through events that transform teams and celebrate achievements.",
         services: [
+          {
+            title: "Corporate Events",
+            desc: "Decoration and scenography tailored to your brand — from conferences and launches to company dinners.",
+          },
           {
             title: "Conferences & Congresses",
             desc: "Full organisation of corporate conferences, from logistics to audiovisual.",
@@ -577,6 +587,7 @@ export const en: Dict = {
     convidados: "Guests",
     data: "Date",
     local: "Location",
+    mensagem: "Message",
     adicionais: "Additional Services",
     noDataNote:
       "Save the reference above. We've sent the details to our team and will be in touch shortly.",
@@ -649,6 +660,9 @@ export const en: Dict = {
       rejeitadaBody:
         "Thank you for letting us know. If you change your mind or want to adjust anything, we're always here.",
       jaRegistado: "We had already recorded your response to this proposal.",
+      expiradaTitle: "This proposal has expired.",
+      expiradaBody:
+        "This proposal's validity date has passed, so it can no longer be accepted here. Get in touch and we'll gladly prepare an updated proposal for you.",
       aceitar: "Accept proposal →",
       aceitarSending: "Recording…",
       recusar: "Decline",
@@ -768,6 +782,7 @@ export const en: Dict = {
     servicosTitulo: "Services",
     serviceLinks: [
       "Wedding Decoration",
+      "Classic Car Rental",
       "Corporate Events",
       "Parties & Celebrations",
       "Gala Dinners",

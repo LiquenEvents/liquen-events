@@ -63,6 +63,11 @@ function Mark({
 export default function ClientMarquee() {
   const { t } = useTranslations();
   const trackRef = useRef<HTMLDivElement>(null);
+  // Persistent user control (WCAG 2.2.2 Pause, Stop, Hide): the band scrolls for
+  // more than 5s, so a visitor must be able to stop it. Orthogonal to the
+  // off-screen IntersectionObserver pause below — user pause is applied via an
+  // inline animation-play-state, which wins over the observer's class either way.
+  const [userPaused, setUserPaused] = useState(false);
 
   // Pause the infinite scroll while the band is off-screen — no point
   // compositing a wide moving strip the user can't see (battery / GPU).
@@ -90,11 +95,25 @@ export default function ClientMarquee() {
       <div
         ref={trackRef}
         className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap"
+        style={userPaused ? { animationPlayState: "paused" } : undefined}
       >
         {[...clientLogos, ...clientLogos].map((c, i) => (
           <Mark key={i} name={c.name} logo={c.logo} duplicate={i >= clientLogos.length} />
         ))}
       </div>
+      {/* Pause/resume control. Hidden from the reduced-motion path — there the
+          band doesn't animate (globals.css), so there's nothing to pause. */}
+      <button
+        type="button"
+        onClick={() => setUserPaused((p) => !p)}
+        aria-pressed={userPaused}
+        aria-label={userPaused ? t.common.retomarLogos : t.common.pausarLogos}
+        className="motion-reduce:hidden absolute bottom-1 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-foreground/15 bg-surface/80 text-foreground/60 backdrop-blur-sm transition-colors hover:text-foreground/90 hover:border-foreground/30"
+      >
+        <span aria-hidden className="text-[11px] leading-none">
+          {userPaused ? "▶" : "❚❚"}
+        </span>
+      </button>
     </div>
   );
 }

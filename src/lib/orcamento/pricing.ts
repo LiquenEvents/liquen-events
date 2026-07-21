@@ -90,7 +90,14 @@ export function calculatePrice(form: Partial<QuoteFormData>): PriceBreakdown {
     urgencySurcharge +
     addonsCost;
   const iva = subtotal * 0.23;
-  const total = subtotal + iva;
+
+  // Round the subtotal and IVA lines independently, then derive the total from
+  // those rounded lines so the breakdown we show the client always adds up
+  // (subtotal + iva === total). Rounding `subtotal * 1.23` on its own drifts a
+  // cent away from the printed lines for awkward fractional subtotals.
+  const roundedSubtotal = Math.round(subtotal);
+  const roundedIva = Math.round(iva);
+  const total = roundedSubtotal + roundedIva;
 
   const isEstimate = !form.date || !form.locationType || !form.guests;
   const variance = isEstimate ? 0.2 : 0.08;
@@ -104,9 +111,9 @@ export function calculatePrice(form: Partial<QuoteFormData>): PriceBreakdown {
     seasonSurcharge: Math.round(seasonSurcharge),
     urgencySurcharge: Math.round(urgencySurcharge),
     addonsCost: Math.round(addonsCost),
-    subtotal: Math.round(subtotal),
-    iva: Math.round(iva),
-    total: Math.round(total),
+    subtotal: roundedSubtotal,
+    iva: roundedIva,
+    total,
     rangeMin: Math.round(total * (1 - variance)),
     rangeMax: Math.round(total * (1 + variance)),
     isEstimate,

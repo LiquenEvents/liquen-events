@@ -34,7 +34,11 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
-    const { endpoint } = await request.json();
+    // A malformed or empty unsubscribe body must not 500 — treat it as "nothing
+    // to remove" (mirrors the POST handler's tolerant JSON parse). Unsubscribe
+    // is idempotent, so an absent endpoint is a no-op, not an error.
+    const body = (await request.json().catch(() => null)) as { endpoint?: unknown } | null;
+    const endpoint = typeof body?.endpoint === "string" ? body.endpoint : undefined;
     if (endpoint) await removeSubscription(endpoint);
     return NextResponse.json({ ok: true });
   } catch {

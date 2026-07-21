@@ -53,6 +53,15 @@ describe("proposal-token — signed accept links", () => {
     expect(readProposalToken(undefined)).toBeNull();
   });
 
+  it("rejects a canonical token with trailing junk appended", () => {
+    // `body.sig` is genuinely valid; appending `.junk` must NOT be silently
+    // dropped (the old 2-target split-destructure accepted `body.sig.junk`).
+    const token = createProposalToken("prop-123");
+    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
+    expect(readProposalToken(`${token}.junk`)).toBeNull();
+    expect(readProposalToken(`${token}.a.b.c`)).toBeNull();
+  });
+
   it("rejects a token signed with a different secret", () => {
     const token = createProposalToken("prop-123");
     process.env.SESSION_SECRET = "a-totally-different-secret-987654321";
@@ -85,6 +94,14 @@ describe("proposal-token — signed accept links", () => {
     expect(a).not.toEqual(b);
     expect(readProposalToken(a)).toEqual({ proposalId: "prop-A" });
     expect(readProposalToken(b)).toEqual({ proposalId: "prop-B" });
+  });
+
+  it("rejects a validly-signed token whose body is not valid JSON", () => {
+    // Assinatura correta, mas o corpo (base64url) não é JSON — a desserialização
+    // rebenta e tem de devolver null em vez de propagar.
+    const body = Buffer.from("nao-e-json{{").toString("base64url");
+    const sig = createHmac("sha256", process.env.SESSION_SECRET!).update(body).digest("base64url");
+    expect(readProposalToken(`${body}.${sig}`)).toBeNull();
   });
 
   // Domain separation: an admin session token must NOT read as a proposal token

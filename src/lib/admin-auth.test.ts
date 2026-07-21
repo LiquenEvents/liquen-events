@@ -81,6 +81,36 @@ describe("verifyCredentials — individual accounts (ADMIN_USERS)", () => {
   });
 });
 
+describe("production fallbacks — login must be disabled without real secrets", () => {
+  beforeEach(() => {
+    // Simulate production with NOTHING configured: no ADMIN_USERS,
+    // no ADMIN_PASSWORD_HASH, no SESSION_SECRET.
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.SESSION_SECRET;
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("refuses the committed public dev password in production", async () => {
+    // "liquen2026" (DEV_SHARED_HASH) is public knowledge — it must NEVER open a
+    // session in production when no real hash is configured.
+    expect(await verifyCredentials("Catarina", "liquen2026")).toBeNull();
+    expect(await verifyCredentials("", "liquen2026")).toBeNull();
+  });
+
+  it("still authenticates a configured ADMIN_PASSWORD_HASH in production", async () => {
+    const bcrypt = (await import("bcryptjs")).default;
+    process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("prod-pass", 10);
+    try {
+      expect(await verifyCredentials("Rui", "prod-pass")).toEqual({ name: "Rui" });
+      expect(await verifyCredentials("Rui", "liquen2026")).toBeNull();
+    } finally {
+      delete process.env.ADMIN_PASSWORD_HASH;
+    }
+  });
+});
+
 describe("sessions — signed and expiring", () => {
   it("round-trips a valid session", () => {
     const token = createSession("Catarina");

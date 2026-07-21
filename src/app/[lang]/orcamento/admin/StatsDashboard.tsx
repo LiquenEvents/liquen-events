@@ -7,13 +7,21 @@ import { computeEventMetrics } from "@/lib/orcamento/dossier";
 import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
 import { eur0 as eur } from "@/lib/money";
 
+// Unified status vocabulary — the same words a newcomer sees everywhere else in
+// the back office (Overview, Kanban): Novo / Em revisão / Proposta enviada /
+// Ganho / Perdido.
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
-  pendente: { label: "Pendente", color: "#8a8a82" },
-  em_revisao: { label: "Em Revisão", color: "#9aa36a" },
-  cotado: { label: "Cotado", color: "#7c854b" },
-  aceite: { label: "Aceite", color: "#525a2f" },
-  rejeitado: { label: "Rejeitado", color: "#5a5a55" },
+  pendente: { label: "Novo", color: "#8a8a82" },
+  em_revisao: { label: "Em revisão", color: "#9aa36a" },
+  cotado: { label: "Proposta enviada", color: "#7c854b" },
+  aceite: { label: "Ganho", color: "#525a2f" },
+  rejeitado: { label: "Perdido", color: "#5a5a55" },
 };
+
+// Shared keyboard focus ring — matches the Overview so focus states read as one
+// system across the back office (WCAG 2.4.7).
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 const MONTHS_PT = [
   "Jan",
@@ -77,22 +85,38 @@ function VBars({
   format?: (n: number) => string;
 }) {
   const max = Math.max(1, ...data.map((d) => d.value));
+  const allZero = data.every((d) => d.value === 0);
+  if (allZero) {
+    return <p className="text-foreground/40 text-xs">Ainda sem dados neste período.</p>;
+  }
   return (
     <div className="flex items-end gap-2 h-40">
-      {data.map((d, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-          <span className="text-foreground/40 text-[10px] tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
-            {format ? format(d.value) : d.value}
-          </span>
-          <div className="w-full bg-foreground/5 rounded-sm relative" style={{ height: "100%" }}>
+      {data.map((d, i) => {
+        const valueLabel = format ? format(d.value) : String(d.value);
+        return (
+          <div
+            key={i}
+            className="flex-1 flex flex-col items-center gap-2 group"
+            title={`${d.label}: ${valueLabel}`}
+          >
+            <span className="text-foreground/45 text-[10px] tabular-nums opacity-0 group-hover:opacity-100 transition-opacity motion-reduce:transition-none">
+              {valueLabel}
+            </span>
             <div
-              className="absolute bottom-0 left-0 right-0 bg-moss/70 group-hover:bg-moss rounded-sm transition-all duration-500"
-              style={{ height: `${(d.value / max) * 100}%` }}
-            />
+              className="w-full bg-foreground/5 rounded-sm relative"
+              style={{ height: "100%" }}
+              role="img"
+              aria-label={`${d.label}: ${valueLabel}`}
+            >
+              <div
+                className="absolute bottom-0 left-0 right-0 bg-moss/70 group-hover:bg-moss rounded-sm transition-all duration-500 motion-reduce:transition-none"
+                style={{ height: `${(d.value / max) * 100}%` }}
+              />
+            </div>
+            <span className="text-foreground/40 text-[9px] tracking-wide">{d.label}</span>
           </div>
-          <span className="text-foreground/25 text-[9px] tracking-wide">{d.label}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -118,7 +142,7 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
           </div>
         </div>
       ))}
-      {data.length === 0 && <p className="text-foreground/25 text-xs">Sem dados.</p>}
+      {data.length === 0 && <p className="text-foreground/40 text-xs">Ainda sem dados.</p>}
     </div>
   );
 }
@@ -126,9 +150,9 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border border-foreground/[0.08] rounded-xl p-6 bg-white shadow-sm">
-      <p className="text-foreground/35 text-[10px] tracking-[0.3em] uppercase mb-6 font-medium">
+      <h2 className="text-foreground/55 text-[10px] tracking-[0.3em] uppercase mb-6 font-medium">
         {title}
-      </p>
+      </h2>
       {children}
     </div>
   );
@@ -397,9 +421,34 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
 
   if (quotes.length === 0) {
     return (
-      <div className="text-center py-24 text-foreground/25">
-        <p className="text-sm">Ainda não há dados para mostrar.</p>
-        <p className="text-xs mt-2">As estatísticas aparecem assim que chegarem pedidos.</p>
+      <div className="bo-card py-20 px-6 text-center flex flex-col items-center">
+        <span
+          className="flex items-center justify-center w-14 h-14 rounded-2xl mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
+          aria-hidden="true"
+        >
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+          >
+            <rect x="3" y="4" width="4" height="16" rx="1" />
+            <rect x="10" y="4" width="4" height="11" rx="1" />
+            <rect x="17" y="4" width="4" height="7" rx="1" />
+          </svg>
+        </span>
+        <h2
+          className="text-foreground/80 font-bold text-xl mb-2"
+          style={{ fontFamily: "var(--font-playfair)" }}
+        >
+          Ainda não há dados para mostrar.
+        </h2>
+        <p className="text-foreground/45 text-sm max-w-sm leading-relaxed">
+          As estatísticas — conversão, receita, margens e tendências — aparecem automaticamente
+          assim que chegarem os primeiros pedidos.
+        </p>
       </div>
     );
   }
@@ -413,10 +462,11 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${
+              aria-pressed={period === p}
+              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 motion-reduce:transition-none ${FOCUS_RING} ${
                 period === p
                   ? "bg-[#1b2119] text-white shadow-sm"
-                  : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
+                  : "bg-foreground/[0.04] text-foreground/50 hover:bg-foreground/[0.07] hover:text-foreground/70"
               }`}
             >
               {PERIOD_LABELS[p]}
@@ -429,7 +479,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               onClick={() =>
                 downloadCsv(`liquen-pagamentos-${dateStamp()}`, paymentsToCsvRows(filteredQuotes))
               }
-              className="px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
+              className={`px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/50 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/70 transition-colors motion-reduce:transition-none shadow-sm ${FOCUS_RING}`}
               title="Exportar todos os pagamentos (tesouraria) para CSV"
             >
               Pagamentos ↓
@@ -439,7 +489,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
             onClick={() =>
               downloadCsv(`liquen-pedidos-${dateStamp()}`, quotesToCsvRows(filteredQuotes))
             }
-            className="px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/45 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm"
+            className={`px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/50 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/70 transition-colors motion-reduce:transition-none shadow-sm ${FOCUS_RING}`}
           >
             Exportar CSV ↓
           </button>
@@ -505,7 +555,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
 
           <Panel title="Próximos pagamentos (60 dias)">
             {stats.upcoming.length === 0 ? (
-              <p className="text-foreground/25 text-xs">
+              <p className="text-foreground/40 text-xs">
                 Sem pagamentos previstos para os próximos 60 dias.
               </p>
             ) : (
@@ -558,7 +608,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               </p>
             </>
           ) : (
-            <p className="text-foreground/25 text-xs">
+            <p className="text-foreground/40 text-xs">
               Ainda sem eventos ganhos com valor contratado. A margem aparece assim que fechar a
               primeira proposta.
             </p>
@@ -606,7 +656,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               })()}
             </div>
           ) : (
-            <p className="text-foreground/25 text-xs">Sem propostas aceites ainda.</p>
+            <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
           )}
         </Panel>
       </div>
@@ -623,7 +673,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               format={(n) => eur(n)}
             />
           ) : (
-            <p className="text-foreground/25 text-xs">Sem propostas aceites ainda.</p>
+            <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
           )}
         </Panel>
       </div>

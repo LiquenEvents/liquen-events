@@ -74,11 +74,20 @@ const nextConfig: NextConfig = {
       "form-action 'self'",
       "frame-ancestors 'self'",
       "upgrade-insecure-requests",
+      // report-to is the modern reporting directive (Reporting API v1); report-uri
+      // is kept as the fallback for browsers that don't yet honour report-to. Both
+      // point at the same collector endpoint.
+      "report-to csp-endpoint",
       "report-uri /api/security/csp-report",
     ].join("; ");
 
     const securityHeaders = [
       { key: "Content-Security-Policy", value: csp },
+      // Named endpoint referenced by the CSP `report-to` directive above.
+      {
+        key: "Reporting-Endpoints",
+        value: 'csp-endpoint="/api/security/csp-report"',
+      },
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "X-Frame-Options", value: "SAMEORIGIN" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

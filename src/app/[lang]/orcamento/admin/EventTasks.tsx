@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
+import { Button, Field, EmptyState } from "./ui";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   baixa: "#8a8a82",
@@ -91,26 +92,42 @@ export default function EventTasks({ quote, userName }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Tarefas do evento</p>
         <div className="flex items-center gap-3">
           {tasks.length > 0 && (
-            <span className="text-foreground/28 text-[10px] tabular-nums">
+            <span className="text-foreground/50 text-[11px] tabular-nums">
               {done.length}/{tasks.length} concluídas
             </span>
           )}
-          <button
+          <Button
+            variant="subtle"
+            size="sm"
+            aria-expanded={adding}
+            iconLeft={
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+            }
             onClick={() => setAdding((v) => !v)}
-            className="text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-70 transition-opacity"
           >
-            + Adicionar
-          </button>
+            Adicionar
+          </Button>
         </div>
       </div>
 
       {adding && (
-        <div className="mb-3 flex flex-col gap-2 p-3 rounded-xl border border-dashed border-[#4d6350]/30 bg-[#4d6350]/[0.04]">
-          <input
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.04] p-4">
+          <Field
+            label="Título da tarefa"
             autoFocus
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
@@ -118,68 +135,86 @@ export default function EventTasks({ quote, userName }: Props) {
               if (e.key === "Enter") addTask();
               if (e.key === "Escape") setAdding(false);
             }}
-            placeholder="Título da tarefa…"
-            className="bo-input px-3 py-2 text-sm text-foreground/70"
+            placeholder="Ex.: Confirmar catering"
           />
-          <div className="flex gap-2">
-            <select
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              as="select"
+              label="Prioridade"
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-              className="bo-input flex-1 px-2 py-1.5 text-xs text-foreground/60"
             >
               {(["baixa", "normal", "alta"] as TaskPriority[]).map((p) => (
                 <option key={p} value={p}>
                   {PRIORITY_LABEL[p]}
                 </option>
               ))}
-            </select>
-            <input
+            </Field>
+            <Field
+              as="input"
               type="date"
+              label="Data limite"
               value={newDue}
               onChange={(e) => setNewDue(e.target.value)}
-              className="bo-input flex-1 px-2 py-1.5 text-xs text-foreground/60"
             />
           </div>
-          <div className="flex gap-2">
-            <button
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              variant="primary"
               onClick={addTask}
+              loading={busy}
               disabled={busy || !newTitle.trim()}
-              className="flex-1 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors disabled:opacity-40"
             >
               {busy ? "A criar…" : "Criar tarefa"}
-            </button>
-            <button
-              onClick={() => setAdding(false)}
-              className="px-4 py-2 text-foreground/40 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors"
-            >
+            </Button>
+            <Button variant="ghost" onClick={() => setAdding(false)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           {[1, 2].map((i) => (
-            <div key={i} className="bo-skeleton h-10 w-full rounded-lg" />
+            <div key={i} className="bo-skeleton h-12 w-full rounded-xl" />
           ))}
         </div>
       ) : tasks.length === 0 && !adding ? (
-        <p className="text-foreground/22 text-xs py-1">Sem tarefas ligadas a este evento.</p>
+        <EmptyState
+          className="px-4 py-10"
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="M9 11l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="4" y="4" width="16" height="16" rx="3" />
+            </svg>
+          }
+          title="Sem tarefas ligadas a este evento"
+          description="Cria a primeira tarefa para acompanhar o que falta preparar."
+          action={{ label: "Adicionar tarefa", onClick: () => setAdding(true) }}
+        />
       ) : (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           {[...todo, ...done].map((task) => (
             <div
               key={task.id}
-              className={`group flex items-start gap-2.5 p-2.5 rounded-lg border transition-all ${
+              className={`group flex items-start gap-3 rounded-xl border p-3 motion-safe:transition-all ${
                 task.done
-                  ? "border-foreground/[0.05] bg-foreground/[0.015] opacity-55"
-                  : "border-foreground/[0.07] bg-white shadow-sm hover:shadow"
+                  ? "border-foreground/[0.05] bg-foreground/[0.015] opacity-60"
+                  : "border-foreground/[0.08] bg-white shadow-[0_1px_2px_rgba(42,38,32,0.04)] hover:shadow"
               }`}
             >
               <button
                 onClick={() => toggleDone(task)}
-                className="mt-0.5 shrink-0 w-4 h-4 rounded border-[1.5px] flex items-center justify-center transition-colors"
+                className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border-[1.5px] motion-safe:transition-colors"
                 style={{
                   borderColor: task.done ? "#4d6350" : PRIORITY_COLOR[task.priority],
                   background: task.done ? "#4d635014" : "transparent",
@@ -188,8 +223,8 @@ export default function EventTasks({ quote, userName }: Props) {
               >
                 {task.done && (
                   <svg
-                    width="10"
-                    height="10"
+                    width="11"
+                    height="11"
                     viewBox="0 0 12 12"
                     fill="none"
                     stroke="#4d6350"
@@ -200,18 +235,18 @@ export default function EventTasks({ quote, userName }: Props) {
                   </svg>
                 )}
               </button>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p
-                  className={`text-xs leading-snug ${
-                    task.done ? "line-through text-foreground/30" : "text-foreground/65"
+                  className={`text-sm leading-snug ${
+                    task.done ? "text-foreground/40 line-through" : "text-foreground/80"
                   }`}
                 >
                   {task.title}
                 </p>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="mt-1 flex flex-wrap items-center gap-2">
                   {!task.done && (
                     <span
-                      className="text-[9px] tracking-[0.08em] uppercase"
+                      className="text-[10px] uppercase tracking-[0.08em]"
                       style={{ color: PRIORITY_COLOR[task.priority] }}
                     >
                       {PRIORITY_LABEL[task.priority]}
@@ -219,12 +254,13 @@ export default function EventTasks({ quote, userName }: Props) {
                   )}
                   {task.dueDate && !task.done && (
                     <span
-                      className={`text-[10px] tabular-nums ${
+                      className={`text-[11px] tabular-nums ${
                         task.dueDate < todayKey
-                          ? "text-[#b5654a] font-medium"
-                          : "text-foreground/28"
+                          ? "font-medium text-[#8a2a22]"
+                          : "text-foreground/45"
                       }`}
                     >
+                      {task.dueDate < todayKey ? "Atrasada · " : ""}
                       {new Date(task.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
                         day: "numeric",
                         month: "short",
@@ -232,22 +268,23 @@ export default function EventTasks({ quote, userName }: Props) {
                     </span>
                   )}
                   {task.assignee && !task.done && (
-                    <span className="text-foreground/25 text-[10px]">{task.assignee}</span>
+                    <span className="text-foreground/45 text-[11px]">{task.assignee}</span>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => removeTask(task.id)}
-                className="mt-0.5 opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-[#b5654a] transition-all shrink-0"
+                className="mt-0.5 shrink-0 text-foreground/25 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                 aria-label="Remover tarefa"
               >
                 <svg
-                  width="12"
-                  height="12"
+                  width="13"
+                  height="13"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
+                  aria-hidden="true"
                 >
                   <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
                 </svg>

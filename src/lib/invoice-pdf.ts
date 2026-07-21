@@ -73,7 +73,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
 
   // Header
   text("LÍQUEN EVENTS", MARGIN, y, { font: bold, size: 20, color: MOSS });
-  tr("RECIBO", right, y, { font: bold, size: 12, color: MUTED });
+  tr("FATURA", right, y, { font: bold, size: 12, color: MUTED });
   y -= 16;
   text("Decoramos eventos, eternizamos memórias.", MARGIN, y, { size: 9, color: MUTED });
   tr(`Nº ${d.number}`, right, y, { size: 9, color: MUTED });

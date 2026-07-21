@@ -83,6 +83,12 @@ jobs:
         run: npm run test:e2e
         env:
           CI: "true"
+          # Test-only admin auth so the back-office smoke can log in against the
+          # production `next start` server (which otherwise disables login).
+          # Hash is the already-committed dev hash for the public "liquen2026"
+          # password — no real secret; the session secret is throwaway.
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
       - name: Upload report on failure
         if: failure()

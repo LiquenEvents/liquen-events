@@ -49,7 +49,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+    }
     const patch: Record<string, unknown> = {};
     for (const key of ALLOWED) {
       if (key in body) {

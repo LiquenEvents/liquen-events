@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Supplier } from "@/lib/orcamento/types";
 import { downloadCsv, dateStamp } from "./export";
 import { SkeletonCard } from "./Skeleton";
-import EmptyState from "./EmptyState";
+import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 
 const CATEGORIES = [
   "Catering",
@@ -27,6 +27,20 @@ const EMPTY_FORM = {
   location: "",
   notes: "",
 };
+
+const PlusIcon = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+  </svg>
+);
 
 export default function Fornecedores() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -139,107 +153,123 @@ export default function Fornecedores() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-        <div className="relative flex-1 max-w-md">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-          </svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Procurar fornecedor…"
-            className="bo-input pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-        </div>
-        {suppliers.length > 0 && (
-          <button
-            onClick={exportCsv}
-            className="px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm shrink-0"
-            title="Exportar fornecedores para CSV"
-          >
-            Exportar
-          </button>
-        )}
-        <button
-          onClick={() => setAdding(!adding)}
-          className="px-4 py-2.5 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm shrink-0"
-        >
-          {adding ? "Cancelar" : "+ Fornecedor"}
-        </button>
-      </div>
+      <Toolbar
+        className="mb-6"
+        start={
+          <div className="relative w-full max-w-md sm:w-80">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Procurar fornecedor…"
+              aria-label="Procurar fornecedores"
+              className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
+            />
+          </div>
+        }
+        end={
+          <>
+            {suppliers.length > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={exportCsv}
+                title="Exportar fornecedores para CSV"
+              >
+                Exportar
+              </Button>
+            )}
+            <Button
+              variant={adding ? "secondary" : "primary"}
+              size="sm"
+              iconLeft={adding ? undefined : PlusIcon}
+              onClick={() => setAdding(!adding)}
+            >
+              {adding ? "Cancelar" : "Fornecedor"}
+            </Button>
+          </>
+        }
+      />
 
       {adding && (
-        <div className="bo-card p-4 mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Nome *"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <select
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            className="bo-input px-3 py-2 text-sm text-foreground/60"
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <input
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            placeholder="Telefone"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <input
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            placeholder="E-mail"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <input
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-            placeholder="Localização"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <input
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="Notas"
-            className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
-          />
-          <button
-            onClick={add}
-            disabled={!form.name.trim()}
-            className="sm:col-span-2 py-2.5 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors disabled:opacity-40"
-          >
-            Guardar Fornecedor
-          </button>
-        </div>
+        <Card padding="sm" className="mb-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field
+              label="Nome"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Nome do fornecedor"
+            />
+            <Field
+              as="select"
+              label="Categoria"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Field>
+            <Field
+              label="Telefone"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="Telefone"
+            />
+            <Field
+              label="E-mail"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="E-mail"
+            />
+            <Field
+              label="Localização"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              placeholder="Localização"
+            />
+            <Field
+              label="Notas"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Notas"
+            />
+          </div>
+          <div className="mt-5 flex justify-end">
+            <Button onClick={add} disabled={!form.name.trim()}>
+              Guardar fornecedor
+            </Button>
+          </div>
+        </Card>
       )}
 
       {/* Category chips */}
-      <div className="flex flex-wrap gap-1.5 mb-5">
+      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrar por categoria">
         {cats.map((c) => (
-          <button
+          <Button
             key={c}
+            size="sm"
+            variant={cat === c ? "subtle" : "ghost"}
+            aria-pressed={cat === c}
             onClick={() => setCat(c)}
-            className={`px-3 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${cat === c ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
           >
             {c}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -250,108 +280,117 @@ export default function Fornecedores() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-            >
-              <path
-                d="M3 9l1-5h16l1 5M4 9h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9z"
-                strokeLinejoin="round"
-              />
-              <path d="M9 13h6" strokeLinecap="round" />
-            </svg>
-          }
-          title={suppliers.length === 0 ? "Sem fornecedores ainda" : "Nenhum fornecedor encontrado"}
-          hint={
-            suppliers.length === 0
-              ? "Guarde aqui os contactos de catering, floristas, fotógrafos e outros parceiros de confiança."
-              : "Tente outra pesquisa ou categoria."
-          }
-          action={
-            suppliers.length === 0
-              ? { label: "+ Adicionar fornecedor", onClick: () => setAdding(true) }
-              : undefined
-          }
-        />
+        <Card padding="none">
+          <EmptyState
+            icon={
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 9l1-5h16l1 5M4 9h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9z"
+                  strokeLinejoin="round"
+                />
+                <path d="M9 13h6" strokeLinecap="round" />
+              </svg>
+            }
+            title={
+              suppliers.length === 0 ? "Sem fornecedores ainda" : "Nenhum fornecedor encontrado"
+            }
+            description={
+              suppliers.length === 0
+                ? "Guarde aqui os contactos de catering, floristas, fotógrafos e outros parceiros de confiança."
+                : "Tente outra pesquisa ou categoria."
+            }
+            action={
+              suppliers.length === 0
+                ? { label: "Adicionar fornecedor", onClick: () => setAdding(true) }
+                : undefined
+            }
+          />
+        </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((s) => (
-            <div key={s.id} className="group bo-card p-4">
+            <Card key={s.id} padding="sm" className="group">
               {editingId === s.id ? (
                 /* ── Edit mode ── */
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-foreground/30">
-                      Editar fornecedor
-                    </p>
+                <div className="flex flex-col gap-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="bo-eyebrow">Editar fornecedor</p>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="text-foreground/30 hover:text-foreground/60 text-sm"
+                      aria-label="Fechar edição"
+                      className="text-sm text-foreground/30 transition-colors hover:text-foreground/60"
                     >
                       ×
                     </button>
                   </div>
-                  <input
+                  <Field
+                    label="Nome"
+                    hideLabel
+                    required
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                     placeholder="Nome *"
-                    className="bo-input px-3 py-2 text-sm text-foreground/70"
                   />
-                  <select
+                  <Field
+                    as="select"
+                    label="Categoria"
+                    hideLabel
                     value={editForm.category}
                     onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                    className="bo-input px-3 py-2 text-sm text-foreground/60"
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
                     ))}
-                  </select>
-                  <input
+                  </Field>
+                  <Field
+                    label="Telefone"
+                    hideLabel
                     value={editForm.phone}
                     onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                     placeholder="Telefone"
-                    className="bo-input px-3 py-2 text-sm text-foreground/70"
                   />
-                  <input
+                  <Field
+                    label="E-mail"
+                    hideLabel
                     value={editForm.email}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                     placeholder="E-mail"
-                    className="bo-input px-3 py-2 text-sm text-foreground/70"
                   />
-                  <input
+                  <Field
+                    label="Localização"
+                    hideLabel
                     value={editForm.location}
                     onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
                     placeholder="Localização"
-                    className="bo-input px-3 py-2 text-sm text-foreground/70"
                   />
-                  <input
+                  <Field
+                    label="Notas"
+                    hideLabel
                     value={editForm.notes}
                     onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                     placeholder="Notas"
-                    className="bo-input px-3 py-2 text-sm text-foreground/70"
                   />
-                  <div className="flex gap-2 mt-1">
-                    <button
+                  <div className="mt-1 flex gap-2">
+                    <Button
+                      fullWidth
                       onClick={() => saveEdit(s.id)}
                       disabled={!editForm.name.trim()}
-                      className="flex-1 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors disabled:opacity-40"
                     >
                       Guardar
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="px-4 py-2 text-foreground/40 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors"
-                    >
+                    </Button>
+                    <Button variant="ghost" onClick={() => setEditingId(null)}>
                       Cancelar
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -482,7 +521,7 @@ export default function Fornecedores() {
                   </div>
                 </>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}

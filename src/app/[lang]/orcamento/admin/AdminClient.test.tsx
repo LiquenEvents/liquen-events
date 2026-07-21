@@ -120,10 +120,17 @@ function renderAdmin(quotes: Quote[]) {
 
 // The desktop sidebar (an <aside>, role "complementary") and the mobile bottom
 // bar both carry nav buttons; jsdom applies no CSS so neither is hidden. Scope
-// nav clicks to the sidebar to keep the button label unambiguous.
+// nav clicks to the sidebar to keep the button label unambiguous. Secondary
+// destinations now live behind a collapsed "Mais" group, so expand it first
+// when the wanted entry isn't in the always-visible core list.
 function navTo(label: RegExp) {
   const sidebar = screen.getByRole("complementary");
-  fireEvent.click(within(sidebar).getByRole("button", { name: label }));
+  let btn = within(sidebar).queryByRole("button", { name: label });
+  if (!btn) {
+    fireEvent.click(within(sidebar).getByRole("button", { name: /^Mais$/ }));
+    btn = within(sidebar).getByRole("button", { name: label });
+  }
+  fireEvent.click(btn);
 }
 
 beforeEach(() => {
@@ -182,8 +189,9 @@ describe("AdminClient shell", () => {
     renderAdmin([quote]);
 
     navTo(/Pedidos/);
-    // Before opening, the id shows once (the list row); no detail drawer yet.
-    expect(screen.getAllByText("LQ-042")).toHaveLength(1);
+    // Before opening, the id shows once (the list row, as a shortened "Ref.");
+    // no detail drawer yet.
+    expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
 
     // The list row is a button labelled by the client's name.
@@ -192,12 +200,12 @@ describe("AdminClient shell", () => {
     // The detail drawer is now open: its close control exists and the id is
     // echoed a second time inside the panel header.
     expect(screen.getByRole("button", { name: "Fechar" })).toBeInTheDocument();
-    expect(screen.getAllByText("LQ-042")).toHaveLength(2);
+    expect(screen.getAllByText(/LQ-042/)).toHaveLength(2);
 
     // Closing the drawer tears it down again.
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("LQ-042")).toHaveLength(1);
+    expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
   });
 
   it("tracks bulk selection via the row checkboxes", () => {

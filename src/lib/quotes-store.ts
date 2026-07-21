@@ -63,3 +63,7 @@ export const updateQuoteWith = (
   id: string,
   mutate: (current: Quote) => Quote,
 ): Promise<Quote | null> => repo.updateWith(id, mutate);
+/** Permanently remove a quote. Distinct from archiving (a soft-delete via the
+    `archived` flag, still restorable and kept for the record) — this is a hard
+    delete for junk/test leads and cannot be undone. */
+export const deleteQuote = (id: string): Promise<void> => repo.remove(id);

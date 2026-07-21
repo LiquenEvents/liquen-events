@@ -138,7 +138,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   },
                 ].map((item) => (
                   <div key={item.label} className="py-6">
-                    <p className="text-foreground/55 text-[10px] tracking-[0.4em] uppercase mb-2.5">
+                    <p className="text-foreground/70 text-[10px] tracking-[0.4em] uppercase mb-2.5">
                       {item.label}
                     </p>
                     {item.href ? (
@@ -154,7 +154,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     ) : (
                       <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
                     )}
-                    <p className="text-foreground/55 text-xs leading-relaxed">{item.sub}</p>
+                    <p className="text-foreground/70 text-xs leading-relaxed">{item.sub}</p>
                   </div>
                 ))}
               </div>
@@ -264,9 +264,8 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     {td.ctaEyebrow}
                   </p>
                   <h2
-                    className="text-cream font-bold leading-[0.95] tracking-tight mb-8"
+                    className="text-cream font-bold uppercase tracking-display leading-[0.95] mb-8"
                     style={{
-                      fontFamily: "var(--font-playfair)",
                       fontSize: "clamp(34px, 4.5vw, 60px)",
                     }}
                   >
@@ -361,10 +360,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     <span aria-hidden className="text-white/40 text-xs font-mono mt-1 tabular-nums">
                       {p.step}
                     </span>
-                    <h3
-                      className="text-white text-lg font-bold"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
+                    <h3 className="text-white text-lg font-bold uppercase tracking-display">
                       {p.title}
                     </h3>
                   </div>
@@ -407,10 +403,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   <span className="w-6 h-px bg-gold flex-shrink-0" />
                   {t.contacto.faqEyebrow}
                 </p>
-                <h2
-                  className="text-white text-4xl lg:text-5xl font-bold leading-tight"
-                  style={{ fontFamily: "var(--font-playfair)" }}
-                >
+                <h2 className="text-white text-4xl lg:text-5xl font-bold uppercase tracking-display leading-tight">
                   {t.contacto.faqTitleLine1}
                   <br />
                   {t.contacto.faqTitleLine2}
@@ -458,8 +451,8 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               {t.contacto.whatsappEyebrow}
             </p>
             <h2
-              className="text-cream font-bold leading-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5vw, 72px)" }}
+              className="text-cream font-bold uppercase tracking-display leading-tight mb-6"
+              style={{ fontSize: "clamp(36px, 5vw, 72px)" }}
             >
               {t.contacto.whatsappTitleLine1}
               <br />

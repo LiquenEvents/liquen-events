@@ -46,7 +46,7 @@ export default function FAQ({
               className="w-full flex items-start justify-between gap-8 py-8 text-left group"
             >
               <span
-                className={`text-sm lg:text-base leading-snug transition-colors duration-200 ${
+                className={`text-sm lg:text-base leading-snug transition-colors duration-200 motion-reduce:transition-none ${
                   isOpen ? qOpen : qClosed
                 }`}
               >
@@ -54,7 +54,7 @@ export default function FAQ({
               </span>
               <span
                 aria-hidden
-                className={`flex-shrink-0 w-5 h-5 border flex items-center justify-center text-xs transition-all duration-300 ${
+                className={`flex-shrink-0 w-5 h-5 border flex items-center justify-center text-xs transition-all duration-300 motion-reduce:transition-none ${
                   isOpen ? iconOpen : iconClosed
                 }`}
               >
@@ -69,7 +69,7 @@ export default function FAQ({
               role="region"
               aria-labelledby={`faq-q-${i}`}
               inert={!isOpen}
-              className={`grid transition-[grid-template-rows,opacity] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              className={`grid transition-[grid-template-rows,opacity] duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
                 isOpen ? "grid-rows-[1fr] opacity-100 pb-8" : "grid-rows-[0fr] opacity-0"
               }`}
             >

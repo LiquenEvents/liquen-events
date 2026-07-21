@@ -12,13 +12,23 @@ import type { Contract } from "@/lib/contract-types";
 interface Props {
   token: string;
   initialStatus: ProposalStatus;
+  // Server-computed: the proposal's validity date has passed. When true (and the
+  // client hasn't already responded), we replace the accept/decline form with an
+  // "expired" notice so they never click Accept only to hit the API's 410.
+  expired?: boolean;
   clientEmail: string;
   // Passed in from the server page instead of the site-wide chrome context, so
   // the proposta namespace only ships on this token route.
   proposta: Dict["proposta"];
 }
 
-export default function ProposalResponse({ token, initialStatus, clientEmail, proposta }: Props) {
+export default function ProposalResponse({
+  token,
+  initialStatus,
+  expired = false,
+  clientEmail,
+  proposta,
+}: Props) {
   const tp = proposta.response;
   const decided = initialStatus === "aceite" || initialStatus === "rejeitada";
   const [status, setStatus] = useState<"aceite" | "rejeitada" | null>(
@@ -94,8 +104,8 @@ export default function ProposalResponse({ token, initialStatus, clientEmail, pr
               ✓
             </div>
             <p
-              className="text-foreground/85 font-bold mb-2"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 26px)" }}
+              className="text-foreground/85 font-bold uppercase tracking-display mb-2"
+              style={{ fontSize: "clamp(20px, 3vw, 26px)" }}
             >
               {tp.aceiteTitle}
             </p>
@@ -104,8 +114,8 @@ export default function ProposalResponse({ token, initialStatus, clientEmail, pr
         ) : (
           <>
             <p
-              className="text-foreground/80 font-bold mb-2"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(19px, 3vw, 24px)" }}
+              className="text-foreground/80 font-bold uppercase tracking-display mb-2"
+              style={{ fontSize: "clamp(19px, 3vw, 24px)" }}
             >
               {tp.rejeitadaTitle}
             </p>
@@ -113,6 +123,31 @@ export default function ProposalResponse({ token, initialStatus, clientEmail, pr
           </>
         )}
         {decided && <p className="text-foreground/68 text-[11px] mt-4">{tp.jaRegistado}</p>}
+      </div>
+    );
+  }
+
+  // Validity date passed and no decision was recorded: show a clear notice with a
+  // way to reach us, instead of an accept form that the API would reject (410).
+  if (expired) {
+    return (
+      <div
+        role="status"
+        className="mt-9 rounded-lg border border-foreground/12 bg-foreground/[0.03] p-6 text-center"
+      >
+        <p
+          className="text-foreground/80 font-bold uppercase tracking-display mb-2"
+          style={{ fontSize: "clamp(19px, 3vw, 24px)" }}
+        >
+          {tp.expiradaTitle}
+        </p>
+        <p className="text-foreground/72 text-sm leading-relaxed">{tp.expiradaBody}</p>
+        <a
+          href={`mailto:${clientEmail}`}
+          className="inline-block mt-5 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
+        >
+          {clientEmail}
+        </a>
       </div>
     );
   }

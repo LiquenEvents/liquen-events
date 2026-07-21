@@ -142,7 +142,13 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
   // "hoje" (countdownDays === 0), não "já passou". Só a partir da meia-noite
   // seguinte é que `eventPassed` fica verdadeiro — mantendo-o coerente com o
   // contador (que só vira negativo no dia seguinte).
-  const eventPassed = !!quote.date && Date.parse(`${quote.date}T23:59:59`) < today.getTime();
+  // `quote.date` costuma ser "yyyy-mm-dd", mas a rota manual/importação não proíbe
+  // um ISO completo com componente horária. Tomamos sempre a porção da DATA (10
+  // primeiros carateres) e ancoramos ao fim desse dia, tal como `countdownDays`
+  // normaliza os dois formatos — assim um datetime já não produz NaN nem deixa um
+  // evento passado preso uma fase atrás.
+  const eventDayEnd = quote.date ? Date.parse(`${quote.date.slice(0, 10)}T23:59:59`) : NaN;
+  const eventPassed = !Number.isNaN(eventDayEnd) && eventDayEnd < today.getTime();
 
   const contracted = contractedTotal(d);
   const ledgerPaid = ledgerPaidTotal(invoices);
@@ -155,7 +161,12 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
     invoices.some((i) => i.kind === "sinal" && i.status === "paga") ||
     (quote.payments ?? []).some((p) => p.kind === "sinal" && p.paid && p.amount > 0);
 
-  const contratoAceite = !!contract?.acceptedAt || proposal?.status === "aceite";
+  // `quote.status === "aceite"` conta como aceite mesmo sem proposta/contrato:
+  // a rota manual permite marcar um negócio como ganho diretamente (reserva
+  // offline), tal como `deriveRequestLifecycle` do stepper já reconhece. Sem
+  // isto, um pedido ganho à mão aparecia como `lead`, contradizendo o stepper.
+  const contratoAceite =
+    !!contract?.acceptedAt || proposal?.status === "aceite" || quote.status === "aceite";
 
   const propostaEnviada =
     (!!proposal && proposal.status !== "rascunho") || quote.status === "cotado";

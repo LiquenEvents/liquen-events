@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { randomId } from "./util";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
+import { Button, Field } from "./ui";
 
 const RSVP_META: Record<RsvpStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },
@@ -77,27 +78,28 @@ export default function GuestList({ quote, onChange }: Props) {
   const estimate = quote.guests || 0;
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-4">
+    <section className="border-t border-foreground/10 pt-6">
+      <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Lista de Convidados</p>
-        <div className="flex items-center gap-1.5">
-          {guests.length > 0 && (
-            <>
-              <button
-                onClick={() =>
-                  downloadCsv(`convidados-${quote.id}-${dateStamp()}`, guestsToCsvRows(quote))
-                }
-                className="text-foreground/35 hover:text-[#4d6350] transition-colors p-1"
-                title="Exportar convidados para CSV"
-                aria-label="Exportar CSV"
-              >
+        {guests.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                downloadCsv(`convidados-${quote.id}-${dateStamp()}`, guestsToCsvRows(quote))
+              }
+              title="Exportar convidados para CSV"
+              aria-label="Exportar CSV"
+              iconLeft={
                 <svg
-                  width="14"
-                  height="14"
+                  width="15"
+                  height="15"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.7"
+                  aria-hidden="true"
                 >
                   <path
                     d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
@@ -105,20 +107,24 @@ export default function GuestList({ quote, onChange }: Props) {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </button>
-              <button
-                onClick={() => printGuestList(quote)}
-                className="text-foreground/35 hover:text-[#4d6350] transition-colors p-1"
-                title="Imprimir lista de convidados"
-                aria-label="Imprimir"
-              >
+              }
+              className="px-2"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => printGuestList(quote)}
+              title="Imprimir lista de convidados"
+              aria-label="Imprimir"
+              iconLeft={
                 <svg
-                  width="14"
-                  height="14"
+                  width="15"
+                  height="15"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.7"
+                  aria-hidden="true"
                 >
                   <path
                     d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
@@ -127,112 +133,128 @@ export default function GuestList({ quote, onChange }: Props) {
                   />
                   <rect x="6" y="14" width="12" height="7" rx="1" />
                 </svg>
-              </button>
-              <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5 ml-0.5">
-                {guests.length} {guests.length === 1 ? "grupo" : "grupos"}
-              </span>
-            </>
-          )}
-        </div>
+              }
+              className="px-2"
+            />
+            <span className="ml-1 shrink-0 rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+              {guests.length} {guests.length === 1 ? "grupo" : "grupos"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Headcount summary */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
-          <p className="text-sm font-semibold text-[#4d6350]">{totals.confirmed}</p>
-          <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+      <div className="mb-5 grid grid-cols-3 gap-2.5">
+        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
+          <p className="text-base font-semibold text-[#4d6350]">{totals.confirmed}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Confirm.
           </p>
         </div>
-        <div className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
-          <p className="text-sm font-semibold text-foreground/60">{totals.pending}</p>
-          <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
+          <p className="text-base font-semibold text-foreground/65">{totals.pending}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Pendente
           </p>
         </div>
-        <div className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
-          <p className="text-sm font-semibold text-foreground/60">
+        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
+          <p className="text-base font-semibold text-foreground/65">
             {totals.confirmed}
-            <span className="text-foreground/30 font-normal">/{estimate || "—"}</span>
+            <span className="font-normal text-foreground/40">/{estimate || "—"}</span>
           </p>
-          <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Estimativa
           </p>
         </div>
       </div>
 
       {/* Guests */}
-      {guests.length > 0 && (
-        <div className="flex flex-col gap-1.5 mb-4">
+      {guests.length > 0 ? (
+        <ul className="mb-5 flex flex-col gap-1.5">
           {guests.map((g) => (
-            <div
+            <li
               key={g.id}
-              className="group flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-lg px-3 py-2"
+              className="group flex items-center gap-2.5 rounded-xl border border-foreground/[0.07] bg-foreground/[0.02] px-3 py-2.5"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-foreground/72 text-xs font-medium truncate">{g.name}</p>
+                <p className="truncate text-sm font-medium text-foreground/80">{g.name}</p>
               </div>
-              <label className="flex items-center gap-1 text-[10px] text-foreground/35 shrink-0">
+              <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-foreground/45">
                 <input
                   type="number"
                   min={1}
                   value={g.party}
                   onChange={(e) => setPartyOf(g.id, e.target.value)}
-                  className="bo-input w-12 px-1.5 py-1 text-xs text-foreground/70 text-center"
-                  aria-label={`Pessoas no grupo ${g.name}`}
+                  className="bo-input w-14 px-1.5 py-1 text-center text-xs text-foreground/75"
+                  aria-label={`Convidados no grupo ${g.name}`}
                 />
-                pax
+                convidados
               </label>
               <button
                 onClick={() => cycle(g)}
-                className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 transition-opacity hover:opacity-80 w-[78px] text-center"
+                className="w-[86px] shrink-0 rounded-lg px-2 py-1 text-center text-[10px] uppercase tracking-[0.1em] motion-safe:transition-opacity hover:opacity-80"
                 style={{
                   background: `${RSVP_META[g.rsvp].color}18`,
                   color: RSVP_META[g.rsvp].color,
                 }}
-                title="Clique para mudar o estado"
+                title="Clique para mudar o estado do RSVP"
               >
                 {RSVP_META[g.rsvp].label}
               </button>
               <button
                 onClick={() => remove(g.id)}
-                className="text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all shrink-0 text-sm leading-none"
-                aria-label="Remover"
+                className="shrink-0 rounded-md p-1 text-foreground/25 opacity-0 hover:text-[#8a2a22] focus-visible:opacity-100 motion-safe:transition-all group-hover:opacity-100"
+                aria-label={`Remover ${g.name}`}
               >
-                ×
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
               </button>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
+      ) : (
+        <p className="mb-5 rounded-xl bg-foreground/[0.02] px-4 py-6 text-center text-sm leading-relaxed text-foreground/50">
+          Ainda sem convidados. Adicione a primeira pessoa ou família abaixo — o número de
+          confirmados atualiza-se sozinho.
+        </p>
       )}
 
       {/* Add guest */}
-      <div className="flex gap-2">
-        <input
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <Field
+          as="input"
+          label="Nome"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Nome (convidado ou família)"
-          className="bo-input flex-1 px-2.5 py-1.5 text-xs text-foreground/70 placeholder-foreground/25"
+          containerClassName="flex-1"
         />
-        <input
+        <Field
+          as="input"
           type="number"
           min={1}
+          label="Convidados"
           value={party}
           onChange={(e) => setParty(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="pax"
-          className="bo-input w-14 px-2 py-1.5 text-xs text-foreground/70 text-center"
-          aria-label="Número de pessoas"
+          className="text-center"
+          containerClassName="w-full sm:w-24"
         />
-        <button
-          onClick={add}
-          disabled={!name.trim()}
-          className="px-3.5 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors disabled:opacity-40"
-        >
-          +
-        </button>
+        <Button variant="primary" onClick={add} disabled={!name.trim()}>
+          Adicionar
+        </Button>
       </div>
-    </div>
+    </section>
   );
 }

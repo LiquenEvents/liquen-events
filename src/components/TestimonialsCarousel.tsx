@@ -151,10 +151,7 @@ export default function TestimonialsCarousel({
               {/* min-height reserves space for the longest testimonial so the
                   6s auto-rotation doesn't reflow the dots + the section below it
                   (a recurring layout shift that field CLS captures). */}
-              <p
-                className="text-foreground text-xl sm:text-2xl lg:text-[2.2rem] font-bold leading-[1.35] mb-8 lg:mb-12 min-h-[11rem] sm:min-h-[10rem] lg:min-h-[13rem]"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
+              <p className="text-foreground text-xl sm:text-2xl lg:text-[2.2rem] font-bold uppercase tracking-display leading-[1.3] mb-8 lg:mb-12 min-h-[11rem] sm:min-h-[10rem] lg:min-h-[13rem]">
                 &ldquo;{t.quote}&rdquo;
               </p>
               <div className="flex items-center gap-5">

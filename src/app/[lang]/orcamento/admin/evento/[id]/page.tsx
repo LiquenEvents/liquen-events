@@ -5,7 +5,7 @@ import { ADMIN_COOKIE, readSession } from "@/lib/admin-auth";
 import { normalizeLocale } from "@/lib/i18n";
 import { getQuote } from "@/lib/quotes-store";
 import { getProposalByQuote } from "@/lib/proposals-store";
-import { getContractByProposal } from "@/lib/contracts-store";
+import { getContractByProposal, getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { listInvoicesForQuote } from "@/lib/invoices-store";
 import { createPortalToken } from "@/lib/portal-token";
 import type { DossierData } from "@/lib/orcamento/dossier";
@@ -44,13 +44,19 @@ export default async function EventoDossierPage({
   const quote = await getQuote(id);
   if (!quote) notFound();
 
-  // A proposta tem de vir primeiro — a procura do contrato indexa por ela.
-  // As faturas são independentes, por isso vão em paralelo com o contrato.
+  // O contrato procura-se PELO PEDIDO (getAcceptedContractByQuote), não pela
+  // proposta mais recente: se a equipa enviar uma nova proposta DEPOIS do aceite,
+  // essa proposta não tem contrato e um lookup por ela perderia o cartão de
+  // contrato e faria a fase regredir de `em_producao` para `sinal_pago`. Mantemos
+  // o lookup por proposta como recurso (contratos antigos indexados só por ela).
+  // As faturas são independentes, por isso vão em paralelo.
   const proposal = await getProposalByQuote(quote.id);
-  const [contract, invoices] = await Promise.all([
+  const [contractByQuote, contractByProposal, invoices] = await Promise.all([
+    getAcceptedContractByQuote(quote.id),
     proposal ? getContractByProposal(proposal.id) : Promise.resolve(null),
     listInvoicesForQuote(quote.id),
   ]);
+  const contract = contractByQuote ?? contractByProposal;
 
   // Link privado do portal do cliente — cunhado aqui (servidor) e passado como
   // string; o cliente nunca importa `portal-token` (server-only).

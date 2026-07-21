@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
+import { Button, Card, EmptyState, Field } from "./ui";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const MONTHS = [
@@ -228,50 +229,54 @@ export default function Calendario({ quotes, onOpen }: Props) {
   return (
     <>
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-        <div className="bo-card p-5">
-          <div className="flex items-center justify-between mb-5">
+        <Card>
+          <div className="flex items-center justify-between gap-4 mb-5">
             <div>
-              <h3
-                className="text-foreground/80 font-bold text-lg"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
+              <h3 className="font-display text-foreground/85 text-lg leading-tight">
                 {MONTHS[month]} {year}
               </h3>
-              <p className="text-foreground/30 text-[10px] tracking-[0.2em] uppercase mt-0.5">
+              <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1">
                 {monthEventCount} evento{monthEventCount !== 1 ? "s" : ""}
               </p>
             </div>
-            <div className="flex items-center gap-1">
-              <button
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => exportIcs(quotes)}
                 title="Exportar para calendário (.ics)"
-                className="px-3 h-8 mr-1 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-[#4d6350] hover:border-[#4d6350]/40 transition-colors"
+                className="mr-1"
               >
                 Exportar
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setCursor(new Date(year, month - 1, 1))}
                 aria-label="Mês anterior"
-                className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors"
+                className="w-8 px-0"
               >
                 ‹
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   const d = new Date();
                   setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
                 }}
-                className="px-3 h-8 rounded-md border border-foreground/12 text-foreground/40 text-[10px] tracking-[0.2em] uppercase hover:text-foreground/70 hover:border-foreground/30 transition-colors"
               >
                 Hoje
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setCursor(new Date(year, month + 1, 1))}
                 aria-label="Mês seguinte"
-                className="w-8 h-8 rounded-md border border-foreground/12 text-foreground/40 hover:text-foreground/70 hover:border-foreground/30 transition-colors"
+                className="w-8 px-0"
               >
                 ›
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -371,44 +376,60 @@ export default function Calendario({ quotes, onOpen }: Props) {
               );
             })}
           </div>
-        </div>
+        </Card>
 
         {/* Upcoming */}
-        <div className="bo-card">
-          <p className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">Próximos eventos</p>
+        <Card padding="none" className="overflow-hidden self-start">
+          <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
+            Próximos eventos
+          </p>
           <div className="divide-y divide-foreground/[0.06]">
             {upcoming.map((q) => (
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 py-3.5 hover:bg-foreground/[0.02] transition-colors"
+                className="w-full text-left px-5 sm:px-6 py-3.5 hover:bg-foreground/[0.02] motion-safe:transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="text-center shrink-0 w-10">
-                    <p
-                      className="text-[#4d6350] text-lg font-bold leading-none"
-                      style={{ fontFamily: "var(--font-playfair)" }}
-                    >
+                    <p className="font-display text-[#4d6350] text-lg font-semibold leading-none">
                       {new Date(q.date + "T12:00:00").getDate()}
                     </p>
-                    <p className="text-foreground/30 text-[9px] uppercase">
+                    <p className="text-foreground/40 text-[9px] uppercase mt-0.5">
                       {MONTHS[new Date(q.date + "T12:00:00").getMonth()].slice(0, 3)}
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-foreground/65 text-xs font-medium truncate">{q.name}</p>
-                    <p className="text-foreground/30 text-[11px] truncate">
-                      {eventTypeLabel(q)} · {q.guests} pax
+                    <p className="text-foreground/70 text-xs font-medium truncate">{q.name}</p>
+                    <p className="text-foreground/40 text-[11px] truncate">
+                      {eventTypeLabel(q)} · {q.guests} convidados
                     </p>
                   </div>
                 </div>
               </button>
             ))}
             {upcoming.length === 0 && (
-              <p className="text-foreground/25 text-sm text-center py-12">Sem eventos agendados.</p>
+              <EmptyState
+                icon={
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="4" width="18" height="17" rx="2" />
+                    <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+                  </svg>
+                }
+                title="Sem eventos agendados"
+                description="Os próximos eventos com data marcada aparecem aqui."
+              />
             )}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Add-event modal */}
@@ -425,70 +446,77 @@ export default function Calendario({ quotes, onOpen }: Props) {
             className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between mb-5">
+            <div className="flex items-start justify-between gap-4 mb-5">
               <div>
-                <p className="text-foreground/22 text-[10px] tracking-[0.3em] uppercase mb-1">
-                  Novo no calendário
-                </p>
-                <p className="text-foreground/70 text-sm capitalize">{modalDateLabel}</p>
+                <p className="bo-eyebrow mb-1.5">Novo no calendário</p>
+                <p className="text-foreground/75 text-sm capitalize">{modalDateLabel}</p>
               </div>
               <button
                 onClick={() => setModalDate(null)}
                 aria-label="Fechar"
-                className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors"
+                className="text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
               >
                 ×
               </button>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setForm((f) => ({ ...f, kind: k }))}
-                  className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border transition-colors ${form.kind === k ? "text-cream" : "text-foreground/40 border-foreground/15 hover:border-foreground/30"}`}
-                  style={
-                    form.kind === k
-                      ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
-                      : undefined
-                  }
-                >
-                  {KIND_META[k].label}
-                </button>
-              ))}
-            </div>
+            <fieldset className="mb-4">
+              <legend className="bo-eyebrow mb-2">Tipo</legend>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={form.kind === k}
+                    onClick={() => setForm((f) => ({ ...f, kind: k }))}
+                    className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-foreground/15 hover:border-foreground/30"}`}
+                    style={
+                      form.kind === k
+                        ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
+                        : undefined
+                    }
+                  >
+                    {KIND_META[k].label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
 
-            <input
+            <Field
               autoFocus
+              label="Título"
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               onKeyDown={(e) => e.key === "Enter" && addEvent()}
-              placeholder="Título (ex: Reunião com fornecedor)"
-              className="bo-input px-3 py-2.5 text-sm text-foreground/75 placeholder-foreground/25 mb-2"
+              placeholder="Ex.: Reunião com fornecedor"
             />
 
-            <div className="flex gap-2 mb-2">
-              <input
+            <div className="mt-3 flex gap-2">
+              <Field
+                label="Hora"
                 type="time"
                 value={form.time}
                 onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                className="bo-input px-3 py-2 text-sm text-foreground/70 w-32"
+                containerClassName="w-32"
               />
-              <input
+              <Field
+                label="Nota"
                 value={form.note}
                 onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-                placeholder="Nota (opcional)"
-                className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70 placeholder-foreground/25"
+                placeholder="Opcional"
+                containerClassName="flex-1"
               />
             </div>
 
-            <button
+            <Button
+              fullWidth
               onClick={addEvent}
-              disabled={saving || !form.title.trim()}
-              className={`w-full mt-3 py-2.5 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-colors ${saving || !form.title.trim() ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
+              loading={saving}
+              disabled={!form.title.trim()}
+              className="mt-4"
             >
               {saving ? "A guardar…" : "Adicionar ao calendário"}
-            </button>
+            </Button>
           </div>
         </div>
       )}

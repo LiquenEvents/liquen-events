@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
+import { Button, Card, EmptyState, Field } from "./ui";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#b5654a" },
@@ -205,18 +206,12 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               </select>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => saveEditTask(t.id)}
-                className="flex-1 py-1.5 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors"
-              >
+              <Button size="sm" onClick={() => saveEditTask(t.id)} className="flex-1">
                 Guardar
-              </button>
-              <button
-                onClick={() => setEditingTaskId(null)}
-                className="px-4 text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors"
-              >
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditingTaskId(null)}>
                 Cancelar
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -334,99 +329,98 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     );
   }
 
-  const inputCls = "bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22";
-
   return (
     <div className="max-w-4xl">
       {/* Add task */}
-      <div className="bo-card p-4 mb-6">
-        <input
+      <Card className="mb-6">
+        <Field
+          label="Nova tarefa"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="O que há para fazer?"
-          className={`${inputCls} w-full mb-2`}
         />
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Field
+            label="Responsável"
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
-            placeholder="Responsável (ex: Catarina)"
-            className={`${inputCls} flex-1`}
+            placeholder="Ex.: Catarina"
           />
-          <select
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
-            className={`${inputCls} text-xs`}
-          >
-            <option value="">Área…</option>
+          <Field as="select" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
+            <option value="">Sem área</option>
             {AREAS.map((a) => (
               <option key={a} value={a}>
                 {a}
               </option>
             ))}
-          </select>
-          <select
+          </Field>
+          <Field
+            as="select"
+            label="Prioridade"
             value={priority}
             onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            className={`${inputCls} text-xs`}
           >
             <option value="alta">Alta</option>
             <option value="normal">Normal</option>
             <option value="baixa">Baixa</option>
-          </select>
-          <input
+          </Field>
+          <Field
+            label="Prazo"
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className={`${inputCls} text-xs`}
           />
-          <button
-            onClick={add}
-            disabled={adding || !title.trim()}
-            className={`px-5 py-2 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-colors shrink-0 ${adding || !title.trim() ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
-          >
-            Adicionar
-          </button>
         </div>
-      </div>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={add} loading={adding} disabled={!title.trim()}>
+            Adicionar tarefa
+          </Button>
+        </div>
+      </Card>
 
       {/* Filter by person */}
       {people.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {defaultAssignee && people.includes(defaultAssignee) && (
-            <button
+            <Button
+              size="sm"
+              variant={who === defaultAssignee ? "primary" : "subtle"}
               onClick={() => setWho(who === defaultAssignee ? "Todos" : defaultAssignee)}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 flex items-center gap-1.5 ${who === defaultAssignee ? "bg-[#4d6350] text-white shadow-sm" : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"}`}
+              iconLeft={
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                </svg>
+              }
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-              >
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-              </svg>
               Minhas tarefas
-            </button>
+            </Button>
           )}
           {people.map((p) => (
-            <button
+            <Button
               key={p}
+              size="sm"
+              variant={who === p ? "primary" : "ghost"}
+              aria-pressed={who === p}
               onClick={() => setWho(p)}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${who === p ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
             >
               {p}
               {p !== "Todos" && (
-                <span className="ml-1.5 text-[9px] opacity-60">
+                <span className="ml-1 text-[11px] tabular-nums opacity-60">
                   {tasks.filter((t) => t.assignee === p && !t.done).length}
                 </span>
               )}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -435,33 +429,54 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         <SkeletonList rows={5} />
       ) : (
         <>
-          <div className="bo-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-foreground/[0.07] flex items-center justify-between">
+          <Card padding="none" className="overflow-hidden">
+            <div className="px-5 sm:px-6 py-3.5 border-b border-foreground/[0.07] flex items-center justify-between">
               <p className="bo-eyebrow">A fazer ({open.length})</p>
             </div>
             <div className="divide-y divide-foreground/[0.06]">
               {open.length === 0 ? (
-                <p className="text-foreground/25 text-sm text-center py-12">
-                  Sem tarefas pendentes. ✓
-                </p>
+                <EmptyState
+                  icon={
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      aria-hidden="true"
+                    >
+                      <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  }
+                  title="Tudo em dia"
+                  description="Não há tarefas pendentes. Adicione uma acima para começar a organizar a equipa."
+                />
               ) : (
                 open.map(row)
               )}
             </div>
-          </div>
+          </Card>
 
           {done.length > 0 && (
             <div className="mt-4">
-              <button
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={() => setShowDone(!showDone)}
-                className="text-foreground/35 text-[10px] tracking-[0.2em] uppercase hover:text-foreground/60 transition-colors mb-2"
+                aria-expanded={showDone}
+                className="mb-2 tracking-[0.12em] uppercase"
               >
                 {showDone ? "▾" : "▸"} Concluídas ({done.length})
-              </button>
+              </Button>
               {showDone && (
-                <div className="bo-card overflow-hidden divide-y divide-foreground/[0.06]">
+                <Card padding="none" className="overflow-hidden divide-y divide-foreground/[0.06]">
                   {done.map(row)}
-                </div>
+                </Card>
               )}
             </div>
           )}

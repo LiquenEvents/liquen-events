@@ -7,13 +7,14 @@ import { useToast } from "./Toast";
 import { eventCountdown, randomId } from "./util";
 import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
+import { Card } from "./ui";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
-  { id: "pendente", label: "Novos", color: "#8a8a82" },
-  { id: "em_revisao", label: "Em Revisão", color: "#9aa36a" },
-  { id: "cotado", label: "Proposta Enviada", color: "#7c854b" },
-  { id: "aceite", label: "Ganhos", color: "#525a2f" },
-  { id: "rejeitado", label: "Perdidos", color: "#5a5a55" },
+  { id: "pendente", label: "Novo", color: "#8a8a82" },
+  { id: "em_revisao", label: "Em revisão", color: "#9aa36a" },
+  { id: "cotado", label: "Proposta enviada", color: "#7c854b" },
+  { id: "aceite", label: "Ganho", color: "#525a2f" },
+  { id: "rejeitado", label: "Perdido", color: "#5a5a55" },
 ];
 
 function eventTypeLabel(q: Quote): string {
@@ -120,39 +121,40 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
   }, [quotes]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {/* Pipeline summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { v: String(summary.active), l: "Leads ativos" },
+          { v: String(summary.active), l: "Pedidos ativos" },
           { v: eur(summary.proposta), l: "Em proposta" },
           { v: eur(summary.ganho), l: "Ganho", dark: true },
           { v: `${summary.winRate}%`, l: "Taxa de conversão" },
-        ].map((k) => (
-          <div
-            key={k.l}
-            className={`rounded-xl p-4 border ${
-              k.dark
-                ? "bg-[#1b2119] border-[#2d3829]"
-                : "bg-white border-foreground/[0.08] shadow-sm"
-            }`}
-          >
-            <p
-              className={`font-bold leading-none mb-1.5 ${k.dark ? "text-[#8aad85]" : "text-foreground/82"}`}
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 26px)" }}
-            >
-              {k.v}
-            </p>
-            <p
-              className={`text-[9px] tracking-[0.22em] uppercase ${k.dark ? "text-white/30" : "text-foreground/30"}`}
-            >
-              {k.l}
-            </p>
-          </div>
-        ))}
+        ].map((k) =>
+          k.dark ? (
+            <div key={k.l} className="rounded-2xl border border-[#2d3829] bg-[#1b2119] p-4 sm:p-5">
+              <p
+                className="font-display font-semibold leading-none mb-2 text-[#8aad85]"
+                style={{ fontSize: "clamp(20px, 2vw, 28px)" }}
+              >
+                {k.v}
+              </p>
+              <p className="text-[10px] tracking-[0.18em] uppercase text-white/35">{k.l}</p>
+            </div>
+          ) : (
+            <Card key={k.l} padding="sm" className="p-4 sm:p-5">
+              <p
+                className="font-display font-semibold leading-none mb-2 text-foreground/85 tabular-nums"
+                style={{ fontSize: "clamp(20px, 2vw, 28px)" }}
+              >
+                {k.v}
+              </p>
+              <p className="text-[10px] tracking-[0.18em] uppercase text-foreground/40">{k.l}</p>
+            </Card>
+          ),
+        )}
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-4 scroll-hide">
+      <div className="flex gap-3.5 overflow-x-auto pb-4 scroll-hide">
         {COLUMNS.map((col) => {
           const items = byStatus[col.id] ?? [];
           const value = items.reduce((s, q) => s + (q.quotedPrice ?? 0), 0);
@@ -165,7 +167,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
               }}
               onDragLeave={() => setOverCol((c) => (c === col.id ? null : c))}
               onDrop={() => drop(col.id)}
-              className={`flex-shrink-0 w-[270px] rounded-2xl border transition-all duration-200 ${
+              className={`flex-shrink-0 w-[276px] rounded-2xl border motion-safe:transition-all motion-safe:duration-200 ${
                 overCol === col.id
                   ? "border-[#637a5f]/50 bg-[#637a5f]/[0.05] ring-2 ring-[#637a5f]/20"
                   : "border-foreground/[0.07] bg-foreground/[0.018]"
@@ -214,8 +216,8 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                           moveByKeyboard(q, 1);
                         }
                       }}
-                      className={`group cursor-grab active:cursor-grabbing rounded-xl border border-foreground/[0.07] bg-white p-3.5 shadow-sm transition-all hover:shadow-md hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
-                        dragId === q.id ? "opacity-40 rotate-1" : ""
+                      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-foreground/[0.07] bg-white p-3.5 shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-all hover:shadow-md hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+                        dragId === q.id ? "opacity-40 motion-safe:rotate-1" : ""
                       }`}
                     >
                       <div className="flex items-start gap-2">
@@ -228,7 +230,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                             {q.name}
                           </p>
                           <p className="text-foreground/45 text-[11px] truncate mt-0.5">
-                            {eventTypeLabel(q)} · {q.guests} pax
+                            {eventTypeLabel(q)} · {q.guests} convidados
                           </p>
                         </div>
                         {q.followUpAt && q.followUpAt <= todayKey && (

@@ -42,9 +42,14 @@ const store = vi.hoisted(() => ({
       : null,
   ),
   update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
+  remove: vi.fn(async (_id: string) => {}),
 }));
 const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
-vi.mock("@/lib/quotes-store", () => ({ getQuote: store.get, updateQuote: store.update }));
+vi.mock("@/lib/quotes-store", () => ({
+  getQuote: store.get,
+  updateQuote: store.update,
+  deleteQuote: store.remove,
+}));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(async () => rl.result),
@@ -52,10 +57,10 @@ vi.mock("@/lib/rate-limit", () => ({
   sweep: () => {},
 }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, DELETE } from "./route";
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-function req(method: "GET" | "PATCH", body?: unknown): NextRequest {
+function req(method: "GET" | "PATCH" | "DELETE", body?: unknown): NextRequest {
   return new Request("https://liquen.test/api/orcamento/LIQ-1", {
     method,
     headers: { "Content-Type": "application/json" },
@@ -125,5 +130,66 @@ describe("PATCH /api/orcamento/[id]", () => {
       ctx("LIQ-1"),
     );
     expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 5000 });
+  });
+
+  it("drops non-allowlisted privileged fields (deep mass-assignment guard)", async () => {
+    authed.ok = true;
+    await PATCH(
+      req("PATCH", {
+        status: "cotado",
+        // None of these may be client-writable: identity, submission time, the
+        // computed price breakdown, personal contact data, the reference id.
+        submittedAt: "1999-01-01T00:00:00.000Z",
+        priceBreakdown: { total: 0 },
+        name: "Attacker",
+        phone: "000",
+        id: "evil",
+        lastUpdated: "spoofed",
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado" });
+  });
+
+  it("returns 400 (not an uncaught 500) for a malformed JSON body", async () => {
+    authed.ok = true;
+    const bad = new Request("https://liquen.test/api/orcamento/LIQ-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json{",
+    }) as unknown as NextRequest;
+    const res = await PATCH(bad, ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a non-object JSON body (null) instead of crashing on `in`", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", null), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid status value with 400", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", { status: "not_a_status" }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/orcamento/[id]", () => {
+  it("requires authentication", async () => {
+    const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
+    expect(res.status).toBe(401);
+    expect(store.remove).not.toHaveBeenCalled();
+  });
+
+  it("hard-deletes the quote for an authenticated admin", async () => {
+    authed.ok = true;
+    const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(store.remove).toHaveBeenCalledWith("LIQ-1");
   });
 });

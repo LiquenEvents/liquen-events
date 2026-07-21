@@ -12,7 +12,6 @@ import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
-import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 
 export async function generateMetadata({
   params,
@@ -34,54 +33,12 @@ export async function generateMetadata({
   });
 }
 
-// The editorial wall draws a fresh 6 from this pool on every entry to the page
-// (see RotatingPhotoGrid). All landscape event frames, so they read well in
-// either a wide or a narrow cell.
-const GRID_POOL = [
-  "/imagens/J&A-68.jpg",
-  "/imagens/matilde-e-tomas0654-1.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
-  "/imagens/ines-goncalo-252.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-  "/imagens/stephanie-mizio-555.jpg",
-  "/imagens/DJI_20250913190635_0120_D.jpg",
-  "/imagens/teresinhaeze-909.jpg",
-  "/imagens/EW1_1330.jpg",
-  "/imagens/J&P-IMGL4769.jpg",
-  "/imagens/hd-edited.jpg",
-  "/imagens/EW1_1408.jpg",
-  "/imagens/20_10_2025_0407.jpg",
-  "/imagens/DaniGui_JantarFesta_26.jpg",
-];
-
-// The grid is 2-col below `lg` and 4-col from `lg` (1024px) up, full-bleed (no
-// max-width wrapper). So a col-span-2 cell is the full row on mobile (100vw) and
-// half the row from lg (50vw); a col-span-1 cell is 50vw on mobile and 25vw from
-// lg. The old values declared 50vw for wide cells on mobile (they render 100vw,
-// so the browser under-fetched and upscaled) and switched at 768px instead of
-// the real 1024px column breakpoint.
-const WIDE_SIZES = "(max-width: 1024px) 100vw, 50vw";
-const NARROW_SIZES = "(max-width: 1024px) 50vw, 25vw";
-// Fixed cell layout (spans + the right `sizes` per cell); whichever photo lands
-// in a cell, the shape stays the same.
-const GRID_CELLS = [
-  { cls: "col-span-2 row-span-2", sizes: WIDE_SIZES },
-  { cls: "col-span-2", sizes: WIDE_SIZES },
-  { cls: "col-span-1", sizes: NARROW_SIZES },
-  { cls: "col-span-1", sizes: NARROW_SIZES },
-  { cls: "col-span-2", sizes: WIDE_SIZES },
-  { cls: "col-span-2", sizes: WIDE_SIZES },
-];
-
 const eyebrowDark =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 export default async function SobrePage({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
-  // Enrich the wall's pool with blur placeholders server-side (keeps blur-map
-  // out of the client bundle); the client picks a random 6 per visit.
-  const gridPool = GRID_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   return (
     <>
       <BreadcrumbJsonLd
@@ -143,8 +100,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               {t.sobre.manifestoEyebrow}
             </p>
             <h2
-              className="text-foreground font-bold leading-[1.05]"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(32px, 5vw, 68px)" }}
+              className="text-foreground font-bold uppercase tracking-display leading-[1.05]"
+              style={{ fontSize: "clamp(32px, 5vw, 68px)" }}
             >
               {t.sobre.manifestoTitleLine1}
               <br />
@@ -187,17 +144,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         </div>
       </section>
 
-      {/* ── EDITORIAL PHOTO GRID ── */}
-      <section className="bg-surface">
-        <RotatingPhotoGrid
-          cells={GRID_CELLS}
-          pool={gridPool}
-          alt={t.common.imageAlt.sobreCelebration}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-0 auto-rows-[150px] sm:auto-rows-[220px] lg:auto-rows-[270px]"
-          imgClassName="transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
-        />
-      </section>
-
       {/* ── CINEMATIC STATEMENT ── */}
       <section
         className="relative overflow-hidden border-t border-foreground/8"
@@ -224,8 +170,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         <div className="text-veil-shadow relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
             <p
-              className="text-cream font-bold leading-[1.12] max-w-4xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 4.5vw, 64px)" }}
+              className="text-cream font-bold uppercase tracking-display leading-[1.12] max-w-4xl"
+              style={{ fontSize: "clamp(26px, 4.5vw, 64px)" }}
             >
               <TitleReveal text={t.sobre.statementLead} as="span" step={50} />{" "}
               <TitleReveal
@@ -278,8 +224,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 {t.sobre.founderEyebrow}
               </p>
               <p
-                className="text-foreground/78 leading-[1.5]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3vw, 38px)" }}
+                className="text-foreground/78 font-bold uppercase tracking-display leading-[1.25]"
+                style={{ fontSize: "clamp(22px, 3vw, 38px)" }}
               >
                 {t.sobre.founderQuote}
               </p>
@@ -316,13 +262,13 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
 
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.sobre.ctaEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(40px, 7vw, 96px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
+              style={{ fontSize: "clamp(40px, 7vw, 96px)" }}
             >
               {t.sobre.ctaTitleLine1}
               <br />

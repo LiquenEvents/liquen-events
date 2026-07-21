@@ -5,7 +5,8 @@ import type { NextRequest } from "next/server";
 const invoicesDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 const proposalsDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 
-vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
+const authState = vi.hoisted(() => ({ authed: true }));
+vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
 
 vi.mock("@/lib/invoices-store", () => ({
   getInvoice: vi.fn(async (id: string) => invoicesDb.store.get(id) ?? null),
@@ -21,6 +22,9 @@ vi.mock("@/lib/invoices-store", () => ({
   ),
   createInvoice: vi.fn(async (i: Record<string, unknown>) => {
     invoicesDb.store.set(i.id as string, i);
+  }),
+  deleteInvoice: vi.fn(async (id: string) => {
+    invoicesDb.store.delete(id);
   }),
   newInvoiceId: vi.fn(() => `inv-${invoicesDb.store.size + 1}`),
   nextInvoiceNumber: vi.fn(async () => "FT 2026/0002"),
@@ -39,8 +43,8 @@ vi.mock("@/lib/money", () => ({ round2: (n: number) => Math.round(n * 100) / 100
 
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
-import { PATCH } from "./route";
-import { createInvoice, listInvoicesForQuote } from "@/lib/invoices-store";
+import { PATCH, DELETE } from "./route";
+import { createInvoice, listInvoicesForQuote, deleteInvoice } from "@/lib/invoices-store";
 
 function patchReq(
   id: string,
@@ -50,6 +54,19 @@ function patchReq(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  }) as unknown as NextRequest;
+  return { req, params: Promise.resolve({ id }) };
+}
+
+// Raw-body variant so we can send malformed JSON / non-object bodies.
+function rawPatchReq(
+  id: string,
+  raw: string,
+): { req: NextRequest; params: Promise<{ id: string }> } {
+  const req = new Request(`https://liquen.test/api/faturas/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: raw,
   }) as unknown as NextRequest;
   return { req, params: Promise.resolve({ id }) };
 }
@@ -70,9 +87,17 @@ function seedSinal(id: string, over: Record<string, unknown> = {}) {
   });
 }
 
+function delReq(id: string): { req: NextRequest; params: Promise<{ id: string }> } {
+  const req = new Request(`https://liquen.test/api/faturas/${id}`, {
+    method: "DELETE",
+  }) as unknown as NextRequest;
+  return { req, params: Promise.resolve({ id }) };
+}
+
 beforeEach(() => {
   invoicesDb.store.clear();
   proposalsDb.store.clear();
+  authState.authed = true;
   vi.clearAllMocks();
 });
 
@@ -160,6 +185,21 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 8750 });
   });
 
+  it("bills the EXACT saldo (total − sinal) for a non-integer proposal total — no lost cent", async () => {
+    // Total de cêntimo ímpar: €10000,01 ⇒ sinal €3000,00, saldo exacto €7000,01.
+    // O fallback sinal/3×7 daria €7000,00 (1 cêntimo a menos); como a proposta é
+    // coerente com o sinal faturado, o saldo tem de fechar o total ao cêntimo.
+    seedSinal("s-odd", { amount: 3000 }); // 30% de 10000,01
+    proposalsDb.store.set("q-s-odd", { total: 10000.01 });
+
+    const { req, params } = patchReq("s-odd", { status: "paga" });
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 7000.01 });
+    // sinal 3000,00 + saldo 7000,01 = 10000,01 (o total acordado), ao cêntimo.
+    expect(Math.round((3000 + json.saldoAutoIssued.amount) * 100)).toBe(1_000_001);
+  });
+
   it("annuls an unpaid auto-saldo when the sinal is reverted from paga (#41)", async () => {
     seedSinal("s8", { status: "paga", paidAt: "2026-07-05" });
     // Saldo órfão auto-emitido, ainda por pagar.
@@ -178,6 +218,40 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     // O saldo órfão foi anulado (não fica a estrangular o livro).
     expect(json.saldoAnnulled).toMatchObject({ id: "saldo-8", kind: "saldo", status: "anulada" });
     expect(invoicesDb.store.get("saldo-8")?.status).toBe("anulada");
+  });
+
+  it("annuls an unpaid auto-saldo when the sinal is ANULLED from paga (paga→anulada) (#41)", async () => {
+    seedSinal("s8b", { status: "paga", paidAt: "2026-07-05" });
+    invoicesDb.store.set("saldo-8b", {
+      id: "saldo-8b",
+      quoteId: "q-s8b",
+      kind: "saldo",
+      amount: 8750,
+      status: "emitida",
+    });
+    const { req, params } = patchReq("s8b", { status: "anulada" }); // paga → anulada
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAnnulled).toMatchObject({ id: "saldo-8b", status: "anulada" });
+    expect(invoicesDb.store.get("saldo-8b")?.status).toBe("anulada");
+    // Anular o sinal também limpa o seu paidAt.
+    expect(invoicesDb.store.get("s8b")?.paidAt).toBeUndefined();
+  });
+
+  it("does NOT annul any saldo when a sinal is annulled directly from emitida (no paga→ transition)", async () => {
+    seedSinal("s8c", { status: "emitida" });
+    invoicesDb.store.set("saldo-8c", {
+      id: "saldo-8c",
+      quoteId: "q-s8c",
+      kind: "saldo",
+      amount: 8750,
+      status: "emitida",
+    });
+    const { req, params } = patchReq("s8c", { status: "anulada" }); // emitida → anulada
+    const res = await PATCH(req, { params });
+    const json = await res.json();
+    expect(json.saldoAnnulled).toBeUndefined();
+    expect(invoicesDb.store.get("saldo-8c")?.status).toBe("emitida");
   });
 
   it("does NOT annul a saldo that is already paga when the sinal is reverted (#41)", async () => {
@@ -258,5 +332,114 @@ describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
     // The sinal is still marked paid; no saldo attached because creation failed.
     expect(json).toMatchObject({ id: "s6", status: "paga" });
     expect(json.saldoAutoIssued).toBeUndefined();
+  });
+});
+
+describe("PATCH /api/faturas/[id] — input validation (400s, never 500 / bad data)", () => {
+  it("rejects malformed JSON with 400 (not 500)", async () => {
+    seedSinal("v1");
+    const { req, params } = rawPatchReq("v1", "{ not json");
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    // The invoice is untouched.
+    expect(invoicesDb.store.get("v1")?.status).toBe("emitida");
+  });
+
+  it("rejects a non-object body (null) with 400 instead of 500", async () => {
+    // Regression: the old `\"status\" in body` threw a TypeError on a non-object
+    // body, surfacing as a 500. It must now be a clean 400.
+    seedSinal("v2");
+    const { req, params } = rawPatchReq("v2", "null");
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Corpo do pedido inválido.");
+  });
+
+  it("rejects an unknown status with 400 (message preserved)", async () => {
+    seedSinal("v3");
+    const { req, params } = patchReq("v3", { status: "pago_talvez" });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("Estado inválido");
+    expect(invoicesDb.store.get("v3")?.status).toBe("emitida");
+  });
+
+  it("rejects a wrong-typed date field with 400", async () => {
+    seedSinal("v4");
+    const { req, params } = patchReq("v4", { paidAt: 20260101 });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(400);
+  });
+
+  it("404s before parsing the body when the invoice does not exist", async () => {
+    const { req, params } = rawPatchReq("missing", "not even json");
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(404);
+  });
+
+  it("still clears a date by sending an empty string (behavior preserved)", async () => {
+    seedSinal("v5", { dueAt: "2026-08-01" });
+    const { req, params } = patchReq("v5", { dueAt: "" });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(invoicesDb.store.get("v5")?.dueAt).toBeUndefined();
+  });
+
+  it("accepts an empty patch body ({}) and leaves the invoice unchanged", async () => {
+    seedSinal("v6");
+    const { req, params } = patchReq("v6", {});
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect(invoicesDb.store.get("v6")?.status).toBe("emitida");
+  });
+});
+
+describe("DELETE /api/faturas/[id] — apagar só faturas anuladas", () => {
+  it("returns 401 without auth (and never touches the store)", async () => {
+    authState.authed = false;
+    seedSinal("d0", { status: "anulada" });
+    const { req, params } = delReq("d0");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(401);
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the invoice does not exist", async () => {
+    const { req, params } = delReq("missing");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(404);
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when the invoice is not anulada (fiscal guard)", async () => {
+    seedSinal("d1"); // status emitida
+    const { req, params } = delReq("d1");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe("Só é possível apagar faturas anuladas. Anule a fatura primeiro.");
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete a paga invoice too (only anulada is deletable)", async () => {
+    seedSinal("d2", { status: "paga", paidAt: "2026-07-05" });
+    const { req, params } = delReq("d2");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(409);
+    expect(deleteInvoice).not.toHaveBeenCalled();
+  });
+
+  it("deletes an anulada invoice: 200 + deleteInvoice called", async () => {
+    seedSinal("d3", { status: "anulada" });
+    const { req, params } = delReq("d3");
+    const res = await DELETE(req, { params });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({ ok: true });
+    expect(deleteInvoice).toHaveBeenCalledTimes(1);
+    expect(deleteInvoice).toHaveBeenCalledWith("d3");
+    expect(invoicesDb.store.has("d3")).toBe(false);
   });
 });

@@ -163,9 +163,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             {/* The wrapper's text-veil-shadow already carries the lift-off-photo
                 shadow, so the statement needs no inline duplicate. */}
             <p
-              className="text-white/90 leading-[1.72]"
+              className="text-white/90 font-bold uppercase tracking-display leading-[1.4]"
               style={{
-                fontFamily: "var(--font-playfair)",
                 fontSize: "clamp(22px, 2.8vw, 36px)",
               }}
             >
@@ -187,8 +186,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                 {t.clientes.logosEyebrow}
               </p>
               <h2
-                className="text-foreground font-bold leading-[1.05]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
+                className="text-foreground font-bold uppercase tracking-display leading-[1.05]"
+                style={{ fontSize: "clamp(28px, 3.4vw, 44px)" }}
               >
                 {t.clientes.logosTitle}
               </h2>
@@ -229,8 +228,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-14">
             <h2
-              className="text-white font-bold leading-[1.05]"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.4vw, 44px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[1.05]"
+              style={{ fontSize: "clamp(28px, 3.4vw, 44px)" }}
             >
               {t.clientes.gridTitle}
             </h2>
@@ -244,9 +243,8 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               <AnimateIn key={item.name} delay={i * 55} className="h-full">
                 <figure className="h-full flex flex-col py-9 lg:py-10 border-t border-white/12">
                   <blockquote
-                    className="text-cream/85 leading-[1.72] flex-1"
+                    className="text-cream/85 uppercase tracking-display leading-[1.55] flex-1"
                     style={{
-                      fontFamily: "var(--font-playfair)",
                       fontSize: "clamp(16px, 1.7vw, 19px)",
                     }}
                   >
@@ -310,13 +308,13 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
 
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.clientes.ctaEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[0.88] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(50px, 9vw, 128px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.88] mb-6"
+              style={{ fontSize: "clamp(50px, 9vw, 128px)" }}
             >
               {t.clientes.ctaTitleLine1}
               <br />

@@ -211,8 +211,13 @@ export function createSession(name: string): string {
 
 /** Validate a session token; returns the user name or null if invalid/expired. */
 export function readSession(token: string | undefined | null): { name: string } | null {
-  if (!token || !token.includes(".")) return null;
-  const [body, sig] = token.split(".");
+  if (!token) return null;
+  // A minted token is exactly `body.sig`; base64url contains no ".", so any
+  // token that doesn't split into precisely two non-empty parts is malformed or
+  // tampered (e.g. trailing junk appended after a valid signature) and refused.
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [body, sig] = parts;
   if (!body || !sig) return null;
 
   const expected = sign(body);

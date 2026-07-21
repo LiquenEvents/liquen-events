@@ -3,6 +3,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import {
   getInvoice,
   updateInvoice,
+  deleteInvoice,
   listInvoicesForQuote,
   createInvoice,
   newInvoiceId,
@@ -14,10 +15,9 @@ import {
 import { getProposalByQuote } from "@/lib/proposals-store";
 import { round2 } from "@/lib/money";
 import { log } from "@/lib/logger";
+import { invoiceUpdateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
 
 export const runtime = "nodejs";
-
-const VALID_STATUS: Invoice["status"][] = ["emitida", "paga", "anulada"];
 
 /** Dias de vencimento por omissão do saldo. Ver `maybeAutoIssueSaldo`. */
 const SALDO_DUE_DAYS = 30;
@@ -42,27 +42,33 @@ async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
     const existing = await listInvoicesForQuote(sinal.quoteId);
     if (existing.some((i) => i.kind === "saldo" && i.status !== "anulada")) return null;
 
-    // 2. Valor do saldo — a fonte de verdade é o SINAL EFECTIVAMENTE FATURADO,
-    //    não a proposta. `getProposalByQuote` devolve a proposta mais RECENTE, que
-    //    pode ter sido revista após o aceite; usá-la daria um saldo incoerente com
-    //    o sinal já cobrado (ex.: sinal €3000 de €10000 + saldo €8400 de uma
-    //    proposta revista para €12000). Como o sinal é 30%, o saldo é sinal/3×7 —
-    //    e as duas parcelas fecham sempre o mesmo total acordado.
-    const amount = round2((sinal.amount / 3) * 7);
-
-    // Verificação de sanidade (só observabilidade): se existir uma proposta e o
-    // seu saldo 70% divergir do valor derivado do sinal, registamos — indício de
-    // proposta revista após o aceite, a reconciliar manualmente. O valor faturado
-    // continua a ser o derivado do sinal; a proposta NUNCA o sobrepõe.
+    // 2. Valor do saldo. Regra fiscal: sinal + saldo têm de FECHAR ao cêntimo o
+    //    total acordado. A fonte de verdade é o SINAL EFECTIVAMENTE FATURADO — a
+    //    proposta mais recente pode ter sido revista após o aceite e NUNCA
+    //    sobrepõe o sinal já cobrado.
+    //
+    //    Preferimos o saldo EXACTO `total − sinal` (via splitThirtySeventy) quando
+    //    existe uma proposta cujo sinal 30% ainda BATE CERTO com o sinal faturado
+    //    (i.e. não foi revista): isso fecha o total ao cêntimo mesmo em totais NÃO
+    //    inteiros (ex.: €1000,01 → sinal €300,00 + saldo €700,01). O fallback
+    //    `sinal/3×7` só perde 1 cêntimo em totais de cêntimo ímpar; para totais em
+    //    euros inteiros (o que o pipeline de propostas emite) é idêntico, por isso
+    //    o fluxo normal não muda. Se a proposta divergir (revista após aceite, o
+    //    seu 30% ≠ sinal), mantemos o valor derivado do sinal e só registamos — a
+    //    proposta nunca o sobrepõe.
+    let amount = round2((sinal.amount / 3) * 7);
     try {
       const proposal = await getProposalByQuote(sinal.quoteId);
       if (proposal && proposal.total > 0) {
-        const fromProposal = splitThirtySeventy(proposal.total).saldo;
-        if (fromProposal !== amount) {
+        const split = splitThirtySeventy(proposal.total);
+        if (Math.abs(split.sinal - sinal.amount) < 0.005) {
+          // Proposta coerente com o sinal → saldo exacto = total − sinal.
+          amount = split.saldo;
+        } else {
           log.warn("faturas: saldo derivado do sinal diverge da proposta mais recente", {
             quoteId: sinal.quoteId,
             fromSinal: amount,
-            fromProposal,
+            fromProposal: split.saldo,
           });
         }
       }
@@ -166,13 +172,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const prior = await getInvoice(id);
     if (!prior) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
 
-    const body = await request.json();
+    // ── Input validation (400 before mutating) ── malformed JSON, a non-object
+    // body, an unknown status or a wrong-typed date now get a clean 400 instead
+    // of a 500 (the old `"status" in body` threw on a non-object body).
+    const read = await readJsonBody(request);
+    if (!read.ok) {
+      return NextResponse.json(
+        { error: "Corpo do pedido inválido (JSON malformado)." },
+        { status: 400 },
+      );
+    }
+    const valid = validateBody(invoiceUpdateSchema, read.body);
+    if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 });
+    const body = valid.data;
     const patch: Partial<Invoice> = {};
 
     if ("status" in body) {
-      if (!VALID_STATUS.includes(body.status)) {
-        return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
-      }
       patch.status = body.status;
       // Keep paidAt in lockstep with the status unless the caller set it
       // explicitly: marking paga stamps today, un-paying (or annulling) clears it.
@@ -221,6 +236,39 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(updated);
   } catch (err) {
     log.error("faturas PATCH falhou", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+/**
+ * Remoção definitiva de uma fatura do livro.
+ *
+ * REGRA FISCAL (só anuladas): uma fatura só pode ser apagada se já estiver
+ * `anulada`. Uma fatura viva (emitida/paga) nunca se apaga — anula-se primeiro
+ * (PATCH → anulada) e só depois se remove. Assim uma fatura ativa nunca
+ * desaparece por engano. As falhas na numeração sequencial são aceitáveis
+ * apenas para linhas anuladas (a integridade da sequência fiscal mantém-se: o
+ * número já estava fora de circulação antes de a linha ser removida).
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const { id } = await params;
+  try {
+    const invoice = await getInvoice(id);
+    if (!invoice) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
+    if (invoice.status !== "anulada") {
+      return NextResponse.json(
+        { error: "Só é possível apagar faturas anuladas. Anule a fatura primeiro." },
+        { status: 409 },
+      );
+    }
+    await deleteInvoice(id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    log.error("faturas DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

@@ -53,7 +53,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const invoiceKind = PAYMENT_TO_INVOICE_KIND[paymentKind] ?? "total";
     const vatRate =
       typeof body.vatRate === "number" ? Math.min(Math.max(body.vatRate, 0), 1) : 0.23;
-    const issuedAt = clean(body.date, 40) || new Date().toISOString().slice(0, 10);
+    // Coerção da data ao formato yyyy-mm-dd, espelhando a rota /faturas: um `date`
+    // malformado do painel persistia tal-e-qual e depois alimentava
+    // `new Date(date+"T12:00:00")` no PDF → "Invalid Date" no recibo (e no `paidAt`
+    // derivado). Um valor ausente ou malformado cai para hoje.
+    const asIsoDate = (v: unknown) => {
+      const s = String(v ?? "")
+        .trim()
+        .slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+    };
+    const issuedAt = asIsoDate(body.date) || new Date().toISOString().slice(0, 10);
     const paid = !!body.paid;
     const email = !!body.email;
     const description = String(body.description ?? "").slice(0, 2000);
@@ -83,11 +93,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // fallback continua alcançável mesmo com `paymentRef` presente (marcador OU
     // espécie+valor), para reaproveitar um documento anterior sem marcador.
     const ledger = await listInvoicesForQuote(id);
+    // Só reaproveitamos faturas ATIVAS: uma fatura `anulada` (voided) nunca volta
+    // à vida. Os índices parciais únicos (invoices_one_active_{sinal,saldo}_uk)
+    // excluem as anuladas de propósito, exatamente para permitir reemitir uma
+    // fresca depois de anular a anterior — coerente com a rota /faturas e com
+    // maybeAutoIssueSaldo. Sem este filtro, reaproveitar uma anulada por espécie
+    // (sinal/saldo) ou por espécie+valor (total) ressuscitava um documento fiscal
+    // anulado para `paga`, ou casava com o anulado ignorando o ativo existente.
+    const activeLedger = ledger.filter((inv) => inv.status !== "anulada");
     const isSinalOrSaldo = invoiceKind === "sinal" || invoiceKind === "saldo";
     let invoice =
       (isSinalOrSaldo
-        ? ledger.find((inv) => inv.kind === invoiceKind)
-        : ledger.find(
+        ? activeLedger.find((inv) => inv.kind === invoiceKind)
+        : activeLedger.find(
             (inv) =>
               (!!paymentRef && (inv.note ?? "").includes(paymentRef)) ||
               (inv.kind === invoiceKind && inv.amount === amount),

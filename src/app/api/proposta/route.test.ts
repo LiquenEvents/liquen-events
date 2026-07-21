@@ -14,6 +14,9 @@ vi.mock("@/lib/proposals-store", () => ({
     proposalsDb.store.set(id, next);
     return next;
   }),
+  listProposalsForQuote: vi.fn(async (quoteId: string) =>
+    [...proposalsDb.store.values()].filter((p) => p.quoteId === quoteId),
+  ),
 }));
 vi.mock("@/lib/quotes-store", () => ({
   getQuote: vi.fn(async (id: string) => quotesDb.store.get(id) ?? null),
@@ -90,15 +93,20 @@ function postReq(body: unknown): NextRequest {
 }
 
 function seedProposal(id: string, over: Record<string, unknown> = {}) {
+  const quoteId = typeof over.quoteId === "string" ? over.quoteId : `q-${id}`;
   proposalsDb.store.set(id, {
     id,
-    quoteId: `q-${id}`,
+    quoteId,
     clientName: "Cliente Teste",
     clientEmail: "cliente@example.com",
     total: 12500,
     status: "enviada",
     ...over,
   });
+  // A live proposal always has a parent quote — model that by default so the
+  // accept path's parent-quote existence guard sees a real quote. Tests that
+  // need the quote GONE (hard-delete) remove it explicitly after seeding.
+  if (!quotesDb.store.has(quoteId)) quotesDb.store.set(quoteId, { id: quoteId });
 }
 
 beforeEach(() => {
@@ -178,6 +186,43 @@ describe("POST /api/proposta", () => {
     expect(createInvoice).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "sinal", amount: 3750 }),
     );
+  });
+
+  it("with the parent quote present, a normal accept mints EXACTLY one contract + one sinal (guard doesn't regress the happy path)", async () => {
+    seedProposal("p-ok");
+    expect(quotesDb.store.has("q-p-ok")).toBe(true); // parent quote is live
+    const res = await POST(
+      postReq({ token: createProposalToken("p-ok"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-ok")?.status).toBe("aceite");
+    // Exactly one of each fiscal record — no duplicates introduced by the guard.
+    expect(createContract).toHaveBeenCalledTimes(1);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+    expect(createInvoice).toHaveBeenCalledWith(expect.objectContaining({ kind: "sinal" }));
+  });
+
+  it("refuses to accept a proposal whose parent quote was hard-deleted (409) and mints NOTHING", async () => {
+    // Data-integrity bug: the back office hard-deletes the quote after the signed
+    // link was sent; the client then clicks accept. The contract and the 30% sinal
+    // invoice both carry proposal.quoteId, so minting them here would create fiscal
+    // records anchored to a quoteId with no parent quote — untraceable in the ledger.
+    // The accept must refuse and mint nothing.
+    seedProposal("p-orphan");
+    quotesDb.store.delete("q-p-orphan"); // parent quote vanished (hard delete)
+    expect(quotesDb.store.has("q-p-orphan")).toBe(false);
+
+    const res = await POST(
+      postReq({ token: createProposalToken("p-orphan"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(409);
+    // Nothing fiscal was minted against the orphan quoteId…
+    expect(createContractIfAbsent).not.toHaveBeenCalled();
+    expect(createContract).not.toHaveBeenCalled();
+    expect(createInvoice).not.toHaveBeenCalled();
+    // …and the proposal itself was not flipped to "aceite" (guard returns first).
+    expect(proposalsDb.store.get("p-orphan")?.status).toBe("enviada");
+    expect(updateQuoteWith).not.toHaveBeenCalled();
   });
 
   it("carries the proposal's vatRate into the auto-sinal, not a hardcoded 0.23 (FIX 4)", async () => {
@@ -273,6 +318,101 @@ describe("POST /api/proposta", () => {
     // No "Sistema" seed note was added (nothing to seed).
     const log = (quote.activityLog ?? []) as { kind: string; actor: string }[];
     expect(log.some((e) => e.actor === "Sistema")).toBe(false);
+  });
+
+  it("accepts a proposal whose validUntil is the current day (não expira à meia-noite)", async () => {
+    // "Válida até 2026-07-19" tem de valer todo o dia 19, não só até 00:00Z.
+    // Bug: Date.parse('2026-07-19') = meia-noite UTC, por isso qualquer aceite
+    // depois da meia-noite do próprio dia da validade era rejeitado com 410.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T09:00:00Z"));
+    try {
+      seedProposal("p-today", { validUntil: "2026-07-19" });
+      const res = await POST(
+        postReq({ token: createProposalToken("p-today"), action: "aceitar", ...CONSENT }),
+      );
+      expect(res.status).toBe(200);
+      expect(proposalsDb.store.get("p-today")?.status).toBe("aceite");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects acceptance of a genuinely expired proposal (validUntil in the past) with 410", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T09:00:00Z"));
+    try {
+      seedProposal("p-exp", { validUntil: "2026-07-18" }); // ontem
+      const res = await POST(
+        postReq({ token: createProposalToken("p-exp"), action: "aceitar", ...CONSENT }),
+      );
+      expect(res.status).toBe(410);
+      expect(proposalsDb.store.get("p-exp")?.status).toBe("enviada");
+      expect(createContract).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects accepting a SUPERSEDED (not-newest) proposal with 409 and mutates nothing", async () => {
+    // Duas propostas enviadas para o mesmo pedido: a equipa reviu o preço. O link
+    // antigo (mais barato) ainda vive na caixa do cliente. Aceitá-lo vincularia a
+    // Líquen ao preço obsoleto — tem de ser recusado a favor da proposta mais nova.
+    seedProposal("p-old", {
+      quoteId: "q-rev",
+      total: 10000,
+      createdAt: "2026-02-01T10:00:00.000Z",
+    });
+    seedProposal("p-new", {
+      quoteId: "q-rev",
+      total: 12000,
+      createdAt: "2026-03-01T10:00:00.000Z",
+    });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-old"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(409);
+    expect(proposalsDb.store.get("p-old")?.status).toBe("enviada");
+    expect(updateQuoteWith).not.toHaveBeenCalled();
+    expect(createContract).not.toHaveBeenCalled();
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("accepts the NEWEST proposal even when an older sibling is still enviada", async () => {
+    seedProposal("p-old2", {
+      quoteId: "q-rev2",
+      total: 10000,
+      createdAt: "2026-02-01T10:00:00.000Z",
+    });
+    seedProposal("p-new2", {
+      quoteId: "q-rev2",
+      total: 12000,
+      createdAt: "2026-03-01T10:00:00.000Z",
+    });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-new2"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-new2")?.status).toBe("aceite");
+  });
+
+  it("a newer DRAFT (rascunho) does not supersede a live sent proposal", async () => {
+    // Um rascunho nunca chegou a ser oferecido ao cliente, por isso não invalida
+    // a proposta enviada mais antiga — o cliente pode aceitá-la à mesma.
+    seedProposal("p-sent", {
+      quoteId: "q-rev3",
+      createdAt: "2026-02-01T10:00:00.000Z",
+    });
+    seedProposal("p-draft", {
+      quoteId: "q-rev3",
+      status: "rascunho",
+      createdAt: "2026-03-01T10:00:00.000Z",
+    });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-sent"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-sent")?.status).toBe("aceite");
   });
 
   it("declines a proposal: marks it rejeitada and the quote rejeitado", async () => {

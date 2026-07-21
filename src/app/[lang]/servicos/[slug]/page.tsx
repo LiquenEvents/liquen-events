@@ -132,16 +132,40 @@ export default async function ServiceDetailPage({
             white caption legible — no heavy full-panel veil. */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-14 lg:pb-20">
+          {/* Full crumb trail (Início › Serviços › serviço) — mirrors the
+              BreadcrumbList JSON-LD above so the visible path matches what search
+              engines index, and gives the visitor two levels up, not just one. */}
           <nav
             aria-label={t.nav.breadcrumb}
             className="text-[11px] tracking-[0.2em] uppercase text-cream/60 mb-8"
           >
-            <Link
-              href={localizeHref("/servicos", locale)}
-              className="inline-flex items-center gap-2 hover:text-cream transition-colors"
-            >
-              <span aria-hidden>←</span> {t.nav.servicos}
-            </Link>
+            <ol className="flex flex-wrap items-center gap-2">
+              <li>
+                <Link
+                  href={localizeHref("/", locale)}
+                  className="hover:text-cream transition-colors"
+                >
+                  {t.nav.inicio}
+                </Link>
+              </li>
+              <li aria-hidden className="text-cream/30">
+                ›
+              </li>
+              <li>
+                <Link
+                  href={localizeHref("/servicos", locale)}
+                  className="hover:text-cream transition-colors"
+                >
+                  {t.nav.servicos}
+                </Link>
+              </li>
+              <li aria-hidden className="text-cream/30">
+                ›
+              </li>
+              <li aria-current="page" className="text-cream/90 normal-case tracking-normal">
+                {svc.title}
+              </li>
+            </ol>
           </nav>
           {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
               photograph owns the first screen. Still the page's single <h1>. */}
@@ -191,7 +215,7 @@ export default async function ServiceDetailPage({
                 stay sentence case — uppercasing the long PT descriptions reads
                 shouty — but sit against the eyebrow's uppercase spec label. */}
             <div>
-              <p className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-2 flex items-center gap-3">
+              <p className="text-foreground/72 text-[10px] tracking-[0.4em] uppercase mb-2 flex items-center gap-3">
                 <span className="w-8 h-px bg-gold flex-shrink-0" />
                 {t.servicoDetalhe.includesTitle}
               </p>
@@ -263,15 +287,15 @@ export default async function ServiceDetailPage({
       <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 mb-10 lg:mb-14">
           <AnimateIn>
-            <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase flex items-center gap-3">
+            <p className="text-foreground/72 text-[10px] tracking-[0.5em] uppercase flex items-center gap-3">
               <span className="w-8 h-px bg-gold flex-shrink-0" />
               {t.servicoDetalhe.galleryEyebrow}
             </p>
           </AnimateIn>
           <AnimateIn delay={80}>
             <h2
-              className="text-foreground font-bold leading-[1.05] tracking-tight mt-5"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 3.8vw, 52px)" }}
+              className="text-foreground font-bold uppercase tracking-display leading-[1.05] mt-5"
+              style={{ fontSize: "clamp(28px, 3.8vw, 52px)" }}
             >
               {t.servicoDetalhe.galleryTitle}
             </h2>
@@ -345,10 +369,7 @@ export default async function ServiceDetailPage({
             <Reveal as="div" stagger={0.08} className="text-veil-shadow flex flex-col">
               {svc.faqs.map((f) => (
                 <div key={f.q} className="border-t border-white/12 py-7">
-                  <h3
-                    className="text-white text-base mb-3"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
+                  <h3 className="text-white text-base font-bold uppercase tracking-display mb-3">
                     {f.q}
                   </h3>
                   <p className="text-white/80 text-sm leading-[1.9]">{f.a}</p>
@@ -365,7 +386,7 @@ export default async function ServiceDetailPage({
         <section className="py-20 lg:py-28 bg-surface border-t border-foreground/8">
           <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <AnimateIn>
-              <h2 className="text-foreground/60 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
+              <h2 className="text-foreground/72 text-[10px] tracking-[0.4em] uppercase mb-10 flex items-center gap-3">
                 <span className="w-8 h-px bg-gold flex-shrink-0" /> {t.servicoDetalhe.relatedTitle}
               </h2>
             </AnimateIn>
@@ -426,8 +447,8 @@ export default async function ServiceDetailPage({
         <div className="text-veil-shadow relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn>
             <h2
-              className="text-white font-bold leading-[0.95] mb-12 max-w-2xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(36px, 5.5vw, 76px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.95] mb-12 max-w-2xl"
+              style={{ fontSize: "clamp(36px, 5.5vw, 76px)" }}
             >
               {t.servicoDetalhe.ctaTitle}
             </h2>

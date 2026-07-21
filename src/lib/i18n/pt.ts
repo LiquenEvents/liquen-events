@@ -72,6 +72,8 @@ export const pt = {
     testemunhoLabel: "Testemunho",
     pausar: "Pausar rotação dos testemunhos",
     retomar: "Retomar rotação dos testemunhos",
+    pausarLogos: "Pausar desfile de logótipos",
+    retomarLogos: "Retomar desfile de logótipos",
     whatsappPrefill: "Olá, gostaria de saber mais sobre a decoração de eventos.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
@@ -508,7 +510,11 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial, com uma decoração à vossa medida e o dia coordenado ao pormenor, para só terem de o viver.",
+            desc: "O vosso dia mais especial — coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
+          },
+          {
+            title: "Aluguer de Viaturas Clássicas",
+            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
           },
           {
             title: "Batizados & Comunhões",
@@ -529,6 +535,10 @@ export const pt = {
         subtitle: "Para empresas",
         desc: "Elevamos a imagem da sua marca através de eventos que transformam equipas e celebram conquistas.",
         services: [
+          {
+            title: "Eventos Corporativos",
+            desc: "Decoração e cenografia à medida da sua marca — de conferências e lançamentos a jantares de empresa.",
+          },
           {
             title: "Conferências & Congressos",
             desc: "Organização completa de conferências empresariais, da logística ao audiovisual.",
@@ -588,6 +598,7 @@ export const pt = {
     convidados: "Convidados",
     data: "Data",
     local: "Local",
+    mensagem: "Mensagem",
     adicionais: "Serviços Adicionais",
     noDataNote:
       "Guarde a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto consigo brevemente.",
@@ -661,6 +672,9 @@ export const pt = {
       rejeitadaBody:
         "Obrigado por nos dizer. Se mudar de ideias ou quiser ajustar algo, estamos sempre ao dispor.",
       jaRegistado: "Já tínhamos registado a sua resposta a esta proposta.",
+      expiradaTitle: "Esta proposta expirou.",
+      expiradaBody:
+        "O prazo de validade desta proposta já passou, por isso não é possível aceitá-la aqui. Fale connosco e preparamos-lhe uma proposta atualizada com todo o gosto.",
       aceitar: "Aceitar proposta →",
       aceitarSending: "A registar…",
       recusar: "Recusar",
@@ -780,6 +794,7 @@ export const pt = {
     servicosTitulo: "Serviços",
     serviceLinks: [
       "Decoração de Casamentos",
+      "Aluguer de Viaturas Clássicas",
       "Eventos Corporativos",
       "Festas e Aniversários",
       "Jantares de Gala",

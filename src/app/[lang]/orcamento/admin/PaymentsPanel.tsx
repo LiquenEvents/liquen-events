@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { randomId, eur2 } from "./util";
+import { Button } from "./ui";
 import { useToast } from "./Toast";
 import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
 // `import type` é apagado no build, por isso puxar a forma da fatura do store
@@ -196,12 +197,18 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Pagamentos &amp; Faturação</p>
         {/* Contract reference */}
         <div className="flex items-center gap-2">
-          <span className="text-foreground/25 text-[10px] tracking-[0.15em] uppercase">Ref.</span>
+          <label
+            htmlFor="payments-contract-ref"
+            className="text-foreground/45 text-[10px] tracking-[0.15em] uppercase"
+          >
+            Ref.
+          </label>
           <input
+            id="payments-contract-ref"
             value={contractRef}
             onChange={(e) => setContractRef(e.target.value)}
             onBlur={saveContractRef}
@@ -209,26 +216,29 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
               if (e.key === "Enter") saveContractRef();
             }}
             placeholder="2026-001"
-            className={`bo-input w-24 px-2 py-1 text-xs text-foreground/65 ${savingRef ? "opacity-50" : ""}`}
+            className={`bo-input w-24 px-2.5 py-1.5 text-xs text-foreground/80 ${savingRef ? "opacity-50" : ""}`}
             title="Número de referência do contrato/fatura"
           />
         </div>
       </div>
 
       {/* Summary — Recebido/Em falta vêm do livro de faturas quando visível. */}
-      <div className="grid grid-cols-3 gap-2 mb-1.5">
+      <div className="grid grid-cols-3 gap-2.5 mb-1.5">
         {[
-          { l: "Total", v: eur2(total), c: "text-foreground/70" },
+          { l: "Total", v: eur2(total), c: "text-foreground/85" },
           { l: "Recebido", v: eur2(headlinePaid), c: "text-[#4d6350]" },
           {
             l: "Em falta",
             v: eur2(outstanding),
-            c: outstanding > 0 ? "text-[#b5654a]" : "text-foreground/40",
+            c: outstanding > 0 ? "text-[#b5654a]" : "text-foreground/45",
           },
         ].map((k) => (
-          <div key={k.l} className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
-            <p className={`text-sm font-semibold ${k.c}`}>{k.v}</p>
-            <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">{k.l}</p>
+          <div
+            key={k.l}
+            className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] p-3 text-center"
+          >
+            <p className={`text-base font-semibold tabular-nums ${k.c}`}>{k.v}</p>
+            <p className="text-foreground/40 text-[9px] tracking-[0.2em] uppercase mt-1">{k.l}</p>
           </div>
         ))}
       </div>
@@ -356,7 +366,7 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
           {payments.map((p) => (
             <div
               key={p.id}
-              className="group flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-lg px-3 py-2"
+              className="group flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-xl px-3.5 py-2.5 motion-safe:transition-colors hover:border-foreground/[0.12]"
             >
               <button
                 onClick={() => togglePaid(p.id)}
@@ -379,15 +389,15 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
                 )}
               </button>
               <div className="flex-1 min-w-0">
-                <p className="text-foreground/65 text-xs">
+                <p className="text-foreground/75 text-xs">
                   {KIND_LABEL[p.kind]} ·{" "}
-                  <span className="text-foreground/40">
+                  <span className="text-foreground/45">
                     {new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT")}
                   </span>
                 </p>
               </div>
               <span
-                className={`text-xs font-semibold shrink-0 ${p.paid ? "text-[#4d6350]" : "text-foreground/50"}`}
+                className={`text-xs font-semibold shrink-0 tabular-nums ${p.paid ? "text-[#4d6350]" : "text-foreground/55"}`}
               >
                 {eur2(p.amount)}
               </span>
@@ -447,11 +457,12 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
       )}
 
       {/* Add */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <select
+          aria-label="Tipo de pagamento"
           value={kind}
           onChange={(e) => setKind(e.target.value as PaymentKind)}
-          className="bo-input px-2 py-1.5 text-xs text-foreground/55"
+          className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
         >
           <option value="sinal">Sinal</option>
           <option value="pagamento">Pagamento</option>
@@ -459,23 +470,22 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
         </select>
         <input
           type="number"
+          aria-label="Valor em euros"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="Valor €"
-          className="bo-input w-24 px-2 py-1.5 text-xs text-foreground/70"
+          className="bo-input w-24 px-2.5 py-2 text-xs text-foreground/80"
         />
         <input
           type="date"
+          aria-label="Data do pagamento"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="bo-input px-2 py-1.5 text-xs text-foreground/55"
+          className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
         />
-        <button
-          onClick={add}
-          className="px-3 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-xs hover:bg-[#2a3227] transition-colors"
-        >
-          + Registar
-        </button>
+        <Button size="sm" onClick={add} iconLeft={<span aria-hidden="true">+</span>}>
+          Registar
+        </Button>
       </div>
     </div>
   );

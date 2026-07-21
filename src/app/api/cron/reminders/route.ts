@@ -53,13 +53,18 @@ export async function GET(request: NextRequest) {
     // Archived quotes are soft-deleted — never worth a notification.
     const quotes = allQuotes.filter((q) => !q.archived);
 
+    // Anchor "today" in UTC — the day keys we compare against (q.date,
+    // followUpAt, payment/calendar dates) are all UTC yyyy-mm-dd strings
+    // (`toISOString().slice(0,10)` elsewhere). Using local `setHours`/`setDate`
+    // here mixed a LOCAL midnight into a UTC key, so in any east-of-UTC zone
+    // (e.g. Europe/Lisbon, the app's own locale) the whole window slipped a day.
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
     const key = (d: Date) => d.toISOString().slice(0, 10);
     const todayKey = key(today);
     const plus = (days: number) => {
       const d = new Date(today);
-      d.setDate(d.getDate() + days);
+      d.setUTCDate(d.getUTCDate() + days);
       return key(d);
     };
     const in3 = plus(3);

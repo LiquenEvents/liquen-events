@@ -23,6 +23,38 @@ export type View =
   | "modelos-email"
   | "inbox";
 
+/**
+ * Sidebar split for the calm, ChatGPT-like rail. Only the owner's DAILY CORE
+ * stays visible at all times (`CORE_NAV`); everything else is tucked into a
+ * collapsible "Mais" group at the bottom (`MORE_NAV`), collapsed by default, so
+ * a newcomer sees a short, legible list instead of 15 destinations at once.
+ *
+ * `NAV` stays the single source of truth for ids / labels / icons and for every
+ * other consumer (command palette, mobile bar); these arrays only decide what
+ * the rail shows up-front vs. behind the disclosure. Together they cover every
+ * `View` id exactly once — nothing is ever unreachable.
+ */
+export const CORE_NAV: View[] = [
+  "overview",
+  "pedidos",
+  "propostas",
+  "faturas",
+  "contratos",
+  "inbox",
+  "calendario",
+];
+
+export const MORE_NAV: View[] = [
+  "kanban",
+  "clientes",
+  "tarefas",
+  "fornecedores",
+  "inventario",
+  "seguimentos",
+  "estatisticas",
+  "modelos-email",
+];
+
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
     id: "overview",
@@ -273,7 +305,7 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   },
   {
     id: "inbox",
-    label: "Inbox",
+    label: "Mensagens",
     icon: (
       <svg
         width="16"

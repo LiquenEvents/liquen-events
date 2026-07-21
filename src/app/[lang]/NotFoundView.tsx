@@ -56,6 +56,7 @@ export default function NotFoundView() {
         {/* Quick links — keep the crawler & visitor moving */}
         <nav className="mt-14 pt-8 border-t border-foreground/8 flex flex-wrap gap-x-7 gap-y-2 justify-center">
           {[
+            [t.common.pedirOrcamento, "/orcamento"],
             [t.nav.servicos, "/servicos"],
             [t.nav.galeria, "/galeria"],
             [t.nav.sobre, "/sobre"],

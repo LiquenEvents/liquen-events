@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import GaleriaClient from "./GaleriaClient";
 import AnimateIn from "@/components/AnimateIn";
@@ -99,6 +100,9 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               <h1 className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                 {t.galeria.headerTitle}
               </h1>
+              <p className="mt-3 text-white/75 text-[12.5px] leading-[1.6] max-w-sm">
+                {t.galeria.headerDesc}
+              </p>
             </div>
           </AnimateIn>
         </div>
@@ -136,10 +140,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               <span className="w-5 h-px bg-gold flex-shrink-0" />
               {t.galeria.instaEyebrow}
             </p>
-            <h2
-              className="text-white text-4xl lg:text-5xl font-bold mb-5"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
+            <h2 className="text-white text-4xl lg:text-5xl font-bold uppercase tracking-display mb-5">
               {t.galeria.instaTitle}
             </h2>
             <p className="text-white/70 text-sm leading-relaxed mb-10 max-w-md">
@@ -153,6 +154,12 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
               >
                 {t.common.pedirOrcamento} <span aria-hidden>→</span>
               </TrackedLink>
+              {/* Interlink to the services hub — moves a visitor browsing the
+                  portfolio toward the offering, and gives crawlers a keyworded
+                  path from /galeria into /servicos. */}
+              <Link href={localizeHref("/servicos", locale)} className={OUTLINE_LIGHT_BUTTON_CLASS}>
+                {t.common.verServicos} <span aria-hidden>→</span>
+              </Link>
               <a
                 href="https://www.instagram.com/liquen.events"
                 target="_blank"

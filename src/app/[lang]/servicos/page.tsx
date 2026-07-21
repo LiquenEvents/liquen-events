@@ -8,7 +8,6 @@ import Parallax from "@/components/Parallax";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
-import TestimonialsCarousel from "@/components/TestimonialsCarousel";
 import { getDictionary, normalizeLocale, localizeHref, type Locale } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
@@ -67,6 +66,7 @@ const categoryMeta = [
     band: "/imagens/DaniGui_Preview20.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
+      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
       { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
@@ -78,9 +78,10 @@ const categoryMeta = [
     layout: "mosaic-right" as const,
     band: "/imagens/EW1_1333.jpg",
     services: [
+      { slug: "eventos-corporativos", image: "/imagens/EW1_1405.jpg" },
       { slug: "conferencias-e-congressos", image: "/imagens/EW1_1332.jpg" },
       { slug: "teambuilding", image: "/imagens/EW1_1330.jpg" },
-      { slug: "lancamentos-de-produto", image: "/imagens/DaniGui_JantarFesta_130.jpg" },
+      { slug: "lancamentos-de-produto", image: "/imagens/EW1_1428.jpg" },
       { slug: "jantares-de-empresa", image: "/imagens/EW1_1404.jpg" },
     ],
   },
@@ -89,14 +90,10 @@ const categoryMeta = [
 /* ── Full-screen service band — one image, one service (SpaceX-style) ── */
 function ServiceBand({
   service,
-  index,
-  catNum,
   cta,
   locale,
 }: {
   service: ServiceCard;
-  index: number;
-  catNum: string;
   cta: string;
   locale: Locale;
 }) {
@@ -107,7 +104,7 @@ function ServiceBand({
       <Parallax speed={0.12} className="absolute inset-0">
         <Image
           src={service.image}
-          alt=""
+          alt={service.title}
           fill
           sizes="100vw"
           className="object-cover object-center"
@@ -118,16 +115,11 @@ function ServiceBand({
           the bottom — where the number/title/description sit — darkens enough to
           keep the white text legible. No heavy full-panel veil. */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-      {/* SpaceX chapter caption (matches the home chapters): mono index as the
-          gold-dashed eyebrow, a big bold uppercase headline, a one-line
-          description, and the ghost outline button. */}
+      {/* A big bold uppercase headline, a one-line description, and the ghost
+          outline button. The mono chapter index was removed on request. */}
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-12 lg:pb-16">
         <AnimateIn>
           <div className="max-w-2xl">
-            <p className="text-white/55 font-mono text-[10px] tracking-[0.4em] mb-3 flex items-center gap-3">
-              <span className="w-6 h-px bg-gold flex-shrink-0" />
-              {catNum}.{String(index + 1).padStart(2, "0")}
-            </p>
             <h3
               className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
               style={{ fontSize: "clamp(28px, 4.5vw, 56px)" }}
@@ -139,6 +131,10 @@ function ServiceBand({
             </p>
             <Link
               href={localizeHref(`/servicos/${service.slug}`, locale)}
+              // Specific accessible name so the link's purpose is clear out of
+              // context (screen-reader link list) and the anchor text carries the
+              // service keyword for SEO — the visible label stays minimal.
+              aria-label={`${cta} — ${service.title}`}
               className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
             >
               {cta} <span aria-hidden>→</span>
@@ -272,16 +268,16 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               {ts.philoEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[1.05] tracking-tight max-w-3xl"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 52px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[1.05] max-w-3xl"
+              style={{ fontSize: "clamp(28px, 4vw, 52px)" }}
             >
               {ts.philoTitle}
             </h2>
           </AnimateIn>
-          {/* Processo numerado (SpaceX-style): 01 / 02 / 03 em mono fino,
-              títulos em caixa alta com tracking-display e filetes hairline
-              (border-white/15) a separar cada passo — sem cantos arredondados,
-              sem floreados. Vertical no telemóvel, três colunas a partir de md. */}
+          {/* Processo em três passos: títulos em caixa alta com tracking-display
+              e filetes hairline (border-white/15) a separar cada passo — sem
+              cantos arredondados, sem floreados. Os números foram removidos a
+              pedido. Vertical no telemóvel, três colunas a partir de md. */}
           <div className="mt-14 grid grid-cols-1 md:grid-cols-3 border-t border-white/15">
             {ts.philoPillars.map((p, i) => (
               <AnimateIn key={p.title} delay={i * 90}>
@@ -292,9 +288,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                       : "border-t border-white/15 md:border-t-0 md:border-l md:border-white/15"
                   }`}
                 >
-                  <span className="font-mono text-[11px] tracking-[0.4em] text-moss-light mb-6">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
                   <h3 className="text-white font-bold uppercase tracking-display text-lg lg:text-xl mb-4">
                     {p.title}
                   </h3>
@@ -320,7 +313,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <Parallax speed={0.12} className="absolute inset-0">
               <Image
                 src={cat.band}
-                alt=""
+                alt={cat.label}
                 fill
                 sizes="100vw"
                 className="object-cover object-center"
@@ -328,19 +321,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               />
             </Parallax>
             <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-            {/* SpaceX chapter caption: gold-dashed eyebrow + big bold uppercase
-                headline + ghost outline button. Slightly larger than a service
-                band to signal it opens a category. */}
+            {/* Big bold uppercase headline + ghost outline button. Slightly
+                larger than a service band to signal it opens a category. The
+                numbered marker and subtitle eyebrow were removed on request. */}
             <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
                 <div className="max-w-2xl">
-                  <p className="text-white/55 font-mono text-[10px] tracking-[0.4em] mb-4">
-                    {cat.num}
-                  </p>
-                  <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
-                    <span className="w-6 h-px bg-gold flex-shrink-0" />
-                    {cat.subtitle}
-                  </p>
                   <h2
                     className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
                     style={{ fontSize: "clamp(32px, 5.5vw, 64px)" }}
@@ -355,6 +341,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                       `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
                       locale,
                     )}
+                    // Category-specific accessible name (visible label stays
+                    // minimal) so the link's target is clear out of context.
+                    aria-label={`${ts.verDetalhes} — ${cat.label}`}
                     className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
                   >
                     {ts.verDetalhes} <span aria-hidden>→</span>
@@ -366,14 +355,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
           {/* Service bands — one full-screen panel per service */}
           {cat.services.map((s, i) => (
-            <ServiceBand
-              key={`${cat.id}-${i}`}
-              service={s}
-              index={i}
-              catNum={cat.num}
-              cta={ts.verMais}
-              locale={locale}
-            />
+            <ServiceBand key={`${cat.id}-${i}`} service={s} cta={ts.verMais} locale={locale} />
           ))}
         </div>
       ))}
@@ -407,8 +389,8 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {ts.seoEyebrow}
               </p>
               <h2
-                className="text-cream font-bold leading-[1.04] mb-7 max-w-3xl"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(32px, 5vw, 76px)" }}
+                className="text-cream font-bold uppercase tracking-display leading-[1.04] mb-7 max-w-3xl"
+                style={{ fontSize: "clamp(32px, 5vw, 76px)" }}
               >
                 {ts.seoTitle}
               </h2>
@@ -419,9 +401,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           </div>
         </div>
       </section>
-
-      {/* ── Testimonials ── */}
-      <TestimonialsCarousel testimonials={t.testimonials} />
 
       {/* ── CTA — full-screen closing panel ── */}
       <section
@@ -447,13 +426,13 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
         <div className="text-veil-shadow relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {ts.ctaEyebrow}
             </p>
             <h2
-              className="text-white font-bold leading-[0.9] tracking-tight mb-6"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(44px, 8vw, 110px)" }}
+              className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
+              style={{ fontSize: "clamp(44px, 8vw, 110px)" }}
             >
               {ts.ctaTitleLine1}
               <br />

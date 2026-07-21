@@ -193,7 +193,16 @@ export async function POST(request: NextRequest) {
     // Honeypot: a real visitor never fills the hidden "website" field. If it's
     // set, this is a bot — pretend success and drop it silently. The client
     // guards it too, but that alone is bypassable, so re-check server-side.
+    // We LOG the drop (with the UA) so a false positive — a real lead lost to an
+    // over-eager autofill on a non-bot browser — is observable instead of 100%
+    // silent. Behaviour is unchanged: the request is still discarded.
     if (body && typeof body === "object" && (body as Record<string, unknown>).website) {
+      const ua = request.headers.get("user-agent") ?? "";
+      const looksLikeBot = /bot|crawl|spider|headless|python|curl|wget|scrapy/i.test(ua);
+      log.warn("orcamento: honeypot acionado — pedido descartado", {
+        looksLikeBot,
+        ua: ua.slice(0, 120),
+      });
       return NextResponse.json({ id: generateQuoteId(), status: "ok" });
     }
     const parsed = quotePayloadSchema.safeParse(body);

@@ -15,10 +15,17 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? "";
 }
 
-/** Escape a single CSV cell (handles quotes, separators and newlines). */
+/** Escape a single CSV cell (handles quotes, separators, newlines) and neutralises
+ *  CSV formula injection (CWE-1236): a STRING whose text begins with = + - @ (or a
+ *  leading tab/CR) is treated as a formula by Excel/Sheets/Numbers when the file is
+ *  opened. Client-supplied data (name, message, location, guest names) flows here,
+ *  so a lead like `=HYPERLINK(...)` could execute in the admin's spreadsheet. We
+ *  prefix such cells with a quote so they are read as text — but NEVER a numeric
+ *  value, so a treasury amount like -100 stays an intact number. */
 function cell(v: unknown): string {
   const s = v == null ? "" : String(v);
-  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const guarded = typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[";\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 /** Build a `;`-separated CSV string (PT locale) with a UTF-8 BOM for Excel. */
@@ -48,6 +55,15 @@ const STATUS_LABEL: Record<string, string> = {
   rejeitado: "Rejeitado",
 };
 
+/** Format an ISO submission timestamp for the pt-PT export, guarding against an
+ *  empty/malformed value: `new Date("")`/`new Date("nope")` is an Invalid Date
+ *  whose `.toLocaleString()` emits the literal "Invalid Date" — garbage in a
+ *  spreadsheet cell. Return "" for anything unparseable so the column stays blank. */
+function submittedStamp(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("pt-PT");
+}
+
 /** Export a list of quotes (pedidos) as CSV rows. */
 export function quotesToCsvRows(quotes: Quote[]): (string | number)[][] {
   const header = [
@@ -75,7 +91,7 @@ export function quotesToCsvRows(quotes: Quote[]): (string | number)[][] {
   ];
   const rows = quotes.map((q) => [
     q.id,
-    new Date(q.submittedAt).toLocaleString("pt-PT"),
+    submittedStamp(q.submittedAt),
     STATUS_LABEL[q.status] ?? q.status,
     q.name,
     q.email,
@@ -150,12 +166,24 @@ function icsText(s: string): string {
 export function buildEventIcs(q: Quote, now: Date = new Date()): string | null {
   if (!q.date) return null;
 
+  // `date`/`endDate` are free-form text (validation only trims to 20 chars — see
+  // quoteFormSchema), so "a definir", a full ISO timestamp, etc. can reach here.
+  // Accept only a plain calendar date; anything else is treated like "no date"
+  // rather than emitting a malformed VALUE=DATE or throwing a RangeError out of
+  // `.toISOString()` on an Invalid Date (which would crash the .ics download).
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const day = (iso: string) => iso.replace(/-/g, "");
-  // DTEND is exclusive for all-day events: day after the last event day.
-  const lastDay = q.endDate && q.endDate >= q.date ? q.endDate : q.date;
-  const end = new Date(lastDay + "T12:00:00");
-  end.setDate(end.getDate() + 1);
-  const dtEnd = end.toISOString().slice(0, 10).replace(/-/g, "");
+  if (!DATE_RE.test(q.date)) return null;
+
+  // DTEND is exclusive for all-day events: the day after the last event day.
+  const lastDay = q.endDate && DATE_RE.test(q.endDate) && q.endDate >= q.date ? q.endDate : q.date;
+  // UTC arithmetic keeps the +1-day rollover timezone-independent (parsing the
+  // day as local noon could shift the ISO date in far-offset zones) while still
+  // normalising month/year boundaries (Jan 31 → Feb 1, Dec 31 → Jan 1).
+  const dtEnd = new Date(Date.parse(lastDay + "T00:00:00Z") + 86_400_000)
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, "");
   const stamp = now
     .toISOString()
     .replace(/[-:]/g, "")
@@ -407,7 +435,7 @@ export function printRunSheet(q: Quote): void {
       : "";
 
   win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8" />
-  <title>Run-sheet — ${escapeHtml(q.name)} — ${q.id}</title>
+  <title>Guião do dia — ${escapeHtml(q.name)} — ${q.id}</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; margin: 0; padding: 40px; }
@@ -436,7 +464,7 @@ export function printRunSheet(q: Quote): void {
   </style></head><body>
     <div class="head">
       <div>
-        <div class="brand">Líquen Events · Run-sheet</div>
+        <div class="brand">Líquen Events · Guião do dia</div>
         <h1>${escapeHtml(q.name)}</h1>
         <div class="sub">${dateStr}</div>
       </div>

@@ -7,10 +7,10 @@ import type { Quote } from "@/lib/orcamento/types";
 // client bundle.
 import type { Invoice } from "@/lib/invoices-store";
 import { SkeletonList } from "./Skeleton";
-import EmptyState from "./EmptyState";
 import { eur2 } from "./util";
 import { splitThirtySeventy } from "@/lib/money";
 import { useToast } from "./Toast";
+import { Button, Card, EmptyState, Field, Segmented } from "./ui";
 
 type Status = Invoice["status"];
 type Kind = Invoice["kind"];
@@ -20,6 +20,22 @@ const STATUS_META: Record<Status, { label: string; color: string }> = {
   paga: { label: "Paga", color: "#4d6350" },
   anulada: { label: "Anulada", color: "#b5654a" },
 };
+
+const STATUSES = Object.keys(STATUS_META) as Status[];
+
+const PlusIcon = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+  </svg>
+);
 
 const KIND_LABEL: Record<Kind, string> = {
   sinal: "Sinal (30%)",
@@ -218,6 +234,88 @@ export default function Faturas({ quotes }: Props) {
     }
   }
 
+  // Apagar definitivamente uma fatura — só permitido quando já está anulada
+  // (a guarda fiscal vive também no servidor, que devolve 409 caso contrário).
+  // Anula-se primeiro, depois apaga-se: uma fatura viva nunca se apaga por engano.
+  async function remove(inv: Invoice) {
+    if (
+      !window.confirm(
+        `Apagar definitivamente a fatura ${inv.number}? Esta ação não pode ser anulada.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(inv.id);
+    try {
+      const res = await fetch(`/api/faturas/${inv.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "Não foi possível apagar", "error");
+        return;
+      }
+      setInvoices((prev) => prev.filter((i) => i.id !== inv.id));
+      toast("Fatura apagada", "success");
+    } catch {
+      toast("Erro de rede ao apagar", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Shared bits used by both the desktop table and the mobile card list, so the
+  // two layouts can never drift apart.
+  const statusBadge = (i: Invoice) => (
+    <span
+      className="inline-block rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
+      style={{
+        background: `${STATUS_META[i.status].color}18`,
+        color: STATUS_META[i.status].color,
+      }}
+    >
+      {STATUS_META[i.status].label}
+    </span>
+  );
+
+  const rowActions = (i: Invoice) => (
+    <>
+      {i.status === "emitida" && (
+        <>
+          <Button
+            size="sm"
+            variant="subtle"
+            onClick={() => setStatus(i, "paga")}
+            disabled={busy === i.id}
+            title="Já recebeu o pagamento desta fatura"
+          >
+            Marcar como paga
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (window.confirm(`Anular a fatura ${i.number}? Deixa de contar para o total.`))
+                setStatus(i, "anulada");
+            }}
+            disabled={busy === i.id}
+            title="Cancelar esta fatura (deixa de contar para os totais)"
+          >
+            Anular
+          </Button>
+        </>
+      )}
+      {i.status === "paga" && (
+        <span className="text-xs text-foreground/40">Pago {fmtDate(i.paidAt)}</span>
+      )}
+      {/* Apagar — só para faturas já anuladas (segurança fiscal:
+          anula-se primeiro, depois apaga-se). */}
+      {i.status === "anulada" && (
+        <Button size="sm" variant="ghost" onClick={() => remove(i)} disabled={busy === i.id}>
+          Apagar
+        </Button>
+      )}
+    </>
+  );
+
   const filtered = useMemo(
     () => (filter === "all" ? invoices : invoices.filter((i) => i.status === filter)),
     [invoices, filter],
@@ -240,177 +338,133 @@ export default function Faturas({ quotes }: Props) {
 
   return (
     <div>
-      {/* Header + totals */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div className="grid grid-cols-3 gap-3 flex-1 min-w-[280px]">
+      {/* Totals + primary action */}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="grid flex-1 grid-cols-3 gap-3 min-w-[280px]">
           {[
-            { l: "Emitido", v: eur2(totals.emitido), c: "text-foreground/75" },
+            { l: "Emitido", v: eur2(totals.emitido), c: "text-foreground/80" },
             { l: "Pago", v: eur2(totals.pago), c: "text-[#4d6350]" },
             {
               l: "Em dívida",
               v: eur2(totals.divida),
-              c: totals.divida > 0 ? "text-[#b5654a]" : "text-foreground/40",
+              c: totals.divida > 0 ? "text-[#8a2a22]" : "text-foreground/40",
             },
           ].map((k) => (
-            <div
-              key={k.l}
-              className="bg-white border border-foreground/[0.08] rounded-xl p-3.5 shadow-sm"
-            >
-              <p className={`text-sm font-semibold tabular-nums ${k.c}`}>{k.v}</p>
-              <p className="text-foreground/28 text-[9px] tracking-[0.22em] uppercase mt-1">
-                {k.l}
-              </p>
-            </div>
+            <Card key={k.l} padding="sm">
+              <p className={`text-lg font-semibold tabular-nums ${k.c}`}>{k.v}</p>
+              <p className="bo-eyebrow mt-1.5">{k.l}</p>
+            </Card>
           ))}
         </div>
-        <button
+        <Button
+          variant={showForm ? "secondary" : "primary"}
+          iconLeft={showForm ? undefined : PlusIcon}
           onClick={() => setShowForm((s) => !s)}
-          className="px-4 py-2.5 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm shrink-0"
+          className="w-full shrink-0 sm:w-auto"
         >
-          {showForm ? "Fechar" : "+ Nova fatura"}
-        </button>
+          {showForm ? "Fechar" : "Nova fatura"}
+        </Button>
       </div>
 
       {/* New-invoice form */}
       {showForm && (
-        <div className="bo-card p-5 mb-6">
+        <Card className="mb-8">
           {/* Mode toggle */}
-          <div className="flex gap-1.5 mb-4">
-            {(
-              [
-                ["split", "Sinal + Saldo (30/70)"],
-                ["single", "Fatura única"],
-              ] as [typeof mode, string][]
-            ).map(([m, label]) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all ${
-                  mode === m
-                    ? "bg-[#1b2119] text-white shadow-sm"
-                    : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="mb-6">
+            <Segmented
+              ariaLabel="Como quer faturar"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: "split", label: "Sinal + Saldo (30/70)" },
+                { value: "single", label: "Fatura única" },
+              ]}
+            />
+            <p className="mt-2.5 text-xs leading-relaxed text-foreground/50">
+              {mode === "split"
+                ? "Cria duas faturas de uma vez: o sinal (entrada de 30% agora) e o saldo (os 70% restantes)."
+                : "Cria só uma fatura — pode ser o total, só o sinal ou só o saldo."}
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {quotes && quotes.length > 0 && (
-              <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                  Evento (opcional)
-                </span>
-                <select
-                  value={quoteId}
-                  onChange={(e) => void onPickQuote(e.target.value)}
-                  className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-                >
-                  <option value="">— Escolher para preencher —</option>
-                  {quotes.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.name} · {q.eventName || q.eventType || "evento"}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Field
+                as="select"
+                label="Evento (opcional)"
+                value={quoteId}
+                onChange={(e) => void onPickQuote(e.target.value)}
+                containerClassName="sm:col-span-2"
+              >
+                <option value="">— Escolher para preencher —</option>
+                {quotes.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.name} · {q.eventName || q.eventType || "evento"}
+                  </option>
+                ))}
+              </Field>
             )}
 
-            <label className="flex flex-col gap-1">
-              <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                Cliente
-              </span>
-              <input
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="Nome do cliente"
-                className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                E-mail
-              </span>
-              <input
-                value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
-                placeholder="cliente@email.pt"
-                className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-              />
-            </label>
+            <Field
+              label="Cliente"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="Nome do cliente"
+            />
+            <Field
+              label="E-mail"
+              value={clientEmail}
+              onChange={(e) => setClientEmail(e.target.value)}
+              placeholder="cliente@email.pt"
+            />
 
             {mode === "single" && (
-              <label className="flex flex-col gap-1">
-                <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                  Tipo
-                </span>
-                <select
-                  value={kind}
-                  onChange={(e) => setKind(e.target.value as Kind)}
-                  className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-                >
-                  <option value="total">Total</option>
-                  <option value="sinal">Sinal (30%)</option>
-                  <option value="saldo">Saldo (70%)</option>
-                </select>
-              </label>
+              <Field
+                as="select"
+                label="Tipo"
+                value={kind}
+                onChange={(e) => setKind(e.target.value as Kind)}
+              >
+                <option value="total">Total</option>
+                <option value="sinal">Sinal (30%)</option>
+                <option value="saldo">Saldo (70%)</option>
+              </Field>
             )}
 
-            <label className="flex flex-col gap-1">
-              <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                {mode === "split" ? "Total do evento (€)" : "Valor (€)"}
-              </span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
-                className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                IVA (%)
-              </span>
-              <input
-                type="number"
-                value={vatRate}
-                onChange={(e) => setVatRate(e.target.value)}
-                className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                Emissão
-              </span>
-              <input
-                type="date"
-                value={issuedAt}
-                onChange={(e) => setIssuedAt(e.target.value)}
-                className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
-                Vencimento (opcional)
-              </span>
-              <input
-                type="date"
-                value={dueAt}
-                onChange={(e) => setDueAt(e.target.value)}
-                className="bo-input px-2.5 py-2 text-xs text-foreground/70"
-              />
-            </label>
+            <Field
+              label={mode === "split" ? "Total do evento (€)" : "Valor (€)"}
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0,00"
+            />
+            <Field
+              label="IVA (%)"
+              type="number"
+              value={vatRate}
+              onChange={(e) => setVatRate(e.target.value)}
+            />
+            <Field
+              label="Emissão"
+              type="date"
+              value={issuedAt}
+              onChange={(e) => setIssuedAt(e.target.value)}
+            />
+            <Field
+              label="Vencimento (opcional)"
+              type="date"
+              value={dueAt}
+              onChange={(e) => setDueAt(e.target.value)}
+            />
           </div>
 
           {splitBlocked && existingSinal ? (
-            <p className="text-[#b5654a] text-xs mt-3">
+            <p className="mt-4 text-sm leading-relaxed text-[#8a2a22]">
               Este evento já tem um sinal emitido ({existingSinal.number}). Para não faturar o sinal
               duas vezes, use “Fatura única” (só o saldo) em vez do split.
             </p>
           ) : singleBlocked && dupSingle ? (
-            <p className="text-[#b5654a] text-xs mt-3">
+            <p className="mt-4 text-sm leading-relaxed text-[#8a2a22]">
               Este evento já tem uma fatura de {kind} ({dupSingle.number}). Para não a faturar duas
               vezes, escolha outro tipo ou anule a existente primeiro.
             </p>
@@ -418,7 +472,7 @@ export default function Faturas({ quotes }: Props) {
             mode === "split" &&
             amount &&
             parseFloat(amount) > 0 && (
-              <p className="text-foreground/40 text-xs mt-3">
+              <p className="mt-4 text-sm leading-relaxed text-foreground/55">
                 Serão emitidas duas faturas: sinal{" "}
                 {eur2(splitThirtySeventy(parseFloat(amount)).sinal)} + saldo{" "}
                 {eur2(splitThirtySeventy(parseFloat(amount)).saldo)}.
@@ -426,16 +480,15 @@ export default function Faturas({ quotes }: Props) {
             )
           )}
 
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              onClick={() => setShowForm(false)}
-              className="px-3.5 py-2 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium bg-foreground/[0.05] text-foreground/45 hover:bg-foreground/[0.09] transition-colors"
-            >
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setShowForm(false)}>
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
               onClick={submit}
-              disabled={submitting || emitBlocked}
+              loading={submitting}
+              disabled={emitBlocked}
               title={
                 splitBlocked
                   ? "Este evento já tem um sinal emitido"
@@ -443,160 +496,154 @@ export default function Faturas({ quotes }: Props) {
                     ? `Este evento já tem uma fatura de ${kind}`
                     : undefined
               }
-              className="px-4 py-2 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] transition-colors disabled:opacity-40"
             >
               {submitting ? "A emitir…" : "Emitir"}
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-1.5 mb-5">
-        <button
+      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
+        <Button
+          size="sm"
+          variant={filter === "all" ? "subtle" : "ghost"}
+          aria-pressed={filter === "all"}
           onClick={() => setFilter("all")}
-          className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all ${
-            filter === "all"
-              ? "bg-[#1b2119] text-white shadow-sm"
-              : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07]"
-          }`}
         >
           Todas · {invoices.length}
-        </button>
-        {(Object.keys(STATUS_META) as Status[]).map((s) => {
+        </Button>
+        {STATUSES.map((s) => {
           const count = invoices.filter((i) => i.status === s).length;
           return (
-            <button
+            <Button
               key={s}
+              size="sm"
+              variant={filter === s ? "subtle" : "ghost"}
+              aria-pressed={filter === s}
               onClick={() => setFilter(s)}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all ${
-                filter === s
-                  ? "bg-[#1b2119] text-white shadow-sm"
-                  : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07]"
-              }`}
             >
               {STATUS_META[s].label} · {count}
-            </button>
+            </Button>
           );
         })}
       </div>
 
       {/* Ledger table */}
-      <div className="bo-card overflow-hidden">
+      <Card padding="none" className="overflow-hidden">
         {filtered.length === 0 ? (
           <EmptyState
             icon={
               <svg
-                width="22"
-                height="22"
+                width="24"
+                height="24"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.4"
+                aria-hidden="true"
               >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             }
             title={filter !== "all" ? "Nenhuma fatura neste estado" : "Sem faturas ainda"}
-            hint={
+            description={
               filter !== "all"
                 ? "Mude de filtro para ver outras."
                 : "Emita a primeira fatura com o botão “Nova fatura”."
             }
             action={
               filter === "all"
-                ? { label: "+ Nova fatura", onClick: () => setShowForm(true) }
+                ? { label: "Nova fatura", onClick: () => setShowForm(true) }
                 : undefined
             }
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase border-b border-foreground/[0.08]">
-                  <th className="text-left font-medium px-4 py-3">Nº</th>
-                  <th className="text-left font-medium px-4 py-3">Cliente</th>
-                  <th className="text-left font-medium px-4 py-3">Tipo</th>
-                  <th className="text-right font-medium px-4 py-3">Valor</th>
-                  <th className="text-left font-medium px-4 py-3">Emitida</th>
-                  <th className="text-left font-medium px-4 py-3">Vencimento</th>
-                  <th className="text-left font-medium px-4 py-3">Estado</th>
-                  <th className="text-right font-medium px-4 py-3">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-foreground/[0.06]">
-                {filtered.map((i) => (
-                  <tr
-                    key={i.id}
-                    className={`hover:bg-foreground/[0.02] transition-colors ${i.status === "anulada" ? "opacity-55" : ""}`}
-                  >
-                    <td className="px-4 py-3 font-medium text-foreground/70 whitespace-nowrap tabular-nums">
-                      {i.number}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-foreground/65 max-w-[180px] truncate"
-                      title={i.clientName}
-                    >
-                      {i.clientName || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-foreground/45 whitespace-nowrap">
-                      {KIND_LABEL[i.kind]}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-foreground/75 whitespace-nowrap tabular-nums">
-                      {eur2(i.amount)}
-                    </td>
-                    <td className="px-4 py-3 text-foreground/40 whitespace-nowrap">
-                      {fmtDate(i.issuedAt)}
-                    </td>
-                    <td className="px-4 py-3 text-foreground/40 whitespace-nowrap">
-                      {fmtDate(i.dueAt)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
-                        style={{
-                          background: `${STATUS_META[i.status].color}18`,
-                          color: STATUS_META[i.status].color,
-                        }}
-                      >
-                        {STATUS_META[i.status].label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {i.status === "emitida" && (
-                          <>
-                            <button
-                              onClick={() => setStatus(i, "paga")}
-                              disabled={busy === i.id}
-                              className="px-2.5 py-1 rounded-lg text-[10px] tracking-[0.08em] uppercase font-medium bg-[#4d6350]/12 text-[#4d6350] hover:bg-[#4d6350]/20 transition-colors disabled:opacity-40"
-                            >
-                              ✓ Paga
-                            </button>
-                            <button
-                              onClick={() => setStatus(i, "anulada")}
-                              disabled={busy === i.id}
-                              className="px-2.5 py-1 rounded-lg text-[10px] tracking-[0.08em] uppercase font-medium bg-foreground/[0.05] text-foreground/40 hover:text-[#b5654a] hover:bg-[#b5654a]/[0.08] transition-colors disabled:opacity-40"
-                            >
-                              Anular
-                            </button>
-                          </>
-                        )}
-                        {i.status === "paga" && (
-                          <span className="text-foreground/30 text-[10px]">
-                            Pago {fmtDate(i.paidAt)}
-                          </span>
-                        )}
-                      </div>
-                    </td>
+          <>
+            {/* Mobile: one calm card per invoice (no horizontal scroll) */}
+            <ul className="divide-y divide-foreground/[0.06] md:hidden">
+              {filtered.map((i) => (
+                <li key={i.id} className={`p-4 ${i.status === "anulada" ? "opacity-55" : ""}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground/80" title={i.clientName}>
+                        {i.clientName || "—"}
+                      </p>
+                      <p className="mt-0.5 text-xs tabular-nums text-foreground/45">
+                        {i.number} · {KIND_LABEL[i.kind]}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-base font-semibold tabular-nums text-foreground/80">
+                        {eur2(i.amount)}
+                      </p>
+                      <div className="mt-1">{statusBadge(i)}</div>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-foreground/45">
+                    Emitida {fmtDate(i.issuedAt)}
+                    {i.dueAt && <> · vence {fmtDate(i.dueAt)}</>}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">{rowActions(i)}</div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop: the full ledger table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-foreground/[0.08] text-foreground/40">
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Nº</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Tipo</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-right">Valor</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Emitida</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Vencimento</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-right">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-foreground/[0.06]">
+                  {filtered.map((i) => (
+                    <tr
+                      key={i.id}
+                      className={`transition-colors hover:bg-foreground/[0.02] ${i.status === "anulada" ? "opacity-55" : ""}`}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3.5 font-medium tabular-nums text-foreground/70">
+                        {i.number}
+                      </td>
+                      <td
+                        className="max-w-[180px] truncate px-4 py-3.5 text-foreground/70"
+                        title={i.clientName}
+                      >
+                        {i.clientName || "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
+                        {KIND_LABEL[i.kind]}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-foreground/80">
+                        {eur2(i.amount)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
+                        {fmtDate(i.issuedAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
+                        {fmtDate(i.dueAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5">{statusBadge(i)}</td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-end gap-1.5">{rowActions(i)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

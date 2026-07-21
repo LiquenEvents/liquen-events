@@ -25,7 +25,9 @@ export default function LanguageToggle({ light = false }: { light?: boolean }) {
     const bare = window.location.pathname.replace(/^\/en(?=\/|$)/, "") || "/";
     const dest = next === "en" ? (bare === "/" ? "/en" : `/en${bare}`) : bare;
     setPending(true);
-    window.location.assign(dest + window.location.search);
+    // Carry the query string and in-page anchor across the switch so a visitor
+    // deep-linked to e.g. #contacto stays on that section in the new language.
+    window.location.assign(dest + window.location.search + window.location.hash);
   }
 
   // px/py enlarge the hit area to the 24×24 minimum (WCAG 2.5.8); the negative

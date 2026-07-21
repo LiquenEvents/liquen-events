@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { randomId, eur2 } from "./util";
 import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/orcamento/types";
+import { Button, Field, EmptyState } from "./ui";
 
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
   contactado: { label: "Contactado", color: "#8a8a82" },
@@ -122,33 +123,33 @@ export default function EventCosts({ quote, onChange }: Props) {
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-4">
+    <div className="border-t border-foreground/10 pt-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Fornecedores &amp; Custos</p>
         {items.length > 0 && (
-          <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
+          <span className="rounded-full bg-foreground/[0.05] px-2.5 py-0.5 text-[11px] tabular-nums text-foreground/55">
             {items.length}
           </span>
         )}
       </div>
 
       {/* Margin summary — the headline number */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
-          <p className="text-sm font-semibold text-foreground/70">{eur2(revenue)}</p>
-          <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">Receita</p>
+      <div className="mb-5 grid grid-cols-3 gap-2.5">
+        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
+          <p className="text-sm font-semibold text-foreground/80">{eur2(revenue)}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">Receita</p>
         </div>
-        <div className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
-          <p className="text-sm font-semibold text-[#c08457]">{eur2(totals.actual)}</p>
-          <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">Custos</p>
+        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
+          <p className="text-sm font-semibold text-[#a4642f]">{eur2(totals.actual)}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">Custos</p>
         </div>
-        <div className="bg-foreground/[0.04] rounded-lg p-2.5 text-center">
+        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
           <p
-            className={`text-sm font-semibold ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"}`}
+            className={`text-sm font-semibold ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}
           >
             {eur2(totals.margin)}
           </p>
-          <p className="text-foreground/25 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
             Margem{revenue > 0 ? ` · ${totals.marginPct}%` : ""}
           </p>
         </div>
@@ -156,20 +157,20 @@ export default function EventCosts({ quote, onChange }: Props) {
 
       {/* Bookings list */}
       {items.length > 0 && (
-        <div className="flex flex-col gap-1.5 mb-4">
+        <div className="mb-4 flex flex-col gap-2">
           {items.map((it) => (
             <div
               key={it.id}
-              className="group bg-foreground/[0.02] border border-foreground/[0.07] rounded-lg px-3 py-2.5"
+              className="group rounded-xl border border-foreground/[0.08] bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
             >
               <div className="flex items-center gap-2.5">
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground/72 text-xs font-medium truncate">{it.name}</p>
-                  <p className="text-foreground/30 text-[10px]">{it.category}</p>
+                  <p className="truncate text-sm font-medium text-foreground/80">{it.name}</p>
+                  <p className="text-[11px] text-foreground/45">{it.category}</p>
                 </div>
                 <button
                   onClick={() => cycleStatus(it)}
-                  className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md shrink-0 transition-opacity hover:opacity-80"
+                  className="shrink-0 rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] motion-safe:transition-opacity hover:opacity-80"
                   style={{
                     background: `${STATUS_META[it.status].color}18`,
                     color: STATUS_META[it.status].color,
@@ -180,40 +181,46 @@ export default function EventCosts({ quote, onChange }: Props) {
                 </button>
                 <button
                   onClick={() => remove(it.id)}
-                  className="text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all shrink-0 text-sm leading-none"
+                  className="shrink-0 text-foreground/25 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                   aria-label="Remover"
                 >
-                  ×
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden="true"
+                  >
+                    <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+                  </svg>
                 </button>
               </div>
-              <div className="flex items-center gap-2 mt-2">
-                <label className="flex-1 flex items-center gap-1.5 text-[10px] text-foreground/35">
-                  Orçado
-                  <input
-                    type="number"
-                    value={it.estimatedCost || ""}
-                    onChange={(e) =>
-                      update(it.id, { estimatedCost: parseFloat(e.target.value) || 0 })
-                    }
-                    className="bo-input flex-1 px-2 py-1 text-xs text-foreground/70"
-                    placeholder="0"
-                  />
-                </label>
-                <label className="flex-1 flex items-center gap-1.5 text-[10px] text-foreground/35">
-                  Real
-                  <input
-                    type="number"
-                    value={it.actualCost ?? ""}
-                    onChange={(e) =>
-                      update(it.id, {
-                        actualCost:
-                          e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="bo-input flex-1 px-2 py-1 text-xs text-foreground/70"
-                    placeholder="—"
-                  />
-                </label>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Field
+                  as="input"
+                  type="number"
+                  label="Orçado (€)"
+                  value={it.estimatedCost || ""}
+                  onChange={(e) =>
+                    update(it.id, { estimatedCost: parseFloat(e.target.value) || 0 })
+                  }
+                  placeholder="0"
+                />
+                <Field
+                  as="input"
+                  type="number"
+                  label="Real (€)"
+                  value={it.actualCost ?? ""}
+                  onChange={(e) =>
+                    update(it.id, {
+                      actualCost:
+                        e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  placeholder="—"
+                />
               </div>
             </div>
           ))}
@@ -222,72 +229,102 @@ export default function EventCosts({ quote, onChange }: Props) {
 
       {/* Add booking */}
       {adding ? (
-        <div className="bg-foreground/[0.02] border border-foreground/[0.07] rounded-lg p-3 flex flex-col gap-2">
+        <div className="flex flex-col gap-3 rounded-2xl border border-foreground/[0.08] bg-foreground/[0.02] p-4">
           {directory.length > 0 && (
-            <select
+            <Field
+              as="select"
+              label="Do diretório de fornecedores"
               value={form.supplierId}
               onChange={(e) => pickDirectory(e.target.value)}
-              className="bo-input px-2.5 py-1.5 text-xs text-foreground/60"
             >
-              <option value="">Do diretório de fornecedores…</option>
+              <option value="">Escolher do diretório…</option>
               {directory.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} · {s.category}
                 </option>
               ))}
-            </select>
+            </Field>
           )}
-          <div className="flex gap-2">
-            <input
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field
+              label="Nome do fornecedor"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value, supplierId: "" }))}
-              placeholder="Nome do fornecedor"
-              className="bo-input flex-1 px-2.5 py-1.5 text-xs text-foreground/70 placeholder-foreground/25"
+              placeholder="Ex.: Flores da Vila"
               autoFocus
             />
-            <select
+            <Field
+              as="select"
+              label="Categoria"
               value={form.category}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              className="bo-input px-2 py-1.5 text-xs text-foreground/60 w-28"
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
-            </select>
+            </Field>
           </div>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={form.estimatedCost}
-              onChange={(e) => setForm((f) => ({ ...f, estimatedCost: e.target.value }))}
-              onKeyDown={(e) => e.key === "Enter" && add()}
-              placeholder="Custo orçado €"
-              className="bo-input flex-1 px-2.5 py-1.5 text-xs text-foreground/70 placeholder-foreground/25"
-            />
-            <button
-              onClick={add}
-              disabled={!form.name.trim()}
-              className="px-4 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors disabled:opacity-40"
-            >
+          <Field
+            as="input"
+            type="number"
+            label="Custo orçado (€)"
+            value={form.estimatedCost}
+            onChange={(e) => setForm((f) => ({ ...f, estimatedCost: e.target.value }))}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="0"
+          />
+          <div className="flex items-center gap-2 pt-1">
+            <Button variant="primary" onClick={add} disabled={!form.name.trim()}>
               Adicionar
-            </button>
-            <button
-              onClick={() => setAdding(false)}
-              className="px-3 py-1.5 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-foreground/65 transition-colors"
-            >
+            </Button>
+            <Button variant="ghost" onClick={() => setAdding(false)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          className="px-4 py-10"
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="M3 7h18M3 12h18M3 17h18" strokeLinecap="round" />
+            </svg>
+          }
+          title="Ainda sem fornecedores"
+          description="Adiciona fornecedores para acompanhar custos orçados, reais e a margem do evento."
+          action={{ label: "Adicionar fornecedor", onClick: () => setAdding(true) }}
+        />
       ) : (
-        <button
+        <Button
+          variant="secondary"
+          fullWidth
+          iconLeft={
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+          }
           onClick={() => setAdding(true)}
-          className="w-full py-2.5 rounded-xl border border-dashed border-foreground/15 text-foreground/40 text-[11px] tracking-[0.2em] uppercase hover:border-[#4d6350]/40 hover:text-[#4d6350] transition-colors"
         >
-          + Adicionar fornecedor ao evento
-        </button>
+          Adicionar fornecedor ao evento
+        </Button>
       )}
     </div>
   );

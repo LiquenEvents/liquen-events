@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Quote, QuoteMessage } from "@/lib/orcamento/types";
+import { Button, Field } from "./ui";
 
 interface Props {
   quote: Quote;
@@ -64,23 +65,23 @@ export default function ClientMessenger({ quote, onSent }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-4">
-        <p className="bo-eyebrow">Responder ao Cliente</p>
-        <span className="text-foreground/20 text-[10px]">{quote.email}</span>
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <p className="bo-eyebrow">Responder ao cliente</p>
+        {quote.email && <span className="bo-text-faint text-xs truncate">{quote.email}</span>}
       </div>
 
       {/* History */}
       {messages.length > 0 && (
-        <div className="flex flex-col gap-2 mb-4 max-h-48 overflow-y-auto">
+        <div className="flex flex-col gap-2 mb-5 max-h-48 overflow-y-auto pr-1">
           {messages.map((m, i) => (
             <div
               key={i}
-              className="rounded-xl bg-[#4d6350]/[0.07] border border-[#4d6350]/15 px-3 py-2"
+              className="rounded-2xl bg-[#4d6350]/[0.06] border border-[#4d6350]/15 px-3.5 py-2.5"
             >
-              <p className="text-foreground/55 text-xs leading-relaxed whitespace-pre-wrap">
+              <p className="text-foreground/70 text-xs leading-relaxed whitespace-pre-wrap">
                 {m.body}
               </p>
-              <p className="text-foreground/22 text-[9px] mt-1.5">
+              <p className="text-foreground/40 text-[10px] mt-1.5">
                 {new Date(m.at).toLocaleString("pt-PT", {
                   day: "numeric",
                   month: "short",
@@ -96,39 +97,43 @@ export default function ClientMessenger({ quote, onSent }: Props) {
       {/* Quick-reply templates */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         {TEMPLATES.map((t) => (
-          <button
+          <Button
             key={t.label}
-            type="button"
+            variant="subtle"
+            size="sm"
+            className="rounded-full"
             onClick={() => applyTemplate(t.text)}
-            className="text-[10px] tracking-[0.08em] uppercase px-2.5 py-1 rounded-full bg-foreground/[0.04] text-foreground/45 hover:bg-foreground/[0.07] hover:text-foreground/70 transition-colors"
           >
             {t.label}
-          </button>
+          </Button>
         ))}
       </div>
 
-      <textarea
+      <Field
+        as="textarea"
+        label="Mensagem ao cliente"
+        hideLabel
         rows={4}
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Escreva a mensagem que será enviada por e-mail ao cliente…"
-        className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none mb-3"
+        className="resize-none"
+        containerClassName="mb-3"
       />
 
-      {error && <p className="text-[#b5654a] text-xs mb-3">{error}</p>}
-      {note && <p className="text-foreground/40 text-xs mb-3">{note}</p>}
+      {error && <p className="text-[#8a2a22] text-xs mb-3">{error}</p>}
+      {note && <p className="text-foreground/50 text-xs mb-3">{note}</p>}
 
-      <button
+      <Button
+        variant="primary"
+        fullWidth
         onClick={send}
-        disabled={sending || !text.trim()}
-        className={`w-full py-2.5 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${
-          sending || !text.trim()
-            ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
-            : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
-        }`}
+        loading={sending}
+        disabled={!text.trim()}
+        iconRight={sending ? undefined : <span aria-hidden="true">→</span>}
       >
-        {sending ? "A enviar…" : "Enviar E-mail →"}
-      </button>
+        {sending ? "A enviar…" : "Enviar e-mail"}
+      </Button>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { randomId, eur2 } from "./util";
+import { Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
 import {
   DECOR_PRODUCTION,
@@ -81,21 +82,24 @@ export default function ProductionPlan({ quote, onChange }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Produção Decor</p>
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={applyPlan}
-          className="text-[10px] tracking-[0.15em] uppercase px-3 py-1 rounded-lg border border-dashed border-foreground/15 text-foreground/45 hover:border-[#4d6350]/40 hover:text-[#4d6350] transition-colors"
+          iconLeft={<span aria-hidden="true">+</span>}
         >
-          + Aplicar plano de produção decor
-        </button>
+          Aplicar plano de produção
+        </Button>
       </div>
 
       {!seeded ? (
-        <p className="text-foreground/35 text-xs leading-relaxed mb-2">
-          Aplique o plano para gerar as tarefas de atelier — do sourcing das flores à desmontagem no
-          local.
-        </p>
+        <EmptyState
+          className="px-4 py-10"
+          title="Plano de produção por gerar"
+          description="Use “Aplicar plano de produção” para gerar as tarefas de atelier — do sourcing das flores à desmontagem no local."
+        />
       ) : (
         <div className="flex flex-col gap-4 mb-4">
           {grouped.map(({ phase, phaseItems, done }) => {
@@ -140,7 +144,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         )}
                       </button>
                       <span
-                        className={`flex-1 text-xs ${i.done ? "text-foreground/30 line-through" : "text-foreground/60"}`}
+                        className={`flex-1 text-xs ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
                       >
                         {i.label.slice((phase.label + SEP).length)}
                       </span>
@@ -166,7 +170,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
           )}
         </div>
         {suppliers.length === 0 ? (
-          <p className="text-foreground/30 text-[11px]">
+          <p className="text-foreground/45 text-xs leading-relaxed">
             Sem fornecedores atribuídos. Faça a gestão no separador Custos.
           </p>
         ) : (
@@ -174,27 +178,27 @@ export default function ProductionPlan({ quote, onChange }: Props) {
             {suppliers.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-lg px-3 py-2"
+                className="flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-xl px-3.5 py-2.5"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground/70 text-xs font-medium truncate">{s.name}</p>
-                  <p className="text-foreground/30 text-[10px]">{s.category}</p>
+                  <p className="text-foreground/80 text-xs font-medium truncate">{s.name}</p>
+                  <p className="text-foreground/45 text-[10px]">{s.category}</p>
                 </div>
                 <span
-                  className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md shrink-0"
+                  className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
                   style={{
-                    background: `${STATUS_LABEL[s.status].color}18`,
+                    background: `${STATUS_LABEL[s.status].color}1f`,
                     color: STATUS_LABEL[s.status].color,
                   }}
                 >
                   {STATUS_LABEL[s.status].label}
                 </span>
-                <span className="text-foreground/45 text-[11px] tabular-nums shrink-0">
+                <span className="text-foreground/55 text-[11px] tabular-nums shrink-0">
                   {eur2(s.estimatedCost)}
                 </span>
               </div>
             ))}
-            <p className="text-foreground/25 text-[10px] mt-1">Geridos no separador Custos.</p>
+            <p className="text-foreground/40 text-[10px] mt-1">Geridos no separador Custos.</p>
           </div>
         )}
       </div>

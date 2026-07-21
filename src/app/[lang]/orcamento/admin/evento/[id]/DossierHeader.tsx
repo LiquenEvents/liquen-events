@@ -12,6 +12,13 @@ import {
   type NextAction,
 } from "@/lib/orcamento/dossier";
 import { downloadEventIcs, printEventDossier, printRunSheet } from "../../export";
+import { Button } from "../../ui";
+
+/** Ghost-style toolbar control shared by the header's link + button actions. */
+const TOOL_LINK =
+  "inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-foreground/55 " +
+  "hover:bg-foreground/[0.06] hover:text-foreground/80 motion-safe:transition-colors " +
+  "motion-safe:duration-150";
 
 /**
  * Copia texto para a área de transferência com degradação graciosa. O caminho
@@ -137,17 +144,17 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
 
   return (
     <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07]">
-      <div className="px-4 sm:px-6 lg:px-10 py-4 flex flex-col gap-4">
+      <div className="px-4 sm:px-6 lg:px-10 py-5 flex flex-col gap-5">
         {/* Linha 1 — voltar + título + próxima ação */}
-        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-5">
           <div className="min-w-0 flex-1">
             <Link
               href={`/${lang}/orcamento/admin`}
-              className="inline-flex items-center gap-1.5 text-foreground/40 text-[10px] tracking-[0.18em] uppercase hover:text-[#4d6350] transition-colors mb-2"
+              className="inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] motion-safe:transition-colors mb-3"
             >
               <svg
-                width="12"
-                height="12"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -157,17 +164,15 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               </svg>
               Pedidos
             </Link>
-            <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
-              Dossier do Evento
-            </p>
+            <p className="bo-eyebrow mb-1.5">Dossier do Evento</p>
             <h1
-              className="text-foreground/88 font-bold leading-tight truncate"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.6vw, 30px)" }}
+              className="font-display text-foreground/90 font-bold leading-tight truncate"
+              style={{ fontSize: "clamp(22px, 2.6vw, 32px)" }}
             >
               {quote.name}
             </h1>
             {titleBits.length > 0 && (
-              <p className="text-foreground/45 text-xs mt-1 truncate">{titleBits.join(" · ")}</p>
+              <p className="text-foreground/55 text-sm mt-1.5 truncate">{titleBits.join(" · ")}</p>
             )}
 
             {/* Barra de ações — partilha / impressão / calendário. Só
@@ -175,70 +180,71 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 nada que gere dinheiro (sinal/saldo são emitidos noutro lado).
                 Ícones sempre visíveis, rótulos escondidos em ecrãs pequenos,
                 tal como o cabeçalho da administração. */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-3">
+            <div className="flex flex-wrap items-center gap-1.5 mt-4">
               {/* Copiar link do portal — ação principal da estúdio para
                   partilhar o portal privado com o cliente, por isso destacada. */}
-              <button
-                type="button"
+              <Button
+                variant={copied ? "primary" : "subtle"}
+                size="sm"
                 onClick={copyPortalLink}
                 aria-live="polite"
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] tracking-[0.15em] uppercase rounded-lg font-medium transition-colors ${
-                  copied
-                    ? "bg-[#4d6350] text-white/95"
-                    : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"
-                }`}
                 title="Copiar o link privado do portal do cliente para a área de transferência"
+                iconLeft={
+                  copied ? (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5" />
+                      <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5" />
+                    </svg>
+                  )
+                }
               >
-                {copied ? (
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5" />
-                    <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5" />
-                  </svg>
-                )}
                 <span className="hidden sm:inline">
                   {copied ? "Copiado ✓" : "Copiar link do portal"}
                 </span>
-              </button>
+              </Button>
 
               {/* Abrir portal — mesma janela nova que o cartão de próxima ação. */}
               <a
                 href={portalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
+                className={TOOL_LINK}
                 title="Abrir o portal do cliente num separador novo"
               >
                 <svg
-                  width="13"
-                  height="13"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.7"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                   <path d="M15 3h6v6M10 14 21 3" />
@@ -247,123 +253,135 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               </a>
 
               {/* Separador subtil entre partilha e impressão/calendário. */}
-              <span aria-hidden className="w-px h-4 bg-foreground/10 mx-0.5" />
+              <span aria-hidden className="w-px h-4 bg-foreground/10 mx-1" />
 
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => printEventDossier(quote)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
                 title="Imprimir dossier completo do evento (contacto, financeiro, cronograma, convidados)"
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                >
-                  <path
-                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
-                </svg>
-                <span className="hidden sm:inline">Imprimir Dossier</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => printRunSheet(quote)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                title="Imprimir run-sheet do evento (cronograma e checklist do dia)"
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                >
-                  <path
-                    d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <rect x="6" y="14" width="12" height="7" rx="1" />
-                </svg>
-                <span className="hidden sm:inline">Run-sheet</span>
-              </button>
-
-              {/* .ics — só quando o evento tem data (buildEventIcs devolve null
-                  sem data, por isso o botão não teria efeito). */}
-              {quote.date && (
-                <button
-                  type="button"
-                  onClick={() => downloadEventIcs(quote)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                  title="Descarregar .ics para adicionar ao calendário (Google/Apple/Outlook)"
-                >
+                iconLeft={
                   <svg
-                    width="13"
-                    height="13"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                    aria-hidden="true"
                   >
-                    <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-                    <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
+                    <path
+                      d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
                   </svg>
+                }
+              >
+                <span className="hidden sm:inline">Imprimir Dossier</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => printRunSheet(quote)}
+                title="Imprimir o guião do dia (cronograma e checklist do evento)"
+                iconLeft={
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <rect x="6" y="14" width="12" height="7" rx="1" />
+                  </svg>
+                }
+              >
+                <span className="hidden sm:inline">Guião do dia</span>
+              </Button>
+
+              {/* .ics — só quando o evento tem data (buildEventIcs devolve null
+                  sem data, por isso o botão não teria efeito). */}
+              {quote.date && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => downloadEventIcs(quote)}
+                  title="Descarregar .ics para adicionar ao calendário (Google/Apple/Outlook)"
+                  iconLeft={
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                      <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
+                    </svg>
+                  }
+                >
                   <span className="hidden sm:inline">.ics</span>
-                </button>
+                </Button>
               )}
             </div>
           </div>
 
           {/* Cartão de próxima ação */}
-          <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-[#1b2119] rounded-xl p-4 shadow-sm">
-            <p className="text-white/40 text-[9px] tracking-[0.3em] uppercase mb-1.5">
+          <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-[#1b2119] rounded-2xl p-5 shadow-sm">
+            <p className="text-white/45 text-[10px] tracking-[0.16em] uppercase font-semibold mb-2">
               Próxima ação
             </p>
-            <p className="text-white/85 text-sm font-medium leading-snug mb-1">{next.label}</p>
-            <p className="text-white/45 text-[11px] leading-relaxed mb-3">{next.hint}</p>
+            <p className="text-white/90 text-sm font-medium leading-snug mb-1.5">{next.label}</p>
+            <p className="text-white/50 text-xs leading-relaxed mb-4">{next.hint}</p>
             {next.kind === "portal" ? (
               <a
                 href={portalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3.5 py-2 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-[10px] tracking-[0.15em] uppercase rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 h-10 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
               >
                 {next.label}
                 <svg
-                  width="12"
-                  height="12"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
+                  aria-hidden="true"
                 >
                   <path d="M7 17 17 7M8 7h9v9" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </a>
             ) : zone ? (
               <button
+                type="button"
                 onClick={() => onScrollTo(zone)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-[10px] tracking-[0.15em] uppercase rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 h-10 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
               >
                 {next.label}
                 <svg
-                  width="12"
-                  height="12"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
+                  aria-hidden="true"
                 >
                   <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -371,9 +389,10 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
             ) : (
               // arquivar / none — ainda por ligar (fase de quick-actions).
               <button
+                type="button"
                 disabled
                 title="Disponível na fase de ações rápidas"
-                className="inline-flex items-center gap-2 px-3.5 py-2 bg-white/10 text-white/45 text-[10px] tracking-[0.15em] uppercase rounded-lg cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-10 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed"
               >
                 {next.label}
               </button>

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
-import EmptyState from "./EmptyState";
+import { Button, Card, EmptyState, Segmented } from "./ui";
+import type { SegmentedOption } from "./ui";
 import { randomId } from "./util";
 
 const eur = (n: number) =>
@@ -17,7 +18,7 @@ const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "#8a8a82" },
   enviada: { label: "Enviada", color: "#9aa36a" },
   aceite: { label: "Aceite", color: "#525a2f" },
-  rejeitada: { label: "Rejeitada", color: "#5a5a55" },
+  rejeitada: { label: "Recusada", color: "#5a5a55" },
 };
 
 function expiryInfo(
@@ -25,10 +26,11 @@ function expiryInfo(
 ): { label: string; tone: "ok" | "soon" | "expired" } | null {
   if (!validUntil) return null;
   const days = Math.round((new Date(validUntil + "T12:00:00").getTime() - Date.now()) / 86400000);
-  if (days < 0) return { label: "Expirada", tone: "expired" };
-  if (days === 0) return { label: "Expira hoje", tone: "soon" };
-  if (days <= 5) return { label: `Expira em ${days}d`, tone: "soon" };
-  return { label: `Válida ${days}d`, tone: "ok" };
+  if (days < 0) return { label: "Prazo terminado", tone: "expired" };
+  if (days === 0) return { label: "Termina hoje", tone: "soon" };
+  if (days === 1) return { label: "Termina amanhã", tone: "soon" };
+  if (days <= 5) return { label: `Termina em ${days} dias`, tone: "soon" };
+  return { label: `Válida mais ${days} dias`, tone: "ok" };
 }
 
 interface Props {
@@ -122,111 +124,104 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
 
   if (loading) return <SkeletonList rows={5} />;
 
+  const filterOptions: SegmentedOption<ProposalStatus | "all">[] = [
+    { value: "all", label: `Todas · ${proposals.length}` },
+    ...(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => ({
+      value: s,
+      label: `${STATUS_META[s].label} · ${proposals.filter((p) => p.status === s).length}`,
+    })),
+  ];
+
   return (
-    <div>
+    <div className="flex flex-col gap-6">
+      {/* One calm line saying what this screen is for */}
+      <p className="text-sm leading-relaxed text-foreground/55">
+        Aqui vê as propostas que enviou aos clientes e acompanha quais foram aceites.
+      </p>
+
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { v: String(proposals.length), l: "Propostas", accent: true },
-          { v: eur(totalSent), l: "Valor proposto" },
-          { v: eur(totalWon), l: "Valor ganho", accent: true },
-          { v: `${acceptRate}%`, l: "Taxa aceitação" },
+          { v: eur(totalSent), l: "Valor enviado aos clientes", accent: false },
+          { v: eur(totalWon), l: "Valor já ganho", accent: true },
+          { v: `${acceptRate}%`, l: "Propostas aceites", accent: false },
         ].map((k) => (
-          <div
+          <Card
             key={k.l}
-            className={`relative overflow-hidden rounded-xl p-4 border ${k.accent ? "bg-[#1b2119] border-[#2d3829]" : "bg-white border-foreground/[0.08] shadow-sm"}`}
+            padding="sm"
+            className={`flex flex-col gap-2 ${k.accent ? "bg-[#4d6350]/[0.05] ring-1 ring-inset ring-[#4d6350]/15" : ""}`}
           >
-            {k.accent && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage:
-                    "radial-gradient(circle at 85% 15%, rgba(99,122,95,0.25) 0%, transparent 60%)",
-                }}
-              />
-            )}
             <p
-              className={`font-bold leading-none mb-1.5 relative ${k.accent ? "text-[#8aad85]" : "text-foreground/82"}`}
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2.2vw, 26px)" }}
+              className={`font-display font-semibold leading-none tabular-nums ${k.accent ? "text-[#4d6350]" : "text-foreground/90"}`}
+              style={{ fontSize: "clamp(20px, 2.2vw, 28px)" }}
             >
               {k.v}
             </p>
-            <p
-              className={`text-[9px] tracking-[0.25em] uppercase relative ${k.accent ? "text-white/30" : "text-foreground/30"}`}
-            >
-              {k.l}
-            </p>
-          </div>
+            <p className="bo-eyebrow text-foreground/45">{k.l}</p>
+          </Card>
         ))}
       </div>
 
       {/* Pending alert */}
       {pending > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] mb-5">
+        <div className="flex items-center gap-3 rounded-2xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] px-4 py-3">
           <svg
-            width="14"
-            height="14"
+            className="shrink-0 text-[#a9781f]"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#b5894a"
-            strokeWidth="2"
+            stroke="currentColor"
+            strokeWidth="1.9"
             strokeLinecap="round"
+            aria-hidden="true"
           >
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v4M12 16h.01" />
           </svg>
-          <p className="text-[#b5894a] text-xs">
-            <strong>
+          <p className="text-[#a9781f] text-sm leading-snug">
+            <strong className="font-semibold">
               {pending} proposta{pending !== 1 ? "s" : ""} enviada{pending !== 1 ? "s" : ""}
             </strong>{" "}
-            aguardam resposta do cliente.
+            {pending !== 1 ? "aguardam" : "aguarda"} resposta do cliente.
           </p>
         </div>
       )}
 
       {/* Filter */}
-      <div className="flex flex-wrap gap-1.5 mb-5">
-        <button
-          onClick={() => setFilter("all")}
-          className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all ${filter === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07]"}`}
-        >
-          Todas · {proposals.length}
-        </button>
-        {(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => {
-          const count = proposals.filter((p) => p.status === s).length;
-          return (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all ${filter === s ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07]"}`}
-            >
-              {STATUS_META[s].label} · {count}
-            </button>
-          );
-        })}
+      <div className="max-w-full overflow-x-auto pb-1 -mb-1">
+        <Segmented
+          ariaLabel="Filtrar propostas por estado"
+          size="sm"
+          value={filter}
+          onChange={setFilter}
+          options={filterOptions}
+        />
       </div>
 
       {/* List */}
-      <div className="bo-card overflow-hidden">
+      <Card padding="none" className="overflow-hidden">
         {filtered.length === 0 ? (
           <EmptyState
             icon={
               <svg
-                width="22"
-                height="22"
+                width="24"
+                height="24"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.4"
+                aria-hidden="true"
               >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             }
             title={filter !== "all" ? "Nenhuma proposta neste estado" : "Sem propostas ainda"}
-            hint={
+            description={
               filter !== "all"
-                ? "Mude de filtro para ver outras."
+                ? "Mude de filtro para ver as restantes."
                 : "As propostas enviadas a partir de um pedido aparecem aqui."
             }
           />
@@ -240,18 +235,18 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
               return (
                 <div
                   key={p.id}
-                  className={`px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-foreground/[0.02] transition-colors ${p.status === "enviada" && exp?.tone === "expired" ? "opacity-60" : ""}`}
+                  className={`px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 motion-safe:transition-colors hover:bg-foreground/[0.02] ${p.status === "enviada" && exp?.tone === "expired" ? "opacity-60" : ""}`}
                 >
                   {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <p className="text-foreground/75 text-sm font-semibold truncate">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <p className="text-foreground/90 text-sm font-medium truncate">
                         {p.clientName}
                       </p>
                       <span
-                        className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md shrink-0"
+                        className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
                         style={{
-                          background: `${STATUS_META[p.status].color}18`,
+                          background: `${STATUS_META[p.status].color}1f`,
                           color: STATUS_META[p.status].color,
                         }}
                       >
@@ -259,67 +254,92 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                       </span>
                       {exp && (
                         <span
-                          className={`text-[9px] tracking-[0.08em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium ${
+                          className={`text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium ${
                             exp.tone === "expired"
-                              ? "bg-red-500/10 text-red-500"
+                              ? "bg-[#8a2a22]/10 text-[#8a2a22]"
                               : exp.tone === "soon"
-                                ? "bg-amber-500/10 text-amber-600"
-                                : "bg-foreground/[0.04] text-foreground/35"
+                                ? "bg-[#b5894a]/12 text-[#a9781f]"
+                                : "bg-foreground/[0.05] text-foreground/45"
                           }`}
                         >
                           {exp.label}
                         </span>
                       )}
                     </div>
-                    <p className="text-foreground/28 text-xs">
-                      {p.clientEmail} · {p.lineItems.length} linha
-                      {p.lineItems.length !== 1 ? "s" : ""}
+                    <p className="text-foreground/45 text-xs">
+                      {p.clientEmail} · {p.lineItems.length}{" "}
+                      {p.lineItems.length !== 1 ? "itens" : "item"}
                       {p.sentAt &&
-                        ` · enviada ${new Date(p.sentAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`}
+                        ` · enviada a ${new Date(p.sentAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`}
                     </p>
                   </div>
 
-                  {/* Value */}
-                  <p className="text-foreground/75 text-sm font-semibold shrink-0 tabular-nums">
-                    {eur(p.total)}
-                  </p>
+                  {/* Value + actions — share one row on phones, split out on desktop */}
+                  <div className="flex items-center justify-between gap-3 sm:contents">
+                    <p className="text-foreground/90 text-sm font-semibold shrink-0 tabular-nums">
+                      {eur(p.total)}
+                    </p>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    {p.status === "enviada" && (
-                      <>
-                        <button
-                          onClick={() => updateStatus(p.id, "aceite")}
-                          disabled={busy}
-                          className="px-3 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium bg-[#4d6350]/12 text-[#4d6350] hover:bg-[#4d6350]/20 transition-colors disabled:opacity-40"
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      {p.status === "enviada" && (
+                        <>
+                          <Button
+                            variant="subtle"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => updateStatus(p.id, "aceite")}
+                            title="O cliente aceitou: fecha o negócio e marca o pedido como ganho"
+                            iconLeft={
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  d="M2 6l2.5 2.5L10 3"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            }
+                          >
+                            Aceitar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => updateStatus(p.id, "rejeitada")}
+                            title="O cliente não avançou com esta proposta"
+                          >
+                            Recusar
+                          </Button>
+                        </>
+                      )}
+                      {linkedQuote && onOpenQuote && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onOpenQuote(linkedQuote)}
+                          title="Abrir o pedido deste cliente"
+                          iconRight={<span aria-hidden="true">→</span>}
                         >
-                          ✓ Aceite
-                        </button>
-                        <button
-                          onClick={() => updateStatus(p.id, "rejeitada")}
-                          disabled={busy}
-                          className="px-3 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium bg-foreground/[0.05] text-foreground/40 hover:bg-foreground/[0.09] transition-colors disabled:opacity-40"
-                        >
-                          ✕ Recusada
-                        </button>
-                      </>
-                    )}
-                    {linkedQuote && onOpenQuote && (
-                      <button
-                        onClick={() => onOpenQuote(linkedQuote)}
-                        className="px-3 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium bg-foreground/[0.04] text-foreground/38 hover:text-[#4d6350] hover:bg-[#4d6350]/[0.07] transition-colors"
-                        title="Abrir pedido associado"
-                      >
-                        Pedido →
-                      </button>
-                    )}
+                          Ver pedido
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

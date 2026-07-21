@@ -83,6 +83,15 @@ export default async function ProposalPage({
   }
 
   const cur = proposal.currency || "EUR";
+  // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
+  // 23:59:59) so the client sees an "expired" notice up front instead of only
+  // discovering it on a 410 after clicking Accept.
+  const expired = proposal.validUntil
+    ? (() => {
+        const e = Date.parse(`${proposal.validUntil.slice(0, 10)}T23:59:59`);
+        return !Number.isNaN(e) && e < Date.now();
+      })()
+    : false;
   const validLabel = proposal.validUntil
     ? new Date(proposal.validUntil + "T12:00:00").toLocaleDateString(t.dateLocale, {
         day: "numeric",
@@ -177,6 +186,7 @@ export default async function ProposalPage({
         <ProposalResponse
           token={token}
           initialStatus={proposal.status}
+          expired={expired}
           clientEmail={proposal.clientEmail}
           proposta={t}
         />

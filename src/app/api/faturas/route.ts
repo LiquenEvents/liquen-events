@@ -11,6 +11,7 @@ import {
   type Invoice,
 } from "@/lib/invoices-store";
 import { log } from "@/lib/logger";
+import { invoiceCreateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,10 @@ const clean = (v: unknown, max: number) =>
     .replace(/[\r\n]+/g, " ")
     .trim()
     .slice(0, max);
-const num = (v: unknown) => Math.min(Math.max(Number(v) || 0, 0), 100_000_000);
+// Clamp to a sane range AND round to cents — a manually-issued invoice must never
+// carry a fractional-cent amount into the fiscal ledger (e.g. 100.567 → 100.57).
+const num = (v: unknown) =>
+  Math.round(Math.min(Math.max(Number(v) || 0, 0), 100_000_000) * 100) / 100;
 const date = (v: unknown) => {
   const s = clean(v, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
@@ -40,9 +44,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  try {
-    const body = await request.json();
 
+  // ── Input validation (400 before any work) ──
+  // Reject malformed JSON, a non-object body, or wrong-typed/out-of-range fields
+  // with a clean 400 instead of letting them 500 or slip bad data into the book.
+  const read = await readJsonBody(request);
+  if (!read.ok) {
+    return NextResponse.json(
+      { error: "Corpo do pedido inválido (JSON malformado)." },
+      { status: 400 },
+    );
+  }
+  const valid = validateBody(invoiceCreateSchema, read.body);
+  if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 });
+  const body = valid.data;
+
+  try {
     const quoteId = clean(body.quoteId, 80);
     const clientName = clean(body.clientName, 120);
     const clientEmail = clean(body.clientEmail, 160);
@@ -124,9 +141,8 @@ export async function POST(request: NextRequest) {
     // ── Single invoice ──
     const amount = num(body.amount);
     if (amount <= 0) return NextResponse.json({ error: "Valor inválido" }, { status: 400 });
-    const kind: Invoice["kind"] = ["sinal", "saldo", "total"].includes(body.kind)
-      ? body.kind
-      : "total";
+    // Schema already validated the enum (or left it absent) — default to "total".
+    const kind: Invoice["kind"] = body.kind ?? "total";
 
     // Mesma guarda de duplicação do ramo split, agora também no modo single: se o
     // operador escolher Tipo=Sinal/Saldo e já existir uma fatura desse tipo (não

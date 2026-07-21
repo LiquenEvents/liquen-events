@@ -34,8 +34,11 @@ const SEVERITY_RANK: Record<FollowUp["severity"], number> = {
 /** UTC day key (yyyy-mm-dd) for an epoch millisecond value. */
 const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-/** Midnight-UTC epoch for a yyyy-mm-dd string. */
-const parseDay = (d: string) => Date.parse(`${d}T00:00:00Z`);
+/** Midnight-UTC epoch for a date string. Takes only the yyyy-mm-dd portion so a
+    full ISO datetime (the manual/import route does not forbid one on
+    `quote.date`) still yields that day's midnight instead of NaN — mirroring how
+    dossier's countdownDays/deriveStage normalise the same field. */
+const parseDay = (d: string) => Date.parse(`${d.slice(0, 10)}T00:00:00Z`);
 
 /** Whole days elapsed since an ISO timestamp (negative if in the future). */
 const daysSince = (now: number, iso: string) => Math.floor((now - new Date(iso).getTime()) / DAY);

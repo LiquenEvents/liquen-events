@@ -11,6 +11,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/d
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
+import AjudaGlossario from "./AjudaGlossario";
 import NewQuoteModal from "./NewQuoteModal";
 import NotificationBell from "./NotificationBell";
 import {
@@ -24,7 +25,10 @@ import {
 import { eventCountdown, randomId, eur } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
-import { NAV, type View } from "./nav";
+import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
+import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
+import { Button, Card, SectionCard } from "./ui";
+import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
   Kanban,
@@ -58,16 +62,81 @@ import {
 // Quantos pedidos a lista renderiza de cada vez ("Mostrar mais" carrega o resto).
 const LIST_PAGE_SIZE = 50;
 
+// Shared content shell for the main column: a comfortable centred max-width with
+// consistent horizontal padding + vertical rhythm, so screens stay readable
+// instead of sprawling edge-to-edge on wide monitors. The top bar aligns to the
+// same measure. `view-in` (the enter animation) is appended per view.
+const VIEW_WRAP = "mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10 py-6 lg:py-10";
+
 // Code-split views + detail-panel tools live in ./lazy — only the view the
 // user opens ships its JS, keeping the back-office's initial load lean.
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
-  { id: "pendente", label: "Pendente", color: "bg-foreground/10 text-foreground/50" },
-  { id: "em_revisao", label: "Em Revisão", color: "bg-moss/15 text-moss" },
-  { id: "cotado", label: "Cotado", color: "bg-moss/25 text-moss" },
-  { id: "aceite", label: "Aceite", color: "bg-moss/35 text-moss" },
-  { id: "rejeitado", label: "Rejeitado", color: "bg-foreground/8 text-foreground/30" },
+  { id: "pendente", label: "Novo", color: "bg-foreground/10 text-foreground/50" },
+  { id: "em_revisao", label: "Em revisão", color: "bg-moss/15 text-moss" },
+  { id: "cotado", label: "Proposta enviada", color: "bg-moss/25 text-moss" },
+  { id: "aceite", label: "Ganho", color: "bg-moss/35 text-moss" },
+  { id: "rejeitado", label: "Perdido", color: "bg-foreground/8 text-foreground/30" },
 ];
+
+// Short, human-readable form of the long internal id (e.g.
+// "LIQ-MRR1L78R-438B649E86343C27" → "LIQ-MRR1L78R…C27"). The full id stays
+// available via title/tooltip; this is only for display.
+function shortRef(id: string): string {
+  const parts = id.split("-");
+  const last4 = id.slice(-4);
+  if (parts.length >= 2) return `${parts[0]}-${parts[1]}…${last4}`;
+  return id.length > 10 ? `${id.slice(0, 8)}…${last4}` : id;
+}
+
+// The single "next action" surfaced on the calm pedido detail — derived from
+// where the request sits in its lifecycle, so a newcomer always sees the one
+// sensible thing to do next. It routes into the (otherwise tucked-away) advanced
+// workspace at the relevant tool tab; every tab stays reachable regardless.
+type DetailTab = "resumo" | "producao" | "financeiro" | "comunicacao";
+function detailNextAction(quote: Quote): { label: string; hint: string; tab: DetailTab } {
+  const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote);
+  if (perdido)
+    return { label: "Reabrir pedido", hint: "Voltar a colocar em revisão", tab: "resumo" };
+  if (allDone)
+    return {
+      label: "Rever produção do evento",
+      hint: "Guião, checklist e convidados",
+      tab: "producao",
+    };
+  switch (currentIndex) {
+    case 0:
+      return {
+        label: "Enviar proposta",
+        hint: "Criar e enviar a proposta ao cliente",
+        tab: "comunicacao",
+      };
+    case 1:
+      return {
+        label: "Acompanhar proposta",
+        hint: "Mensagens e registo de atividade",
+        tab: "comunicacao",
+      };
+    case 2:
+      return {
+        label: "Registar pagamento",
+        hint: "Sinal, faturação e custos do evento",
+        tab: "financeiro",
+      };
+    case 3:
+      return {
+        label: "Planear produção",
+        hint: "Checklist, plano de decoração e guião",
+        tab: "producao",
+      };
+    default:
+      return {
+        label: "Preparar o dia do evento",
+        hint: "Timeline, convidados e checklist",
+        tab: "producao",
+      };
+  }
+}
 
 // Single-key destinations for the "g then <key>" navigation chord.
 const VIEW_KEYS: Record<string, View> = {
@@ -112,12 +181,22 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [detailTab, setDetailTab] = useState<"resumo" | "producao" | "financeiro" | "comunicacao">(
     "resumo",
   );
+  // Comunicação tab shows one proposal tool by default (ProposalStudio); the
+  // simpler price-table tool (ProposalBuilder) stays collapsed behind a link.
+  const [showBuilder, setShowBuilder] = useState(false);
+  // Progressive disclosure on the pedido detail: the default view is calm
+  // essentials only; the heavy tools (management form + Produção/Financeiro/
+  // Comunicação tabs) stay tucked behind this "Mostrar mais" disclosure.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
+  // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
+  const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [ajudaOpen, setAjudaOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [recentQuotes, setRecentQuotes] = useState<RecentQuote[]>([]);
@@ -129,6 +208,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const searchRef = useRef<HTMLInputElement>(null);
   // Focus trap for the mobile detail drawer — active only while it's the overlay.
   const drawerRef = useFocusTrap<HTMLDivElement>(!!selected && isDetailOverlay);
+  // Focus management for the inline (desktop, non-overlay) detail workspace. The
+  // mobile overlay already traps + restores focus via useFocusTrap; for the inline
+  // panel we manually move focus to the panel heading on open and hand it back to
+  // the element that opened it on close, so keyboard users are never stranded.
+  const detailTitleRef = useRef<HTMLHeadingElement>(null);
+  const detailOpenerRef = useRef<HTMLElement | null>(null);
   // Current locale, read from the path (/{lang}/orcamento/admin), to build the
   // deep link into a quote's full-screen Dossier route.
   const pathname = usePathname();
@@ -284,7 +369,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // Escape dismisses the open drawer/nav — but only when no modal is capturing
   // it (the palette / new-quote / shortcuts dialogs handle their own Escape).
   useEffect(() => {
-    if (paletteOpen || newQuoteOpen || shortcutsOpen) return;
+    if (paletteOpen || newQuoteOpen || shortcutsOpen || ajudaOpen) return;
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (navOpen) setNavOpen(false);
@@ -299,7 +384,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [paletteOpen, newQuoteOpen, shortcutsOpen, navOpen, selected]);
+  }, [paletteOpen, newQuoteOpen, shortcutsOpen, ajudaOpen, navOpen, selected]);
 
   // Lock background scroll while the mobile nav drawer is open.
   useEffect(() => {
@@ -331,6 +416,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+    };
+  }, [selected, isDetailOverlay]);
+
+  // Inline (desktop) detail: move focus into the workspace heading when a pedido
+  // opens and restore it to the opener when it closes. Skipped while the panel is
+  // the mobile overlay, where useFocusTrap owns focus instead.
+  useEffect(() => {
+    if (!selected || isDetailOverlay) return;
+    const opener = detailOpenerRef.current;
+    // Defer to after paint so the heading exists and layout has settled.
+    const id = requestAnimationFrame(() => detailTitleRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      opener?.focus?.();
     };
   }, [selected, isDetailOverlay]);
 
@@ -383,6 +482,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   function openQuote(q: Quote) {
     if (!discardGuard()) return;
+    // Remember who opened the detail so focus can return there on close.
+    if (typeof document !== "undefined") {
+      detailOpenerRef.current = document.activeElement as HTMLElement | null;
+    }
     setView("pedidos");
     setSelected(q);
     // Track in recently-viewed list (localStorage)
@@ -404,6 +507,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditGuests(String(q.guests ?? ""));
     setEditLocation(q.location ?? "");
     setDetailTab("resumo");
+    setAdvancedOpen(false);
   }
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
@@ -442,6 +546,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditGuests(String(data.quote.guests ?? ""));
       setEditLocation(data.quote.location ?? "");
       setDetailTab("resumo");
+      setAdvancedOpen(false);
       toast("Pedido duplicado — defina a nova data", "success");
     } catch {
       toast("Não foi possível duplicar o pedido", "error");
@@ -642,6 +747,46 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }
 
+  // Permanently delete every selected pedido (hard delete, not archive). One
+  // confirm covers the whole batch; each id is DELETEd, then the successful
+  // ones are dropped from local state and the selection is cleared.
+  async function deleteSelected() {
+    const ids = [...selectedIds];
+    if (ids.length === 0 || bulkBusy) return;
+    if (
+      !window.confirm(
+        `Apagar ${ids.length} pedidos definitivamente? Esta ação não pode ser anulada.`,
+      )
+    )
+      return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/orcamento/${id}`, { method: "DELETE" })
+            .then((r) => (r.ok ? id : null))
+            .catch(() => null),
+        ),
+      );
+      const removed = new Set(results.filter((x): x is string => x !== null));
+      if (removed.size > 0) {
+        setQuotes((prev) => prev.filter((q) => !removed.has(q.id)));
+        setSelected((prev) => (prev && removed.has(prev.id) ? null : prev));
+      }
+      const ok = removed.size;
+      const failed = ids.length - ok;
+      toast(
+        failed === 0
+          ? `${ok} pedido${ok !== 1 ? "s" : ""} apagado${ok !== 1 ? "s" : ""}`
+          : `${ok} apagado(s), ${failed} falhou(ram)`,
+        failed === 0 ? "success" : "error",
+      );
+      setSelectedIds(new Set());
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const archivedCount = useMemo(() => quotes.filter((q) => q.archived).length, [quotes]);
 
   // Archived quotes are soft-deleted: keep them out of the analytical surfaces
@@ -753,6 +898,50 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   const todayKey = new Date().toISOString().slice(0, 10);
 
+  // One sidebar destination — shared by the always-visible core list and the
+  // collapsible "Mais" group so both render identically.
+  function renderNavItem(id: View) {
+    const item = NAV.find((n) => n.id === id)!;
+    const active = view === id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => {
+          setView(item.id);
+          setNavOpen(false);
+        }}
+        aria-current={active ? "page" : undefined}
+        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
+          active
+            ? "bg-[var(--bo-tint-accent)] text-[var(--bo-accent)]"
+            : "text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
+        }`}
+      >
+        <span
+          className={`shrink-0 motion-safe:transition-colors duration-150 ${
+            active
+              ? "text-[var(--bo-accent)]"
+              : "text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
+          }`}
+        >
+          {item.icon}
+        </span>
+        <span className="truncate">{item.label}</span>
+        {item.id === "pedidos" && pendingCount > 0 && (
+          <span
+            className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
+              active
+                ? "bg-[var(--bo-accent)] text-white"
+                : "bg-[var(--bo-surface-hover)] text-[var(--bo-text-muted)]"
+            }`}
+          >
+            {pendingCount}
+          </span>
+        )}
+      </button>
+    );
+  }
+
   function statusBadge(status: QuoteStatus) {
     const s = STATUS_OPTIONS.find((o) => o.id === status);
     return (
@@ -779,13 +968,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Faturas",
     contratos: "Contratos",
     "modelos-email": "Modelos de email",
-    inbox: "Inbox",
+    inbox: "Mensagens",
   };
 
   const VIEW_SUB: Record<View, string> = {
     overview: "O resumo do seu dia",
     pedidos: "Pedidos de orçamento recebidos",
-    kanban: "Arraste entre estados",
+    kanban: "Arraste os pedidos entre fases",
     clientes: "Histórico por cliente",
     calendario: "Os seus eventos no tempo",
     propostas: "Todas as propostas enviadas",
@@ -804,6 +993,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     <>
       <div className="min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        <AjudaGlossario open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
         <CommandPalette
           open={paletteOpen}
           onClose={() => setPaletteOpen(false)}
@@ -823,13 +1013,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         />
         {/* ── Sidebar ── */}
         <aside
-          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#1b2119] flex flex-col transition-transform duration-300 shadow-2xl lg:shadow-none ${
+          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
             navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
         >
           {/* Mobile close */}
           <button
-            className="lg:hidden absolute top-5 right-4 w-8 h-8 flex items-center justify-center text-white/35 hover:text-white/70 rounded-lg hover:bg-white/8 transition-colors"
+            className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
             onClick={() => setNavOpen(false)}
             aria-label="Fechar menu"
           >
@@ -845,68 +1035,95 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </svg>
           </button>
 
-          {/* Brand — official Líquen wordmark (white lockup for the dark sidebar) */}
-          <div className="px-5 pt-8 pb-5 flex flex-col items-center text-center">
+          {/* Brand — small, quiet Líquen lockup for the light rail. */}
+          <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center">
             <Image
-              src="/logo-liquen-branco.png"
+              src="/logo-liquen.png"
               alt="Líquen Events"
               width={300}
               height={179}
               preload
-              className="h-24 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
-            <p className="text-white/25 text-[9px] tracking-[0.35em] uppercase mt-3">Back Office</p>
+            <span className="text-[var(--bo-text-faint)] text-[9px] tracking-[0.3em] uppercase mt-2">
+              Back Office
+            </span>
           </div>
-          <div className="mx-4 h-px bg-white/[0.07] mb-1" />
 
-          {/* Nav */}
-          <nav className="flex-1 px-2.5 py-3 flex flex-col gap-0.5 overflow-y-auto">
-            {NAV.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setView(item.id);
-                  setNavOpen(false);
-                }}
-                aria-current={view === item.id ? "page" : undefined}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[11px] tracking-[0.08em] uppercase font-medium transition-all duration-150 ${
-                  view === item.id
-                    ? "bg-white/12 text-white"
-                    : "text-white/38 hover:text-white/80 hover:bg-white/[0.06]"
-                }`}
-              >
-                <span
-                  className={`shrink-0 transition-colors duration-150 ${
-                    view === item.id ? "text-[#8aad85]" : "text-white/28 group-hover:text-white/60"
-                  }`}
-                >
-                  {item.icon}
-                </span>
-                <span className="truncate">{item.label}</span>
-                {item.id === "pedidos" && pendingCount > 0 && (
-                  <span className="ml-auto min-w-[18px] text-center text-[9px] bg-[#4d6350] text-white/90 rounded-full px-1.5 py-0.5 tabular-nums leading-none">
-                    {pendingCount}
-                  </span>
-                )}
-              </button>
-            ))}
+          {/* Nav — quiet, ChatGPT-like rail: a short core list always visible,
+              everything else tucked into a collapsed "Mais" group so a newcomer
+              sees few things at once. The group auto-opens when a "Mais" view is
+              active, so the current item (and its aria-current) is never hidden. */}
+          <nav
+            aria-label="Navegação do back office"
+            className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
+          >
+            {CORE_NAV.map((id) => renderNavItem(id))}
+
+            {/* "Mais" — secondary destinations, collapsed by default. */}
+            {(() => {
+              const activeInMore = MORE_NAV.includes(view);
+              const expanded = moreNavOpen || activeInMore;
+              return (
+                <div className="mt-3 pt-3 border-t border-[var(--bo-hairline)] flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMoreNavOpen((o) => !o)}
+                    aria-expanded={expanded}
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                  >
+                    <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      >
+                        <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                        <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                      </svg>
+                    </span>
+                    <span className="truncate">Mais</span>
+                    <svg
+                      className={`ml-auto shrink-0 text-[var(--bo-text-faint)] motion-safe:transition-transform duration-200 ${
+                        expanded ? "rotate-180" : ""
+                      }`}
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    >
+                      <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {expanded && (
+                    <div className="flex flex-col gap-1">{MORE_NAV.map(renderNavItem)}</div>
+                  )}
+                </div>
+              );
+            })()}
           </nav>
 
           {/* User */}
-          <div className="px-2.5 pb-5 pt-3 border-t border-white/[0.07]">
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.06] mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#4d6350] flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-white/10">
+          <div className="px-2.5 pb-5 pt-3 border-t border-[var(--bo-hairline)]">
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bo-surface-hover)] mb-2">
+              <div className="w-8 h-8 rounded-full bg-[var(--bo-accent)] flex items-center justify-center text-white text-xs font-bold shrink-0">
                 {userName.slice(0, 1).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-white/80 text-xs font-medium truncate">{userName}</p>
-                <p className="text-white/30 text-[10px] truncate">Administração</p>
+                <p className="text-[var(--bo-text)] text-xs font-medium truncate">{userName}</p>
+                <p className="text-[var(--bo-text-faint)] text-[10px] truncate">Administração</p>
               </div>
             </div>
             <div className="flex gap-1">
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Atalhos de teclado"
               >
                 <svg
@@ -927,7 +1144,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a
                 href="/api/backup"
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Exportar backup"
               >
                 <svg
@@ -948,7 +1165,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </a>
               <button
                 onClick={logout}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white/28 text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-white/60 hover:bg-white/6 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Terminar sessão"
               >
                 <svg
@@ -983,7 +1200,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             Hidden while a quote detail drawer is open: it's a focused, modal
             surface, so the tab bar would only overlap its footer and distract. */}
         <nav
-          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1b2119] border-t border-white/[0.07] transition-transform duration-300 ${
+          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--bo-surface)] border-t border-[var(--bo-hairline)] transition-transform duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -991,10 +1208,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           <div className="flex items-stretch">
             {(
               [
-                { id: "overview", label: "Início" },
+                { id: "overview", label: "Visão Geral" },
                 { id: "pedidos", label: "Pedidos" },
-                { id: "kanban", label: "Pipeline" },
-                { id: "calendario", label: "Agenda" },
+                { id: "propostas", label: "Propostas" },
+                { id: "inbox", label: "Mensagens" },
               ] as const
             ).map((item) => {
               const navItem = NAV.find((n) => n.id === item.id)!;
@@ -1003,12 +1220,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <button
                   key={item.id}
                   onClick={() => setView(item.id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-3 px-1 transition-colors ${
-                    isActive ? "text-[#8aad85]" : "text-white/32"
+                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
+                    isActive ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-faint)]"
                   }`}
                 >
                   {item.id === "pedidos" && pendingCount > 0 && (
-                    <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[#637a5f]" />
+                    <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
                   )}
                   <span
                     className={`transition-transform duration-150 ${isActive ? "scale-110" : ""}`}
@@ -1023,10 +1240,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             })}
             <button
               onClick={() => setNavOpen(true)}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 px-1 transition-colors ${
-                !["overview", "pedidos", "kanban", "calendario"].includes(view)
-                  ? "text-[#8aad85]"
-                  : "text-white/32"
+              aria-label="Mais destinos"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
+                !["overview", "pedidos", "propostas", "inbox"].includes(view)
+                  ? "text-[var(--bo-accent)]"
+                  : "text-[var(--bo-text-faint)]"
               }`}
             >
               <svg
@@ -1049,94 +1267,121 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         {/* ── Main ── */}
         <div className="flex-1 min-w-0 flex flex-col pb-16 lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
-            <div className="min-w-0">
-              <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
-                {VIEW_SUB[view]}
-              </p>
-              <h1
-                className="text-foreground/88 font-bold leading-none"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.6vw, 30px)" }}
-              >
-                {VIEW_TITLES[view]}
-              </h1>
-            </div>
-            <div className="ml-auto flex items-center gap-2 shrink-0">
-              <NotificationBell />
-              <button
-                onClick={() => setPaletteOpen(true)}
-                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-foreground/60 transition-colors"
-                title="Pesquisar (Ctrl K)"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)]">
+            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
+              <div className="min-w-0">
+                <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
+                  {VIEW_SUB[view]}
+                </p>
+                <h1
+                  className="text-foreground/88 font-bold leading-none"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(20px, 2.6vw, 30px)",
+                  }}
                 >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-                </svg>
-                <span className="hidden md:inline">Pesquisar</span>
-                <kbd className="text-[8px] border border-foreground/12 rounded px-1 py-0.5 ml-0.5">
-                  ⌘K
-                </kbd>
-              </button>
-              <button
-                onClick={refresh}
-                disabled={refreshing}
-                aria-label="Actualizar pedidos"
-                className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className={
-                    refreshing
-                      ? "animate-spin"
-                      : "group-hover:rotate-180 transition-transform duration-500"
-                  }
+                  {VIEW_TITLES[view]}
+                </h1>
+              </div>
+              <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <button
+                  onClick={() => setAjudaOpen(true)}
+                  aria-label="Ajuda e glossário"
+                  title="Ajuda e glossário"
+                  className="w-9 h-9 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
-                  <path
-                    d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="hidden sm:inline">
-                  {refreshing ? "A actualizar" : "Actualizar"}
-                </span>
-              </button>
-              <button
-                onClick={() => setNewQuoteOpen(true)}
-                aria-label="Novo pedido"
-                className="flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
-                title="Criar pedido manualmente"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path
+                      d="M9.4 9a2.6 2.6 0 1 1 3.4 2.5c-.7.3-1.3.9-1.3 1.7v.3"
+                      strokeLinecap="round"
+                    />
+                    <path d="M12 17h.01" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <NotificationBell />
+                <button
+                  onClick={() => setPaletteOpen(true)}
+                  className="hidden sm:flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-foreground/60 transition-colors"
+                  title="Pesquisar (Ctrl K)"
                 >
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                </svg>
-                <span className="hidden sm:inline">Novo</span>
-              </button>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                  </svg>
+                  <span className="hidden md:inline">Pesquisar</span>
+                  <kbd className="text-[8px] border border-foreground/12 rounded px-1 py-0.5 ml-0.5">
+                    ⌘K
+                  </kbd>
+                </button>
+                <button
+                  onClick={refresh}
+                  disabled={refreshing}
+                  aria-label="Atualizar pedidos"
+                  className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
+                >
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className={
+                      refreshing
+                        ? "animate-spin"
+                        : "group-hover:rotate-180 transition-transform duration-500"
+                    }
+                  >
+                    <path
+                      d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {refreshing ? "A atualizar" : "Atualizar"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setNewQuoteOpen(true)}
+                  aria-label="Novo pedido"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
+                  title="Criar pedido manualmente"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                  >
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                  </svg>
+                  <span className="hidden sm:inline">Novo</span>
+                </button>
+              </div>
             </div>
           </header>
 
           {/* ── Overview ── */}
           {view === "overview" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Overview
                 quotes={activeQuotes}
                 userName={userName}
@@ -1150,7 +1395,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Pipeline (Kanban) ── */}
           {view === "kanban" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Kanban
                 quotes={activeQuotes}
                 onOpen={openQuote}
@@ -1165,21 +1410,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Clientes ── */}
           {view === "clientes" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Clientes quotes={activeQuotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Calendário ── */}
           {view === "calendario" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Calendario quotes={activeQuotes} onOpen={openQuote} />
             </div>
           )}
 
           {/* ── Propostas ── */}
           {view === "propostas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Propostas
                 quotes={quotes}
                 onOpenQuote={openQuote}
@@ -1193,35 +1438,35 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Tarefas ── */}
           {view === "tarefas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Tarefas defaultAssignee={userName} />
             </div>
           )}
 
           {/* ── Fornecedores ── */}
           {view === "fornecedores" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Fornecedores />
             </div>
           )}
 
           {/* ── Estatísticas ── */}
           {view === "estatisticas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <StatsDashboard quotes={activeQuotes} />
             </div>
           )}
 
           {/* ── Inventário ── */}
           {view === "inventario" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Inventario />
             </div>
           )}
 
           {/* ── Seguimentos automáticos ── */}
           {view === "seguimentos" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Seguimentos
                 onOpenQuote={(id) => {
                   const q = quotes.find((x) => x.id === id);
@@ -1233,36 +1478,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Faturas ── */}
           {view === "faturas" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Faturas quotes={quotes} />
             </div>
           )}
 
           {/* ── Contratos ── */}
           {view === "contratos" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Contratos />
             </div>
           )}
 
           {/* ── Modelos de email ── */}
           {view === "modelos-email" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <EmailTemplates />
             </div>
           )}
 
           {/* ── Inbox ── */}
           {view === "inbox" && (
-            <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 view-in">
+            <div className={`${VIEW_WRAP} view-in`}>
               <Inbox />
             </div>
           )}
 
           {/* ── Pedidos ── */}
-          <div
-            className={`px-4 sm:px-6 lg:px-12 py-6 lg:py-12 ${view === "pedidos" ? "view-in" : "hidden"}`}
-          >
+          <div className={`${VIEW_WRAP} ${view === "pedidos" ? "view-in" : "hidden"}`}>
             {/* Controls */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
               <div className="relative flex-1 max-w-md">
@@ -1309,7 +1552,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <circle cx="12" cy="8" r="4" />
                     <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                   </svg>
-                  Meus
+                  Atribuídos a mim
                 </button>
                 <select
                   value={filterCategory}
@@ -1333,7 +1576,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   <option value="recent">Mais recentes</option>
                   <option value="old">Mais antigos</option>
                   <option value="value">Maior valor</option>
-                  <option value="followup">Seguir primeiro</option>
+                  <option value="followup">Seguimentos primeiro</option>
                   <option value="eventdate">Data do evento</option>
                 </select>
                 <button
@@ -1495,6 +1738,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     </a>
                   );
                 })()}
+                {/* Hard delete for the whole selection — restrained terracotta,
+                    always behind a single confirm; disabled while a batch runs. */}
+                <button
+                  onClick={deleteSelected}
+                  disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#b5654a]/25 text-[#b5654a]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#b5654a]/10 hover:text-[#b5654a] transition-colors shadow-sm disabled:opacity-50"
+                >
+                  Apagar ({selectedIds.size})
+                </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}
                   className="ml-auto text-foreground/40 text-xs hover:text-foreground/70 transition-colors"
@@ -1504,9 +1756,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </div>
             )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_440px] gap-8">
+            {/* When a pedido is open, the list collapses to a slim rail and the
+                detail takes over the remaining width as a spacious workspace.
+                With nothing selected the list spreads full-width. */}
+            <div
+              className={`grid grid-cols-1 gap-8 ${
+                selected ? "xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]" : "xl:grid-cols-1"
+              }`}
+            >
               {/* List */}
-              <div className="flex flex-col gap-3">
+              <div className="flex min-w-0 flex-col gap-3">
                 {filtered.length === 0 && (
                   <div className="bo-card">
                     <EmptyState
@@ -1640,7 +1899,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             </>
                           )}
                           <span className="w-px h-2.5 bg-foreground/12" />
-                          <span>{q.guests} pax</span>
+                          <span>{q.guests} convidados</span>
                           {(() => {
                             const cd = eventCountdown(q.date);
                             if (!cd || cd.tone === "past") return null;
@@ -1678,8 +1937,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </div>
                         )}
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
-                          <span className="text-foreground/70 text-[10px] font-mono tracking-tight">
-                            {q.id}
+                          <span
+                            className="text-foreground/40 text-[9px] font-mono tracking-tight"
+                            title={q.id}
+                          >
+                            Ref. {shortRef(q.id)}
                           </span>
                           <div className="flex items-center gap-3">
                             {q.quotedPrice ? (
@@ -1725,809 +1987,440 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     role={isDetailOverlay ? "dialog" : undefined}
                     aria-modal={isDetailOverlay ? true : undefined}
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md xl:max-w-none xl:w-auto bg-white xl:bg-white border-l xl:border border-foreground/[0.08] xl:rounded-xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-sm"
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
                   >
-                    <div className="px-5 pt-4 border-b border-foreground/[0.07] sticky top-0 bg-white/90 backdrop-blur-sm z-10">
-                      <div className="flex items-center justify-between">
+                    <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white/95 px-5 pt-5 backdrop-blur-sm sm:px-7">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-foreground/70 text-[10px] tracking-[0.3em] uppercase mb-1">
-                            {selected.id}
-                          </p>
-                          <p
+                          <h2
                             id="detail-drawer-title"
-                            className="text-foreground/70 text-sm font-medium truncate"
+                            ref={detailTitleRef}
+                            tabIndex={-1}
+                            className="truncate font-display text-xl leading-tight text-foreground/90 focus:outline-none sm:text-2xl"
                           >
                             {selected.name}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={async () => {
-                              const next = !selected.archived;
-                              const confirm_ =
-                                !next ||
-                                window.confirm(
-                                  `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
-                                );
-                              if (!confirm_) return;
-                              const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ archived: next }),
-                              });
-                              if (res.ok) {
-                                const updated = await res.json();
-                                setQuotes((prev) =>
-                                  prev.map((q) => (q.id === updated.id ? updated : q)),
-                                );
-                                setSelected(updated);
-                                toast(next ? "Pedido arquivado" : "Pedido restaurado", "success");
-                              }
-                            }}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] tracking-[0.15em] uppercase rounded-lg transition-colors ${selected.archived ? "text-[#4d6350] bg-[#4d6350]/10" : "text-foreground/35 hover:text-foreground/55 hover:bg-foreground/[0.06]"}`}
-                            title={selected.archived ? "Restaurar pedido" : "Arquivar pedido"}
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
+                          </h2>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+                            {statusBadge(selected.status)}
+                            <span
+                              className="font-mono text-[10px] tracking-tight text-foreground/40"
+                              title={selected.id}
                             >
-                              <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
-                            </svg>
-                            <span className="hidden sm:inline">
-                              {selected.archived ? "Restaurar" : "Arquivar"}
+                              Ref. {shortRef(selected.id)}
                             </span>
-                          </button>
-                          <button
-                            onClick={() => duplicateQuote(selected)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                            title="Duplicar este pedido (cliente recorrente)"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                            >
-                              <rect x="9" y="9" width="11" height="11" rx="2" />
-                              <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
-                            </svg>
-                            <span className="hidden sm:inline">Duplicar</span>
-                          </button>
-                          <button
-                            onClick={() => printRunSheet(selected)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                            title="Imprimir run-sheet do evento"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                            >
-                              <path
-                                d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <rect x="6" y="14" width="12" height="7" rx="1" />
-                            </svg>
-                            <span className="hidden sm:inline">Run-sheet</span>
-                          </button>
-                          {/* Full-screen cockpit for this event — the one place
-                              that unifies proposta/contrato/faturas/produção. */}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                          {/* Full-screen cockpit for this event — the one place that
+                              unifies proposta/contrato/faturas/produção. Primary. */}
                           <Link
                             href={`/${lang}/orcamento/admin/evento/${selected.id}`}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-[#4d6350] text-[10px] tracking-[0.15em] uppercase rounded-lg bg-[#4d6350]/10 hover:bg-[#4d6350]/18 transition-colors font-medium"
+                            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16]"
                             title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                           >
                             <svg
-                              width="13"
-                              height="13"
+                              width="15"
+                              height="15"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
                               strokeWidth="1.7"
+                              aria-hidden="true"
                             >
                               <rect x="3" y="3" width="7" height="9" rx="1" />
                               <rect x="14" y="3" width="7" height="5" rx="1" />
                               <rect x="14" y="12" width="7" height="9" rx="1" />
                               <rect x="3" y="16" width="7" height="5" rx="1" />
                             </svg>
-                            <span className="hidden sm:inline">Abrir Dossier</span>
+                            <span className="hidden sm:inline">Dossier</span>
                           </Link>
-                          <button
-                            onClick={() => printEventDossier(selected)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                            title="Imprimir dossier completo do evento (contacto, financeiro, cronograma, convidados)"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                            >
-                              <path
-                                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
-                            </svg>
-                            <span className="hidden sm:inline">Dossier PDF</span>
-                          </button>
-                          {selected.date && (
-                            <button
-                              onClick={() => downloadEventIcs(selected)}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-foreground/35 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:text-[#4d6350] hover:bg-[#4d6350]/10 transition-colors"
-                              title="Descarregar .ics para adicionar ao seu calendário (Google/Apple/Outlook)"
-                            >
-                              <svg
-                                width="13"
-                                height="13"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.7"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-                                <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
-                              </svg>
-                              <span className="hidden sm:inline">.ics</span>
-                            </button>
-                          )}
-                          <button
-                            onClick={closeDetail}
-                            className="text-foreground/30 text-lg hover:text-foreground/60 transition-colors px-1"
-                            aria-label="Fechar"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                      {/* Section tabs — keep the long panel navigable.
-                          Arrow keys move between tabs (WAI-ARIA tablist pattern). */}
-                      <div
-                        role="tablist"
-                        aria-label="Secções do pedido"
-                        className="flex gap-1 mt-3"
-                      >
-                        {(
-                          [
-                            ["resumo", "Resumo"],
-                            ["producao", "Produção"],
-                            ["financeiro", "Financeiro"],
-                            ["comunicacao", "Comunicação"],
-                          ] as const
-                        ).map(([id, label], i, arr) => {
-                          const active = detailTab === id;
-                          return (
-                            <button
-                              key={id}
-                              id={`detail-tab-${id}`}
-                              role="tab"
-                              aria-selected={active}
-                              aria-controls={`detail-panel-${id}`}
-                              tabIndex={active ? 0 : -1}
-                              onClick={() => setDetailTab(id)}
-                              onKeyDown={(e) => {
-                                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-                                e.preventDefault();
-                                const dir = e.key === "ArrowRight" ? 1 : -1;
-                                const next = arr[(i + dir + arr.length) % arr.length][0];
-                                setDetailTab(next);
-                                // Move focus to the newly-selected tab (roving tabindex).
-                                const tabs =
-                                  e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                                    '[role="tab"]',
-                                  );
-                                tabs?.[(i + dir + arr.length) % arr.length]?.focus();
-                              }}
-                              className={`flex-1 px-1 py-2 text-[10px] tracking-[0.08em] uppercase font-medium border-b-2 transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] rounded-t ${
-                                active
-                                  ? "border-[#4d6350] text-foreground/80"
-                                  : "border-transparent text-foreground/35 hover:text-foreground/60"
-                              }`}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="p-5 flex flex-col gap-6">
-                      {detailTab === "resumo" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-resumo"
-                          aria-labelledby="detail-tab-resumo"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          {/* Snapshot — key facts at a glance */}
-                          {(() => {
-                            const revenue =
-                              selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
-                            const costs = (selected.eventSuppliers ?? []).reduce(
-                              (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
-                              0,
-                            );
-                            const margin = revenue - costs;
-                            const cd = eventCountdown(selected.date);
-                            const cells: { l: string; v: string; tone?: string }[] = [
-                              { l: "Valor", v: revenue ? formatPrice(revenue) : "—" },
-                            ];
-                            if (costs > 0)
-                              cells.push({
-                                l: "Margem",
-                                v: formatPrice(margin),
-                                tone: margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]",
-                              });
-                            if (cd)
-                              cells.push({
-                                l: "Evento",
-                                v: cd.label,
-                                tone:
-                                  cd.tone === "soon" || cd.tone === "today"
-                                    ? "text-[#b5654a]"
-                                    : undefined,
-                              });
-                            return (
-                              <div
-                                className={`grid gap-2 ${cells.length === 3 ? "grid-cols-3" : cells.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}
-                              >
-                                {cells.map((c) => (
-                                  <div
-                                    key={c.l}
-                                    className="bg-foreground/[0.04] rounded-lg p-2.5 text-center"
-                                  >
-                                    <p
-                                      className={`text-sm font-semibold ${c.tone ?? "text-foreground/72"}`}
-                                    >
-                                      {c.v}
-                                    </p>
-                                    <p className="text-foreground/60 text-[9px] tracking-[0.2em] uppercase mt-0.5">
-                                      {c.l}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
-
-                          {/* Contact */}
-                          <div>
-                            <p className="bo-eyebrow mb-3">Contacto</p>
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-2">
-                                <a
-                                  href={`mailto:${selected.email}`}
-                                  className="text-[#4d6350] text-xs hover:underline truncate"
-                                >
-                                  {selected.email}
-                                </a>
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard?.writeText(selected.email);
-                                    toast("Email copiado", "success");
-                                  }}
-                                  className="text-foreground/25 hover:text-foreground/55 transition-colors shrink-0"
-                                  title="Copiar email"
-                                  aria-label="Copiar email"
-                                >
+                          {/* Every secondary / destructive / print action tucked into
+                              one calm overflow menu so the header stays uncluttered. */}
+                          <MoreMenu
+                            items={[
+                              {
+                                label: "Duplicar pedido",
+                                hint: "Clonar para um cliente recorrente",
+                                onClick: () => duplicateQuote(selected),
+                                icon: (
                                   <svg
-                                    width="12"
-                                    height="12"
+                                    width="16"
+                                    height="16"
                                     viewBox="0 0 24 24"
                                     fill="none"
                                     stroke="currentColor"
-                                    strokeWidth="1.8"
+                                    strokeWidth="1.7"
+                                    aria-hidden="true"
                                   >
                                     <rect x="9" y="9" width="11" height="11" rx="2" />
                                     <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
                                   </svg>
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <a
-                                  href={`tel:${selected.phone}`}
-                                  className="text-foreground/70 text-xs hover:text-foreground/90"
-                                >
-                                  {selected.phone}
-                                </a>
-                                {selected.phone && (
-                                  <a
-                                    href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-80 transition-opacity shrink-0"
-                                    title="Abrir conversa no WhatsApp"
+                                ),
+                              },
+                              {
+                                label: selected.archived ? "Restaurar pedido" : "Arquivar pedido",
+                                hint: selected.archived
+                                  ? "Voltar a mostrar na lista principal"
+                                  : "Ocultar da lista principal (reversível)",
+                                onClick: async () => {
+                                  const next = !selected.archived;
+                                  const confirm_ =
+                                    !next ||
+                                    window.confirm(
+                                      `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
+                                    );
+                                  if (!confirm_) return;
+                                  const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ archived: next }),
+                                  });
+                                  if (res.ok) {
+                                    const updated = await res.json();
+                                    setQuotes((prev) =>
+                                      prev.map((q) => (q.id === updated.id ? updated : q)),
+                                    );
+                                    setSelected(updated);
+                                    toast(
+                                      next ? "Pedido arquivado" : "Pedido restaurado",
+                                      "success",
+                                    );
+                                  }
+                                },
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
                                   >
-                                    <svg
-                                      width="12"
-                                      height="12"
-                                      viewBox="0 0 24 24"
-                                      fill="currentColor"
-                                    >
-                                      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
-                                    </svg>
-                                    WhatsApp
-                                  </a>
-                                )}
-                              </div>
-                              {selected.company && (
-                                <p className="text-foreground/70 text-xs">{selected.company}</p>
-                              )}
-                              {selected.nif && (
-                                <p className="text-foreground/70 text-xs">NIF: {selected.nif}</p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Event */}
-                          <div>
-                            <p className="bo-eyebrow mb-3">Evento</p>
-                            {/* Read-only facts */}
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                              {[
-                                {
-                                  l: "Tipo",
-                                  v: CATEGORIES.find((c) => c.id === selected.category)?.label,
+                                    <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
+                                  </svg>
+                                ),
+                              },
+                              {
+                                label: "Guião do dia",
+                                hint: "Imprimir a folha de operações",
+                                onClick: () => printRunSheet(selected),
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                    <rect x="6" y="14" width="12" height="7" rx="1" />
+                                  </svg>
+                                ),
+                              },
+                              {
+                                label: "Dossier PDF",
+                                hint: "Imprimir o dossier completo do evento",
+                                onClick: () => printEventDossier(selected),
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                    <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
+                                  </svg>
+                                ),
+                              },
+                              ...(selected.date
+                                ? [
+                                    {
+                                      label: "Adicionar ao calendário",
+                                      hint: "Descarregar .ics (Google/Apple/Outlook)",
+                                      onClick: () => downloadEventIcs(selected),
+                                      icon: (
+                                        <svg
+                                          width="16"
+                                          height="16"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="1.7"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          aria-hidden="true"
+                                        >
+                                          <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                                          <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
+                                        </svg>
+                                      ),
+                                    },
+                                  ]
+                                : []),
+                              {
+                                label: "Apagar pedido",
+                                hint: "Ação definitiva — não pode ser anulada",
+                                onClick: async () => {
+                                  if (
+                                    !window.confirm(
+                                      "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
+                                    )
+                                  )
+                                    return;
+                                  try {
+                                    const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                      method: "DELETE",
+                                    });
+                                    if (!res.ok) throw new Error("delete failed");
+                                    setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
+                                    setSelected(null);
+                                    toast("Pedido apagado", "success");
+                                  } catch {
+                                    toast("Não foi possível apagar o pedido", "error");
+                                  }
                                 },
-                                {
-                                  l: "Sub-tipo",
-                                  v:
-                                    selected.category && selected.eventType
-                                      ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
-                                          (e) => e.id === selected.eventType,
-                                        )?.label
-                                      : null,
-                                },
-                                {
-                                  l: "Pacote",
-                                  v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
-                                },
-                                {
-                                  l: "Duração",
-                                  v: selected.duration ? `${selected.duration}h` : "—",
-                                },
-                                { l: "Extras", v: `${selected.addons?.length ?? 0} serviços` },
-                              ].map(({ l, v }) => (
-                                <div key={l}>
-                                  <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
-                                    {l}
-                                  </p>
-                                  <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
-                                </div>
-                              ))}
-                            </div>
-                            {/* Editable logistics */}
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-foreground/[0.06]">
-                              <div>
-                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                  Data
-                                </label>
-                                <input
-                                  type="date"
-                                  value={editDate}
-                                  onChange={(e) => setEditDate(e.target.value)}
-                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                />
-                                {editDate &&
-                                  (() => {
-                                    const cd = eventCountdown(editDate);
-                                    return cd ? (
-                                      <p
-                                        className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
-                                      >
-                                        {cd.label}
-                                      </p>
-                                    ) : null;
-                                  })()}
-                              </div>
-                              <div>
-                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                  Convidados
-                                </label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={editGuests}
-                                  onChange={(e) => setEditGuests(e.target.value)}
-                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                  Local
-                                </label>
-                                <input
-                                  value={editLocation}
-                                  onChange={(e) => setEditLocation(e.target.value)}
-                                  placeholder="Local do evento…"
-                                  className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                />
-                              </div>
-                            </div>
-                          </div>
+                                icon: (
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+                                  </svg>
+                                ),
+                              },
+                            ]}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={closeDetail}
+                            aria-label="Fechar"
+                            className="px-2"
+                          >
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M18 6 6 18M6 6l12 12" />
+                            </svg>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
 
-                          {/* Client notes */}
-                          {selected.notes && (
-                            <div>
-                              <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                              <p className="text-foreground/72 text-xs leading-relaxed bg-foreground/4 p-3 rounded-sm">
-                                {selected.notes}
-                              </p>
-                            </div>
-                          )}
+                    {/* Detalhe calmo: por defeito só o essencial (quem, quanto, em
+                        que fase, e a próxima ação). As ferramentas pesadas ficam
+                        atrás da revelação "Mostrar mais" mais abaixo. */}
+                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
+                      {/* Ciclo de vida — em que fase está o pedido, num relance. */}
+                      <LifecycleStepper quote={selected} />
 
-                          {/* Estimate */}
-                          {selected.priceBreakdown && (
-                            <div>
-                              <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
-                              <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
-                                {selected.priceBreakdown.addonsCost > 0 && (
-                                  <div className="flex justify-between text-[10px]">
-                                    <span className="text-foreground/60">Extras</span>
-                                    <span className="text-foreground/72">
-                                      {formatPrice(selected.priceBreakdown.addonsCost)}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
-                                  <span className="text-foreground/60">Subtotal</span>
-                                  <span className="text-foreground/72">
-                                    {formatPrice(selected.priceBreakdown.subtotal)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-[10px]">
-                                  <span className="text-foreground/60">IVA 23%</span>
-                                  <span className="text-foreground/72">
-                                    {formatPrice(selected.priceBreakdown.iva)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
-                                  <span className="text-foreground/60">Total</span>
-                                  <span className="text-[#4d6350] font-semibold">
-                                    {formatPrice(selected.priceBreakdown.total)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Admin actions */}
-                          <div className="border-t border-foreground/10 pt-5">
-                            <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
-                            <div className="flex flex-col gap-4">
-                              <TagsField
-                                key={`tags-${selected.id}`}
-                                quote={selected}
-                                suggestions={allTags}
-                                onChange={(tags) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) => (q.id === selected.id ? { ...q, tags } : q)),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, tags } : prev));
-                                }}
-                              />
-                              <FollowUpField
-                                key={`fu-${selected.id}`}
-                                quote={selected}
-                                onChange={(followUpAt) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, followUpAt } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, followUpAt } : prev));
-                                }}
-                              />
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Responsável
-                                </label>
-                                <input
-                                  type="text"
-                                  value={editAssigned}
-                                  onChange={(e) => setEditAssigned(e.target.value)}
-                                  placeholder="Nome do membro da equipa…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                      {/* Snapshot — valor, estado e evento. */}
+                      <Card padding="sm">
+                        {(() => {
+                          const revenue =
+                            selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
+                          const costs = (selected.eventSuppliers ?? []).reduce(
+                            (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
+                            0,
+                          );
+                          const margin = revenue - costs;
+                          const cd = eventCountdown(selected.date);
+                          return (
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                              <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
                                   Estado
-                                </label>
-                                <select
-                                  value={editStatus}
-                                  onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                >
-                                  {STATUS_OPTIONS.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                </span>
+                                <span>{statusBadge(selected.status)}</span>
                               </div>
-                              {editStatus === "rejeitado" && (
-                                <div>
-                                  <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                    Motivo de perda
-                                  </label>
-                                  <textarea
-                                    rows={2}
-                                    value={editLostReason}
-                                    onChange={(e) => setEditLostReason(e.target.value)}
-                                    placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
-                                    className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                  />
+                              <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                  Valor
+                                </span>
+                                <span className="text-sm font-semibold text-foreground/80">
+                                  {revenue ? formatPrice(revenue) : "—"}
+                                </span>
+                              </div>
+                              {costs > 0 && (
+                                <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                  <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                    Margem
+                                  </span>
+                                  <span
+                                    className={`text-sm font-semibold ${margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"}`}
+                                  >
+                                    {formatPrice(margin)}
+                                  </span>
                                 </div>
                               )}
-                              {selected.status === "rejeitado" &&
-                                selected.lostReason &&
-                                editStatus !== "rejeitado" && (
-                                  <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
-                                    <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
-                                      Motivo de perda anterior
-                                    </p>
-                                    <p className="text-xs text-foreground/72">
-                                      {selected.lostReason}
-                                    </p>
-                                  </div>
-                                )}
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Preço Final Cotado (€ s/IVA)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={editPrice}
-                                  onChange={(e) => setEditPrice(e.target.value)}
-                                  placeholder="Ex: 12500"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                  Notas Internas
-                                </label>
-                                <textarea
-                                  rows={3}
-                                  value={editNotes}
-                                  onChange={(e) => setEditNotes(e.target.value)}
-                                  placeholder="Notas internas sobre este pedido…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                />
-                              </div>
-                              {isDirty && !saving && (
-                                <p
-                                  role="status"
-                                  className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
-                                >
-                                  <span className="w-1 h-1 rounded-full bg-gold/80" />
-                                  Alterações por guardar
-                                </p>
+                              {cd && (
+                                <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
+                                  <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                    Evento
+                                  </span>
+                                  <span
+                                    className={`text-sm font-semibold ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/80"}`}
+                                  >
+                                    {cd.label}
+                                  </span>
+                                </div>
                               )}
-                              <button
-                                onClick={saveChanges}
-                                disabled={saving || !isDirty}
-                                className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
-                              >
-                                {saving ? "A guardar…" : "Guardar Alterações →"}
-                              </button>
                             </div>
+                          );
+                        })()}
+                      </Card>
+
+                      {/* Próxima ação — o único passo seguinte, em destaque. Abre a
+                          ferramenta certa dentro da área avançada. */}
+                      {(() => {
+                        const na = detailNextAction(selected);
+                        const reopen = deriveRequestLifecycle(selected).perdido;
+                        return (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (reopen) setEditStatus("em_revisao");
+                                setDetailTab(na.tab);
+                                setAdvancedOpen(true);
+                              }}
+                              className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white shadow-sm motion-safe:transition-colors hover:bg-[#415440]"
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
+                                  Próxima ação
+                                </span>
+                                <span className="mt-0.5 block text-sm font-semibold">
+                                  {na.label}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-white/70">
+                                  {na.hint}
+                                </span>
+                              </span>
+                              <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                                className="shrink-0 text-white/80"
+                              >
+                                <path d="M5 12h14M13 6l6 6-6 6" />
+                              </svg>
+                            </button>
                           </div>
+                        );
+                      })()}
+
+                      {/* Contacto — como falar com o cliente. */}
+                      <SectionCard eyebrow="Contacto" padding="sm">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`mailto:${selected.email}`}
+                              className="truncate text-xs text-[#4d6350] hover:underline"
+                            >
+                              {selected.email}
+                            </a>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard?.writeText(selected.email);
+                                toast("Email copiado", "success");
+                              }}
+                              className="shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
+                              title="Copiar email"
+                              aria-label="Copiar email"
+                            >
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                              >
+                                <rect x="9" y="9" width="11" height="11" rx="2" />
+                                <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`tel:${selected.phone}`}
+                              className="text-xs text-foreground/70 hover:text-foreground/90"
+                            >
+                              {selected.phone}
+                            </a>
+                            {selected.phone && (
+                              <a
+                                href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80"
+                                title="Abrir conversa no WhatsApp"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
+                                </svg>
+                                WhatsApp
+                              </a>
+                            )}
+                          </div>
+                          {selected.company && (
+                            <p className="text-xs text-foreground/70">{selected.company}</p>
+                          )}
+                          {selected.nif && (
+                            <p className="text-xs text-foreground/70">NIF: {selected.nif}</p>
+                          )}
+                        </div>
+                      </SectionCard>
+
+                      {/* Notas do cliente — contexto imediato, se existirem. */}
+                      {selected.notes && (
+                        <div>
+                          <p className="bo-eyebrow mb-2">Notas do Cliente</p>
+                          <p className="rounded-lg bg-foreground/[0.04] p-3 text-xs leading-relaxed text-foreground/72">
+                            {selected.notes}
+                          </p>
                         </div>
                       )}
 
-                      {detailTab === "producao" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-producao"
-                          aria-labelledby="detail-tab-producao"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          {/* Tasks linked to this event */}
-                          <EventTasks
-                            key={`tasks-${selected.id}`}
-                            quote={selected}
-                            userName={userName}
-                          />
-
-                          {/* Production checklist */}
-                          <EventChecklist
-                            key={`cl-${selected.id}`}
-                            quote={selected}
-                            onChange={(checklist) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                            }}
-                          />
-
-                          {/* Decor production plan (sourcing → strike) */}
-                          <ProductionPlan
-                            key={`prod-${selected.id}`}
-                            quote={selected}
-                            onChange={(productionPlan) => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id ? { ...q, productionPlan } : q,
-                                ),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, productionPlan } : prev));
-                            }}
-                          />
-
-                          {/* Day-of run sheet */}
-                          <EventTimeline
-                            key={`tl-${selected.id}`}
-                            quote={selected}
-                            onChange={(timeline) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, timeline } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                            }}
-                          />
-
-                          {/* Guest list / RSVP */}
-                          <GuestList
-                            key={`guests-${selected.id}`}
-                            quote={selected}
-                            onChange={(guestList) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, guestList } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {detailTab === "financeiro" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-financeiro"
-                          aria-labelledby="detail-tab-financeiro"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          {/* Payments & invoicing */}
-                          <PaymentsPanel
-                            key={`pay-${selected.id}`}
-                            quote={selected}
-                            showLedger
-                            onChange={(payments) => {
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                            }}
-                          />
-
-                          {/* Suppliers booked for this event + budget vs actual cost */}
-                          <EventCosts
-                            key={`costs-${selected.id}`}
-                            quote={selected}
-                            onChange={(eventSuppliers) => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                ),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, eventSuppliers } : prev));
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {detailTab === "comunicacao" && (
-                        <div
-                          role="tabpanel"
-                          id="detail-panel-comunicacao"
-                          aria-labelledby="detail-tab-comunicacao"
-                          tabIndex={0}
-                          className="flex flex-col gap-6 focus:outline-none"
-                        >
-                          <ProposalStudio
-                            key={`studio-${selected.id}`}
-                            quote={selected}
-                            onSent={() => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                ),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, status: "cotado" } : prev));
-                              setEditStatus("cotado");
-                              appendActivity(selected.id, [
-                                {
-                                  id: randomId(),
-                                  at: new Date().toISOString(),
-                                  kind: "proposal_sent",
-                                  actor: userName,
-                                  summary: "Proposta enviada ao cliente (Studio)",
-                                },
-                              ]);
-                            }}
-                          />
-                          <ProposalBuilder
-                            quote={selected}
-                            onSent={(total) => {
-                              setQuotes((prev) =>
-                                prev.map((q) =>
-                                  q.id === selected.id
-                                    ? { ...q, status: "cotado", quotedPrice: total }
-                                    : q,
-                                ),
-                              );
-                              setSelected((prev) =>
-                                prev ? { ...prev, status: "cotado", quotedPrice: total } : prev,
-                              );
-                              setEditStatus("cotado");
-                              appendActivity(selected.id, [
-                                {
-                                  id: randomId(),
-                                  at: new Date().toISOString(),
-                                  kind: "proposal_sent",
-                                  actor: userName,
-                                  summary: `Proposta enviada — ${eur(total)}`,
-                                },
-                              ]);
-                            }}
-                          />
-
-                          <ClientMessenger
-                            key={selected.id}
-                            quote={selected}
-                            onSent={(messages) => {
-                              const prev_count = selected.messages?.length ?? 0;
-                              setQuotes((prev) =>
-                                prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
-                              );
-                              setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                              if (messages.length > prev_count) {
-                                appendActivity(selected.id, [
-                                  {
-                                    id: randomId(),
-                                    at: new Date().toISOString(),
-                                    kind: "message_sent",
-                                    actor: userName,
-                                    summary: "Mensagem enviada ao cliente",
-                                  },
-                                ]);
-                              }
-                            }}
-                          />
-
-                          <ActivityLog
-                            quote={selected}
-                            actor={userName}
-                            onAddEntry={(entry) => appendActivity(selected.id, [entry])}
-                          />
-                        </div>
-                      )}
-
-                      <div className="text-foreground/70 text-[10px] text-center">
+                      <p className="text-[10px] text-foreground/50">
                         Submetido em{" "}
                         {new Date(selected.submittedAt).toLocaleString("pt-PT", {
                           day: "numeric",
@@ -2536,28 +2429,583 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
+                      </p>
+
+                      {/* ── Área avançada — gestão e ferramentas, escondida por
+                          defeito para manter a vista calma. Tudo continua acessível. */}
+                      <div className="border-t border-foreground/[0.08] pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setAdvancedOpen((o) => !o)}
+                          aria-expanded={advancedOpen}
+                          aria-controls="detail-advanced"
+                          className="flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.14em] text-foreground/50 motion-safe:transition-colors hover:bg-foreground/[0.04] hover:text-foreground/75"
+                        >
+                          <svg
+                            className={`shrink-0 motion-safe:transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""}`}
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          >
+                            <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          {advancedOpen
+                            ? "Ocultar gestão e ferramentas"
+                            : "Mostrar mais — gestão e ferramentas"}
+                        </button>
                       </div>
+
+                      {advancedOpen && (
+                        <div id="detail-advanced" className="flex flex-col gap-6">
+                          {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
+                              tablist pattern). */}
+                          <div
+                            role="tablist"
+                            aria-label="Secções do pedido"
+                            className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
+                          >
+                            {(
+                              [
+                                ["resumo", "Gestão"],
+                                ["producao", "Produção"],
+                                ["financeiro", "Financeiro"],
+                                ["comunicacao", "Comunicação"],
+                              ] as const
+                            ).map(([id, label], i, arr) => {
+                              const active = detailTab === id;
+                              return (
+                                <button
+                                  key={id}
+                                  id={`detail-tab-${id}`}
+                                  role="tab"
+                                  aria-selected={active}
+                                  aria-controls={`detail-panel-${id}`}
+                                  tabIndex={active ? 0 : -1}
+                                  onClick={() => setDetailTab(id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                                    e.preventDefault();
+                                    const dir = e.key === "ArrowRight" ? 1 : -1;
+                                    const next = arr[(i + dir + arr.length) % arr.length][0];
+                                    setDetailTab(next);
+                                    const tabs =
+                                      e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                                        '[role="tab"]',
+                                      );
+                                    tabs?.[(i + dir + arr.length) % arr.length]?.focus();
+                                  }}
+                                  className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                    active
+                                      ? "border-[#4d6350] text-foreground/85"
+                                      : "border-transparent text-foreground/40 hover:text-foreground/65"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Coluna única — as ferramentas do separador ativo */}
+                          <div className="flex min-w-0 flex-col gap-6">
+                            {detailTab === "resumo" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-resumo"
+                                aria-labelledby="detail-tab-resumo"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                {/* Event */}
+                                <div>
+                                  <p className="bo-eyebrow mb-3">Evento</p>
+                                  {/* Read-only facts */}
+                                  <div className="grid grid-cols-2 gap-2 mb-3">
+                                    {[
+                                      {
+                                        l: "Tipo",
+                                        v: CATEGORIES.find((c) => c.id === selected.category)
+                                          ?.label,
+                                      },
+                                      {
+                                        l: "Sub-tipo",
+                                        v:
+                                          selected.category && selected.eventType
+                                            ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
+                                                (e) => e.id === selected.eventType,
+                                              )?.label
+                                            : null,
+                                      },
+                                      {
+                                        l: "Pacote",
+                                        v: PACKAGES.find((p) => p.id === selected.packageTier)
+                                          ?.label,
+                                      },
+                                      {
+                                        l: "Duração",
+                                        v: selected.duration ? `${selected.duration}h` : "—",
+                                      },
+                                      {
+                                        l: "Extras",
+                                        v: `${selected.addons?.length ?? 0} serviços`,
+                                      },
+                                    ].map(({ l, v }) => (
+                                      <div key={l}>
+                                        <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
+                                          {l}
+                                        </p>
+                                        <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {/* Editable logistics */}
+                                  <div className="grid grid-cols-1 gap-2 pt-2 border-t border-foreground/[0.06] sm:grid-cols-2">
+                                    <div>
+                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                        Data
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={editDate}
+                                        onChange={(e) => setEditDate(e.target.value)}
+                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                      />
+                                      {editDate &&
+                                        (() => {
+                                          const cd = eventCountdown(editDate);
+                                          return cd ? (
+                                            <p
+                                              className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
+                                            >
+                                              {cd.label}
+                                            </p>
+                                          ) : null;
+                                        })()}
+                                    </div>
+                                    <div>
+                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                        Convidados
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={editGuests}
+                                        onChange={(e) => setEditGuests(e.target.value)}
+                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                      />
+                                    </div>
+                                    <div className="col-span-2">
+                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                        Local
+                                      </label>
+                                      <input
+                                        value={editLocation}
+                                        onChange={(e) => setEditLocation(e.target.value)}
+                                        placeholder="Local do evento…"
+                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Estimate */}
+                                {selected.priceBreakdown && (
+                                  <div>
+                                    <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
+                                    <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
+                                      {selected.priceBreakdown.addonsCost > 0 && (
+                                        <div className="flex justify-between text-[10px]">
+                                          <span className="text-foreground/60">Extras</span>
+                                          <span className="text-foreground/72">
+                                            {formatPrice(selected.priceBreakdown.addonsCost)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
+                                        <span className="text-foreground/60">Subtotal</span>
+                                        <span className="text-foreground/72">
+                                          {formatPrice(selected.priceBreakdown.subtotal)}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between text-[10px]">
+                                        <span className="text-foreground/60">IVA 23%</span>
+                                        <span className="text-foreground/72">
+                                          {formatPrice(selected.priceBreakdown.iva)}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
+                                        <span className="text-foreground/60">Total</span>
+                                        <span className="text-[#4d6350] font-semibold">
+                                          {formatPrice(selected.priceBreakdown.total)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Admin actions */}
+                                <div className="border-t border-foreground/10 pt-5">
+                                  <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
+                                  <div className="flex flex-col gap-4">
+                                    <TagsField
+                                      key={`tags-${selected.id}`}
+                                      quote={selected}
+                                      suggestions={allTags}
+                                      onChange={(tags) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, tags } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) => (prev ? { ...prev, tags } : prev));
+                                      }}
+                                    />
+                                    <FollowUpField
+                                      key={`fu-${selected.id}`}
+                                      quote={selected}
+                                      onChange={(followUpAt) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, followUpAt } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev ? { ...prev, followUpAt } : prev,
+                                        );
+                                      }}
+                                    />
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Responsável
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editAssigned}
+                                        onChange={(e) => setEditAssigned(e.target.value)}
+                                        placeholder="Nome do membro da equipa…"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Estado
+                                      </label>
+                                      <select
+                                        value={editStatus}
+                                        onChange={(e) =>
+                                          setEditStatus(e.target.value as QuoteStatus)
+                                        }
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      >
+                                        {STATUS_OPTIONS.map((s) => (
+                                          <option key={s.id} value={s.id}>
+                                            {s.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    {editStatus === "rejeitado" && (
+                                      <div>
+                                        <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                          Motivo de perda
+                                        </label>
+                                        <textarea
+                                          rows={2}
+                                          value={editLostReason}
+                                          onChange={(e) => setEditLostReason(e.target.value)}
+                                          placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                          className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                        />
+                                      </div>
+                                    )}
+                                    {selected.status === "rejeitado" &&
+                                      selected.lostReason &&
+                                      editStatus !== "rejeitado" && (
+                                        <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
+                                          <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
+                                            Motivo de perda anterior
+                                          </p>
+                                          <p className="text-xs text-foreground/72">
+                                            {selected.lostReason}
+                                          </p>
+                                        </div>
+                                      )}
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Preço final (sem IVA) €
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={editPrice}
+                                        onChange={(e) => setEditPrice(e.target.value)}
+                                        placeholder="Ex: 12500"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
+                                        Notas Internas
+                                      </label>
+                                      <textarea
+                                        rows={3}
+                                        value={editNotes}
+                                        onChange={(e) => setEditNotes(e.target.value)}
+                                        placeholder="Notas internas sobre este pedido…"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                      />
+                                    </div>
+                                    {isDirty && !saving && (
+                                      <p
+                                        role="status"
+                                        className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
+                                      >
+                                        <span className="w-1 h-1 rounded-full bg-gold/80" />
+                                        Alterações por guardar
+                                      </p>
+                                    )}
+                                    <button
+                                      onClick={saveChanges}
+                                      disabled={saving || !isDirty}
+                                      className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
+                                    >
+                                      {saving ? "A guardar…" : "Guardar Alterações →"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {detailTab === "producao" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-producao"
+                                aria-labelledby="detail-tab-producao"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                {/* Tasks linked to this event */}
+                                <EventTasks
+                                  key={`tasks-${selected.id}`}
+                                  quote={selected}
+                                  userName={userName}
+                                />
+
+                                {/* Production checklist */}
+                                <EventChecklist
+                                  key={`cl-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(checklist) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, checklist } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                                  }}
+                                />
+
+                                {/* Decor production plan (sourcing → strike) */}
+                                <ProductionPlan
+                                  key={`prod-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(productionPlan) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, productionPlan } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, productionPlan } : prev,
+                                    );
+                                  }}
+                                />
+
+                                {/* Day-of run sheet */}
+                                <EventTimeline
+                                  key={`tl-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(timeline) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, timeline } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                                  }}
+                                />
+
+                                {/* Guest list / RSVP */}
+                                <GuestList
+                                  key={`guests-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(guestList) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, guestList } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {detailTab === "financeiro" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-financeiro"
+                                aria-labelledby="detail-tab-financeiro"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                {/* Payments & invoicing */}
+                                <PaymentsPanel
+                                  key={`pay-${selected.id}`}
+                                  quote={selected}
+                                  showLedger
+                                  onChange={(payments) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, payments } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                                  }}
+                                />
+
+                                {/* Suppliers booked for this event + budget vs actual cost */}
+                                <EventCosts
+                                  key={`costs-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(eventSuppliers) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, eventSuppliers } : prev,
+                                    );
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {detailTab === "comunicacao" && (
+                              <div
+                                role="tabpanel"
+                                id="detail-panel-comunicacao"
+                                aria-labelledby="detail-tab-comunicacao"
+                                tabIndex={0}
+                                className="flex flex-col gap-6 focus:outline-none"
+                              >
+                                <p className="text-foreground/50 text-[11px] leading-relaxed">
+                                  Crie e envie a proposta ao cliente. Comece por aqui.
+                                </p>
+                                <ProposalStudio
+                                  key={`studio-${selected.id}`}
+                                  quote={selected}
+                                  onSent={() => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, status: "cotado" } : prev,
+                                    );
+                                    setEditStatus("cotado");
+                                    appendActivity(selected.id, [
+                                      {
+                                        id: randomId(),
+                                        at: new Date().toISOString(),
+                                        kind: "proposal_sent",
+                                        actor: userName,
+                                        summary: "Proposta enviada ao cliente (Studio)",
+                                      },
+                                    ]);
+                                  }}
+                                />
+                                {!showBuilder ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowBuilder(true)}
+                                    className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
+                                  >
+                                    Outra forma de propor (tabela de preços simples)
+                                  </button>
+                                ) : (
+                                  <ProposalBuilder
+                                    quote={selected}
+                                    onSent={(total) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id
+                                            ? { ...q, status: "cotado", quotedPrice: total }
+                                            : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev
+                                          ? { ...prev, status: "cotado", quotedPrice: total }
+                                          : prev,
+                                      );
+                                      setEditStatus("cotado");
+                                      appendActivity(selected.id, [
+                                        {
+                                          id: randomId(),
+                                          at: new Date().toISOString(),
+                                          kind: "proposal_sent",
+                                          actor: userName,
+                                          summary: `Proposta enviada — ${eur(total)}`,
+                                        },
+                                      ]);
+                                    }}
+                                  />
+                                )}
+
+                                <ClientMessenger
+                                  key={selected.id}
+                                  quote={selected}
+                                  onSent={(messages) => {
+                                    const prev_count = selected.messages?.length ?? 0;
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, messages } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                    if (messages.length > prev_count) {
+                                      appendActivity(selected.id, [
+                                        {
+                                          id: randomId(),
+                                          at: new Date().toISOString(),
+                                          kind: "message_sent",
+                                          actor: userName,
+                                          summary: "Mensagem enviada ao cliente",
+                                        },
+                                      ]);
+                                    }
+                                  }}
+                                />
+
+                                <ActivityLog
+                                  quote={selected}
+                                  actor={userName}
+                                  onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
-              ) : (
-                <div className="hidden xl:flex flex-col items-center justify-center gap-3 border border-dashed border-foreground/12 rounded-xl text-foreground/22 text-sm bg-foreground/[0.015]">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    className="text-foreground/15"
-                  >
-                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-                    <rect x="9" y="3" width="6" height="4" rx="1" />
-                    <path d="M9 12h6M9 16h4" strokeLinecap="round" />
-                  </svg>
-                  Seleccione um pedido para ver detalhes
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

@@ -52,4 +52,31 @@ describe("/api/tarefas", () => {
     expect(res.status).toBe(400);
     expect(store.create).not.toHaveBeenCalled();
   });
+
+  it("POST rejects an invalid priority with 400 (value validation)", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", { title: "X", priority: "urgente" }));
+    expect(res.status).toBe(400);
+    expect(store.create).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects a malformed JSON body with 400 (not a 500)", async () => {
+    authed.ok = true;
+    const bad = new Request("https://liquen.test/api/tarefas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{ not json",
+    }) as unknown as NextRequest;
+    const res = await POST(bad);
+    expect(res.status).toBe(400);
+    expect(store.create).not.toHaveBeenCalled();
+  });
+
+  it("POST maps only the whitelisted fields into the created task", async () => {
+    authed.ok = true;
+    await POST(req("POST", { title: "Nova", priority: "alta", dueDate: "2026-08-01" }));
+    expect(store.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Nova", priority: "alta", dueDate: "2026-08-01" }),
+    );
+  });
 });

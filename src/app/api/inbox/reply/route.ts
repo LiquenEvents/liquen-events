@@ -22,6 +22,9 @@ const replySchema = z.object({
       (v) => !/[\r\n]/.test(v) && /[^\s@]+@[^\s@]+\.[^\s@]+/.test(v),
       "Destinatário inválido",
     ),
+  // TODO(qa): `subject` isn't CRLF-guarded like `to`. Not provably exploitable —
+  // nodemailer encodes/sanitizes header values so a newline here can't inject a
+  // second header — but a defence-in-depth `!/[\r\n]/` refine would mirror `to`.
   subject: z.string().trim().max(200).optional(),
   message: z.string().trim().min(1, "Mensagem obrigatória").max(10_000),
 });
@@ -41,8 +44,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Parse the JSON body on its own so a malformed request is a clean 400,
+  // never a 500 swallowed by the send/error handler below.
+  let raw: unknown;
   try {
-    const parsed = replySchema.safeParse(await request.json());
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Pedido inválido" }, { status: 400 });
+  }
+
+  try {
+    const parsed = replySchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Destinatário e mensagem são obrigatórios." },
