@@ -67,6 +67,45 @@ describe("POST /api/security/csp-report", () => {
     );
   });
 
+  it("accepts the Reporting API array shape (report nested under .body) → 204", async () => {
+    const res = await POST(
+      post(
+        JSON.stringify([
+          {
+            type: "csp-violation",
+            age: 10,
+            url: "https://liquen.pt/b",
+            body: {
+              documentURL: "https://liquen.pt/b",
+              effectiveDirective: "connect-src",
+              blockedURL: "https://evil.example/beacon",
+            },
+          },
+        ]),
+        "application/reports+json",
+      ),
+    );
+    expect(res.status).toBe(204);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "CSP violation",
+      expect.objectContaining({
+        documentUri: "https://liquen.pt/b",
+        blockedUri: "https://evil.example/beacon",
+      }),
+    );
+  });
+
+  it("ignores non-CSP report types in the Reporting API array (no log)", async () => {
+    const res = await POST(
+      post(
+        JSON.stringify([{ type: "deprecation", body: { id: "x" } }]),
+        "application/reports+json",
+      ),
+    );
+    expect(res.status).toBe(204);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
   it("application/csp-report content-type still parses → 204", async () => {
     const res = await POST(
       post(JSON.stringify({ "csp-report": { "document-uri": "x" } }), "application/csp-report"),
