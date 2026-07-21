@@ -596,11 +596,30 @@ export default function GaleriaClient({
           </div>
         </div>
       ) : (
-        /* Barra de categorias removida a pedido — a galeria mostra todas as
-           fotos numa só grelha, sem chrome de filtros. (A vista de coleção
-           acima, com o chip "voltar à galeria", mantém-se para o deep-link a
-           um casamento específico.) */
-        <div className="mb-2" />
+        /* Barra de filtros de categoria — re-exposta a pedido. O filtro por
+           hash (#casamentos, …) já existia; faltava o chrome visível para o
+           visitante poder ver só casamentos / corporativo / etc. */
+        <div className="mb-8 px-3 sm:px-4 lg:px-6">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            {CATS.map((c) => {
+              const active = c === cat;
+              return (
+                <button
+                  key={c}
+                  onClick={() => switchCat(c)}
+                  aria-pressed={active}
+                  className={`min-h-[40px] px-4 py-2 text-[11px] tracking-[0.2em] uppercase border transition-colors duration-300 ${
+                    active
+                      ? "border-gold text-white bg-white/5"
+                      : "border-white/20 text-white/60 hover:border-white/50 hover:text-white"
+                  }`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* ── Grid ── */}
