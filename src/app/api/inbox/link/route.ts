@@ -84,7 +84,14 @@ export async function POST(request: NextRequest) {
   try {
     let link = null;
     if (has("quoteId") || has("proposalId")) {
-      link = await linkToQuote(d.messageId, d.quoteId ?? undefined, d.proposalId ?? undefined);
+      // Per the schema contract ("absent leaves it untouched"), only the fields
+      // actually present in the body may change; the OTHER link is preserved by
+      // carrying its current value forward. `linkToQuote` writes both keys, so
+      // passing an absent field as `undefined` would silently clear it.
+      const existing = await getLink(d.messageId);
+      const quoteId = has("quoteId") ? (d.quoteId ?? undefined) : existing?.quoteId;
+      const proposalId = has("proposalId") ? (d.proposalId ?? undefined) : existing?.proposalId;
+      link = await linkToQuote(d.messageId, quoteId, proposalId);
     }
     if (d.toggleLabel !== undefined) link = await toggleLabel(d.messageId, d.toggleLabel);
     if (d.pinned !== undefined) link = await setPinned(d.messageId, d.pinned);
