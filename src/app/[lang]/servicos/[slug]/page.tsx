@@ -132,16 +132,40 @@ export default async function ServiceDetailPage({
             white caption legible — no heavy full-panel veil. */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-14 lg:pb-20">
+          {/* Full crumb trail (Início › Serviços › serviço) — mirrors the
+              BreadcrumbList JSON-LD above so the visible path matches what search
+              engines index, and gives the visitor two levels up, not just one. */}
           <nav
             aria-label={t.nav.breadcrumb}
             className="text-[11px] tracking-[0.2em] uppercase text-cream/60 mb-8"
           >
-            <Link
-              href={localizeHref("/servicos", locale)}
-              className="inline-flex items-center gap-2 hover:text-cream transition-colors"
-            >
-              <span aria-hidden>←</span> {t.nav.servicos}
-            </Link>
+            <ol className="flex flex-wrap items-center gap-2">
+              <li>
+                <Link
+                  href={localizeHref("/", locale)}
+                  className="hover:text-cream transition-colors"
+                >
+                  {t.nav.inicio}
+                </Link>
+              </li>
+              <li aria-hidden className="text-cream/30">
+                ›
+              </li>
+              <li>
+                <Link
+                  href={localizeHref("/servicos", locale)}
+                  className="hover:text-cream transition-colors"
+                >
+                  {t.nav.servicos}
+                </Link>
+              </li>
+              <li aria-hidden className="text-cream/30">
+                ›
+              </li>
+              <li aria-current="page" className="text-cream/90 normal-case tracking-normal">
+                {svc.title}
+              </li>
+            </ol>
           </nav>
           {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
               photograph owns the first screen. Still the page's single <h1>. */}

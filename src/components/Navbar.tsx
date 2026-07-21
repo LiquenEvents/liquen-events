@@ -153,6 +153,11 @@ const MobileMenu = memo(function MobileMenu({
     { href: "/clientes", label: t.nav.clientes },
   ];
 
+  // A section stays "current" while the visitor is on any page beneath it, so a
+  // service-detail route (/servicos/casamentos) keeps the Serviços item lit.
+  const isActive = (href: string) =>
+    pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+
   const navTypes = (href: string) => [
     orderIdx(href) >= orderIdx(pathname) ? "nav-forward" : "nav-back",
   ];
@@ -234,7 +239,7 @@ const MobileMenu = memo(function MobileMenu({
       >
         <div className="m-auto w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
-            const active = pathname === link.href;
+            const active = isActive(link.href);
             return (
               <Link
                 key={link.href}
@@ -356,6 +361,12 @@ export default function Navbar() {
     { href: "/galeria", label: t.nav.galeria },
     { href: "/clientes", label: t.nav.clientes },
   ];
+
+  // A section stays "current" while the visitor is on any page beneath it, so a
+  // service-detail route (/servicos/casamentos) keeps the Serviços item lit and
+  // exposes aria-current to assistive tech. Exact match otherwise.
+  const isActive = (href: string) =>
+    pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
 
   // Pages whose hero is a full-bleed dark image sitting *under* the transparent
   // navbar. On those, the unscrolled nav needs light text + a subtle scrim to
@@ -526,13 +537,13 @@ export default function Navbar() {
                 key={link.href}
                 href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
-                aria-current={pathname === link.href ? "page" : undefined}
+                aria-current={isActive(link.href) ? "page" : undefined}
                 className={`link-line py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                   light
-                    ? pathname === link.href
+                    ? isActive(link.href)
                       ? "text-white nav-active-light"
                       : "text-white/80 hover:text-white"
-                    : pathname === link.href
+                    : isActive(link.href)
                       ? "text-moss nav-active"
                       : "text-moss hover:text-moss-dark"
                 }`}
