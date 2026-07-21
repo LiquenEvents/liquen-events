@@ -194,7 +194,10 @@ export default async function RootLayout({
             <ScrollProgress />
             <StickyCTA />
             <Navbar />
-            <main id="conteudo" className="flex-1 pt-24">
+            {/* tabIndex=-1 so the skip link actually MOVES keyboard focus into
+                the content (an <a href="#conteudo"> only scrolls to a non-
+                focusable target — focus would stay on the skip link). */}
+            <main id="conteudo" tabIndex={-1} className="flex-1 pt-24 outline-none">
               <PageTransition>{children}</PageTransition>
             </main>
             <Footer locale={locale} />

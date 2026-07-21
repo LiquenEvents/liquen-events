@@ -72,6 +72,8 @@ export const en: Dict = {
     testemunhoLabel: "Testimonial",
     pausar: "Pause testimonial rotation",
     retomar: "Resume testimonial rotation",
+    pausarLogos: "Pause logo marquee",
+    retomarLogos: "Resume logo marquee",
     whatsappPrefill: "Hi, I'd like to know more about your event decoration services.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).

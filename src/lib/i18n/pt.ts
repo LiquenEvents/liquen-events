@@ -72,6 +72,8 @@ export const pt = {
     testemunhoLabel: "Testemunho",
     pausar: "Pausar rotação dos testemunhos",
     retomar: "Retomar rotação dos testemunhos",
+    pausarLogos: "Pausar desfile de logótipos",
+    retomarLogos: "Retomar desfile de logótipos",
     whatsappPrefill: "Olá, gostaria de saber mais sobre a decoração de eventos.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
