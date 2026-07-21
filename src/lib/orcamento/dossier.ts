@@ -161,7 +161,12 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
     invoices.some((i) => i.kind === "sinal" && i.status === "paga") ||
     (quote.payments ?? []).some((p) => p.kind === "sinal" && p.paid && p.amount > 0);
 
-  const contratoAceite = !!contract?.acceptedAt || proposal?.status === "aceite";
+  // `quote.status === "aceite"` conta como aceite mesmo sem proposta/contrato:
+  // a rota manual permite marcar um negócio como ganho diretamente (reserva
+  // offline), tal como `deriveRequestLifecycle` do stepper já reconhece. Sem
+  // isto, um pedido ganho à mão aparecia como `lead`, contradizendo o stepper.
+  const contratoAceite =
+    !!contract?.acceptedAt || proposal?.status === "aceite" || quote.status === "aceite";
 
   const propostaEnviada =
     (!!proposal && proposal.status !== "rascunho") || quote.status === "cotado";
