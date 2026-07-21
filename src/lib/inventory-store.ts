@@ -37,7 +37,7 @@ export const mapper: Mapper<PropItem> = {
     id: String(r.id),
     name: String(r.name ?? ""),
     category: String(r.category ?? "Outro"),
-    quantity: Number(r.quantity ?? 0),
+    quantity: Number.isFinite(Number(r.quantity)) ? Number(r.quantity) : 0,
     unit: (r.unit as string) ?? undefined,
     condition: (r.condition as PropItem["condition"]) ?? "bom",
     location: (r.location as string) ?? undefined,
