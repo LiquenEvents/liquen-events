@@ -80,17 +80,20 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                   </span>
                 ))}
               </h1>
-              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">
+                {/* Primary hero actions. text-[11px] + py-2 gives a comfortable
+                    reading size and a ≥40px tap target on phones (the underline
+                    keeps the minimal look); tightens back to 10px from sm up. */}
                 <TrackedLink
                   href={localizeHref("/orcamento", locale)}
                   trackProps={{ source: "hero" }}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[11px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
                 >
                   {t.common.pedirOrcamento} <span aria-hidden>→</span>
                 </TrackedLink>
                 <Link
                   href={localizeHref("/galeria", locale)}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[10px] tracking-[0.28em] uppercase border-b border-white/30 pb-1 transition-colors hover:border-white hover:text-white"
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[11px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
                 >
                   {t.common.verGaleria} <span aria-hidden>→</span>
                 </Link>
@@ -213,7 +216,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
           <AnimateIn>
-            <p className="text-white/70 text-[9px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
+            <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />
               {t.home.ctaEyebrow}
             </p>
