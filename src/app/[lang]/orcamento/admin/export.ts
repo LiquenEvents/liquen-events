@@ -15,10 +15,17 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? "";
 }
 
-/** Escape a single CSV cell (handles quotes, separators and newlines). */
+/** Escape a single CSV cell (handles quotes, separators, newlines) and neutralises
+ *  CSV formula injection (CWE-1236): a STRING whose text begins with = + - @ (or a
+ *  leading tab/CR) is treated as a formula by Excel/Sheets/Numbers when the file is
+ *  opened. Client-supplied data (name, message, location, guest names) flows here,
+ *  so a lead like `=HYPERLINK(...)` could execute in the admin's spreadsheet. We
+ *  prefix such cells with a quote so they are read as text — but NEVER a numeric
+ *  value, so a treasury amount like -100 stays an intact number. */
 function cell(v: unknown): string {
   const s = v == null ? "" : String(v);
-  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const guarded = typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[";\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 /** Build a `;`-separated CSV string (PT locale) with a UTF-8 BOM for Excel. */
