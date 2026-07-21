@@ -55,6 +55,15 @@ const STATUS_LABEL: Record<string, string> = {
   rejeitado: "Rejeitado",
 };
 
+/** Format an ISO submission timestamp for the pt-PT export, guarding against an
+ *  empty/malformed value: `new Date("")`/`new Date("nope")` is an Invalid Date
+ *  whose `.toLocaleString()` emits the literal "Invalid Date" — garbage in a
+ *  spreadsheet cell. Return "" for anything unparseable so the column stays blank. */
+function submittedStamp(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("pt-PT");
+}
+
 /** Export a list of quotes (pedidos) as CSV rows. */
 export function quotesToCsvRows(quotes: Quote[]): (string | number)[][] {
   const header = [
@@ -82,7 +91,7 @@ export function quotesToCsvRows(quotes: Quote[]): (string | number)[][] {
   ];
   const rows = quotes.map((q) => [
     q.id,
-    new Date(q.submittedAt).toLocaleString("pt-PT"),
+    submittedStamp(q.submittedAt),
     STATUS_LABEL[q.status] ?? q.status,
     q.name,
     q.email,
