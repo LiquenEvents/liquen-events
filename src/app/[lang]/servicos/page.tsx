@@ -321,33 +321,24 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               />
             </Parallax>
             <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-            {/* Big bold uppercase headline + ghost outline button. Slightly
-                larger than a service band to signal it opens a category. The
-                numbered marker and subtitle eyebrow were removed on request. */}
+            {/* The descriptive sentence IS the headline now — the uppercase
+                category label and the ghost "Ver detalhes" button were dropped
+                so the panel reads as a single elegant statement. Navigation into
+                the category still happens via the service bands below, each with
+                its own link. Rendered in the serif display face, sentence case
+                (a full sentence uppercased at display size reads shouty). */}
             <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
                 <div className="max-w-2xl">
                   <h2
-                    className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
-                    style={{ fontSize: "clamp(32px, 5.5vw, 64px)" }}
+                    className="text-veil-shadow text-white font-bold leading-[1.15]"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(26px, 4vw, 48px)",
+                    }}
                   >
-                    {cat.label}
-                  </h2>
-                  <p className="mt-4 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
                     {cat.desc}
-                  </p>
-                  <Link
-                    href={localizeHref(
-                      `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
-                      locale,
-                    )}
-                    // Category-specific accessible name (visible label stays
-                    // minimal) so the link's target is clear out of context.
-                    aria-label={`${ts.verDetalhes} — ${cat.label}`}
-                    className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
-                  >
-                    {ts.verDetalhes} <span aria-hidden>→</span>
-                  </Link>
+                  </h2>
                 </div>
               </AnimateIn>
             </div>
