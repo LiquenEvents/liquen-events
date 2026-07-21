@@ -464,6 +464,7 @@ export default function OrcamentoForm({
             onSubmit={submit}
             onFocusCapture={markStart}
             aria-busy={sending}
+            noValidate
             className="flex flex-col gap-11"
           >
             {/* Required-fields key, before the fields so the '*' is explained
@@ -591,6 +592,7 @@ export default function OrcamentoForm({
               <input
                 id="of-local"
                 type="text"
+                autoComplete="address-level2"
                 value={local}
                 onChange={(e) => setLocal(e.target.value)}
                 className={inputCls}
@@ -664,6 +666,7 @@ export default function OrcamentoForm({
               <input
                 id="of-telefone"
                 type="tel"
+                inputMode="tel"
                 autoComplete="tel"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}

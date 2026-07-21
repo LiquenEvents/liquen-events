@@ -200,6 +200,10 @@ export default function ConfirmacaoClient({
             : "",
         },
         { label: tc.local, value: quote.location ?? "" },
+        // Echo back the free-text message the client wrote, so they can see it
+        // was captured (reassurance). `notes` may carry a leading "(flexible
+        // date)" marker from the form — keep it, it's still their own context.
+        { label: tc.mensagem, value: quote.notes?.trim() ?? "" },
       ].filter((d) => d.value)
     : [];
 

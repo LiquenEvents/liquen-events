@@ -585,6 +585,7 @@ export const en: Dict = {
     convidados: "Guests",
     data: "Date",
     local: "Location",
+    mensagem: "Message",
     adicionais: "Additional Services",
     noDataNote:
       "Save the reference above. We've sent the details to our team and will be in touch shortly.",

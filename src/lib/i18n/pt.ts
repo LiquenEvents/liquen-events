@@ -596,6 +596,7 @@ export const pt = {
     convidados: "Convidados",
     data: "Data",
     local: "Local",
+    mensagem: "Mensagem",
     adicionais: "Serviços Adicionais",
     noDataNote:
       "Guarde a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto consigo brevemente.",
