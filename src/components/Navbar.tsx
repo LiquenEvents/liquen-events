@@ -217,7 +217,12 @@ const MobileMenu = memo(function MobileMenu({
       aria-modal={isOpen}
       aria-label={t.nav.menuLabel}
       aria-hidden={!isOpen}
-      className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#0c0e0b] transition-[opacity,visibility] duration-500 ${
+      // h-[100dvh] (dynamic viewport height) instead of inset-0 / 100vh: on
+      // mobile the layout viewport is taller than the VISIBLE area while the
+      // browser's URL bar is showing, so an inset-0 overlay pushed the bottom
+      // block (contacts) behind the browser chrome. dvh tracks the visible area,
+      // keeping the contacts on screen as the URL bar shows/hides.
+      className={`lg:hidden fixed inset-x-0 top-0 h-[100dvh] -z-10 flex flex-col bg-[#0c0e0b] transition-[opacity,visibility] duration-500 ${
         isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
       }`}
     >
