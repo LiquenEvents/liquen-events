@@ -58,7 +58,13 @@ export function deriveRequestLifecycle(
     (quote.activityLog ?? []).some((a) => a.kind === "proposal_sent");
   const contratoAceite = quote.status === "aceite" || !!quote.contractRef;
   const faturaEmitida = (quote.payments ?? []).some((p) => p.amount > 0);
-  const eventPassed = !!quote.date && Date.parse(`${quote.date}T23:59:59`) < today.getTime();
+  // Ancorar ao FIM do dia do evento, tomando sempre a porção da DATA (10
+  // primeiros carateres) — tal como `deriveStage` e `countdownDays`. Assim um
+  // `quote.date` com componente horária (ISO completo, permitido pela rota
+  // manual/importação) não produz `NaN` nem deixa um evento passado preso uma
+  // fase atrás.
+  const eventPassed =
+    !!quote.date && Date.parse(`${quote.date.slice(0, 10)}T23:59:59`) < today.getTime();
   const cd = countdownDays(quote.date, today);
   const semanaEvento = contratoAceite && cd !== null && cd >= 0 && cd <= 7;
 
