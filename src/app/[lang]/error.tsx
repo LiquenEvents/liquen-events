@@ -22,7 +22,7 @@ export default function Error({
   return (
     <section className="min-h-[80vh] flex items-center justify-center px-6 bg-surface">
       <div className="max-w-lg text-center">
-        <p className="text-foreground/28 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
+        <p className="text-foreground/60 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
           <span className="w-5 h-px bg-moss/50" />
           {t.errors.errorEyebrow}
         </p>
@@ -43,8 +43,14 @@ export default function Error({
             {t.errors.retry} →
           </button>
           <Link
+            href={localizeHref("/orcamento", locale)}
+            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/25 text-foreground/75 font-medium rounded-sm hover:border-foreground/40 hover:text-foreground transition-all duration-300 text-sm tracking-widest uppercase"
+          >
+            {t.common.pedirOrcamento}
+          </Link>
+          <Link
             href={localizeHref("/", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/12 text-foreground/45 font-medium rounded-sm hover:border-foreground/25 hover:text-foreground/75 transition-all duration-300 text-sm tracking-widest uppercase"
+            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/25 text-foreground/75 font-medium rounded-sm hover:border-foreground/40 hover:text-foreground transition-all duration-300 text-sm tracking-widest uppercase"
           >
             {t.common.voltarInicio}
           </Link>

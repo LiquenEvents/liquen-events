@@ -729,7 +729,7 @@ export default function OrcamentoForm({
 
             {/* Reassurance + privacy at the point of decision — the moment
                 hesitation peaks. Reuses facts already shown up top. */}
-            <p className="mt-6 text-[11px] leading-relaxed text-foreground/55 max-w-md">
+            <p className="mt-6 text-[11px] leading-relaxed text-foreground/70 max-w-md">
               {to.submitReassure}
               <br />
               {to.privacyPre}

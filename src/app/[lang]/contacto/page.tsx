@@ -138,7 +138,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   },
                 ].map((item) => (
                   <div key={item.label} className="py-6">
-                    <p className="text-foreground/55 text-[10px] tracking-[0.4em] uppercase mb-2.5">
+                    <p className="text-foreground/70 text-[10px] tracking-[0.4em] uppercase mb-2.5">
                       {item.label}
                     </p>
                     {item.href ? (
@@ -154,7 +154,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     ) : (
                       <p className="text-foreground text-sm font-medium mb-1.5">{item.value}</p>
                     )}
-                    <p className="text-foreground/55 text-xs leading-relaxed">{item.sub}</p>
+                    <p className="text-foreground/70 text-xs leading-relaxed">{item.sub}</p>
                   </div>
                 ))}
               </div>
