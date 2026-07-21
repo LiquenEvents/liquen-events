@@ -38,7 +38,6 @@ const serviceSlugs = [
   "aluguer-de-viaturas-classicas",
   "eventos-corporativos",
   "festas-e-aniversarios",
-  "jantares-de-gala",
 ];
 
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {

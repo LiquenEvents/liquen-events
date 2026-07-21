@@ -67,7 +67,7 @@ export const SERVICES: ServiceDetail[] = [
         a: "Sim. Decoramos e coordenamos casamentos em todo o Portugal continental e ilhas, em articulação com os fornecedores de cada região.",
       },
     ],
-    related: ["jantares-de-gala", "festas-e-aniversarios"],
+    related: ["festas-e-aniversarios"],
   },
   {
     slug: "aluguer-de-viaturas-classicas",
@@ -112,7 +112,7 @@ export const SERVICES: ServiceDetail[] = [
         a: "Sim. Levamos as viaturas a casamentos em todo o Portugal continental, mediante disponibilidade e planeamento da logística.",
       },
     ],
-    related: ["casamentos", "jantares-de-gala"],
+    related: ["casamentos"],
   },
   {
     slug: "eventos-corporativos",
@@ -162,12 +162,7 @@ export const SERVICES: ServiceDetail[] = [
         a: "Sim, temos experiência em eventos com logística internacional, incluindo tradução simultânea, alojamento e transfers.",
       },
     ],
-    related: [
-      "conferencias-e-congressos",
-      "teambuilding",
-      "lancamentos-de-produto",
-      "jantares-de-empresa",
-    ],
+    related: ["casamentos", "festas-e-aniversarios"],
   },
   {
     slug: "festas-e-aniversarios",
@@ -213,53 +208,7 @@ export const SERVICES: ServiceDetail[] = [
         a: "Quanto mais cedo melhor para garantir a data, mas conseguimos entrar mais perto do dia, consoante a disponibilidade e a dimensão da festa.",
       },
     ],
-    related: ["casamentos", "jantares-de-gala"],
-  },
-  {
-    slug: "jantares-de-gala",
-    eyebrow: "Eventos Sociais",
-    title: "Decoração de Jantares de Gala e Eventos Sociais",
-    metaTitle: "Decoração de Jantares de Gala",
-    metaDescription:
-      "Decoração de jantares de gala e eventos sociais de prestígio em Lisboa e Portugal. Mesa posta premium, cenografia sofisticada e coordenação impecável.",
-    keywords: [
-      "decoração de jantares de gala",
-      "jantar de gala Portugal",
-      "eventos sociais de prestígio",
-      "evento de prestígio Alentejo",
-    ],
-    hero: "/imagens/J&P-IMGL3188.jpg",
-    intro: [
-      "Para os momentos que pedem sofisticação, criamos a decoração de jantares de gala e eventos sociais de prestígio em Lisboa e por todo o Portugal.",
-      "Mesa posta premium, cenografia e iluminação de autor — uma experiência cuidada ao pormenor, com a coordenação impecável que um evento de gala exige.",
-    ],
-    includes: [
-      "Mesa posta e decoração premium",
-      "Cenografia e iluminação de autor",
-      "Design floral e styling",
-      "Articulação de chef, menu e harmonização de vinhos",
-      "Articulação de animação e entretenimento",
-      "Coordenação integral do evento",
-    ],
-    gallery: [
-      "/imagens/stephanie-mizio-838.jpg",
-      "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg",
-      "/imagens/Natalia e Jonathan-198.jpg",
-      "/imagens/stephanie-mizio-564.jpg",
-      "/imagens/M&F0512.jpg",
-      "/imagens/JOAO_E_PEDRO_1Y1A3170.jpg",
-    ],
-    faqs: [
-      {
-        q: "A Líquen trata do catering e do chef?",
-        a: "A Líquen faz a decoração e a cenografia; o catering, o chef e a harmonização de vinhos são assegurados pelos nossos parceiros, que articulamos e coordenamos por si.",
-      },
-      {
-        q: "Fazem jantares de gala no espaço à escolha do cliente?",
-        a: "Sim. Adaptamos o conceito e a cenografia ao espaço que escolher — de palácios e herdades a hotéis —, em Lisboa e em todo o Portugal.",
-      },
-    ],
-    related: ["eventos-corporativos", "casamentos"],
+    related: ["casamentos"],
   },
   {
     slug: "batizados-e-comunhoes",
@@ -306,178 +255,6 @@ export const SERVICES: ServiceDetail[] = [
       },
     ],
     related: ["festas-e-aniversarios", "casamentos"],
-  },
-  {
-    slug: "conferencias-e-congressos",
-    eyebrow: "Para Empresas",
-    title: "Decoração e Cenografia de Conferências e Congressos",
-    metaTitle: "Cenografia de Conferências e Congressos",
-    metaDescription:
-      "Decoração, cenografia e produção de conferências e congressos em Lisboa e em todo o Portugal — palco, iluminação, sinalética e coordenação no local.",
-    keywords: [
-      "cenografia de conferências",
-      "decoração de congressos",
-      "produção de conferências Lisboa",
-      "eventos corporativos Portugal",
-    ],
-    hero: "/imagens/EW1_1330.jpg",
-    intro: [
-      "Uma conferência é a montra da sua marca. A Líquen Events cria a cenografia e a produção de conferências e congressos em Lisboa e em todo o Portugal — do palco à sinalética, com o rigor que um evento profissional exige.",
-      "Cuidamos do conceito visual, da iluminação e do audiovisual à coordenação no local, para que a sua equipa se foque apenas no conteúdo e nos resultados.",
-    ],
-    includes: [
-      "Conceito visual e cenografia de palco",
-      "Iluminação e audiovisual",
-      "Sinalética e identidade do evento",
-      "Ambientação de áreas de networking",
-      "Articulação de fornecedores técnicos",
-      "Coordenação e produção no local",
-    ],
-    gallery: [
-      "/imagens/EW1_1330.jpg",
-      "/imagens/EW1_1398.jpg",
-      "/imagens/EW1_1428.jpg",
-      "/imagens/EW1_1404.jpg",
-      "/imagens/EW1_1408.jpg",
-      "/imagens/hd-edited.jpg",
-    ],
-    faqs: [
-      {
-        q: "Tratam da parte técnica (palco, som, luz)?",
-        a: "Sim. Coordenamos toda a produção técnica com a nossa rede de fornecedores, do palco e iluminação ao audiovisual e tradução simultânea.",
-      },
-    ],
-    related: ["eventos-corporativos", "jantares-de-empresa"],
-  },
-  {
-    slug: "teambuilding",
-    eyebrow: "Para Empresas",
-    title: "Teambuilding e Experiências de Equipa",
-    metaTitle: "Teambuilding para Empresas no Alentejo",
-    metaDescription:
-      "Organização de teambuilding e experiências de equipa no Alentejo e em Portugal — atividades e ambientes à medida que unem e fortalecem a equipa.",
-    keywords: [
-      "teambuilding empresas",
-      "teambuilding Alentejo",
-      "atividades de equipa",
-      "eventos corporativos Portugal",
-    ],
-    hero: "/imagens/EW1_1398.jpg",
-    intro: [
-      "As melhores equipas constroem-se fora da sala de reuniões. A Líquen Events cria experiências de teambuilding no Alentejo e em todo o Portugal — do conceito à ambientação, pensadas para unir equipas e celebrar conquistas.",
-      "Tratamos do espaço, da logística e de cada detalhe, para que a sua empresa viva o momento sem preocupações.",
-    ],
-    includes: [
-      "Conceito e tema da experiência",
-      "Ambientação e decoração do espaço",
-      "Logística e catering",
-      "Atividades e dinâmicas de equipa",
-      "Articulação de fornecedores",
-      "Coordenação no local",
-    ],
-    gallery: [
-      "/imagens/EW1_1428.jpg",
-      "/imagens/EW1_1404.jpg",
-      "/imagens/EW1_1332.jpg",
-      "/imagens/EW1_1408.jpg",
-      "/imagens/20_10_2025_0295.jpg",
-      "/imagens/20_10_2025_0358.jpg",
-    ],
-    faqs: [
-      {
-        q: "Fazem teambuilding em herdades do Alentejo?",
-        a: "Sim. Temos parceiros em herdades e quintas por todo o Alentejo, ideais para experiências de equipa em ambiente único.",
-      },
-    ],
-    related: ["eventos-corporativos", "conferencias-e-congressos"],
-  },
-  {
-    slug: "lancamentos-de-produto",
-    eyebrow: "Para Empresas",
-    title: "Lançamentos de Produto e Eventos de Marca",
-    metaTitle: "Decoração de Lançamentos de Produto",
-    metaDescription:
-      "Decoração, cenografia e produção de lançamentos de produto e eventos de marca em Lisboa e Portugal — ambientes de impacto para apresentar novidades ao mercado.",
-    keywords: [
-      "lançamento de produto",
-      "evento de marca",
-      "cenografia de lançamento",
-      "eventos corporativos Lisboa",
-    ],
-    hero: "/imagens/EW1_1428.jpg",
-    intro: [
-      "Um lançamento é a primeira impressão do seu produto. A Líquen Events cria a cenografia e a produção de lançamentos de produto e eventos de marca em Lisboa e em todo o Portugal — ambientes de impacto, fiéis à identidade da marca.",
-      "Do conceito visual à montagem e coordenação no local, criamos o momento que faz o mercado olhar.",
-    ],
-    includes: [
-      "Conceito visual e cenografia de marca",
-      "Decoração e styling do espaço",
-      "Iluminação e audiovisual",
-      "Zonas de demonstração e imprensa",
-      "Sinalética e identidade do evento",
-      "Coordenação e produção no local",
-    ],
-    gallery: [
-      "/imagens/EW1_1405.jpg",
-      "/imagens/EW1_1408.jpg",
-      "/imagens/20_10_2025_0295.jpg",
-      "/imagens/20_10_2025_0358.jpg",
-      "/imagens/EW1_1330.jpg",
-      "/imagens/hd-edited.jpg",
-    ],
-    faqs: [
-      {
-        q: "Fazem lançamentos de produto em Lisboa e no Porto?",
-        a: "Sim. Produzimos lançamentos e eventos de marca em Lisboa, no Porto e em todo o Portugal, com equipa e fornecedores em cada região.",
-      },
-      {
-        q: "Conseguem cenografia fiel à identidade da marca?",
-        a: "Sim. Partimos do manual da marca — cores, materiais e tom — para desenhar um ambiente coerente com a identidade, do conceito à montagem.",
-      },
-    ],
-    related: ["eventos-corporativos", "conferencias-e-congressos"],
-  },
-  {
-    slug: "jantares-de-empresa",
-    eyebrow: "Para Empresas",
-    title: "Jantares de Empresa e Galas Corporativas",
-    metaTitle: "Decoração de Jantares de Empresa",
-    metaDescription:
-      "Decoração de jantares de empresa e galas corporativas em Lisboa e Portugal — de jantares de Natal a galas de prémios, com mesa posta premium.",
-    keywords: [
-      "jantar de empresa",
-      "gala corporativa",
-      "jantar de Natal empresa",
-      "eventos corporativos Portugal",
-    ],
-    hero: "/imagens/EW1_1404.jpg",
-    intro: [
-      "Do jantar de Natal à gala de entrega de prémios, os jantares de empresa são momentos de celebração que merecem cuidado. A Líquen Events cria a decoração e a ambientação destes eventos em Lisboa e em todo o Portugal.",
-      "Mesa posta premium, cenografia e iluminação à medida, com a coordenação impecável que uma noite memorável exige.",
-    ],
-    includes: [
-      "Mesa posta e decoração premium",
-      "Cenografia e iluminação",
-      "Ambientação de palco e entrega de prémios",
-      "Articulação de catering e fornecedores",
-      "Sinalética e identidade do evento",
-      "Coordenação integral da noite",
-    ],
-    gallery: [
-      "/imagens/EW1_1405.jpg",
-      "/imagens/EW1_1428.jpg",
-      "/imagens/EW1_1332.jpg",
-      "/imagens/EW1_1398.jpg",
-      "/imagens/M&F0512.jpg",
-      "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg",
-    ],
-    faqs: [
-      {
-        q: "Organizam jantares de Natal de empresa?",
-        a: "Sim. Do conceito à mesa e à coordenação da noite, tratamos de tudo para a sua empresa celebrar sem preocupações.",
-      },
-    ],
-    related: ["eventos-corporativos", "jantares-de-gala"],
   },
 ];
 
@@ -607,35 +384,6 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       },
     ],
   },
-  "jantares-de-gala": {
-    eyebrow: "Social Events",
-    title: "Decoration for Gala Dinners and Social Events",
-    metaTitle: "Gala Dinner Decoration",
-    metaDescription:
-      "Decoration for gala dinners and prestige social events in Lisbon and Portugal. Premium table settings, sophisticated scenography and impeccable coordination.",
-    intro: [
-      "For moments that call for sophistication, we create the decoration for gala dinners and prestige social events in Lisbon and throughout Portugal.",
-      "Premium table settings, signature scenography and lighting — a meticulously crafted experience, with the impeccable coordination a gala event demands.",
-    ],
-    includes: [
-      "Premium table settings and décor",
-      "Signature scenography and lighting",
-      "Floral design and styling",
-      "Chef, menu and wine-pairing liaison",
-      "Entertainment and performance liaison",
-      "End-to-end event coordination",
-    ],
-    faqs: [
-      {
-        q: "Does Líquen handle catering and the chef?",
-        a: "Líquen creates the decoration and scenography; catering, the chef and wine pairing are provided by our partners, whom we liaise with and coordinate on your behalf.",
-      },
-      {
-        q: "Do you do gala dinners at a venue of the client's choice?",
-        a: "Yes. We adapt the concept and scenography to whatever venue you choose — from palaces and estates to hotels — in Lisbon and across Portugal.",
-      },
-    ],
-  },
   "batizados-e-comunhoes": {
     eyebrow: "Family Celebrations",
     title: "Christening & Communion Decoration in the Alentejo",
@@ -665,110 +413,6 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       },
     ],
   },
-  "conferencias-e-congressos": {
-    eyebrow: "For Companies",
-    title: "Conference & Congress Decoration and Scenography",
-    metaTitle: "Conference & Congress Scenography",
-    metaDescription:
-      "Decoration, scenography and production for conferences and congresses in Lisbon and across Portugal — stage, lighting, signage and on-site coordination.",
-    intro: [
-      "A conference is your brand's showcase. Líquen Events creates the scenography and production for conferences and congresses in Lisbon and across Portugal — from stage to signage, with the rigour a professional event demands.",
-      "We take care of the visual concept, lighting and audiovisual through to on-site coordination, so your team can focus on the content and the results.",
-    ],
-    includes: [
-      "Visual concept and stage scenography",
-      "Lighting and audiovisual",
-      "Signage and event identity",
-      "Styling of networking areas",
-      "Technical supplier liaison",
-      "On-site coordination and production",
-    ],
-    faqs: [
-      {
-        q: "Do you handle the technical side (stage, sound, lighting)?",
-        a: "Yes. We coordinate the full technical production with our network of suppliers, from stage and lighting to audiovisual and simultaneous translation.",
-      },
-    ],
-  },
-  teambuilding: {
-    eyebrow: "For Companies",
-    title: "Team Building & Team Experiences",
-    metaTitle: "Team Building for Companies in the Alentejo",
-    metaDescription:
-      "Team building and team experiences in the Alentejo and Portugal — bespoke activities and settings that bring teams together and strengthen company culture.",
-    intro: [
-      "The best teams are built outside the meeting room. Líquen Events creates team-building experiences in the Alentejo and across Portugal — from concept to setting, designed to bring teams together and celebrate achievements.",
-      "We handle the venue, the logistics and every detail, so your company can simply enjoy the moment.",
-    ],
-    includes: [
-      "Concept and theme",
-      "Setting and space decoration",
-      "Logistics and catering",
-      "Team activities and dynamics",
-      "Supplier liaison",
-      "On-site coordination",
-    ],
-    faqs: [
-      {
-        q: "Do you run team building at Alentejo estates?",
-        a: "Yes. We have partners at estates and quintas across the Alentejo, ideal for team experiences in a unique setting.",
-      },
-    ],
-  },
-  "lancamentos-de-produto": {
-    eyebrow: "For Companies",
-    title: "Product Launches & Brand Events",
-    metaTitle: "Product Launch Decoration",
-    metaDescription:
-      "Decoration, scenography and production for product launches and brand events in Lisbon and Portugal — high-impact settings to bring new products to market.",
-    intro: [
-      "A launch is your product's first impression. Líquen Events creates the scenography and production for product launches and brand events in Lisbon and across Portugal — high-impact settings, true to the brand's identity.",
-      "From the visual concept to the build and on-site coordination, we create the moment that makes the market look.",
-    ],
-    includes: [
-      "Visual concept and brand scenography",
-      "Decoration and space styling",
-      "Lighting and audiovisual",
-      "Demo and press areas",
-      "Signage and event identity",
-      "On-site coordination and production",
-    ],
-    faqs: [
-      {
-        q: "Do you do product launches in Lisbon and Porto?",
-        a: "Yes. We produce launches and brand events in Lisbon, Porto and across Portugal, with a team and suppliers in each region.",
-      },
-      {
-        q: "Can you make the scenography true to our brand identity?",
-        a: "Yes. We start from your brand guidelines — colours, materials and tone — to design an environment coherent with your identity, from concept to build.",
-      },
-    ],
-  },
-  "jantares-de-empresa": {
-    eyebrow: "For Companies",
-    title: "Company Dinners & Corporate Galas",
-    metaTitle: "Company Dinner Decoration",
-    metaDescription:
-      "Decoration for company dinners and corporate galas in Lisbon and Portugal — from Christmas dinners to awards galas, with premium table settings.",
-    intro: [
-      "From the Christmas dinner to the awards gala, company dinners are moments of celebration that deserve care. Líquen Events creates the decoration and styling for these events in Lisbon and across Portugal.",
-      "Premium table settings, bespoke scenography and lighting, with the impeccable coordination a memorable evening demands.",
-    ],
-    includes: [
-      "Premium table settings and décor",
-      "Scenography and lighting",
-      "Stage and awards styling",
-      "Catering and supplier liaison",
-      "Signage and event identity",
-      "End-to-end coordination of the evening",
-    ],
-    faqs: [
-      {
-        q: "Do you organise company Christmas dinners?",
-        a: "Yes. From concept to the table and coordination of the evening, we take care of everything so your company can celebrate without a worry.",
-      },
-    ],
-  },
 };
 
 export function getService(slug: string, locale: "pt" | "en" = "pt"): ServiceDetail | undefined {
@@ -788,12 +432,7 @@ const SLUG_TO_QUOTE_TIPO: Record<string, string> = {
   "aluguer-de-viaturas-classicas": "casamentos",
   "eventos-corporativos": "conferencias",
   "festas-e-aniversarios": "aniversarios",
-  "jantares-de-gala": "jantares_gala",
   "batizados-e-comunhoes": "batizados",
-  "conferencias-e-congressos": "conferencias",
-  teambuilding: "conferencias",
-  "lancamentos-de-produto": "conferencias",
-  "jantares-de-empresa": "conferencias",
 };
 
 /** Quote-form event-type id for a service slug, or undefined if none applies. */

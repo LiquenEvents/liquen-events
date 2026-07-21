@@ -15,7 +15,6 @@ The site is Portuguese-first, with a full English mirror under `/en/`. Visitors 
 - [Casamentos](https://www.liquen-events.com/servicos/casamentos): Wedding planning and coordination in the Alentejo and across Portugal.
 - [Eventos Corporativos](https://www.liquen-events.com/servicos/eventos-corporativos): Corporate events, conferences and company celebrations.
 - [Festas e Aniversários](https://www.liquen-events.com/servicos/festas-e-aniversarios): Private parties, birthdays and celebrations.
-- [Jantares de Gala](https://www.liquen-events.com/servicos/jantares-de-gala): Gala dinners and prestige social events.
 - [Galeria](https://www.liquen-events.com/galeria): Photo gallery of real events organized by Líquen Events.
 - [Sobre](https://www.liquen-events.com/sobre): About the company, its founder and approach.
 - [Clientes](https://www.liquen-events.com/clientes): Clients and testimonials.
