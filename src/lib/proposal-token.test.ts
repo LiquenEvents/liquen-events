@@ -53,6 +53,15 @@ describe("proposal-token — signed accept links", () => {
     expect(readProposalToken(undefined)).toBeNull();
   });
 
+  it("rejects a canonical token with trailing junk appended", () => {
+    // `body.sig` is genuinely valid; appending `.junk` must NOT be silently
+    // dropped (the old 2-target split-destructure accepted `body.sig.junk`).
+    const token = createProposalToken("prop-123");
+    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
+    expect(readProposalToken(`${token}.junk`)).toBeNull();
+    expect(readProposalToken(`${token}.a.b.c`)).toBeNull();
+  });
+
   it("rejects a token signed with a different secret", () => {
     const token = createProposalToken("prop-123");
     process.env.SESSION_SECRET = "a-totally-different-secret-987654321";

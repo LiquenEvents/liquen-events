@@ -64,8 +64,13 @@ export function createProposalToken(proposalId: string): string {
 
 /** Validate a token; returns the proposal id or null if invalid/expired/tampered. */
 export function readProposalToken(token: string | undefined | null): { proposalId: string } | null {
-  if (!token || !token.includes(".")) return null;
-  const [body, sig] = token.split(".");
+  if (!token) return null;
+  // A canonical token is exactly `body.sig` (a base64url signature never contains
+  // a "."). Reject any trailing junk (`body.sig.x`) rather than silently dropping
+  // it — mirrors readPortalToken / readSession so all three verifiers are strict.
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [body, sig] = parts;
   if (!body || !sig) return null;
 
   const expected = sign(body);
