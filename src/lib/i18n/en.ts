@@ -658,6 +658,9 @@ export const en: Dict = {
       rejeitadaBody:
         "Thank you for letting us know. If you change your mind or want to adjust anything, we're always here.",
       jaRegistado: "We had already recorded your response to this proposal.",
+      expiradaTitle: "This proposal has expired.",
+      expiradaBody:
+        "This proposal's validity date has passed, so it can no longer be accepted here. Get in touch and we'll gladly prepare an updated proposal for you.",
       aceitar: "Accept proposal →",
       aceitarSending: "Recording…",
       recusar: "Decline",

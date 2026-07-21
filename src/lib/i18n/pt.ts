@@ -670,6 +670,9 @@ export const pt = {
       rejeitadaBody:
         "Obrigado por nos dizer. Se mudar de ideias ou quiser ajustar algo, estamos sempre ao dispor.",
       jaRegistado: "Já tínhamos registado a sua resposta a esta proposta.",
+      expiradaTitle: "Esta proposta expirou.",
+      expiradaBody:
+        "O prazo de validade desta proposta já passou, por isso não é possível aceitá-la aqui. Fale connosco e preparamos-lhe uma proposta atualizada com todo o gosto.",
       aceitar: "Aceitar proposta →",
       aceitarSending: "A registar…",
       recusar: "Recusar",
