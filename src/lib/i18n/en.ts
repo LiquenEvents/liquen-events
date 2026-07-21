@@ -513,10 +513,6 @@ export const en: Dict = {
             title: "Birthday Parties",
             desc: "Themed or classic parties for all ages. Every birthday is a story.",
           },
-          {
-            title: "Gala Dinners",
-            desc: "Prestige social events with a sophisticated atmosphere and impeccable coordination.",
-          },
         ],
       },
       {
@@ -527,22 +523,6 @@ export const en: Dict = {
           {
             title: "Corporate Events",
             desc: "Decoration and scenography tailored to your brand — from conferences and launches to company dinners.",
-          },
-          {
-            title: "Conferences & Congresses",
-            desc: "Full organisation of corporate conferences, from logistics to audiovisual.",
-          },
-          {
-            title: "Team Building",
-            desc: "Activities and experiences that unite teams and strengthen company culture.",
-          },
-          {
-            title: "Product Launches",
-            desc: "High-impact events to present new products to the market with creativity.",
-          },
-          {
-            title: "Company Dinners",
-            desc: "From Christmas dinners to awards galas, we create memorable moments of celebration.",
           },
         ],
       },
@@ -785,7 +765,6 @@ export const en: Dict = {
       "Classic Car Rental",
       "Corporate Events",
       "Parties & Celebrations",
-      "Gala Dinners",
     ],
     contacto: "Contact",
     country: "Évora, Alentejo, Portugal",

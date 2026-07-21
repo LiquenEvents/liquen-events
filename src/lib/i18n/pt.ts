@@ -524,10 +524,6 @@ export const pt = {
             title: "Festas de Aniversário",
             desc: "Festas temáticas ou clássicas para todas as idades. Cada aniversário é uma história.",
           },
-          {
-            title: "Jantares de Gala",
-            desc: "Eventos sociais de prestígio com ambiente sofisticado e coordenação impecável.",
-          },
         ],
       },
       {
@@ -538,22 +534,6 @@ export const pt = {
           {
             title: "Eventos Corporativos",
             desc: "Decoração e cenografia à medida da sua marca — de conferências e lançamentos a jantares de empresa.",
-          },
-          {
-            title: "Conferências & Congressos",
-            desc: "Organização completa de conferências empresariais, da logística ao audiovisual.",
-          },
-          {
-            title: "Teambuilding",
-            desc: "Atividades e experiências que unem equipas e fortalecem a cultura organizacional.",
-          },
-          {
-            title: "Lançamentos de Produto",
-            desc: "Eventos de impacto para apresentar novos produtos ao mercado com criatividade.",
-          },
-          {
-            title: "Jantares de Empresa",
-            desc: "Desde jantares de Natal a galas de entrega de prémios, criamos momentos de celebração memoráveis.",
           },
         ],
       },
@@ -797,7 +777,6 @@ export const pt = {
       "Aluguer de Viaturas Clássicas",
       "Eventos Corporativos",
       "Festas e Aniversários",
-      "Jantares de Gala",
     ],
     contacto: "Contacto",
     country: "Évora, Alentejo, Portugal",
