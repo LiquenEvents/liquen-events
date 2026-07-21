@@ -40,7 +40,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     const proposal = acceptedContract
       ? await getProposal(acceptedContract.proposalId)
       : await getProposalByQuote(quote.id);
-    if (!proposal?.doc) return new NextResponse(null, { status: 404 });
+    // Defense in depth: the resolved proposal MUST belong to this token's quote.
+    // The accepted-contract path trusts a stored linkage (contract.proposalId);
+    // a mislinked/corrupted contract pointing at another client's proposal must
+    // never leak that client's document. (The fallback already scopes by quote.)
+    if (!proposal?.doc || (proposal.quoteId && proposal.quoteId !== quote.id)) {
+      return new NextResponse(null, { status: 404 });
+    }
 
     const pdf = await renderStoredProposalDocPdf(proposal.doc);
     return new NextResponse(pdf, {

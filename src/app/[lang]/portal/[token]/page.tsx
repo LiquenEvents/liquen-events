@@ -65,9 +65,14 @@ export default async function PortalPage({
   // proposta. Só quando não há aceite (proposta ainda em aberto) é que caímos na
   // mais recente (`getProposalByQuote`) e no seu contrato por proposta.
   const acceptedContract = await getAcceptedContractByQuote(quote.id);
-  const proposal = acceptedContract
+  let proposal = acceptedContract
     ? await getProposal(acceptedContract.proposalId)
     : await getProposalByQuote(quote.id);
+  // Defense in depth: never surface a proposal that belongs to another quote
+  // via a mislinked accepted contract. The accepted-contract path resolves a
+  // proposal by a stored id (contract.proposalId); if that linkage is corrupt
+  // it must not leak another client's proposal (total, status, or PDF link).
+  if (proposal && proposal.quoteId && proposal.quoteId !== quote.id) proposal = null;
   const [contract, invoices] = await Promise.all([
     acceptedContract
       ? Promise.resolve(acceptedContract)
