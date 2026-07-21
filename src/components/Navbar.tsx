@@ -350,7 +350,6 @@ const MobileMenu = memo(function MobileMenu({
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [hidden, setHidden] = useState(false);
   const pathname = usePublicPathname();
   const { locale, t } = useTranslations();
   const reduce = useReducedMotion();
@@ -396,20 +395,14 @@ export default function Navbar() {
 
   useEffect(() => {
     let frame = 0;
-    let lastY = window.scrollY;
     const onScroll = () => {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        const y = window.scrollY;
-        setScrolled(y > 30);
-        // Hide when scrolling down past the hero, reveal on the first upward
-        // intent — content gets the full stage, navigation is always one
-        // gesture away. Small deltas are ignored so it never flickers.
-        const delta = y - lastY;
-        if (y < 200 || delta < -6) setHidden(false);
-        else if (delta > 6) setHidden(true);
-        lastY = y;
+        // Only track the scrolled state (for the solid frosted background). The
+        // bar stays fixed and always visible — it never auto-hides on scroll —
+        // so navigation is available on every page at any scroll position.
+        setScrolled(window.scrollY > 30);
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -473,12 +466,7 @@ export default function Navbar() {
     <nav
       data-public-nav
       aria-label={t.nav.primaryLabel}
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ease-expo ${
-        // NB: nada de "translate-y-0" no estado visível — QUALQUER transform no
-        // nav cria um containing block e prenderia o overlay fixed inset-0 do
-        // menu mobile à altura da barra em vez do viewport inteiro.
-        hidden && !isOpen ? "-translate-y-full" : ""
-      } ${
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[background-color,border-color,box-shadow] duration-500 ease-expo ${
         // Barra CLARA sólida ao fazer scroll (fundo surface a 95% + filete ténue
         // + sombra suave). SEM backdrop-blur de propósito — um backdrop-filter num
         // elemento fixo cria um containing-block que prenderia o overlay
