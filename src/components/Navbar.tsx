@@ -232,17 +232,13 @@ const MobileMenu = memo(function MobileMenu({
           único acento é um filete branco que cresce no item ativo. */}
       <nav
         aria-label={t.nav.menuLabel}
-        // min-h-0 lets this flex child actually shrink so overflow-y-auto scrolls
-        // the list INSIDE the nav on short screens — instead of the list growing
-        // and spilling over the compact top bar or the CTA block below. pt-24
-        // clears the (now compact) bar when the menu is open. Centering is done
-        // with `m-auto` on the inner list (NOT justify-center on this scroller):
-        // margin:auto centers only when the list fits and collapses to a normal
-        // top-aligned, fully-scrollable start when it doesn't — so the first link
-        // is never stranded above an unreachable overflow on short/landscape.
-        className="relative flex-1 min-h-0 flex flex-col px-8 pt-52 pb-6 overflow-y-auto overscroll-contain"
+        // No scroll — the whole menu is sized to fit the viewport. flex-1 +
+        // justify-center centres the links in the space between the (compact)
+        // top bar and the footer block; pt-24 keeps the first link clear of the
+        // open-state logo. Compact link padding keeps everything on one screen.
+        className="relative flex-1 flex flex-col justify-center px-8 pt-28"
       >
-        <div className="m-auto w-full">
+        <div className="w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
             const active = isActive(link.href);
             return (
@@ -251,7 +247,7 @@ const MobileMenu = memo(function MobileMenu({
                 href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center justify-between py-5 sm:py-6 transition-colors duration-300 ${
+                className={`group flex items-center justify-between py-3 sm:py-4 transition-colors duration-300 ${
                   active ? "text-white" : "text-white/55 hover:text-white"
                 }`}
                 style={reveal(80 + i * 60)}
@@ -500,7 +496,7 @@ export default function Navbar() {
             // Three bar heights: a taller bar while the mobile menu is OPEN so it
             // can carry a prominent centred logo (the menu's pt clears it); the
             // compact 72px bar once the page is scrolled; the full 140px at rest.
-            isOpen ? "h-[200px]" : scrolled ? "h-[76px]" : "h-[164px]"
+            isOpen ? "h-[112px]" : scrolled ? "h-[76px]" : "h-[164px]"
           }`}
         >
           {/* Logo: horizontally centred on mobile (absolute, out of flow), and
@@ -514,7 +510,7 @@ export default function Navbar() {
               alt="Líquen Events"
               width={300}
               height={179}
-              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[152px] sm:h-[168px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[80px] sm:h-[88px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
             />
           </Link>
 
