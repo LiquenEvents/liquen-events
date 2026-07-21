@@ -262,6 +262,35 @@ describe("POST /api/orcamento/[id]/fatura", () => {
     expect(ledger.rows.find((r) => r.id === "voided-total")?.status).toBe("anulada");
   });
 
+  it("coerces a malformed date to today (yyyy-mm-dd) instead of persisting 'Invalid Date' (N13)", async () => {
+    // A garbage `date` from the panel used to be stored verbatim and later fed
+    // `new Date(date+"T12:00:00")` in the PDF → "Invalid Date" on the receipt.
+    // It must now fall back to a valid yyyy-mm-dd (today) — never a raw bad string.
+    const res = await POST(
+      req({ paymentId: "p-bad", kind: "pagamento", amount: 500, date: "not-a-date", paid: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(ledger.rows).toHaveLength(1);
+
+    const stored = String(ledger.rows[0].issuedAt);
+    expect(stored).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(stored).not.toBe("not-a-date");
+    // The derived paidAt must be a real date too, and the PDF renders a valid date.
+    expect(String(ledger.rows[0].paidAt)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(renderInvoicePdf).toHaveBeenCalledWith(expect.objectContaining({ date: stored }));
+    expect(Number.isNaN(new Date(`${stored}T12:00:00`).getTime())).toBe(false);
+  });
+
+  it("preserves a valid yyyy-mm-dd date exactly (does not clobber good input)", async () => {
+    const res = await POST(
+      req({ paymentId: "p-ok", kind: "pagamento", amount: 500, date: "2026-07-18", paid: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(ledger.rows[0]).toMatchObject({ issuedAt: "2026-07-18", paidAt: "2026-07-18" });
+  });
+
   it("rejects a non-positive amount with 400 and never touches the ledger", async () => {
     const res = await POST(req({ paymentId: "p-0", kind: "sinal", amount: 0 }), ctx("LIQ-1"));
     expect(res.status).toBe(400);

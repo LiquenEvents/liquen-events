@@ -53,12 +53,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const invoiceKind = PAYMENT_TO_INVOICE_KIND[paymentKind] ?? "total";
     const vatRate =
       typeof body.vatRate === "number" ? Math.min(Math.max(body.vatRate, 0), 1) : 0.23;
-    // TODO(qa): `issuedAt` (e, quando `paid`, o `paidAt` derivado) NÃO é validado
-    // ao formato yyyy-mm-dd aqui (a rota /faturas fá-lo). Um `date` malformado do
-    // painel é persistido tal-e-qual e depois alimenta `new Date(date+"T12:00:00")`
-    // no PDF → "Invalid Date". É admin-only, por isso deixo nota em vez de mudar
-    // comportamento; a corrigir com a mesma coerção yyyy-mm-dd de /faturas.
-    const issuedAt = clean(body.date, 40) || new Date().toISOString().slice(0, 10);
+    // Coerção da data ao formato yyyy-mm-dd, espelhando a rota /faturas: um `date`
+    // malformado do painel persistia tal-e-qual e depois alimentava
+    // `new Date(date+"T12:00:00")` no PDF → "Invalid Date" no recibo (e no `paidAt`
+    // derivado). Um valor ausente ou malformado cai para hoje.
+    const asIsoDate = (v: unknown) => {
+      const s = String(v ?? "")
+        .trim()
+        .slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+    };
+    const issuedAt = asIsoDate(body.date) || new Date().toISOString().slice(0, 10);
     const paid = !!body.paid;
     const email = !!body.email;
     const description = String(body.description ?? "").slice(0, 2000);
