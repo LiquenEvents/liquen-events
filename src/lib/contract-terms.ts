@@ -11,7 +11,7 @@
  */
 
 /** Versão dos termos. Incrementar quando o texto muda de forma relevante. */
-export const TERMS_VERSION = "2026-01";
+export const TERMS_VERSION = "2026-07";
 
 export interface TermsSection {
   heading: string;
@@ -30,15 +30,15 @@ export const DEFAULT_TERMS: TermsSection[] = [
   },
   {
     heading: "2. Orçamento e validade",
-    body: "Os valores apresentados incluem IVA à taxa legal em vigor e mantêm-se válidos até à data de validade indicada na proposta. Após essa data, o Estúdio poderá rever preços em função da disponibilidade de materiais e fornecedores. Alterações de âmbito solicitadas pelo cliente podem originar um ajuste de orçamento, sempre acordado por escrito antes da execução.",
+    body: "Aos valores apresentados acresce o IVA à taxa legal em vigor. Os valores mantêm-se válidos até à data de validade indicada na proposta. Após essa data, o Estúdio poderá rever preços em função da disponibilidade de materiais e fornecedores. Alterações de âmbito solicitadas pelo cliente podem originar um ajuste de orçamento, sempre acordado por escrito antes da execução.",
   },
   {
     heading: "3. Pagamento",
-    body: "A reserva da data fica confirmada com o pagamento de um sinal de 30% do valor total, devido no momento da aceitação da proposta. O restante 70% é liquidado até 15 dias antes da data do evento. A não liquidação do saldo dentro do prazo poderá implicar a suspensão dos preparativos, sem prejuízo dos valores já pagos.",
+    body: "A reserva da data fica confirmada com o pagamento de um sinal de 30% do valor total, devido no momento da aceitação da proposta. O restante 70% é liquidado até 1 mês antes da data do evento. A não liquidação do saldo dentro do prazo poderá implicar a suspensão dos preparativos, sem prejuízo dos valores já pagos.",
   },
   {
     heading: "4. Cancelamento e alterações",
-    body: "O sinal de 30% destina-se a garantir a reserva da data e não é reembolsável em caso de cancelamento por parte do cliente. Cancelamentos com menos de 30 dias de antecedência poderão implicar o pagamento dos custos já incorridos (materiais adquiridos, adiantamentos a fornecedores). Alterações de data ficam sujeitas à disponibilidade do Estúdio e à confirmação dos fornecedores envolvidos.",
+    body: "O sinal de 30% destina-se a garantir a reserva da data e não é reembolsável em caso de cancelamento por parte do cliente. Em caso de cancelamento efetuado entre o 30.º dia anterior e até às 14h do 8.º dia útil anterior à data do evento, o Estúdio tem direito a receber 70% do valor total estipulado, acrescido de IVA; após esse momento, tem direito ao valor total estipulado, acrescido de IVA. A denúncia só é válida se efetuada por escrito, por email, valendo a data e a hora de receção do mesmo. Alterações de data ficam sujeitas à disponibilidade do Estúdio e à confirmação dos fornecedores envolvidos.",
   },
   {
     heading: "5. Responsabilidades das partes",
@@ -58,7 +58,7 @@ export const DEFAULT_TERMS: TermsSection[] = [
   },
   {
     heading: "9. Foro",
-    body: "Estas condições regem-se pela lei portuguesa. Para a resolução de qualquer litígio emergente deste contrato, e não sendo possível um acordo amigável, as partes elegem o foro da Comarca de Évora, com expressa renúncia a qualquer outro.",
+    body: "Estas condições regem-se pela lei portuguesa. Para a resolução de qualquer litígio emergente deste contrato, e não sendo possível um acordo amigável, as partes recorrem ao Centro de Arbitragem de Conflitos de Consumo de Lisboa.",
   },
 ];
 
