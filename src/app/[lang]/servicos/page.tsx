@@ -323,10 +323,10 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
                 <div className="max-w-2xl">
-                  <h2
-                    className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[1.05]"
-                    style={{ fontSize: "clamp(28px, 3.4vw, 44px)" }}
-                  >
+                  {/* Same lettering as the Clientes hero title: the compact
+                      SpaceX caption size (text-[18px] sm:text-[21px]), not the
+                      large section-heading size. */}
+                  <h2 className="text-veil-shadow text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug max-w-md">
                     {cat.desc}
                   </h2>
                 </div>
