@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { randomId, eur2 } from "./util";
+import { parseMoney, randomId, eur2 } from "./util";
+import { useToast } from "./Toast";
 import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/orcamento/types";
 import { Button, Field, EmptyState } from "./ui";
 
@@ -37,6 +38,7 @@ interface Props {
  * survives if the directory entry is later removed.
  */
 export default function EventCosts({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [items, setItems] = useState<EventSupplier[]>(quote.eventSuppliers ?? []);
   const [directory, setDirectory] = useState<Supplier[]>([]);
   const [adding, setAdding] = useState(false);
@@ -69,19 +71,30 @@ export default function EventCosts({ quote, onChange }: Props) {
   }, [items, revenue]);
 
   function persist(next: EventSupplier[]) {
+    // Otimista com reversão + aviso: custos errados no ecrã sem estarem na base
+    // de dados corrompiam a margem sem ninguém saber.
+    const snapshot = items;
     setItems(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventSuppliers: next }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setItems(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar o custo. Tente novamente.", "error");
+      });
   }
 
   function add() {
     const name = form.name.trim();
     if (!name) return;
-    const est = parseFloat(form.estimatedCost) || 0;
+    const est = parseMoney(form.estimatedCost) ?? 0;
     persist([
       ...items,
       {

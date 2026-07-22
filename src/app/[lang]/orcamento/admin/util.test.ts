@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { randomId, eur, eur2, eventCountdown, isDateKey, todayKey } from "./util";
+import { randomId, eur, eur2, eventCountdown, isDateKey, parseMoney, todayKey } from "./util";
 
 /**
  * Adversarial coverage for the admin shared-helper module `util.ts`.
@@ -206,6 +206,42 @@ describe("eventCountdown", () => {
   it("BUG-GUARD: a full ISO datetime (has its own time part) is rejected as null, not NaN", () => {
     // `date + "T12:00:00"` -> "...T15:30:00ZT12:00:00" -> Invalid Date -> NaN.
     expect(eventCountdown("2026-08-20T15:30:00Z")).toBeNull();
+  });
+});
+
+describe("parseMoney", () => {
+  it("parses plain integers and dot-decimals", () => {
+    expect(parseMoney("1500")).toBe(1500);
+    expect(parseMoney("12.5")).toBe(12.5);
+    expect(parseMoney("12.50")).toBe(12.5);
+  });
+
+  it("BUG-GUARD: pt-PT thousands dot — '1.500' is 1500 €, never 1.5 €", () => {
+    // parseFloat("1.500") === 1.5 silently corrupted quoted prices/payments.
+    expect(parseMoney("1.500")).toBe(1500);
+    expect(parseMoney("12.500")).toBe(12500);
+    expect(parseMoney("1.234.567")).toBe(1234567);
+  });
+
+  it("accepts the pt-PT decimal comma", () => {
+    expect(parseMoney("1500,50")).toBe(1500.5);
+    expect(parseMoney("0,99")).toBe(0.99);
+  });
+
+  it("handles mixed thousands+decimal ('1.500,50')", () => {
+    expect(parseMoney("1.500,50")).toBe(1500.5);
+  });
+
+  it("tolerates spaces and the € sign", () => {
+    expect(parseMoney(" 1 500,50 € ")).toBe(1500.5);
+    expect(parseMoney("€1500")).toBe(1500);
+  });
+
+  it("returns undefined for empty or garbage", () => {
+    expect(parseMoney("")).toBeUndefined();
+    expect(parseMoney("   ")).toBeUndefined();
+    expect(parseMoney("abc")).toBeUndefined();
+    expect(parseMoney("1,2,3")).toBeUndefined();
   });
 });
 

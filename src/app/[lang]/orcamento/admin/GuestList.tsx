@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { randomId } from "./util";
+import { useToast } from "./Toast";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
 import { Button, Field } from "./ui";
@@ -24,6 +25,7 @@ interface Props {
  * at a glance how the numbers are firming up.
  */
 export default function GuestList({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [guests, setGuests] = useState<Guest[]>(quote.guestList ?? []);
   const [name, setName] = useState("");
   const [party, setParty] = useState("1");
@@ -42,13 +44,23 @@ export default function GuestList({ quote, onChange }: Props) {
   }, [guests]);
 
   function persist(next: Guest[]) {
+    // Otimista com reversão: falha do servidor repõe o estado e avisa.
+    const snapshot = guests;
     setGuests(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ guestList: next }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setGuests(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar a lista de convidados. Tente novamente.", "error");
+      });
   }
 
   function add() {

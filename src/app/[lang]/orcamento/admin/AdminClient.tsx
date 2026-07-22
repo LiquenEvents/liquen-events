@@ -22,12 +22,12 @@ import {
   printEventDossier,
   downloadEventIcs,
 } from "./export";
-import { eventCountdown, randomId, eur, todayKey } from "./util";
+import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
-import { Button, Card, SectionCard } from "./ui";
+import { Button, SectionCard } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -89,15 +89,19 @@ function shortRef(id: string): string {
   return id.length > 10 ? `${id.slice(0, 8)}…${last4}` : id;
 }
 
-// The single "next action" surfaced on the calm pedido detail — derived from
-// where the request sits in its lifecycle, so a newcomer always sees the one
-// sensible thing to do next. It routes into the (otherwise tucked-away) advanced
-// workspace at the relevant tool tab; every tab stays reachable regardless.
-type DetailTab = "resumo" | "producao" | "financeiro" | "comunicacao";
-function detailNextAction(quote: Quote): { label: string; hint: string; tab: DetailTab } {
+// Preço final: aceita "1500", "1500,50", "1.500" — ver parseMoney em util.ts.
+const parsePriceInput = parseMoney;
+
+// The single "next action" surfaced on the pedido detail — derived from where
+// the request sits in its lifecycle, so a newcomer always sees the one sensible
+// thing to do next. It routes to the relevant tool tab, or to the always-visible
+// management form ("gestao") when the next step is a form edit (e.g. reopening).
+type DetailTab = "producao" | "financeiro" | "comunicacao";
+type DetailTarget = DetailTab | "gestao";
+function detailNextAction(quote: Quote): { label: string; hint: string; tab: DetailTarget } {
   const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote);
   if (perdido)
-    return { label: "Reabrir pedido", hint: "Voltar a colocar em revisão", tab: "resumo" };
+    return { label: "Reabrir pedido", hint: "Voltar a colocar em revisão", tab: "gestao" };
   if (allDone)
     return {
       label: "Rever produção do evento",
@@ -177,17 +181,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [editDate, setEditDate] = useState("");
   const [editGuests, setEditGuests] = useState("");
   const [editLocation, setEditLocation] = useState("");
-  // Which section of the (long) detail panel is showing.
-  const [detailTab, setDetailTab] = useState<"resumo" | "producao" | "financeiro" | "comunicacao">(
-    "resumo",
-  );
+  // Which tools section of the detail panel is showing. Everything is visible
+  // at once now — the management form always renders; only the heavier tool
+  // groups (Produção / Financeiro / Comunicação) are tabbed for organisation.
+  const [detailTab, setDetailTab] = useState<DetailTab>("comunicacao");
   // Comunicação tab shows one proposal tool by default (ProposalStudio); the
   // simpler price-table tool (ProposalBuilder) stays collapsed behind a link.
   const [showBuilder, setShowBuilder] = useState(false);
-  // Progressive disclosure on the pedido detail: the default view is calm
-  // essentials only; the heavy tools (management form + Produção/Financeiro/
-  // Comunicação tabs) stay tucked behind this "Mostrar mais" disclosure.
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Scroll targets for the "Próxima ação" shortcut: the always-visible
+  // management form and the tools (tabs) section.
+  const gestaoRef = useRef<HTMLDivElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
@@ -225,7 +229,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     !!selected &&
     (editStatus !== selected.status ||
       editNotes !== (selected.adminNotes ?? "") ||
-      editPrice !== (selected.quotedPrice ? String(selected.quotedPrice) : "") ||
+      // Compare parsed values, not raw strings — "1500,50" vs "1500.5" or a
+      // trailing zero must not read as a phantom edit.
+      parsePriceInput(editPrice) !== (selected.quotedPrice ?? undefined) ||
       editAssigned !== (selected.assignedTo ?? "") ||
       editLostReason !== (selected.lostReason ?? "") ||
       editDate !== (selected.date ?? "") ||
@@ -372,6 +378,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     if (paletteOpen || newQuoteOpen || shortcutsOpen || ajudaOpen) return;
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // Escape dentro de um campo de texto sai do CAMPO (dispensa autocomplete/
+      // IME, tira o foco), nunca fecha o painel inteiro — fechar o detalhe a
+      // meio da escrita descartava trabalho (ex.: um contractRef por gravar).
+      const t = e.target as HTMLElement | null;
+      if (t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) {
+        t.blur();
+        return;
+      }
       if (navOpen) setNavOpen(false);
       else if (selected) {
         if (
@@ -506,8 +520,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditDate(q.date ?? "");
     setEditGuests(String(q.guests ?? ""));
     setEditLocation(q.location ?? "");
-    setDetailTab("resumo");
-    setAdvancedOpen(false);
+    // Open on the tools tab that matches where this pedido is in its lifecycle.
+    const target = detailNextAction(q).tab;
+    setDetailTab(target === "gestao" ? "comunicacao" : target);
   }
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
@@ -545,8 +560,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditDate(data.quote.date ?? "");
       setEditGuests(String(data.quote.guests ?? ""));
       setEditLocation(data.quote.location ?? "");
-      setDetailTab("resumo");
-      setAdvancedOpen(false);
+      setDetailTab("comunicacao");
       toast("Pedido duplicado — defina a nova data", "success");
     } catch {
       toast("Não foi possível duplicar o pedido", "error");
@@ -576,14 +590,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   async function appendActivity(quoteId: string, entries: ActivityEntry[]) {
     if (entries.length === 0) return;
-    const q = quotes.find((x) => x.id === quoteId);
-    if (!q) return;
-    const activityLog = [...(q.activityLog ?? []), ...entries];
     try {
+      // Só as entradas NOVAS — o servidor junta ao histórico mais recente, para
+      // que duas ferramentas a gravar em simultâneo nunca se sobrescrevam.
       const res = await fetch(`/api/orcamento/${quoteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activityLog }),
+        body: JSON.stringify({ activityLogAppend: entries }),
       });
       if (res.ok) {
         const updated = await res.json();
@@ -613,7 +626,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           summary: `${from} → ${to}`,
         });
       }
-      const newPrice = editPrice ? parseFloat(editPrice) : undefined;
+      const newPrice = parsePriceInput(editPrice);
       if (newPrice !== undefined && newPrice !== (selected.quotedPrice ?? 0)) {
         newEntries.push({
           id: randomId(),
@@ -645,7 +658,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
       const newDate = editDate || undefined;
       const newGuests = editGuests ? parseInt(editGuests, 10) : selected.guests;
-      const newLocation = editLocation.trim() || selected.location;
+      const newLocation = editLocation.trim();
 
       if (newDate !== (selected.date ?? undefined) && newDate) {
         newEntries.push({
@@ -675,18 +688,22 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         });
       }
 
+      // Campos limpos são enviados como null/"" (e não omitidos): `undefined`
+      // desaparece no JSON e o merge parcial do servidor mantinha o valor
+      // antigo — apagar um responsável/preço/data nunca chegava a gravar.
       const body: Record<string, unknown> = {
         status: editStatus,
-        quotedPrice: editPrice ? parseFloat(editPrice) : undefined,
+        quotedPrice: newPrice ?? null,
         adminNotes: editNotes,
-        assignedTo: editAssigned.trim() || undefined,
-        lostReason: editLostReason.trim() || undefined,
-        date: newDate,
+        assignedTo: editAssigned.trim() || null,
+        lostReason: editLostReason.trim() || null,
+        date: editDate,
         guests: newGuests,
         location: newLocation,
       };
       if (newEntries.length > 0) {
-        body.activityLog = [...(selected.activityLog ?? []), ...newEntries];
+        // Append server-side (nunca o array completo) — ver appendActivity.
+        body.activityLogAppend = newEntries;
       }
 
       const res = await fetch(`/api/orcamento/${selected.id}`, {
@@ -698,6 +715,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       const updated = await res.json();
       setQuotes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
       setSelected(updated);
+      // Re-sync EVERY edit field to what the server persisted, so the form can
+      // never sit dirty on a value the user did not type (e.g. price formatting).
+      setEditStatus(updated.status);
+      setEditPrice(updated.quotedPrice ? String(updated.quotedPrice) : "");
+      setEditNotes(updated.adminNotes ?? "");
       setEditAssigned(updated.assignedTo ?? "");
       setEditLostReason(updated.lostReason ?? "");
       setEditDate(updated.date ?? "");
@@ -2251,68 +2273,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       </div>
                     </div>
 
-                    {/* Detalhe calmo: por defeito só o essencial (quem, quanto, em
-                        que fase, e a próxima ação). As ferramentas pesadas ficam
-                        atrás da revelação "Mostrar mais" mais abaixo. */}
+                    {/* Tudo à vista: ciclo de vida, próxima ação, o formulário de
+                        gestão sempre presente e as ferramentas em separadores logo
+                        abaixo — nada fica escondido atrás de revelações. */}
                     <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
                       {/* Ciclo de vida — em que fase está o pedido, num relance. */}
                       <LifecycleStepper quote={selected} />
-
-                      {/* Snapshot — valor, estado e evento. */}
-                      <Card padding="sm">
-                        {(() => {
-                          const revenue =
-                            selected.quotedPrice ?? selected.priceBreakdown?.total ?? 0;
-                          const costs = (selected.eventSuppliers ?? []).reduce(
-                            (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
-                            0,
-                          );
-                          const margin = revenue - costs;
-                          const cd = eventCountdown(selected.date);
-                          return (
-                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                              <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
-                                <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
-                                  Estado
-                                </span>
-                                <span>{statusBadge(selected.status)}</span>
-                              </div>
-                              <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
-                                <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
-                                  Valor
-                                </span>
-                                <span className="text-sm font-semibold text-foreground/80">
-                                  {revenue ? formatPrice(revenue) : "—"}
-                                </span>
-                              </div>
-                              {costs > 0 && (
-                                <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
-                                  <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
-                                    Margem
-                                  </span>
-                                  <span
-                                    className={`text-sm font-semibold ${margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"}`}
-                                  >
-                                    {formatPrice(margin)}
-                                  </span>
-                                </div>
-                              )}
-                              {cd && (
-                                <div className="flex flex-col gap-1 rounded-lg bg-foreground/[0.04] px-3 py-2.5">
-                                  <span className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
-                                    Evento
-                                  </span>
-                                  <span
-                                    className={`text-sm font-semibold ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/80"}`}
-                                  >
-                                    {cd.label}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </Card>
 
                       {/* Próxima ação — o único passo seguinte, em destaque. Abre a
                           ferramenta certa dentro da área avançada. */}
@@ -2325,8 +2291,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               type="button"
                               onClick={() => {
                                 if (reopen) setEditStatus("em_revisao");
-                                setDetailTab(na.tab);
-                                setAdvancedOpen(true);
+                                if (na.tab === "gestao") {
+                                  // O próximo passo é uma edição no formulário —
+                                  // levar o utilizador até lá.
+                                  gestaoRef.current?.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "start",
+                                  });
+                                } else {
+                                  setDetailTab(na.tab);
+                                  toolsRef.current?.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "start",
+                                  });
+                                }
                               }}
                               className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white shadow-sm motion-safe:transition-colors hover:bg-[#415440]"
                             >
@@ -2359,6 +2337,259 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </div>
                         );
                       })()}
+
+                      {/* ── Gestão do pedido — o formulário de trabalho, SEMPRE
+                          visível (nada escondido atrás de "Mostrar mais"). ── */}
+                      <div ref={gestaoRef} className="scroll-mt-24">
+                        <SectionCard eyebrow="Gestão do pedido" padding="md">
+                          <div className="flex flex-col gap-5">
+                            {/* Factos do evento — contexto compacto, só leitura. */}
+                            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/55">
+                              {[
+                                {
+                                  l: "Tipo",
+                                  v: CATEGORIES.find((c) => c.id === selected.category)?.label,
+                                },
+                                {
+                                  l: "Sub-tipo",
+                                  v:
+                                    selected.category && selected.eventType
+                                      ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
+                                          (e) => e.id === selected.eventType,
+                                        )?.label
+                                      : null,
+                                },
+                                {
+                                  l: "Pacote",
+                                  v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
+                                },
+                                {
+                                  l: "Duração",
+                                  v: selected.duration ? `${selected.duration}h` : null,
+                                },
+                                {
+                                  l: "Extras",
+                                  v: selected.addons?.length
+                                    ? `${selected.addons.length} serviços`
+                                    : null,
+                                },
+                              ]
+                                .filter((f) => f.v)
+                                .map(({ l, v }) => (
+                                  <span key={l}>
+                                    <span className="uppercase tracking-wide text-foreground/40 text-[9px] mr-1">
+                                      {l}
+                                    </span>
+                                    {v}
+                                  </span>
+                                ))}
+                            </div>
+
+                            {/* Campos editáveis — tudo em grelha, à mão. */}
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Estado</label>
+                                <select
+                                  value={editStatus}
+                                  onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                >
+                                  {STATUS_OPTIONS.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">
+                                  Preço final (sem IVA) €
+                                </label>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={editPrice}
+                                  onChange={(e) => setEditPrice(e.target.value)}
+                                  placeholder="Ex.: 12500"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                                {(() => {
+                                  const revenue =
+                                    parsePriceInput(editPrice) ??
+                                    selected.quotedPrice ??
+                                    selected.priceBreakdown?.total ??
+                                    0;
+                                  const costs = (selected.eventSuppliers ?? []).reduce(
+                                    (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
+                                    0,
+                                  );
+                                  if (!costs) return null;
+                                  const margin = revenue - costs;
+                                  return (
+                                    <p className="mt-1 text-[10px] text-foreground/45">
+                                      Custos {formatPrice(costs)} · Margem{" "}
+                                      <span
+                                        className={
+                                          margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"
+                                        }
+                                      >
+                                        {formatPrice(margin)}
+                                      </span>
+                                    </p>
+                                  );
+                                })()}
+                              </div>
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Data do evento</label>
+                                <input
+                                  type="date"
+                                  value={editDate}
+                                  onChange={(e) => setEditDate(e.target.value)}
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                                {editDate &&
+                                  (() => {
+                                    const cd = eventCountdown(editDate);
+                                    return cd ? (
+                                      <p
+                                        className={`mt-1 text-[10px] ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/40"}`}
+                                      >
+                                        {cd.label}
+                                      </p>
+                                    ) : null;
+                                  })()}
+                              </div>
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Convidados</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={editGuests}
+                                  onChange={(e) => setEditGuests(e.target.value)}
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                              </div>
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Responsável</label>
+                                <input
+                                  type="text"
+                                  value={editAssigned}
+                                  onChange={(e) => setEditAssigned(e.target.value)}
+                                  placeholder="Nome do membro da equipa…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                              </div>
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Local</label>
+                                <input
+                                  value={editLocation}
+                                  onChange={(e) => setEditLocation(e.target.value)}
+                                  placeholder="Local do evento…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Etiquetas + seguimento — gravam sozinhos. */}
+                            <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-2">
+                              <TagsField
+                                key={`tags-${selected.id}`}
+                                quote={selected}
+                                suggestions={allTags}
+                                onChange={(tags) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) => (q.id === selected.id ? { ...q, tags } : q)),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, tags } : prev));
+                                }}
+                              />
+                              <FollowUpField
+                                key={`fu-${selected.id}`}
+                                quote={selected}
+                                onChange={(followUpAt) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, followUpAt } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, followUpAt } : prev));
+                                }}
+                              />
+                            </div>
+
+                            {editStatus === "rejeitado" && (
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Motivo de perda</label>
+                                <textarea
+                                  rows={2}
+                                  value={editLostReason}
+                                  onChange={(e) => setEditLostReason(e.target.value)}
+                                  placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
+                                />
+                              </div>
+                            )}
+                            {selected.status === "rejeitado" &&
+                              selected.lostReason &&
+                              editStatus !== "rejeitado" && (
+                                <div className="rounded-lg border border-foreground/[0.07] bg-foreground/[0.04] px-3 py-2">
+                                  <p className="mb-1 text-[9px] uppercase tracking-[0.2em] text-foreground/60">
+                                    Motivo de perda anterior
+                                  </p>
+                                  <p className="text-xs text-foreground/72">
+                                    {selected.lostReason}
+                                  </p>
+                                </div>
+                              )}
+
+                            <div>
+                              <label className="bo-eyebrow block mb-1.5">Notas internas</label>
+                              <textarea
+                                rows={3}
+                                value={editNotes}
+                                onChange={(e) => setEditNotes(e.target.value)}
+                                placeholder="Notas internas sobre este pedido…"
+                                className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
+                              />
+                            </div>
+
+                            {/* Estimativa calculada — contexto para definir o preço. */}
+                            {selected.priceBreakdown && (
+                              <div className="rounded-lg bg-foreground/[0.04] p-3 flex flex-col gap-1.5">
+                                <p className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                  Estimativa calculada
+                                </p>
+                                {selected.priceBreakdown.addonsCost > 0 && (
+                                  <div className="flex justify-between text-[10px]">
+                                    <span className="text-foreground/60">Extras</span>
+                                    <span className="text-foreground/72">
+                                      {formatPrice(selected.priceBreakdown.addonsCost)}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-[10px]">
+                                  <span className="text-foreground/60">Subtotal</span>
+                                  <span className="text-foreground/72">
+                                    {formatPrice(selected.priceBreakdown.subtotal)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-[10px]">
+                                  <span className="text-foreground/60">IVA 23%</span>
+                                  <span className="text-foreground/72">
+                                    {formatPrice(selected.priceBreakdown.iva)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between border-t border-foreground/8 pt-1 text-xs font-medium">
+                                  <span className="text-foreground/60">Total</span>
+                                  <span className="font-semibold text-[#4d6350]">
+                                    {formatPrice(selected.priceBreakdown.total)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </SectionCard>
+                      </div>
 
                       {/* Contacto — como falar com o cliente. */}
                       <SectionCard eyebrow="Contacto" padding="sm">
@@ -2444,491 +2675,246 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         })}
                       </p>
 
-                      {/* ── Área avançada — gestão e ferramentas, escondida por
-                          defeito para manter a vista calma. Tudo continua acessível. */}
-                      <div className="border-t border-foreground/[0.08] pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setAdvancedOpen((o) => !o)}
-                          aria-expanded={advancedOpen}
-                          aria-controls="detail-advanced"
-                          className="flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.14em] text-foreground/50 motion-safe:transition-colors hover:bg-foreground/[0.04] hover:text-foreground/75"
-                        >
-                          <svg
-                            className={`shrink-0 motion-safe:transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""}`}
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                          >
-                            <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          {advancedOpen
-                            ? "Ocultar gestão e ferramentas"
-                            : "Mostrar mais — gestão e ferramentas"}
-                        </button>
-                      </div>
-
-                      {advancedOpen && (
-                        <div id="detail-advanced" className="flex flex-col gap-6">
-                          {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
+                      {/* ── Ferramentas — sempre visíveis, organizadas em três
+                          separadores (a gestão já está acima, sempre presente). */}
+                      <div
+                        id="detail-tools"
+                        ref={toolsRef}
+                        className="flex scroll-mt-24 flex-col gap-6"
+                      >
+                        {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
                               tablist pattern). */}
-                          <div
-                            role="tablist"
-                            aria-label="Secções do pedido"
-                            className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
-                          >
-                            {(
-                              [
-                                ["resumo", "Gestão"],
-                                ["producao", "Produção"],
-                                ["financeiro", "Financeiro"],
-                                ["comunicacao", "Comunicação"],
-                              ] as const
-                            ).map(([id, label], i, arr) => {
-                              const active = detailTab === id;
-                              return (
+                        <div
+                          role="tablist"
+                          aria-label="Secções do pedido"
+                          className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
+                        >
+                          {(
+                            [
+                              ["producao", "Produção"],
+                              ["financeiro", "Financeiro"],
+                              ["comunicacao", "Comunicação"],
+                            ] as const
+                          ).map(([id, label], i, arr) => {
+                            const active = detailTab === id;
+                            return (
+                              <button
+                                key={id}
+                                id={`detail-tab-${id}`}
+                                role="tab"
+                                aria-selected={active}
+                                aria-controls={`detail-panel-${id}`}
+                                tabIndex={active ? 0 : -1}
+                                onClick={() => setDetailTab(id)}
+                                onKeyDown={(e) => {
+                                  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                                  e.preventDefault();
+                                  const dir = e.key === "ArrowRight" ? 1 : -1;
+                                  const next = arr[(i + dir + arr.length) % arr.length][0];
+                                  setDetailTab(next);
+                                  const tabs =
+                                    e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                                      '[role="tab"]',
+                                    );
+                                  tabs?.[(i + dir + arr.length) % arr.length]?.focus();
+                                }}
+                                className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                  active
+                                    ? "border-[#4d6350] text-foreground/85"
+                                    : "border-transparent text-foreground/40 hover:text-foreground/65"
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Coluna única — as ferramentas do separador ativo */}
+                        <div className="flex min-w-0 flex-col gap-6">
+                          {detailTab === "producao" && (
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-producao"
+                              aria-labelledby="detail-tab-producao"
+                              tabIndex={0}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Tasks linked to this event */}
+                              <EventTasks
+                                key={`tasks-${selected.id}`}
+                                quote={selected}
+                                userName={userName}
+                              />
+
+                              {/* Production checklist */}
+                              <EventChecklist
+                                key={`cl-${selected.id}`}
+                                quote={selected}
+                                onChange={(checklist) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, checklist } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                                }}
+                              />
+
+                              {/* Decor production plan (sourcing → strike) */}
+                              <ProductionPlan
+                                key={`prod-${selected.id}`}
+                                quote={selected}
+                                onChange={(productionPlan) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, productionPlan } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) =>
+                                    prev ? { ...prev, productionPlan } : prev,
+                                  );
+                                }}
+                              />
+
+                              {/* Day-of run sheet */}
+                              <EventTimeline
+                                key={`tl-${selected.id}`}
+                                quote={selected}
+                                onChange={(timeline) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, timeline } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                                }}
+                              />
+
+                              {/* Guest list / RSVP */}
+                              <GuestList
+                                key={`guests-${selected.id}`}
+                                quote={selected}
+                                onChange={(guestList) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, guestList } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {detailTab === "financeiro" && (
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-financeiro"
+                              aria-labelledby="detail-tab-financeiro"
+                              tabIndex={0}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Payments & invoicing */}
+                              <PaymentsPanel
+                                key={`pay-${selected.id}`}
+                                quote={selected}
+                                showLedger
+                                onChange={(payments) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, payments } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                                }}
+                                onContractRef={(ref) => {
+                                  const contractRef = ref || undefined;
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, contractRef } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
+                                }}
+                              />
+
+                              {/* Suppliers booked for this event + budget vs actual cost */}
+                              <EventCosts
+                                key={`costs-${selected.id}`}
+                                quote={selected}
+                                onChange={(eventSuppliers) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) =>
+                                    prev ? { ...prev, eventSuppliers } : prev,
+                                  );
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {detailTab === "comunicacao" && (
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-comunicacao"
+                              aria-labelledby="detail-tab-comunicacao"
+                              tabIndex={0}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              <p className="text-foreground/50 text-[11px] leading-relaxed">
+                                Crie e envie a proposta ao cliente. Comece por aqui.
+                              </p>
+                              <ProposalStudio
+                                key={`studio-${selected.id}`}
+                                quote={selected}
+                                onSent={() => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) =>
+                                    prev ? { ...prev, status: "cotado" } : prev,
+                                  );
+                                  setEditStatus("cotado");
+                                  appendActivity(selected.id, [
+                                    {
+                                      id: randomId(),
+                                      at: new Date().toISOString(),
+                                      kind: "proposal_sent",
+                                      actor: userName,
+                                      summary: "Proposta enviada ao cliente (Studio)",
+                                    },
+                                  ]);
+                                }}
+                              />
+                              {!showBuilder ? (
                                 <button
-                                  key={id}
-                                  id={`detail-tab-${id}`}
-                                  role="tab"
-                                  aria-selected={active}
-                                  aria-controls={`detail-panel-${id}`}
-                                  tabIndex={active ? 0 : -1}
-                                  onClick={() => setDetailTab(id)}
-                                  onKeyDown={(e) => {
-                                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-                                    e.preventDefault();
-                                    const dir = e.key === "ArrowRight" ? 1 : -1;
-                                    const next = arr[(i + dir + arr.length) % arr.length][0];
-                                    setDetailTab(next);
-                                    const tabs =
-                                      e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                                        '[role="tab"]',
-                                      );
-                                    tabs?.[(i + dir + arr.length) % arr.length]?.focus();
-                                  }}
-                                  className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
-                                    active
-                                      ? "border-[#4d6350] text-foreground/85"
-                                      : "border-transparent text-foreground/40 hover:text-foreground/65"
-                                  }`}
+                                  type="button"
+                                  onClick={() => setShowBuilder(true)}
+                                  className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
                                 >
-                                  {label}
+                                  Outra forma de propor (tabela de preços simples)
                                 </button>
-                              );
-                            })}
-                          </div>
-
-                          {/* Coluna única — as ferramentas do separador ativo */}
-                          <div className="flex min-w-0 flex-col gap-6">
-                            {detailTab === "resumo" && (
-                              <div
-                                role="tabpanel"
-                                id="detail-panel-resumo"
-                                aria-labelledby="detail-tab-resumo"
-                                tabIndex={0}
-                                className="flex flex-col gap-6 focus:outline-none"
-                              >
-                                {/* Event */}
-                                <div>
-                                  <p className="bo-eyebrow mb-3">Evento</p>
-                                  {/* Read-only facts */}
-                                  <div className="grid grid-cols-2 gap-2 mb-3">
-                                    {[
-                                      {
-                                        l: "Tipo",
-                                        v: CATEGORIES.find((c) => c.id === selected.category)
-                                          ?.label,
-                                      },
-                                      {
-                                        l: "Sub-tipo",
-                                        v:
-                                          selected.category && selected.eventType
-                                            ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
-                                                (e) => e.id === selected.eventType,
-                                              )?.label
-                                            : null,
-                                      },
-                                      {
-                                        l: "Pacote",
-                                        v: PACKAGES.find((p) => p.id === selected.packageTier)
-                                          ?.label,
-                                      },
-                                      {
-                                        l: "Duração",
-                                        v: selected.duration ? `${selected.duration}h` : "—",
-                                      },
-                                      {
-                                        l: "Extras",
-                                        v: `${selected.addons?.length ?? 0} serviços`,
-                                      },
-                                    ].map(({ l, v }) => (
-                                      <div key={l}>
-                                        <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
-                                          {l}
-                                        </p>
-                                        <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  {/* Editable logistics */}
-                                  <div className="grid grid-cols-1 gap-2 pt-2 border-t border-foreground/[0.06] sm:grid-cols-2">
-                                    <div>
-                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                        Data
-                                      </label>
-                                      <input
-                                        type="date"
-                                        value={editDate}
-                                        onChange={(e) => setEditDate(e.target.value)}
-                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                      />
-                                      {editDate &&
-                                        (() => {
-                                          const cd = eventCountdown(editDate);
-                                          return cd ? (
-                                            <p
-                                              className={`text-[10px] mt-0.5 ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/30"}`}
-                                            >
-                                              {cd.label}
-                                            </p>
-                                          ) : null;
-                                        })()}
-                                    </div>
-                                    <div>
-                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                        Convidados
-                                      </label>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        value={editGuests}
-                                        onChange={(e) => setEditGuests(e.target.value)}
-                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                      />
-                                    </div>
-                                    <div className="col-span-2">
-                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
-                                        Local
-                                      </label>
-                                      <input
-                                        value={editLocation}
-                                        onChange={(e) => setEditLocation(e.target.value)}
-                                        placeholder="Local do evento…"
-                                        className="bo-input px-2 py-1.5 text-xs text-foreground/70 w-full"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Estimate */}
-                                {selected.priceBreakdown && (
-                                  <div>
-                                    <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
-                                    <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
-                                      {selected.priceBreakdown.addonsCost > 0 && (
-                                        <div className="flex justify-between text-[10px]">
-                                          <span className="text-foreground/60">Extras</span>
-                                          <span className="text-foreground/72">
-                                            {formatPrice(selected.priceBreakdown.addonsCost)}
-                                          </span>
-                                        </div>
-                                      )}
-                                      <div className="flex justify-between text-[10px] pt-1 border-t border-foreground/8">
-                                        <span className="text-foreground/60">Subtotal</span>
-                                        <span className="text-foreground/72">
-                                          {formatPrice(selected.priceBreakdown.subtotal)}
-                                        </span>
-                                      </div>
-                                      <div className="flex justify-between text-[10px]">
-                                        <span className="text-foreground/60">IVA 23%</span>
-                                        <span className="text-foreground/72">
-                                          {formatPrice(selected.priceBreakdown.iva)}
-                                        </span>
-                                      </div>
-                                      <div className="flex justify-between text-xs font-medium pt-1 border-t border-foreground/8">
-                                        <span className="text-foreground/60">Total</span>
-                                        <span className="text-[#4d6350] font-semibold">
-                                          {formatPrice(selected.priceBreakdown.total)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Admin actions */}
-                                <div className="border-t border-foreground/10 pt-5">
-                                  <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
-                                  <div className="flex flex-col gap-4">
-                                    <TagsField
-                                      key={`tags-${selected.id}`}
-                                      quote={selected}
-                                      suggestions={allTags}
-                                      onChange={(tags) => {
-                                        setQuotes((prev) =>
-                                          prev.map((q) =>
-                                            q.id === selected.id ? { ...q, tags } : q,
-                                          ),
-                                        );
-                                        setSelected((prev) => (prev ? { ...prev, tags } : prev));
-                                      }}
-                                    />
-                                    <FollowUpField
-                                      key={`fu-${selected.id}`}
-                                      quote={selected}
-                                      onChange={(followUpAt) => {
-                                        setQuotes((prev) =>
-                                          prev.map((q) =>
-                                            q.id === selected.id ? { ...q, followUpAt } : q,
-                                          ),
-                                        );
-                                        setSelected((prev) =>
-                                          prev ? { ...prev, followUpAt } : prev,
-                                        );
-                                      }}
-                                    />
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Responsável
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={editAssigned}
-                                        onChange={(e) => setEditAssigned(e.target.value)}
-                                        placeholder="Nome do membro da equipa…"
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Estado
-                                      </label>
-                                      <select
-                                        value={editStatus}
-                                        onChange={(e) =>
-                                          setEditStatus(e.target.value as QuoteStatus)
-                                        }
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                      >
-                                        {STATUS_OPTIONS.map((s) => (
-                                          <option key={s.id} value={s.id}>
-                                            {s.label}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    {editStatus === "rejeitado" && (
-                                      <div>
-                                        <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                          Motivo de perda
-                                        </label>
-                                        <textarea
-                                          rows={2}
-                                          value={editLostReason}
-                                          onChange={(e) => setEditLostReason(e.target.value)}
-                                          placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
-                                          className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                        />
-                                      </div>
-                                    )}
-                                    {selected.status === "rejeitado" &&
-                                      selected.lostReason &&
-                                      editStatus !== "rejeitado" && (
-                                        <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
-                                          <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
-                                            Motivo de perda anterior
-                                          </p>
-                                          <p className="text-xs text-foreground/72">
-                                            {selected.lostReason}
-                                          </p>
-                                        </div>
-                                      )}
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Preço final (sem IVA) €
-                                      </label>
-                                      <input
-                                        type="number"
-                                        value={editPrice}
-                                        onChange={(e) => setEditPrice(e.target.value)}
-                                        placeholder="Ex: 12500"
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Notas Internas
-                                      </label>
-                                      <textarea
-                                        rows={3}
-                                        value={editNotes}
-                                        onChange={(e) => setEditNotes(e.target.value)}
-                                        placeholder="Notas internas sobre este pedido…"
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                      />
-                                    </div>
-                                    {isDirty && !saving && (
-                                      <p
-                                        role="status"
-                                        className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
-                                      >
-                                        <span className="w-1 h-1 rounded-full bg-gold/80" />
-                                        Alterações por guardar
-                                      </p>
-                                    )}
-                                    <button
-                                      onClick={saveChanges}
-                                      disabled={saving || !isDirty}
-                                      className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
-                                    >
-                                      {saving ? "A guardar…" : "Guardar Alterações →"}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {detailTab === "producao" && (
-                              <div
-                                role="tabpanel"
-                                id="detail-panel-producao"
-                                aria-labelledby="detail-tab-producao"
-                                tabIndex={0}
-                                className="flex flex-col gap-6 focus:outline-none"
-                              >
-                                {/* Tasks linked to this event */}
-                                <EventTasks
-                                  key={`tasks-${selected.id}`}
+                              ) : (
+                                <ProposalBuilder
                                   quote={selected}
-                                  userName={userName}
-                                />
-
-                                {/* Production checklist */}
-                                <EventChecklist
-                                  key={`cl-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(checklist) => {
+                                  onSent={(total) => {
                                     setQuotes((prev) =>
                                       prev.map((q) =>
-                                        q.id === selected.id ? { ...q, checklist } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                                  }}
-                                />
-
-                                {/* Decor production plan (sourcing → strike) */}
-                                <ProductionPlan
-                                  key={`prod-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(productionPlan) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, productionPlan } : q,
+                                        q.id === selected.id
+                                          ? { ...q, status: "cotado", quotedPrice: total }
+                                          : q,
                                       ),
                                     );
                                     setSelected((prev) =>
-                                      prev ? { ...prev, productionPlan } : prev,
-                                    );
-                                  }}
-                                />
-
-                                {/* Day-of run sheet */}
-                                <EventTimeline
-                                  key={`tl-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(timeline) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, timeline } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                                  }}
-                                />
-
-                                {/* Guest list / RSVP */}
-                                <GuestList
-                                  key={`guests-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(guestList) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, guestList } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {detailTab === "financeiro" && (
-                              <div
-                                role="tabpanel"
-                                id="detail-panel-financeiro"
-                                aria-labelledby="detail-tab-financeiro"
-                                tabIndex={0}
-                                className="flex flex-col gap-6 focus:outline-none"
-                              >
-                                {/* Payments & invoicing */}
-                                <PaymentsPanel
-                                  key={`pay-${selected.id}`}
-                                  quote={selected}
-                                  showLedger
-                                  onChange={(payments) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, payments } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                                  }}
-                                />
-
-                                {/* Suppliers booked for this event + budget vs actual cost */}
-                                <EventCosts
-                                  key={`costs-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(eventSuppliers) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) =>
-                                      prev ? { ...prev, eventSuppliers } : prev,
-                                    );
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {detailTab === "comunicacao" && (
-                              <div
-                                role="tabpanel"
-                                id="detail-panel-comunicacao"
-                                aria-labelledby="detail-tab-comunicacao"
-                                tabIndex={0}
-                                className="flex flex-col gap-6 focus:outline-none"
-                              >
-                                <p className="text-foreground/50 text-[11px] leading-relaxed">
-                                  Crie e envie a proposta ao cliente. Comece por aqui.
-                                </p>
-                                <ProposalStudio
-                                  key={`studio-${selected.id}`}
-                                  quote={selected}
-                                  onSent={() => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) =>
-                                      prev ? { ...prev, status: "cotado" } : prev,
+                                      prev
+                                        ? { ...prev, status: "cotado", quotedPrice: total }
+                                        : prev,
                                     );
                                     setEditStatus("cotado");
                                     appendActivity(selected.id, [
@@ -2937,81 +2923,69 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                         at: new Date().toISOString(),
                                         kind: "proposal_sent",
                                         actor: userName,
-                                        summary: "Proposta enviada ao cliente (Studio)",
+                                        summary: `Proposta enviada — ${eur(total)}`,
                                       },
                                     ]);
                                   }}
                                 />
-                                {!showBuilder ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowBuilder(true)}
-                                    className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
-                                  >
-                                    Outra forma de propor (tabela de preços simples)
-                                  </button>
-                                ) : (
-                                  <ProposalBuilder
-                                    quote={selected}
-                                    onSent={(total) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id
-                                            ? { ...q, status: "cotado", quotedPrice: total }
-                                            : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev
-                                          ? { ...prev, status: "cotado", quotedPrice: total }
-                                          : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: `Proposta enviada — ${eur(total)}`,
-                                        },
-                                      ]);
-                                    }}
-                                  />
-                                )}
+                              )}
 
-                                <ClientMessenger
-                                  key={selected.id}
-                                  quote={selected}
-                                  onSent={(messages) => {
-                                    const prev_count = selected.messages?.length ?? 0;
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, messages } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                                    if (messages.length > prev_count) {
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "message_sent",
-                                          actor: userName,
-                                          summary: "Mensagem enviada ao cliente",
-                                        },
-                                      ]);
-                                    }
-                                  }}
-                                />
+                              <ClientMessenger
+                                key={selected.id}
+                                quote={selected}
+                                onSent={(messages) => {
+                                  const prev_count = selected.messages?.length ?? 0;
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, messages } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                  if (messages.length > prev_count) {
+                                    appendActivity(selected.id, [
+                                      {
+                                        id: randomId(),
+                                        at: new Date().toISOString(),
+                                        kind: "message_sent",
+                                        actor: userName,
+                                        summary: "Mensagem enviada ao cliente",
+                                      },
+                                    ]);
+                                  }
+                                }}
+                              />
 
-                                <ActivityLog
-                                  quote={selected}
-                                  actor={userName}
-                                  onAddEntry={(entry) => appendActivity(selected.id, [entry])}
-                                />
-                              </div>
-                            )}
+                              <ActivityLog
+                                quote={selected}
+                                actor={userName}
+                                onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ── Barra de gravação fixa — aparece SEMPRE que há
+                          alterações por guardar, seja qual for a secção onde o
+                          utilizador está. Nunca mais um "guardar" escondido. */}
+                      {isDirty && (
+                        <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white/95 px-5 py-3 backdrop-blur-sm sm:-mx-7 sm:-mb-8 sm:px-7">
+                          <div className="flex items-center justify-between gap-3">
+                            <p
+                              role="status"
+                              className="flex items-center gap-1.5 text-[11px] tracking-wide text-gold-text"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-gold/80" />
+                              Alterações por guardar
+                            </p>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={saveChanges}
+                              loading={saving}
+                            >
+                              {saving ? "A guardar…" : "Guardar alterações"}
+                            </Button>
                           </div>
                         </div>
                       )}

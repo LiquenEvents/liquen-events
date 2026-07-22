@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { randomId } from "./util";
+import { useToast } from "./Toast";
 import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
 import { checklistTemplate } from "@/lib/checklist-templates";
 import { Button, Field, EmptyState } from "./ui";
@@ -12,17 +13,28 @@ interface Props {
 }
 
 export default function EventChecklist({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [items, setItems] = useState<ChecklistItem[]>(quote.checklist ?? []);
   const [newItem, setNewItem] = useState("");
 
   function persist(next: ChecklistItem[]) {
+    // Otimista com reversão: falha do servidor repõe o estado e avisa.
+    const snapshot = items;
     setItems(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ checklist: next }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setItems(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar a checklist. Tente novamente.", "error");
+      });
   }
 
   function seed() {

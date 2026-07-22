@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { randomId } from "./util";
+import { useToast } from "./Toast";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import { Button, Field, EmptyState } from "./ui";
 
@@ -27,6 +28,7 @@ function sortByTime(items: TimelineItem[]): TimelineItem[] {
 }
 
 export default function EventTimeline({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [items, setItems] = useState<TimelineItem[]>(quote.timeline ?? []);
   const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
@@ -34,13 +36,23 @@ export default function EventTimeline({ quote, onChange }: Props) {
 
   function persist(next: TimelineItem[]) {
     const sorted = sortByTime(next);
+    // Otimista com reversão: falha do servidor repõe o estado e avisa.
+    const snapshot = items;
     setItems(sorted);
     onChange(sorted);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ timeline: sorted }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setItems(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar o guião. Tente novamente.", "error");
+      });
   }
 
   function seed() {

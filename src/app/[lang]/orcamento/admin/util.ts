@@ -16,6 +16,34 @@ export function todayKey(): string {
 }
 
 /**
+ * Parse money typed by a pt-PT hand into a number of euros.
+ *
+ * `parseFloat` alone corrupts local habits: "1.500" (thousands dot) becomes
+ * 1.5 € and "1500,50" (decimal comma) fails inside `type="number"` inputs.
+ * Rules here: comma is the decimal separator; a dot followed by exactly three
+ * digits (and not a 1–2-digit decimal tail) is a thousands separator.
+ * Returns undefined for an empty or unparseable value.
+ */
+export function parseMoney(s: string): number | undefined {
+  let t = s.replace(/\s|€/g, "");
+  if (!t) return undefined;
+  const hasComma = t.includes(",");
+  const hasDot = t.includes(".");
+  if (hasComma && hasDot) {
+    // "1.500,50" — dots are thousands, comma is the decimal.
+    t = t.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    // "1500,50"
+    t = t.replace(",", ".");
+  } else if (hasDot && /\.\d{3}(\.|$)/.test(t) && !/\.\d{1,2}$/.test(t)) {
+    // "1.500" / "1.234.567" — thousands dots, no decimal part.
+    t = t.replace(/\./g, "");
+  }
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
  * True only for a strict `YYYY-MM-DD` calendar date. Quote `date`/`endDate` are
  * free-form text (the schema only trims length), so values like "a definir" or
  * a full ISO timestamp can reach the UI. Guarding with this before

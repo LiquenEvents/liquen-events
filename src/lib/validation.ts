@@ -171,6 +171,9 @@ export const quoteUpdateSchema = z
     followUpAt: shortDate.nullish(),
     guestList: z.array(guestSchema).max(5000),
     activityLog: z.array(activityEntrySchema).max(5000),
+    // Append-only variant: the server merges these onto the STORED log, so two
+    // tools writing at once can't overwrite each other's entries.
+    activityLogAppend: z.array(activityEntrySchema).max(500),
     assignedTo: trimmed(120).nullish(),
     lostReason: trimmed(1000).nullish(),
     date: shortDate,
