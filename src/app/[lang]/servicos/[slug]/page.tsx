@@ -122,6 +122,7 @@ export default async function ServiceDetailPage({
             fill
             preload
             sizes="100vw"
+            quality={60}
             className="object-cover hero-settle"
           />
         </Parallax>
@@ -252,6 +253,7 @@ export default async function ServiceDetailPage({
             alt=""
             fill
             sizes="100vw"
+            quality={60}
             className="object-cover object-center"
           />
           {/* This band's photo is brighter than the other service bands, so the
@@ -330,6 +332,7 @@ export default async function ServiceDetailPage({
                   alt={`${t.servicoDetalhe.galleryAlt} — ${svc.title} ${i + 1}`}
                   fill
                   sizes={`(max-width: 1024px) 50vw, ${dvw}`}
+                  quality={60}
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
@@ -346,6 +349,7 @@ export default async function ServiceDetailPage({
             alt=""
             fill
             sizes="100vw"
+            quality={60}
             className="object-cover object-center"
             {...blurFor(svc.hero)}
           />
@@ -433,6 +437,7 @@ export default async function ServiceDetailPage({
           alt=""
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-bottom"
           {...blurFor(ctaImg)}
         />

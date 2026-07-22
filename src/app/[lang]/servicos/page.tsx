@@ -100,6 +100,7 @@ function ServiceBand({
           alt={service.title}
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-center"
           {...blurFor(service.image)}
         />
@@ -186,6 +187,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             fill
             preload
             sizes="100vw"
+            quality={60}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/EW1_1330.jpg")}
           />
@@ -241,6 +243,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           alt=""
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-center"
           {...blurFor("/imagens/hd-edited.jpg")}
         />
@@ -284,7 +287,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                   <h3 className="text-white font-bold uppercase tracking-display text-lg lg:text-xl mb-4">
                     {p.title}
                   </h3>
-                  <p className="text-white/75 text-[15px] leading-[1.75] max-w-xs">{p.text}</p>
+                  <p className="text-white/70 text-[13px] leading-[1.7] tracking-display uppercase max-w-xs">
+                    {p.text}
+                  </p>
                 </div>
               </AnimateIn>
             ))}
@@ -309,6 +314,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 alt={cat.label}
                 fill
                 sizes="100vw"
+                quality={60}
                 className="object-cover object-center"
                 {...blurFor(cat.band)}
               />
@@ -351,6 +357,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           alt={t.common.imageAlt.servicosCeremony}
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-center"
           {...blurFor("/imagens/J&A-68.jpg")}
         />
@@ -393,6 +400,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           alt={t.common.imageAlt.servicosEvening}
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-center"
           {...blurFor("/imagens/M&F0497.jpg")}
         />

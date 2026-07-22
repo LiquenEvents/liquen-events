@@ -596,30 +596,10 @@ export default function GaleriaClient({
           </div>
         </div>
       ) : (
-        /* Barra de filtros de categoria — re-exposta a pedido. O filtro por
-           hash (#casamentos, …) já existia; faltava o chrome visível para o
-           visitante poder ver só casamentos / corporativo / etc. */
-        <div className="mb-8 px-3 sm:px-4 lg:px-6">
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            {CATS.map((c) => {
-              const active = c === cat;
-              return (
-                <button
-                  key={c}
-                  onClick={() => switchCat(c)}
-                  aria-pressed={active}
-                  className={`min-h-[40px] px-4 py-2 text-[11px] tracking-[0.2em] uppercase border transition-colors duration-300 ${
-                    active
-                      ? "border-gold text-white bg-white/5"
-                      : "border-white/20 text-white/60 hover:border-white/50 hover:text-white"
-                  }`}
-                >
-                  {c}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        /* Category filter bar removed on request — the gallery shows every
+           photo, with no category chrome. (Collection deep-links still work via
+           the collection view above; there's just no category filter now.) */
+        <div className="mb-6" />
       )}
 
       {/* ── Grid ── */}
@@ -651,6 +631,7 @@ export default function GaleriaClient({
                     alt={altText(visible[0].src, visible[0].label)}
                     fill
                     sizes="(max-width: 640px) 100vw, 50vw"
+                    quality={60}
                     className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                     // The 2×2 flagship tile is the largest grid image, the LCP
                     // candidate on this route, and the lightbox morph source —
@@ -682,6 +663,7 @@ export default function GaleriaClient({
                         alt={altText(visible[idx].src, visible[idx].label)}
                         fill
                         sizes="25vw"
+                        quality={60}
                         className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                         loading="lazy"
                         {...blurProps(visible[idx])}
@@ -738,6 +720,12 @@ export default function GaleriaClient({
                             // under-fetching and softening the flagship gallery
                             // photos on mobile — the majority of visitors.
                             sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
+                            // 50 (not 60) for the dense masonry thumbnails: at a
+                            // 33vw tile the difference is invisible, but it shaves
+                            // the encode + transfer of every gallery photo, so the
+                            // grid fills in faster. The lightbox (full-bleed) keeps
+                            // the higher quality where detail actually shows.
+                            quality={50}
                             className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                             loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
                             {...blurProps(p)}
@@ -1160,6 +1148,7 @@ function Lightbox({
               alt={altText(pool[index].src, pool[index].label)}
               fill
               sizes="90vw"
+              quality={60}
               className={`object-contain ${
                 playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
               }`}
@@ -1182,7 +1171,15 @@ function Lightbox({
             )
               .filter((i) => i !== index)
               .map((i) => (
-                <Image key={i} src={pool[i].src} alt="" fill sizes="90vw" loading="eager" />
+                <Image
+                  key={i}
+                  src={pool[i].src}
+                  alt=""
+                  fill
+                  sizes="90vw"
+                  quality={60}
+                  loading="eager"
+                />
               ))}
         </div>
 
