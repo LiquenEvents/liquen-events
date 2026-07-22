@@ -407,6 +407,7 @@ export default async function ServiceDetailPage({
                     alt=""
                     fill
                     sizes="(max-width: 639px) 100vw, (max-width: 1280px) 50vw, 576px"
+                    quality={60}
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />

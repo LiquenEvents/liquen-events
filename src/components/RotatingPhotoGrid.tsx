@@ -36,6 +36,7 @@ export default function RotatingPhotoGrid({
   className = "",
   imgClassName = "",
   overlayClassName = "bg-black/15 group-hover:bg-black/0",
+  quality = 60,
 }: {
   cells: GridCell[];
   pool: GridPic[];
@@ -43,6 +44,7 @@ export default function RotatingPhotoGrid({
   className?: string;
   imgClassName?: string;
   overlayClassName?: string;
+  quality?: number;
 }) {
   const n = cells.length;
   const [pics, setPics] = useState<GridPic[]>(() => pool.slice(0, n));
@@ -63,6 +65,10 @@ export default function RotatingPhotoGrid({
               alt={alt}
               fill
               sizes={cell.sizes}
+              // Decorative below-the-fold grid (Footer on every page + clientes):
+              // quality 60 matches the site's heroes, invisible at this size but
+              // lighter to fetch on every page.
+              quality={quality}
               className={`object-cover ${imgClassName}`}
               {...(p.blurDataURL
                 ? { placeholder: "blur" as const, blurDataURL: p.blurDataURL }

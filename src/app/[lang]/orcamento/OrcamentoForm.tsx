@@ -403,6 +403,7 @@ export default function OrcamentoForm({
           fill
           preload
           sizes="(max-width: 1024px) 0vw, 45vw"
+          quality={60}
           className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/35 to-[#080808]/55" />
