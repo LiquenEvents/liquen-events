@@ -32,20 +32,62 @@ interface Fonts {
   serifIt: PDFFont;
 }
 
+/** Embed image bytes into the PDF, trying JPEG then PNG by their magic bytes and
+ *  never throwing. Returns null when the bytes are neither (so a bad image is
+ *  simply omitted instead of failing the whole document). `embedJpg`/`embedPng`
+ *  are awaited so a rejection (e.g. "SOI not found in JPEG") is caught here. */
+async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | null> {
+  const isJpg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8;
+  const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e;
+  if (isJpg) {
+    try {
+      return await doc.embedJpg(bytes);
+    } catch {
+      /* fall through */
+    }
+  }
+  if (isPng) {
+    try {
+      return await doc.embedPng(bytes);
+    } catch {
+      /* fall through */
+    }
+  }
+  // Unknown/none of the magic bytes matched — last-resort attempts, still guarded.
+  try {
+    return await doc.embedJpg(bytes);
+  } catch {
+    try {
+      return await doc.embedPng(bytes);
+    } catch {
+      return null;
+    }
+  }
+}
+
 /** Decode a base64 (optionally data:-prefixed) image and cover-crop it to the
  *  target point box via sharp, returning an embedded PDFImage. Rendered at 2×
- *  for crispness; smart-cropped so faces/subjects survive the crop. */
+ *  for crispness; smart-cropped so faces/subjects survive the crop. Any failure
+ *  (bad bytes, sharp unavailable, non-JPEG output) degrades to embedding the
+ *  original image, and finally to null — the PDF is always produced. */
 async function coverImage(
   doc: PDFDocument,
   b64: string,
   wPt: number,
   hPt: number,
 ): Promise<PDFImage | null> {
+  const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  let input: Buffer;
   try {
-    const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
-    const input = Buffer.from(raw, "base64");
-    if (input.length < 32) return null;
-    const out = await sharp(input)
+    input = Buffer.from(raw, "base64");
+  } catch {
+    return null;
+  }
+  if (input.length < 32) return null;
+
+  let cropped: Buffer | null = null;
+  try {
+    cropped = await sharp(input)
       .rotate()
       .resize(Math.max(1, Math.round(wPt * 2)), Math.max(1, Math.round(hPt * 2)), {
         fit: "cover",
@@ -53,10 +95,17 @@ async function coverImage(
       })
       .jpeg({ quality: 82 })
       .toBuffer();
-    return doc.embedJpg(out);
   } catch {
-    return null;
+    cropped = null; // sharp unavailable/failed — fall back to the original bytes
   }
+
+  if (cropped) {
+    const img = await embedImage(doc, cropped);
+    if (img) return img;
+  }
+  // Fallback: embed the original image as-is (may not be perfectly cropped, but
+  // it shows) rather than dropping it or crashing the whole proposal.
+  return embedImage(doc, input);
 }
 
 function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
