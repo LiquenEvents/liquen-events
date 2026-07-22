@@ -3,6 +3,29 @@ export function randomId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/**
+ * Today's calendar day as a LOCAL `YYYY-MM-DD` key. Never derive "today" from
+ * `new Date().toISOString()` — that is UTC, so around midnight it lands on the
+ * wrong day for anyone east/west of UTC (e.g. Portugal in summer, UTC+1). Same
+ * reasoning as `eventCountdown` below.
+ */
+export function todayKey(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * True only for a strict `YYYY-MM-DD` calendar date. Quote `date`/`endDate` are
+ * free-form text (the schema only trims length), so values like "a definir" or
+ * a full ISO timestamp can reach the UI. Guarding with this before
+ * `new Date(...).toISOString()` prevents a `RangeError` from crashing a whole
+ * view (calendar grid, upcoming list…).
+ */
+export function isDateKey(s: string | undefined | null): s is string {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
 // Formatação de euros consolidada em `@/lib/money` (fonte única). Mantemos os
 // nomes locais `eur` (sem casas) e `eur2` (2 casas) para os importadores atuais.
 export { eur0 as eur, eur as eur2 } from "@/lib/money";

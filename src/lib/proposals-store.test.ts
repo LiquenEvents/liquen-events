@@ -32,6 +32,9 @@ vi.mock("./repository", () => ({
         mem.store[idx] = merged;
         return merged;
       },
+      remove: async (id: string) => {
+        mem.store = mem.store.filter((p) => m.getId(p) !== id);
+      },
     };
   },
 }));
@@ -42,6 +45,7 @@ import {
   listAllProposals,
   getProposal,
   updateProposal,
+  deleteProposal,
   listProposalsForQuote,
   getProposalByQuote,
 } from "./proposals-store";
@@ -331,5 +335,22 @@ describe("updateProposal — persistence only, no lifecycle guard (guards live i
     // mutates the row. (The quote FK is `on delete set null` in the DB.)
     await createProposal(mk({ id: "a", quoteId: "deleted-quote", status: "enviada" }));
     expect((await updateProposal("a", { status: "aceite" }))?.status).toBe("aceite");
+  });
+});
+
+// ── deleteProposal ────────────────────────────────────────────────────────────
+describe("deleteProposal", () => {
+  it("removes the proposal so it no longer lists or gets", async () => {
+    await createProposal(mk({ id: "a" }));
+    await createProposal(mk({ id: "b" }));
+    await deleteProposal("a");
+    expect(await getProposal("a")).toBeNull();
+    expect((await listAllProposals()).map((p) => p.id)).toEqual(["b"]);
+  });
+
+  it("is a no-op for an unknown id (never throws, never touches others)", async () => {
+    await createProposal(mk({ id: "a" }));
+    await expect(deleteProposal("ghost")).resolves.toBeUndefined();
+    expect((await listAllProposals()).map((p) => p.id)).toEqual(["a"]);
   });
 });

@@ -9,13 +9,22 @@ const store = vi.hoisted(() => ({
       patch: Record<string, unknown>,
     ): Promise<Record<string, unknown> | null> => ({ id, ...patch }),
   ),
+  remove: vi.fn(async (): Promise<void> => {}),
 }));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
-vi.mock("@/lib/proposals-store", () => ({ updateProposal: store.update }));
+vi.mock("@/lib/proposals-store", () => ({
+  updateProposal: store.update,
+  deleteProposal: store.remove,
+}));
 
-import { PATCH } from "./route";
+import { DELETE, PATCH } from "./route";
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+function delReq(): NextRequest {
+  return new Request("https://liquen.test/api/propostas/p1", {
+    method: "DELETE",
+  }) as unknown as NextRequest;
+}
 function req(body?: unknown): NextRequest {
   return new Request("https://liquen.test/api/propostas/p1", {
     method: "PATCH",
@@ -88,5 +97,27 @@ describe("PATCH /api/propostas/[id]", () => {
     const res = await PATCH(rawReq("null"), ctx("p1"));
     expect(res.status).toBe(400);
     expect(store.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/propostas/[id]", () => {
+  it("rejects the unauthenticated with 401 and never deletes", async () => {
+    const res = await DELETE(delReq(), ctx("p1"));
+    expect(res.status).toBe(401);
+    expect(store.remove).not.toHaveBeenCalled();
+  });
+
+  it("deletes the proposal for an authenticated admin", async () => {
+    authed.ok = true;
+    const res = await DELETE(delReq(), ctx("p1"));
+    expect(res.status).toBe(200);
+    expect(store.remove).toHaveBeenCalledWith("p1");
+  });
+
+  it("returns 500 when the store throws", async () => {
+    authed.ok = true;
+    store.remove.mockRejectedValueOnce(new Error("db down"));
+    const res = await DELETE(delReq(), ctx("p1"));
+    expect(res.status).toBe(500);
   });
 });

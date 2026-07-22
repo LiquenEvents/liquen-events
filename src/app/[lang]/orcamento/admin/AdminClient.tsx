@@ -22,7 +22,7 @@ import {
   printEventDossier,
   downloadEventIcs,
 } from "./export";
-import { eventCountdown, randomId, eur } from "./util";
+import { eventCountdown, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
@@ -896,7 +896,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [quotes]);
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // Active-quote counts per status, computed once instead of one full
+  // `quotes.filter()` per status pill on every render.
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let activeTotal = 0;
+    for (const q of quotes) {
+      if (q.archived) continue;
+      activeTotal += 1;
+      counts[q.status] = (counts[q.status] ?? 0) + 1;
+    }
+    return { counts, activeTotal };
+  }, [quotes]);
+
+  const todayStr = todayKey();
 
   // One sidebar destination — shared by the always-visible core list and the
   // collapsible "Mais" group so both render identically.
@@ -1617,10 +1630,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     onClick={() => setFilterStatus("all")}
                     className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
-                    Todos · {quotes.filter((q) => !q.archived).length}
+                    Todos · {statusCounts.activeTotal}
                   </button>
                   {STATUS_OPTIONS.map((s) => {
-                    const count = quotes.filter((q) => !q.archived && q.status === s.id).length;
+                    const count = statusCounts.counts[s.id] ?? 0;
                     return (
                       <button
                         key={s.id}
@@ -1869,17 +1882,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               </span>
                             )}
                             {q.followUpAt &&
-                              q.followUpAt <= todayKey &&
+                              q.followUpAt <= todayStr &&
                               q.status !== "aceite" &&
                               q.status !== "rejeitado" && (
                                 <span
                                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
-                                    q.followUpAt < todayKey
+                                    q.followUpAt < todayStr
                                       ? "bg-[#b5654a]/15 text-[#b5654a]"
                                       : "bg-[#637a5f]/15 text-[#4d6350]"
                                   }`}
                                   title={
-                                    q.followUpAt < todayKey
+                                    q.followUpAt < todayStr
                                       ? "Seguimento em atraso"
                                       : "Seguimento hoje"
                                   }

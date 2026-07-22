@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
+import { todayKey } from "./util";
 import { Button, Field, EmptyState } from "./ui";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
@@ -86,7 +87,7 @@ export default function EventTasks({ quote, userName }: Props) {
     await fetch(`/api/tarefas/${id}`, { method: "DELETE" }).catch(() => {});
   }
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayStr = todayKey();
   const todo = tasks.filter((t) => !t.done);
   const done = tasks.filter((t) => t.done);
 
@@ -255,12 +256,12 @@ export default function EventTasks({ quote, userName }: Props) {
                   {task.dueDate && !task.done && (
                     <span
                       className={`text-[11px] tabular-nums ${
-                        task.dueDate < todayKey
+                        task.dueDate < todayStr
                           ? "font-medium text-[#8a2a22]"
                           : "text-foreground/45"
                       }`}
                     >
-                      {task.dueDate < todayKey ? "Atrasada · " : ""}
+                      {task.dueDate < todayStr ? "Atrasada · " : ""}
                       {new Date(task.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
                         day: "numeric",
                         month: "short",

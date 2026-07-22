@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
+import { useToast } from "./Toast";
+import { todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
@@ -14,6 +16,7 @@ const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
 const AREAS = ["Comercial", "Produção", "Decoração", "Financeiro", "Logística", "Geral"];
 
 export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: string }) {
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -53,6 +56,8 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   }
 
   async function saveEditTask(id: string) {
+    // Keep the pre-edit list so we can undo if the save doesn't stick.
+    const snapshot = tasks;
     setTasks((prev) =>
       prev.map((t) =>
         t.id === id
@@ -61,11 +66,20 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       ),
     );
     setEditingTaskId(null);
-    await fetch(`/api/tarefas/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editTaskFields, title: editTaskFields.title.trim() || undefined }),
-    });
+    try {
+      const res = await fetch(`/api/tarefas/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editTaskFields,
+          title: editTaskFields.title.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTasks(snapshot);
+      toast("Não foi possível guardar as alterações. Tente novamente.", "error");
+    }
   }
 
   useEffect(() => {
@@ -103,27 +117,47 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         setPriority("normal");
         setArea("");
         setAssignee(defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "");
+      } else {
+        toast("Não foi possível criar a tarefa. Tente novamente.", "error");
       }
+    } catch {
+      toast("Erro de ligação. Verifique a internet e tente novamente.", "error");
     } finally {
       setAdding(false);
     }
   }
 
   async function toggle(task: Task) {
+    // Optimistic tick, but undo it if the server rejects — otherwise the box
+    // stays flipped while the task is unchanged, and desyncs on next reload.
+    const snapshot = tasks;
     setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
-    await fetch(`/api/tarefas/${task.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !task.done }),
-    });
+    try {
+      const res = await fetch(`/api/tarefas/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done: !task.done }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTasks(snapshot);
+      toast("Não foi possível atualizar a tarefa. Tente novamente.", "error");
+    }
   }
 
   async function remove(id: string) {
     const t = tasks.find((x) => x.id === id);
     // Only confirm when there's real content to lose (skip trivial empties).
     if (t && !confirm(`Eliminar a tarefa "${t.title}"?`)) return;
+    const snapshot = tasks;
     setTasks((prev) => prev.filter((x) => x.id !== id));
-    await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTasks(snapshot);
+      toast("Não foi possível eliminar a tarefa. Tente novamente.", "error");
+    }
   }
 
   const people = useMemo(
@@ -146,10 +180,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     return order[a.priority] - order[b.priority];
   });
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayStr = todayKey();
 
   function row(t: Task) {
-    const overdue = t.dueDate && !t.done && t.dueDate < todayKey;
+    const overdue = t.dueDate && !t.done && t.dueDate < todayStr;
 
     if (editingTaskId === t.id) {
       return (

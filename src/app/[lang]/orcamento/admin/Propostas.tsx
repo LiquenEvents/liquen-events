@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
+import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { randomId } from "./util";
@@ -41,21 +42,55 @@ interface Props {
 }
 
 export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props) {
+  const { toast } = useToast();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<ProposalStatus | "all">("all");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/propostas", { cache: "no-store" });
-        if (res.ok) setProposals(await res.json());
-      } finally {
-        setLoading(false);
+  // No `setLoading(true)`/`setLoadError(false)` here — the initial state already
+  // is "loading, no error", and doing it synchronously would fire setState from
+  // inside the mount effect. The retry button resets those before re-calling.
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/propostas", { cache: "no-store" });
+      if (!res.ok) {
+        setLoadError(true);
+        return;
       }
-    })();
+      setProposals(await res.json());
+      setLoadError(false);
+    } catch {
+      // Falha de rede — mostramos um estado de erro com botão para tentar de novo
+      // em vez de fingir que não há propostas.
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // Wrapped in an async IIFE (not a direct `load()`) so the effect body has no
+    // synchronous setState — same shape as before, keeps the lint clean.
+    void (async () => {
+      await load();
+    })();
+  }, [load]);
+
+  const retryLoad = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
+    void load();
+  }, [load]);
+
+  // Índice id→pedido: evita um varrimento linear de todos os pedidos por cada
+  // linha da lista (e dentro de `updateStatus`).
+  const quotesById = useMemo(() => {
+    const m = new Map<string, Quote>();
+    for (const q of quotes ?? []) m.set(q.id, q);
+    return m;
+  }, [quotes]);
 
   async function updateStatus(id: string, status: ProposalStatus) {
     setActionBusy(id);
@@ -65,72 +100,175 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, respondedAt: new Date().toISOString() }),
       });
-      if (res.ok) {
-        const updated: Proposal = await res.json();
-        setProposals((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      if (!res.ok) {
+        toast("Não foi possível atualizar a proposta. Tente novamente.", "error");
+        return;
+      }
+      const updated: Proposal = await res.json();
+      setProposals((prev) => prev.map((p) => (p.id === id ? updated : p)));
 
-        // Aceitar a proposta fecha o negócio: o pedido associado passa também
-        // a "aceite" no pipeline (com entrada no histórico). Recusar não toca
-        // no pedido — a equipa pode querer renegociar antes de o dar por perdido.
-        if (status === "aceite") {
-          const lq = quotes?.find((q) => q.id === updated.quoteId);
-          if (lq && lq.status !== "aceite") {
-            const entry = {
-              id: randomId(),
-              at: new Date().toISOString(),
-              kind: "status_change" as const,
-              summary: `Proposta aceite — pedido movido para Aceite (${eur(updated.total)})`,
-            };
-            const qRes = await fetch(`/api/orcamento/${lq.id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                status: "aceite",
-                activityLog: [...(lq.activityLog ?? []), entry],
-              }),
-            }).catch(() => null);
-            if (qRes?.ok) {
-              const updatedQuote: Quote = await qRes.json();
-              onQuoteUpdated?.(updatedQuote);
-            }
+      // Aceitar a proposta fecha o negócio: o pedido associado passa também
+      // a "aceite" no pipeline (com entrada no histórico). Recusar não toca
+      // no pedido — a equipa pode querer renegociar antes de o dar por perdido.
+      if (status === "aceite") {
+        const lq = quotesById.get(updated.quoteId);
+        if (lq && lq.status !== "aceite") {
+          const entry = {
+            id: randomId(),
+            at: new Date().toISOString(),
+            kind: "status_change" as const,
+            summary: `Proposta aceite — pedido movido para Aceite (${eur(updated.total)})`,
+          };
+          const qRes = await fetch(`/api/orcamento/${lq.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "aceite",
+              activityLog: [...(lq.activityLog ?? []), entry],
+            }),
+          }).catch(() => null);
+          if (qRes?.ok) {
+            const updatedQuote: Quote = await qRes.json();
+            onQuoteUpdated?.(updatedQuote);
+          } else {
+            toast("Proposta aceite, mas não foi possível atualizar o pedido associado.", "info");
           }
         }
+        toast(`Proposta de ${updated.clientName} aceite.`, "success");
+      } else if (status === "rejeitada") {
+        toast("Proposta marcada como recusada.", "info");
       }
+    } catch {
+      toast("Erro de ligação. Verifique a internet e tente novamente.", "error");
     } finally {
       setActionBusy(null);
     }
   }
 
-  const filtered = (filter === "all" ? proposals : proposals.filter((p) => p.status === filter))
-    .slice()
-    .sort((a, b) => {
-      // Enviadas com expiração iminente first
-      const aExp = a.validUntil ? new Date(a.validUntil + "T12:00:00").getTime() : Infinity;
-      const bExp = b.validUntil ? new Date(b.validUntil + "T12:00:00").getTime() : Infinity;
-      if (a.status === "enviada" && b.status !== "enviada") return -1;
-      if (a.status !== "enviada" && b.status === "enviada") return 1;
-      if (a.status === "enviada" && b.status === "enviada") return aExp - bExp;
-      return +new Date(b.createdAt) - +new Date(a.createdAt);
-    });
+  // Aceitar/recusar é uma ação de negócio consequente (aceitar é irreversível e
+  // move o pedido). Pedimos confirmação antes de avançar.
+  const confirmAndUpdate = useCallback(
+    (id: string, status: ProposalStatus) => {
+      const p = proposals.find((x) => x.id === id);
+      const name = p?.clientName ?? "este cliente";
+      const message =
+        status === "aceite"
+          ? `Marcar a proposta de ${name} como ACEITE?\n\nO pedido associado passa também a "Aceite".`
+          : `Marcar a proposta de ${name} como recusada?`;
+      if (typeof window !== "undefined" && !window.confirm(message)) return;
+      void updateStatus(id, status);
+    },
+    // updateStatus é estável o suficiente (fecha sobre estado atual via setters);
+    // dependemos apenas da lista para resolver o nome do cliente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [proposals],
+  );
 
-  const totalSent = proposals
-    .filter((p) => p.status === "enviada" || p.status === "aceite")
-    .reduce((s, p) => s + p.total, 0);
-  const totalWon = proposals.filter((p) => p.status === "aceite").reduce((s, p) => s + p.total, 0);
-  const acceptRate = proposals.length
-    ? Math.round((proposals.filter((p) => p.status === "aceite").length / proposals.length) * 100)
-    : 0;
-  const pending = proposals.filter((p) => p.status === "enviada").length;
+  // Apagar uma proposta da lista. Pede confirmação (é irreversível) e repõe a
+  // proposta se o servidor recusar, para nunca desaparecer sem ter sido guardado.
+  async function deleteProposal(id: string) {
+    const p = proposals.find((x) => x.id === id);
+    const name = p?.clientName ?? "esta proposta";
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Apagar a proposta de ${name}?\n\nEsta ação não pode ser anulada.`)
+    ) {
+      return;
+    }
+    setActionBusy(id);
+    const snapshot = proposals;
+    setProposals((prev) => prev.filter((x) => x.id !== id));
+    try {
+      const res = await fetch(`/api/propostas/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast("Proposta apagada.", "success");
+    } catch {
+      setProposals(snapshot);
+      toast("Não foi possível apagar a proposta. Tente novamente.", "error");
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  const filtered = useMemo(
+    () =>
+      (filter === "all" ? proposals : proposals.filter((p) => p.status === filter))
+        .slice()
+        .sort((a, b) => {
+          // Enviadas com expiração iminente first
+          const aExp = a.validUntil ? new Date(a.validUntil + "T12:00:00").getTime() : Infinity;
+          const bExp = b.validUntil ? new Date(b.validUntil + "T12:00:00").getTime() : Infinity;
+          if (a.status === "enviada" && b.status !== "enviada") return -1;
+          if (a.status !== "enviada" && b.status === "enviada") return 1;
+          if (a.status === "enviada" && b.status === "enviada") return aExp - bExp;
+          return +new Date(b.createdAt) - +new Date(a.createdAt);
+        }),
+    [proposals, filter],
+  );
+
+  const stats = useMemo(() => {
+    let totalSent = 0;
+    let totalWon = 0;
+    let won = 0;
+    let pending = 0;
+    for (const p of proposals) {
+      if (p.status === "enviada" || p.status === "aceite") totalSent += p.total;
+      if (p.status === "aceite") {
+        totalWon += p.total;
+        won += 1;
+      }
+      if (p.status === "enviada") pending += 1;
+    }
+    const acceptRate = proposals.length ? Math.round((won / proposals.length) * 100) : 0;
+    return { totalSent, totalWon, acceptRate, pending };
+  }, [proposals]);
+  const { totalSent, totalWon, acceptRate, pending } = stats;
+
+  const filterOptions: SegmentedOption<ProposalStatus | "all">[] = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of proposals) counts[p.status] = (counts[p.status] ?? 0) + 1;
+    return [
+      { value: "all", label: `Todas · ${proposals.length}` },
+      ...(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => ({
+        value: s,
+        label: `${STATUS_META[s].label} · ${counts[s] ?? 0}`,
+      })),
+    ];
+  }, [proposals]);
 
   if (loading) return <SkeletonList rows={5} />;
 
-  const filterOptions: SegmentedOption<ProposalStatus | "all">[] = [
-    { value: "all", label: `Todas · ${proposals.length}` },
-    ...(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => ({
-      value: s,
-      label: `${STATUS_META[s].label} · ${proposals.filter((p) => p.status === s).length}`,
-    })),
-  ];
+  if (loadError) {
+    return (
+      <Card padding="md" className="flex flex-col items-center gap-4 text-center py-10">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8a2a22]/10 text-[#8a2a22]">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-foreground/90 text-sm font-medium">
+            Não foi possível carregar as propostas
+          </p>
+          <p className="text-foreground/50 text-xs mt-1">
+            Verifique a ligação à internet e tente novamente.
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={retryLoad}>
+          Tentar novamente
+        </Button>
+      </Card>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -229,7 +367,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
           <div className="divide-y divide-foreground/[0.06]">
             {filtered.map((p) => {
               const exp = expiryInfo(p.validUntil);
-              const linkedQuote = quotes?.find((q) => q.id === p.quoteId);
+              const linkedQuote = quotesById.get(p.quoteId);
               const busy = actionBusy === p.id;
 
               return (
@@ -288,7 +426,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                             variant="subtle"
                             size="sm"
                             disabled={busy}
-                            onClick={() => updateStatus(p.id, "aceite")}
+                            onClick={() => confirmAndUpdate(p.id, "aceite")}
                             title="O cliente aceitou: fecha o negócio e marca o pedido como ganho"
                             iconLeft={
                               <svg
@@ -314,7 +452,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                             variant="ghost"
                             size="sm"
                             disabled={busy}
-                            onClick={() => updateStatus(p.id, "rejeitada")}
+                            onClick={() => confirmAndUpdate(p.id, "rejeitada")}
                             title="O cliente não avançou com esta proposta"
                           >
                             Recusar
@@ -332,6 +470,33 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                           Ver pedido
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => deleteProposal(p.id)}
+                        aria-label={`Apagar a proposta de ${p.clientName}`}
+                        title="Apagar esta proposta"
+                        className="text-foreground/40 hover:text-[#8a2a22]"
+                        iconLeft={
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                            <path d="M10 11v6M14 11v6" />
+                          </svg>
+                        }
+                      >
+                        Apagar
+                      </Button>
                     </div>
                   </div>
                 </div>
