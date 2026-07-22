@@ -12,7 +12,7 @@ import {
 } from "@/lib/proposal-doc";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
-import { prepareImageForUpload } from "./image-prep";
+import { prepareImageForUpload, type ImageKind } from "./image-prep";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -290,12 +290,16 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   async function handleUpload(key: string, files: File[], onPaths: (paths: string[]) => void) {
     if (files.length === 0) return;
     setUploading((u) => ({ ...u, [key]: true }));
+    // Cover photos print large (the document's hero) so they keep more pixels and
+    // a higher JPEG quality; mood-board photos render as small collage cells and
+    // use a tighter cap. The upload key encodes which is which ("cover-…"/"board-…").
+    const kind: ImageKind = key.startsWith("board-") ? "board" : "cover";
     const paths: string[] = [];
     const errors: string[] = [];
     try {
       for (const f of files) {
         try {
-          const prepared = await prepareImageForUpload(f);
+          const prepared = await prepareImageForUpload(f, kind);
           const im = await uploadOne(prepared);
           paths.push(im.path);
         } catch (e) {

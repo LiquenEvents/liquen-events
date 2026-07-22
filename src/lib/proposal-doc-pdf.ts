@@ -3,6 +3,13 @@ import {
   PDFDocument,
   StandardFonts,
   rgb,
+  pushGraphicsState,
+  popGraphicsState,
+  moveTo,
+  lineTo,
+  closePath,
+  clip,
+  endPath,
   type PDFFont,
   type PDFPage,
   type PDFImage,
@@ -49,6 +56,16 @@ const M = 56; // page margin — generous editorial whitespace
 // Max text measure: long lines (~120+ chars edge-to-edge) are the biggest "DIY"
 // tell. Cap body copy near the 45–75 char ideal.
 const MEASURE = 430;
+
+// ── Image rendering quality knobs ──
+// Point boxes are drawn at 72pt/inch; we rasterise at DENSITY× that (= DENSITY·72
+// dpi) so photos stay crisp on screen and in print. Cover strips are large and
+// prominent → 3× (216 dpi). Mood-board cells are many and smaller → 2.5× (180 dpi)
+// keeps the PDF lean. Capped at MAX_IMG_PX so we never upscale-and-bloat past the
+// source (the client caps cover uploads at 3000px, boards at 1600px).
+const COVER_DENSITY = 3;
+const COLLAGE_DENSITY = 2.5;
+const MAX_IMG_PX = 3000;
 
 // ── Brand palette ──
 const MOSS = rgb(0.388, 0.478, 0.373); // #637a5f
@@ -104,47 +121,100 @@ async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | n
   }
 }
 
-/** Decode a base64 (optionally data:-prefixed) image and cover-crop it to the
- *  target point box via sharp, returning an embedded PDFImage. Rendered at 2×
- *  for crispness; smart-cropped so faces/subjects survive the crop. Any failure
- *  (bad bytes, sharp unavailable, non-JPEG output) degrades to embedding the
- *  original image, and finally to null — the PDF is always produced. */
-async function coverImage(
+/** Draw `img` to COVER the box (x,y,w,h) — the same visual result as CSS
+ *  `object-fit: cover`: scaled to fill, centred, and the overflow clipped away.
+ *  Uses pdf-lib's low-level content-stream clipping (pushGraphicsState → a
+ *  rectangular clip path → drawImage → popGraphicsState). Because the image is
+ *  scaled by a SINGLE factor `max(w/iw, h/ih)`, its aspect ratio is always
+ *  preserved — it can never be stretched, only cropped by the clip. */
+function drawImageCover(
+  page: PDFPage,
+  img: PDFImage,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  const scale = Math.max(w / img.width, h / img.height); // fill, don't fit
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  const dx = x + (w - dw) / 2; // centre the overflow
+  const dy = y + (h - dh) / 2;
+  page.pushOperators(
+    pushGraphicsState(),
+    moveTo(x, y),
+    lineTo(x + w, y),
+    lineTo(x + w, y + h),
+    lineTo(x, y + h),
+    closePath(),
+    clip(),
+    endPath(),
+  );
+  page.drawImage(img, { x: dx, y: dy, width: dw, height: dh });
+  page.pushOperators(popGraphicsState());
+}
+
+/** Cover-crop a base64 image into the point box (x,y,w,h) on `page` and draw it.
+ *
+ *  Primary path: sharp smart-crops to the box's EXACT aspect at `density`× and
+ *  re-encodes as high-quality JPEG (mozjpeg, full 4:4:4 chroma); drawing that at
+ *  the box dims cannot distort. Fallback (sharp unavailable/failed): the ORIGINAL
+ *  image is embedded and drawn via `drawImageCover`, which preserves aspect ratio
+ *  through clipping — so it looks like the sharp path and STILL cannot be
+ *  stretched (fixing the "fotos esticadas" the studio saw on the fallback path).
+ *  Any hard failure (bad bytes, non-image) draws nothing: the caller's hairline
+ *  frame remains and the PDF is always produced. Never throws. */
+async function drawCoverImage(
   doc: PDFDocument,
+  page: PDFPage,
   b64: string,
-  wPt: number,
-  hPt: number,
-): Promise<PDFImage | null> {
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  density: number,
+): Promise<void> {
   const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
   let input: Buffer;
   try {
     input = Buffer.from(raw, "base64");
   } catch {
-    return null;
+    return;
   }
-  if (input.length < 32) return null;
+  if (input.length < 32) return;
 
-  let cropped: Buffer | null = null;
+  // Target pixels = density× the point box, capped at MAX_IMG_PX so we never
+  // upscale past the source. Both dims scale together → the cover aspect (w:h)
+  // is preserved, so drawing the result at the box dims cannot stretch it.
+  let tw = Math.max(1, Math.round(w * density));
+  let th = Math.max(1, Math.round(h * density));
+  const over = Math.max(tw, th) / MAX_IMG_PX;
+  if (over > 1) {
+    tw = Math.max(1, Math.round(tw / over));
+    th = Math.max(1, Math.round(th / over));
+  }
+
+  // Primary: sharp smart cover-crop → high-quality JPEG.
   try {
-    cropped = await sharp(input)
-      .rotate()
-      .resize(Math.max(1, Math.round(wPt * 2)), Math.max(1, Math.round(hPt * 2)), {
-        fit: "cover",
-        position: "attention",
-      })
-      .jpeg({ quality: 82 })
+    const cropped = await sharp(input)
+      .rotate() // bake EXIF orientation so phone photos aren't sideways
+      .resize(tw, th, { fit: "cover", position: "attention", kernel: "lanczos3" })
+      .jpeg({ quality: 90, mozjpeg: true, chromaSubsampling: "4:4:4" })
       .toBuffer();
+    const img = await embedImage(doc, cropped);
+    if (img) {
+      // Cropped to the exact box aspect — drawing at box dims cannot stretch.
+      page.drawImage(img, { x, y, width: w, height: h });
+      return;
+    }
   } catch {
-    cropped = null; // sharp unavailable/failed — fall back to the original bytes
+    /* sharp unavailable/failed — fall through to the aspect-safe clip path */
   }
 
-  if (cropped) {
-    const img = await embedImage(doc, cropped);
-    if (img) return img;
-  }
-  // Fallback: embed the original image as-is (may not be perfectly cropped, but
-  // it shows) rather than dropping it or crashing the whole proposal.
-  return embedImage(doc, input);
+  // Fallback: embed the ORIGINAL bytes and cover-fit with clipping (never stretch).
+  const orig = await embedImage(doc, input);
+  if (orig) drawImageCover(page, orig, x, y, w, h);
+  // else: draw nothing — the caller's hairline frame still renders.
 }
 
 function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
@@ -314,10 +384,10 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       // Two side photos flanking a centre band — the editorial "gatefold" look.
       const panelW = W * 0.34;
       const sideW = (W - panelW) / 2;
-      const left = doc.coverImages[0] ? await coverImage(pdf, doc.coverImages[0], sideW, H) : null;
-      const right = doc.coverImages[1] ? await coverImage(pdf, doc.coverImages[1], sideW, H) : null;
-      if (left) p.drawImage(left, { x: 0, y: 0, width: sideW, height: H });
-      if (right) p.drawImage(right, { x: sideW + panelW, y: 0, width: sideW, height: H });
+      const left = doc.coverImages[0];
+      const right = doc.coverImages[1];
+      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, COVER_DENSITY);
+      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, COVER_DENSITY);
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
@@ -810,8 +880,7 @@ async function drawCollage(
 
   // Draw one framed image into a box (cover-cropped, thin hairline frame).
   const place = async (b64: string, x: number, yBottom: number, w: number, h: number) => {
-    const img = await coverImage(pdf, b64, w, h);
-    if (img) p.drawImage(img, { x, y: yBottom, width: w, height: h });
+    await drawCoverImage(pdf, p, b64, x, yBottom, w, h, COLLAGE_DENSITY);
     p.drawRectangle({ x, y: yBottom, width: w, height: h, borderColor: LINE, borderWidth: 0.5 });
   };
 

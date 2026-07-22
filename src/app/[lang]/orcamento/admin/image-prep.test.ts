@@ -40,4 +40,11 @@ describe("keepOriginal", () => {
     expect(keepOriginal("image/heif", 100_000)).toBe(false);
     expect(keepOriginal("", 100_000)).toBe(false);
   });
+
+  it("uses a tighter byte gate for mood-board photos than for covers", () => {
+    // 1.2 MB supported file: kept as-is for a cover (≤1.5 MB), re-encoded for a
+    // board (≤1.0 MB) so a board of many photos stays light.
+    expect(keepOriginal("image/jpeg", 1_200_000, "cover")).toBe(true);
+    expect(keepOriginal("image/jpeg", 1_200_000, "board")).toBe(false);
+  });
 });

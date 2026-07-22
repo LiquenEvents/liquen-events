@@ -15,11 +15,25 @@
  * exactly where HEIC files come from).
  */
 
-const MAX_EDGE = 2000;
-// Under this size an already-supported file is sent untouched (no quality loss).
-const KEEP_BYTES = 1_500_000;
 const SUPPORTED = /^image\/(jpe?g|png|webp)$/i;
-const JPEG_QUALITY = 0.85;
+
+/**
+ * Per-use-case encode targets. Cover photos are printed LARGE in the proposal
+ * (up to ~half the landscape A4 ≈ 300 DPI wants ~2500–3000 px) and are the hero
+ * of the document, so they keep more pixels and a higher JPEG quality. Mood-board
+ * photos render as small collage cells (a few hundred px each), so a tighter cap
+ * keeps a board of 8–12 photos light without any visible loss.
+ *
+ * The 4.5 MB serverless body limit applies PER image (uploads are one file per
+ * request), so a 3000 px cover at q0.92 (~2.5–3.5 MB) stays comfortably under it.
+ */
+export type ImageKind = "cover" | "board";
+const PRESETS: Record<ImageKind, { maxEdge: number; quality: number; keepBytes: number }> = {
+  // Covers: bigger + higher quality (printed large, the document's hero image).
+  cover: { maxEdge: 3000, quality: 0.92, keepBytes: 1_500_000 },
+  // Mood boards: rendered as small cells → a tighter cap keeps boards snappy.
+  board: { maxEdge: 1600, quality: 0.82, keepBytes: 1_000_000 },
+};
 
 /** Target width/height after capping the long edge (pure — unit-tested). */
 export function fitWithin(w: number, h: number, maxEdge: number): { w: number; h: number } {
@@ -27,9 +41,13 @@ export function fitWithin(w: number, h: number, maxEdge: number): { w: number; h
   return { w: Math.max(1, Math.round(w * scale)), h: Math.max(1, Math.round(h * scale)) };
 }
 
-/** Should this file skip re-encoding entirely? (pure — unit-tested) */
-export function keepOriginal(type: string, size: number): boolean {
-  return SUPPORTED.test(type) && size <= KEEP_BYTES;
+/** Should this file skip re-encoding entirely? (pure — unit-tested)
+ *  A supported file that is BOTH small in bytes and already within the kind's
+ *  pixel cap is sent untouched (no re-encode, no quality loss). We can't read
+ *  pixels here, so this is the byte-size gate; oversize-dimension files fall
+ *  through to the canvas path which enforces the cap. */
+export function keepOriginal(type: string, size: number, kind: ImageKind = "cover"): boolean {
+  return SUPPORTED.test(type) && size <= PRESETS[kind].keepBytes;
 }
 
 async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
@@ -58,8 +76,9 @@ async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
  * it is already small and in a supported format. Throws a user-readable
  * (pt-PT) error when the browser cannot decode the file at all.
  */
-export async function prepareImageForUpload(file: File): Promise<File> {
-  if (keepOriginal(file.type, file.size)) return file;
+export async function prepareImageForUpload(file: File, kind: ImageKind = "cover"): Promise<File> {
+  const preset = PRESETS[kind];
+  if (keepOriginal(file.type, file.size, kind)) return file;
 
   let source: ImageBitmap | HTMLImageElement;
   try {
@@ -73,7 +92,7 @@ export async function prepareImageForUpload(file: File): Promise<File> {
 
   const sw = "naturalWidth" in source ? source.naturalWidth : source.width;
   const sh = "naturalHeight" in source ? source.naturalHeight : source.height;
-  const { w, h } = fitWithin(sw, sh, MAX_EDGE);
+  const { w, h } = fitWithin(sw, sh, preset.maxEdge);
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -87,7 +106,7 @@ export async function prepareImageForUpload(file: File): Promise<File> {
   if ("close" in source) source.close();
 
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
+    canvas.toBlob(resolve, "image/jpeg", preset.quality),
   );
   if (!blob) {
     if (SUPPORTED.test(file.type)) return file;
