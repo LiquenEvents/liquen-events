@@ -24,6 +24,13 @@ import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
  * NB: the parent needs `overflow-hidden`, and the child some scale headroom
  * (e.g. `hero-settle` or `scale-110`), so the drift never exposes edges.
  */
+// Master switch for the parallax drift. Currently OFF everywhere so desktop
+// scrolls as fluidly as mobile; return the capability check (e.g. pointer:fine
+// && !reduced-motion) here to bring the effect back.
+function parallaxWanted(): boolean {
+  return false;
+}
+
 interface Item {
   el: HTMLElement;
   speed: number;
@@ -150,12 +157,12 @@ export default function Parallax({ children, className = "", speed = 0.12 }: Pro
     const el = ref.current;
     if (!el) return;
     if (prefersReducedMotion()) return;
-    // Skip parallax on touch devices: translating a viewport-sized image layer
-    // every scroll frame competes with the touch-scroll thread on mid-range
-    // phones — exactly where "not fluid" shows. The parent has scale headroom
-    // (hero-settle), so with parallax off the image simply sits static. Desktop
-    // (pointer:fine) keeps the depth effect.
-    if (window.matchMedia?.("(pointer: coarse)").matches) return;
+    // Parallax disabled on every device for maximum scroll fluidity — the
+    // desktop now scrolls as natively-smooth as mobile (which already had
+    // parallax off on touch). The parent keeps scale headroom (hero-settle), so
+    // each image simply sits static: no drift, and no per-frame compositing of
+    // viewport-sized layers. Flip parallaxWanted() to re-enable the effect.
+    if (!parallaxWanted()) return;
 
     const item: Item = { el, speed, top: 0, height: 0, shift: 0, active: false };
     items.add(item);
