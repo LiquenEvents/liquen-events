@@ -12,6 +12,7 @@ import {
 } from "@/lib/proposal-doc";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
+import { prepareImageForUpload } from "./image-prep";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -253,29 +254,65 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   // ── Image upload ──
-  async function uploadImages(files: File[]): Promise<{ path: string; url: string }[]> {
-    const form = new FormData();
-    for (const f of files) form.append("files", f);
-    const res = await fetch(`/api/orcamento/${quote.id}/assets`, { method: "POST", body: form });
+  // Uma imagem por pedido: um lote inteiro num só POST rebentava o limite de
+  // corpo do alojamento (~4,5 MB) com fotos reais de telemóvel — o upload
+  // "às vezes não funcionava". Cada ficheiro é comprimido no navegador
+  // (image-prep) e enviado individualmente, com uma repetição automática em
+  // falha de rede; um ficheiro mau nunca deita fora os restantes.
+  async function uploadOne(file: File): Promise<{ path: string; url: string }> {
+    const post = () => {
+      const form = new FormData();
+      form.append("files", file);
+      return fetch(`/api/orcamento/${quote.id}/assets`, { method: "POST", body: form });
+    };
+    let res: Response;
+    try {
+      res = await post();
+    } catch {
+      // Soluço de rede — tenta uma segunda vez antes de desistir.
+      res = await post();
+    }
     const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error || "Falha ao carregar as imagens.");
-    const images: { path: string; url: string }[] = data?.images ?? [];
-    setAssetUrls((prev) => {
-      const next = { ...prev };
-      for (const im of images) next[im.path] = im.url;
-      return next;
-    });
-    return images;
+    if (!res.ok) {
+      throw new Error(
+        data?.error ||
+          (res.status === 413
+            ? "Imagem demasiado grande para envio."
+            : "Falha ao carregar a imagem."),
+      );
+    }
+    const im: { path: string; url: string } | undefined = data?.images?.[0];
+    if (!im) throw new Error("Falha ao carregar a imagem.");
+    setAssetUrls((prev) => ({ ...prev, [im.path]: im.url }));
+    return im;
   }
 
   async function handleUpload(key: string, files: File[], onPaths: (paths: string[]) => void) {
     if (files.length === 0) return;
     setUploading((u) => ({ ...u, [key]: true }));
+    const paths: string[] = [];
+    const errors: string[] = [];
     try {
-      const images = await uploadImages(files);
-      onPaths(images.map((im) => im.path));
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Erro ao carregar imagens.", "error");
+      for (const f of files) {
+        try {
+          const prepared = await prepareImageForUpload(f);
+          const im = await uploadOne(prepared);
+          paths.push(im.path);
+        } catch (e) {
+          errors.push(e instanceof Error ? e.message : `Falha ao carregar "${f.name}".`);
+        }
+      }
+      if (paths.length > 0) onPaths(paths);
+      if (errors.length > 0) {
+        toast(
+          errors.length === files.length
+            ? errors[0]
+            : `${paths.length} de ${files.length} carregadas. ${errors[0]}`,
+          "error",
+        );
+      } else if (paths.length > 1) {
+        toast(`${paths.length} imagens carregadas`, "success");
+      }
     } finally {
       setUploading((u) => ({ ...u, [key]: false }));
     }
@@ -1131,7 +1168,12 @@ function UploadArea({
 
   function pick(list: FileList | null) {
     if (!list) return;
-    const files = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    // Alguns sistemas entregam HEIC/ficheiros de câmara com `type` vazio —
+    // aceitar também por extensão, em vez de os descartar em silêncio.
+    const files = Array.from(list).filter(
+      (f) =>
+        f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i.test(f.name),
+    );
     if (files.length) onFiles(files);
   }
 
@@ -1166,7 +1208,7 @@ function UploadArea({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         multiple={multiple}
         className="hidden"
         onChange={(e) => {
