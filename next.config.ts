@@ -6,8 +6,16 @@ const nextConfig: NextConfig = {
   // (Vercel ignores this and uses its own build).
   output: "standalone",
   images: {
-    formats: ["image/avif", "image/webp"],
-    qualities: [60, 75],
+    // WebP only — no AVIF. AVIF compresses a few % smaller but its on-the-fly
+    // encode is several times slower than WebP, and the gallery has 500+ photos
+    // that are almost never pre-warmed in the optimizer cache. Serving AVIF meant
+    // every first view paid a multi-second cold encode (and, under a burst of
+    // tiles, the optimizer timing out entirely — "às vezes nem carregam"). WebP
+    // encodes fast enough that cold tiles paint quickly and never stall, which is
+    // the whole point of the desktop-fluidity pass. Once encoded, both are cached
+    // immutably for a year, so the size delta only ever costs the first visitor.
+    formats: ["image/webp"],
+    qualities: [50, 60, 75],
     deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
     imageSizes: [16, 32, 64, 96, 128, 256, 384],
     minimumCacheTTL: 31_536_000,

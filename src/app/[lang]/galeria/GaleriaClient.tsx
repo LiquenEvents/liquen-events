@@ -720,7 +720,12 @@ export default function GaleriaClient({
                             // under-fetching and softening the flagship gallery
                             // photos on mobile — the majority of visitors.
                             sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
-                            quality={60}
+                            // 50 (not 60) for the dense masonry thumbnails: at a
+                            // 33vw tile the difference is invisible, but it shaves
+                            // the encode + transfer of every gallery photo, so the
+                            // grid fills in faster. The lightbox (full-bleed) keeps
+                            // the higher quality where detail actually shows.
+                            quality={50}
                             className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                             loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
                             {...blurProps(p)}
