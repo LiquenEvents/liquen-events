@@ -160,6 +160,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
           )}
 
           <Field
+            variant="underline"
             containerClassName="sm:col-span-2"
             label="Nome"
             required
@@ -169,6 +170,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             autoFocus
           />
           <Field
+            variant="underline"
             label="E-mail"
             type="email"
             value={f.email}
@@ -176,6 +178,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             placeholder="email@exemplo.com"
           />
           <Field
+            variant="underline"
             label="Telefone"
             type="tel"
             value={f.phone}
@@ -183,16 +186,19 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             placeholder="+351 …"
           />
           <Field
+            variant="underline"
             label="Empresa"
             value={f.company}
             onChange={(e) => set("company", e.target.value)}
           />
           <Field
+            variant="underline"
             label="Como nos conheceu"
             value={f.referralSource}
             onChange={(e) => set("referralSource", e.target.value)}
           />
           <Field
+            variant="underline"
             as="select"
             label="Categoria"
             value={f.category}
@@ -209,6 +215,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             ))}
           </Field>
           <Field
+            variant="underline"
             as="select"
             label="Tipo de evento"
             value={f.eventType}
@@ -223,12 +230,14 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             ))}
           </Field>
           <Field
+            variant="underline"
             label="Data do evento"
             type="date"
             value={f.date}
             onChange={(e) => set("date", e.target.value)}
           />
           <Field
+            variant="underline"
             label="Nº de convidados"
             type="number"
             min={0}
@@ -236,6 +245,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             onChange={(e) => set("guests", e.target.value)}
           />
           <Field
+            variant="underline"
             containerClassName="sm:col-span-2"
             label="Local"
             value={f.location}
@@ -243,6 +253,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             placeholder="Espaço / cidade"
           />
           <Field
+            variant="underline"
             as="textarea"
             containerClassName="sm:col-span-2"
             label="Notas"

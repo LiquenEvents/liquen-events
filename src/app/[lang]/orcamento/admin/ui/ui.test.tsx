@@ -86,6 +86,25 @@ describe("Field", () => {
     expect(select.tagName).toBe("SELECT");
     expect(select.value).toBe("novo");
   });
+
+  it("underline variant swaps the boxed look for a bottom hairline, keeping a11y wiring", () => {
+    render(<Field variant="underline" label="Nome" hint="Só interno." />);
+    const input = screen.getByLabelText("Nome");
+    // Unboxed: transparent, no rounding, underline only.
+    expect(input.className).toContain("border-b");
+    expect(input.className).toContain("bg-transparent");
+    expect(input.className).not.toContain("rounded-xl");
+    // The a11y contract is variant-independent.
+    const describedBy = input.getAttribute("aria-describedby");
+    expect(document.getElementById(describedBy!)).toHaveTextContent("Só interno.");
+  });
+
+  it("underline variant still signals errors via aria-invalid + message", () => {
+    render(<Field variant="underline" label="Email" error="Email inválido" />);
+    const input = screen.getByLabelText(/Email/);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input.className).toContain("border-[#8a2a22]");
+  });
 });
 
 describe("PageHeader", () => {
