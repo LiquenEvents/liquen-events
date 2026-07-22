@@ -596,30 +596,10 @@ export default function GaleriaClient({
           </div>
         </div>
       ) : (
-        /* Barra de filtros de categoria — re-exposta a pedido. O filtro por
-           hash (#casamentos, …) já existia; faltava o chrome visível para o
-           visitante poder ver só casamentos / corporativo / etc. */
-        <div className="mb-8 px-3 sm:px-4 lg:px-6">
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            {CATS.map((c) => {
-              const active = c === cat;
-              return (
-                <button
-                  key={c}
-                  onClick={() => switchCat(c)}
-                  aria-pressed={active}
-                  className={`min-h-[40px] px-4 py-2 text-[11px] tracking-[0.2em] uppercase border transition-colors duration-300 ${
-                    active
-                      ? "border-gold text-white bg-white/5"
-                      : "border-white/20 text-white/60 hover:border-white/50 hover:text-white"
-                  }`}
-                >
-                  {c}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        /* Category filter bar removed on request — the gallery shows every
+           photo, with no category chrome. (Collection deep-links still work via
+           the collection view above; there's just no category filter now.) */
+        <div className="mb-6" />
       )}
 
       {/* ── Grid ── */}

@@ -284,7 +284,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                   <h3 className="text-white font-bold uppercase tracking-display text-lg lg:text-xl mb-4">
                     {p.title}
                   </h3>
-                  <p className="text-white/75 text-[15px] leading-[1.75] max-w-xs">{p.text}</p>
+                  <p className="text-white/70 text-[13px] leading-[1.7] tracking-display uppercase max-w-xs">
+                    {p.text}
+                  </p>
                 </div>
               </AnimateIn>
             ))}
