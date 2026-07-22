@@ -221,6 +221,29 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(doc.cancelamento.length).toBeGreaterThan(0);
   });
 
+  it("BUG-GUARD: coerces missing variable arrays to [] so the PDF renderer never crashes", () => {
+    // A corrupt/old localStorage draft can omit serviceGroups/budgetItems/etc.;
+    // the renderer iterates them directly, so an undefined would throw
+    // "undefined is not iterable" → generic 500 "erro ao gerar a proposta".
+    const partial = {
+      ref: "PO Test",
+      clientNames: "Maria",
+      eventType: "Casamento",
+      eventDate: "",
+      location: "",
+      guests: "",
+      totalLabel: "Total",
+      totalText: "",
+    } as Parameters<typeof withProposalDefaults>[0];
+    const doc = withProposalDefaults(partial);
+    expect(doc.serviceGroups).toEqual([]);
+    expect(doc.moodBoards).toEqual([]);
+    expect(doc.cronograma).toEqual([]);
+    expect(doc.budgetItems).toEqual([]);
+    expect(doc.budgetRows).toEqual([]);
+    expect(doc.coverImages).toEqual([]);
+  });
+
   it("substitutes {DATA} and {CONVIDADOS} in the general conditions", () => {
     const doc = withProposalDefaults(base());
     const joined = doc.condicoesGerais.join("\n");

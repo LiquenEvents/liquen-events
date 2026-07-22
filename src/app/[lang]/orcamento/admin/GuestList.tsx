@@ -82,8 +82,16 @@ export default function GuestList({ quote, onChange }: Props) {
     const next = order[(order.indexOf(g.rsvp) + 1) % order.length];
     persist(guests.map((x) => (x.id === g.id ? { ...x, rsvp: next } : x)));
   }
+  // Escrever no campo atualiza o número no ecrã de imediato (aceita vazio para se
+  // poder reescrever); só grava (um PATCH) ao sair do campo, com o mínimo de 1.
   function setPartyOf(id: string, value: string) {
-    const n = Math.max(1, parseInt(value) || 1);
+    const n = value === "" ? 0 : Math.max(0, parseInt(value) || 0);
+    setGuests((prev) => prev.map((x) => (x.id === id ? { ...x, party: n } : x)));
+  }
+  function commitPartyOf(id: string) {
+    const g = guests.find((x) => x.id === id);
+    if (!g) return;
+    const n = Math.max(1, g.party || 1);
     persist(guests.map((x) => (x.id === id ? { ...x, party: n } : x)));
   }
 
@@ -195,8 +203,9 @@ export default function GuestList({ quote, onChange }: Props) {
                 <input
                   type="number"
                   min={1}
-                  value={g.party}
+                  value={g.party || ""}
                   onChange={(e) => setPartyOf(g.id, e.target.value)}
+                  onBlur={() => commitPartyOf(g.id)}
                   className="bo-input w-14 px-1.5 py-1 text-center text-xs text-foreground/75"
                   aria-label={`Convidados no grupo ${g.name}`}
                 />

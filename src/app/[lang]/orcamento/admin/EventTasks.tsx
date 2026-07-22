@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
 import { todayKey } from "./util";
+import { useToast } from "./Toast";
 import { Button, Field, EmptyState } from "./ui";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function EventTasks({ quote, userName }: Props) {
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -50,7 +52,10 @@ export default function EventTasks({ quote, userName }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ done: !task.done }),
     }).catch(() => null);
-    if (!res?.ok) setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    if (!res?.ok) {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+      toast("Não foi possível atualizar a tarefa. Tente novamente.", "error");
+    }
   }
 
   async function addTask() {
@@ -69,22 +74,35 @@ export default function EventTasks({ quote, userName }: Props) {
           assignee: userName || undefined,
         }),
       });
-      const created = await res.json();
+      const created = res.ok ? await res.json().catch(() => null) : null;
       if (created?.id) {
         setTasks((prev) => [...prev, created]);
         setNewTitle("");
         setNewPriority("normal");
         setNewDue("");
         setAdding(false);
+      } else {
+        toast("Não foi possível criar a tarefa. Tente novamente.", "error");
       }
+    } catch {
+      toast("Erro de ligação. Verifique a internet e tente novamente.", "error");
     } finally {
       setBusy(false);
     }
   }
 
   async function removeTask(id: string) {
+    const task = tasks.find((t) => t.id === id);
+    if (task && !window.confirm(`Eliminar a tarefa "${task.title}"?`)) return;
+    const snapshot = tasks;
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    await fetch(`/api/tarefas/${id}`, { method: "DELETE" }).catch(() => {});
+    try {
+      const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTasks(snapshot);
+      toast("Não foi possível eliminar a tarefa. Tente novamente.", "error");
+    }
   }
 
   const todayStr = todayKey();

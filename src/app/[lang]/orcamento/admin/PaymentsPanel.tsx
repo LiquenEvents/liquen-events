@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { parseMoney, randomId, eur2 } from "./util";
+import { parseMoney, randomId, eur2, todayKey } from "./util";
 import { Button } from "./ui";
 import { useToast } from "./Toast";
 import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
@@ -65,7 +65,7 @@ export default function PaymentsPanel({
   const [payments, setPayments] = useState<Payment[]>(quote.payments ?? []);
   const [kind, setKind] = useState<PaymentKind>("sinal");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayKey());
   const [busy, setBusy] = useState<string | null>(null);
   const [contractRef, setContractRef] = useState(quote.contractRef ?? "");
   const [savingRef, setSavingRef] = useState(false);
@@ -203,23 +203,28 @@ export default function PaymentsPanel({
           email,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        throw new Error(data?.error || "Falha ao gerar o recibo.");
+      }
       if (data.pdfBase64 && !email) {
         const a = document.createElement("a");
         a.href = `data:application/pdf;base64,${data.pdfBase64}`;
-        a.download = `Recibo-${data.number.replace(/\//g, "-")}.pdf`;
+        a.download = `Recibo-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
         a.click();
       }
       if (email) {
         toast(
           data.emailed
             ? `Recibo enviado para ${quote.email}`
-            : "Recibo gerado (e-mail não configurado)",
+            : "Recibo gerado (email não configurado)",
           data.emailed ? "success" : "info",
         );
       } else {
         toast("Recibo descarregado", "success");
       }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível gerar o recibo.", "error");
     } finally {
       setBusy(null);
     }
@@ -514,7 +519,12 @@ export default function PaymentsPanel({
           onChange={(e) => setDate(e.target.value)}
           className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
         />
-        <Button size="sm" onClick={add} iconLeft={<span aria-hidden="true">+</span>}>
+        <Button
+          size="sm"
+          onClick={add}
+          disabled={!((parseMoney(amount) ?? 0) > 0)}
+          iconLeft={<span aria-hidden="true">+</span>}
+        >
           Registar
         </Button>
       </div>

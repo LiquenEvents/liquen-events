@@ -23,8 +23,18 @@ const TEMPLATE: Omit<TimelineItem, "id">[] = [
   { time: "02:00", title: "Encerramento e desmontagem" },
 ];
 
+// Um dia de evento estende-se para lá da meia-noite: "02:00 Encerramento" é o
+// FIM, não o princípio. Horas antes das 05:00 contam como +24h para ordenarem
+// depois da noite, em vez de saltarem para o topo do guião.
+function timeRank(t: string): number {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+  if (!m) return Number.MAX_SAFE_INTEGER; // sem hora válida → fim
+  const mins = Number(m[1]) * 60 + Number(m[2]);
+  return mins < 5 * 60 ? mins + 24 * 60 : mins;
+}
+
 function sortByTime(items: TimelineItem[]): TimelineItem[] {
-  return [...items].sort((a, b) => a.time.localeCompare(b.time));
+  return [...items].sort((a, b) => timeRank(a.time) - timeRank(b.time));
 }
 
 export default function EventTimeline({ quote, onChange }: Props) {

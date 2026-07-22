@@ -122,18 +122,19 @@ body.admin-mode {
   --bo-lh-body: 1.6;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
-  /* ChatGPT-clean titles: the back office drops the Playfair serif entirely.
-     Redefining the font variable INSIDE .admin-mode means both the `font-display`
-     class and any inline `var(--font-playfair)` resolve to the modern UI sans —
-     the public marketing site (outside .admin-mode) keeps Playfair untouched. */
+  /* SpaceX-style engineered look: the back office uses the technical Archivo
+     grotesque everywhere (loaded via next/font as --font-spacex). Redefining
+     --font-playfair INSIDE .admin-mode means both the `font-display` class and
+     any inline `var(--font-playfair)` resolve to it too — the public marketing
+     site (outside .admin-mode) keeps Playfair/Inter untouched. */
   --font-playfair:
-    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+    var(--font-spacex), var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Clean, modern UI sans for all working admin text — Inter first (loaded),
-     then a system-ui stack so there is never a network dependency. Big display
-     headings opt into Playfair via `font-display`. */
+  /* Technical grotesque for all working admin text; system-ui stack behind it so
+     there is never a network dependency. */
   font-family:
+    var(--font-spacex),
     var(--font-inter),
     ui-sans-serif,
     system-ui,
@@ -144,15 +145,35 @@ body.admin-mode {
     Arial,
     sans-serif;
   line-height: var(--bo-lh-body);
-  letter-spacing: -0.006em; /* whisper-tight; calmer, more contemporary */
+  /* Uppercase, mission-control aesthetic across the whole interface. Positive
+     tracking so caps breathe (never the cramped negative tracking used for
+     lowercase UI text). Data the team TYPES or reads literally (inputs, emails,
+     phone numbers, the ref id) is exempted below so nothing is mangled. */
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
-/* Admin UI text breathes: generous line-height on flowing copy, and the modern
-   sans tightening on the working (non-display) headings so labels/titles read
-   crisp like ChatGPT's. Playfair display titles keep their natural tracking. */
+/* Display / working headings: slightly wider tracking now that they're caps. */
 body.admin-mode :is(h1, h2, h3, h4),
 body.admin-mode .font-display {
-  letter-spacing: var(--bo-tracking-tight);
+  letter-spacing: 0.015em;
+}
+
+/* Keep real DATA in its true case — uppercasing an email, a client's name mid-
+   typing, a phone number or a reference id reads as broken, not premium. These
+   opt out of the global uppercase (the SpaceX look stays on all the chrome:
+   labels, headings, buttons, menus, values). */
+body.admin-mode input,
+body.admin-mode textarea,
+body.admin-mode select,
+body.admin-mode [contenteditable],
+body.admin-mode .bo-input,
+body.admin-mode a[href^="mailto:"],
+body.admin-mode a[href^="tel:"],
+body.admin-mode .font-mono,
+body.admin-mode [data-keep-case] {
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* Moss is the single admin accent — even the text selection picks it up instead

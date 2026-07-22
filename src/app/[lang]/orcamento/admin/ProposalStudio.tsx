@@ -516,10 +516,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
-      toast(
-        data?.emailed ? "Proposta enviada" : "Proposta gerada (e-mail não configurado)",
-        data?.emailed ? "success" : "info",
-      );
+      // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
+      // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
+      if (data?.emailed) {
+        toast("Proposta enviada ao cliente", "success");
+      } else {
+        toast(data?.emailError || "Proposta gerada (email não enviado)", "info");
+      }
       onSent?.();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro ao enviar a proposta.", "error");
