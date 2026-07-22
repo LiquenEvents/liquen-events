@@ -482,9 +482,6 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   // ── Actions ──
   async function preview() {
     if (busy) return;
-    // Abrir a janela AGORA, no gesto do clique — se a abríssemos só depois do
-    // `await` (fetch), o browser bloqueava-a como popup e "não acontecia nada".
-    const win = typeof window !== "undefined" ? window.open("", "_blank") : null;
     setBusy("preview");
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
@@ -497,19 +494,20 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         throw new Error(err?.error || "Não foi possível gerar a pré-visualização.");
       }
       const blob = await res.blob();
+      // Descarregar o PDF (anexo) em vez de abrir numa aba nova: a CSP do site
+      // (object-src 'none', sem frame-src) bloqueia mostrar um blob:PDF numa aba
+      // ou iframe, o que fazia "não acontecer nada". Um download nunca é
+      // bloqueado e abre no leitor de PDF do dispositivo.
       const url = URL.createObjectURL(blob);
-      if (win) {
-        win.location.href = url;
-      } else {
-        // Popup bloqueado mesmo assim → descarrega o PDF (nunca é bloqueado).
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "proposta-preview.pdf";
-        a.click();
-      }
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proposta-${quote.name || quote.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast("Pré-visualização gerada (PDF descarregado)", "success");
     } catch (e) {
-      if (win) win.close();
       toast(e instanceof Error ? e.message : "Erro na pré-visualização.", "error");
     } finally {
       setBusy(null);
