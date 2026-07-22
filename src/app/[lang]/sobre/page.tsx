@@ -58,7 +58,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             fill
             preload
             sizes="100vw"
-            quality={60}
+            quality={75}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/hd-edited.jpg")}
           />
@@ -124,7 +124,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 alt={t.common.imageAlt.sobrePortrait}
                 fill
                 sizes="(max-width: 1024px) 100vw, 55vw"
-                quality={60}
+                quality={75}
                 className="object-cover"
                 {...blurFor("/imagens/DaniGui_Preview12.jpg")}
               />
@@ -157,7 +157,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             alt={t.common.imageAlt.sobreGolden}
             fill
             sizes="100vw"
-            quality={60}
+            quality={75}
             className="object-cover object-center scale-110"
             {...blurFor("/imagens/M&F0497.jpg")}
           />
@@ -203,7 +203,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                 alt={t.common.imageAlt.sobreFounder}
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
-                quality={60}
+                quality={75}
                 className="object-cover object-center"
                 {...blurFor("/imagens/catarina-gaspar.jpg")}
               />
@@ -252,7 +252,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           alt={t.common.imageAlt.sobreOutdoor}
           fill
           sizes="100vw"
-          quality={60}
+          quality={75}
           className="object-cover object-center"
           {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
         />

@@ -631,7 +631,7 @@ export default function GaleriaClient({
                     alt={altText(visible[0].src, visible[0].label)}
                     fill
                     sizes="(max-width: 640px) 100vw, 50vw"
-                    quality={60}
+                    quality={75}
                     className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                     // The 2×2 flagship tile is the largest grid image, the LCP
                     // candidate on this route, and the lightbox morph source —
@@ -663,7 +663,7 @@ export default function GaleriaClient({
                         alt={altText(visible[idx].src, visible[idx].label)}
                         fill
                         sizes="25vw"
-                        quality={60}
+                        quality={75}
                         className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                         loading="lazy"
                         {...blurProps(visible[idx])}
@@ -720,12 +720,12 @@ export default function GaleriaClient({
                             // under-fetching and softening the flagship gallery
                             // photos on mobile — the majority of visitors.
                             sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
-                            // 50 (not 60) for the dense masonry thumbnails: at a
-                            // 33vw tile the difference is invisible, but it shaves
-                            // the encode + transfer of every gallery photo, so the
-                            // grid fills in faster. The lightbox (full-bleed) keeps
-                            // the higher quality where detail actually shows.
-                            quality={50}
+                            // 72 for the masonry thumbnails — crisp portfolio work
+                            // (the photos are the product). Slightly below the
+                            // lightbox's 75 since tiles render at ~33vw, but well
+                            // above a lossy look. Speed comes from WebP-only encode,
+                            // not from starving quality, so this stays fast.
+                            quality={72}
                             className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
                             loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
                             {...blurProps(p)}
@@ -1148,7 +1148,7 @@ function Lightbox({
               alt={altText(pool[index].src, pool[index].label)}
               fill
               sizes="90vw"
-              quality={60}
+              quality={75}
               className={`object-contain ${
                 playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
               }`}
@@ -1177,7 +1177,7 @@ function Lightbox({
                   alt=""
                   fill
                   sizes="90vw"
-                  quality={60}
+                  quality={75}
                   loading="eager"
                 />
               ))}

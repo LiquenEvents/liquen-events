@@ -36,6 +36,7 @@ export default function RotatingPhotoGrid({
   className = "",
   imgClassName = "",
   overlayClassName = "bg-black/15 group-hover:bg-black/0",
+  quality = 75,
 }: {
   cells: GridCell[];
   pool: GridPic[];
@@ -43,6 +44,7 @@ export default function RotatingPhotoGrid({
   className?: string;
   imgClassName?: string;
   overlayClassName?: string;
+  quality?: number;
 }) {
   const n = cells.length;
   const [pics, setPics] = useState<GridPic[]>(() => pool.slice(0, n));
@@ -63,6 +65,9 @@ export default function RotatingPhotoGrid({
               alt={alt}
               fill
               sizes={cell.sizes}
+              // Full quality (75) — these frames are real portfolio photos, and
+              // WebP-only keeps them fast to encode/serve without lowering it.
+              quality={quality}
               className={`object-cover ${imgClassName}`}
               {...(p.blurDataURL
                 ? { placeholder: "blur" as const, blurDataURL: p.blurDataURL }
