@@ -80,7 +80,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             fill
             preload
             sizes="100vw"
-            quality={60}
+            quality={75}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/DaniGui_Preview20.jpg")}
           />
@@ -124,7 +124,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           alt={t.common.imageAlt.galeriaInstagram}
           fill
           sizes="100vw"
-          quality={60}
+          quality={75}
           className="object-cover object-center"
           {...blurFor("/imagens/DaniGui_Adois_61.jpg")}
         />

@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     // the whole point of the desktop-fluidity pass. Once encoded, both are cached
     // immutably for a year, so the size delta only ever costs the first visitor.
     formats: ["image/webp"],
-    qualities: [50, 60, 75],
+    qualities: [50, 72, 75],
     deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
     imageSizes: [16, 32, 64, 96, 128, 256, 384],
     minimumCacheTTL: 31_536_000,

@@ -70,7 +70,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             fill
             preload
             sizes="100vw"
-            quality={60}
+            quality={75}
             className="object-cover hero-settle"
           />
         </Parallax>
@@ -253,7 +253,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 aria-hidden
                 fill
                 sizes="(max-width: 1024px) 100vw, 60vw"
-                quality={60}
+                quality={75}
                 className="object-cover"
               />
               {/* Véu 100% neutro (sem tinte moss) — a foto lê-se como textura
@@ -317,7 +317,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   alt={t.common.imageAlt.contactoBand[i] ?? alt}
                   fill
                   sizes="33vw"
-                  quality={60}
+                  quality={75}
                   className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-black/25 group-hover:bg-black/10 transition-colors duration-500" />
@@ -334,7 +334,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           alt=""
           fill
           sizes="100vw"
-          quality={60}
+          quality={75}
           className="object-cover object-center"
           {...blurFor(stepsBgImg)}
         />
@@ -386,7 +386,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           alt=""
           fill
           sizes="100vw"
-          quality={60}
+          quality={75}
           className="object-cover object-center"
           {...blurFor("/imagens/EW1_1332.jpg")}
         />
@@ -437,7 +437,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           aria-hidden
           fill
           sizes="100vw"
-          quality={60}
+          quality={75}
           className="object-cover"
         />
         {/* Text lives in the left column, so darken only the left and let the
