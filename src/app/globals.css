@@ -20,8 +20,16 @@
   --color-surface-raised: #ffffff;
   --color-surface-elevated: #ffffff;
   --color-foreground: #2a2620;
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-playfair);
+  /* SpaceX-style engineered typeface across the WHOLE site (public + admin):
+     Archivo (technical DIN-adjacent grotesque, self-hosted via next/font as
+     --font-spacex) is the primary for both body and display, ahead of the old
+     Inter/Playfair which remain only as graceful fallbacks. */
+  --font-sans:
+    var(--font-spacex), var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display:
+    var(--font-spacex), var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* ── Hero type scale — single source of truth for the marketing page heroes.
@@ -260,6 +268,31 @@ body {
     "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* SpaceX "capslock" aesthetic across the whole site. Any inline
+     var(--font-playfair) usage also resolves to the technical typeface now. */
+  --font-playfair: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.015em;
+}
+
+/* Keep real DATA and things people TYPE in their true case — uppercasing an
+   email, a phone number, a form value or code reads as broken, not premium.
+   Add data-keep-case to any specific block that should stay sentence-case. */
+input,
+textarea,
+select,
+[contenteditable],
+.bo-input,
+a[href^="mailto:"],
+a[href^="tel:"],
+.font-mono,
+[data-keep-case],
+[data-keep-case] * {
+  text-transform: none;
+}
+input::placeholder,
+textarea::placeholder {
+  text-transform: none;
 }
 
 /* Cleaner line breaks everywhere: balanced multi-line headings and
