@@ -99,6 +99,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             fill
             preload
             sizes="100vw"
+            quality={60}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/EW1_1393.jpg")}
           />
@@ -147,6 +148,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           alt=""
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-center"
           {...blurFor(introImg)}
         />
@@ -214,6 +216,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           alt=""
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-center"
           {...blurFor(wordsImg)}
         />
@@ -294,6 +297,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           alt={t.common.imageAlt.clientesAerial}
           fill
           sizes="100vw"
+          quality={60}
           className="object-cover object-center"
           {...blurFor("/imagens/DJI_20250913190635_0120_D.jpg")}
         />
