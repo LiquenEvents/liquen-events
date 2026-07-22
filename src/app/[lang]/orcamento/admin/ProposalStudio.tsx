@@ -1126,16 +1126,29 @@ function Thumb({
   onRemove: () => void;
   className?: string;
 }) {
+  const [failed, setFailed] = useState(false);
   return (
     <div
       className={`group relative overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${className}`}
     >
-      {url ? (
+      {url && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="h-full w-full object-cover" />
+        <img
+          src={url}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-[9px] tracking-[0.15em] uppercase text-foreground/30">
-          Imagem
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center text-[9px] leading-relaxed text-foreground/40">
+          {failed ? (
+            <>
+              <span className="font-medium text-foreground/55">Imagem carregada</span>
+              <span>Guardada, mas não foi possível pré-visualizar aqui.</span>
+            </>
+          ) : (
+            <span className="tracking-[0.15em] uppercase text-foreground/30">Imagem</span>
+          )}
         </div>
       )}
       <button
