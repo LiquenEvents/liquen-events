@@ -6,7 +6,7 @@
 export const SITE = {
   name: "Líquen Events",
   legalName: "Líquen Events",
-  url: "https://www.liquen-events.com",
+  url: "https://liquen-events.com",
   domain: "liquen-events.com",
   locale: "pt_PT",
   email: "liquen.alentejo@gmail.com",
