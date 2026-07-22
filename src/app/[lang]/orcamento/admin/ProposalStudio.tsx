@@ -128,6 +128,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   const [totalInput, setTotalInput] = useState<string>("");
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  // Every image ever uploaded for THIS pedido (server-side, device-independent),
+  // so covers/mood boards can be re-picked on any device — a localStorage draft
+  // lives only in the browser that created it.
+  const [library, setLibrary] = useState<{ path: string; url: string }[]>([]);
   const [refEdited, setRefEdited] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
@@ -157,6 +161,36 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     hydrated.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Load the pedido's uploaded-image library (server, device-independent) ──
+  // Fills in signed URLs for any image already in the draft (so thumbnails render
+  // even on a fresh device / after the cached URL expired) and offers the full
+  // set for re-picking into covers and mood boards.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/orcamento/${quote.id}/assets`);
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const imgs: { path: string; url: string }[] = Array.isArray(data?.images)
+          ? data.images
+          : [];
+        if (!alive || imgs.length === 0) return;
+        setLibrary(imgs);
+        setAssetUrls((prev) => {
+          const next = { ...prev };
+          for (const im of imgs) if (im.path && im.url && !next[im.path]) next[im.path] = im.url;
+          return next;
+        });
+      } catch {
+        /* offline / storage unavailable — the studio still works with uploads */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [quote.id]);
 
   // ── Auto-compose the reference until the user overrides it ──
   useEffect(() => {
@@ -410,6 +444,19 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     setDoc((d) => {
       const cover = [...(d.coverImages ?? [])];
       cover[idx] = path;
+      return { ...d, coverImages: cover };
+    });
+  }
+  /** Place a library image into the first free cover slot (of the two). */
+  function addCoverFromLibrary(path: string) {
+    setDoc((d) => {
+      const cover = [...(d.coverImages ?? [])];
+      const free = !cover[0] ? 0 : !cover[1] ? 1 : -1;
+      if (free === -1) {
+        toast("As duas capas já estão preenchidas. Remova uma para trocar.", "info");
+        return d;
+      }
+      cover[free] = path;
       return { ...d, coverImages: cover };
     });
   }
@@ -684,6 +731,12 @@ export default function ProposalStudio({ quote, onSent }: Props) {
             );
           })}
         </div>
+        <ImageLibrary
+          images={library}
+          used={doc.coverImages ?? []}
+          onPick={addCoverFromLibrary}
+          label="Já carregadas neste pedido — toque para usar como capa"
+        />
       </Section>
 
       {/* Service groups */}
@@ -826,6 +879,12 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                     }
                   />
                 </div>
+                <ImageLibrary
+                  images={library}
+                  used={b.images}
+                  onPick={(path) => addBoardImages(bi, [path])}
+                  label="Já carregadas neste pedido — toque para juntar a este mood board"
+                />
               </div>
             ))}
           </div>
@@ -1130,6 +1189,69 @@ function MoveBtns({
       >
         ↓
       </button>
+    </div>
+  );
+}
+
+/** A strip of the pedido's already-uploaded images. Tapping one re-uses it
+ *  (into a cover slot or a mood board) without re-uploading — so the images the
+ *  owner added earlier are available again on any device. Images already used in
+ *  the current target are dimmed with a check. Renders nothing when the library
+ *  is empty. */
+function ImageLibrary({
+  images,
+  used,
+  onPick,
+  label,
+}: {
+  images: { path: string; url: string }[];
+  used: string[];
+  onPick: (path: string) => void;
+  label: string;
+}) {
+  if (images.length === 0) return null;
+  const usedSet = new Set(used);
+  return (
+    <div className="mt-3 border-t border-foreground/[0.08] pt-3">
+      <p className="mb-2 text-[11px] leading-relaxed text-foreground/45">{label}</p>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+        {images.map((im) => {
+          const isUsed = usedSet.has(im.path);
+          return (
+            <button
+              key={im.path}
+              type="button"
+              onClick={() => onPick(im.path)}
+              aria-label={isUsed ? "Imagem já usada — usar de novo" : "Usar esta imagem"}
+              className={`group relative aspect-square overflow-hidden rounded-lg border transition ${
+                isUsed
+                  ? "border-[#637a5f]/60 ring-1 ring-[#637a5f]/40"
+                  : "border-foreground/[0.1] hover:border-foreground/30"
+              }`}
+            >
+              {im.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={im.url}
+                  alt=""
+                  className={`h-full w-full object-cover transition ${
+                    isUsed ? "opacity-55" : "group-hover:scale-[1.04]"
+                  }`}
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-[8px] uppercase tracking-wider text-foreground/30">
+                  Imagem
+                </span>
+              )}
+              {isUsed && (
+                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#637a5f] text-[9px] leading-none text-white">
+                  ✓
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

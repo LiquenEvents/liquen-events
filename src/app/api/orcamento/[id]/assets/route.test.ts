@@ -10,14 +10,18 @@ const st = vi.hoisted(() => ({
   authed: false,
   dbConfigured: true,
   upload: vi.fn(async (id: string) => ({ path: `${id}/x.jpg`, url: "https://signed/x.jpg" })),
+  list: vi.fn(async (id: string) => [{ path: `${id}/x.jpg`, url: "https://signed/x.jpg" }]),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
 vi.mock("@/lib/supabase", () => ({ isDatabaseConfigured: () => st.dbConfigured }));
-vi.mock("@/lib/proposal-storage", () => ({ uploadProposalImage: st.upload }));
+vi.mock("@/lib/proposal-storage", () => ({
+  uploadProposalImage: st.upload,
+  listProposalImages: st.list,
+}));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const MAX_BYTES = 12 * 1024 * 1024;
 
@@ -117,5 +121,41 @@ describe("POST /api/orcamento/[id]/assets", () => {
     const [req, ctx] = uploadReq([file("a.jpg", "image/jpeg")]);
     const res = await POST(req, ctx);
     expect(res.status).toBe(502);
+  });
+});
+
+function getReq(id = "q-1"): [NextRequest, { params: Promise<{ id: string }> }] {
+  const req = new Request(`https://liquen.test/api/orcamento/${id}/assets`, {
+    method: "GET",
+  }) as unknown as NextRequest;
+  return [req, { params: Promise.resolve({ id }) }];
+}
+
+describe("GET /api/orcamento/[id]/assets", () => {
+  it("401s the unauthenticated and never lists", async () => {
+    st.authed = false;
+    const [req, ctx] = getReq();
+    const res = await GET(req, ctx);
+    expect(res.status).toBe(401);
+    expect(st.list).not.toHaveBeenCalled();
+  });
+
+  it("returns the pedido's uploaded images with signed urls", async () => {
+    const [req, ctx] = getReq("q-42");
+    const res = await GET(req, ctx);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.images).toEqual([{ path: "q-42/x.jpg", url: "https://signed/x.jpg" }]);
+    expect(st.list).toHaveBeenCalledWith("q-42");
+  });
+
+  it("returns an empty list (200) when storage is unavailable", async () => {
+    st.list.mockResolvedValueOnce([]);
+    const [req, ctx] = getReq();
+    const res = await GET(req, ctx);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.images).toEqual([]);
   });
 });

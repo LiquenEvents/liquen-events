@@ -72,6 +72,40 @@ export async function uploadProposalImage(
 }
 
 /**
+ * List every image already uploaded for a quote, newest first, each with a fresh
+ * signed URL. The bucket folder (`${quoteId}/…`) is the device-independent index
+ * of what the studio has stored for this pedido, so the studio can re-offer those
+ * images on ANY device (a localStorage draft is per-browser and lost elsewhere).
+ * Returns [] when Storage is unavailable — never throws.
+ */
+export async function listProposalImages(quoteId: string): Promise<UploadedImage[]> {
+  const sb = getSupabase();
+  if (!sb || !(await ensureBucket())) return [];
+  const safeId = quoteId.replace(/[^a-zA-Z0-9_-]/g, "");
+  try {
+    const { data, error } = await sb.storage.from(PROPOSAL_BUCKET).list(safeId, {
+      limit: 200,
+      sortBy: { column: "created_at", order: "desc" },
+    });
+    if (error || !data) return [];
+    // Only real files (Storage can report folder placeholders with no id).
+    const paths = data
+      .filter((o) => o.id && !o.name.startsWith("."))
+      .map((o) => `${safeId}/${o.name}`);
+    if (paths.length === 0) return [];
+    const { data: signed } = await sb.storage
+      .from(PROPOSAL_BUCKET)
+      .createSignedUrls(paths, SIGNED_TTL);
+    return (signed ?? [])
+      .map((s) => ({ path: s.path ?? "", url: s.signedUrl ?? "" }))
+      .filter((im) => im.path && im.url);
+  } catch (e) {
+    log.error("proposal-storage: list falhou", e, { quoteId });
+    return [];
+  }
+}
+
+/**
  * Resolve an image reference to raw bytes for embedding in the PDF. Accepts a
  * bucket storage path, a full http(s) URL, or a base64 (optionally data:-URI)
  * string — so the generator input can mix stored images and inline uploads.
