@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import type { Quote, EventCategory } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
+import { Button, Field } from "./ui";
 
 interface Props {
   open: boolean;
@@ -31,6 +32,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
   const { toast } = useToast();
   const [f, setF] = useState({ ...EMPTY });
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
   // Trap Tab within the dialog + restore focus to the trigger on close.
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
 
@@ -43,10 +45,15 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   const set = (k: keyof typeof EMPTY, v: string) => setF((p) => ({ ...p, [k]: v }));
   const eventTypes = f.category ? (EVENT_TYPES_BY_CATEGORY[f.category as EventCategory] ?? []) : [];
+
+  // Match the typed e-mail against existing quotes once per change, not per render.
+  const email = f.email.trim().toLowerCase();
+  const duplicates = useMemo(
+    () => (email ? (existingQuotes ?? []).filter((q) => q.email.toLowerCase() === email) : []),
+    [email, existingQuotes],
+  );
 
   async function submit() {
     if (!f.name.trim() || saving) return;
@@ -74,16 +81,11 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
     }
   }
 
-  const duplicates = f.email.trim()
-    ? (existingQuotes ?? []).filter((q) => q.email.toLowerCase() === f.email.trim().toLowerCase())
-    : [];
-
-  const input = "bo-input px-3 py-2 text-sm text-foreground/75 placeholder-foreground/22";
-  const label = "block text-[10px] text-foreground/30 tracking-[0.3em] uppercase mb-2";
+  if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[85] flex items-start justify-center pt-[8vh] px-4 overflow-y-auto"
+      className="fixed inset-0 z-[85] flex items-center justify-center p-4 sm:p-6"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
@@ -91,15 +93,17 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Novo pedido"
-        className="relative w-full max-w-xl bg-white border border-foreground/10 rounded-2xl shadow-2xl mb-12"
+        aria-labelledby={titleId}
+        className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/8">
+        {/* ── Header ── */}
+        <div className="flex shrink-0 items-center justify-between gap-4 px-7 pt-7 pb-5 sm:px-9">
           <div>
-            <p className="eyebrow mb-1">Registo manual</p>
+            <p className="bo-eyebrow text-foreground/40 mb-2">Registo manual</p>
             <h2
-              className="text-foreground/85 font-bold text-lg"
+              id={titleId}
+              className="text-foreground/90 text-xl leading-tight font-semibold"
               style={{ fontFamily: "var(--font-playfair)" }}
             >
               Novo pedido
@@ -108,180 +112,162 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="text-foreground/30 hover:text-foreground/60 text-xl leading-none"
+            className="-mt-3 -mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/35 motion-safe:transition-colors hover:text-foreground/70"
           >
-            ×
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
           </button>
         </div>
 
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* ── Body ── */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-4 gap-y-5 overflow-y-auto px-7 pb-7 sm:grid-cols-2 sm:px-9">
           {duplicates.length > 0 && (
-            <div className="sm:col-span-2 flex items-start gap-3 p-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.06]">
+            <div className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] p-3.5">
               <svg
-                width="15"
-                height="15"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#b5894a"
-                strokeWidth="2"
+                stroke="#a9781f"
+                strokeWidth="1.9"
                 strokeLinecap="round"
-                className="shrink-0 mt-0.5"
+                className="mt-0.5 shrink-0"
+                aria-hidden="true"
               >
                 <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                 <path d="M12 9v4M12 17h.01" />
               </svg>
               <div className="min-w-0">
-                <p className="text-[#b5894a] text-xs font-semibold mb-0.5">
+                <p className="text-[#a9781f] text-xs font-semibold mb-0.5">
                   Este e-mail já tem {duplicates.length} pedido{duplicates.length !== 1 ? "s" : ""}{" "}
                   registado{duplicates.length !== 1 ? "s" : ""}
                 </p>
-                <p className="text-foreground/45 text-[10px]">
-                  {duplicates
-                    .slice(0, 3)
-                    .map((q) => q.id.slice(-8))
-                    .join(", ")}
-                  {duplicates.length > 3 ? ` +${duplicates.length - 3}` : ""}
-                  {" · "}
+                <p className="text-foreground/50 text-[11px] leading-relaxed">
                   Pode continuar se for um evento diferente.
                 </p>
               </div>
             </div>
           )}
-          <div className="sm:col-span-2">
-            <label className={label}>Nome *</label>
-            <input
-              value={f.name}
-              onChange={(e) => set("name", e.target.value)}
-              placeholder="Nome do cliente"
-              className={input}
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className={label}>E-mail</label>
-            <input
-              value={f.email}
-              onChange={(e) => set("email", e.target.value)}
-              placeholder="email@exemplo.com"
-              className={input}
-            />
-          </div>
-          <div>
-            <label className={label}>Telefone</label>
-            <input
-              value={f.phone}
-              onChange={(e) => set("phone", e.target.value)}
-              placeholder="+351 …"
-              className={input}
-            />
-          </div>
-          <div>
-            <label className={label}>Empresa</label>
-            <input
-              value={f.company}
-              onChange={(e) => set("company", e.target.value)}
-              className={input}
-            />
-          </div>
-          <div>
-            <label className={label}>Como nos conheceu</label>
-            <input
-              value={f.referralSource}
-              onChange={(e) => set("referralSource", e.target.value)}
-              className={input}
-            />
-          </div>
-          <div>
-            <label className={label}>Categoria</label>
-            <select
-              value={f.category}
-              onChange={(e) => {
-                set("category", e.target.value);
-                set("eventType", "");
-              }}
-              className={input}
-            >
-              <option value="">—</option>
-              {CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={label}>Tipo de evento</label>
-            <select
-              value={f.eventType}
-              onChange={(e) => set("eventType", e.target.value)}
-              className={input}
-              disabled={!eventTypes.length}
-            >
-              <option value="">—</option>
-              {eventTypes.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={label}>Data do evento</label>
-            <input
-              type="date"
-              value={f.date}
-              onChange={(e) => set("date", e.target.value)}
-              className={input}
-            />
-          </div>
-          <div>
-            <label className={label}>Nº convidados</label>
-            <input
-              type="number"
-              value={f.guests}
-              onChange={(e) => set("guests", e.target.value)}
-              className={input}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className={label}>Local</label>
-            <input
-              value={f.location}
-              onChange={(e) => set("location", e.target.value)}
-              placeholder="Espaço / cidade"
-              className={input}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className={label}>Notas</label>
-            <textarea
-              rows={3}
-              value={f.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              placeholder="Detalhes da conversa, pedidos especiais…"
-              className={`${input} resize-none`}
-            />
-          </div>
+
+          <Field
+            containerClassName="sm:col-span-2"
+            label="Nome"
+            required
+            value={f.name}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="Nome do cliente"
+            autoFocus
+          />
+          <Field
+            label="E-mail"
+            type="email"
+            value={f.email}
+            onChange={(e) => set("email", e.target.value)}
+            placeholder="email@exemplo.com"
+          />
+          <Field
+            label="Telefone"
+            type="tel"
+            value={f.phone}
+            onChange={(e) => set("phone", e.target.value)}
+            placeholder="+351 …"
+          />
+          <Field
+            label="Empresa"
+            value={f.company}
+            onChange={(e) => set("company", e.target.value)}
+          />
+          <Field
+            label="Como nos conheceu"
+            value={f.referralSource}
+            onChange={(e) => set("referralSource", e.target.value)}
+          />
+          <Field
+            as="select"
+            label="Categoria"
+            value={f.category}
+            onChange={(e) => {
+              set("category", e.target.value);
+              set("eventType", "");
+            }}
+          >
+            <option value="">—</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </Field>
+          <Field
+            as="select"
+            label="Tipo de evento"
+            value={f.eventType}
+            onChange={(e) => set("eventType", e.target.value)}
+            disabled={!eventTypes.length}
+          >
+            <option value="">—</option>
+            {eventTypes.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.label}
+              </option>
+            ))}
+          </Field>
+          <Field
+            label="Data do evento"
+            type="date"
+            value={f.date}
+            onChange={(e) => set("date", e.target.value)}
+          />
+          <Field
+            label="Nº de convidados"
+            type="number"
+            min={0}
+            value={f.guests}
+            onChange={(e) => set("guests", e.target.value)}
+          />
+          <Field
+            containerClassName="sm:col-span-2"
+            label="Local"
+            value={f.location}
+            onChange={(e) => set("location", e.target.value)}
+            placeholder="Espaço / cidade"
+          />
+          <Field
+            as="textarea"
+            containerClassName="sm:col-span-2"
+            label="Notas"
+            rows={3}
+            value={f.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            placeholder="Detalhes da conversa, pedidos especiais…"
+            className="resize-none"
+          />
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-foreground/8">
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 text-foreground/45 text-[11px] tracking-[0.2em] uppercase hover:text-foreground/70 transition-colors"
-          >
+        {/* ── Footer ── */}
+        <div className="flex shrink-0 items-center justify-end gap-2 px-7 py-5 sm:px-9">
+          <Button variant="ghost" onClick={onClose}>
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             onClick={submit}
-            disabled={saving || !f.name.trim()}
-            className={`px-6 py-2.5 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-colors ${
-              saving || !f.name.trim()
-                ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
-                : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
-            }`}
+            loading={saving}
+            disabled={!f.name.trim()}
+            iconRight={<span aria-hidden="true">→</span>}
           >
-            {saving ? "A criar…" : "Criar pedido →"}
-          </button>
+            {saving ? "A criar…" : "Criar pedido"}
+          </Button>
         </div>
       </div>
     </div>
