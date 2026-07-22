@@ -156,6 +156,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ ok: true, id: proposal.id, emailed, emailError });
   } catch (err) {
     log.error("proposta-doc POST falhou", err);
-    return NextResponse.json({ error: "Erro ao gerar a proposta" }, { status: 500 });
+    // Rota só para administradores autenticados — incluir o motivo real ajuda a
+    // equipa (e o suporte) a perceber a causa em vez de um erro genérico opaco.
+    const detail = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: `Erro ao gerar a proposta: ${detail || "desconhecido"}` },
+      { status: 500 },
+    );
   }
 }

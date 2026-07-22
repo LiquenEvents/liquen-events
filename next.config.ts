@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // Self-contained server bundle so the app can run in any container/cloud
   // (Vercel ignores this and uses its own build).
   output: "standalone",
+  // sharp is a NATIVE module used directly in the proposal-PDF route (image
+  // cover-crop). Keep it external so it's loaded from node_modules at runtime
+  // instead of being bundled — a bundled native binary can fail to load on
+  // serverless and throw when the first image is processed.
+  serverExternalPackages: ["sharp"],
   images: {
     // WebP only — no AVIF. AVIF compresses a few % smaller but its on-the-fly
     // encode is several times slower than WebP, and the gallery has 500+ photos

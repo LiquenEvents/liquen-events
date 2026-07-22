@@ -482,6 +482,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   // ── Actions ──
   async function preview() {
     if (busy) return;
+    // Abrir a janela AGORA, no gesto do clique — se a abríssemos só depois do
+    // `await` (fetch), o browser bloqueava-a como popup e "não acontecia nada".
+    const win = typeof window !== "undefined" ? window.open("", "_blank") : null;
     setBusy("preview");
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
@@ -495,9 +498,18 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      if (win) {
+        win.location.href = url;
+      } else {
+        // Popup bloqueado mesmo assim → descarrega o PDF (nunca é bloqueado).
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "proposta-preview.pdf";
+        a.click();
+      }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
+      if (win) win.close();
       toast(e instanceof Error ? e.message : "Erro na pré-visualização.", "error");
     } finally {
       setBusy(null);
