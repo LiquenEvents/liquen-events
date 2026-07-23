@@ -189,66 +189,64 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         </div>
       </section>
 
-      {/* ── FOUNDER ── */}
-      {/* The founder portrait is now a clean, light studio headshot, so the old
-          full-bleed dark-scrim chapter treatment (built for the previous dark
-          event photo) would look artificial. Instead it sits in an elegant
-          framed portrait — thin gold-lined edge + soft shadow — beside a richer
-          text column (quote → bio → signature → founding line). */}
+      {/* ── FOUNDER — SpaceX-minimal ── */}
+      {/* Deliberately stark and monochrome (no gold, no frame/shadow), set in the
+          Saira grotesque (a free D-DIN-like face) scoped to this section only via
+          the --font-saira variable: uppercase, tight display tracking, generous
+          negative space and a single hairline rule — the SpaceX idiom. */}
       <section className="bg-surface border-t border-foreground/8 overflow-x-clip">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 py-16 lg:py-28">
-          <div className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] gap-12 lg:gap-20 items-center">
-            {/* Portrait — framed, uncovered with the cinematic mask-wipe. No dark
-                scrim: the light background reads clean against the surface. */}
+        <div
+          className="max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36"
+          style={{ fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif" }}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-14 lg:gap-24 items-center">
+            {/* Portrait — flat and borderless, uncovered with the mask-wipe. */}
             <Reveal
               as="div"
               variant="mask"
-              className="relative mx-auto w-full max-w-sm lg:max-w-none"
+              className="relative mx-auto w-full max-w-xs lg:max-w-none"
             >
-              <div className="relative aspect-[3/4] overflow-hidden rounded-sm ring-1 ring-foreground/10 shadow-2xl shadow-black/10">
+              <div className="relative aspect-[3/4] overflow-hidden">
                 <Image
                   src="/imagens/catarina-gaspar.jpg"
                   alt={t.common.imageAlt.sobreFounder}
                   fill
-                  sizes="(max-width: 1024px) 90vw, 38vw"
+                  sizes="(max-width: 1024px) 80vw, 34vw"
                   quality={75}
                   className="object-cover object-[50%_18%]"
                   {...blurFor("/imagens/catarina-gaspar.jpg")}
                 />
               </div>
-              {/* Gold accent rule anchoring the portrait's lower-left corner. */}
-              <span aria-hidden className="absolute -bottom-3 left-6 h-px w-16 bg-gold" />
             </Reveal>
 
-            {/* Text column */}
+            {/* Text — uppercase, monochrome, wide negative space. */}
             <div className="flex flex-col justify-center">
               <AnimateIn>
-                <p className={`${eyebrowDark} mb-8`}>
-                  <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+                <p className="text-foreground/45 text-[10px] tracking-[0.5em] uppercase mb-10">
                   {t.sobre.founderEyebrow}
                 </p>
                 <p
-                  className="text-foreground/85 font-bold uppercase tracking-display leading-[1.2]"
-                  style={{ fontSize: "clamp(24px, 3.2vw, 42px)" }}
+                  className="text-foreground uppercase font-medium leading-[1.05]"
+                  style={{ fontSize: "clamp(28px, 4vw, 52px)", letterSpacing: "-0.01em" }}
                 >
                   {t.sobre.founderQuote}
                 </p>
-                <p className="text-foreground/70 text-base lg:text-lg leading-[1.85] mt-8 max-w-xl">
+                <p className="text-foreground/60 text-base lg:text-lg leading-[1.8] mt-10 max-w-xl">
                   {t.sobre.founderBio}
                 </p>
-                <div className="mt-10 flex items-center gap-4">
-                  <span className="w-10 h-px bg-gold/60" />
+                <div className="mt-12 pt-6 border-t border-foreground/10 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4">
                   <div>
-                    <p className="text-foreground text-base font-semibold">{t.sobre.founderName}</p>
-                    <p className="text-foreground/72 text-xs tracking-[0.2em] uppercase mt-1">
+                    <p className="text-foreground text-sm tracking-[0.15em] uppercase">
+                      {t.sobre.founderName}
+                    </p>
+                    <p className="text-foreground/45 text-[11px] tracking-[0.3em] uppercase mt-1.5">
                       {t.sobre.founderRole}
                     </p>
                   </div>
+                  <p className="text-foreground/40 text-[10px] tracking-[0.4em] uppercase">
+                    {t.sobre.founderSince}
+                  </p>
                 </div>
-                <p className="text-foreground/55 text-[11px] tracking-[0.4em] uppercase mt-8 flex items-center gap-3">
-                  <span className="w-6 h-px bg-foreground/20 flex-shrink-0" />
-                  {t.sobre.founderSince}
-                </p>
               </AnimateIn>
             </div>
           </div>
