@@ -166,7 +166,7 @@ const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode
   },
   {
     id: "comunicacao",
-    label: "Comunicação",
+    label: "Fazer proposta",
     hint: "Desenhar e enviar a proposta, e falar com o cliente.",
     icon: (
       <svg
