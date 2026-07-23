@@ -392,7 +392,9 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     }
 
     const cx = W / 2;
-    // Thin cream frame inset from the trim — a quiet mark of craft.
+    // Thin cream frame inset from the trim — a quiet mark of craft. Border only:
+    // a DARK fill here would repaint the whole interior and hide the two side
+    // photos, leaving just the centre band showing.
     const inset = 22;
     p.drawRectangle({
       x: inset,
@@ -401,7 +403,6 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       height: H - 2 * inset,
       borderColor: rgb(0.32, 0.34, 0.31),
       borderWidth: 0.6,
-      color: DARK,
     });
 
     // White logo, upper area.
