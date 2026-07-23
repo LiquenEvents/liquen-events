@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+  useDeferredValue,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -94,6 +102,90 @@ function shortRef(id: string): string {
 // sensible thing to do next. It routes into the (otherwise tucked-away) advanced
 // workspace at the relevant tool tab; every tab stays reachable regardless.
 type DetailTab = "resumo" | "producao" | "financeiro" | "comunicacao";
+
+// The pedido detail's management tabs, each with a plain-language hint so it's
+// obvious what you do there. The tablist renders the icon + label, and a single
+// explainer line under it shows the active tab's hint.
+const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode }[] = [
+  {
+    id: "resumo",
+    label: "Gestão",
+    hint: "Dados do evento, estado, responsável e detalhes do pedido.",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "producao",
+    label: "Produção",
+    hint: "Checklist de produção, plano de decoração, convidados e logística.",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <path d="M3 8l9-5 9 5v8l-9 5-9-5V8z" strokeLinejoin="round" />
+        <path d="M3 8l9 5 9-5M12 13v8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "financeiro",
+    label: "Financeiro",
+    hint: "Preço, custos, margem, pagamentos e faturação.",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path
+          d="M15 9.5C14.5 8.5 13.3 8 12 8c-1.7 0-3 .9-3 2s1.3 2 3 2 3 .9 3 2-1.3 2-3 2c-1.3 0-2.5-.5-3-1.5M12 6.5v11"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    id: "comunicacao",
+    label: "Comunicação",
+    hint: "Desenhar e enviar a proposta, e falar com o cliente.",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <path
+          d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+];
+
 function detailNextAction(quote: Quote): { label: string; hint: string; tab: DetailTab } {
   const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote);
   if (perdido)
@@ -184,10 +276,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // Comunicação tab shows one proposal tool by default (ProposalStudio); the
   // simpler price-table tool (ProposalBuilder) stays collapsed behind a link.
   const [showBuilder, setShowBuilder] = useState(false);
-  // Progressive disclosure on the pedido detail: the default view is calm
-  // essentials only; the heavy tools (management form + Produção/Financeiro/
-  // Comunicação tabs) stay tucked behind this "Mostrar mais" disclosure.
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // The pedido detail's management tools (Gestão / Produção / Financeiro /
+  // Comunicação) are shown by DEFAULT so they're easy to find; the header can
+  // still collapse them. Only the active tab's panel renders, and the default
+  // "resumo" tab is light, so opening a pedido stays cheap.
+  const [advancedOpen, setAdvancedOpen] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
@@ -507,7 +600,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditGuests(String(q.guests ?? ""));
     setEditLocation(q.location ?? "");
     setDetailTab("resumo");
-    setAdvancedOpen(false);
+    setAdvancedOpen(true);
   }
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
@@ -546,7 +639,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditGuests(String(data.quote.guests ?? ""));
       setEditLocation(data.quote.location ?? "");
       setDetailTab("resumo");
-      setAdvancedOpen(false);
+      setAdvancedOpen(true);
       toast("Pedido duplicado — defina a nova data", "success");
     } catch {
       toast("Não foi possível duplicar o pedido", "error");
@@ -2431,20 +2524,28 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         })}
                       </p>
 
-                      {/* ── Área avançada — gestão e ferramentas, escondida por
-                          defeito para manter a vista calma. Tudo continua acessível. */}
-                      <div className="border-t border-foreground/[0.08] pt-2">
+                      {/* ── Ferramentas do pedido — o sítio para gerir este evento.
+                          Visível por defeito; o cabeçalho recolhe/expande. */}
+                      <div className="border-t border-foreground/[0.08] pt-4">
                         <button
                           type="button"
                           onClick={() => setAdvancedOpen((o) => !o)}
                           aria-expanded={advancedOpen}
                           aria-controls="detail-advanced"
-                          className="flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.14em] text-foreground/50 motion-safe:transition-colors hover:bg-foreground/[0.04] hover:text-foreground/75"
+                          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left motion-safe:transition-colors hover:bg-foreground/[0.04]"
                         >
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-foreground/75">
+                              Ferramentas do pedido
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-foreground/45">
+                              Gerir, produção, finanças e comunicação — tudo num só sítio.
+                            </span>
+                          </span>
                           <svg
-                            className={`shrink-0 motion-safe:transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""}`}
-                            width="14"
-                            height="14"
+                            className={`shrink-0 text-foreground/40 motion-safe:transition-transform duration-200 ${advancedOpen ? "rotate-180" : ""}`}
+                            width="16"
+                            height="16"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -2452,62 +2553,62 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           >
                             <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
-                          {advancedOpen
-                            ? "Ocultar gestão e ferramentas"
-                            : "Mostrar mais — gestão e ferramentas"}
                         </button>
                       </div>
 
                       {advancedOpen && (
-                        <div id="detail-advanced" className="flex flex-col gap-6">
-                          {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
-                              tablist pattern). */}
+                        <div id="detail-advanced" className="flex flex-col gap-4">
+                          {/* Tabs — icon + label; Arrow keys move between them
+                              (WAI-ARIA tablist). A line below explains the active one. */}
                           <div
                             role="tablist"
-                            aria-label="Secções do pedido"
+                            aria-label="Ferramentas do pedido"
                             className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
                           >
-                            {(
-                              [
-                                ["resumo", "Gestão"],
-                                ["producao", "Produção"],
-                                ["financeiro", "Financeiro"],
-                                ["comunicacao", "Comunicação"],
-                              ] as const
-                            ).map(([id, label], i, arr) => {
-                              const active = detailTab === id;
+                            {DETAIL_TABS.map((tab, i, arr) => {
+                              const active = detailTab === tab.id;
                               return (
                                 <button
-                                  key={id}
-                                  id={`detail-tab-${id}`}
+                                  key={tab.id}
+                                  id={`detail-tab-${tab.id}`}
                                   role="tab"
                                   aria-selected={active}
-                                  aria-controls={`detail-panel-${id}`}
+                                  aria-controls={`detail-panel-${tab.id}`}
                                   tabIndex={active ? 0 : -1}
-                                  onClick={() => setDetailTab(id)}
+                                  onClick={() => setDetailTab(tab.id)}
                                   onKeyDown={(e) => {
                                     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
                                     e.preventDefault();
                                     const dir = e.key === "ArrowRight" ? 1 : -1;
-                                    const next = arr[(i + dir + arr.length) % arr.length][0];
-                                    setDetailTab(next);
+                                    const nextIdx = (i + dir + arr.length) % arr.length;
+                                    setDetailTab(arr[nextIdx].id);
                                     const tabs =
                                       e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
                                         '[role="tab"]',
                                       );
-                                    tabs?.[(i + dir + arr.length) % arr.length]?.focus();
+                                    tabs?.[nextIdx]?.focus();
                                   }}
-                                  className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                  className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
                                     active
                                       ? "border-[#4d6350] text-foreground/85"
                                       : "border-transparent text-foreground/40 hover:text-foreground/65"
                                   }`}
                                 >
-                                  {label}
+                                  <span
+                                    aria-hidden
+                                    className={active ? "text-[#4d6350]" : "text-foreground/35"}
+                                  >
+                                    {tab.icon}
+                                  </span>
+                                  {tab.label}
                                 </button>
                               );
                             })}
                           </div>
+                          {/* Plain-language explainer for the active tab. */}
+                          <p className="text-[11px] leading-relaxed text-foreground/55">
+                            {DETAIL_TABS.find((t) => t.id === detailTab)?.hint}
+                          </p>
 
                           {/* Coluna única — as ferramentas do separador ativo */}
                           <div className="flex min-w-0 flex-col gap-6">
