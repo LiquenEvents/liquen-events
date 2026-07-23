@@ -819,11 +819,27 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     text(p, SITE.phoneDisplay, M + 70, y, { size: 10.5, color: INK });
   }
 
-  // ── Back cover — a silent, dark closing page that bookends the cover. ──
+  // ── Back cover — mirrors the front cover's gatefold so the document opens and
+  //    closes on the same image: two side photos flanking a dark centre band,
+  //    with a quiet closing note in the middle. ──
   {
     const p = pdf.addPage([W, H]);
     p.drawRectangle({ x: 0, y: 0, width: W, height: H, color: DARK });
-    // Thin cream frame inset from the trim — a quiet mark of craft.
+
+    const hasImgs = !!(doc.coverImages[0] || doc.coverImages[1]);
+    if (hasImgs) {
+      // Same gatefold geometry as page 1 so the covers bookend each other.
+      const panelW = W * 0.34;
+      const sideW = (W - panelW) / 2;
+      const left = doc.coverImages[0];
+      const right = doc.coverImages[1];
+      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, COVER_DENSITY);
+      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, COVER_DENSITY);
+      p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
+    }
+
+    // Border only — a DARK fill here would repaint the interior and hide the
+    // side photos, exactly as on the front cover.
     const inset = 22;
     p.drawRectangle({
       x: inset,
@@ -832,24 +848,31 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       height: H - 2 * inset,
       borderColor: rgb(0.32, 0.34, 0.31),
       borderWidth: 0.6,
-      color: DARK,
     });
+
     const cx = W / 2;
+    // Keep every line inside the centre band so text never spills onto the
+    // photos; wrap to the band width when images flank the page.
+    const bandW = (hasImgs ? W * 0.34 : W * 0.72) - 24;
     textCenter(p, "OBRIGADA", cx, H * 0.62, {
       font: f.bold,
       size: 9,
       color: rgb(0.72, 0.6, 0.34),
       tracking: 3,
     });
-    textCenter(p, "Por nos deixarem fazer parte deste momento.", cx, H * 0.56, {
-      font: f.serifIt,
-      size: 13,
-      color: CREAM,
-    });
+    let my = H * 0.56;
+    for (const ln of wrap(f.serifIt, "Por nos deixarem fazer parte deste momento.", 13, bandW)) {
+      textCenter(p, ln, cx, my, { font: f.serifIt, size: 13, color: CREAM });
+      my -= 13 * 1.3;
+    }
     const lw = 168;
     const lh = (logoWhite.height / logoWhite.width) * lw;
     p.drawImage(logoWhite, { x: cx - lw / 2, y: H * 0.3, width: lw, height: lh });
-    textCenter(p, SITE.slogan, cx, H * 0.3 - 18, { font: f.serifIt, size: 10.5, color: CREAM_DIM });
+    let sy = H * 0.3 - 18;
+    for (const ln of wrap(f.serifIt, SITE.slogan, 10.5, bandW)) {
+      textCenter(p, ln, cx, sy, { font: f.serifIt, size: 10.5, color: CREAM_DIM });
+      sy -= 10.5 * 1.3;
+    }
   }
 
   return pdf.save();
