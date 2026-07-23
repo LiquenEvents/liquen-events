@@ -128,7 +128,7 @@ const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode
   {
     id: "producao",
     label: "Produção",
-    hint: "Checklist de produção, plano de decoração, convidados e logística.",
+    hint: "Prepare o evento: tarefas e checklist. Abra o plano, o cronograma e os convidados quando precisar.",
     icon: (
       <svg
         width="15"
@@ -2633,52 +2633,86 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 tabIndex={0}
                                 className="flex flex-col gap-6 focus:outline-none"
                               >
-                                {/* Event */}
-                                <div>
-                                  <p className="bo-eyebrow mb-3">Evento</p>
-                                  {/* Read-only facts */}
-                                  <div className="grid grid-cols-2 gap-2 mb-3">
-                                    {[
-                                      {
-                                        l: "Tipo",
-                                        v: CATEGORIES.find((c) => c.id === selected.category)
-                                          ?.label,
-                                      },
-                                      {
-                                        l: "Sub-tipo",
-                                        v:
-                                          selected.category && selected.eventType
-                                            ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
-                                                (e) => e.id === selected.eventType,
-                                              )?.label
-                                            : null,
-                                      },
-                                      {
-                                        l: "Pacote",
-                                        v: PACKAGES.find((p) => p.id === selected.packageTier)
-                                          ?.label,
-                                      },
-                                      {
-                                        l: "Duração",
-                                        v: selected.duration ? `${selected.duration}h` : "—",
-                                      },
-                                      {
-                                        l: "Extras",
-                                        v: `${selected.addons?.length ?? 0} serviços`,
-                                      },
-                                    ].map(({ l, v }) => (
-                                      <div key={l}>
-                                        <p className="text-foreground/60 text-[9px] tracking-wide uppercase mb-0.5">
-                                          {l}
-                                        </p>
-                                        <p className="text-foreground/72 text-xs">{v ?? "—"}</p>
-                                      </div>
-                                    ))}
+                                {/* ── Estado e preço — the decision you came here to make,
+                                    first and emphasised, side by side. ── */}
+                                <div className="flex flex-col gap-4 rounded-xl border border-[#4d6350]/20 bg-[#4d6350]/[0.04] p-4">
+                                  <div>
+                                    <p className="bo-eyebrow">Estado e preço</p>
+                                    <p className="mt-1 text-[11px] text-foreground/55">
+                                      O estado do pedido e o valor que vai cobrar. Guarde no fim.
+                                    </p>
                                   </div>
-                                  {/* Editable logistics */}
-                                  <div className="grid grid-cols-1 gap-2 pt-2 border-t border-foreground/[0.06] sm:grid-cols-2">
+                                  <div className="grid gap-4 sm:grid-cols-2">
                                     <div>
-                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                      <label className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
+                                        Estado
+                                      </label>
+                                      <select
+                                        value={editStatus}
+                                        onChange={(e) =>
+                                          setEditStatus(e.target.value as QuoteStatus)
+                                        }
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      >
+                                        {STATUS_OPTIONS.map((s) => (
+                                          <option key={s.id} value={s.id}>
+                                            {s.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
+                                        Preço final que vai cobrar (sem IVA) €
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={editPrice}
+                                        onChange={(e) => setEditPrice(e.target.value)}
+                                        placeholder="Ex: 12500"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      />
+                                      <p className="mt-1 text-[10px] text-foreground/45">
+                                        Substitui a estimativa automática. É o valor que aparece ao
+                                        cliente.
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {editStatus === "rejeitado" && (
+                                    <div>
+                                      <label className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
+                                        Motivo de perda
+                                      </label>
+                                      <textarea
+                                        rows={2}
+                                        value={editLostReason}
+                                        onChange={(e) => setEditLostReason(e.target.value)}
+                                        placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                      />
+                                    </div>
+                                  )}
+                                  {selected.status === "rejeitado" &&
+                                    selected.lostReason &&
+                                    editStatus !== "rejeitado" && (
+                                      <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
+                                        <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
+                                          Motivo de perda anterior
+                                        </p>
+                                        <p className="text-xs text-foreground/72">
+                                          {selected.lostReason}
+                                        </p>
+                                      </div>
+                                    )}
+                                </div>
+
+                                {/* ── Detalhes do evento — editable fields first, then the
+                                    client-form facts (read-only) below. ── */}
+                                <div>
+                                  <p className="bo-eyebrow mb-3">Detalhes do evento</p>
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <div>
+                                      <label className="mb-1 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
                                         Data
                                       </label>
                                       <input
@@ -2700,7 +2734,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                         })()}
                                     </div>
                                     <div>
-                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                      <label className="mb-1 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
                                         Convidados
                                       </label>
                                       <input
@@ -2712,7 +2746,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       />
                                     </div>
                                     <div className="col-span-2">
-                                      <label className="text-foreground/60 text-[9px] tracking-wide uppercase block mb-1">
+                                      <label className="mb-1 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
                                         Local
                                       </label>
                                       <input
@@ -2723,12 +2757,119 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       />
                                     </div>
                                   </div>
+                                  <div className="mt-3 rounded-lg bg-foreground/[0.03] p-3">
+                                    <p className="mb-2 text-[10px] uppercase tracking-[0.14em] text-foreground/40">
+                                      Do formulário do cliente (não editável)
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {[
+                                        {
+                                          l: "Tipo",
+                                          v: CATEGORIES.find((c) => c.id === selected.category)
+                                            ?.label,
+                                        },
+                                        {
+                                          l: "Sub-tipo",
+                                          v:
+                                            selected.category && selected.eventType
+                                              ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
+                                                  (e) => e.id === selected.eventType,
+                                                )?.label
+                                              : null,
+                                        },
+                                        {
+                                          l: "Pacote",
+                                          v: PACKAGES.find((p) => p.id === selected.packageTier)
+                                            ?.label,
+                                        },
+                                        {
+                                          l: "Duração",
+                                          v: selected.duration ? `${selected.duration}h` : "—",
+                                        },
+                                        {
+                                          l: "Extras",
+                                          v: `${selected.addons?.length ?? 0} serviços`,
+                                        },
+                                      ].map(({ l, v }) => (
+                                        <div key={l}>
+                                          <p className="text-foreground/50 text-[9px] tracking-wide uppercase mb-0.5">
+                                            {l}
+                                          </p>
+                                          <p className="text-foreground/70 text-xs">{v ?? "—"}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
 
-                                {/* Estimate */}
+                                {/* ── Organização — who owns it and how we track it. ── */}
+                                <div>
+                                  <p className="bo-eyebrow mb-4">Organização</p>
+                                  <div className="flex flex-col gap-4">
+                                    <div>
+                                      <label className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
+                                        Responsável
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editAssigned}
+                                        onChange={(e) => setEditAssigned(e.target.value)}
+                                        placeholder="Nome do membro da equipa…"
+                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
+                                      />
+                                    </div>
+                                    <TagsField
+                                      key={`tags-${selected.id}`}
+                                      quote={selected}
+                                      suggestions={allTags}
+                                      onChange={(tags) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, tags } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) => (prev ? { ...prev, tags } : prev));
+                                      }}
+                                    />
+                                    <FollowUpField
+                                      key={`fu-${selected.id}`}
+                                      quote={selected}
+                                      onChange={(followUpAt) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, followUpAt } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev ? { ...prev, followUpAt } : prev,
+                                        );
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* ── Notas internas ── */}
+                                <div>
+                                  <label className="mb-1.5 block text-[10px] uppercase tracking-[0.14em] text-foreground/55">
+                                    Notas internas
+                                  </label>
+                                  <textarea
+                                    rows={3}
+                                    value={editNotes}
+                                    onChange={(e) => setEditNotes(e.target.value)}
+                                    placeholder="Notas internas sobre este pedido…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
+                                  />
+                                </div>
+
+                                {/* ── Estimativa automática — reference only, de-emphasised. ── */}
                                 {selected.priceBreakdown && (
                                   <div>
-                                    <p className="bo-eyebrow mb-3">Estimativa Calculada</p>
+                                    <p className="bo-eyebrow">Estimativa automática</p>
+                                    <p className="mt-1 mb-2 text-[10px] text-foreground/45">
+                                      Cálculo a partir do que o cliente escolheu no formulário.
+                                      Serve de referência.
+                                    </p>
                                     <div className="bg-foreground/4 rounded-sm p-3 flex flex-col gap-1.5">
                                       {selected.priceBreakdown.addonsCost > 0 && (
                                         <div className="flex justify-between text-[10px]">
@@ -2760,135 +2901,23 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   </div>
                                 )}
 
-                                {/* Admin actions */}
-                                <div className="border-t border-foreground/10 pt-5">
-                                  <p className="bo-eyebrow mb-4">Gestão do Pedido</p>
-                                  <div className="flex flex-col gap-4">
-                                    <TagsField
-                                      key={`tags-${selected.id}`}
-                                      quote={selected}
-                                      suggestions={allTags}
-                                      onChange={(tags) => {
-                                        setQuotes((prev) =>
-                                          prev.map((q) =>
-                                            q.id === selected.id ? { ...q, tags } : q,
-                                          ),
-                                        );
-                                        setSelected((prev) => (prev ? { ...prev, tags } : prev));
-                                      }}
-                                    />
-                                    <FollowUpField
-                                      key={`fu-${selected.id}`}
-                                      quote={selected}
-                                      onChange={(followUpAt) => {
-                                        setQuotes((prev) =>
-                                          prev.map((q) =>
-                                            q.id === selected.id ? { ...q, followUpAt } : q,
-                                          ),
-                                        );
-                                        setSelected((prev) =>
-                                          prev ? { ...prev, followUpAt } : prev,
-                                        );
-                                      }}
-                                    />
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Responsável
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={editAssigned}
-                                        onChange={(e) => setEditAssigned(e.target.value)}
-                                        placeholder="Nome do membro da equipa…"
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Estado
-                                      </label>
-                                      <select
-                                        value={editStatus}
-                                        onChange={(e) =>
-                                          setEditStatus(e.target.value as QuoteStatus)
-                                        }
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                      >
-                                        {STATUS_OPTIONS.map((s) => (
-                                          <option key={s.id} value={s.id}>
-                                            {s.label}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    {editStatus === "rejeitado" && (
-                                      <div>
-                                        <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                          Motivo de perda
-                                        </label>
-                                        <textarea
-                                          rows={2}
-                                          value={editLostReason}
-                                          onChange={(e) => setEditLostReason(e.target.value)}
-                                          placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
-                                          className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                        />
-                                      </div>
-                                    )}
-                                    {selected.status === "rejeitado" &&
-                                      selected.lostReason &&
-                                      editStatus !== "rejeitado" && (
-                                        <div className="px-3 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07]">
-                                          <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/60 mb-1">
-                                            Motivo de perda anterior
-                                          </p>
-                                          <p className="text-xs text-foreground/72">
-                                            {selected.lostReason}
-                                          </p>
-                                        </div>
-                                      )}
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Preço final (sem IVA) €
-                                      </label>
-                                      <input
-                                        type="number"
-                                        value={editPrice}
-                                        onChange={(e) => setEditPrice(e.target.value)}
-                                        placeholder="Ex: 12500"
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-foreground/70 tracking-[0.3em] uppercase mb-2">
-                                        Notas Internas
-                                      </label>
-                                      <textarea
-                                        rows={3}
-                                        value={editNotes}
-                                        onChange={(e) => setEditNotes(e.target.value)}
-                                        placeholder="Notas internas sobre este pedido…"
-                                        className="bo-input px-3 py-2 text-sm text-foreground/70 resize-none"
-                                      />
-                                    </div>
-                                    {isDirty && !saving && (
-                                      <p
-                                        role="status"
-                                        className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
-                                      >
-                                        <span className="w-1 h-1 rounded-full bg-gold/80" />
-                                        Alterações por guardar
-                                      </p>
-                                    )}
-                                    <button
-                                      onClick={saveChanges}
-                                      disabled={saving || !isDirty}
-                                      className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
-                                    >
-                                      {saving ? "A guardar…" : "Guardar Alterações →"}
-                                    </button>
-                                  </div>
-                                </div>
+                                {/* Save — unchanged wiring (isDirty / saveChanges). */}
+                                {isDirty && !saving && (
+                                  <p
+                                    role="status"
+                                    className="flex items-center gap-1.5 text-[10px] tracking-wide text-gold-text -mb-1"
+                                  >
+                                    <span className="w-1 h-1 rounded-full bg-gold/80" />
+                                    Alterações por guardar
+                                  </p>
+                                )}
+                                <button
+                                  onClick={saveChanges}
+                                  disabled={saving || !isDirty}
+                                  className={`w-full py-3 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-all ${saving || !isDirty ? "bg-[#1b2119]/30 text-white/50 cursor-not-allowed" : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"}`}
+                                >
+                                  {saving ? "A guardar…" : "Guardar Alterações →"}
+                                </button>
                               </div>
                             )}
 
@@ -2900,6 +2929,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 tabIndex={0}
                                 className="flex flex-col gap-6 focus:outline-none"
                               >
+                                {/* Preparação — the daily driver (tasks + checklist),
+                                    always open and first. */}
+                                <p className="bo-eyebrow text-foreground/45">Preparação</p>
+
                                 {/* Tasks linked to this event */}
                                 <EventTasks
                                   key={`tasks-${selected.id}`}
@@ -2921,49 +2954,79 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   }}
                                 />
 
-                                {/* Decor production plan (sourcing → strike) */}
-                                <ProductionPlan
-                                  key={`prod-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(productionPlan) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, productionPlan } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) =>
-                                      prev ? { ...prev, productionPlan } : prev,
-                                    );
-                                  }}
-                                />
+                                {/* Plano &amp; dia do evento — occasional tools, collapsed so
+                                    the tab opens short. Native <details> keeps every child
+                                    mounted (hidden via CSS), so their fetch/PATCH lifecycles
+                                    are untouched. */}
+                                <details className="group border-t border-foreground/10 pt-4">
+                                  <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                    <svg
+                                      className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.8"
+                                    >
+                                      <path
+                                        d="m9 6 6 6-6 6"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                    Plano de decoração, cronograma e convidados
+                                  </summary>
+                                  <div className="flex flex-col gap-6 pt-6">
+                                    {/* Decor production plan (sourcing → strike) */}
+                                    <ProductionPlan
+                                      key={`prod-${selected.id}`}
+                                      quote={selected}
+                                      onChange={(productionPlan) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, productionPlan } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev ? { ...prev, productionPlan } : prev,
+                                        );
+                                      }}
+                                    />
 
-                                {/* Day-of run sheet */}
-                                <EventTimeline
-                                  key={`tl-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(timeline) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, timeline } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                                  }}
-                                />
+                                    {/* Day-of run sheet */}
+                                    <EventTimeline
+                                      key={`tl-${selected.id}`}
+                                      quote={selected}
+                                      onChange={(timeline) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, timeline } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev ? { ...prev, timeline } : prev,
+                                        );
+                                      }}
+                                    />
 
-                                {/* Guest list / RSVP */}
-                                <GuestList
-                                  key={`guests-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(guestList) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, guestList } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                                  }}
-                                />
+                                    {/* Guest list / RSVP */}
+                                    <GuestList
+                                      key={`guests-${selected.id}`}
+                                      quote={selected}
+                                      onChange={(guestList) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, guestList } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev ? { ...prev, guestList } : prev,
+                                        );
+                                      }}
+                                    />
+                                  </div>
+                                </details>
                               </div>
                             )}
 
@@ -2975,6 +3038,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 tabIndex={0}
                                 className="flex flex-col gap-6 focus:outline-none"
                               >
+                                <p className="text-[11px] leading-relaxed text-foreground/55">
+                                  Quanto o evento vale, quanto já recebeu, quanto falta — e a margem
+                                  depois dos custos.
+                                </p>
                                 {/* Payments & invoicing */}
                                 <PaymentsPanel
                                   key={`pay-${selected.id}`}
@@ -3016,71 +3083,87 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 tabIndex={0}
                                 className="flex flex-col gap-6 focus:outline-none"
                               >
-                                <p className="text-foreground/50 text-[11px] leading-relaxed">
-                                  Crie e envie a proposta ao cliente. Comece por aqui.
-                                </p>
-                                <ProposalStudio
-                                  key={`studio-${selected.id}`}
-                                  quote={selected}
-                                  onSent={() => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) =>
-                                      prev ? { ...prev, status: "cotado" } : prev,
-                                    );
-                                    setEditStatus("cotado");
-                                    appendActivity(selected.id, [
-                                      {
-                                        id: randomId(),
-                                        at: new Date().toISOString(),
-                                        kind: "proposal_sent",
-                                        actor: userName,
-                                        summary: "Proposta enviada ao cliente (Studio)",
-                                      },
-                                    ]);
-                                  }}
-                                />
+                                {/* Step 1 — the proposal. One tool at a time: the
+                                    detailed Studio by default, or the quick price-table
+                                    Builder — never both stacked on screen. */}
+                                <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
                                 {!showBuilder ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowBuilder(true)}
-                                    className="self-start text-[#4d6350] text-[11px] tracking-[0.08em] hover:opacity-75 transition-opacity underline underline-offset-2"
-                                  >
-                                    Outra forma de propor (tabela de preços simples)
-                                  </button>
+                                  <>
+                                    <ProposalStudio
+                                      key={`studio-${selected.id}`}
+                                      quote={selected}
+                                      onSent={() => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev ? { ...prev, status: "cotado" } : prev,
+                                        );
+                                        setEditStatus("cotado");
+                                        appendActivity(selected.id, [
+                                          {
+                                            id: randomId(),
+                                            at: new Date().toISOString(),
+                                            kind: "proposal_sent",
+                                            actor: userName,
+                                            summary: "Proposta enviada ao cliente (Studio)",
+                                          },
+                                        ]);
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowBuilder(true)}
+                                      className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
+                                    >
+                                      Prefiro uma proposta rápida (tabela de preços) →
+                                    </button>
+                                  </>
                                 ) : (
-                                  <ProposalBuilder
-                                    quote={selected}
-                                    onSent={(total) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id
-                                            ? { ...q, status: "cotado", quotedPrice: total }
-                                            : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev
-                                          ? { ...prev, status: "cotado", quotedPrice: total }
-                                          : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: `Proposta enviada — ${eur(total)}`,
-                                        },
-                                      ]);
-                                    }}
-                                  />
+                                  <>
+                                    <ProposalBuilder
+                                      quote={selected}
+                                      onSent={(total) => {
+                                        setQuotes((prev) =>
+                                          prev.map((q) =>
+                                            q.id === selected.id
+                                              ? { ...q, status: "cotado", quotedPrice: total }
+                                              : q,
+                                          ),
+                                        );
+                                        setSelected((prev) =>
+                                          prev
+                                            ? { ...prev, status: "cotado", quotedPrice: total }
+                                            : prev,
+                                        );
+                                        setEditStatus("cotado");
+                                        appendActivity(selected.id, [
+                                          {
+                                            id: randomId(),
+                                            at: new Date().toISOString(),
+                                            kind: "proposal_sent",
+                                            actor: userName,
+                                            summary: `Proposta enviada — ${eur(total)}`,
+                                          },
+                                        ]);
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowBuilder(false)}
+                                      className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
+                                    >
+                                      ← Voltar à proposta detalhada (com imagens)
+                                    </button>
+                                  </>
                                 )}
 
+                                {/* Step 2 — talk to the client. */}
+                                <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
+                                  2 · Falar com o cliente
+                                </p>
                                 <ClientMessenger
                                   key={selected.id}
                                   quote={selected}
@@ -3106,11 +3189,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   }}
                                 />
 
-                                <ActivityLog
-                                  quote={selected}
-                                  actor={userName}
-                                  onAddEntry={(entry) => appendActivity(selected.id, [entry])}
-                                />
+                                {/* Activity history — de-emphasised, collapsed by default. */}
+                                <details className="group border-t border-foreground/10 pt-4">
+                                  <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                    <svg
+                                      className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.8"
+                                    >
+                                      <path
+                                        d="m9 6 6 6-6 6"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                    Histórico de atividade
+                                  </summary>
+                                  <div className="pt-6">
+                                    <ActivityLog
+                                      quote={selected}
+                                      actor={userName}
+                                      onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                    />
+                                  </div>
+                                </details>
                               </div>
                             )}
                           </div>
