@@ -211,7 +211,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                   alt={t.common.imageAlt.sobreFounder}
                   fill
                   sizes="(max-width: 1024px) 90vw, 38vw"
-                  quality={82}
+                  quality={75}
                   className="object-cover object-[50%_18%]"
                   {...blurFor("/imagens/catarina-gaspar.jpg")}
                 />
