@@ -189,16 +189,13 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         </div>
       </section>
 
-      {/* ── FOUNDER — SpaceX-minimal ── */}
-      {/* Deliberately stark and monochrome (no gold, no frame/shadow), set in the
-          Saira grotesque (a free D-DIN-like face) scoped to this section only via
-          the --font-saira variable: uppercase, tight display tracking, generous
-          negative space and a single hairline rule — the SpaceX idiom. */}
+      {/* ── FOUNDER — minimal, in the site's signature idiom ── */}
+      {/* Pared back to the site's own "signature" rhythm and typeface (Inter):
+          gold-dash eyebrow + big uppercase display headline + a hairline +
+          attribution. Just the portrait, the founder's words and her name — no
+          bio paragraph, no extra lines. */}
       <section className="bg-surface border-t border-foreground/8 overflow-x-clip">
-        <div
-          className="max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36"
-          style={{ fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif" }}
-        >
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36">
           <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-14 lg:gap-24 items-center">
             {/* Portrait — flat and borderless, uncovered with the mask-wipe. */}
             <Reveal
@@ -219,32 +216,25 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               </div>
             </Reveal>
 
-            {/* Text — uppercase, monochrome, wide negative space. */}
+            {/* Text — eyebrow, the founder's words, and her name. Nothing more. */}
             <div className="flex flex-col justify-center">
               <AnimateIn>
-                <p className="text-foreground/45 text-[10px] tracking-[0.5em] uppercase mb-10">
+                <p className={`${eyebrowDark} mb-8`}>
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
                   {t.sobre.founderEyebrow}
                 </p>
                 <p
-                  className="text-foreground uppercase font-medium leading-[1.05]"
-                  style={{ fontSize: "clamp(28px, 4vw, 52px)", letterSpacing: "-0.01em" }}
+                  className="text-foreground font-bold uppercase tracking-display leading-[1.05]"
+                  style={{ fontSize: "clamp(28px, 4vw, 52px)" }}
                 >
                   {t.sobre.founderQuote}
                 </p>
-                <p className="text-foreground/60 text-base lg:text-lg leading-[1.8] mt-10 max-w-xl">
-                  {t.sobre.founderBio}
-                </p>
-                <div className="mt-12 pt-6 border-t border-foreground/10 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4">
-                  <div>
-                    <p className="text-foreground text-sm tracking-[0.15em] uppercase">
-                      {t.sobre.founderName}
-                    </p>
-                    <p className="text-foreground/45 text-[11px] tracking-[0.3em] uppercase mt-1.5">
-                      {t.sobre.founderRole}
-                    </p>
-                  </div>
-                  <p className="text-foreground/40 text-[10px] tracking-[0.4em] uppercase">
-                    {t.sobre.founderSince}
+                <div className="mt-12 pt-6 border-t border-foreground/10">
+                  <p className="text-foreground text-sm tracking-[0.15em] uppercase">
+                    {t.sobre.founderName}
+                  </p>
+                  <p className="text-foreground/50 text-[11px] tracking-[0.3em] uppercase mt-1.5">
+                    {t.sobre.founderRole}
                   </p>
                 </div>
               </AnimateIn>

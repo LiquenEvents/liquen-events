@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display, Saira } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "../globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -62,27 +62,6 @@ const playfair = Playfair_Display({
   display: "swap",
   adjustFontFallback: true,
   fallback: ["Georgia", "Times New Roman", "Times", "serif"],
-});
-
-// SpaceX-style technical grotesque, used ONLY on the Sobre founder section
-// (scoped via the --font-saira variable). Saira is a free, DIN-adjacent
-// variable face — the closest open substitute for SpaceX's proprietary D-DIN —
-// so nothing proprietary ships in the repo. Variable (no `weight`): one woff2
-// covers the light→bold range the section uses.
-const saira = Saira({
-  variable: "--font-saira",
-  subsets: ["latin"],
-  display: "swap",
-  adjustFontFallback: true,
-  fallback: [
-    "system-ui",
-    "-apple-system",
-    "Segoe UI",
-    "Roboto",
-    "Helvetica Neue",
-    "Arial",
-    "sans-serif",
-  ],
 });
 
 export async function generateMetadata({
@@ -197,7 +176,7 @@ export default async function RootLayout({
     <html
       lang={htmlLang(locale)}
       data-scroll-behavior="smooth"
-      className={`${inter.variable} ${playfair.variable} ${saira.variable}`}
+      className={`${inter.variable} ${playfair.variable}`}
     >
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale} dict={pickChromeDict(t)}>
