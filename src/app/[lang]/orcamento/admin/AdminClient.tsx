@@ -1851,14 +1851,23 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
             {/* When a pedido is open, the list collapses to a slim rail and the
                 detail takes over the remaining width as a spacious workspace.
+                In FOCUS MODE (its tools open) the list is hidden entirely and the
+                detail spans the full width — no cramped side column.
                 With nothing selected the list spreads full-width. */}
             <div
               className={`grid grid-cols-1 gap-8 ${
-                selected ? "xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]" : "xl:grid-cols-1"
+                selected && !advancedOpen
+                  ? "xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]"
+                  : "xl:grid-cols-1"
               }`}
             >
-              {/* List */}
-              <div className="flex min-w-0 flex-col gap-3">
+              {/* List — hidden on desktop while the pedido's tools are open, so the
+                  detail workspace uses the full width instead of a slim column. */}
+              <div
+                className={`flex min-w-0 flex-col gap-3 ${
+                  selected && advancedOpen ? "xl:hidden" : ""
+                }`}
+              >
                 {filtered.length === 0 && (
                   <div className="bo-card">
                     <EmptyState
@@ -2080,7 +2089,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     role={isDetailOverlay ? "dialog" : undefined}
                     aria-modal={isDetailOverlay ? true : undefined}
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
+                    className={`fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl max-h-screen overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)] ${
+                      advancedOpen
+                        ? "xl:max-h-none"
+                        : "xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)]"
+                    }`}
                   >
                     <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white/95 px-5 pt-5 backdrop-blur-sm sm:px-7">
                       <div className="flex items-start justify-between gap-4">
