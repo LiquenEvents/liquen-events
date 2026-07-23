@@ -2022,7 +2022,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     role={isDetailOverlay ? "dialog" : undefined}
                     aria-modal={isDetailOverlay ? true : undefined}
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-x-hidden overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
                   >
                     <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white/95 px-5 pt-5 backdrop-blur-sm sm:px-7">
                       <div className="flex items-start justify-between gap-4">
@@ -2031,7 +2031,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             id="detail-drawer-title"
                             ref={detailTitleRef}
                             tabIndex={-1}
-                            className="truncate font-display text-xl leading-tight text-foreground/90 focus:outline-none sm:text-2xl"
+                            title={selected.name}
+                            /* line-clamp (not truncate): a global `h1,h2,h3 {
+                               text-wrap: balance }` is unlayered and overrides
+                               Tailwind's layered `truncate`, so a long name would
+                               wrap to many lines and shove the content down.
+                               Clamp to 2 lines with an ellipsis instead. */
+                            className="line-clamp-2 break-words font-display text-xl leading-tight text-foreground/90 focus:outline-none sm:text-2xl"
                           >
                             {selected.name}
                           </h2>
