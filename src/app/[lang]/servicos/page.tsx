@@ -69,7 +69,6 @@ const categoryMeta = [
       { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
-      { slug: "jantares-de-gala", image: "/imagens/J&P-IMGL4767.jpg" },
     ],
   },
   {
@@ -77,13 +76,7 @@ const categoryMeta = [
     num: "02",
     layout: "mosaic-right" as const,
     band: "/imagens/EW1_1333.jpg",
-    services: [
-      { slug: "eventos-corporativos", image: "/imagens/EW1_1405.jpg" },
-      { slug: "conferencias-e-congressos", image: "/imagens/EW1_1332.jpg" },
-      { slug: "teambuilding", image: "/imagens/EW1_1330.jpg" },
-      { slug: "lancamentos-de-produto", image: "/imagens/EW1_1428.jpg" },
-      { slug: "jantares-de-empresa", image: "/imagens/EW1_1404.jpg" },
-    ],
+    services: [{ slug: "eventos-corporativos", image: "/imagens/EW1_1405.jpg" }],
   },
 ];
 
@@ -107,6 +100,7 @@ function ServiceBand({
           alt={service.title}
           fill
           sizes="100vw"
+          quality={75}
           className="object-cover object-center"
           {...blurFor(service.image)}
         />
@@ -193,6 +187,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             fill
             preload
             sizes="100vw"
+            quality={75}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/EW1_1330.jpg")}
           />
@@ -248,6 +243,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           alt=""
           fill
           sizes="100vw"
+          quality={75}
           className="object-cover object-center"
           {...blurFor("/imagens/hd-edited.jpg")}
         />
@@ -291,7 +287,9 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                   <h3 className="text-white font-bold uppercase tracking-display text-lg lg:text-xl mb-4">
                     {p.title}
                   </h3>
-                  <p className="text-white/75 text-[15px] leading-[1.75] max-w-xs">{p.text}</p>
+                  <p className="text-white/70 text-[13px] leading-[1.7] tracking-display uppercase max-w-xs">
+                    {p.text}
+                  </p>
                 </div>
               </AnimateIn>
             ))}
@@ -316,38 +314,27 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 alt={cat.label}
                 fill
                 sizes="100vw"
+                quality={75}
                 className="object-cover object-center"
                 {...blurFor(cat.band)}
               />
             </Parallax>
             <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
-            {/* Big bold uppercase headline + ghost outline button. Slightly
-                larger than a service band to signal it opens a category. The
-                numbered marker and subtitle eyebrow were removed on request. */}
+            {/* The descriptive sentence IS the headline now — the uppercase
+                category label and the ghost "Ver detalhes" button were dropped
+                so the panel reads as a single elegant statement. Navigation into
+                the category still happens via the service bands below, each with
+                its own link. Rendered in the serif display face, sentence case
+                (a full sentence uppercased at display size reads shouty). */}
             <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-12 lg:pb-16">
               <AnimateIn>
                 <div className="max-w-2xl">
-                  <h2
-                    className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
-                    style={{ fontSize: "clamp(32px, 5.5vw, 64px)" }}
-                  >
-                    {cat.label}
-                  </h2>
-                  <p className="mt-4 text-white/70 text-[12.5px] leading-[1.6] max-w-xs">
+                  {/* Same lettering as the Clientes hero title: the compact
+                      SpaceX caption size (text-[18px] sm:text-[21px]), not the
+                      large section-heading size. */}
+                  <h2 className="text-veil-shadow text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug max-w-md">
                     {cat.desc}
-                  </p>
-                  <Link
-                    href={localizeHref(
-                      `/servicos/${cat.id === "empresas" ? "eventos-corporativos" : cat.services[0].slug}`,
-                      locale,
-                    )}
-                    // Category-specific accessible name (visible label stays
-                    // minimal) so the link's target is clear out of context.
-                    aria-label={`${ts.verDetalhes} — ${cat.label}`}
-                    className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
-                  >
-                    {ts.verDetalhes} <span aria-hidden>→</span>
-                  </Link>
+                  </h2>
                 </div>
               </AnimateIn>
             </div>
@@ -370,6 +357,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           alt={t.common.imageAlt.servicosCeremony}
           fill
           sizes="100vw"
+          quality={75}
           className="object-cover object-center"
           {...blurFor("/imagens/J&A-68.jpg")}
         />
@@ -412,6 +400,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           alt={t.common.imageAlt.servicosEvening}
           fill
           sizes="100vw"
+          quality={75}
           className="object-cover object-center"
           {...blurFor("/imagens/M&F0497.jpg")}
         />

@@ -40,6 +40,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             fill
             preload
             sizes="100vw"
+            quality={75}
             className="object-cover object-center hero-settle"
           />
         </Parallax>
@@ -135,6 +136,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               alt=""
               fill
               sizes="100vw"
+              quality={75}
               className="object-cover object-center"
               {...blurFor(s.image)}
             />
@@ -201,6 +203,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           alt={t.common.imageAlt.homeWedding}
           fill
           sizes="100vw"
+          quality={75}
           className="object-cover object-center"
           {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
         />

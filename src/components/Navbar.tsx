@@ -217,7 +217,12 @@ const MobileMenu = memo(function MobileMenu({
       aria-modal={isOpen}
       aria-label={t.nav.menuLabel}
       aria-hidden={!isOpen}
-      className={`lg:hidden fixed inset-0 -z-10 flex flex-col bg-[#0c0e0b] transition-[opacity,visibility] duration-500 ${
+      // h-[100dvh] (dynamic viewport height) instead of inset-0 / 100vh: on
+      // mobile the layout viewport is taller than the VISIBLE area while the
+      // browser's URL bar is showing, so an inset-0 overlay pushed the bottom
+      // block (contacts) behind the browser chrome. dvh tracks the visible area,
+      // keeping the contacts on screen as the URL bar shows/hides.
+      className={`lg:hidden fixed inset-x-0 top-0 h-[100dvh] -z-10 flex flex-col bg-[#0c0e0b] transition-[opacity,visibility] duration-500 ${
         isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
       }`}
     >
@@ -227,17 +232,13 @@ const MobileMenu = memo(function MobileMenu({
           único acento é um filete branco que cresce no item ativo. */}
       <nav
         aria-label={t.nav.menuLabel}
-        // min-h-0 lets this flex child actually shrink so overflow-y-auto scrolls
-        // the list INSIDE the nav on short screens — instead of the list growing
-        // and spilling over the compact top bar or the CTA block below. pt-24
-        // clears the (now compact) bar when the menu is open. Centering is done
-        // with `m-auto` on the inner list (NOT justify-center on this scroller):
-        // margin:auto centers only when the list fits and collapses to a normal
-        // top-aligned, fully-scrollable start when it doesn't — so the first link
-        // is never stranded above an unreachable overflow on short/landscape.
-        className="relative flex-1 min-h-0 flex flex-col px-8 pt-52 pb-6 overflow-y-auto overscroll-contain"
+        // No scroll — the whole menu is sized to fit the viewport. flex-1 +
+        // justify-center centres the links in the space between the (compact)
+        // top bar and the footer block; pt-24 keeps the first link clear of the
+        // open-state logo. Compact link padding keeps everything on one screen.
+        className="relative flex-1 flex flex-col justify-center px-8 pt-28"
       >
-        <div className="m-auto w-full">
+        <div className="w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
             const active = isActive(link.href);
             return (
@@ -246,7 +247,7 @@ const MobileMenu = memo(function MobileMenu({
                 href={localizeHref(link.href, locale)}
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center justify-between py-5 sm:py-6 transition-colors duration-300 ${
+                className={`group flex items-center justify-between py-3 sm:py-4 transition-colors duration-300 ${
                   active ? "text-white" : "text-white/55 hover:text-white"
                 }`}
                 style={reveal(80 + i * 60)}
@@ -350,7 +351,6 @@ const MobileMenu = memo(function MobileMenu({
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [hidden, setHidden] = useState(false);
   const pathname = usePublicPathname();
   const { locale, t } = useTranslations();
   const reduce = useReducedMotion();
@@ -396,20 +396,14 @@ export default function Navbar() {
 
   useEffect(() => {
     let frame = 0;
-    let lastY = window.scrollY;
     const onScroll = () => {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        const y = window.scrollY;
-        setScrolled(y > 30);
-        // Hide when scrolling down past the hero, reveal on the first upward
-        // intent — content gets the full stage, navigation is always one
-        // gesture away. Small deltas are ignored so it never flickers.
-        const delta = y - lastY;
-        if (y < 200 || delta < -6) setHidden(false);
-        else if (delta > 6) setHidden(true);
-        lastY = y;
+        // Only track the scrolled state (for the solid frosted background). The
+        // bar stays fixed and always visible — it never auto-hides on scroll —
+        // so navigation is available on every page at any scroll position.
+        setScrolled(window.scrollY > 30);
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -473,12 +467,7 @@ export default function Navbar() {
     <nav
       data-public-nav
       aria-label={t.nav.primaryLabel}
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[transform,background-color,border-color,box-shadow] duration-500 ease-expo ${
-        // NB: nada de "translate-y-0" no estado visível — QUALQUER transform no
-        // nav cria um containing block e prenderia o overlay fixed inset-0 do
-        // menu mobile à altura da barra em vez do viewport inteiro.
-        hidden && !isOpen ? "-translate-y-full" : ""
-      } ${
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[background-color,border-color,box-shadow] duration-500 ease-expo ${
         // Barra CLARA sólida ao fazer scroll (fundo surface a 95% + filete ténue
         // + sombra suave). SEM backdrop-blur de propósito — um backdrop-filter num
         // elemento fixo cria um containing-block que prenderia o overlay
@@ -507,7 +496,7 @@ export default function Navbar() {
             // Three bar heights: a taller bar while the mobile menu is OPEN so it
             // can carry a prominent centred logo (the menu's pt clears it); the
             // compact 72px bar once the page is scrolled; the full 140px at rest.
-            isOpen ? "h-[200px]" : scrolled ? "h-[76px]" : "h-[164px]"
+            isOpen ? "h-[112px]" : scrolled ? "h-[76px]" : "h-[164px]"
           }`}
         >
           {/* Logo: horizontally centred on mobile (absolute, out of flow), and
@@ -521,7 +510,7 @@ export default function Navbar() {
               alt="Líquen Events"
               width={300}
               height={179}
-              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[152px] sm:h-[168px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[80px] sm:h-[88px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
             />
           </Link>
 

@@ -52,6 +52,9 @@ function Mark({
         // Declaring the CSS cap switches it to a viewport/DPR-aware srcset that
         // picks a correctly-small candidate — same pixels, far fewer bytes.
         sizes="(max-width: 640px) 140px, 170px"
+        // Rendered as flat black silhouettes (brightness-0), so encoder quality
+        // is imperceptible — 50 just trims the bytes of every logo in the strip.
+        quality={50}
         style={{ height: `${h}px` }}
         className="w-auto max-w-[140px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
         onError={() => setFailed(true)}

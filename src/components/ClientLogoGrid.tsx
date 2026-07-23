@@ -38,6 +38,9 @@ function ClientLogo({ client, index }: { client: Client; index: number }) {
               // instead of a 1x/2x one off the raw source width — same look, a
               // fraction of the bytes across ~20 logos on /clientes.
               sizes="(max-width: 639px) 34vw, (max-width: 1023px) 23vw, (max-width: 1279px) 17vw, 157px"
+              // Flat black silhouette (brightness-0) — encoder quality is
+              // imperceptible, so 50 trims the bytes of ~20 logos on /clientes.
+              quality={50}
               style={{ height: `${h}px` }}
               className="cl-black object-contain w-auto max-w-[68%] brightness-0"
               onError={() => setFailed(true)}

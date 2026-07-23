@@ -16,17 +16,12 @@ const HeroCanvas = dynamic(() => import("./HeroCanvas"), { ssr: false });
 // (Save-Data, or 2g/3g). On phones, low-memory devices and constrained networks
 // the static hero <Image> stands alone — no wasted GPU, battery or bytes.
 function heavyEffectsWelcome(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!window.matchMedia("(min-width: 1024px) and (pointer: fine)").matches) return false;
-  const nav = navigator as Navigator & {
-    connection?: { saveData?: boolean; effectiveType?: string };
-    deviceMemory?: number;
-  };
-  const c = nav.connection;
-  if (c?.saveData) return false;
-  if (c?.effectiveType && /2g|3g/.test(c.effectiveType)) return false;
-  if (typeof nav.deviceMemory === "number" && nav.deviceMemory < 4) return false;
-  return true;
+  // WebGL hero layer disabled on all devices for maximum scroll fluidity — the
+  // static hero <Image> beneath (which was always the LCP) stands alone, so the
+  // desktop no longer pays the continuous GPU/render cost. Restore the
+  // capability checks (viewport ≥1024 + pointer:fine + memory + connection) to
+  // re-enable the effect on capable desktops.
+  return false;
 }
 
 export default function HeroWebGL({ src, className }: { src: string; className?: string }) {
