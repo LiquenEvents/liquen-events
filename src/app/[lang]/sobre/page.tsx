@@ -189,58 +189,55 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         </div>
       </section>
 
-      {/* ── FOUNDER ── */}
-      <section className="bg-surface border-t border-foreground/8">
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="relative overflow-hidden min-h-[460px] lg:min-h-[620px]">
-            {/* Founder portrait as a full-bleed chapter panel (fills its column,
-                bleeding to the section edge) instead of a small centred frame —
-                uncovered with the same cinematic mask-wipe used on the editorial
-                grids, so it arrives instead of just being there. */}
-            <Reveal as="div" variant="mask" className="absolute inset-0">
-              <Image
-                src="/imagens/catarina-gaspar.jpg"
-                alt={t.common.imageAlt.sobreFounder}
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                quality={75}
-                className="object-cover object-center"
-                {...blurFor("/imagens/catarina-gaspar.jpg")}
-              />
-            </Reveal>
-            {/* Chapter scrim + bottom-left caption (gold dash + uppercase
-                eyebrow), matching the manifesto and home service chapters. */}
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-gradient-to-t from-[#080808]/80 via-[#080808]/15 to-transparent"
-            />
-            <div className="absolute inset-x-0 bottom-0 p-6 lg:p-10">
-              <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
-                <span className="w-8 h-px bg-gold flex-shrink-0" />
-                {t.sobre.founderRole}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
-            <AnimateIn>
-              <p className={`${eyebrowDark} mb-10`}>
-                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                {t.sobre.founderEyebrow}
-              </p>
-              <p
-                className="text-foreground/78 font-bold uppercase tracking-display leading-[1.25]"
-                style={{ fontSize: "clamp(22px, 3vw, 38px)" }}
-              >
-                {t.sobre.founderQuote}
-              </p>
-              <div className="mt-10 flex items-center gap-4">
-                <span className="w-8 h-px bg-gold/50" />
-                <div>
-                  <p className="text-foreground text-sm font-semibold">{t.sobre.founderName}</p>
-                  <p className="text-foreground/72 text-xs mt-0.5">{t.sobre.founderRole}</p>
-                </div>
+      {/* ── FOUNDER — minimal, in the site's signature idiom ── */}
+      {/* Pared back to the site's own "signature" rhythm and typeface (Inter):
+          gold-dash eyebrow + big uppercase display headline + a hairline +
+          attribution. Just the portrait, the founder's words and her name — no
+          bio paragraph, no extra lines. */}
+      <section className="bg-surface border-t border-foreground/8 overflow-x-clip">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-14 lg:gap-24 items-center">
+            {/* Portrait — flat and borderless, uncovered with the mask-wipe. */}
+            <Reveal
+              as="div"
+              variant="mask"
+              className="relative mx-auto w-full max-w-xs lg:max-w-none"
+            >
+              <div className="relative aspect-[3/4] overflow-hidden">
+                <Image
+                  src="/imagens/catarina-gaspar.jpg"
+                  alt={t.common.imageAlt.sobreFounder}
+                  fill
+                  sizes="(max-width: 1024px) 80vw, 34vw"
+                  quality={75}
+                  className="object-cover object-[50%_18%]"
+                  {...blurFor("/imagens/catarina-gaspar.jpg")}
+                />
               </div>
-            </AnimateIn>
+            </Reveal>
+
+            {/* Text — eyebrow, the founder's words, and her name. Nothing more. */}
+            <div className="flex flex-col justify-center">
+              <AnimateIn>
+                <p className={`${eyebrowDark} mb-8`}>
+                  <span className="w-8 h-px bg-gold flex-shrink-0" />
+                  {t.sobre.founderEyebrow}
+                </p>
+                {/* Matches the Clientes page <h1> exactly: the site's small,
+                    understated SpaceX caption size (18/21px). */}
+                <p className="text-foreground font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
+                  {t.sobre.founderQuote}
+                </p>
+                <div className="mt-12 pt-6 border-t border-foreground/10">
+                  <p className="text-foreground text-sm tracking-[0.15em] uppercase">
+                    {t.sobre.founderName}
+                  </p>
+                  <p className="text-foreground/50 text-[11px] tracking-[0.3em] uppercase mt-1.5">
+                    {t.sobre.founderRole}
+                  </p>
+                </div>
+              </AnimateIn>
+            </div>
           </div>
         </div>
       </section>
