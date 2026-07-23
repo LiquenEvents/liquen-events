@@ -190,57 +190,67 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       </section>
 
       {/* ── FOUNDER ── */}
-      <section className="bg-surface border-t border-foreground/8">
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="relative overflow-hidden min-h-[460px] lg:min-h-[620px]">
-            {/* Founder portrait as a full-bleed chapter panel (fills its column,
-                bleeding to the section edge) instead of a small centred frame —
-                uncovered with the same cinematic mask-wipe used on the editorial
-                grids, so it arrives instead of just being there. */}
-            <Reveal as="div" variant="mask" className="absolute inset-0">
-              <Image
-                src="/imagens/catarina-gaspar.jpg"
-                alt={t.common.imageAlt.sobreFounder}
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                quality={75}
-                className="object-cover object-center"
-                {...blurFor("/imagens/catarina-gaspar.jpg")}
-              />
-            </Reveal>
-            {/* Chapter scrim + bottom-left caption (gold dash + uppercase
-                eyebrow), matching the manifesto and home service chapters. */}
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-gradient-to-t from-[#080808]/80 via-[#080808]/15 to-transparent"
-            />
-            <div className="absolute inset-x-0 bottom-0 p-6 lg:p-10">
-              <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
-                <span className="w-8 h-px bg-gold flex-shrink-0" />
-                {t.sobre.founderRole}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col justify-center px-6 lg:px-16 py-16 lg:py-28">
-            <AnimateIn>
-              <p className={`${eyebrowDark} mb-10`}>
-                <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
-                {t.sobre.founderEyebrow}
-              </p>
-              <p
-                className="text-foreground/78 font-bold uppercase tracking-display leading-[1.25]"
-                style={{ fontSize: "clamp(22px, 3vw, 38px)" }}
-              >
-                {t.sobre.founderQuote}
-              </p>
-              <div className="mt-10 flex items-center gap-4">
-                <span className="w-8 h-px bg-gold/50" />
-                <div>
-                  <p className="text-foreground text-sm font-semibold">{t.sobre.founderName}</p>
-                  <p className="text-foreground/72 text-xs mt-0.5">{t.sobre.founderRole}</p>
-                </div>
+      {/* The founder portrait is now a clean, light studio headshot, so the old
+          full-bleed dark-scrim chapter treatment (built for the previous dark
+          event photo) would look artificial. Instead it sits in an elegant
+          framed portrait — thin gold-lined edge + soft shadow — beside a richer
+          text column (quote → bio → signature → founding line). */}
+      <section className="bg-surface border-t border-foreground/8 overflow-x-clip">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 py-16 lg:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] gap-12 lg:gap-20 items-center">
+            {/* Portrait — framed, uncovered with the cinematic mask-wipe. No dark
+                scrim: the light background reads clean against the surface. */}
+            <Reveal
+              as="div"
+              variant="mask"
+              className="relative mx-auto w-full max-w-sm lg:max-w-none"
+            >
+              <div className="relative aspect-[3/4] overflow-hidden rounded-sm ring-1 ring-foreground/10 shadow-2xl shadow-black/10">
+                <Image
+                  src="/imagens/catarina-gaspar.jpg"
+                  alt={t.common.imageAlt.sobreFounder}
+                  fill
+                  sizes="(max-width: 1024px) 90vw, 38vw"
+                  quality={82}
+                  className="object-cover object-[50%_18%]"
+                  {...blurFor("/imagens/catarina-gaspar.jpg")}
+                />
               </div>
-            </AnimateIn>
+              {/* Gold accent rule anchoring the portrait's lower-left corner. */}
+              <span aria-hidden className="absolute -bottom-3 left-6 h-px w-16 bg-gold" />
+            </Reveal>
+
+            {/* Text column */}
+            <div className="flex flex-col justify-center">
+              <AnimateIn>
+                <p className={`${eyebrowDark} mb-8`}>
+                  <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
+                  {t.sobre.founderEyebrow}
+                </p>
+                <p
+                  className="text-foreground/85 font-bold uppercase tracking-display leading-[1.2]"
+                  style={{ fontSize: "clamp(24px, 3.2vw, 42px)" }}
+                >
+                  {t.sobre.founderQuote}
+                </p>
+                <p className="text-foreground/70 text-base lg:text-lg leading-[1.85] mt-8 max-w-xl">
+                  {t.sobre.founderBio}
+                </p>
+                <div className="mt-10 flex items-center gap-4">
+                  <span className="w-10 h-px bg-gold/60" />
+                  <div>
+                    <p className="text-foreground text-base font-semibold">{t.sobre.founderName}</p>
+                    <p className="text-foreground/72 text-xs tracking-[0.2em] uppercase mt-1">
+                      {t.sobre.founderRole}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-foreground/55 text-[11px] tracking-[0.4em] uppercase mt-8 flex items-center gap-3">
+                  <span className="w-6 h-px bg-foreground/20 flex-shrink-0" />
+                  {t.sobre.founderSince}
+                </p>
+              </AnimateIn>
+            </div>
           </div>
         </div>
       </section>

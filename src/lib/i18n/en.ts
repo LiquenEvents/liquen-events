@@ -178,8 +178,11 @@ export const en: Dict = {
     founderEyebrow: "The people",
     founderQuote:
       "Every event is a chance to create something extraordinary. That's what drives us.",
+    founderBio:
+      "At the helm of Líquen Events, Catarina leads every project with a meticulous eye for detail and a genuine passion for turning celebrations into unforgettable memories.",
     founderName: "Catarina Gaspar",
     founderRole: "Founder & CEO",
+    founderSince: "Creating events since 2018",
     ctaEyebrow: "Let's create together",
     ctaTitleLine1: "Shall we work",
     ctaTitleMoss: "together?",

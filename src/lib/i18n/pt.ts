@@ -180,8 +180,11 @@ export const pt = {
     statementRest: " Desenhamos experiências que ficam para sempre.",
     founderEyebrow: "As pessoas",
     founderQuote: "Cada evento é uma oportunidade de criar algo extraordinário. É o que nos move.",
+    founderBio:
+      "À frente da Líquen Events, a Catarina lidera cada projeto com um olhar meticuloso para o detalhe e uma paixão genuína por transformar celebrações em memórias inesquecíveis.",
     founderName: "Catarina Gaspar",
     founderRole: "Fundadora & CEO",
+    founderSince: "A criar eventos desde 2018",
     ctaEyebrow: "Vamos criar juntos",
     ctaTitleLine1: "Vamos trabalhar",
     ctaTitleMoss: "juntos?",
