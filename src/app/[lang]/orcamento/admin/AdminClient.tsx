@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+  useDeferredValue,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -98,6 +106,71 @@ const parsePriceInput = parseMoney;
 // management form ("gestao") when the next step is a form edit (e.g. reopening).
 type DetailTab = "producao" | "financeiro" | "comunicacao";
 type DetailTarget = DetailTab | "gestao";
+
+// The pedido's tool tabs, each with an icon and a plain-language hint so it's
+// obvious what you do there. The tablist renders icon + label, and a single
+// explainer line under it shows the active tab's hint.
+const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode }[] = [
+  {
+    id: "producao",
+    label: "Produção",
+    hint: "Prepare o evento: tarefas e checklist. Abra o plano, o cronograma e os convidados quando precisar.",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <path d="M3 8l9-5 9 5v8l-9 5-9-5V8z" strokeLinejoin="round" />
+        <path d="M3 8l9 5 9-5M12 13v8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "financeiro",
+    label: "Financeiro",
+    hint: "Preço, custos, margem, pagamentos e faturação.",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path
+          d="M15 9.5C14.5 8.5 13.3 8 12 8c-1.7 0-3 .9-3 2s1.3 2 3 2 3 .9 3 2-1.3 2-3 2c-1.3 0-2.5-.5-3-1.5M12 6.5v11"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    id: "comunicacao",
+    label: "Fazer proposta",
+    hint: "Desenhar e enviar a proposta, e falar com o cliente.",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      >
+        <path
+          d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+];
 function detailNextAction(quote: Quote): { label: string; hint: string; tab: DetailTarget } {
   const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote);
   if (perdido)
@@ -2695,46 +2768,50 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           aria-label="Secções do pedido"
                           className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
                         >
-                          {(
-                            [
-                              ["producao", "Produção"],
-                              ["financeiro", "Financeiro"],
-                              ["comunicacao", "Comunicação"],
-                            ] as const
-                          ).map(([id, label], i, arr) => {
-                            const active = detailTab === id;
+                          {DETAIL_TABS.map((tab, i, arr) => {
+                            const active = detailTab === tab.id;
                             return (
                               <button
-                                key={id}
-                                id={`detail-tab-${id}`}
+                                key={tab.id}
+                                id={`detail-tab-${tab.id}`}
                                 role="tab"
                                 aria-selected={active}
-                                aria-controls={`detail-panel-${id}`}
+                                aria-controls={`detail-panel-${tab.id}`}
                                 tabIndex={active ? 0 : -1}
-                                onClick={() => setDetailTab(id)}
+                                onClick={() => setDetailTab(tab.id)}
                                 onKeyDown={(e) => {
                                   if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
                                   e.preventDefault();
                                   const dir = e.key === "ArrowRight" ? 1 : -1;
-                                  const next = arr[(i + dir + arr.length) % arr.length][0];
-                                  setDetailTab(next);
+                                  const nextIdx = (i + dir + arr.length) % arr.length;
+                                  setDetailTab(arr[nextIdx].id);
                                   const tabs =
                                     e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
                                       '[role="tab"]',
                                     );
-                                  tabs?.[(i + dir + arr.length) % arr.length]?.focus();
+                                  tabs?.[nextIdx]?.focus();
                                 }}
-                                className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
                                   active
                                     ? "border-[#4d6350] text-foreground/85"
                                     : "border-transparent text-foreground/40 hover:text-foreground/65"
                                 }`}
                               >
-                                {label}
+                                <span
+                                  aria-hidden
+                                  className={active ? "text-[#4d6350]" : "text-foreground/35"}
+                                >
+                                  {tab.icon}
+                                </span>
+                                {tab.label}
                               </button>
                             );
                           })}
                         </div>
+                        {/* Plain-language explainer for the active tab. */}
+                        <p className="text-[11px] leading-relaxed text-foreground/55">
+                          {DETAIL_TABS.find((t) => t.id === detailTab)?.hint}
+                        </p>
 
                         {/* Coluna única — as ferramentas do separador ativo */}
                         <div className="flex min-w-0 flex-col gap-6">
