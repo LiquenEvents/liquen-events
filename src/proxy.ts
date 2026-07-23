@@ -77,6 +77,17 @@ export function proxy(req: NextRequest) {
   // ── Metadata files / assets pass straight through ──
   if (isNonLocalized(pathname)) return NextResponse.next();
 
+  // ── Short link for the team: `/admin` → the back-office ──
+  // The real back-office lives at the long `/orcamento/admin`; this memorable
+  // alias means the owner can just type `.../admin` (or bookmark it) instead.
+  // A redirect (not a rewrite) keeps the canonical URL the admin page already
+  // relies on for locale/deep-link resolution.
+  if (pathname === "/admin" || pathname === "/admin/") {
+    // Build the target from `req.url` (not nextUrl.clone) so NextURL's
+    // trailing-slash normalisation can't turn `/admin/` into `/orcamento/admin/`.
+    return NextResponse.redirect(new URL("/orcamento/admin", req.url), 307);
+  }
+
   // ── Internal Portuguese prefix leaked to a public URL → canonicalise ──
   if (pathname === "/pt" || pathname.startsWith("/pt/")) {
     const url = req.nextUrl.clone();

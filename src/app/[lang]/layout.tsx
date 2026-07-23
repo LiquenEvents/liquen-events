@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Inter, Playfair_Display, Archivo } from "next/font/google";
 import "../globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -62,6 +62,18 @@ const playfair = Playfair_Display({
   display: "swap",
   adjustFontFallback: true,
   fallback: ["Georgia", "Times New Roman", "Times", "serif"],
+});
+
+// Technical "engineered" grotesque (DIN-adjacent) for the back-office's
+// SpaceX-style, uppercase interface. Self-hosted by next/font so it's covered
+// by the tight CSP (font-src 'self'). Only the admin surface opts into it (see
+// .admin-mode in globals.css); the public marketing site keeps Inter/Playfair.
+const archivo = Archivo({
+  variable: "--font-spacex",
+  subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
+  fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Arial", "sans-serif"],
 });
 
 export async function generateMetadata({
@@ -176,7 +188,7 @@ export default async function RootLayout({
     <html
       lang={htmlLang(locale)}
       data-scroll-behavior="smooth"
-      className={`${inter.variable} ${playfair.variable}`}
+      className={`${inter.variable} ${playfair.variable} ${archivo.variable}`}
     >
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale} dict={pickChromeDict(t)}>

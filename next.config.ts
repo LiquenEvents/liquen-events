@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // Self-contained server bundle so the app can run in any container/cloud
   // (Vercel ignores this and uses its own build).
   output: "standalone",
+  // sharp is a NATIVE module used directly in the proposal-PDF route (image
+  // cover-crop). Keep it external so it's loaded from node_modules at runtime
+  // instead of being bundled — a bundled native binary can fail to load on
+  // serverless and throw when the first image is processed.
+  serverExternalPackages: ["sharp"],
   images: {
     // WebP only — no AVIF. AVIF compresses a few % smaller but its on-the-fly
     // encode is several times slower than WebP, and the gallery has 500+ photos
@@ -53,6 +58,31 @@ const nextConfig: NextConfig = {
     }
     const plausible = plausibleOrigin ? ` ${plausibleOrigin}` : "";
 
+    // Image hosts the BROWSER loads via <img>: proposal cover/mood-board images
+    // are served as signed URLs from Supabase Storage, and the (optional) gallery
+    // CDN. Without these in img-src the browser blocks them and the thumbnail
+    // renders as a broken image. Derive exact origins from env so the policy
+    // stays as tight as possible (empty when unconfigured).
+    const imgOrigins = Array.from(
+      new Set(
+        [
+          process.env.SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_IMAGE_CDN,
+        ]
+          .map((v) => {
+            if (!v) return "";
+            try {
+              return new URL(v).origin;
+            } catch {
+              return "";
+            }
+          })
+          .filter(Boolean),
+      ),
+    ).join(" ");
+    const imgExtra = imgOrigins ? ` ${imgOrigins}` : "";
+
     // Browser-side connections. Everything third-party runs SERVER-side with
     // non-public env (Supabase service key, Sentry DSN, Slack/Discord webhooks),
     // so the browser never opens those sockets — connect-src doesn't need them.
@@ -73,7 +103,7 @@ const nextConfig: NextConfig = {
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      `img-src 'self' data: blob:${imgExtra}`,
       "font-src 'self' data:",
       connectSrc,
       "worker-src 'self'",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { randomId, eur2 } from "./util";
+import { parseMoney, randomId, eur2, todayKey } from "./util";
 import { Button } from "./ui";
 import { useToast } from "./Toast";
 import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
@@ -48,14 +48,24 @@ interface Props {
    * não duplicar. O painel Financeiro do back office liga-o.
    */
   showLedger?: boolean;
+  /**
+   * Notifica o pai quando o Nº de contrato é gravado, para o estado partilhado
+   * (selected/quotes) não ficar velho — o ciclo de vida e o CSV dependem dele.
+   */
+  onContractRef?: (ref: string) => void;
 }
 
-export default function PaymentsPanel({ quote, onChange, showLedger = false }: Props) {
+export default function PaymentsPanel({
+  quote,
+  onChange,
+  showLedger = false,
+  onContractRef,
+}: Props) {
   const { toast } = useToast();
   const [payments, setPayments] = useState<Payment[]>(quote.payments ?? []);
   const [kind, setKind] = useState<PaymentKind>("sinal");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayKey());
   const [busy, setBusy] = useState<string | null>(null);
   const [contractRef, setContractRef] = useState(quote.contractRef ?? "");
   const [savingRef, setSavingRef] = useState(false);
@@ -112,14 +122,22 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
   const reconciliation = useMemo(() => reconcileFinance(dossier), [dossier]);
 
   async function saveContractRef() {
-    if (contractRef.trim() === (quote.contractRef ?? "")) return;
+    const next = contractRef.trim();
+    if (next === (quote.contractRef ?? "")) return;
     setSavingRef(true);
     try {
-      await fetch(`/api/orcamento/${quote.id}`, {
+      const res = await fetch(`/api/orcamento/${quote.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractRef: contractRef.trim() || undefined }),
+        // null (não undefined): limpar o campo tem de chegar ao servidor —
+        // undefined desaparece no JSON e o valor antigo voltava sozinho.
+        body: JSON.stringify({ contractRef: next || null }),
       });
+      if (!res.ok) throw new Error();
+      onContractRef?.(next);
+      toast("Nº de contrato guardado", "success");
+    } catch {
+      toast("Não foi possível guardar o nº de contrato. Tente novamente.", "error");
     } finally {
       setSavingRef(false);
     }
@@ -134,17 +152,29 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
   const outstanding = Math.max(0, total - headlinePaid);
 
   function persist(next: Payment[]) {
+    // Otimista com reversão: se o servidor recusar, o dinheiro NÃO pode ficar
+    // diferente no ecrã e na base de dados sem ninguém dar por isso.
+    const snapshot = payments;
     setPayments(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ payments: next }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setPayments(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar o pagamento. Tente novamente.", "error");
+      });
   }
 
   function add() {
-    const a = parseFloat(amount);
+    // parseMoney entende "1.500" e "1500,50" — parseFloat lia 1.5 € e falhava.
+    const a = parseMoney(amount);
     if (!a || a <= 0) return;
     persist([...payments, { id: randomId(), kind, amount: a, date, paid: false }]);
     setAmount("");
@@ -173,23 +203,28 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
           email,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        throw new Error(data?.error || "Falha ao gerar o recibo.");
+      }
       if (data.pdfBase64 && !email) {
         const a = document.createElement("a");
         a.href = `data:application/pdf;base64,${data.pdfBase64}`;
-        a.download = `Recibo-${data.number.replace(/\//g, "-")}.pdf`;
+        a.download = `Recibo-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
         a.click();
       }
       if (email) {
         toast(
           data.emailed
             ? `Recibo enviado para ${quote.email}`
-            : "Recibo gerado (e-mail não configurado)",
+            : "Recibo gerado (email não configurado)",
           data.emailed ? "success" : "info",
         );
       } else {
         toast("Recibo descarregado", "success");
       }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível gerar o recibo.", "error");
     } finally {
       setBusy(null);
     }
@@ -469,7 +504,8 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
           <option value="saldo">Saldo final</option>
         </select>
         <input
-          type="number"
+          type="text"
+          inputMode="decimal"
           aria-label="Valor em euros"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -483,7 +519,12 @@ export default function PaymentsPanel({ quote, onChange, showLedger = false }: P
           onChange={(e) => setDate(e.target.value)}
           className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
         />
-        <Button size="sm" onClick={add} iconLeft={<span aria-hidden="true">+</span>}>
+        <Button
+          size="sm"
+          onClick={add}
+          disabled={!((parseMoney(amount) ?? 0) > 0)}
+          iconLeft={<span aria-hidden="true">+</span>}
+        >
           Registar
         </Button>
       </div>

@@ -46,6 +46,12 @@ type BaseProps = {
   hideLabel?: boolean;
   /** Wrapper class (the control itself takes native `className`). */
   containerClassName?: string;
+  /**
+   * Visual style. `box` (default) is the boxed `.bo-input` look; `underline`
+   * is the ultra-minimal variant — no box, no shadow, just a hairline under
+   * the value that darkens to moss on focus. Same a11y wiring either way.
+   */
+  variant?: "box" | "underline";
 };
 
 type InputFieldProps = BaseProps & { as?: "input" } & Omit<
@@ -68,6 +74,13 @@ const CONTROL =
   "shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors " +
   "focus:outline-none px-3.5 py-2.5";
 
+// Underline variant: transparent, unboxed, a hairline that darkens on focus.
+// `rounded-none` keeps iOS Safari from re-rounding the bare input.
+const CONTROL_UNDERLINE =
+  "w-full rounded-none bg-transparent border-0 border-b text-sm text-foreground/90 " +
+  "placeholder:text-foreground/30 motion-safe:transition-colors " +
+  "focus:outline-none px-0 py-2";
+
 export function Field(props: FieldProps) {
   const {
     label,
@@ -75,6 +88,7 @@ export function Field(props: FieldProps) {
     error,
     hideLabel,
     containerClassName,
+    variant = "box",
     as = "input",
     className,
     required,
@@ -94,10 +108,12 @@ export function Field(props: FieldProps) {
     cn(hint && !error ? hintId : undefined, error ? errorId : undefined) || undefined;
 
   const controlClass = cn(
-    CONTROL,
+    variant === "underline" ? CONTROL_UNDERLINE : CONTROL,
     error
       ? "border-[#8a2a22]/70 focus:border-[#8a2a22]"
-      : "border-foreground/50 focus:border-foreground/75",
+      : variant === "underline"
+        ? "border-foreground/20 focus:border-[#4d6350] hover:border-foreground/40"
+        : "border-foreground/50 focus:border-foreground/75",
     className,
   );
 

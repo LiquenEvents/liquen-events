@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { randomId } from "./util";
+import { useToast } from "./Toast";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
 import { Button, Field } from "./ui";
@@ -24,6 +25,7 @@ interface Props {
  * at a glance how the numbers are firming up.
  */
 export default function GuestList({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [guests, setGuests] = useState<Guest[]>(quote.guestList ?? []);
   const [name, setName] = useState("");
   const [party, setParty] = useState("1");
@@ -42,13 +44,23 @@ export default function GuestList({ quote, onChange }: Props) {
   }, [guests]);
 
   function persist(next: Guest[]) {
+    // Otimista com reversão: falha do servidor repõe o estado e avisa.
+    const snapshot = guests;
     setGuests(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ guestList: next }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setGuests(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar a lista de convidados. Tente novamente.", "error");
+      });
   }
 
   function add() {
@@ -70,8 +82,16 @@ export default function GuestList({ quote, onChange }: Props) {
     const next = order[(order.indexOf(g.rsvp) + 1) % order.length];
     persist(guests.map((x) => (x.id === g.id ? { ...x, rsvp: next } : x)));
   }
+  // Escrever no campo atualiza o número no ecrã de imediato (aceita vazio para se
+  // poder reescrever); só grava (um PATCH) ao sair do campo, com o mínimo de 1.
   function setPartyOf(id: string, value: string) {
-    const n = Math.max(1, parseInt(value) || 1);
+    const n = value === "" ? 0 : Math.max(0, parseInt(value) || 0);
+    setGuests((prev) => prev.map((x) => (x.id === id ? { ...x, party: n } : x)));
+  }
+  function commitPartyOf(id: string) {
+    const g = guests.find((x) => x.id === id);
+    if (!g) return;
+    const n = Math.max(1, g.party || 1);
     persist(guests.map((x) => (x.id === id ? { ...x, party: n } : x)));
   }
 
@@ -183,8 +203,9 @@ export default function GuestList({ quote, onChange }: Props) {
                 <input
                   type="number"
                   min={1}
-                  value={g.party}
+                  value={g.party || ""}
                   onChange={(e) => setPartyOf(g.id, e.target.value)}
+                  onBlur={() => commitPartyOf(g.id)}
                   className="bo-input w-14 px-1.5 py-1 text-center text-xs text-foreground/75"
                   aria-label={`Convidados no grupo ${g.name}`}
                 />

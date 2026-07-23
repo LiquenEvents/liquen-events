@@ -3,6 +3,57 @@ export function randomId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/**
+ * Today's calendar day as a LOCAL `YYYY-MM-DD` key. Never derive "today" from
+ * `new Date().toISOString()` — that is UTC, so around midnight it lands on the
+ * wrong day for anyone east/west of UTC (e.g. Portugal in summer, UTC+1). Same
+ * reasoning as `eventCountdown` below.
+ */
+export function todayKey(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * Parse money typed by a pt-PT hand into a number of euros.
+ *
+ * `parseFloat` alone corrupts local habits: "1.500" (thousands dot) becomes
+ * 1.5 € and "1500,50" (decimal comma) fails inside `type="number"` inputs.
+ * Rules here: comma is the decimal separator; a dot followed by exactly three
+ * digits (and not a 1–2-digit decimal tail) is a thousands separator.
+ * Returns undefined for an empty or unparseable value.
+ */
+export function parseMoney(s: string): number | undefined {
+  let t = s.replace(/\s|€/g, "");
+  if (!t) return undefined;
+  const hasComma = t.includes(",");
+  const hasDot = t.includes(".");
+  if (hasComma && hasDot) {
+    // "1.500,50" — dots are thousands, comma is the decimal.
+    t = t.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    // "1500,50"
+    t = t.replace(",", ".");
+  } else if (hasDot && /\.\d{3}(\.|$)/.test(t) && !/\.\d{1,2}$/.test(t)) {
+    // "1.500" / "1.234.567" — thousands dots, no decimal part.
+    t = t.replace(/\./g, "");
+  }
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * True only for a strict `YYYY-MM-DD` calendar date. Quote `date`/`endDate` are
+ * free-form text (the schema only trims length), so values like "a definir" or
+ * a full ISO timestamp can reach the UI. Guarding with this before
+ * `new Date(...).toISOString()` prevents a `RangeError` from crashing a whole
+ * view (calendar grid, upcoming list…).
+ */
+export function isDateKey(s: string | undefined | null): s is string {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
 // Formatação de euros consolidada em `@/lib/money` (fonte única). Mantemos os
 // nomes locais `eur` (sem casas) e `eur2` (2 casas) para os importadores atuais.
 export { eur0 as eur, eur as eur2 } from "@/lib/money";

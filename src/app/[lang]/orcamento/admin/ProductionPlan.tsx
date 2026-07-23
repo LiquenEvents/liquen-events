@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { randomId, eur2 } from "./util";
+import { useToast } from "./Toast";
 import { Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
 import {
@@ -34,6 +35,7 @@ const SEP = PRODUCTION_PHASE_SEP;
  * per-event supplier assignment is visible from the production view.
  */
 export default function ProductionPlan({ quote, onChange }: Props) {
+  const { toast } = useToast();
   // Novo campo dedicado: default [] quando ausente. Sem migração de dados — em
   // orçamentos antigos, itens de produção que tenham ficado gravados em
   // `checklist` permanecem lá intactos até serem re-aplicados aqui.
@@ -41,6 +43,8 @@ export default function ProductionPlan({ quote, onChange }: Props) {
   const suppliers = quote.eventSuppliers ?? [];
 
   async function persist(next: ChecklistItem[]) {
+    // Otimista com reversão: falha do servidor repõe o estado e avisa.
+    const snapshot = items;
     setItems(next);
     onChange?.(next);
     try {
@@ -51,7 +55,9 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       });
       if (!res.ok) throw new Error(String(res.status));
     } catch {
-      // Best-effort persistence; UI keeps the optimistic state.
+      setItems(snapshot);
+      onChange?.(snapshot);
+      toast("Não foi possível guardar o plano de produção. Tente novamente.", "error");
     }
   }
 

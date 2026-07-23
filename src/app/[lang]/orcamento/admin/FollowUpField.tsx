@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
+import { useToast } from "./Toast";
+import { todayKey } from "./util";
 
 interface Props {
   quote: Quote;
   onChange: (followUpAt: string | undefined) => void;
 }
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+// Dias a partir do dia LOCAL de hoje (não UTC — perto da meia-noite a data
+// saltava um dia para quem está a leste/oeste de UTC; ver util.todayKey).
 function plusDays(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /**
@@ -21,16 +25,27 @@ function plusDays(n: number): string {
  * in Reminders + Agenda so no proposal goes cold.
  */
 export default function FollowUpField({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [value, setValue] = useState<string>(quote.followUpAt ?? "");
 
   function persist(next: string | undefined) {
+    // Otimista com reversão: falha do servidor repõe o estado e avisa.
+    const snapshot = quote.followUpAt;
     setValue(next ?? "");
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ followUpAt: next ?? null }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setValue(snapshot ?? "");
+        onChange(snapshot);
+        toast("Não foi possível guardar o seguimento. Tente novamente.", "error");
+      });
   }
 
   const overdue = value && value < todayKey();

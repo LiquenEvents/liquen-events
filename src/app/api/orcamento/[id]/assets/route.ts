@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { uploadProposalImage } from "@/lib/proposal-storage";
+import { uploadProposalImage, listProposalImages } from "@/lib/proposal-storage";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -8,6 +8,21 @@ export const runtime = "nodejs";
 
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB per image
 const OK_TYPES = /^image\/(jpe?g|png|webp)$/i;
+
+/**
+ * List every image already uploaded for this quote (each with a fresh signed
+ * URL), so the studio can re-offer them on any device and re-preview images
+ * whose cached URL is gone. Admin-only; returns an empty list when Storage
+ * isn't configured rather than erroring.
+ */
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAuthed(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  const { id } = await params;
+  const images = await listProposalImages(id);
+  return NextResponse.json({ ok: true, images });
+}
 
 /**
  * Admin-only upload of proposal mood-board / cover images to Supabase Storage.

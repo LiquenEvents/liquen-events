@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { updateProposal } from "@/lib/proposals-store";
+import { deleteProposal, updateProposal } from "@/lib/proposals-store";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -29,6 +29,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(updated);
   } catch (err) {
     log.error("propostas PATCH falhou", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  try {
+    const { id } = await params;
+    await deleteProposal(id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    log.error("propostas DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

@@ -310,6 +310,16 @@ export function withProposalDefaults(
     s.replace("{DATA}", doc.eventDate || "—").replace("{CONVIDADOS}", doc.guests || "—");
   return {
     ...doc,
+    // Coerce the editor's variable arrays to [] — a corrupt/old localStorage
+    // draft (merged in the studio on mount) could omit them, and the PDF
+    // renderer iterates serviceGroups/budgetItems/… directly. A missing array
+    // would throw "undefined is not iterable" → generic 500 "erro ao gerar".
+    serviceGroups: doc.serviceGroups ?? [],
+    moodBoards: doc.moodBoards ?? [],
+    cronograma: doc.cronograma ?? [],
+    budgetItems: doc.budgetItems ?? [],
+    budgetRows: doc.budgetRows ?? [],
+    coverImages: doc.coverImages ?? [],
     notasImportantes: doc.notasImportantes ?? DEFAULT_NOTAS_IMPORTANTES,
     incluido: doc.incluido ?? DEFAULT_INCLUIDO,
     naoIncluido: doc.naoIncluido ?? DEFAULT_NAO_INCLUIDO,

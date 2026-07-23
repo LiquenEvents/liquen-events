@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
+import { useToast } from "./Toast";
 
 interface Props {
   quote: Quote;
@@ -16,17 +17,28 @@ interface Props {
  * sprouting near-duplicates.
  */
 export default function TagsField({ quote, suggestions, onChange }: Props) {
+  const { toast } = useToast();
   const [tags, setTags] = useState<string[]>(quote.tags ?? []);
   const [input, setInput] = useState("");
 
   function persist(next: string[]) {
+    // Otimista com reversão: falha do servidor repõe o estado e avisa.
+    const snapshot = tags;
     setTags(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tags: next }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setTags(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar as etiquetas. Tente novamente.", "error");
+      });
   }
 
   function add(raw: string) {
