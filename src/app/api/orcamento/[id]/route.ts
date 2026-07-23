@@ -99,6 +99,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       picked[key] = body[key];
     }
   }
+  // Append-only path for the activity log (not a Quote key, so picked apart).
+  if ("activityLogAppend" in body) {
+    picked.activityLogAppend = (body as Record<string, unknown>).activityLogAppend;
+  }
 
   // Allowlist says WHICH fields may change; the schema validates the VALUES
   // (status enum, numeric price, well-formed arrays) so nothing malformed is
@@ -107,9 +111,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!parsed.success) {
     return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
   }
-  const updates = parsed.data as Partial<Quote>;
+  const { activityLogAppend, ...updates } = parsed.data as Partial<Quote> & {
+    activityLogAppend?: Quote["activityLog"];
+  };
 
   try {
+    // Merge appends onto the FRESH stored log, server-side. Clients used to
+    // send the whole recomputed array; two tools saving near-simultaneously
+    // (e.g. "proposta enviada" + Guardar) would overwrite each other's entries.
+    if (activityLogAppend && activityLogAppend.length > 0) {
+      const current = await getQuote(id);
+      if (!current) {
+        return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+      }
+      (updates as Partial<Quote>).activityLog = [
+        ...(current.activityLog ?? []),
+        ...activityLogAppend,
+      ].slice(-5000);
+    }
+
     const updated = await updateQuote(id, updates);
     if (!updated) {
       return NextResponse.json({ error: "Não encontrado" }, { status: 404 });

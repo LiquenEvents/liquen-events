@@ -31,8 +31,12 @@ export type View =
  *
  * `NAV` stays the single source of truth for ids / labels / icons and for every
  * other consumer (command palette, mobile bar); these arrays only decide what
- * the rail shows up-front vs. behind the disclosure. Together they cover every
- * `View` id exactly once — nothing is ever unreachable.
+ * the rail shows up-front vs. behind the disclosure.
+ *
+ * Note: a couple of `View` ids (e.g. `inventario`, `modelos-email`) exist in the
+ * type and still render if reached, but are intentionally left out of `NAV` so
+ * they don't clutter the menu — the owner asked to hide them. Add an id back to
+ * `NAV` (and one of the arrays below) to surface it again.
  */
 export const CORE_NAV: View[] = [
   "overview",
@@ -49,10 +53,8 @@ export const MORE_NAV: View[] = [
   "clientes",
   "tarefas",
   "fornecedores",
-  "inventario",
   "seguimentos",
   "estatisticas",
-  "modelos-email",
 ];
 
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
@@ -201,23 +203,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    id: "inventario",
-    label: "Inventário",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M3 8l9-5 9 5v8l-9 5-9-5V8z" strokeLinejoin="round" />
-        <path d="M3 8l9 5 9-5M12 13v8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
     id: "seguimentos",
     label: "Seguimentos",
     icon: (
@@ -283,23 +268,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
         <path d="m9 14 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "modelos-email",
-    label: "Modelos de email",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <path d="M3 8l9 5 9-5M8 14h4" strokeLinecap="round" />
       </svg>
     ),
   },

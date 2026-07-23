@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { randomId, eur2 } from "./util";
+import { parseMoney, randomId, eur2 } from "./util";
+import { useToast } from "./Toast";
 import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/orcamento/types";
 import { Button, Field, EmptyState } from "./ui";
 
@@ -37,9 +38,13 @@ interface Props {
  * survives if the directory entry is later removed.
  */
 export default function EventCosts({ quote, onChange }: Props) {
+  const { toast } = useToast();
   const [items, setItems] = useState<EventSupplier[]>(quote.eventSuppliers ?? []);
   const [directory, setDirectory] = useState<Supplier[]>([]);
   const [adding, setAdding] = useState(false);
+  // Buffer de escrita por campo ("id:est" / "id:act") — deixa escrever "1.500,50"
+  // livremente e só grava (um PATCH) ao sair do campo, em vez de a cada tecla.
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     name: "",
     category: "Catering",
@@ -69,19 +74,30 @@ export default function EventCosts({ quote, onChange }: Props) {
   }, [items, revenue]);
 
   function persist(next: EventSupplier[]) {
+    // Otimista com reversão + aviso: custos errados no ecrã sem estarem na base
+    // de dados corrompiam a margem sem ninguém saber.
+    const snapshot = items;
     setItems(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventSuppliers: next }),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error();
+      })
+      .catch(() => {
+        setItems(snapshot);
+        onChange(snapshot);
+        toast("Não foi possível guardar o custo. Tente novamente.", "error");
+      });
   }
 
   function add() {
     const name = form.name.trim();
     if (!name) return;
-    const est = parseFloat(form.estimatedCost) || 0;
+    const est = parseMoney(form.estimatedCost) ?? 0;
     persist([
       ...items,
       {
@@ -200,25 +216,37 @@ export default function EventCosts({ quote, onChange }: Props) {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Field
                   as="input"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   label="Orçado (€)"
-                  value={it.estimatedCost || ""}
-                  onChange={(e) =>
-                    update(it.id, { estimatedCost: parseFloat(e.target.value) || 0 })
-                  }
+                  value={draft[`${it.id}:est`] ?? (it.estimatedCost || "")}
+                  onChange={(e) => setDraft((d) => ({ ...d, [`${it.id}:est`]: e.target.value }))}
+                  onBlur={(e) => {
+                    update(it.id, { estimatedCost: parseMoney(e.target.value) ?? 0 });
+                    setDraft((d) => {
+                      const n = { ...d };
+                      delete n[`${it.id}:est`];
+                      return n;
+                    });
+                  }}
                   placeholder="0"
                 />
                 <Field
                   as="input"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   label="Real (€)"
-                  value={it.actualCost ?? ""}
-                  onChange={(e) =>
-                    update(it.id, {
-                      actualCost:
-                        e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
-                    })
-                  }
+                  value={draft[`${it.id}:act`] ?? it.actualCost ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, [`${it.id}:act`]: e.target.value }))}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    update(it.id, { actualCost: v === "" ? undefined : (parseMoney(v) ?? 0) });
+                    setDraft((d) => {
+                      const n = { ...d };
+                      delete n[`${it.id}:act`];
+                      return n;
+                    });
+                  }}
                   placeholder="—"
                 />
               </div>
@@ -268,7 +296,8 @@ export default function EventCosts({ quote, onChange }: Props) {
           </div>
           <Field
             as="input"
-            type="number"
+            type="text"
+            inputMode="decimal"
             label="Custo orçado (€)"
             value={form.estimatedCost}
             onChange={(e) => setForm((f) => ({ ...f, estimatedCost: e.target.value }))}

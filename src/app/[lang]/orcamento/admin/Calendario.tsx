@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
+import { isDateKey, todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -47,32 +48,48 @@ function eventTypeLabel(q: Quote): string {
 
 /** Build and download an .ics calendar with every dated event. */
 function exportIcs(quotes: Quote[]) {
-  const dated = quotes.filter((q) => q.date);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const day = (iso: string) => iso.replace(/-/g, "");
+  // Escape per RFC 5545 instead of blanking commas/semicolons.
+  const esc = (s: string) => s.replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Liquen Events//Back Office//PT",
     "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
   ];
-  for (const q of dated) {
-    const d = q.date.replace(/-/g, "");
-    const title = `${eventTypeLabel(q)} — ${q.name}`.replace(/[,;\\]/g, " ");
+  for (const q of quotes) {
+    // Only real calendar dates — free-form values ("a definir") would otherwise
+    // emit a malformed `DTSTART;VALUE=DATE:adefinir`. Skip them.
+    if (!isDateKey(q.date)) continue;
+    // DTEND is exclusive for all-day events: the day after the last day. Honour
+    // multi-day ranges (endDate) so a 3-day wedding shows as 3 days, not 1.
+    const lastDay = q.endDate && isDateKey(q.endDate) && q.endDate >= q.date ? q.endDate : q.date;
+    const dtEnd = new Date(Date.parse(lastDay + "T00:00:00Z") + 86_400_000)
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, "");
+    const title = `${eventTypeLabel(q)} — ${q.name}`;
     const desc = [
       q.location && `Local: ${q.location}`,
       q.guests && `${q.guests} convidados`,
       q.phone && `Tel: ${q.phone}`,
     ]
       .filter(Boolean)
-      .join(" \\n ");
+      .join("\n");
     lines.push(
       "BEGIN:VEVENT",
       `UID:${q.id}@liquen-events.com`,
       `DTSTAMP:${stamp}`,
-      `DTSTART;VALUE=DATE:${d}`,
-      `SUMMARY:${title}`,
-      desc ? `DESCRIPTION:${desc}` : "",
+      `DTSTART;VALUE=DATE:${day(q.date)}`,
+      `DTEND;VALUE=DATE:${dtEnd}`,
+      `SUMMARY:${esc(title)}`,
+      q.location ? `LOCATION:${esc(q.location)}` : "",
+      desc ? `DESCRIPTION:${esc(desc)}` : "",
       "END:VEVENT",
     );
   }
@@ -86,7 +103,6 @@ function exportIcs(quotes: Quote[]) {
   a.download = "liquen-eventos.ics";
   a.click();
   URL.revokeObjectURL(url);
-  void pad;
 }
 
 interface Props {
@@ -145,8 +161,18 @@ export default function Calendario({ quotes, onOpen }: Props) {
   async function deleteEvent(id: string, title: string) {
     // Single-click delete is a footgun on a tiny target — confirm first.
     if (!window.confirm(`Remover "${title}" do calendário?`)) return;
+    // Optimistic remove, but keep the previous list so we can put the event
+    // back if the server rejects the delete — otherwise it silently reappears
+    // on the next reload and the team never learns it failed.
+    const snapshot = events;
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    await fetch(`/api/calendario/${id}`, { method: "DELETE" }).catch(() => {});
+    try {
+      const res = await fetch(`/api/calendario/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setEvents(snapshot);
+      toast("Não foi possível remover. Tente novamente.", "error");
+    }
   }
 
   // Open the "add event" modal for a given day (shared by click + keyboard).
@@ -176,15 +202,21 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
   const byDay = useMemo(() => {
     const map = new Map<string, Quote[]>();
+    const pad = (n: number) => String(n).padStart(2, "0");
     for (const q of quotes) {
-      if (!q.date) continue;
+      // Free-form dates ("a definir", etc.) are allowed by the schema; skip
+      // anything that isn't a real YYYY-MM-DD so `.toISOString()` below can't
+      // throw a RangeError and take the whole month grid down with it.
+      if (!isDateKey(q.date)) continue;
       // Multi-day events (endDate set) occupy every day of the range, so a
       // 3-day wedding blocks all three days on the grid — not just day one.
       // Capped at 31 days as a guard against bad data.
-      const last = q.endDate && q.endDate >= q.date ? q.endDate : q.date;
+      const last = q.endDate && isDateKey(q.endDate) && q.endDate >= q.date ? q.endDate : q.date;
       const d = new Date(q.date + "T12:00:00");
       for (let i = 0; i < 31; i++) {
-        const key = d.toISOString().slice(0, 10);
+        // Build the key from LOCAL parts (not toISOString/UTC) so it matches the
+        // grid cell keys below and stays correct in far-offset zones.
+        const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
         if (key > last) break;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(q);
@@ -199,16 +231,16 @@ export default function Calendario({ quotes, onOpen }: Props) {
   const firstDay = new Date(year, month, 1);
   const startOffset = (firstDay.getDay() + 6) % 7; // Monday-first
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayStr = todayKey();
 
   const cells: (number | null)[] = [];
   for (let i = 0; i < startOffset; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   const upcoming = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayKey();
     return quotes
-      .filter((q) => q.date && q.date >= today)
+      .filter((q) => isDateKey(q.date) && q.date >= today)
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 6);
   }, [quotes]);
@@ -296,8 +328,16 @@ export default function Calendario({ quotes, onOpen }: Props) {
               const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
               const dayQuotes = byDay.get(key) ?? [];
               const dayEvents = eventsByDay.get(key) ?? [];
-              const isToday = key === todayKey;
+              const isToday = key === todayStr;
               const total = dayQuotes.length + dayEvents.length;
+              // Chip budget for the cell: up to 2 quotes, then events fill the
+              // rest (compressed to 1 when the day is busy so the "+N" fits).
+              // `hidden` is derived from what's actually shown — so a day with
+              // exactly 3 of one type still surfaces the 3rd via "+1" instead of
+              // dropping it silently.
+              const shownQuotes = dayQuotes.slice(0, 2);
+              const shownEvents = dayEvents.slice(0, total > 3 ? 1 : 2);
+              const hiddenCount = total - shownQuotes.length - shownEvents.length;
               const dayLabel = `${d} de ${MONTHS[month]}${isToday ? " (hoje)" : ""} — ${
                 total > 0 ? `${total} evento${total !== 1 ? "s" : ""}; ` : ""
               }Enter para adicionar`;
@@ -327,7 +367,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     </span>
                   </div>
                   <div className="flex flex-col gap-0.5 mt-0.5">
-                    {dayQuotes.slice(0, 2).map((q) => (
+                    {shownQuotes.map((q) => (
                       <button
                         key={q.id}
                         onClick={(e) => {
@@ -345,7 +385,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         {q.name.split(" ")[0]}
                       </button>
                     ))}
-                    {dayEvents.slice(0, total > 3 ? 1 : 2).map((ev) => (
+                    {shownEvents.map((ev) => (
                       <button
                         key={ev.id}
                         onClick={(e) => {
@@ -368,8 +408,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         {ev.title}
                       </button>
                     ))}
-                    {total > 3 && (
-                      <span className="text-foreground/30 text-[9px] px-1">+{total - 3}</span>
+                    {hiddenCount > 0 && (
+                      <span className="text-foreground/30 text-[9px] px-1">+{hiddenCount}</span>
                     )}
                   </div>
                 </div>

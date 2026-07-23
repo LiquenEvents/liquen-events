@@ -113,20 +113,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       `Líquen Events · ${MAIL_TO} · ${SITE.phoneDisplay}`,
     ].join("\n");
 
-    const mail = await sendMail({
-      to: quote.email,
-      replyTo: MAIL_TO,
-      subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
-      html,
-      text,
-      attachments: [
-        {
-          filename: `Proposta-Liquen-${id}.pdf`,
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        },
-      ],
-    });
+    // A proposta JÁ foi guardada acima. O envio do email é um passo separado: se
+    // falhar (SMTP em baixo, credenciais erradas, email do cliente inválido) NÃO
+    // pode deitar abaixo a geração inteira com um 500 — senão o utilizador vê
+    // "erro", tenta de novo e cria propostas duplicadas. Falhar no email devolve
+    // 200 com emailed:false + motivo, para a UI explicar o que aconteceu.
+    const hasRecipient = !!quote.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email);
+    let emailed = false;
+    let emailError: string | undefined;
+    if (!hasRecipient) {
+      emailError = "O pedido não tem um email de cliente válido.";
+    } else {
+      try {
+        const mail = await sendMail({
+          to: quote.email,
+          replyTo: MAIL_TO,
+          subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
+          html,
+          text,
+          attachments: [
+            {
+              filename: `Proposta-Liquen-${id}.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ],
+        });
+        emailed = mail.sent;
+        if (!mail.sent) emailError = "Envio de email não configurado.";
+      } catch (e) {
+        log.error("proposta-doc: envio de email falhou", e, { id });
+        emailError = "A proposta foi guardada, mas o email ao cliente falhou.";
+      }
+    }
 
     try {
       await updateQuote(id, { status: "cotado", quotedPrice: money.gross });
@@ -134,9 +153,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       log.error("proposta-doc: actualizar pedido falhou", e);
     }
 
-    return NextResponse.json({ ok: true, id: proposal.id, emailed: mail.sent });
+    return NextResponse.json({ ok: true, id: proposal.id, emailed, emailError });
   } catch (err) {
     log.error("proposta-doc POST falhou", err);
-    return NextResponse.json({ error: "Erro ao gerar a proposta" }, { status: 500 });
+    // Rota só para administradores autenticados — incluir o motivo real ajuda a
+    // equipa (e o suporte) a perceber a causa em vez de um erro genérico opaco.
+    const detail = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: `Erro ao gerar a proposta: ${detail || "desconhecido"}` },
+      { status: 500 },
+    );
   }
 }

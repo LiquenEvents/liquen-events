@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { eur0 as eur } from "@/lib/money";
+import { todayKey } from "./util";
 import { Card, EmptyState } from "./ui";
 
 const DAYS_AHEAD = 14;
@@ -70,10 +71,15 @@ export default function Agenda({ quotes, onOpen }: Props) {
   const { byDay, days } = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayKey = today.toISOString().slice(0, 10);
+    // Local `YYYY-MM-DD` keys — deriving these from `toISOString()` (UTC) shifts
+    // the window by a day in +offset zones (e.g. Portugal in summer, UTC+1), so
+    // yesterday's items leak in and "Hoje" lands on the wrong header.
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const localKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const todayKey = localKey(today);
     const horizon = new Date(today);
     horizon.setDate(horizon.getDate() + DAYS_AHEAD);
-    const horizonKey = horizon.toISOString().slice(0, 10);
+    const horizonKey = localKey(horizon);
     const inRange = (d?: string) => !!d && d >= todayKey && d <= horizonKey;
 
     const items: AgendaItem[] = [];
@@ -149,11 +155,11 @@ export default function Agenda({ quotes, onOpen }: Props) {
     return { byDay: map, days: Array.from(map.keys()) };
   }, [quotes, calEvents, tasks, onOpen]);
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayStr = todayKey();
   function dayLabel(key: string): string {
     const d = new Date(key + "T12:00:00");
     const diff = Math.round(
-      (+new Date(key + "T12:00:00") - +new Date(todayKey + "T12:00:00")) / 864e5,
+      (+new Date(key + "T12:00:00") - +new Date(todayStr + "T12:00:00")) / 864e5,
     );
     const rel = diff === 0 ? "Hoje" : diff === 1 ? "Amanhã" : "";
     const full = d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
@@ -201,7 +207,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
           days.map((key) => (
             <div key={key} className="border-b border-foreground/[0.06] last:border-0">
               <p
-                className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayKey ? "text-[#4d6350]" : "text-foreground/40"}`}
+                className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-[#4d6350]" : "text-foreground/40"}`}
               >
                 {dayLabel(key)}
               </p>

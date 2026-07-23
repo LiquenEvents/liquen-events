@@ -12,6 +12,7 @@ import {
 } from "@/lib/proposal-doc";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
+import { prepareImageForUpload, type ImageKind } from "./image-prep";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -127,6 +128,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   const [totalInput, setTotalInput] = useState<string>("");
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  // Every image ever uploaded for THIS pedido (server-side, device-independent),
+  // so covers/mood boards can be re-picked on any device — a localStorage draft
+  // lives only in the browser that created it.
+  const [library, setLibrary] = useState<{ path: string; url: string }[]>([]);
   const [refEdited, setRefEdited] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
@@ -156,6 +161,36 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     hydrated.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Load the pedido's uploaded-image library (server, device-independent) ──
+  // Fills in signed URLs for any image already in the draft (so thumbnails render
+  // even on a fresh device / after the cached URL expired) and offers the full
+  // set for re-picking into covers and mood boards.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/orcamento/${quote.id}/assets`);
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const imgs: { path: string; url: string }[] = Array.isArray(data?.images)
+          ? data.images
+          : [];
+        if (!alive || imgs.length === 0) return;
+        setLibrary(imgs);
+        setAssetUrls((prev) => {
+          const next = { ...prev };
+          for (const im of imgs) if (im.path && im.url && !next[im.path]) next[im.path] = im.url;
+          return next;
+        });
+      } catch {
+        /* offline / storage unavailable — the studio still works with uploads */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [quote.id]);
 
   // ── Auto-compose the reference until the user overrides it ──
   useEffect(() => {
@@ -253,29 +288,69 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   // ── Image upload ──
-  async function uploadImages(files: File[]): Promise<{ path: string; url: string }[]> {
-    const form = new FormData();
-    for (const f of files) form.append("files", f);
-    const res = await fetch(`/api/orcamento/${quote.id}/assets`, { method: "POST", body: form });
+  // Uma imagem por pedido: um lote inteiro num só POST rebentava o limite de
+  // corpo do alojamento (~4,5 MB) com fotos reais de telemóvel — o upload
+  // "às vezes não funcionava". Cada ficheiro é comprimido no navegador
+  // (image-prep) e enviado individualmente, com uma repetição automática em
+  // falha de rede; um ficheiro mau nunca deita fora os restantes.
+  async function uploadOne(file: File): Promise<{ path: string; url: string }> {
+    const post = () => {
+      const form = new FormData();
+      form.append("files", file);
+      return fetch(`/api/orcamento/${quote.id}/assets`, { method: "POST", body: form });
+    };
+    let res: Response;
+    try {
+      res = await post();
+    } catch {
+      // Soluço de rede — tenta uma segunda vez antes de desistir.
+      res = await post();
+    }
     const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error || "Falha ao carregar as imagens.");
-    const images: { path: string; url: string }[] = data?.images ?? [];
-    setAssetUrls((prev) => {
-      const next = { ...prev };
-      for (const im of images) next[im.path] = im.url;
-      return next;
-    });
-    return images;
+    if (!res.ok) {
+      throw new Error(
+        data?.error ||
+          (res.status === 413
+            ? "Imagem demasiado grande para envio."
+            : "Falha ao carregar a imagem."),
+      );
+    }
+    const im: { path: string; url: string } | undefined = data?.images?.[0];
+    if (!im) throw new Error("Falha ao carregar a imagem.");
+    setAssetUrls((prev) => ({ ...prev, [im.path]: im.url }));
+    return im;
   }
 
   async function handleUpload(key: string, files: File[], onPaths: (paths: string[]) => void) {
     if (files.length === 0) return;
     setUploading((u) => ({ ...u, [key]: true }));
+    // Cover photos print large (the document's hero) so they keep more pixels and
+    // a higher JPEG quality; mood-board photos render as small collage cells and
+    // use a tighter cap. The upload key encodes which is which ("cover-…"/"board-…").
+    const kind: ImageKind = key.startsWith("board-") ? "board" : "cover";
+    const paths: string[] = [];
+    const errors: string[] = [];
     try {
-      const images = await uploadImages(files);
-      onPaths(images.map((im) => im.path));
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Erro ao carregar imagens.", "error");
+      for (const f of files) {
+        try {
+          const prepared = await prepareImageForUpload(f, kind);
+          const im = await uploadOne(prepared);
+          paths.push(im.path);
+        } catch (e) {
+          errors.push(e instanceof Error ? e.message : `Falha ao carregar "${f.name}".`);
+        }
+      }
+      if (paths.length > 0) onPaths(paths);
+      if (errors.length > 0) {
+        toast(
+          errors.length === files.length
+            ? errors[0]
+            : `${paths.length} de ${files.length} carregadas. ${errors[0]}`,
+          "error",
+        );
+      } else if (paths.length > 1) {
+        toast(`${paths.length} imagens carregadas`, "success");
+      }
     } finally {
       setUploading((u) => ({ ...u, [key]: false }));
     }
@@ -372,6 +447,19 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       return { ...d, coverImages: cover };
     });
   }
+  /** Place a library image into the first free cover slot (of the two). */
+  function addCoverFromLibrary(path: string) {
+    setDoc((d) => {
+      const cover = [...(d.coverImages ?? [])];
+      const free = !cover[0] ? 0 : !cover[1] ? 1 : -1;
+      if (free === -1) {
+        toast("As duas capas já estão preenchidas. Remova uma para trocar.", "info");
+        return d;
+      }
+      cover[free] = path;
+      return { ...d, coverImages: cover };
+    });
+  }
   function removeCoverAt(idx: number) {
     setDoc((d) => ({ ...d, coverImages: (d.coverImages ?? []).filter((_, i) => i !== idx) }));
   }
@@ -457,9 +545,19 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         throw new Error(err?.error || "Não foi possível gerar a pré-visualização.");
       }
       const blob = await res.blob();
+      // Descarregar o PDF (anexo) em vez de abrir numa aba nova: a CSP do site
+      // (object-src 'none', sem frame-src) bloqueia mostrar um blob:PDF numa aba
+      // ou iframe, o que fazia "não acontecer nada". Um download nunca é
+      // bloqueado e abre no leitor de PDF do dispositivo.
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proposta-${quote.name || quote.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast("Pré-visualização gerada (PDF descarregado)", "success");
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro na pré-visualização.", "error");
     } finally {
@@ -479,10 +577,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
-      toast(
-        data?.emailed ? "Proposta enviada" : "Proposta gerada (e-mail não configurado)",
-        data?.emailed ? "success" : "info",
-      );
+      // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
+      // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
+      if (data?.emailed) {
+        toast("Proposta enviada ao cliente", "success");
+      } else {
+        toast(data?.emailError || "Proposta gerada (email não enviado)", "info");
+      }
       onSent?.();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro ao enviar a proposta.", "error");
@@ -630,6 +731,12 @@ export default function ProposalStudio({ quote, onSent }: Props) {
             );
           })}
         </div>
+        <ImageLibrary
+          images={library}
+          used={doc.coverImages ?? []}
+          onPick={addCoverFromLibrary}
+          label="Já carregadas neste pedido — toque para usar como capa"
+        />
       </Section>
 
       {/* Service groups */}
@@ -772,6 +879,12 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                     }
                   />
                 </div>
+                <ImageLibrary
+                  images={library}
+                  used={b.images}
+                  onPick={(path) => addBoardImages(bi, [path])}
+                  label="Já carregadas neste pedido — toque para juntar a este mood board"
+                />
               </div>
             ))}
           </div>
@@ -1080,6 +1193,69 @@ function MoveBtns({
   );
 }
 
+/** A strip of the pedido's already-uploaded images. Tapping one re-uses it
+ *  (into a cover slot or a mood board) without re-uploading — so the images the
+ *  owner added earlier are available again on any device. Images already used in
+ *  the current target are dimmed with a check. Renders nothing when the library
+ *  is empty. */
+function ImageLibrary({
+  images,
+  used,
+  onPick,
+  label,
+}: {
+  images: { path: string; url: string }[];
+  used: string[];
+  onPick: (path: string) => void;
+  label: string;
+}) {
+  if (images.length === 0) return null;
+  const usedSet = new Set(used);
+  return (
+    <div className="mt-3 border-t border-foreground/[0.08] pt-3">
+      <p className="mb-2 text-[11px] leading-relaxed text-foreground/45">{label}</p>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+        {images.map((im) => {
+          const isUsed = usedSet.has(im.path);
+          return (
+            <button
+              key={im.path}
+              type="button"
+              onClick={() => onPick(im.path)}
+              aria-label={isUsed ? "Imagem já usada — usar de novo" : "Usar esta imagem"}
+              className={`group relative aspect-square overflow-hidden rounded-lg border transition ${
+                isUsed
+                  ? "border-[#637a5f]/60 ring-1 ring-[#637a5f]/40"
+                  : "border-foreground/[0.1] hover:border-foreground/30"
+              }`}
+            >
+              {im.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={im.url}
+                  alt=""
+                  className={`h-full w-full object-cover transition ${
+                    isUsed ? "opacity-55" : "group-hover:scale-[1.04]"
+                  }`}
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-[8px] uppercase tracking-wider text-foreground/30">
+                  Imagem
+                </span>
+              )}
+              {isUsed && (
+                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#637a5f] text-[9px] leading-none text-white">
+                  ✓
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Thumb({
   url,
   onRemove,
@@ -1089,16 +1265,29 @@ function Thumb({
   onRemove: () => void;
   className?: string;
 }) {
+  const [failed, setFailed] = useState(false);
   return (
     <div
       className={`group relative overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${className}`}
     >
-      {url ? (
+      {url && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="h-full w-full object-cover" />
+        <img
+          src={url}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-[9px] tracking-[0.15em] uppercase text-foreground/30">
-          Imagem
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center text-[9px] leading-relaxed text-foreground/40">
+          {failed ? (
+            <>
+              <span className="font-medium text-foreground/55">Imagem carregada</span>
+              <span>Guardada, mas não foi possível pré-visualizar aqui.</span>
+            </>
+          ) : (
+            <span className="tracking-[0.15em] uppercase text-foreground/30">Imagem</span>
+          )}
         </div>
       )}
       <button
@@ -1131,7 +1320,12 @@ function UploadArea({
 
   function pick(list: FileList | null) {
     if (!list) return;
-    const files = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    // Alguns sistemas entregam HEIC/ficheiros de câmara com `type` vazio —
+    // aceitar também por extensão, em vez de os descartar em silêncio.
+    const files = Array.from(list).filter(
+      (f) =>
+        f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i.test(f.name),
+    );
     if (files.length) onFiles(files);
   }
 
@@ -1166,7 +1360,7 @@ function UploadArea({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         multiple={multiple}
         className="hidden"
         onChange={(e) => {
