@@ -223,10 +223,9 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                   <span className="w-8 h-px bg-gold flex-shrink-0" />
                   {t.sobre.founderEyebrow}
                 </p>
-                <p
-                  className="text-foreground font-bold uppercase tracking-display leading-[1.05]"
-                  style={{ fontSize: "clamp(28px, 4vw, 52px)" }}
-                >
+                {/* Matches the Clientes page <h1> exactly: the site's small,
+                    understated SpaceX caption size (18/21px). */}
+                <p className="text-foreground font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                   {t.sobre.founderQuote}
                 </p>
                 <div className="mt-12 pt-6 border-t border-foreground/10">
