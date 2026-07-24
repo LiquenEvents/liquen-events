@@ -7,10 +7,10 @@ import { WHATSAPP_HREF } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
 
-// Editorial footer background — a single Líquen photo under a dark veil, so the
-// footer reads as one immersive, premium band (wedding-editorial look) rather
-// than a plain link list. Chosen for warmth + legibility under white text.
-const FOOTER_BG = "/imagens/EW1_1428.jpg";
+// Editorial footer background — an evening photo from João & Pedro's wedding
+// under a dark veil, so the footer reads as one immersive, premium band
+// (wedding-editorial look). Chosen for warmth + legibility under white text.
+const FOOTER_BG = "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg";
 
 // Service detail slugs, paired with t.footer.serviceLinks (same order) — gives
 // the money pages keyword-anchored internal links from every page's footer.
