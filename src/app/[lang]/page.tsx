@@ -40,7 +40,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             fill
             preload
             sizes="100vw"
-            quality={75}
+            quality={82}
             className="object-cover object-center hero-settle"
           />
         </Parallax>

@@ -80,7 +80,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             fill
             preload
             sizes="100vw"
-            quality={75}
+            quality={82}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/DaniGui_Preview20.jpg")}
           />
