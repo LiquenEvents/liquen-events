@@ -22,41 +22,6 @@ const MENU_EASE = "cubic-bezier(0.16,1,0.3,1)";
 // the site's thin-line motif. Purely decorative — labelled by their parent <a>. ──
 // memo: these four are prop-less, so memoizing lets React skip reconciling their
 // SVG subtrees entirely when the Navbar re-renders on scroll (scrolled/hidden).
-const IconMail = memo(function IconMail() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.35"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <rect x="3" y="5" width="18" height="14" rx="1.5" />
-      <path d="m3.5 6.5 8.5 6 8.5-6" />
-    </svg>
-  );
-});
-const IconPhone = memo(function IconPhone() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.35"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M6.5 3.5h3l1.4 3.9-2 1.4a12 12 0 0 0 4.9 4.9l1.4-2 3.9 1.4v3a1.8 1.8 0 0 1-1.9 1.8A15.8 15.8 0 0 1 4.7 5.4 1.8 1.8 0 0 1 6.5 3.5Z" />
-    </svg>
-  );
-});
 const IconInstagram = memo(function IconInstagram() {
   return (
     <svg
@@ -299,28 +264,7 @@ const MobileMenu = memo(function MobileMenu({
           </span>
         </Link>
 
-        <div className="flex flex-col gap-1.5 pt-5 border-t border-white/10 text-[12px] tracking-wide">
-          <a
-            href={`mailto:${SITE.email}`}
-            className="group inline-flex items-center gap-2.5 text-white/65 hover:text-white transition-colors min-w-0"
-          >
-            <span className="text-white/30 group-hover:text-white/60 transition-colors flex-shrink-0">
-              <IconMail />
-            </span>
-            <span className="truncate">{SITE.email}</span>
-          </a>
-          <a
-            href={`tel:${SITE.phone}`}
-            className="group inline-flex items-center gap-2.5 text-white/65 hover:text-white transition-colors"
-          >
-            <span className="text-white/30 group-hover:text-white/60 transition-colors flex-shrink-0">
-              <IconPhone />
-            </span>
-            {SITE.phoneDisplay}
-          </a>
-        </div>
-
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <div className="flex items-center gap-1 -ml-2.5">
             <a
               href={SITE.instagram}
@@ -341,7 +285,6 @@ const MobileMenu = memo(function MobileMenu({
               <IconFacebook />
             </a>
           </div>
-          <LanguageToggle light />
         </div>
       </div>
     </div>
