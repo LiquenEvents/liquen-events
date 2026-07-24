@@ -510,6 +510,7 @@ export default function Navbar() {
               alt="Líquen Events"
               width={300}
               height={179}
+              priority
               className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[80px] sm:h-[88px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
             />
           </Link>
