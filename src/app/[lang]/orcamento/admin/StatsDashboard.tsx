@@ -6,6 +6,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { computeEventMetrics } from "@/lib/orcamento/dossier";
 import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
 import { eur0 as eur } from "@/lib/money";
+import { Button, Card, EmptyState, Segmented } from "./ui";
 
 // Unified status vocabulary — the same words a newcomer sees everywhere else in
 // the back office (Overview, Kanban): Novo / Em revisão / Proposta enviada /
@@ -17,11 +18,6 @@ const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   aceite: { label: "Ganho", color: "#525a2f" },
   rejeitado: { label: "Perdido", color: "#5a5a55" },
 };
-
-// Shared keyboard focus ring — matches the Overview so focus states read as one
-// system across the back office (WCAG 2.4.7).
-const FOCUS_RING =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 const MONTHS_PT = [
   "Jan",
@@ -46,10 +42,21 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? "Outro";
 }
 
-function Kpi({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
+function Kpi({
+  value,
+  label,
+  accent,
+  small,
+}: {
+  value: string;
+  label: string;
+  accent?: boolean;
+  /** Secondary, less prominent tile (smaller number, tighter padding). */
+  small?: boolean;
+}) {
   return (
     <div
-      className={`relative overflow-hidden rounded-xl p-5 border ${
+      className={`relative overflow-hidden rounded-2xl border ${small ? "p-4" : "p-5"} ${
         accent ? "bg-[#1b2119] border-[#2d3829]" : "bg-white border-foreground/[0.08] shadow-sm"
       }`}
     >
@@ -64,7 +71,10 @@ function Kpi({ value, label, accent }: { value: string; label: string; accent?: 
       )}
       <p
         className={`font-bold leading-none mb-2 relative ${accent ? "text-[#8aad85]" : "text-foreground/82"}`}
-        style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 2.6vw, 34px)" }}
+        style={{
+          fontFamily: "var(--font-playfair)",
+          fontSize: small ? "clamp(18px, 1.9vw, 24px)" : "clamp(22px, 2.6vw, 34px)",
+        }}
       >
         {value}
       </p>
@@ -147,12 +157,58 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
   );
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+// A collapsible titled section — the deeper breakdowns fold away so the screen
+// opens calm (headline numbers + money) and the analytics are one click away.
+// `defaultOpen` keeps the sections that matter most for the owner expanded.
+function Section({
+  title,
+  hint,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="border border-foreground/[0.08] rounded-xl p-6 bg-white shadow-sm">
-      <h2 className="text-foreground/55 text-[10px] tracking-[0.3em] uppercase mb-6 font-medium">
+    <details
+      open={defaultOpen}
+      className="group rounded-2xl border border-foreground/[0.08] bg-white shadow-sm overflow-hidden"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0">
+          <span className="text-foreground/55 text-[10px] tracking-[0.3em] uppercase font-medium">
+            {title}
+          </span>
+          {hint && <p className="mt-1 text-[11px] text-foreground/35 leading-snug">{hint}</p>}
+        </div>
+        <svg
+          className="shrink-0 text-foreground/30 motion-safe:transition-transform group-open:rotate-180"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </summary>
+      <div className="px-6 pb-6 pt-1">{children}</div>
+    </details>
+  );
+}
+
+// A lightweight titled block used inside a Section — no border of its own, so
+// grouped charts read as one calm panel instead of nested cards.
+function Sub({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-foreground/45 text-[10px] tracking-[0.25em] uppercase mb-5 font-medium">
         {title}
-      </h2>
+      </h3>
       {children}
     </div>
   );
@@ -421,282 +477,287 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
 
   if (quotes.length === 0) {
     return (
-      <div className="bo-card py-20 px-6 text-center flex flex-col items-center">
-        <span
-          className="flex items-center justify-center w-14 h-14 rounded-2xl mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
-          aria-hidden="true"
-        >
-          <svg
-            width="26"
-            height="26"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-          >
-            <rect x="3" y="4" width="4" height="16" rx="1" />
-            <rect x="10" y="4" width="4" height="11" rx="1" />
-            <rect x="17" y="4" width="4" height="7" rx="1" />
-          </svg>
-        </span>
-        <h2
-          className="text-foreground/80 font-bold text-xl mb-2"
-          style={{ fontFamily: "var(--font-playfair)" }}
-        >
-          Ainda não há dados para mostrar.
-        </h2>
-        <p className="text-foreground/45 text-sm max-w-sm leading-relaxed">
-          As estatísticas — conversão, receita, margens e tendências — aparecem automaticamente
-          assim que chegarem os primeiros pedidos.
-        </p>
-      </div>
+      <Card padding="none">
+        <EmptyState
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden="true"
+            >
+              <rect x="3" y="4" width="4" height="16" rx="1" />
+              <rect x="10" y="4" width="4" height="11" rx="1" />
+              <rect x="17" y="4" width="4" height="7" rx="1" />
+            </svg>
+          }
+          title="Ainda não há dados para mostrar"
+          description="As estatísticas — conversão, receita, margens e tendências — aparecem automaticamente assim que chegarem os primeiros pedidos."
+        />
+      </Card>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Toolbar: period filter + export */}
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex items-center gap-1.5">
-          {(["all", "1y", "6m", "3m"] as Period[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              aria-pressed={period === p}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 motion-reduce:transition-none ${FOCUS_RING} ${
-                period === p
-                  ? "bg-[#1b2119] text-white shadow-sm"
-                  : "bg-foreground/[0.04] text-foreground/50 hover:bg-foreground/[0.07] hover:text-foreground/70"
-              }`}
-            >
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
+      {/* Toolbar: period filter (primary control) + quiet export actions */}
+      <div className="flex flex-wrap items-center gap-3 justify-between">
+        <Segmented
+          ariaLabel="Período"
+          size="sm"
+          value={period}
+          onChange={setPeriod}
+          options={(["all", "1y", "6m", "3m"] as Period[]).map((p) => ({
+            value: p,
+            label: PERIOD_LABELS[p],
+          }))}
+        />
+        <div className="flex flex-wrap gap-2">
           {stats.hasPayments && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() =>
                 downloadCsv(`liquen-pagamentos-${dateStamp()}`, paymentsToCsvRows(filteredQuotes))
               }
-              className={`px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/50 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/70 transition-colors motion-reduce:transition-none shadow-sm ${FOCUS_RING}`}
               title="Exportar todos os pagamentos (tesouraria) para CSV"
             >
-              Pagamentos ↓
-            </button>
+              Exportar pagamentos
+            </Button>
           )}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() =>
               downloadCsv(`liquen-pedidos-${dateStamp()}`, quotesToCsvRows(filteredQuotes))
             }
-            className={`px-4 py-2 bg-white border border-foreground/[0.09] text-foreground/50 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:text-foreground/70 transition-colors motion-reduce:transition-none shadow-sm ${FOCUS_RING}`}
+            title="Exportar todos os pedidos para CSV"
           >
-            Exportar CSV ↓
-          </button>
+            Exportar pedidos
+          </Button>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+      {/* Headline numbers — the four that answer "how are we doing?" at a glance */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi value={String(stats.total)} label="Pedidos totais" accent />
-        <Kpi value={String(stats.thisMonth)} label="Este mês" />
         <Kpi value={`${stats.conversion}%`} label="Conversão" />
-        <Kpi value={stats.avgRespLabel} label="Resposta média" />
+        <Kpi value={eur(stats.pipelineSum)} label="Em proposta" />
+        <Kpi value={eur(stats.wonSum)} label="Ganho (aceite)" accent />
+      </div>
+
+      {/* Secondary indicators — still here, just quieter */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi small value={String(stats.thisMonth)} label="Este mês" />
+        <Kpi small value={stats.avgRespLabel} label="Resposta média" />
         <Kpi
+          small
           value={stats.avgDaysClose > 0 ? `${stats.avgDaysClose}d` : "—"}
           label="Tempo de fecho"
         />
-        <Kpi value={eur(stats.pipelineSum)} label="Em proposta" />
         <Kpi
+          small
           value={stats.forecastRevenue > 0 ? eur(stats.forecastRevenue) : "—"}
           label="Previsão pipeline"
         />
-        <Kpi value={eur(stats.wonSum)} label="Ganho (aceite)" accent />
       </div>
 
       {/* Financeiro */}
       {stats.hasPayments && (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-6">
-          <Panel title="Finanças (pagamentos registados)">
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <Kpi value={eur(stats.received)} label="Recebido" accent />
-              <Kpi value={eur(stats.outstanding)} label="A receber" />
-              <Kpi value={eur(stats.avgTicket)} label="Ticket médio" />
-              <Kpi value={eur(stats.received + stats.outstanding)} label="Faturado total" />
-            </div>
-            {/* received vs outstanding bar */}
-            {stats.received + stats.outstanding > 0 && (
-              <div>
-                <div className="h-2 rounded-full overflow-hidden flex bg-foreground/6">
-                  <div
-                    className="h-full bg-moss transition-all duration-700"
-                    style={{
-                      width: `${(stats.received / (stats.received + stats.outstanding)) * 100}%`,
-                    }}
-                  />
-                  <div
-                    className="h-full bg-[#b5894a]/70 transition-all duration-700"
-                    style={{
-                      width: `${(stats.outstanding / (stats.received + stats.outstanding)) * 100}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-moss" /> Recebido
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#b5894a]/70" /> A receber
-                  </span>
-                </div>
+        <Section title="Dinheiro" hint="Pagamentos registados nos pedidos." defaultOpen>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8">
+            <Sub title="Recebido e a receber">
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <Kpi value={eur(stats.received)} label="Recebido" accent />
+                <Kpi value={eur(stats.outstanding)} label="A receber" />
+                <Kpi value={eur(stats.avgTicket)} label="Ticket médio" />
+                <Kpi value={eur(stats.received + stats.outstanding)} label="Faturado total" />
               </div>
-            )}
-          </Panel>
-
-          <Panel title="Próximos pagamentos (60 dias)">
-            {stats.upcoming.length === 0 ? (
-              <p className="text-foreground/40 text-xs">
-                Sem pagamentos previstos para os próximos 60 dias.
-              </p>
-            ) : (
-              <div className="flex flex-col divide-y divide-foreground/6">
-                {stats.upcoming.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-foreground/65 text-sm truncate">{p.name}</p>
-                      <p className="text-foreground/30 text-[10px] capitalize">{p.kind}</p>
-                    </div>
-                    <div className="text-right shrink-0 ml-3">
-                      <p className="text-moss text-sm font-medium tabular-nums">{eur(p.amount)}</p>
-                      <p className="text-foreground/30 text-[10px]">
-                        {new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </p>
-                    </div>
+              {/* received vs outstanding bar */}
+              {stats.received + stats.outstanding > 0 && (
+                <div>
+                  <div className="h-2 rounded-full overflow-hidden flex bg-foreground/6">
+                    <div
+                      className="h-full bg-moss transition-all duration-700"
+                      style={{
+                        width: `${(stats.received / (stats.received + stats.outstanding)) * 100}%`,
+                      }}
+                    />
+                    <div
+                      className="h-full bg-[#b5894a]/70 transition-all duration-700"
+                      style={{
+                        width: `${(stats.outstanding / (stats.received + stats.outstanding)) * 100}%`,
+                      }}
+                    />
                   </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-        </div>
+                  <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-moss" /> Recebido
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#b5894a]/70" /> A receber
+                    </span>
+                  </div>
+                </div>
+              )}
+            </Sub>
+
+            <Sub title="Próximos pagamentos (60 dias)">
+              {stats.upcoming.length === 0 ? (
+                <p className="text-foreground/40 text-xs">
+                  Sem pagamentos previstos para os próximos 60 dias.
+                </p>
+              ) : (
+                <div className="flex flex-col divide-y divide-foreground/6">
+                  {stats.upcoming.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-foreground/65 text-sm truncate">{p.name}</p>
+                        <p className="text-foreground/30 text-[10px] capitalize">{p.kind}</p>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <p className="text-moss text-sm font-medium tabular-nums">
+                          {eur(p.amount)}
+                        </p>
+                        <p className="text-foreground/30 text-[10px]">
+                          {new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT", {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Sub>
+          </div>
+        </Section>
       )}
 
       {/* Rentabilidade */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-6">
-        <Panel title="Rentabilidade (eventos ganhos · c/ IVA)">
-          {stats.hasProfit ? (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <Kpi
-                  value={eur(stats.profitability.contracted)}
-                  label="Receita contratada"
-                  accent
-                />
-                <Kpi value={eur(stats.profitability.costs)} label="Custo fornecedores" />
-                <Kpi value={eur(stats.profitability.margin)} label="Margem" accent />
-                <Kpi
-                  value={`${Math.round(stats.profitability.avgMarginPct)}%`}
-                  label="Margem média"
-                />
-              </div>
-              <p className="text-foreground/25 text-[10px] mt-4">
-                Valores c/ IVA · {stats.profitability.count} evento
-                {stats.profitability.count === 1 ? "" : "s"} ganho
-                {stats.profitability.count === 1 ? "" : "s"} com valor contratado.
+      <Section title="Rentabilidade" hint="Margem dos eventos ganhos (valores c/ IVA)." defaultOpen>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8">
+          <Sub title="Eventos ganhos">
+            {stats.hasProfit ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Kpi
+                    value={eur(stats.profitability.contracted)}
+                    label="Receita contratada"
+                    accent
+                  />
+                  <Kpi value={eur(stats.profitability.costs)} label="Custo fornecedores" />
+                  <Kpi value={eur(stats.profitability.margin)} label="Margem" accent />
+                  <Kpi
+                    value={`${Math.round(stats.profitability.avgMarginPct)}%`}
+                    label="Margem média"
+                  />
+                </div>
+                <p className="text-foreground/25 text-[10px] mt-4">
+                  Valores c/ IVA · {stats.profitability.count} evento
+                  {stats.profitability.count === 1 ? "" : "s"} ganho
+                  {stats.profitability.count === 1 ? "" : "s"} com valor contratado.
+                </p>
+              </>
+            ) : (
+              <p className="text-foreground/40 text-xs">
+                Ainda sem eventos ganhos com valor contratado. A margem aparece assim que fechar a
+                primeira proposta.
               </p>
-            </>
-          ) : (
-            <p className="text-foreground/40 text-xs">
-              Ainda sem eventos ganhos com valor contratado. A margem aparece assim que fechar a
-              primeira proposta.
-            </p>
-          )}
-        </Panel>
+            )}
+          </Sub>
 
-        <Panel title="Margem por tipo de evento (c/ IVA)">
-          {stats.hasProfit ? (
-            <div className="flex flex-col gap-3">
-              {(() => {
-                const maxMargin = Math.max(1, ...stats.profitability.byType.map((r) => r.margin));
-                return stats.profitability.byType.map((row) => {
-                  const pct = Math.round(row.marginPct);
-                  const color = pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82";
-                  return (
-                    <div key={row.label}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-foreground/55 text-xs truncate max-w-[45%]">
-                          {row.label}
-                        </span>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-foreground/30 text-[10px] tabular-nums">
-                            {eur(row.margin)}
+          <Sub title="Margem por tipo de evento">
+            {stats.hasProfit ? (
+              <div className="flex flex-col gap-3">
+                {(() => {
+                  const maxMargin = Math.max(1, ...stats.profitability.byType.map((r) => r.margin));
+                  return stats.profitability.byType.map((row) => {
+                    const pct = Math.round(row.marginPct);
+                    const color = pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82";
+                    return (
+                      <div key={row.label}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-foreground/55 text-xs truncate max-w-[45%]">
+                            {row.label}
                           </span>
-                          <span
-                            className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
-                            style={{ color }}
-                          >
-                            {pct}%
-                          </span>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-foreground/30 text-[10px] tabular-nums">
+                              {eur(row.margin)}
+                            </span>
+                            <span
+                              className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
+                              style={{ color }}
+                            >
+                              {pct}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${(Math.max(0, row.margin) / maxMargin) * 100}%`,
+                              background: color,
+                            }}
+                          />
                         </div>
                       </div>
-                      <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-700"
-                          style={{
-                            width: `${(Math.max(0, row.margin) / maxMargin) * 100}%`,
-                            background: color,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          ) : (
-            <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
-          )}
-        </Panel>
-      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
+            )}
+          </Sub>
+        </div>
+      </Section>
 
       {/* Trends */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel title="Pedidos por mês (últimos 8)">
-          <VBars data={stats.months.map((m) => ({ label: m.label, value: m.value }))} />
-        </Panel>
-        <Panel title="Receita ganha por mês (€)">
-          {stats.hasRevenue ? (
-            <VBars
-              data={stats.months.map((m) => ({ label: m.label, value: Math.round(m.revenue) }))}
-              format={(n) => eur(n)}
-            />
-          ) : (
-            <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
-          )}
-        </Panel>
-      </div>
+      <Section title="Tendências" hint="Pedidos e receita ganha, mês a mês.">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Sub title="Pedidos por mês (últimos 8)">
+            <VBars data={stats.months.map((m) => ({ label: m.label, value: m.value }))} />
+          </Sub>
+          <Sub title="Receita ganha por mês (€)">
+            {stats.hasRevenue ? (
+              <VBars
+                data={stats.months.map((m) => ({ label: m.label, value: Math.round(m.revenue) }))}
+                format={(n) => eur(n)}
+              />
+            ) : (
+              <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
+            )}
+          </Sub>
+        </div>
+      </Section>
 
       {/* Breakdowns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel title="Por estado">
-          <HBars data={stats.statusBars} />
-        </Panel>
-        <Panel title="Por categoria">
-          <HBars data={stats.categoryBars} />
-        </Panel>
-        <Panel title="Tipos de evento mais pedidos">
-          <HBars data={stats.eventTypeBars} />
-        </Panel>
-        <Panel title="Como nos conheceram">
-          <HBars data={stats.referralBars} />
-        </Panel>
-      </div>
+      <Section title="Repartições" hint="Como se distribuem os pedidos.">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Sub title="Por estado">
+            <HBars data={stats.statusBars} />
+          </Sub>
+          <Sub title="Por categoria">
+            <HBars data={stats.categoryBars} />
+          </Sub>
+          <Sub title="Tipos de evento mais pedidos">
+            <HBars data={stats.eventTypeBars} />
+          </Sub>
+          <Sub title="Como nos conheceram">
+            <HBars data={stats.referralBars} />
+          </Sub>
+        </div>
+      </Section>
 
       {/* Lost reasons */}
       {stats.lostReasonRows.length > 0 && (
-        <Panel title="Motivos de perda">
+        <Section title="Motivos de perda">
           <div className="flex flex-col gap-3">
             {stats.lostReasonRows.map((row) => {
               const total = stats.lostReasonRows.reduce((s, r) => s + r.value, 0);
@@ -720,12 +781,12 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               );
             })}
           </div>
-        </Panel>
+        </Section>
       )}
 
       {/* Referral conversion */}
       {stats.referralConvRows.length > 0 && (
-        <Panel title="Conversão por fonte (leads → aceite)">
+        <Section title="Conversão por fonte" hint="Leads que se tornaram evento ganho, por origem.">
           <div className="flex flex-col gap-3">
             {stats.referralConvRows.map((row) => (
               <div key={row.label}>
@@ -760,7 +821,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               </div>
             ))}
           </div>
-        </Panel>
+        </Section>
       )}
     </div>
   );

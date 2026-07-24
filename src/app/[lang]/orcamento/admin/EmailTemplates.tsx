@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
+import { Button } from "./ui";
 import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
 import {
   extractSimpleText,
@@ -293,19 +294,15 @@ export default function EmailTemplates() {
                   {DESCRIPTIONS[selected.key] ?? "Modelo de email."}
                 </p>
               </div>
-              <button
+              <Button
+                variant={showSaved ? "subtle" : "primary"}
+                className="shrink-0"
                 onClick={save}
+                loading={saving}
                 disabled={saving || !dirty}
-                className={`px-5 py-2 rounded-xl text-[11px] tracking-[0.18em] uppercase transition-colors shrink-0 ${
-                  saving || !dirty
-                    ? showSaved
-                      ? "bg-[#4d6350]/12 text-[#4d6350] cursor-default"
-                      : "bg-[#1b2119]/30 text-white/50 cursor-not-allowed"
-                    : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
-                }`}
               >
                 {saving ? "A guardar…" : showSaved ? "Guardado ✓" : "Guardar"}
-              </button>
+              </Button>
             </div>
 
             {/* Subject */}
@@ -341,8 +338,8 @@ export default function EmailTemplates() {
               ))}
             </div>
             <p className="text-[11px] text-foreground/40 mb-4 leading-relaxed">
-              Clique num botão para inserir o dado do cliente onde está o cursor. No envio, cada
-              campo é substituído pelos dados reais.
+              Clique para inserir onde está o cursor — no envio, cada campo é preenchido com os
+              dados reais.
             </p>
 
             {/* Body */}
@@ -377,8 +374,7 @@ export default function EmailTemplates() {
                   onFocus={() => (activeFieldRef.current = "visual")}
                 />
                 <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
-                  Escreva e formate a mensagem com a barra acima. Use os botões dos dados do cliente
-                  para inserir campos. À direita vê exatamente como o cliente a recebe.
+                  Escreva e formate com a barra acima. À direita vê como o cliente recebe.
                 </p>
               </>
             ) : (

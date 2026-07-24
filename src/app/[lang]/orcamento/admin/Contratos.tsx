@@ -309,28 +309,24 @@ export default function Contratos() {
                           <td colSpan={7} className="px-4 py-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-4">
                               <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  Proposta
-                                </p>
+                                <p className="bo-eyebrow text-foreground/40 mb-1">Proposta</p>
                                 <p className="text-foreground/60 font-mono text-[11px] break-all">
                                   {c.proposalId || "—"}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  Criado em
-                                </p>
+                                <p className="bo-eyebrow text-foreground/40 mb-1">Criado em</p>
                                 <p className="text-foreground/60">{fmtDateTime(c.createdAt)}</p>
                               </div>
                               <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
+                                <p className="bo-eyebrow text-foreground/40 mb-1">
                                   Versão dos termos
                                 </p>
                                 <p className="text-foreground/60">Versão {c.termsVersion}</p>
                               </div>
                               {/* IP é dado de auditoria — discreto, não em destaque. */}
                               <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
+                                <p className="bo-eyebrow text-foreground/40 mb-1">
                                   IP de quem aceitou
                                 </p>
                                 <p className="text-foreground/45 font-mono text-[11px] break-all">
@@ -338,7 +334,7 @@ export default function Contratos() {
                                 </p>
                               </div>
                             </div>
-                            <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-1.5">
+                            <p className="bo-eyebrow text-foreground/40 mb-2">
                               Termos aceites (cópia guardada)
                             </p>
                             <div className="max-h-72 overflow-y-auto rounded-lg border border-foreground/10 bg-white p-4">

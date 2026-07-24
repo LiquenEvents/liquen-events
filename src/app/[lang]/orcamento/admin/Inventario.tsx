@@ -108,6 +108,8 @@ export default function Inventario() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // A repartição por categoria é detalhe — o total é o que importa ao relance.
+  const [showCatTotals, setShowCatTotals] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -410,23 +412,34 @@ export default function Inventario() {
         ))}
       </div>
 
-      {/* Category totals */}
+      {/* Totals — the grand total leads; the per-category breakdown folds away */}
       {!loading && filtered.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          {totals.map(([c, t]) => (
-            <span
-              key={c}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground/[0.04] px-2.5 py-1 text-[11px] text-foreground/50"
-            >
-              <span className="font-medium text-foreground/70">{c}</span>
-              <span className="text-foreground/35">
-                {t.items} {t.items === 1 ? "item" : "itens"} · {t.qty} un.
-              </span>
-            </span>
-          ))}
+        <div className="mb-6 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#eef1e6] px-2.5 py-1 text-[11px] font-medium text-[#525a2f]">
             Total: {filtered.length} {filtered.length === 1 ? "item" : "itens"} · {totalQty} un.
           </span>
+          {totals.length > 1 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-expanded={showCatTotals}
+              onClick={() => setShowCatTotals((s) => !s)}
+            >
+              {showCatTotals ? "Ocultar por categoria" : "Ver por categoria"}
+            </Button>
+          )}
+          {showCatTotals &&
+            totals.map(([c, t]) => (
+              <span
+                key={c}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground/[0.04] px-2.5 py-1 text-[11px] text-foreground/50"
+              >
+                <span className="font-medium text-foreground/70">{c}</span>
+                <span className="text-foreground/35">
+                  {t.items} {t.items === 1 ? "item" : "itens"} · {t.qty} un.
+                </span>
+              </span>
+            ))}
         </div>
       )}
 
