@@ -1,7 +1,6 @@
 import "server-only";
 import {
   PDFDocument,
-  StandardFonts,
   rgb,
   pushGraphicsState,
   popGraphicsState,
@@ -14,6 +13,7 @@ import {
   type PDFPage,
   type PDFImage,
 } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import sharp from "sharp";
 import { SITE } from "@/lib/site";
 import {
@@ -24,6 +24,11 @@ import {
 } from "@/lib/proposal-doc";
 import { splitThirtySeventy, eur } from "@/lib/money";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
+import {
+  CARLITO_REGULAR_TTF_B64,
+  CARLITO_BOLD_TTF_B64,
+  CARLITO_ITALIC_TTF_B64,
+} from "@/lib/proposal-fonts";
 import { winAnsiSafe } from "@/lib/pdf-text";
 
 const PT_MONTHS_SHORT = [
@@ -248,13 +253,20 @@ function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): s
 
 export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  const f: Fonts = {
-    reg: await pdf.embedFont(StandardFonts.Helvetica),
-    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
-    serif: await pdf.embedFont(StandardFonts.TimesRoman),
-    serifB: await pdf.embedFont(StandardFonts.TimesRomanBold),
-    serifIt: await pdf.embedFont(StandardFonts.TimesRomanItalic),
-  };
+  pdf.registerFontkit(fontkit);
+  // Carlito — a free, metric-compatible twin of Microsoft Calibri, the font the
+  // studio's real "PO Decoração" sample proposals are set in. Embedding it (from
+  // base64 WOFF, like the logos) means the generated PDF matches those samples
+  // instead of mixing Helvetica + Times (neither of which appears in the
+  // samples). One family, used everywhere; subset:true keeps only drawn glyphs.
+  const carlito = (b64: string) => pdf.embedFont(Buffer.from(b64, "base64"), { subset: true });
+  const reg = await carlito(CARLITO_REGULAR_TTF_B64);
+  const bold = await carlito(CARLITO_BOLD_TTF_B64);
+  const italic = await carlito(CARLITO_ITALIC_TTF_B64);
+  // The layout still names "serif"/"serifB"/"serifIt" slots for its elegant
+  // moments; in the sample proposals those are simply Calibri regular/bold/
+  // italic, so every slot now resolves to Carlito — one consistent typeface.
+  const f: Fonts = { reg, bold, serif: reg, serifB: bold, serifIt: italic };
   const logoDark = await pdf.embedPng(Buffer.from(LOGO_DARK_PNG_B64, "base64"));
   const logoWhite = await pdf.embedPng(Buffer.from(LOGO_WHITE_PNG_B64, "base64"));
 
