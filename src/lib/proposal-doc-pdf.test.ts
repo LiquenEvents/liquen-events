@@ -23,6 +23,7 @@ function decoracaoDoc(): ProposalDoc {
     guests: "80 pax",
     ceremony: "Civil, simbólica",
     time: "16h00",
+    weddingPlanners: "Equipa AMARA",
     serviceGroups: [
       {
         letter: "a)",
@@ -37,6 +38,10 @@ function decoracaoDoc(): ProposalDoc {
       { title: "Decoração Cerimónia", images: [], annotation: "Paleta em tons de musgo." },
     ],
     budgetItems: ["Decor Cerimónia", "Decor Copo d'água"],
+    budgetExtras: [
+      { label: "Deslocação da equipa Líquen", valueText: "896,00 €" },
+      { label: "Wedding Coordinator", valueText: "895,00 € + IVA" },
+    ],
     totalLabel: "Valor Total Decoração",
     totalText: "3000,00 € + IVA",
     coverImages: [],
@@ -93,6 +98,19 @@ describe("renderProposalDocPdf", () => {
     expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
     const parsed = await PDFDocument.load(bytes);
     expect(parsed.getPageCount()).toBeGreaterThan(3);
+  });
+
+  it("renders budget extras (deslocação, coordenação) without throwing", async () => {
+    const doc = decoracaoDoc();
+    doc.budgetExtras = [
+      { label: "Deslocação da equipa Líquen", valueText: "896,00 €" },
+      { label: "Valor Tecidos suspensos", valueText: "4.742,50 € + IVA" },
+      { label: "Mobiliário e atoalhado (opção A)", valueText: "4.169,78 € + IVA" },
+      { label: "", valueText: "" }, // blank line is filtered out, never crashes
+    ];
+    const bytes = await renderProposalDocPdf(doc);
+    expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
+    expect(bytes.length).toBeGreaterThan(1000);
   });
 
   it("does NOT throw on client text Helvetica can't encode (emoji/CJK)", async () => {

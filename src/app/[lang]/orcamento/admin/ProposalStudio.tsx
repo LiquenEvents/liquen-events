@@ -87,10 +87,12 @@ function initialDoc(quote: Quote): StudioDoc {
     guests: quote.guests ? `${quote.guests} pax` : "",
     ceremony: "",
     time: "",
+    weddingPlanners: "",
     serviceGroups: [],
     moodBoards: [],
     cronograma: [],
     budgetItems: [],
+    budgetExtras: [],
     totalLabel: "Valor Total Decoração",
     totalText: "",
     budgetRows: [],
@@ -546,6 +548,23 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     setDoc((d) => ({ ...d, budgetItems: d.budgetItems.filter((_, j) => j !== i) }));
   }
 
+  // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
+  function addBudgetExtra() {
+    setDoc((d) => ({
+      ...d,
+      budgetExtras: [...(d.budgetExtras ?? []), { label: "", valueText: "" }],
+    }));
+  }
+  function updateBudgetExtra(i: number, p: Partial<{ label: string; valueText: string }>) {
+    setDoc((d) => ({
+      ...d,
+      budgetExtras: (d.budgetExtras ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)),
+    }));
+  }
+  function removeBudgetExtra(i: number) {
+    setDoc((d) => ({ ...d, budgetExtras: (d.budgetExtras ?? []).filter((_, j) => j !== i) }));
+  }
+
   // ── Budget: organizacao (per-item rows) ──
   function addBudgetRow() {
     setDoc((d) => ({ ...d, budgetRows: [...(d.budgetRows ?? []), { item: "", price: "" }] }));
@@ -710,6 +729,12 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   value={doc.time ?? ""}
                   onChange={(e) => patch({ time: e.target.value })}
                   placeholder="A definir"
+                />
+                <Field
+                  label="Wedding Planners (opcional)"
+                  value={doc.weddingPlanners ?? ""}
+                  onChange={(e) => patch({ weddingPlanners: e.target.value })}
+                  placeholder="Equipa AMARA"
                 />
               </>
             )}
@@ -888,12 +913,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                       ×
                     </button>
                   </div>
-                  <input
-                    className={`${INPUT_SM} mb-2`}
+                  <textarea
+                    className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
+                    rows={2}
                     value={b.annotation ?? ""}
                     onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
-                    placeholder="Anotação (opcional)"
-                    aria-label="Anotação"
+                    placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
+                    aria-label="Descrição do mood board"
                   />
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {b.images.map((path) => (
@@ -1023,6 +1049,54 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   onChange={(e) => patch({ totalLabel: e.target.value })}
                   placeholder="Valor Total Decoração"
                 />
+              </div>
+
+              {/* Valores adicionais — linhas mostradas por baixo do total (Deslocação,
+                  Wedding Coordinator, Tecidos, Mobiliário opção A/B, …). Só aparecem no
+                  PDF; o valor faturado e o sinal 30/70 continuam a partir do «Total» abaixo. */}
+              <div className="mt-5">
+                <span className="bo-eyebrow">Valores adicionais</span>
+                <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
+                  Linhas mostradas por baixo do total na proposta (ex.: deslocação, coordenação,
+                  tecidos). Só para o PDF — o total faturado e o sinal continuam a partir do
+                  «Total».
+                </p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                    <span className="flex-1">Descrição</span>
+                    <span className="w-36">Valor (texto)</span>
+                    <span className="w-5" />
+                  </div>
+                  {(doc.budgetExtras ?? []).map((ex, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                        value={ex.label}
+                        onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                        placeholder="Deslocação da equipa Líquen"
+                        aria-label="Descrição da linha adicional"
+                      />
+                      <input
+                        className="bo-input w-36 px-2.5 py-2 text-xs text-foreground/75 text-right"
+                        value={ex.valueText}
+                        onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
+                        placeholder="896,00 €"
+                        aria-label="Valor da linha adicional"
+                      />
+                      <button
+                        type="button"
+                        className={REMOVE_BTN}
+                        onClick={() => removeBudgetExtra(i)}
+                        aria-label="Remover linha adicional"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
+                    + Adicionar valor adicional
+                  </button>
+                </div>
               </div>
             </>
           ) : (
@@ -1391,6 +1465,9 @@ function PreviewSummary({
 }) {
   const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
   const groups = doc.serviceGroups.filter((g) => (g.title ?? "").trim() || g.items.length > 0);
+  const extras = (doc.budgetExtras ?? []).filter(
+    (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
+  );
   return (
     <Section title="Resumo da proposta">
       <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
@@ -1430,6 +1507,20 @@ function PreviewSummary({
                     </span>
                   )}
                 </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {extras.length > 0 && (
+        <div className="mt-5">
+          <p className="bo-eyebrow mb-2">Valores adicionais</p>
+          <ul className="flex flex-col gap-1 text-sm text-foreground/75">
+            {extras.map((e, i) => (
+              <li key={i} className="flex items-baseline justify-between gap-3">
+                <span>{e.label || "—"}</span>
+                <span className="text-foreground/55">{e.valueText || "—"}</span>
               </li>
             ))}
           </ul>

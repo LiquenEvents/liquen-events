@@ -240,6 +240,7 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(doc.moodBoards).toEqual([]);
     expect(doc.cronograma).toEqual([]);
     expect(doc.budgetItems).toEqual([]);
+    expect(doc.budgetExtras).toEqual([]);
     expect(doc.budgetRows).toEqual([]);
     expect(doc.coverImages).toEqual([]);
   });

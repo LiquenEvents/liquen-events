@@ -495,6 +495,9 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       ...(doc.guests ? ([["Convidados", doc.guests]] as [string, string][]) : []),
       ...(!org && doc.ceremony ? ([["Cerimónia", doc.ceremony]] as [string, string][]) : []),
       ...(!org && doc.time ? ([["Hora", doc.time]] as [string, string][]) : []),
+      ...(!org && doc.weddingPlanners
+        ? ([["Wedding Planners", doc.weddingPlanners]] as [string, string][])
+        : []),
     ];
     if (details.length) {
       // Flat, borderless key–value row: tiny grey label over a quiet serif value,
@@ -670,6 +673,26 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     y -= 16;
     drawTotal(p, y);
     y -= boxH + 20;
+
+    // Extra budget lines — per-couple add-ons shown right under the total, exactly
+    // as in the studio's real proposals (Deslocação da equipa, Wedding Coordinator,
+    // Tecidos suspensos, Mobiliário opção A/B, …). Display-only free text; the
+    // billed total / 30-70 split come from the structured total above.
+    const extras = (doc.budgetExtras ?? []).filter(
+      (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
+    );
+    if (extras.length) {
+      budgetBreak(24 + extras.length * 18);
+      eyebrow(p, "Valores adicionais", M, y);
+      y -= 18;
+      for (const ex of extras) {
+        budgetBreak(18);
+        text(p, ex.label, M, y, { size: 10.5, color: INK });
+        textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: MUTED });
+        y -= 18;
+      }
+      y -= 8;
+    }
 
     // Payment schedule with the actual amounts (30% sinal / 70% saldo) — the
     // clarity a client wants right under the total. Amounts come from the same
@@ -885,8 +908,13 @@ async function drawCollage(
   f: Fonts,
   fns: ReturnType<typeof textFns>,
 ) {
+  // Wrap the annotation (description + optional flower list) to the page measure
+  // up front so the collage reserves exactly the height the caption needs. Capped
+  // at 5 lines so a very long note never crowds out the photos.
+  const annLines = mb.annotation ? wrap(f.serifIt, mb.annotation, 11, W - 2 * M).slice(0, 5) : [];
+  const annH = annLines.length ? annLines.length * 15 + 12 : 8;
   const top = H - M - 112;
-  const bottom = M + (mb.annotation ? 40 : 8);
+  const bottom = M + annH;
   const areaW = W - 2 * M;
   const areaH = top - bottom;
   const imgs = mb.images.slice(0, 6);
@@ -925,8 +953,12 @@ async function drawCollage(
     }
   }
 
-  if (mb.annotation) {
-    fns.text(p, mb.annotation, M, M + 14, { font: f.serifIt, size: 12, color: MUTED });
+  if (annLines.length) {
+    let ay = bottom - 15;
+    for (const ln of annLines) {
+      fns.text(p, ln, M, ay, { font: f.serifIt, size: 11, color: MUTED });
+      ay -= 15;
+    }
   }
 }
 
