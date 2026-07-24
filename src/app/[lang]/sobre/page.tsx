@@ -33,8 +33,8 @@ export async function generateMetadata({
   });
 }
 
-const eyebrowDark =
-  "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
+const eyebrowLight =
+  "text-white/70 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
 export default async function SobrePage({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
@@ -93,22 +93,36 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       {/* ── MANIFESTO — short statement + image ── */}
       {/* overflow-x-clip contains the ~4px the from-left/right reveal transforms
           and grid rounding push past the viewport edge on mobile. */}
-      <section className="py-20 lg:py-28 bg-surface overflow-x-clip">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
+      <section className="relative overflow-hidden py-20 lg:py-28">
+        <Image
+          src="/imagens/EW1_1428.jpg"
+          {...blurFor("/imagens/EW1_1428.jpg")}
+          alt=""
+          fill
+          sizes="100vw"
+          quality={70}
+          className="absolute inset-0 object-cover object-center"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ backgroundImage: "linear-gradient(rgba(8,10,8,0.72), rgba(8,10,8,0.84))" }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
           <AnimateIn from="left">
-            <p className={`${eyebrowDark} mb-8`}>
+            <p className={`${eyebrowLight} mb-8`}>
               <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
               {t.sobre.manifestoEyebrow}
             </p>
             <h2
-              className="text-foreground font-bold uppercase tracking-display leading-[1.05]"
+              className="text-white font-bold uppercase tracking-display leading-[1.05]"
               style={{ fontSize: "clamp(32px, 5vw, 68px)" }}
             >
               {t.sobre.manifestoTitleLine1}
               <br />
               <span className="text-moss">{t.sobre.manifestoTitleLine2}</span>
             </h2>
-            <p className="text-foreground/78 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
+            <p className="text-white/80 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
               {t.sobre.manifestoText}
             </p>
           </AnimateIn>
@@ -170,19 +184,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
           }}
         />
-        {/* Soft fades top & bottom so this image emerges from, and melts back
-            into, the white sections around it (no hard line). Text is centred,
-            so the edge fades never touch it. */}
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-28"
-          style={{ backgroundImage: "linear-gradient(to bottom, #ffffff, transparent)" }}
-        />
-        <div
-          aria-hidden
-          className="absolute inset-x-0 bottom-0 h-28"
-          style={{ backgroundImage: "linear-gradient(to top, #ffffff, transparent)" }}
-        />
         <div className="text-veil-shadow relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
             <p
@@ -207,8 +208,22 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           gold-dash eyebrow + big uppercase display headline + a hairline +
           attribution. Just the portrait, the founder's words and her name — no
           bio paragraph, no extra lines. */}
-      <section className="bg-surface overflow-x-clip">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36">
+      <section className="relative overflow-hidden">
+        <Image
+          src="/imagens/hd-edited.jpg"
+          {...blurFor("/imagens/hd-edited.jpg")}
+          alt=""
+          fill
+          sizes="100vw"
+          quality={70}
+          className="absolute inset-0 object-cover object-center"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ backgroundImage: "linear-gradient(rgba(8,10,8,0.74), rgba(8,10,8,0.86))" }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36">
           <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-14 lg:gap-24 items-center">
             {/* Portrait — flat and borderless, uncovered with the mask-wipe. */}
             <Reveal
@@ -232,20 +247,20 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             {/* Text — eyebrow, the founder's words, and her name. Nothing more. */}
             <div className="flex flex-col justify-center">
               <AnimateIn>
-                <p className={`${eyebrowDark} mb-8`}>
+                <p className={`${eyebrowLight} mb-8`}>
                   <span className="w-8 h-px bg-gold flex-shrink-0" />
                   {t.sobre.founderEyebrow}
                 </p>
                 {/* Matches the Clientes page <h1> exactly: the site's small,
                     understated SpaceX caption size (18/21px). */}
-                <p className="text-foreground font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
+                <p className="text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
                   {t.sobre.founderQuote}
                 </p>
-                <div className="mt-12 pt-6 border-t border-foreground/10">
-                  <p className="text-foreground text-sm tracking-[0.15em] uppercase">
+                <div className="mt-12 pt-6 border-t border-white/20">
+                  <p className="text-white text-sm tracking-[0.15em] uppercase">
                     {t.sobre.founderName}
                   </p>
-                  <p className="text-foreground/50 text-[11px] tracking-[0.3em] uppercase mt-1.5">
+                  <p className="text-white/55 text-[11px] tracking-[0.3em] uppercase mt-1.5">
                     {t.sobre.founderRole}
                   </p>
                 </div>
@@ -273,13 +288,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             backgroundImage:
               "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
           }}
-        />
-        {/* Soft top fade so this closing image emerges from the white section
-            above instead of cutting at a line. */}
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-28"
-          style={{ backgroundImage: "linear-gradient(to bottom, #ffffff, transparent)" }}
         />
 
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
