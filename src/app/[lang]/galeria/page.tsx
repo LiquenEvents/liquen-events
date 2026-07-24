@@ -113,12 +113,12 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       {/* Full-bleed (SpaceX-style): sem wrapper max-w/px — a masonry corre de
           borda a borda, só com o gap-0.5 interno entre fotos. O chrome dos
           filtros traz o seu próprio padding lateral (ver GaleriaClient). */}
-      <section className="py-12 lg:py-16 bg-[#0b0b0b]">
+      <section className="pt-4 pb-12 lg:pb-16 bg-[#0b0b0b]">
         <GaleriaClient photos={galleryPhotos} dict={t.galeria} />
       </section>
 
       {/* ── Instagram CTA ── */}
-      <section className="relative overflow-hidden border-t border-white/8">
+      <section className="relative overflow-hidden">
         <Image
           src="/imagens/DaniGui_Adois_61.jpg"
           alt={t.common.imageAlt.galeriaInstagram}
