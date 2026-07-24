@@ -120,7 +120,7 @@ export default async function ServiceDetailPage({
             {...blurFor(svc.hero)}
             alt=""
             fill
-            preload
+            priority
             sizes="100vw"
             quality={82}
             className="object-cover hero-settle"

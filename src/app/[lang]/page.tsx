@@ -38,7 +38,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             {...blurFor("/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg")}
             alt={t.common.imageAlt.homeHero}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={82}
             className="object-cover object-center hero-settle"

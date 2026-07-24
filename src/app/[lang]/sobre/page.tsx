@@ -56,7 +56,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             src="/imagens/hd-edited.jpg"
             alt={t.common.imageAlt.sobreCelebration}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={82}
             className="object-cover object-center hero-settle"

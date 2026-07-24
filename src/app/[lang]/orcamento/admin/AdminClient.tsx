@@ -1149,7 +1149,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               alt="Líquen Events"
               width={300}
               height={179}
-              preload
+              priority
               className="h-12 w-auto object-contain"
             />
             <span className="text-[var(--bo-text-faint)] text-[9px] tracking-[0.3em] uppercase mt-2">

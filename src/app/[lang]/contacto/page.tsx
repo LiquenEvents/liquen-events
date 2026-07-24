@@ -68,7 +68,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             {...blurFor(heroImg)}
             alt={t.common.imageAlt.contactoHero}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={82}
             className="object-cover hero-settle"

@@ -401,7 +401,7 @@ export default function OrcamentoForm({
           blurDataURL={panelBlur}
           alt={t.common.imageAlt.orcamentoPanel}
           fill
-          preload
+          priority
           sizes="(max-width: 1024px) 0vw, 45vw"
           quality={75}
           className="object-cover"

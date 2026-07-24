@@ -185,7 +185,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             src="/imagens/EW1_1330.jpg"
             alt={t.common.imageAlt.servicosEndOfDay}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={82}
             className="object-cover object-center hero-settle"

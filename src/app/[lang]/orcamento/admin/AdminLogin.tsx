@@ -60,7 +60,7 @@ export default function AdminLogin() {
           alt="Líquen Events"
           width={210}
           height={125}
-          preload
+          priority
           className="h-16 w-auto object-contain opacity-95"
         />
 

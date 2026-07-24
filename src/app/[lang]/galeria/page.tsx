@@ -78,7 +78,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             src="/imagens/DaniGui_Preview20.jpg"
             alt={t.common.imageAlt.galeriaHeader}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={82}
             className="object-cover object-center hero-settle"
