@@ -278,7 +278,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                             {eur(q.quotedPrice)}
                           </span>
                         ) : (
-                          <span className="text-foreground/20 text-[10px]">sem valor</span>
+                          <span className="text-foreground/40 text-[10px]">Sem valor</span>
                         )}
                         <div className="flex items-center gap-2">
                           {q.date &&
@@ -355,7 +355,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                   );
                 })}
                 {items.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-foreground/18">
+                  <div className="flex flex-col items-center justify-center py-8 text-foreground/30">
                     <svg
                       width="20"
                       height="20"

@@ -208,7 +208,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
               {clients.length} cliente{clients.length !== 1 ? "s" : ""}
             </span>
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={exportCsv}
               iconLeft={

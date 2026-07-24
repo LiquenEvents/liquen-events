@@ -183,7 +183,7 @@ export default function Fornecedores() {
           <>
             {suppliers.length > 0 && (
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 onClick={exportCsv}
                 title="Exportar fornecedores para CSV"
@@ -197,7 +197,7 @@ export default function Fornecedores() {
               iconLeft={adding ? undefined : PlusIcon}
               onClick={() => setAdding(!adding)}
             >
-              {adding ? "Cancelar" : "Fornecedor"}
+              {adding ? "Cancelar" : "Novo fornecedor"}
             </Button>
           </>
         }

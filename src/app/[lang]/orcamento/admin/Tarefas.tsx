@@ -322,7 +322,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         {!t.done && (
           <button
             onClick={() => startEditTask(t)}
-            className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+            className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
             aria-label="Editar tarefa"
           >
             <svg
@@ -341,7 +341,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         )}
         <button
           onClick={() => remove(t.id)}
-          className="text-foreground/20 hover:text-[#b5654a] transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+          className="text-foreground/20 hover:text-[#b5654a] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
           aria-label="Eliminar"
         >
           <svg
@@ -365,52 +365,79 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
 
   return (
     <div className="max-w-4xl">
-      {/* Add task */}
+      {/* Add task — a single, obvious primary action; the optional detail fields
+          (responsável, área, prioridade, prazo) collapse behind a disclosure so
+          the daily "add a to-do" flow stays a title + one button. */}
       <Card className="mb-6">
-        <Field
-          label="Nova tarefa"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="O que há para fazer?"
-        />
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <Field
-            label="Responsável"
-            value={assignee}
-            onChange={(e) => setAssignee(e.target.value)}
-            placeholder="Ex.: Catarina"
+            containerClassName="flex-1"
+            label="Nova tarefa"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="O que há para fazer?"
           />
-          <Field as="select" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">Sem área</option>
-            {AREAS.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </Field>
-          <Field
-            as="select"
-            label="Prioridade"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as TaskPriority)}
+          <Button
+            onClick={add}
+            loading={adding}
+            disabled={!title.trim()}
+            className="w-full shrink-0 sm:w-auto"
           >
-            <option value="alta">Alta</option>
-            <option value="normal">Normal</option>
-            <option value="baixa">Baixa</option>
-          </Field>
-          <Field
-            label="Prazo"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button onClick={add} loading={adding} disabled={!title.trim()}>
-            Adicionar tarefa
+            Adicionar
           </Button>
         </div>
+        <details className="group mt-3">
+          <summary className="bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-foreground/55 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="motion-safe:transition-transform group-open:rotate-90"
+              aria-hidden="true"
+            >
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+            Detalhes (opcional)
+          </summary>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field
+              label="Responsável"
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+              placeholder="Ex.: Catarina"
+            />
+            <Field as="select" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
+              <option value="">Sem área</option>
+              {AREAS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </Field>
+            <Field
+              as="select"
+              label="Prioridade"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as TaskPriority)}
+            >
+              <option value="alta">Alta</option>
+              <option value="normal">Normal</option>
+              <option value="baixa">Baixa</option>
+            </Field>
+            <Field
+              label="Prazo"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+        </details>
       </Card>
 
       {/* Filter by person */}

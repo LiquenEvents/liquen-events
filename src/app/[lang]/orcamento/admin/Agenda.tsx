@@ -168,19 +168,11 @@ export default function Agenda({ quotes, onOpen }: Props) {
 
   return (
     <Card padding="none" className="overflow-hidden">
-      <div className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
+      <div className="px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
         <p className="bo-eyebrow">Agenda · próximos {DAYS_AHEAD} dias</p>
-        <div className="flex items-center gap-3">
-          {(["evento", "agenda", "tarefa", "pagamento", "seguimento"] as ItemKind[]).map((k) => (
-            <span
-              key={k}
-              className="hidden sm:flex items-center gap-1.5 text-foreground/40 text-[9px] uppercase tracking-wider"
-            >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: KIND_COLOR[k] }} />
-              {KIND_LABEL[k]}
-            </span>
-          ))}
-        </div>
+        <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+          Eventos, tarefas e pagamentos que se aproximam. Cada linha indica o tipo.
+        </p>
       </div>
 
       <div className="max-h-[420px] overflow-y-auto">
