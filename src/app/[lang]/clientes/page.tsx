@@ -210,7 +210,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── TESTIMONIALS GRID ── */}
-      <section className="relative py-24 lg:py-28 overflow-hidden border-b border-foreground/8">
+      <section className="relative py-24 lg:py-28 overflow-hidden">
         <Image
           src={wordsImg}
           alt=""
@@ -272,10 +272,10 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       {/* ── PHOTO MOSAIC ── */}
       {/* O mosaico sangra de bordo a bordo (sem moldura max-w nem goteiras),
           à maneira SpaceX; só o eyebrow mantém a grelha de conteúdo. */}
-      <section className="py-20 lg:py-28 bg-surface border-b border-foreground/8">
+      <section className="pt-16 lg:pt-20 bg-[#0b0b0b]">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-10">
-            <p className={eyebrow}>
+            <p className="text-white/70 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3">
               <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
               {t.clientes.mosaicEyebrow}
             </p>
