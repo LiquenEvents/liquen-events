@@ -203,8 +203,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           bio paragraph, no extra lines. */}
       <section className="relative overflow-hidden">
         <Image
-          src="/imagens/JOAO_E_PEDRO_1Y1A4467.jpg"
-          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A4467.jpg")}
+          src="/imagens/JOAO_E_PEDRO_1Y1A4738.jpg"
+          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A4738.jpg")}
           alt=""
           fill
           sizes="100vw"
