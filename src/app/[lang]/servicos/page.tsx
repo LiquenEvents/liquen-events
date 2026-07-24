@@ -237,7 +237,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           the studio's signature approach (decoration + coordination + production)
           — copy that already existed in the dictionary but was never on screen.
           Gives the page words and a differentiator before the service panels. */}
-      <section className="relative overflow-hidden border-t border-white/10 py-20 lg:py-28">
+      <section className="relative overflow-hidden py-20 lg:py-28">
         <Image
           src="/imagens/hd-edited.jpg"
           alt=""
@@ -349,7 +349,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
       {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}
       <section
-        className="relative overflow-hidden border-t border-foreground/8"
+        className="relative overflow-hidden"
         style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
       >
         <Image
@@ -392,7 +392,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
       {/* ── CTA — full-screen closing panel ── */}
       <section
-        className="relative overflow-hidden border-t border-foreground/8 flex items-center py-28 lg:py-40"
+        className="relative overflow-hidden flex items-center py-28 lg:py-40"
         style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
       >
         <Image

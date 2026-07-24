@@ -148,7 +148,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
 
       {/* ── CINEMATIC STATEMENT ── */}
       <section
-        className="relative overflow-hidden border-t border-foreground/8"
+        className="relative overflow-hidden"
         style={{ minHeight: "clamp(360px, 65vh, 760px)" }}
       >
         <Parallax speed={0.1} className="absolute inset-0">
@@ -169,6 +169,19 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             backgroundImage:
               "linear-gradient(to top, rgb(8,8,8), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42))",
           }}
+        />
+        {/* Soft fades top & bottom so this image emerges from, and melts back
+            into, the white sections around it (no hard line). Text is centred,
+            so the edge fades never touch it. */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-28"
+          style={{ backgroundImage: "linear-gradient(to bottom, #ffffff, transparent)" }}
+        />
+        <div
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-28"
+          style={{ backgroundImage: "linear-gradient(to top, #ffffff, transparent)" }}
         />
         <div className="text-veil-shadow relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 w-full py-20 lg:py-28">
@@ -194,7 +207,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           gold-dash eyebrow + big uppercase display headline + a hairline +
           attribution. Just the portrait, the founder's words and her name — no
           bio paragraph, no extra lines. */}
-      <section className="bg-surface border-t border-foreground/8 overflow-x-clip">
+      <section className="bg-surface overflow-x-clip">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36">
           <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-14 lg:gap-24 items-center">
             {/* Portrait — flat and borderless, uncovered with the mask-wipe. */}
@@ -243,7 +256,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       </section>
 
       {/* ── CTA ── */}
-      <section className="relative py-32 lg:py-52 overflow-hidden border-t border-foreground/8">
+      <section className="relative py-32 lg:py-52 overflow-hidden">
         <Image
           src="/imagens/DaniGui_Adois_61.jpg"
           alt={t.common.imageAlt.sobreOutdoor}
@@ -260,6 +273,13 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             backgroundImage:
               "linear-gradient(to top, rgba(8,8,8,0.9), transparent, rgba(8,8,8,0.5)), linear-gradient(rgba(0,0,0,0.48), rgba(0,0,0,0.48))",
           }}
+        />
+        {/* Soft top fade so this closing image emerges from the white section
+            above instead of cutting at a line. */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-28"
+          style={{ backgroundImage: "linear-gradient(to bottom, #ffffff, transparent)" }}
         />
 
         <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
