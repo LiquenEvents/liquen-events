@@ -84,6 +84,10 @@ export default function PaymentsPanel({
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(todayKey());
+  // Registar assume, por omissão, que o dinheiro JÁ foi recebido (é o caso comum:
+  // "colocar o que já foi pago") — assim "Recebido" sobe logo. Desligar regista
+  // um pagamento previsto/por receber.
+  const [paidOnAdd, setPaidOnAdd] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [contractRef, setContractRef] = useState(quote.contractRef ?? "");
   const [savingRef, setSavingRef] = useState(false);
@@ -154,11 +158,13 @@ export default function PaymentsPanel({
   const total = metrics.contractedGross; // proposta > preço cotado > estimativa
   const totalNet = metrics.contractedNet;
   const totalIva = metrics.contractedIva;
-  // Recebido informal (quote.payments) — passa a ser uma nota secundária.
+  // "Recebido" = soma dos pagamentos que o utilizador marcou como pagos
+  // (quote.payments). É a leitura que atualiza AO VIVO à medida que se regista o
+  // que já foi pago — antes derivava do livro de faturas (FT) e só mexia ao
+  // emitir uma fatura, o que confundia ("registo um pagamento e nada muda"). O
+  // livro de faturas mantém-se como reconciliação secundária (tabela + banner).
   const informalPaid = reconciliation.informalPaid;
-  // Headline: quando o livro está visível, Recebido/Em falta derivam DELE (a
-  // verdade); caso contrário mantém-se o comportamento informal anterior.
-  const headlinePaid = showLedger ? metrics.ledgerPaid : informalPaid;
+  const headlinePaid = informalPaid;
   const outstanding = Math.max(0, total - headlinePaid);
   // Estado "tudo recebido" só faz sentido quando há um total contratado.
   const allReceived = total > 0 && outstanding === 0;
@@ -196,7 +202,7 @@ export default function PaymentsPanel({
     const trimmedNote = note.trim();
     persist([
       ...payments,
-      { id: randomId(), kind, amount: a, date, paid: false, note: trimmedNote || undefined },
+      { id: randomId(), kind, amount: a, date, paid: paidOnAdd, note: trimmedNote || undefined },
     ]);
     setAmount("");
     setNote("");
@@ -322,9 +328,9 @@ export default function PaymentsPanel({
       </div>
 
       {/* ── Resumo — as três respostas que importam, numa linha ──
-          Recebido/Em falta vêm do livro de faturas quando visível. "Em falta" é
-          o herói quando há dinheiro por receber; quando está tudo recebido vira
-          um estado calmo de confirmação. */}
+          Recebido = pagamentos marcados como pagos (atualiza ao vivo). "Em
+          falta" é o herói quando há dinheiro por receber; quando está tudo
+          recebido vira um estado calmo de confirmação. */}
       <div className="grid grid-cols-3 gap-2.5 mb-1.5">
         <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] p-3 text-center">
           <p className="text-base font-semibold tabular-nums text-foreground/85">{eur2(total)}</p>
@@ -386,7 +392,7 @@ export default function PaymentsPanel({
       </div>
       {showLedger ? (
         <p className="text-foreground/30 text-[10px] mb-4">
-          Recebido e Em falta com base no livro de faturas (FT).
+          Recebido e Em falta atualizam à medida que marca cada pagamento como pago.
         </p>
       ) : (
         <div className="mb-4" />
@@ -651,6 +657,15 @@ export default function PaymentsPanel({
           placeholder="Método / nota (ex.: MB Way)"
           className="bo-input flex-1 min-w-[8rem] px-2.5 py-2 text-xs text-foreground/70"
         />
+        <label className="inline-flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-foreground/65">
+          <input
+            type="checkbox"
+            checked={paidOnAdd}
+            onChange={(e) => setPaidOnAdd(e.target.checked)}
+            className="h-3.5 w-3.5 accent-[#4d6350]"
+          />
+          Já pago
+        </label>
         <Button
           size="sm"
           onClick={add}
