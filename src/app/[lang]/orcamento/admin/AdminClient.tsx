@@ -1018,16 +1018,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
+        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] motion-safe:transition-colors duration-150 ${
           active
-            ? "bg-[var(--bo-tint-accent)] text-[var(--bo-accent)]"
-            : "text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
+            ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
+            : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
         }`}
       >
         <span
           className={`shrink-0 motion-safe:transition-colors duration-150 ${
             active
-              ? "text-[var(--bo-accent)]"
+              ? "text-[var(--bo-text)]"
               : "text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
           }`}
         >
@@ -1177,7 +1177,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     type="button"
                     onClick={() => setMoreNavOpen((o) => !o)}
                     aria-expanded={expanded}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
                   >
                     <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
                       <svg
@@ -1417,7 +1417,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <NotificationBell />
                 <button
                   onClick={() => setPaletteOpen(true)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-foreground/60 transition-colors"
+                  className="hidden sm:flex items-center gap-2 px-3 py-2 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
                   title="Pesquisar (Ctrl K)"
                 >
                   <svg
@@ -1432,7 +1432,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <path d="m21 21-4.3-4.3" strokeLinecap="round" />
                   </svg>
                   <span className="hidden md:inline">Pesquisar</span>
-                  <kbd className="text-[8px] border border-foreground/12 rounded px-1 py-0.5 ml-0.5">
+                  <kbd className="text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
                     ⌘K
                   </kbd>
                 </button>
@@ -1440,7 +1440,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   onClick={refresh}
                   disabled={refreshing}
                   aria-label="Atualizar pedidos"
-                  className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
+                  className="group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
                 >
                   <svg
                     width="13"
