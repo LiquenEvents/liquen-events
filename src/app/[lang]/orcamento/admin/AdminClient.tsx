@@ -1078,7 +1078,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   };
 
   const VIEW_SUB: Record<View, string> = {
-    overview: "O resumo do seu dia",
+    // Vazio de propósito: a própria Visão Geral já abre com data + saudação —
+    // um eyebrow extra aqui era só mais texto.
+    overview: "",
     pedidos: "Pedidos de orçamento recebidos",
     kanban: "Arraste os pedidos entre fases",
     clientes: "Histórico por cliente",
@@ -1374,9 +1376,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)]">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
               <div className="min-w-0">
-                <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
-                  {VIEW_SUB[view]}
-                </p>
+                {VIEW_SUB[view] && (
+                  <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
+                    {VIEW_SUB[view]}
+                  </p>
+                )}
                 <h1
                   className="text-foreground/88 font-bold leading-none"
                   style={{
