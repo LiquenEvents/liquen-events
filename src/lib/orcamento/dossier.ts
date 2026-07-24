@@ -118,6 +118,50 @@ function contractedTotal(d: DossierData): number {
   return d.proposal?.total ?? d.quote.quotedPrice ?? d.quote.priceBreakdown?.total ?? 0;
 }
 
+/**
+ * Taxa de IVA efetiva do pedido — derivada do breakdown (iva/subtotal) quando
+ * existe, senão a taxa normal portuguesa (23%), a mesma que o motor de preços usa.
+ */
+export function effectiveVatRate(quote: Quote): number {
+  const pb = quote.priceBreakdown;
+  if (pb && pb.subtotal > 0 && Number.isFinite(pb.iva)) return pb.iva / pb.subtotal;
+  return 0.23;
+}
+
+/** Valor contratado decomposto em sem IVA / IVA / com IVA. */
+export interface ContractedAmounts {
+  net: number; // sem IVA
+  iva: number; // valor do IVA
+  gross: number; // com IVA — o que o cliente paga
+}
+
+/**
+ * Valor contratado, decomposto nas três parcelas de IVA. Fonte, por ordem:
+ * proposta > preço cotado (`quotedPrice`) > estimativa (`priceBreakdown`).
+ *
+ * A proposta e o `priceBreakdown` já guardam sem IVA (subtotal) + IVA + com IVA
+ * (total). O `quotedPrice` é o campo "Preço final (sem IVA)", logo SEM IVA — o
+ * valor com IVA é derivado à taxa efetiva do pedido. Isto corrige o "em falta" e
+ * a margem, que antes comparavam um total sem IVA com pagamentos/custos com IVA
+ * (erro de ~23% nos negócios de preço manual).
+ */
+export function contractedAmounts(quote: Quote, proposal?: Proposal | null): ContractedAmounts {
+  if (proposal && proposal.total != null) {
+    const gross = proposal.total;
+    const net = proposal.subtotal ?? round2(gross / (1 + (proposal.vatRate || 0.23)));
+    const iva = proposal.vat ?? round2(gross - net);
+    return { net, iva, gross };
+  }
+  if (quote.quotedPrice != null) {
+    const net = quote.quotedPrice;
+    const gross = round2(net * (1 + effectiveVatRate(quote)));
+    return { net, iva: round2(gross - net), gross };
+  }
+  const pb = quote.priceBreakdown;
+  if (pb) return { net: pb.subtotal, iva: pb.iva, gross: pb.total };
+  return { net: 0, iva: 0, gross: 0 };
+}
+
 /** Soma das faturas pagas (com IVA). */
 function ledgerPaidTotal(invoices: DossierInvoice[]): number {
   return invoices.reduce((s, i) => s + (i.status === "paga" ? i.amount : 0), 0);
@@ -185,6 +229,11 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
 
 export interface EventMetrics {
   contracted: number;
+  /** Valor contratado com IVA (o que o cliente paga) — corrige o `quotedPrice`
+   *  sem IVA para a mesma base dos pagamentos/faturas. Usar isto no "em falta". */
+  contractedGross: number;
+  contractedNet: number; // sem IVA
+  contractedIva: number; // valor do IVA
   ledgerIssued: number;
   ledgerPaid: number;
   informalPaid: number;
@@ -204,6 +253,7 @@ export function computeEventMetrics(d: DossierData, today: Date = new Date()): E
   const { quote, invoices } = d;
 
   const contracted = contractedTotal(d);
+  const amounts = contractedAmounts(quote, d.proposal);
   const ledgerIssued = invoices.reduce((s, i) => s + (i.status !== "anulada" ? i.amount : 0), 0);
   const ledgerPaid = ledgerPaidTotal(invoices);
   const informalPaid = informalPaidTotal(quote);
@@ -224,6 +274,9 @@ export function computeEventMetrics(d: DossierData, today: Date = new Date()): E
 
   return {
     contracted,
+    contractedGross: amounts.gross,
+    contractedNet: amounts.net,
+    contractedIva: amounts.iva,
     ledgerIssued,
     ledgerPaid,
     informalPaid,

@@ -38,6 +38,19 @@ const fmtInvDate = (d?: string) =>
     ? new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short" })
     : "—";
 
+/** Invoice (superconjunto server-only) → DossierInvoice (os campos puros). */
+const toDossierInvoices = (list: Invoice[]): DossierInvoice[] =>
+  list.map((i) => ({
+    id: i.id,
+    number: i.number,
+    kind: i.kind,
+    amount: i.amount,
+    status: i.status,
+    issuedAt: i.issuedAt,
+    dueAt: i.dueAt,
+    paidAt: i.paidAt,
+  }));
+
 interface Props {
   quote: Quote;
   onChange: (payments: Payment[]) => void;
@@ -65,6 +78,7 @@ export default function PaymentsPanel({
   const [payments, setPayments] = useState<Payment[]>(quote.payments ?? []);
   const [kind, setKind] = useState<PaymentKind>("sinal");
   const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
   const [date, setDate] = useState(todayKey());
   const [busy, setBusy] = useState<string | null>(null);
   const [contractRef, setContractRef] = useState(quote.contractRef ?? "");
@@ -86,20 +100,7 @@ export default function PaymentsPanel({
         });
         if (res.ok && alive) {
           const list: Invoice[] = await res.json();
-          // Invoice é um superconjunto de DossierInvoice — mapeamos os campos que
-          // as funções puras do Dossier consomem.
-          setInvoices(
-            list.map((i) => ({
-              id: i.id,
-              number: i.number,
-              kind: i.kind,
-              amount: i.amount,
-              status: i.status,
-              issuedAt: i.issuedAt,
-              dueAt: i.dueAt,
-              paidAt: i.paidAt,
-            })),
-          );
+          setInvoices(toDossierInvoices(list));
         }
       } catch {
         // Silencioso — o resumo informal continua a funcionar sem o livro.
@@ -143,7 +144,12 @@ export default function PaymentsPanel({
     }
   }
 
-  const total = metrics.contracted; // proposta > preço cotado > estimativa
+  // Total COM IVA (o que o cliente paga): a mesma base dos pagamentos/faturas, que
+  // são com IVA. Antes usava-se `contracted`, que para um preço manual (quotedPrice,
+  // sem IVA) deixava o "Em falta" errado em ~23%.
+  const total = metrics.contractedGross; // proposta > preço cotado > estimativa
+  const totalNet = metrics.contractedNet;
+  const totalIva = metrics.contractedIva;
   // Recebido informal (quote.payments) — passa a ser uma nota secundária.
   const informalPaid = reconciliation.informalPaid;
   // Headline: quando o livro está visível, Recebido/Em falta derivam DELE (a
@@ -176,8 +182,13 @@ export default function PaymentsPanel({
     // parseMoney entende "1.500" e "1500,50" — parseFloat lia 1.5 € e falhava.
     const a = parseMoney(amount);
     if (!a || a <= 0) return;
-    persist([...payments, { id: randomId(), kind, amount: a, date, paid: false }]);
+    const trimmedNote = note.trim();
+    persist([
+      ...payments,
+      { id: randomId(), kind, amount: a, date, paid: false, note: trimmedNote || undefined },
+    ]);
     setAmount("");
+    setNote("");
   }
   function togglePaid(id: string) {
     persist(payments.map((p) => (p.id === id ? { ...p, paid: !p.paid } : p)));
@@ -186,7 +197,25 @@ export default function PaymentsPanel({
     persist(payments.filter((p) => p.id !== id));
   }
 
+  /** Recarrega o livro de faturas (após emitir uma fatura/recibo, para a tabela e
+   *  o banner de reconciliação não ficarem velhos). */
+  async function refreshLedger() {
+    if (!showLedger || !quote.id) return;
+    try {
+      const res = await fetch(`/api/faturas?quoteId=${encodeURIComponent(quote.id)}`, {
+        cache: "no-store",
+      });
+      if (res.ok) setInvoices(toDossierInvoices(await res.json()));
+    } catch {
+      /* silencioso — o resumo informal continua a funcionar sem o livro */
+    }
+  }
+
   async function invoice(p: Payment, email: boolean) {
+    // Um documento fiscal só é "Recibo" quando o valor foi recebido; se ainda está
+    // por pagar é uma "Fatura". Rotular em conformidade (o back-end já emite o
+    // estado certo — emitida vs paga).
+    const docLabel = p.paid ? "Recibo" : "Fatura";
     setBusy(p.id);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/fatura`, {
@@ -205,26 +234,36 @@ export default function PaymentsPanel({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) {
-        throw new Error(data?.error || "Falha ao gerar o recibo.");
+        throw new Error(
+          data?.error || `Falha ao gerar ${docLabel === "Recibo" ? "o recibo" : "a fatura"}.`,
+        );
       }
       if (data.pdfBase64 && !email) {
         const a = document.createElement("a");
         a.href = `data:application/pdf;base64,${data.pdfBase64}`;
-        a.download = `Recibo-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
+        a.download = `${docLabel}-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
         a.click();
       }
       if (email) {
         toast(
           data.emailed
-            ? `Recibo enviado para ${quote.email}`
-            : "Recibo gerado (email não configurado)",
+            ? `${docLabel} enviado para ${quote.email}`
+            : `${docLabel} gerado (email não configurado)`,
           data.emailed ? "success" : "info",
         );
       } else {
-        toast("Recibo descarregado", "success");
+        toast(`${docLabel} descarregado`, "success");
       }
+      // O livro de faturas mudou — recarregar para a tabela e a reconciliação
+      // refletirem o novo documento sem reabrir o separador.
+      await refreshLedger();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Não foi possível gerar o recibo.", "error");
+      toast(
+        e instanceof Error
+          ? e.message
+          : `Não foi possível gerar ${docLabel === "Recibo" ? "o recibo" : "a fatura"}.`,
+        "error",
+      );
     } finally {
       setBusy(null);
     }
@@ -257,15 +296,22 @@ export default function PaymentsPanel({
         </div>
       </div>
 
-      {/* Summary — Recebido/Em falta vêm do livro de faturas quando visível. */}
+      {/* Summary — Recebido/Em falta vêm do livro de faturas quando visível.
+          O Total mostra as três parcelas: sem IVA · IVA · com IVA. */}
       <div className="grid grid-cols-3 gap-2.5 mb-1.5">
         {[
-          { l: "Total", v: eur2(total), c: "text-foreground/85" },
-          { l: "Recebido", v: eur2(headlinePaid), c: "text-[#4d6350]" },
+          {
+            l: "Total (c/ IVA)",
+            v: eur2(total),
+            c: "text-foreground/85",
+            sub: `s/ IVA ${eur2(totalNet)} · IVA ${eur2(totalIva)}`,
+          },
+          { l: "Recebido", v: eur2(headlinePaid), c: "text-[#4d6350]", sub: undefined },
           {
             l: "Em falta",
             v: eur2(outstanding),
             c: outstanding > 0 ? "text-[#b5654a]" : "text-foreground/45",
+            sub: undefined,
           },
         ].map((k) => (
           <div
@@ -274,6 +320,11 @@ export default function PaymentsPanel({
           >
             <p className={`text-base font-semibold tabular-nums ${k.c}`}>{k.v}</p>
             <p className="text-foreground/40 text-[9px] tracking-[0.2em] uppercase mt-1">{k.l}</p>
+            {k.sub && (
+              <p className="text-foreground/35 text-[9px] tabular-nums mt-1 leading-tight">
+                {k.sub}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -430,6 +481,11 @@ export default function PaymentsPanel({
                     {new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT")}
                   </span>
                 </p>
+                {p.note && (
+                  <p className="text-foreground/40 text-[10px] truncate" title={p.note}>
+                    {p.note}
+                  </p>
+                )}
               </div>
               <span
                 className={`text-xs font-semibold shrink-0 tabular-nums ${p.paid ? "text-[#4d6350]" : "text-foreground/55"}`}
@@ -440,8 +496,8 @@ export default function PaymentsPanel({
                 <button
                   onClick={() => invoice(p, false)}
                   disabled={busy === p.id}
-                  aria-label="Descarregar recibo PDF"
-                  title="Descarregar recibo PDF"
+                  aria-label={`Descarregar ${p.paid ? "recibo" : "fatura"} PDF`}
+                  title={`Descarregar ${p.paid ? "recibo" : "fatura"} PDF`}
                   className="text-foreground/30 hover:text-[#4d6350] transition-colors p-1"
                 >
                   <svg
@@ -462,8 +518,8 @@ export default function PaymentsPanel({
                 <button
                   onClick={() => invoice(p, true)}
                   disabled={busy === p.id}
-                  aria-label="Enviar recibo por e-mail"
-                  title="Enviar recibo por e-mail"
+                  aria-label={`Enviar ${p.paid ? "recibo" : "fatura"} por e-mail`}
+                  title={`Enviar ${p.paid ? "recibo" : "fatura"} por e-mail`}
                   className="text-foreground/30 hover:text-[#4d6350] transition-colors p-1"
                 >
                   <svg
@@ -518,6 +574,17 @@ export default function PaymentsPanel({
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
+        />
+        <input
+          type="text"
+          aria-label="Método ou nota (opcional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (parseMoney(amount) ?? 0) > 0) add();
+          }}
+          placeholder="Método / nota (ex.: MB Way)"
+          className="bo-input flex-1 min-w-[8rem] px-2.5 py-2 text-xs text-foreground/70"
         />
         <Button
           size="sm"
