@@ -2,34 +2,15 @@ import Link from "next/link";
 import Image from "next/image";
 import TrackedLink from "@/components/TrackedLink";
 import { blurFor } from "@/lib/blur";
-import RotatingPhotoGrid from "@/components/RotatingPhotoGrid";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
 import { SITE } from "@/lib/site";
 import { getDictionary, localizeHref, type Locale } from "@/lib/i18n";
 
-// The footer photo strip draws a fresh 3 from this pool on every entry to the
-// page (see RotatingPhotoGrid), so it changes as you move around the site.
-const STRIP_POOL = [
-  "/imagens/JOAO_E_PEDRO_DJI_20250628213935_0005_D.jpg",
-  "/imagens/M&F0152.jpg",
-  "/imagens/EW1_1428.jpg",
-  "/imagens/hd-edited.jpg",
-  "/imagens/EW1_1330.jpg",
-  "/imagens/J&P-IMGL4769.jpg",
-  "/imagens/teresinhaeze-909.jpg",
-  "/imagens/stephanie-mizio-555.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
-  "/imagens/DJI_20250913190635_0120_D.jpg",
-  "/imagens/matilde-e-tomas0654-1.jpg",
-  "/imagens/DaniGui_JantarFesta_26.jpg",
-];
-
-const STRIP_CELLS = [
-  { cls: "col-span-2", sizes: "50vw" },
-  { cls: "col-span-1", sizes: "25vw" },
-  { cls: "col-span-1", sizes: "25vw" },
-];
+// Editorial footer background — a single Líquen photo under a dark veil, so the
+// footer reads as one immersive, premium band (wedding-editorial look) rather
+// than a plain link list. Chosen for warmth + legibility under white text.
+const FOOTER_BG = "/imagens/EW1_1428.jpg";
 
 // Service detail slugs, paired with t.footer.serviceLinks (same order) — gives
 // the money pages keyword-anchored internal links from every page's footer.
@@ -42,103 +23,109 @@ const serviceSlugs = [
 
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   const t = getDictionary(locale);
-  const stripPool = STRIP_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
   return (
-    <footer className="relative bg-transparent overflow-hidden">
-      {/* ── Photo strip — full bleed, 4-col grid; rotates per entry ── */}
-      <RotatingPhotoGrid
-        cells={STRIP_CELLS}
-        pool={stripPool}
+    <footer className="relative overflow-hidden bg-[#0c0e0b] text-white">
+      {/* ── Background photo + dark veil ── */}
+      <Image
+        src={FOOTER_BG}
+        {...blurFor(FOOTER_BG)}
         alt=""
-        className="grid grid-cols-4 h-[96px] sm:h-[120px] lg:h-[150px]"
-        imgClassName="transition-transform duration-700 group-hover:scale-[1.04]"
-        overlayClassName="bg-black/30 group-hover:bg-black/10"
+        fill
+        sizes="100vw"
+        quality={70}
+        className="absolute inset-0 object-cover object-center"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          backgroundImage: "linear-gradient(to bottom, rgba(8,10,8,0.74), rgba(8,10,8,0.92))",
+        }}
       />
 
-      {/* ── Main content ── */}
-      <div className="border-t border-foreground/6">
+      {/* ── Content (over the photo) ── */}
+      <div className="relative">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="py-8 md:py-10 grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10 text-center md:text-left">
-            {/* Brand column — centred on mobile, left-aligned from md up */}
-            <div className="md:col-span-5 flex flex-col items-center md:items-start">
-              <Image
-                src="/logo-liquen.png"
-                alt="Líquen Events"
-                width={215}
-                height={128}
-                className="object-contain mb-4 h-14 sm:h-16 w-auto"
-              />
-              {/* Social icons — sem o antigo badge "disponível": nada de pontos
-                  a pulsar (idioma SpaceX = sem ornamentos animados). */}
-              <div className="flex items-center gap-5 mt-1">
-                {[
-                  {
-                    label: "Instagram",
-                    href: SITE.instagram,
-                    icon: (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect x="2" y="2" width="20" height="20" rx="5" />
-                        <circle cx="12" cy="12" r="4" />
-                        <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" />
-                      </svg>
-                    ),
-                  },
-                  {
-                    label: "Facebook",
-                    href: SITE.facebook,
-                    icon: (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-                      </svg>
-                    ),
-                  },
-                ].map((s) => (
-                  <a
-                    key={s.label}
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`${s.label} (${t.common.newWindow})`}
-                    className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
-                  >
-                    {s.icon}
-                  </a>
-                ))}
+          {/* Editorial hero — big white logo, serif promise, CTA, social */}
+          <div className="pt-16 pb-12 flex flex-col items-center text-center">
+            <Image
+              src="/logo-liquen-branco.png"
+              alt="Líquen Events"
+              width={215}
+              height={128}
+              className="h-20 sm:h-24 w-auto object-contain"
+            />
+            <p className="mt-7 font-display text-2xl sm:text-[2rem] leading-[1.25] text-white/95 max-w-xl">
+              {t.footer.sloganLine1} {t.footer.sloganLine2}
+            </p>
+            <TrackedLink
+              href={localizeHref("/orcamento", locale)}
+              trackProps={{ source: "footer" }}
+              className="mt-8 inline-flex items-center gap-2.5 px-8 py-3.5 border border-white/35 text-white/90 text-[11px] tracking-[0.25em] uppercase hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 ease-expo"
+            >
+              {t.footer.pedirOrcamento} <span aria-hidden>→</span>
+            </TrackedLink>
 
-                {/* WhatsApp */}
-                <a
-                  href={WHATSAPP_HREF}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`WhatsApp (${t.common.newWindow})`}
-                  className="inline-flex items-center justify-center p-2 -m-2 text-foreground/68 hover:text-moss transition-colors duration-300"
+            {/* Social icons */}
+            <div className="mt-9 flex items-center gap-6">
+              <a
+                href={SITE.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Instagram (${t.common.newWindow})`}
+                className="inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
+              >
+                <svg
+                  width="19"
+                  height="19"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <WhatsAppIcon className="w-[18px] h-[18px]" />
-                </a>
-              </div>
+                  <rect x="2" y="2" width="20" height="20" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" />
+                </svg>
+              </a>
+              <a
+                href={SITE.facebook}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Facebook (${t.common.newWindow})`}
+                className="inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
+              >
+                <svg
+                  width="19"
+                  height="19"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                </svg>
+              </a>
+              <a
+                href={WHATSAPP_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`WhatsApp (${t.common.newWindow})`}
+                className="inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
+              >
+                <WhatsAppIcon className="w-[19px] h-[19px]" />
+              </a>
             </div>
+          </div>
 
-            {/* Pages */}
-            <div className="md:col-span-3">
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-4">
+          {/* Serviços + Contacto — centred on mobile, two columns from sm up */}
+          <div className="border-t border-white/12 py-10 grid grid-cols-1 sm:grid-cols-2 gap-8 text-center sm:text-left">
+            <div>
+              <p className="text-white/55 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.servicosTitulo}
               </p>
               <ul className="flex flex-col gap-2.5">
@@ -146,7 +133,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   <li key={slug}>
                     <Link
                       href={localizeHref(`/servicos/${slug}`, locale)}
-                      className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
+                      className="link-line text-[13px] text-white/75 hover:text-white transition-colors duration-300"
                     >
                       {t.footer.serviceLinks[i]}
                     </Link>
@@ -154,62 +141,49 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 ))}
               </ul>
             </div>
-
-            {/* Contact */}
-            <div className="md:col-span-4">
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-4">
+            <div>
+              <p className="text-white/55 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.contacto}
               </p>
-              <div className="flex flex-col gap-2.5 text-[13px] text-foreground/72 mb-6">
+              <div className="flex flex-col gap-2.5 text-[13px] text-white/75">
                 <a
                   href={`mailto:${SITE.email}`}
-                  className="link-line hover:text-foreground/78 transition-colors duration-300"
+                  className="link-line hover:text-white transition-colors duration-300"
                 >
                   {SITE.email}
                 </a>
                 <a
                   href={`tel:${SITE.phone}`}
-                  className="link-line hover:text-foreground/78 transition-colors duration-300"
+                  className="link-line hover:text-white transition-colors duration-300"
                 >
                   {SITE.phoneDisplay}
                 </a>
-                <span className="text-foreground/78">{t.footer.country}</span>
+                <span className="text-white/55">{t.footer.country}</span>
               </div>
-              {/* CTA no idioma SpaceX — filete quadrado que enche no hover com
-                  inversão de texto (o ground do footer é branco, por isso enche
-                  a foreground escura e o texto passa a claro), em vez do antigo
-                  hover que só tingia o traço de moss. */}
-              <TrackedLink
-                href={localizeHref("/orcamento", locale)}
-                trackProps={{ source: "footer" }}
-                className="inline-flex items-center gap-2.5 px-6 py-3 border border-foreground/25 text-foreground/70 text-[11px] tracking-[0.25em] uppercase hover:bg-foreground hover:text-white hover:border-foreground transition-colors duration-300 ease-expo"
-              >
-                {t.footer.pedirOrcamento} <span aria-hidden>→</span>
-              </TrackedLink>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Copyright bar ── */}
-      <div className="border-t border-foreground/6 py-4">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-center gap-3 text-center sm:text-left">
-          <p className="text-[11px] text-foreground/78 tracking-wide">
-            © {new Date().getFullYear()} Líquen Events — {t.footer.rights}
-          </p>
-          <div className="flex items-center gap-5 text-[11px] text-foreground/68 tracking-wide">
-            <Link
-              href={localizeHref("/privacidade", locale)}
-              className="link-line hover:text-moss transition-colors"
-            >
-              {t.footer.privacidade}
-            </Link>
-            <Link
-              href={localizeHref("/termos", locale)}
-              className="link-line hover:text-moss transition-colors"
-            >
-              {t.footer.termos}
-            </Link>
+        {/* ── Copyright bar ── */}
+        <div className="border-t border-white/12 py-5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-center gap-3 text-center">
+            <p className="text-[11px] text-white/55 tracking-wide">
+              © {new Date().getFullYear()} Líquen Events — {t.footer.rights}
+            </p>
+            <div className="flex items-center gap-5 text-[11px] text-white/55 tracking-wide">
+              <Link
+                href={localizeHref("/privacidade", locale)}
+                className="link-line hover:text-white transition-colors"
+              >
+                {t.footer.privacidade}
+              </Link>
+              <Link
+                href={localizeHref("/termos", locale)}
+                className="link-line hover:text-white transition-colors"
+              >
+                {t.footer.termos}
+              </Link>
+            </div>
           </div>
         </div>
       </div>
