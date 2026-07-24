@@ -29,6 +29,7 @@ export default function GuestList({ quote, onChange }: Props) {
   const [guests, setGuests] = useState<Guest[]>(quote.guestList ?? []);
   const [name, setName] = useState("");
   const [party, setParty] = useState("1");
+  const [note, setNote] = useState("");
 
   const totals = useMemo(() => {
     let confirmed = 0;
@@ -66,21 +67,28 @@ export default function GuestList({ quote, onChange }: Props) {
   function add() {
     const n = name.trim();
     if (!n) return;
+    const trimmedNote = note.trim();
     persist([
       ...guests,
-      { id: randomId(), name: n, party: Math.max(1, parseInt(party) || 1), rsvp: "pendente" },
+      {
+        id: randomId(),
+        name: n,
+        party: Math.max(1, parseInt(party) || 1),
+        rsvp: "pendente",
+        note: trimmedNote || undefined,
+      },
     ]);
     setName("");
     setParty("1");
+    setNote("");
   }
   function remove(id: string) {
     persist(guests.filter((g) => g.id !== id));
   }
-  // Tap the badge to cycle the RSVP state.
-  function cycle(g: Guest) {
-    const order: RsvpStatus[] = ["pendente", "confirmado", "recusado"];
-    const next = order[(order.indexOf(g.rsvp) + 1) % order.length];
-    persist(guests.map((x) => (x.id === g.id ? { ...x, rsvp: next } : x)));
+  // Estado do RSVP escolhido diretamente (um clique para qualquer estado), em vez
+  // de ciclar tocando no badge (que ninguém adivinhava).
+  function setRsvpOf(id: string, rsvp: RsvpStatus) {
+    persist(guests.map((x) => (x.id === id ? { ...x, rsvp } : x)));
   }
   // Escrever no campo atualiza o número no ecrã de imediato (aceita vazio para se
   // poder reescrever); só grava (um PATCH) ao sair do campo, com o mínimo de 1.
@@ -164,7 +172,7 @@ export default function GuestList({ quote, onChange }: Props) {
       </div>
 
       {/* Headcount summary */}
-      <div className="mb-5 grid grid-cols-3 gap-2.5">
+      <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
           <p className="text-base font-semibold text-[#4d6350]">{totals.confirmed}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
@@ -175,6 +183,12 @@ export default function GuestList({ quote, onChange }: Props) {
           <p className="text-base font-semibold text-foreground/65">{totals.pending}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Pendente
+          </p>
+        </div>
+        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
+          <p className="text-base font-semibold text-[#b5654a]">{totals.declined}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
+            Recusados
           </p>
         </div>
         <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
@@ -198,6 +212,11 @@ export default function GuestList({ quote, onChange }: Props) {
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground/80">{g.name}</p>
+                {g.note && (
+                  <p className="truncate text-[11px] text-foreground/40" title={g.note}>
+                    {g.note}
+                  </p>
+                )}
               </div>
               <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-foreground/45">
                 <input
@@ -211,17 +230,17 @@ export default function GuestList({ quote, onChange }: Props) {
                 />
                 convidados
               </label>
-              <button
-                onClick={() => cycle(g)}
-                className="w-[86px] shrink-0 rounded-lg px-2 py-1 text-center text-[10px] uppercase tracking-[0.1em] motion-safe:transition-opacity hover:opacity-80"
-                style={{
-                  background: `${RSVP_META[g.rsvp].color}18`,
-                  color: RSVP_META[g.rsvp].color,
-                }}
-                title="Clique para mudar o estado do RSVP"
+              <select
+                value={g.rsvp}
+                onChange={(e) => setRsvpOf(g.id, e.target.value as RsvpStatus)}
+                aria-label={`Estado do RSVP de ${g.name}`}
+                className="bo-input w-[110px] shrink-0 px-2 py-1 text-[11px] font-medium"
+                style={{ color: RSVP_META[g.rsvp].color }}
               >
-                {RSVP_META[g.rsvp].label}
-              </button>
+                <option value="pendente">Pendente</option>
+                <option value="confirmado">Confirmado</option>
+                <option value="recusado">Recusado</option>
+              </select>
               <button
                 onClick={() => remove(g.id)}
                 className="shrink-0 rounded-md p-1 text-foreground/25 opacity-0 hover:text-[#8a2a22] focus-visible:opacity-100 motion-safe:transition-all group-hover:opacity-100"
@@ -259,6 +278,15 @@ export default function GuestList({ quote, onChange }: Props) {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Nome (convidado ou família)"
+          containerClassName="flex-1"
+        />
+        <Field
+          as="input"
+          label="Nota (opcional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Ex.: mesa 3, alergia, +1"
           containerClassName="flex-1"
         />
         <Field
