@@ -93,7 +93,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       {/* ── MANIFESTO — short statement + image ── */}
       {/* overflow-x-clip contains the ~4px the from-left/right reveal transforms
           and grid rounding push past the viewport edge on mobile. */}
-      <section className="relative overflow-hidden py-20 lg:py-28">
+      <section className="relative overflow-hidden flex flex-col lg:flex-row lg:min-h-[680px]">
         <Image
           src="/imagens/JOAO_E_PEDRO_IMGL2823.jpg"
           {...blurFor("/imagens/JOAO_E_PEDRO_IMGL2823.jpg")}
@@ -101,14 +101,15 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           fill
           sizes="100vw"
           quality={70}
-          className="absolute inset-0 object-cover object-center"
+          className="absolute inset-0 object-cover object-left"
         />
         <div
           aria-hidden
           className="absolute inset-0"
           style={{ backgroundImage: "linear-gradient(rgba(8,10,8,0.72), rgba(8,10,8,0.84))" }}
         />
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-20 items-center">
+        {/* Left — the manifesto text over the (veiled) backdrop */}
+        <div className="relative z-10 lg:w-1/2 flex items-center px-6 lg:px-16 py-20 lg:py-28">
           <AnimateIn from="left">
             <p className={`${eyebrowLight} mb-8`}>
               <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
@@ -126,37 +127,29 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               {t.sobre.manifestoText}
             </p>
           </AnimateIn>
-          <AnimateIn from="right" delay={120}>
-            {/* From lg the photo breaks out of the content frame and bleeds to
-                the right viewport edge (SpaceX full-bleed): the negative margin
-                cancels the container's centering slack + its 4rem padding. The
-                section's overflow-x-clip swallows the ~half-scrollbar of 100vw
-                overshoot, so nothing scrolls sideways. */}
-            <div className="relative aspect-[4/5] overflow-hidden lg:-mr-[calc((100vw_-_min(100vw,80rem))/2_+_4rem)]">
-              <Image
-                src="/imagens/DaniGui_Preview12.jpg"
-                alt={t.common.imageAlt.sobrePortrait}
-                fill
-                sizes="(max-width: 1024px) 100vw, 55vw"
-                quality={75}
-                className="object-cover"
-                {...blurFor("/imagens/DaniGui_Preview12.jpg")}
-              />
-              {/* SpaceX chapter treatment on the full-bleed photo: a bottom-left
-                  scrim + corner caption (single gold dash + uppercase eyebrow),
-                  the same idiom as the home service chapters. */}
-              <div
-                aria-hidden
-                className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/20 to-[#080808]/5"
-              />
-              <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8">
-                <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
-                  <span className="w-8 h-px bg-gold flex-shrink-0" />
-                  {t.sobre.manifestoImageCaption}
-                </p>
-              </div>
-            </div>
-          </AnimateIn>
+        </div>
+        {/* Right — full-height photo, covering the centre of the backdrop (the
+            cross/altar) and running top-to-bottom of the section. */}
+        <div className="relative z-10 lg:w-1/2 min-h-[75vw] sm:min-h-[460px] lg:min-h-0">
+          <Image
+            src="/imagens/DaniGui_Preview12.jpg"
+            alt={t.common.imageAlt.sobrePortrait}
+            fill
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            quality={75}
+            className="object-cover"
+            {...blurFor("/imagens/DaniGui_Preview12.jpg")}
+          />
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-t from-[#080808]/80 via-transparent to-transparent"
+          />
+          <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8">
+            <p className="text-white/75 text-[10px] tracking-[0.4em] uppercase flex items-center gap-3">
+              <span className="w-8 h-px bg-gold flex-shrink-0" />
+              {t.sobre.manifestoImageCaption}
+            </p>
+          </div>
         </div>
       </section>
 
