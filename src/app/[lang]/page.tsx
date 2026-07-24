@@ -195,17 +195,17 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
       {/* ── CTA — full-screen closing panel (matches /servicos) ── */}
       <section
-        className="relative overflow-hidden border-t border-foreground/8 flex items-center py-28 lg:py-40"
+        className="relative overflow-hidden flex items-center py-28 lg:py-40"
         style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
       >
         <Image
-          src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
+          src="/imagens/JOAO_E_PEDRO_1Y1A4463.jpg"
           alt={t.common.imageAlt.homeWedding}
           fill
           sizes="100vw"
           quality={75}
           className="object-cover object-center"
-          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
+          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A4463.jpg")}
         />
         {/* Wash + gradient merged into one layer (gradient listed first = on
             top, matching the former div order). Same look, one paint pass. */}

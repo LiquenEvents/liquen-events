@@ -44,15 +44,13 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
           backgroundImage: "linear-gradient(to bottom, rgba(7,8,7,0.55), rgba(7,8,7,0.8))",
         }}
       />
-      {/* Crisp seam so the footer reads as a DISTINCT band from the (also
-          photo-backed) page section above: a hairline of light at the very top,
-          plus a soft shadow just below it — together an embossed "edge" that
-          marks where the page ends and the footer begins, images still touching. */}
-      <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-white/25" />
+      {/* Soft top fade (no hard line): the footer image eases in from the dark
+          section above as you scroll, so the backgrounds read as one continuous
+          flow instead of two panels with a seam between them. */}
       <div
         aria-hidden
-        className="absolute inset-x-0 top-0 h-20"
-        style={{ backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)" }}
+        className="absolute inset-x-0 top-0 h-40"
+        style={{ backgroundImage: "linear-gradient(to bottom, rgba(7,8,7,0.9), transparent)" }}
       />
 
       {/* ── Content (over the photo) ── */}
