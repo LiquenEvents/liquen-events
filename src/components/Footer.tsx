@@ -39,8 +39,18 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
         aria-hidden
         className="absolute inset-0"
         style={{
-          backgroundImage: "linear-gradient(to bottom, rgba(8,10,8,0.74), rgba(8,10,8,0.92))",
+          backgroundImage: "linear-gradient(to bottom, rgba(7,8,7,0.8), rgba(7,8,7,0.94))",
         }}
+      />
+      {/* Crisp seam so the footer reads as a DISTINCT band from the (also
+          photo-backed) page section above: a hairline of light at the very top,
+          plus a soft shadow just below it — together an embossed "edge" that
+          marks where the page ends and the footer begins, images still touching. */}
+      <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-white/25" />
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-20"
+        style={{ backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)" }}
       />
 
       {/* ── Content (over the photo) ── */}
