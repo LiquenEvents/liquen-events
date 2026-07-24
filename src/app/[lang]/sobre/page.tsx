@@ -95,8 +95,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           and grid rounding push past the viewport edge on mobile. */}
       <section className="relative overflow-hidden py-20 lg:py-28">
         <Image
-          src="/imagens/EW1_1428.jpg"
-          {...blurFor("/imagens/EW1_1428.jpg")}
+          src="/imagens/JOAO_E_PEDRO_IMGL2823.jpg"
+          {...blurFor("/imagens/JOAO_E_PEDRO_IMGL2823.jpg")}
           alt=""
           fill
           sizes="100vw"
@@ -210,8 +210,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           bio paragraph, no extra lines. */}
       <section className="relative overflow-hidden">
         <Image
-          src="/imagens/hd-edited.jpg"
-          {...blurFor("/imagens/hd-edited.jpg")}
+          src="/imagens/JOAO_E_PEDRO_1Y1A4467.jpg"
+          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A4467.jpg")}
           alt=""
           fill
           sizes="100vw"
