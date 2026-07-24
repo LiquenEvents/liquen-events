@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { parseMoney, randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
 import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/orcamento/types";
+import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
+import { round2 } from "@/lib/money";
 import { Button, Field, EmptyState } from "./ui";
 
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
@@ -60,7 +62,12 @@ export default function EventCosts({ quote, onChange }: Props) {
       .catch(() => {});
   }, []);
 
-  const revenue = quote.quotedPrice ?? quote.priceBreakdown?.total ?? 0;
+  // Receita e custos comparados na MESMA base (sem IVA): o preço "Preço final
+  // (sem IVA)" já é líquido; os custos de fornecedor são com IVA e o IVA é
+  // dedutível, por isso divide-se por (1+taxa). Assim a margem é o lucro real —
+  // antes comparava receita sem IVA com custos com IVA (margem falsamente baixa).
+  const amounts = contractedAmounts(quote);
+  const vatRate = effectiveVatRate(quote);
   const totals = useMemo(() => {
     let estimated = 0;
     let actual = 0;
@@ -68,10 +75,12 @@ export default function EventCosts({ quote, onChange }: Props) {
       estimated += it.estimatedCost || 0;
       actual += it.actualCost ?? it.estimatedCost ?? 0;
     }
-    const margin = revenue - actual;
-    const marginPct = revenue > 0 ? Math.round((margin / revenue) * 100) : 0;
-    return { estimated, actual, margin, marginPct };
-  }, [items, revenue]);
+    const actualNet = round2(actual / (1 + vatRate));
+    const revenueNet = amounts.net;
+    const margin = round2(revenueNet - actualNet);
+    const marginPct = revenueNet > 0 ? Math.round((margin / revenueNet) * 100) : 0;
+    return { estimated, actual, actualNet, revenueNet, margin, marginPct };
+  }, [items, amounts.net, vatRate]);
 
   function persist(next: EventSupplier[]) {
     // Otimista com reversão + aviso: custos errados no ecrã sem estarem na base
@@ -149,25 +158,45 @@ export default function EventCosts({ quote, onChange }: Props) {
         )}
       </div>
 
-      {/* Margin summary — the headline number */}
+      {/* Margin summary — the headline number. Receita/Custos/Margem na mesma base
+          (sem IVA) para reconciliarem no ecrã; o valor com IVA vai por baixo. */}
       <div className="mb-5 grid grid-cols-3 gap-2.5">
         <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
-          <p className="text-sm font-semibold text-foreground/80">{eur2(revenue)}</p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">Receita</p>
+          <p className="text-sm font-semibold text-foreground/80 tabular-nums">
+            {eur2(totals.revenueNet)}
+          </p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
+            Receita (s/ IVA)
+          </p>
+          <p className="mt-1 text-[9px] tabular-nums text-foreground/35 leading-tight">
+            c/ IVA {eur2(amounts.gross)}
+          </p>
         </div>
         <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
-          <p className="text-sm font-semibold text-[#a4642f]">{eur2(totals.actual)}</p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">Custos</p>
+          <p className="text-sm font-semibold text-[#a4642f] tabular-nums">
+            {eur2(totals.actualNet)}
+          </p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
+            Custos (s/ IVA)
+          </p>
+          <p className="mt-1 text-[9px] tabular-nums text-foreground/35 leading-tight">
+            c/ IVA {eur2(totals.actual)}
+          </p>
         </div>
         <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
           <p
-            className={`text-sm font-semibold ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}
+            className={`text-sm font-semibold tabular-nums ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}
           >
             {eur2(totals.margin)}
           </p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
-            Margem{revenue > 0 ? ` · ${totals.marginPct}%` : ""}
+            Margem{totals.revenueNet > 0 ? ` · ${totals.marginPct}%` : ""}
           </p>
+          {totals.margin < 0 && (
+            <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-[#8a2a22] leading-tight">
+              Prejuízo
+            </p>
+          )}
         </div>
       </div>
 
