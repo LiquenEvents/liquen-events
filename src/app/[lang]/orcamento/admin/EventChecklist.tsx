@@ -16,6 +16,11 @@ export default function EventChecklist({ quote, onChange }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<ChecklistItem[]>(quote.checklist ?? []);
   const [newItem, setNewItem] = useState("");
+  // Edição inline do texto de um item: commit em blur/Enter, Escape cancela.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  // Confirmação inline (dois cliques) antes de limpar itens concluídos.
+  const [confirmClear, setConfirmClear] = useState(false);
 
   function persist(next: ChecklistItem[]) {
     // Otimista com reversão: falha do servidor repõe o estado e avisa.
@@ -56,6 +61,48 @@ export default function EventChecklist({ quote, onChange }: Props) {
     if (!l) return;
     persist([...items, { id: randomId(), label: l, done: false }]);
     setNewItem("");
+  }
+
+  function markAll() {
+    persist(items.map((i) => (i.done ? i : { ...i, done: true })));
+  }
+  function clearCompleted() {
+    // Primeiro clique arma a confirmação; o segundo executa. Blur desarma.
+    if (!confirmClear) {
+      setConfirmClear(true);
+      return;
+    }
+    setConfirmClear(false);
+    persist(items.filter((i) => !i.done));
+  }
+
+  function startEdit(item: ChecklistItem) {
+    setEditingId(item.id);
+    setDraft(item.label);
+  }
+  function commitEdit() {
+    const id = editingId;
+    setEditingId(null); // fecha já — o blur que se segue não repete o commit
+    if (!id) return;
+    const item = items.find((i) => i.id === id);
+    const l = draft.trim();
+    // Vazio ou inalterado cancela em vez de gravar um item sem texto.
+    if (!item || !l || l === item.label) return;
+    persist(items.map((i) => (i.id === id ? { ...i, label: l } : i)));
+  }
+
+  // Itens do modelo ainda em falta (dedupe por label exato, como o applyPlan
+  // do ProductionPlan) — permite completar uma checklist já começada.
+  const existingLabels = new Set(items.map((i) => i.label));
+  const missingFromTemplate = checklistTemplate(quote.category).filter(
+    (label) => !existingLabels.has(label),
+  );
+  function addTemplateItems() {
+    if (missingFromTemplate.length === 0) return;
+    persist([
+      ...items,
+      ...missingFromTemplate.map((label) => ({ id: randomId(), label, done: false })),
+    ]);
   }
 
   const doneCount = items.filter((i) => i.done).length;
@@ -110,6 +157,43 @@ export default function EventChecklist({ quote, onChange }: Props) {
               style={{ width: `${pct}%` }}
             />
           </div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={markAll}
+                disabled={doneCount === items.length}
+                className="rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 disabled:pointer-events-none disabled:opacity-40 motion-safe:transition-colors"
+              >
+                Marcar todas
+              </button>
+              {doneCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearCompleted}
+                  onBlur={() => setConfirmClear(false)}
+                  className={`rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] motion-safe:transition-colors ${
+                    confirmClear
+                      ? "bg-[#b5654a]/10 text-[#b5654a] hover:bg-[#b5654a]/[0.16]"
+                      : "text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75"
+                  }`}
+                >
+                  {confirmClear
+                    ? `Remover ${doneCount} ${doneCount === 1 ? "concluída" : "concluídas"}?`
+                    : "Limpar concluídas"}
+                </button>
+              )}
+            </div>
+            {missingFromTemplate.length > 0 && (
+              <button
+                type="button"
+                onClick={addTemplateItems}
+                className="rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 motion-safe:transition-colors"
+              >
+                Adicionar itens do modelo ({missingFromTemplate.length})
+              </button>
+            )}
+          </div>
           <ul className="mb-5 flex flex-col gap-0.5">
             {items.map((i) => (
               <li
@@ -139,13 +223,31 @@ export default function EventChecklist({ quote, onChange }: Props) {
                     </svg>
                   )}
                 </button>
-                <span
-                  className={`flex-1 text-sm leading-snug ${
-                    i.done ? "text-foreground/35 line-through" : "text-foreground/75"
-                  }`}
-                >
-                  {i.label}
-                </span>
+                {editingId === i.id ? (
+                  <input
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={commitEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitEdit();
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                    aria-label="Editar item"
+                    className="bo-input flex-1 px-2 py-0.5 text-sm text-foreground/80"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startEdit(i)}
+                    title="Editar item"
+                    className={`flex-1 rounded-md text-left text-sm leading-snug decoration-dotted underline-offset-2 hover:underline ${
+                      i.done ? "text-foreground/35 line-through" : "text-foreground/75"
+                    }`}
+                  >
+                    {i.label}
+                  </button>
+                )}
                 <button
                   onClick={() => remove(i.id)}
                   className="shrink-0 rounded-md p-1 text-foreground/25 opacity-0 hover:text-[#8a2a22] focus-visible:opacity-100 motion-safe:transition-all group-hover:opacity-100"

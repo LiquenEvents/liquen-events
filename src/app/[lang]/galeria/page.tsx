@@ -72,7 +72,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       {/* ── Immersive hero ── */}
       {/* -mt-24 cancels the global <main> pt-24 so the hero image runs to the
           very top behind the transparent navbar (no white strip / hairline). */}
-      <section className="relative -mt-24 min-h-[68svh] lg:min-h-[80svh] flex flex-col justify-end overflow-hidden">
+      <section className="relative -mt-24 min-h-[100svh] lg:min-h-[80svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
           <Image
             src="/imagens/DaniGui_Preview20.jpg"
@@ -80,7 +80,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             fill
             preload
             sizes="100vw"
-            quality={75}
+            quality={82}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/DaniGui_Preview20.jpg")}
           />

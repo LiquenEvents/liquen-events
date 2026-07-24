@@ -575,7 +575,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   const isDeco = doc.template !== "organizacao";
-  const canSend = !!doc.ref.trim() && !!doc.clientNames.trim();
+  // Também exige um total > 0: uma proposta a €0 seria enviada e poluiria os
+  // indicadores (total enviado, taxa de aceitação) com um negócio vazio.
+  const canSend = !!doc.ref.trim() && !!doc.clientNames.trim() && money.gross > 0;
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -1104,7 +1106,11 @@ export default function ProposalStudio({ quote, onSent }: Props) {
             variant="primary"
             onClick={() => setConfirmSend(true)}
             disabled={busy !== null || !canSend}
-            title={canSend ? undefined : "Preencha clientes e referência."}
+            title={
+              canSend
+                ? undefined
+                : "Preencha clientes, referência e um total maior que 0 antes de enviar."
+            }
             iconRight={<span aria-hidden="true">→</span>}
           >
             Gerar e enviar ao cliente

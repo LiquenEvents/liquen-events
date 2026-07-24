@@ -110,6 +110,8 @@ interface Props {
   onOpen: (q: Quote) => void;
 }
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
 export default function Calendario({ quotes, onOpen }: Props) {
   const { toast } = useToast();
   const [cursor, setCursor] = useState(() => {
@@ -120,6 +122,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
   // Standalone calendar entries (reuniões, marcações, bloqueios…)
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [modalDate, setModalDate] = useState<string | null>(null);
+  // Day peek: the day whose events are expanded in the panel under the grid.
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [form, setForm] = useState<{
     title: string;
     kind: CalendarEventKind;
@@ -181,6 +185,13 @@ export default function Calendario({ quotes, onOpen }: Props) {
     setForm({ title: "", kind: "evento", time: "", note: "" });
   }
 
+  // Month navigation always goes through here so the day peek never lingers
+  // pointing at a day the grid no longer shows.
+  function goTo(next: Date) {
+    setCursor(next);
+    setSelectedDay(null);
+  }
+
   // Escape closes the add-event modal.
   useEffect(() => {
     if (!modalDate) return;
@@ -202,7 +213,6 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
   const byDay = useMemo(() => {
     const map = new Map<string, Quote[]>();
-    const pad = (n: number) => String(n).padStart(2, "0");
     for (const q of quotes) {
       // Free-form dates ("a definir", etc.) are allowed by the schema; skip
       // anything that isn't a real YYYY-MM-DD so `.toISOString()` below can't
@@ -216,7 +226,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
       for (let i = 0; i < 31; i++) {
         // Build the key from LOCAL parts (not toISOString/UTC) so it matches the
         // grid cell keys below and stays correct in far-offset zones.
-        const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
         if (key > last) break;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(q);
@@ -233,9 +243,18 @@ export default function Calendario({ quotes, onOpen }: Props) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = todayKey();
 
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < startOffset; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  // Full weeks: leading/trailing days of the neighbouring months are rendered
+  // dimmed (and inert) so the grid is always a clean rectangle of hairlines.
+  const cells: { key: string; day: number; inMonth: boolean }[] = [];
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(year, month, i - startOffset + 1);
+    cells.push({
+      key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`,
+      day: d.getDate(),
+      inMonth: d.getMonth() === month,
+    });
+  }
 
   const upcoming = useMemo(() => {
     const today = todayKey();
@@ -245,9 +264,17 @@ export default function Calendario({ quotes, onOpen }: Props) {
       .slice(0, 6);
   }, [quotes]);
 
-  const monthEventCount = quotes.filter(
-    (q) => q.date && q.date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`),
-  ).length;
+  const monthPrefix = `${year}-${pad2(month + 1)}`;
+  const monthQuoteCount = quotes.filter((q) => q.date && q.date.startsWith(monthPrefix)).length;
+  const monthEventCount = events.filter((e) => e.date.startsWith(monthPrefix)).length;
+  const monthTotal = monthQuoteCount + monthEventCount;
+
+  const dayLabelLong = (key: string) =>
+    new Date(key + "T12:00:00").toLocaleDateString("pt-PT", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
 
   const modalDateLabel = modalDate
     ? new Date(modalDate + "T12:00:00").toLocaleDateString("pt-PT", {
@@ -258,77 +285,133 @@ export default function Calendario({ quotes, onOpen }: Props) {
       })
     : "";
 
+  const selectedQuotes = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
+  const selectedEvents = selectedDay ? (eventsByDay.get(selectedDay) ?? []) : [];
+
   return (
     <>
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-        <Card>
-          <div className="flex items-center justify-between gap-4 mb-5">
-            <div>
-              <h3 className="font-display text-foreground/85 text-lg leading-tight">
+        <Card padding="lg">
+          {/* ── Header: month title + quiet controls on one row ── */}
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="min-w-0">
+              <h3 className="font-display text-foreground/90 text-xl sm:text-2xl leading-tight truncate">
                 {MONTHS[month]} {year}
               </h3>
-              <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1">
-                {monthEventCount} evento{monthEventCount !== 1 ? "s" : ""}
+              <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1.5">
+                {monthTotal === 0
+                  ? "Sem eventos este mês"
+                  : `${monthTotal} evento${monthTotal !== 1 ? "s" : ""} este mês`}
               </p>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => exportIcs(quotes)}
                 title="Exportar para calendário (.ics)"
-                className="mr-1"
+                className="hidden sm:inline-flex"
               >
                 Exportar
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setCursor(new Date(year, month - 1, 1))}
-                aria-label="Mês anterior"
-                className="w-8 px-0"
+              <div
+                className="flex items-center rounded-xl border border-foreground/[0.08] p-0.5"
+                role="group"
+                aria-label="Navegação do mês"
               >
-                ‹
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const d = new Date();
-                  setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
-                }}
-              >
-                Hoje
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setCursor(new Date(year, month + 1, 1))}
-                aria-label="Mês seguinte"
-                className="w-8 px-0"
-              >
-                ›
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => goTo(new Date(year, month - 1, 1))}
+                  aria-label="Mês anterior"
+                  className="w-8 px-0"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const d = new Date();
+                    goTo(new Date(d.getFullYear(), d.getMonth(), 1));
+                  }}
+                >
+                  Hoje
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => goTo(new Date(year, month + 1, 1))}
+                  aria-label="Mês seguinte"
+                  className="w-8 px-0"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 mb-1">
+          {/* ── Weekday header ── */}
+          <div className="grid grid-cols-7 mb-2" aria-hidden="true">
             {WEEKDAYS.map((w) => (
               <div
                 key={w}
-                className="text-center text-foreground/25 text-[9px] tracking-[0.2em] uppercase py-1"
+                className="text-center text-foreground/30 text-[9px] tracking-[0.25em] uppercase py-1"
               >
                 {w}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((d, i) => {
-              if (d === null) return <div key={i} />;
-              const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+          {/* ── Month grid: hairline lines via 1px gaps over a tinted base ── */}
+          <div
+            role="group"
+            aria-label={`Calendário de ${MONTHS[month]} ${year}`}
+            className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-foreground/[0.06] bg-foreground/[0.06]"
+          >
+            {cells.map((c) => {
+              if (!c.inMonth) {
+                return (
+                  <div
+                    key={c.key}
+                    aria-hidden="true"
+                    className="min-h-[52px] sm:min-h-[80px] bg-white p-1.5 sm:p-2"
+                  >
+                    <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/[0.15]">
+                      {c.day}
+                    </span>
+                  </div>
+                );
+              }
+              const key = c.key;
               const dayQuotes = byDay.get(key) ?? [];
               const dayEvents = eventsByDay.get(key) ?? [];
               const isToday = key === todayStr;
+              const isSelected = key === selectedDay;
               const total = dayQuotes.length + dayEvents.length;
               // Chip budget for the cell: up to 2 quotes, then events fill the
               // rest (compressed to 1 when the day is busy so the "+N" fits).
@@ -338,35 +421,70 @@ export default function Calendario({ quotes, onOpen }: Props) {
               const shownQuotes = dayQuotes.slice(0, 2);
               const shownEvents = dayEvents.slice(0, total > 3 ? 1 : 2);
               const hiddenCount = total - shownQuotes.length - shownEvents.length;
-              const dayLabel = `${d} de ${MONTHS[month]}${isToday ? " (hoje)" : ""} — ${
-                total > 0 ? `${total} evento${total !== 1 ? "s" : ""}; ` : ""
-              }Enter para adicionar`;
+              // On very narrow screens the chips collapse into plain dots.
+              const dots = [
+                ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
+                ...dayEvents.map((ev) => KIND_META[ev.kind].color),
+              ].slice(0, 4);
+              const dayLabel = `${c.day} de ${MONTHS[month]}${isToday ? " (hoje)" : ""} — ${
+                total > 0
+                  ? `${total} evento${total !== 1 ? "s" : ""}; Enter para ver`
+                  : "Enter para adicionar"
+              }`;
               return (
                 <div
-                  key={i}
+                  key={key}
                   role="button"
                   tabIndex={0}
                   aria-label={dayLabel}
-                  onClick={() => openAdd(key)}
+                  aria-pressed={isSelected || undefined}
+                  onClick={() => {
+                    // A day with entries opens the peek; an empty day goes
+                    // straight to "add" — the fastest path either way.
+                    if (total > 0) setSelectedDay(isSelected ? null : key);
+                    else openAdd(key);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      openAdd(key);
+                      if (total > 0) setSelectedDay(isSelected ? null : key);
+                      else openAdd(key);
                     }
                   }}
-                  className={`group min-h-[64px] rounded-md border p-1.5 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${isToday ? "border-[#4d6350]/50 bg-[#4d6350]/[0.06]" : "border-foreground/[0.07] bg-white hover:border-[#4d6350]/30 hover:bg-[#4d6350]/[0.025]"}`}
+                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer motion-safe:transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${
+                    isSelected
+                      ? "ring-1 ring-inset ring-[#4d6350]/45 bg-[#4d6350]/[0.04]"
+                      : isToday
+                        ? "hover:bg-[#4d6350]/[0.03]"
+                        : "hover:bg-[#4d6350]/[0.025]"
+                  }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span
-                      className={`text-[10px] tabular-nums ${isToday ? "text-[#4d6350] font-bold" : "text-foreground/35"}`}
+                    {isToday ? (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white text-[10px] font-semibold tabular-nums">
+                        {c.day}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/40 px-0.5">
+                        {c.day}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      aria-label={`Adicionar a ${c.day} de ${MONTHS[month]}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAdd(key);
+                      }}
+                      className="hidden sm:block text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none px-0.5 motion-safe:transition-colors"
                     >
-                      {d}
-                    </span>
-                    <span className="text-[#4d6350]/0 group-hover:text-[#4d6350]/60 text-[11px] leading-none transition-colors">
                       +
-                    </span>
+                    </button>
                   </div>
-                  <div className="flex flex-col gap-0.5 mt-0.5">
+
+                  {/* Chips (sm and up) */}
+                  <div className="hidden sm:flex flex-col gap-[3px] mt-1">
                     {shownQuotes.map((q) => (
                       <button
                         key={q.id}
@@ -376,13 +494,13 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
                         title={`${q.name} — ${eventTypeLabel(q)}`}
-                        className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/40"
-                        style={{
-                          background: `${STATUS_COLOR[q.status]}26`,
-                          color: STATUS_COLOR[q.status],
-                        }}
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-foreground/[0.035] text-foreground/65 hover:bg-foreground/[0.07] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
-                        {q.name.split(" ")[0]}
+                        <span
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ background: STATUS_COLOR[q.status] }}
+                        />
+                        <span className="truncate">{q.name.split(" ")[0]}</span>
                       </button>
                     ))}
                     {shownEvents.map((ev) => (
@@ -394,28 +512,161 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className="text-left text-[9px] leading-tight truncate px-1 py-0.5 rounded-sm hover:line-through transition-all flex items-center gap-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/40"
-                        style={{
-                          background: `${KIND_META[ev.kind].color}22`,
-                          color: KIND_META[ev.kind].color,
-                        }}
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-foreground/[0.035] text-foreground/65 hover:line-through hover:bg-foreground/[0.07] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
                         <span
-                          className="w-1 h-1 rounded-full shrink-0"
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
                           style={{ background: KIND_META[ev.kind].color }}
                         />
-                        {ev.time ? `${ev.time} ` : ""}
-                        {ev.title}
+                        <span className="truncate">
+                          {ev.time ? `${ev.time} ` : ""}
+                          {ev.title}
+                        </span>
                       </button>
                     ))}
                     {hiddenCount > 0 && (
-                      <span className="text-foreground/30 text-[9px] px-1">+{hiddenCount}</span>
+                      <span className="text-foreground/35 text-[9px] leading-none px-1.5 py-0.5">
+                        +{hiddenCount}
+                      </span>
                     )}
                   </div>
+
+                  {/* Dots (below sm) — chips would overflow tiny cells */}
+                  {dots.length > 0 && (
+                    <div className="flex sm:hidden flex-wrap gap-[3px] mt-1.5 px-0.5">
+                      {dots.map((color, di) => (
+                        <span
+                          key={di}
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ background: color }}
+                        />
+                      ))}
+                      {total > dots.length && (
+                        <span className="text-foreground/35 text-[8px] leading-[6px]">+</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
+
+          {/* ── Legend ── */}
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
+              <span key={k} className="flex items-center gap-1.5">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: KIND_META[k].color }}
+                  aria-hidden="true"
+                />
+                <span className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase">
+                  {KIND_META[k].label}
+                </span>
+              </span>
+            ))}
+            <span className="ml-auto hidden sm:inline text-foreground/25 text-[9px] tracking-[0.15em] uppercase">
+              Clique num dia para ver ou adicionar
+            </span>
+          </div>
+
+          {/* ── Day peek: everything on the selected day, with real targets ── */}
+          {selectedDay && (selectedQuotes.length > 0 || selectedEvents.length > 0) && (
+            <div className="mt-5 rounded-xl border border-foreground/[0.07] bg-foreground/[0.02] overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-foreground/[0.06]">
+                <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
+                <div className="flex items-center gap-1">
+                  <Button variant="subtle" size="sm" onClick={() => openAdd(selectedDay)}>
+                    Adicionar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedDay(null)}
+                    aria-label="Fechar dia"
+                    className="w-8 px-0"
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
+              <div className="divide-y divide-foreground/[0.05]">
+                {selectedQuotes.map((q) => (
+                  <button
+                    key={q.id}
+                    onClick={() => onOpen(q)}
+                    className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-foreground/[0.03] motion-safe:transition-colors"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: STATUS_COLOR[q.status] }}
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-foreground/75 text-xs font-medium truncate">
+                        {q.name}
+                      </span>
+                      <span className="block text-foreground/40 text-[10px] truncate">
+                        {eventTypeLabel(q)}
+                        {q.guests ? ` · ${q.guests} convidados` : ""}
+                      </span>
+                    </span>
+                    <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase shrink-0">
+                      Abrir
+                    </span>
+                  </button>
+                ))}
+                {selectedEvents.map((ev) => (
+                  <div key={ev.id} className="flex items-center gap-3 px-4 py-3">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: KIND_META[ev.kind].color }}
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-foreground/75 text-xs font-medium truncate">
+                        {ev.time ? `${ev.time} · ` : ""}
+                        {ev.title}
+                      </span>
+                      <span className="block text-foreground/40 text-[10px] truncate">
+                        {KIND_META[ev.kind].label}
+                        {ev.note ? ` · ${ev.note}` : ""}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => deleteEvent(ev.id, ev.title)}
+                      aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
+                      className="text-foreground/35 hover:text-[#8a2a22] text-[9px] tracking-[0.15em] uppercase shrink-0 motion-safe:transition-colors"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Empty month ── */}
+          {monthTotal === 0 && (
+            <EmptyState
+              icon={
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="18" height="17" rx="2" />
+                  <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+                </svg>
+              }
+              title="Mês sem eventos"
+              description="Clique num dia do calendário para adicionar uma reunião, um bloqueio ou uma nota."
+            />
+          )}
         </Card>
 
         {/* Upcoming */}
@@ -431,7 +682,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 className="w-full text-left px-5 sm:px-6 py-3.5 hover:bg-foreground/[0.02] motion-safe:transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="text-center shrink-0 w-10">
+                  <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-[#4d6350]/[0.06]">
                     <p className="font-display text-[#4d6350] text-lg font-semibold leading-none">
                       {new Date(q.date + "T12:00:00").getDate()}
                     </p>

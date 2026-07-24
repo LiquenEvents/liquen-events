@@ -18,6 +18,9 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
   alta: "Alta",
 };
 
+// Para ordenar as tarefas por fazer: mais urgente primeiro.
+const PRIORITY_RANK: Record<TaskPriority, number> = { alta: 0, normal: 1, baixa: 2 };
+
 interface Props {
   quote: Quote;
   userName?: string;
@@ -72,6 +75,9 @@ export default function EventTasks({ quote, userName }: Props) {
           quoteId: quote.id,
           clientName: quote.name,
           assignee: userName || undefined,
+          // Marca a área para estas tarefas poderem ser filtradas/agrupadas numa
+          // vista global de tarefas (antes ficavam sem área e perdiam-se).
+          area: "Produção",
         }),
       });
       const created = res.ok ? await res.json().catch(() => null) : null;
@@ -106,7 +112,21 @@ export default function EventTasks({ quote, userName }: Props) {
   }
 
   const todayStr = todayKey();
-  const todo = tasks.filter((t) => !t.done);
+  // Por fazer, ordenadas: atrasadas primeiro, depois por prioridade, depois pela
+  // data limite mais próxima — o que é urgente fica no topo em vez de se perder
+  // pela ordem de criação.
+  const todo = tasks
+    .filter((t) => !t.done)
+    .sort((a, b) => {
+      const aOver = a.dueDate && a.dueDate < todayStr ? 0 : 1;
+      const bOver = b.dueDate && b.dueDate < todayStr ? 0 : 1;
+      if (aOver !== bOver) return aOver - bOver;
+      if (PRIORITY_RANK[a.priority] !== PRIORITY_RANK[b.priority])
+        return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+      const ad = a.dueDate ?? "9999-99-99";
+      const bd = b.dueDate ?? "9999-99-99";
+      return ad < bd ? -1 : ad > bd ? 1 : 0;
+    });
   const done = tasks.filter((t) => t.done);
 
   return (

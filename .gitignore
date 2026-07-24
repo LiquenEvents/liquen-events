@@ -65,3 +65,8 @@ remotion/public/*.mp4
 /*.mjs
 !/eslint.config.mjs
 !/postcss.config.mjs
+
+# Agent skills installed via `skills add` (build-time tooling, not site code)
+.agents/
+.claude/skills/
+skills-lock.json

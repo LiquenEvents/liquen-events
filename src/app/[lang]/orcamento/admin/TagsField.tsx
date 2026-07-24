@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 
@@ -20,6 +20,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
   const { toast } = useToast();
   const [tags, setTags] = useState<string[]>(quote.tags ?? []);
   const [input, setInput] = useState("");
+  const id = useId();
 
   function persist(next: string[]) {
     // Otimista com reversão: falha do servidor repõe o estado e avisa.
@@ -67,7 +68,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
 
   return (
     <div>
-      <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+      <label htmlFor={id} className="bo-eyebrow mb-2 block">
         Etiquetas
       </label>
       <div className="flex flex-wrap items-center gap-1.5 mb-2">
@@ -89,6 +90,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
         {tags.length === 0 && <span className="text-foreground/25 text-xs">Sem etiquetas.</span>}
       </div>
       <input
+        id={id}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {

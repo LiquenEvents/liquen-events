@@ -31,7 +31,6 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
       { keys: ["G", "T"], label: "Tarefas" },
       { keys: ["G", "F"], label: "Fornecedores" },
       { keys: ["G", "E"], label: "Estatísticas" },
-      { keys: ["G", "I"], label: "Inbox" },
     ],
   },
   {

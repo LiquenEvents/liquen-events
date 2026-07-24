@@ -281,7 +281,8 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       bits.push(
         `${data.needAction.length} pedido${data.needAction.length !== 1 ? "s" : ""} a precisar de atenção`,
       );
-    if (bits.length === 0) return "Tudo em dia. Nada urgente por agora.";
+    // Minimalista: só fala quando há algo a pedir ação — sem frases de enchimento.
+    if (bits.length === 0) return "";
     return `Tem ${bits.join(" e ")}.`;
   })();
 
@@ -410,7 +411,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
           >
             {greeting}, {userName}.
           </h2>
-          <p className="text-foreground/40 text-sm mt-2">{headline}</p>
+          {headline && <p className="text-foreground/40 text-sm mt-2">{headline}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {quickActions.map((a, i) => (
@@ -581,11 +582,6 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             >
               {k.l}
             </p>
-            <p
-              className={`text-[10px] mt-1 relative leading-tight ${k.dark ? "text-white/25" : "text-foreground/28"}`}
-            >
-              {k.hint}
-            </p>
           </button>
         ))}
       </div>
@@ -673,9 +669,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             )}
           </>
         ) : (
-          <p className="text-foreground/40 text-xs py-1">
-            Defina uma meta mensal para acompanhar o progresso de receita.
-          </p>
+          <p className="text-foreground/40 text-xs py-1">Sem meta definida.</p>
         )}
       </div>
 
@@ -725,9 +719,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             {teamNotes}
           </p>
         ) : (
-          <p className="text-foreground/40 text-xs">
-            Sem notas. Clique em &ldquo;Adicionar nota&rdquo; para começar.
-          </p>
+          <p className="text-foreground/40 text-xs">Sem notas.</p>
         )}
       </div>
 

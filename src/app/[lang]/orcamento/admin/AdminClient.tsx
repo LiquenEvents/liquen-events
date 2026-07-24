@@ -15,6 +15,7 @@ import { usePathname } from "next/navigation";
 import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
+import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
@@ -46,7 +47,6 @@ import {
   Tarefas,
   Fornecedores,
   StatsDashboard,
-  Inbox,
   ProposalBuilder,
   ProposalStudio,
   ProductionPlan,
@@ -108,13 +108,13 @@ type DetailTab = "producao" | "financeiro" | "comunicacao";
 type DetailTarget = DetailTab | "gestao";
 
 // The pedido's tool tabs, each with an icon and a plain-language hint so it's
-// obvious what you do there. The tablist renders icon + label, and a single
-// explainer line under it shows the active tab's hint.
+// obvious what you do there. The tablist renders one card per tab (icon +
+// label + the hint as a one-line description inside the card).
 const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode }[] = [
   {
     id: "producao",
     label: "Produção",
-    hint: "Prepare o evento: tarefas e checklist. Abra o plano, o cronograma e os convidados quando precisar.",
+    hint: "Prepare o evento: tarefas, checklist, plano e convidados.",
     icon: (
       <svg
         width="15"
@@ -226,7 +226,6 @@ const VIEW_KEYS: Record<string, View> = {
   t: "tarefas",
   f: "fornecedores",
   e: "estatisticas",
-  i: "inbox",
 };
 const VIEW_STORAGE_KEY = "liquen-admin-view";
 
@@ -1076,11 +1075,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Faturas",
     contratos: "Contratos",
     "modelos-email": "Modelos de email",
-    inbox: "Mensagens",
   };
 
   const VIEW_SUB: Record<View, string> = {
-    overview: "O resumo do seu dia",
+    // Vazio de propósito: a própria Visão Geral já abre com data + saudação —
+    // um eyebrow extra aqui era só mais texto.
+    overview: "",
     pedidos: "Pedidos de orçamento recebidos",
     kanban: "Arraste os pedidos entre fases",
     clientes: "Histórico por cliente",
@@ -1094,7 +1094,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Livro de faturação e pagamentos",
     contratos: "Aceitações de condições e estado de cada contrato",
     "modelos-email": "Emails reutilizáveis da equipa",
-    inbox: "Mensagens recebidas",
   };
 
   return (
@@ -1319,7 +1318,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 { id: "overview", label: "Visão Geral" },
                 { id: "pedidos", label: "Pedidos" },
                 { id: "propostas", label: "Propostas" },
-                { id: "inbox", label: "Mensagens" },
               ] as const
             ).map((item) => {
               const navItem = NAV.find((n) => n.id === item.id)!;
@@ -1350,7 +1348,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               onClick={() => setNavOpen(true)}
               aria-label="Mais destinos"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
-                !["overview", "pedidos", "propostas", "inbox"].includes(view)
+                !["overview", "pedidos", "propostas"].includes(view)
                   ? "text-[var(--bo-accent)]"
                   : "text-[var(--bo-text-faint)]"
               }`}
@@ -1378,9 +1376,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)]">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
               <div className="min-w-0">
-                <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
-                  {VIEW_SUB[view]}
-                </p>
+                {VIEW_SUB[view] && (
+                  <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
+                    {VIEW_SUB[view]}
+                  </p>
+                )}
                 <h1
                   className="text-foreground/88 font-bold leading-none"
                   style={{
@@ -1602,13 +1602,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "modelos-email" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <EmailTemplates />
-            </div>
-          )}
-
-          {/* ── Inbox ── */}
-          {view === "inbox" && (
-            <div className={`${VIEW_WRAP} view-in`}>
-              <Inbox />
             </div>
           )}
 
@@ -2759,17 +2752,42 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <div
                         id="detail-tools"
                         ref={toolsRef}
-                        className="flex scroll-mt-24 flex-col gap-6"
+                        className="flex scroll-mt-24 flex-col gap-7 border-t border-foreground/[0.08] pt-8"
                       >
-                        {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
-                              tablist pattern). */}
+                        {/* Section header — the command centre of the pedido. */}
+                        <div className="flex flex-col gap-1.5">
+                          <p className="bo-eyebrow">Ferramentas do pedido</p>
+                          <p className="text-xs leading-relaxed text-foreground/55">
+                            Tudo o que precisa para preparar, cobrar e propor — num só lugar.
+                          </p>
+                        </div>
+
+                        {/* Section tabs as cards — Arrow keys move between tabs
+                            (WAI-ARIA tablist pattern). Each card carries the tab's
+                            plain-language hint plus its live counter as a pill. */}
                         <div
                           role="tablist"
                           aria-label="Secções do pedido"
-                          className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
+                          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
                         >
                           {DETAIL_TABS.map((tab, i, arr) => {
                             const active = detailTab === tab.id;
+                            // Contador por cartão: "N por fazer" (checklist) na
+                            // Produção e "falta €X" no Financeiro — visão imediata
+                            // sem abrir cada separador.
+                            let badge: string | null = null;
+                            if (tab.id === "producao") {
+                              const todo = (selected.checklist ?? []).filter((c) => !c.done).length;
+                              badge = todo > 0 ? `${todo} por fazer` : null;
+                            } else if (tab.id === "financeiro") {
+                              const gross = contractedAmounts(selected).gross;
+                              const paid = (selected.payments ?? []).reduce(
+                                (s, p) => s + (p.paid ? p.amount : 0),
+                                0,
+                              );
+                              const out = Math.max(0, gross - paid);
+                              badge = out > 0 ? `falta ${eur(out)}` : null;
+                            }
                             return (
                               <button
                                 key={tab.id}
@@ -2791,329 +2809,348 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     );
                                   tabs?.[nextIdx]?.focus();
                                 }}
-                                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                   active
-                                    ? "border-[#4d6350] text-foreground/85"
-                                    : "border-transparent text-foreground/40 hover:text-foreground/65"
+                                    ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-[0_2px_12px_rgba(77,99,80,0.10)]"
+                                    : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] hover:shadow-sm"
                                 }`}
                               >
                                 <span
                                   aria-hidden
-                                  className={active ? "text-[#4d6350]" : "text-foreground/35"}
+                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
+                                    active
+                                      ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
+                                      : "bg-foreground/[0.05] text-foreground/55"
+                                  }`}
                                 >
                                   {tab.icon}
                                 </span>
-                                {tab.label}
+                                <span className="flex min-w-0 flex-col gap-1">
+                                  <span
+                                    className={`text-xs font-semibold uppercase tracking-[0.08em] ${
+                                      active ? "text-foreground/85" : "text-foreground/70"
+                                    }`}
+                                  >
+                                    {tab.label}
+                                  </span>
+                                  <span className="text-[11px] leading-relaxed text-foreground/50">
+                                    {tab.hint}
+                                  </span>
+                                </span>
+                                {badge && (
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
+                                      active
+                                        ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                        : "bg-foreground/[0.07] text-foreground/55"
+                                    }`}
+                                  >
+                                    {badge}
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
                         </div>
-                        {/* Plain-language explainer for the active tab. */}
-                        <p className="text-[11px] leading-relaxed text-foreground/55">
-                          {DETAIL_TABS.find((t) => t.id === detailTab)?.hint}
-                        </p>
 
                         {/* Coluna única — as ferramentas do separador ativo */}
                         <div className="flex min-w-0 flex-col gap-6">
-                          {detailTab === "producao" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-producao"
-                              aria-labelledby="detail-tab-producao"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Preparação — the daily driver (tarefas + checklist),
+                          {/* Keep-alive: os três painéis ficam sempre montados e só
+                              escondidos (`hidden`), para nunca se perder trabalho a
+                              meio (mensagem por enviar, proposta em edição) ao trocar
+                              de separador. */}
+                          <div
+                            role="tabpanel"
+                            id="detail-panel-producao"
+                            aria-labelledby="detail-tab-producao"
+                            tabIndex={0}
+                            hidden={detailTab !== "producao"}
+                            className="flex flex-col gap-6 focus:outline-none"
+                          >
+                            {/* Preparação — the daily driver (tarefas + checklist),
                                   always open and first. */}
-                              <p className="bo-eyebrow text-foreground/45">Preparação</p>
+                            <p className="bo-eyebrow text-foreground/45">Preparação</p>
 
-                              {/* Tasks linked to this event */}
-                              <EventTasks
-                                key={`tasks-${selected.id}`}
-                                quote={selected}
-                                userName={userName}
-                              />
+                            {/* Tasks linked to this event */}
+                            <EventTasks
+                              key={`tasks-${selected.id}`}
+                              quote={selected}
+                              userName={userName}
+                            />
 
-                              {/* Production checklist */}
-                              <EventChecklist
-                                key={`cl-${selected.id}`}
-                                quote={selected}
-                                onChange={(checklist) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, checklist } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                                }}
-                              />
+                            {/* Production checklist */}
+                            <EventChecklist
+                              key={`cl-${selected.id}`}
+                              quote={selected}
+                              onChange={(checklist) => {
+                                setQuotes((prev) =>
+                                  prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                              }}
+                            />
 
-                              {/* Plano &amp; dia do evento — occasional tools, collapsed so
+                            {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child
                                   mounted (hidden via CSS), so fetch/PATCH lifecycles are
                                   untouched. */}
-                              <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                  <svg
-                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                  >
-                                    <path
-                                      d="m9 6 6 6-6 6"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                  Plano de decoração, cronograma e convidados
-                                </summary>
-                                <div className="flex flex-col gap-6 pt-6">
-                                  {/* Decor production plan (sourcing → strike) */}
-                                  <ProductionPlan
-                                    key={`prod-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(productionPlan) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, productionPlan } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev ? { ...prev, productionPlan } : prev,
-                                      );
-                                    }}
+                            <details className="group border-t border-foreground/10 pt-4">
+                              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <svg
+                                  className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                >
+                                  <path
+                                    d="m9 6 6 6-6 6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                   />
+                                </svg>
+                                Plano de decoração, cronograma e convidados
+                              </summary>
+                              <div className="flex flex-col gap-6 pt-6">
+                                {/* Decor production plan (sourcing → strike) */}
+                                <ProductionPlan
+                                  key={`prod-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(productionPlan) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, productionPlan } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, productionPlan } : prev,
+                                    );
+                                  }}
+                                />
 
-                                  {/* Day-of run sheet */}
-                                  <EventTimeline
-                                    key={`tl-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(timeline) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, timeline } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                                    }}
-                                  />
+                                {/* Day-of run sheet */}
+                                <EventTimeline
+                                  key={`tl-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(timeline) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, timeline } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                                  }}
+                                />
 
-                                  {/* Guest list / RSVP */}
-                                  <GuestList
-                                    key={`guests-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(guestList) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, guestList } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                                    }}
-                                  />
-                                </div>
-                              </details>
-                            </div>
-                          )}
+                                {/* Guest list / RSVP */}
+                                <GuestList
+                                  key={`guests-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(guestList) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, guestList } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                                  }}
+                                />
+                              </div>
+                            </details>
+                          </div>
 
-                          {detailTab === "financeiro" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-financeiro"
-                              aria-labelledby="detail-tab-financeiro"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Payments & invoicing */}
-                              <PaymentsPanel
-                                key={`pay-${selected.id}`}
-                                quote={selected}
-                                showLedger
-                                onChange={(payments) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, payments } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                                }}
-                                onContractRef={(ref) => {
-                                  const contractRef = ref || undefined;
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, contractRef } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
-                                }}
-                              />
+                          <div
+                            role="tabpanel"
+                            id="detail-panel-financeiro"
+                            aria-labelledby="detail-tab-financeiro"
+                            tabIndex={0}
+                            hidden={detailTab !== "financeiro"}
+                            className="flex flex-col gap-6 focus:outline-none"
+                          >
+                            {/* Cobrança — payments first (the key action), costs
+                                  below. Eyebrow mirrors the other two panels. */}
+                            <p className="bo-eyebrow text-foreground/45">Pagamentos e faturação</p>
 
-                              {/* Suppliers booked for this event + budget vs actual cost */}
-                              <EventCosts
-                                key={`costs-${selected.id}`}
-                                quote={selected}
-                                onChange={(eventSuppliers) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) =>
-                                    prev ? { ...prev, eventSuppliers } : prev,
-                                  );
-                                }}
-                              />
-                            </div>
-                          )}
+                            {/* Payments & invoicing */}
+                            <PaymentsPanel
+                              key={`pay-${selected.id}`}
+                              quote={selected}
+                              showLedger
+                              onChange={(payments) => {
+                                setQuotes((prev) =>
+                                  prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                              }}
+                              onContractRef={(ref) => {
+                                const contractRef = ref || undefined;
+                                setQuotes((prev) =>
+                                  prev.map((q) =>
+                                    q.id === selected.id ? { ...q, contractRef } : q,
+                                  ),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
+                              }}
+                            />
 
-                          {detailTab === "comunicacao" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-comunicacao"
-                              aria-labelledby="detail-tab-comunicacao"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Step 1 — the proposal. One tool at a time: the detailed
+                            {/* Suppliers booked for this event + budget vs actual cost */}
+                            <EventCosts
+                              key={`costs-${selected.id}`}
+                              quote={selected}
+                              onChange={(eventSuppliers) => {
+                                setQuotes((prev) =>
+                                  prev.map((q) =>
+                                    q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                  ),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, eventSuppliers } : prev));
+                              }}
+                            />
+                          </div>
+
+                          <div
+                            role="tabpanel"
+                            id="detail-panel-comunicacao"
+                            aria-labelledby="detail-tab-comunicacao"
+                            tabIndex={0}
+                            hidden={detailTab !== "comunicacao"}
+                            className="flex flex-col gap-6 focus:outline-none"
+                          >
+                            {/* Step 1 — the proposal. One tool at a time: the detailed
                                   Studio by default, or the quick price-table Builder —
                                   never both stacked on screen. */}
-                              <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
-                              {!showBuilder ? (
-                                <>
-                                  <ProposalStudio
-                                    key={`studio-${selected.id}`}
-                                    quote={selected}
-                                    onSent={() => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev ? { ...prev, status: "cotado" } : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: "Proposta enviada ao cliente (Studio)",
-                                        },
-                                      ]);
-                                    }}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowBuilder(true)}
-                                    className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
-                                  >
-                                    Prefiro uma proposta rápida (tabela de preços) →
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <ProposalBuilder
-                                    quote={selected}
-                                    onSent={(total) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id
-                                            ? { ...q, status: "cotado", quotedPrice: total }
-                                            : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev
-                                          ? { ...prev, status: "cotado", quotedPrice: total }
-                                          : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: `Proposta enviada — ${eur(total)}`,
-                                        },
-                                      ]);
-                                    }}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowBuilder(false)}
-                                    className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
-                                  >
-                                    ← Voltar à proposta detalhada (com imagens)
-                                  </button>
-                                </>
-                              )}
-
-                              {/* Step 2 — talk to the client. */}
-                              <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
-                                2 · Falar com o cliente
-                              </p>
-                              <ClientMessenger
-                                key={selected.id}
-                                quote={selected}
-                                onSent={(messages) => {
-                                  const prev_count = selected.messages?.length ?? 0;
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, messages } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                                  if (messages.length > prev_count) {
+                            <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
+                            {!showBuilder ? (
+                              <>
+                                <ProposalStudio
+                                  key={`studio-${selected.id}`}
+                                  quote={selected}
+                                  onSent={() => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, status: "cotado" } : prev,
+                                    );
+                                    setEditStatus("cotado");
                                     appendActivity(selected.id, [
                                       {
                                         id: randomId(),
                                         at: new Date().toISOString(),
-                                        kind: "message_sent",
+                                        kind: "proposal_sent",
                                         actor: userName,
-                                        summary: "Mensagem enviada ao cliente",
+                                        summary: "Proposta enviada ao cliente (Studio)",
                                       },
                                     ]);
-                                  }
-                                }}
-                              />
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowBuilder(true)}
+                                  className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
+                                >
+                                  Prefiro uma proposta rápida (tabela de preços) →
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <ProposalBuilder
+                                  quote={selected}
+                                  onSent={(total) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id
+                                          ? { ...q, status: "cotado", quotedPrice: total }
+                                          : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev
+                                        ? { ...prev, status: "cotado", quotedPrice: total }
+                                        : prev,
+                                    );
+                                    setEditStatus("cotado");
+                                    appendActivity(selected.id, [
+                                      {
+                                        id: randomId(),
+                                        at: new Date().toISOString(),
+                                        kind: "proposal_sent",
+                                        actor: userName,
+                                        summary: `Proposta enviada — ${eur(total)}`,
+                                      },
+                                    ]);
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowBuilder(false)}
+                                  className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
+                                >
+                                  ← Voltar à proposta detalhada (com imagens)
+                                </button>
+                              </>
+                            )}
 
-                              {/* Activity history — de-emphasised, collapsed by default. */}
-                              <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                  <svg
-                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                  >
-                                    <path
-                                      d="m9 6 6 6-6 6"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                  Histórico de atividade
-                                </summary>
-                                <div className="pt-6">
-                                  <ActivityLog
-                                    quote={selected}
-                                    actor={userName}
-                                    onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                            {/* Step 2 — talk to the client. */}
+                            <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
+                              2 · Falar com o cliente
+                            </p>
+                            <ClientMessenger
+                              key={selected.id}
+                              quote={selected}
+                              onSent={(messages) => {
+                                const prev_count = selected.messages?.length ?? 0;
+                                setQuotes((prev) =>
+                                  prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                if (messages.length > prev_count) {
+                                  appendActivity(selected.id, [
+                                    {
+                                      id: randomId(),
+                                      at: new Date().toISOString(),
+                                      kind: "message_sent",
+                                      actor: userName,
+                                      summary: "Mensagem enviada ao cliente",
+                                    },
+                                  ]);
+                                }
+                              }}
+                            />
+
+                            {/* Activity history — de-emphasised, collapsed by default. */}
+                            <details className="group border-t border-foreground/10 pt-4">
+                              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <svg
+                                  className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                >
+                                  <path
+                                    d="m9 6 6 6-6 6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                   />
-                                </div>
-                              </details>
-                            </div>
-                          )}
+                                </svg>
+                                Histórico de atividade
+                              </summary>
+                              <div className="pt-6">
+                                <ActivityLog
+                                  quote={selected}
+                                  actor={userName}
+                                  onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                />
+                              </div>
+                            </details>
+                          </div>
                         </div>
                       </div>
 

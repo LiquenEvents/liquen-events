@@ -58,7 +58,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             fill
             preload
             sizes="100vw"
-            quality={75}
+            quality={82}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/hd-edited.jpg")}
           />

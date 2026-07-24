@@ -229,10 +229,14 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
     for (const p of proposals) counts[p.status] = (counts[p.status] ?? 0) + 1;
     return [
       { value: "all", label: `Todas · ${proposals.length}` },
-      ...(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => ({
-        value: s,
-        label: `${STATUS_META[s].label} · ${counts[s] ?? 0}`,
-      })),
+      // "rascunho" não é persistido no servidor (os rascunhos vivem só no
+      // browser), por isso o chip aparecia sempre a 0 e confundia — fica de fora.
+      ...(Object.keys(STATUS_META) as ProposalStatus[])
+        .filter((s) => s !== "rascunho")
+        .map((s) => ({
+          value: s,
+          label: `${STATUS_META[s].label} · ${counts[s] ?? 0}`,
+        })),
     ];
   }, [proposals]);
 

@@ -20,8 +20,16 @@ const nextConfig: NextConfig = {
     // the whole point of the desktop-fluidity pass. Once encoded, both are cached
     // immutably for a year, so the size delta only ever costs the first visitor.
     formats: ["image/webp"],
-    qualities: [50, 72, 75],
-    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
+    // 82 is used ONLY by the full-bleed page covers (heroes) — the crispest LCP
+    // image on each page — while everything else stays ≤75. 50/72/75 keep the
+    // gallery + body imagery lean.
+    qualities: [50, 72, 75, 82],
+    // Added 2048/2560 so 4K / retina screens get a sharp cover instead of a
+    // 1920 upscale. WebP (not AVIF — see the note above) so the cold encode of
+    // these larger sizes stays fast; smaller screens are unaffected (they pick a
+    // smaller width from the srcset). The cover sources are ~2.1–2.6k, so 2560 is
+    // at/near native — no synthetic upscaling.
+    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920, 2048, 2560],
     imageSizes: [16, 32, 64, 96, 128, 256, 384],
     minimumCacheTTL: 31_536_000,
     // Serve images inline instead of as attachment downloads
