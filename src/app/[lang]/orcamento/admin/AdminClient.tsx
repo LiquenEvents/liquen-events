@@ -47,7 +47,6 @@ import {
   Tarefas,
   Fornecedores,
   StatsDashboard,
-  Inbox,
   ProposalBuilder,
   ProposalStudio,
   ProductionPlan,
@@ -109,13 +108,13 @@ type DetailTab = "producao" | "financeiro" | "comunicacao";
 type DetailTarget = DetailTab | "gestao";
 
 // The pedido's tool tabs, each with an icon and a plain-language hint so it's
-// obvious what you do there. The tablist renders icon + label, and a single
-// explainer line under it shows the active tab's hint.
+// obvious what you do there. The tablist renders one card per tab (icon +
+// label + the hint as a one-line description inside the card).
 const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode }[] = [
   {
     id: "producao",
     label: "Produção",
-    hint: "Prepare o evento: tarefas e checklist. Abra o plano, o cronograma e os convidados quando precisar.",
+    hint: "Prepare o evento: tarefas, checklist, plano e convidados.",
     icon: (
       <svg
         width="15"
@@ -227,7 +226,6 @@ const VIEW_KEYS: Record<string, View> = {
   t: "tarefas",
   f: "fornecedores",
   e: "estatisticas",
-  i: "inbox",
 };
 const VIEW_STORAGE_KEY = "liquen-admin-view";
 
@@ -1077,7 +1075,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Faturas",
     contratos: "Contratos",
     "modelos-email": "Modelos de email",
-    inbox: "Mensagens",
   };
 
   const VIEW_SUB: Record<View, string> = {
@@ -1095,7 +1092,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Livro de faturação e pagamentos",
     contratos: "Aceitações de condições e estado de cada contrato",
     "modelos-email": "Emails reutilizáveis da equipa",
-    inbox: "Mensagens recebidas",
   };
 
   return (
@@ -1320,7 +1316,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 { id: "overview", label: "Visão Geral" },
                 { id: "pedidos", label: "Pedidos" },
                 { id: "propostas", label: "Propostas" },
-                { id: "inbox", label: "Mensagens" },
               ] as const
             ).map((item) => {
               const navItem = NAV.find((n) => n.id === item.id)!;
@@ -1351,7 +1346,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               onClick={() => setNavOpen(true)}
               aria-label="Mais destinos"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
-                !["overview", "pedidos", "propostas", "inbox"].includes(view)
+                !["overview", "pedidos", "propostas"].includes(view)
                   ? "text-[var(--bo-accent)]"
                   : "text-[var(--bo-text-faint)]"
               }`}
@@ -1603,13 +1598,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "modelos-email" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <EmailTemplates />
-            </div>
-          )}
-
-          {/* ── Inbox ── */}
-          {view === "inbox" && (
-            <div className={`${VIEW_WRAP} view-in`}>
-              <Inbox />
             </div>
           )}
 
@@ -2760,24 +2748,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <div
                         id="detail-tools"
                         ref={toolsRef}
-                        className="flex scroll-mt-24 flex-col gap-6"
+                        className="flex scroll-mt-24 flex-col gap-7 border-t border-foreground/[0.08] pt-8"
                       >
-                        {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
-                              tablist pattern). */}
+                        {/* Section header — the command centre of the pedido. */}
+                        <div className="flex flex-col gap-1.5">
+                          <p className="bo-eyebrow">Ferramentas do pedido</p>
+                          <p className="text-xs leading-relaxed text-foreground/55">
+                            Tudo o que precisa para preparar, cobrar e propor — num só lugar.
+                          </p>
+                        </div>
+
+                        {/* Section tabs as cards — Arrow keys move between tabs
+                            (WAI-ARIA tablist pattern). Each card carries the tab's
+                            plain-language hint plus its live counter as a pill. */}
                         <div
                           role="tablist"
                           aria-label="Secções do pedido"
-                          className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
+                          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
                         >
                           {DETAIL_TABS.map((tab, i, arr) => {
                             const active = detailTab === tab.id;
-                            // Contador por aba: "N por fazer" (checklist) na Produção
-                            // e "falta receber €X" no Financeiro — visão imediata sem
-                            // abrir cada separador.
+                            // Contador por cartão: "N por fazer" (checklist) na
+                            // Produção e "falta €X" no Financeiro — visão imediata
+                            // sem abrir cada separador.
                             let badge: string | null = null;
                             if (tab.id === "producao") {
                               const todo = (selected.checklist ?? []).filter((c) => !c.done).length;
-                              badge = todo > 0 ? String(todo) : null;
+                              badge = todo > 0 ? `${todo} por fazer` : null;
                             } else if (tab.id === "financeiro") {
                               const gross = contractedAmounts(selected).gross;
                               const paid = (selected.payments ?? []).reduce(
@@ -2785,7 +2782,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 0,
                               );
                               const out = Math.max(0, gross - paid);
-                              badge = out > 0 ? eur(out) : null;
+                              badge = out > 0 ? `falta ${eur(out)}` : null;
                             }
                             return (
                               <button
@@ -2808,22 +2805,41 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     );
                                   tabs?.[nextIdx]?.focus();
                                 }}
-                                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                   active
-                                    ? "border-[#4d6350] text-foreground/85"
-                                    : "border-transparent text-foreground/60 hover:text-foreground/80"
+                                    ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-[0_2px_12px_rgba(77,99,80,0.10)]"
+                                    : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] hover:shadow-sm"
                                 }`}
                               >
                                 <span
                                   aria-hidden
-                                  className={active ? "text-[#4d6350]" : "text-foreground/55"}
+                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
+                                    active
+                                      ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
+                                      : "bg-foreground/[0.05] text-foreground/55"
+                                  }`}
                                 >
                                   {tab.icon}
                                 </span>
-                                {tab.label}
+                                <span className="flex min-w-0 flex-col gap-1">
+                                  <span
+                                    className={`text-xs font-semibold uppercase tracking-[0.08em] ${
+                                      active ? "text-foreground/85" : "text-foreground/70"
+                                    }`}
+                                  >
+                                    {tab.label}
+                                  </span>
+                                  <span className="text-[11px] leading-relaxed text-foreground/50">
+                                    {tab.hint}
+                                  </span>
+                                </span>
                                 {badge && (
                                   <span
-                                    className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none tabular-nums ${active ? "bg-[#4d6350]/15 text-[#4d6350]" : "bg-foreground/10 text-foreground/55"}`}
+                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
+                                      active
+                                        ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                        : "bg-foreground/[0.07] text-foreground/55"
+                                    }`}
                                   >
                                     {badge}
                                   </span>
@@ -2832,10 +2848,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             );
                           })}
                         </div>
-                        {/* Plain-language explainer for the active tab. */}
-                        <p className="text-[11px] leading-relaxed text-foreground/55">
-                          {DETAIL_TABS.find((t) => t.id === detailTab)?.hint}
-                        </p>
 
                         {/* Coluna única — as ferramentas do separador ativo */}
                         <div className="flex min-w-0 flex-col gap-6">
@@ -2953,6 +2965,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             hidden={detailTab !== "financeiro"}
                             className="flex flex-col gap-6 focus:outline-none"
                           >
+                            {/* Cobrança — payments first (the key action), costs
+                                  below. Eyebrow mirrors the other two panels. */}
+                            <p className="bo-eyebrow text-foreground/45">Pagamentos e faturação</p>
+
                             {/* Payments & invoicing */}
                             <PaymentsPanel
                               key={`pay-${selected.id}`}

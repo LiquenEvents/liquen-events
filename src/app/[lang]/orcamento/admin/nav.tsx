@@ -20,8 +20,7 @@ export type View =
   | "estatisticas"
   | "faturas"
   | "contratos"
-  | "modelos-email"
-  | "inbox";
+  | "modelos-email";
 
 /**
  * Sidebar split for the calm, ChatGPT-like rail. Only the owner's DAILY CORE
@@ -44,7 +43,6 @@ export const CORE_NAV: View[] = [
   "propostas",
   "faturas",
   "contratos",
-  "inbox",
   "calendario",
 ];
 
@@ -268,23 +266,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
         <path d="m9 14 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "inbox",
-    label: "Mensagens",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M3 7l9 6 9-6" />
-        <rect x="3" y="5" width="18" height="14" rx="2" />
       </svg>
     ),
   },
