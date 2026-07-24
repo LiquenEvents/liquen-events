@@ -106,21 +106,45 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     <div className="border-t border-foreground/10 pt-5">
       <div className="flex items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Produção Decor</p>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={applyPlan}
-          iconLeft={<span aria-hidden="true">+</span>}
-        >
-          Aplicar plano de produção
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {items.length > 0 && (
+            <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+              {items.filter((i) => i.done).length}/{items.length} do plano
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={applyPlan}
+            iconLeft={<span aria-hidden="true">+</span>}
+          >
+            Aplicar plano de produção
+          </Button>
+        </div>
       </div>
 
       {!seeded ? (
         <EmptyState
           className="px-4 py-10"
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3 3 8l9 5 9-5-9-5Z" />
+              <path d="m3 13 9 5 9-5" />
+            </svg>
+          }
           title="Plano de produção por gerar"
-          description="Use “Aplicar plano de produção” para gerar as tarefas de atelier — do sourcing das flores à desmontagem no local."
+          description="Gere as tarefas de atelier — do sourcing das flores à desmontagem no local — e ajuste-as a este evento."
+          action={{ label: "Aplicar plano de produção", onClick: applyPlan }}
         />
       ) : (
         <div className="flex flex-col gap-4 mb-4">
@@ -137,7 +161,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                     {done}/{phaseItems.length}
                   </span>
                 </div>
-                <div className="h-1 bg-foreground/6 rounded-full overflow-hidden mb-2">
+                <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mb-2">
                   <div
                     className="h-full bg-[#4d6350] rounded-full transition-all duration-500"
                     style={{ width: `${pct}%` }}
@@ -166,7 +190,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         )}
                       </button>
                       <span
-                        className={`flex-1 text-xs ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
+                        className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
                       >
                         {i.label.slice((phase.label + SEP).length)}
                       </span>
@@ -222,7 +246,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       </div>
 
       {/* Suppliers assigned to this event — managed in Custos, shown read-only. */}
-      <div className="mt-5 pt-4 border-t border-foreground/8">
+      <div className="mt-5 pt-4 border-t border-foreground/[0.08]">
         <div className="flex items-center justify-between mb-2.5">
           <p className="text-foreground/45 text-[11px] tracking-[0.1em] uppercase">
             Fornecedores atribuídos
