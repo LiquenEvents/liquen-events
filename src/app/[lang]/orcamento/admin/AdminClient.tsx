@@ -36,7 +36,7 @@ import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
-import { Button, SectionCard } from "./ui";
+import { Button, SectionCard, Segmented } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -3020,8 +3020,26 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           >
                             {/* Step 1 — the proposal. One tool at a time: the detailed
                                   Studio by default, or the quick price-table Builder —
-                                  never both stacked on screen. */}
-                            <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
+                                  never both stacked on screen. The mode is an explicit,
+                                  calm segmented choice so a newcomer sees both exist. */}
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
+                              <Segmented
+                                ariaLabel="Tipo de proposta"
+                                size="sm"
+                                value={showBuilder ? "rapida" : "detalhada"}
+                                onChange={(v) => setShowBuilder(v === "rapida")}
+                                options={[
+                                  { value: "detalhada", label: "Detalhada" },
+                                  { value: "rapida", label: "Rápida" },
+                                ]}
+                              />
+                            </div>
+                            <p className="-mt-3 text-xs leading-relaxed text-foreground/45">
+                              {showBuilder
+                                ? "Rápida — uma tabela de preços simples, sem imagens nem PDF."
+                                : "Detalhada — proposta completa em PDF, com capa, serviços e imagens."}
+                            </p>
                             {!showBuilder ? (
                               <>
                                 <ProposalStudio
@@ -3048,13 +3066,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     ]);
                                   }}
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowBuilder(true)}
-                                  className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
-                                >
-                                  Prefiro uma proposta rápida (tabela de preços) →
-                                </button>
                               </>
                             ) : (
                               <>
@@ -3085,13 +3096,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     ]);
                                   }}
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowBuilder(false)}
-                                  className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
-                                >
-                                  ← Voltar à proposta detalhada (com imagens)
-                                </button>
                               </>
                             )}
 
