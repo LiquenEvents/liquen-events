@@ -58,9 +58,9 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
       {/* ── Main content ── */}
       <div className="border-t border-foreground/6">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-          <div className="py-8 md:py-10 grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10">
-            {/* Brand column */}
-            <div className="md:col-span-5 flex flex-col">
+          <div className="py-8 md:py-10 grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10 text-center md:text-left">
+            {/* Brand column — centred on mobile, left-aligned from md up */}
+            <div className="md:col-span-5 flex flex-col items-center md:items-start">
               <Image
                 src="/logo-liquen.png"
                 alt="Líquen Events"
@@ -193,7 +193,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
 
       {/* ── Copyright bar ── */}
       <div className="border-t border-foreground/6 py-4">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-center gap-3 text-center sm:text-left">
           <p className="text-[11px] text-foreground/78 tracking-wide">
             © {new Date().getFullYear()} Líquen Events — {t.footer.rights}
           </p>
@@ -211,9 +211,6 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
               {t.footer.termos}
             </Link>
           </div>
-          <p className="text-[11px] text-foreground/68 tracking-[0.28em] uppercase">
-            {t.footer.country}
-          </p>
         </div>
       </div>
     </footer>
