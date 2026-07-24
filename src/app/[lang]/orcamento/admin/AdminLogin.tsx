@@ -51,17 +51,17 @@ export default function AdminLogin() {
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: "linear-gradient(135deg, #1b2119 0%, #232c21 60%, #1e2a1c 100%)" }}
+      style={{ background: "linear-gradient(180deg, #ffffff 0%, #f4f5f3 100%)" }}
     >
       <div className="w-full max-w-sm flex flex-col items-center gap-8">
-        {/* Brand mark */}
+        {/* Brand mark — colour logo on the light, calm entry screen */}
         <Image
-          src="/logo-liquen-branco.png"
+          src="/logo-liquen.png"
           alt="Líquen Events"
           width={210}
           height={125}
           priority
-          className="h-16 w-auto object-contain opacity-95"
+          className="h-16 w-auto object-contain"
         />
 
         {/* Login card */}
