@@ -1018,7 +1018,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] motion-safe:transition-colors duration-150 ${
+        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
           active
             ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
             : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
@@ -1126,7 +1126,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         >
           {/* Mobile close */}
           <button
-            className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
+            className="lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
             onClick={() => setNavOpen(false)}
             aria-label="Fechar menu"
           >
@@ -1371,10 +1371,30 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         </nav>
 
         {/* ── Main ── */}
-        <div className="flex-1 min-w-0 flex flex-col pb-16 lg:pb-0">
+        {/* Bottom padding clears the real mobile nav height (56px + the notch
+            safe-area inset) so the last row never hides under the tab bar. */}
+        <div className="flex-1 min-w-0 flex flex-col pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)]">
-            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
+          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)] pt-safe">
+            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
+              {/* Mobile menu — opens the full nav drawer without depending on the
+                  bottom-nav "Mais" (which is hidden while a quote drawer is open). */}
+              <button
+                onClick={() => setNavOpen(true)}
+                aria-label="Abrir menu"
+                className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] transition-colors"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+                </svg>
+              </button>
               <div className="min-w-0">
                 {VIEW_SUB[view] && (
                   <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
@@ -1396,7 +1416,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   onClick={() => setAjudaOpen(true)}
                   aria-label="Ajuda e glossário"
                   title="Ajuda e glossário"
-                  className="w-9 h-9 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
+                  className="w-10 h-10 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
                   <svg
                     width="16"

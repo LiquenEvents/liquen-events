@@ -665,19 +665,31 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       }
     };
 
+    // Reserve room on the right of each row for the price/value column so a long
+    // item name wraps onto extra lines instead of running through the amount (and
+    // on into the "Notas importantes" column). ~120pt covers "12.500,00 € + IVA".
+    const PRICE_COL = 120;
     if (orgT) {
       for (const r of doc.budgetRows ?? []) {
-        budgetBreak(20);
-        text(p, r.item, M, y, { size: 10.5, color: INK });
-        textRight(p, r.price, M + boxW, y, { size: 10.5, color: MUTED });
-        y -= 20;
+        const lines = wrap(f.reg, r.item, 10.5, boxW - PRICE_COL);
+        budgetBreak(Math.max(20, lines.length * 15));
+        lines.forEach((ln, i) => {
+          text(p, ln, M, y, { size: 10.5, color: INK });
+          if (i === 0) textRight(p, r.price, M + boxW, y, { size: 10.5, color: MUTED });
+          y -= 15;
+        });
+        y -= 5;
       }
     } else {
       for (const it of doc.budgetItems) {
-        budgetBreak(20);
+        const lines = wrap(f.reg, it, 10.5, boxW - 14);
+        budgetBreak(Math.max(20, lines.length * 15));
         p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
-        text(p, it, M + 14, y, { size: 10.5, color: INK });
-        y -= 20;
+        lines.forEach((ln) => {
+          text(p, ln, M + 14, y, { size: 10.5, color: INK });
+          y -= 15;
+        });
+        y -= 5;
       }
     }
 
@@ -698,10 +710,14 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       eyebrow(p, "Valores adicionais", M, y);
       y -= 18;
       for (const ex of extras) {
-        budgetBreak(18);
-        text(p, ex.label, M, y, { size: 10.5, color: INK });
-        textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: MUTED });
-        y -= 18;
+        const lines = wrap(f.reg, ex.label, 10.5, boxW - PRICE_COL);
+        budgetBreak(Math.max(18, lines.length * 14));
+        lines.forEach((ln, i) => {
+          text(p, ln, M, y, { size: 10.5, color: INK });
+          if (i === 0) textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: MUTED });
+          y -= 14;
+        });
+        y -= 4;
       }
       y -= 8;
     }

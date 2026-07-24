@@ -297,7 +297,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                                   moveByKeyboard(q, -1);
                                 }}
                                 aria-label="Mover para a coluna anterior"
-                                className="w-6 h-6 rounded-md flex items-center justify-center bg-foreground/[0.05] text-foreground/40 active:bg-foreground/10"
+                                className="w-9 h-9 rounded-lg flex items-center justify-center bg-foreground/[0.05] text-foreground/40 active:bg-foreground/10"
                               >
                                 <svg
                                   width="11"
@@ -320,7 +320,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                                   moveByKeyboard(q, 1);
                                 }}
                                 aria-label="Mover para a coluna seguinte"
-                                className="w-6 h-6 rounded-md flex items-center justify-center bg-[#4d6350]/10 text-[#4d6350] active:bg-[#4d6350]/20"
+                                className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#4d6350]/10 text-[#4d6350] active:bg-[#4d6350]/20"
                               >
                                 <svg
                                   width="11"

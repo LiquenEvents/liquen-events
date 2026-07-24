@@ -207,11 +207,23 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
   );
 
   const stats = useMemo(() => {
+    // Re-sending a proposal for the same couple creates a NEW row (a revision),
+    // so a single deal can appear several times. Counting every row would
+    // triple-count "valor enviado" and skew the accept-rate. Dedupe to the
+    // latest proposal per quote before computing KPIs. (Rows without a quoteId
+    // — e.g. legacy — fall back to their own id so they still count once.)
+    const latestByQuote = new Map<string, (typeof proposals)[number]>();
+    for (const p of proposals) {
+      const key = p.quoteId || `id:${p.id}`;
+      const cur = latestByQuote.get(key);
+      if (!cur || +new Date(p.createdAt) > +new Date(cur.createdAt)) latestByQuote.set(key, p);
+    }
+    const unique = [...latestByQuote.values()];
     let totalSent = 0;
     let totalWon = 0;
     let won = 0;
     let pending = 0;
-    for (const p of proposals) {
+    for (const p of unique) {
       if (p.status === "enviada" || p.status === "aceite") totalSent += p.total;
       if (p.status === "aceite") {
         totalWon += p.total;
@@ -219,7 +231,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
       }
       if (p.status === "enviada") pending += 1;
     }
-    const acceptRate = proposals.length ? Math.round((won / proposals.length) * 100) : 0;
+    const acceptRate = unique.length ? Math.round((won / unique.length) * 100) : 0;
     return { totalSent, totalWon, acceptRate, pending };
   }, [proposals]);
   const { totalSent, totalWon, acceptRate, pending } = stats;
