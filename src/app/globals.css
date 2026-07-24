@@ -126,19 +126,20 @@ body.admin-mode {
   --bo-lh-body: 1.6;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
-  /* SpaceX-style engineered look: the back office uses the technical Archivo
-     grotesque everywhere (loaded via next/font as --font-spacex). Redefining
-     --font-playfair INSIDE .admin-mode means both the `font-display` class and
-     any inline `var(--font-playfair)` resolve to it too — the public marketing
-     site (outside .admin-mode) keeps Playfair/Inter untouched. */
+  /* Calm "ChatGPT-app" look: the back office uses one clean humanist sans
+     (Inter, already loaded via next/font) for BOTH working text and headings.
+     Redefining --font-playfair INSIDE .admin-mode means the `font-display`
+     class and any inline `var(--font-playfair)` resolve to Inter too, so the
+     display titles read as a quiet modern sans instead of a serif or the old
+     technical grotesque — the public marketing site (outside .admin-mode)
+     keeps Playfair/Inter untouched. */
   --font-playfair:
-    var(--font-spacex), var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 
-  /* Technical grotesque for all working admin text; system-ui stack behind it so
+  /* Clean humanist sans for all working admin text; system-ui stack behind it so
      there is never a network dependency. */
   font-family:
-    var(--font-spacex),
     var(--font-inter),
     ui-sans-serif,
     system-ui,
@@ -149,24 +150,37 @@ body.admin-mode {
     Arial,
     sans-serif;
   line-height: var(--bo-lh-body);
-  /* Uppercase, mission-control aesthetic across the whole interface. Positive
-     tracking so caps breathe (never the cramped negative tracking used for
-     lowercase UI text). Data the team TYPES or reads literally (inputs, emails,
-     phone numbers, the ref id) is exempted below so nothing is mangled. */
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  /* Sentence case, quiet. A hair of negative tracking gives UI text the crisp,
+     modern feel of a product app (ChatGPT/Linear) — NOT the shouty uppercase
+     mission-control look this interface used to force on every element. */
+  letter-spacing: var(--bo-tracking-tight);
 }
 
-/* Display / working headings: slightly wider tracking now that they're caps. */
+/* Display / working headings: tighter tracking for the calm modern-sans look. */
 body.admin-mode :is(h1, h2, h3, h4),
 body.admin-mode .font-display {
-  letter-spacing: 0.015em;
+  letter-spacing: -0.02em;
 }
 
-/* Keep real DATA in its true case — uppercasing an email, a client's name mid-
-   typing, a phone number or a reference id reads as broken, not premium. These
-   opt out of the global uppercase (the SpaceX look stays on all the chrome:
-   labels, headings, buttons, menus, values). */
+/* ── ChatGPT-calm typography ──────────────────────────────────────────────
+   The back office used to SHOUT: besides the old global uppercase (removed
+   above), individual buttons, labels and eyebrows STILL request `uppercase`
+   and wide `tracking-*` inline, across ~15 screens. Rather than edit every
+   call site, neutralise it here — scoped to .admin-mode, so the public
+   marketing site keeps its editorial caps. Every admin screen now reads in
+   calm sentence case with quiet spacing, like a modern product app (ChatGPT/
+   Linear). Data fields keep their true case via the block below. */
+body.admin-mode .uppercase,
+body.admin-mode .bo-eyebrow,
+body.admin-mode .eyebrow {
+  text-transform: none;
+  letter-spacing: 0.005em;
+}
+
+/* Keep real DATA in its true case — an email, a client's name mid-typing, a
+   phone number or a reference id must never be transformed. (Now that the
+   interface is sentence case this is mostly redundant, but it also resets the
+   letter-spacing on typed fields, so it stays.) */
 body.admin-mode input,
 body.admin-mode textarea,
 body.admin-mode select,
