@@ -52,10 +52,16 @@ function prettyDate(iso: string): string {
 // ── Landscape A4 ──
 const W = 841.89;
 const H = 595.28;
-const M = 56; // page margin — generous editorial whitespace
+const M = 68; // page margin — generous editorial whitespace, let the page breathe
 // Max text measure: long lines (~120+ chars edge-to-edge) are the biggest "DIY"
 // tell. Cap body copy near the 45–75 char ideal.
 const MEASURE = 430;
+
+// ── Type scale (one display, one subtitle, one body, one caption) ──
+const T_DISPLAY = 20; // section titles (serif)
+const T_SUB = 13; // sub-section / group titles (serif)
+const T_BODY = 10; // body copy
+const T_CAPTION = 7.5; // eyebrows / captions (uppercase)
 
 // ── Image rendering quality knobs ──
 // Point boxes are drawn at 72pt/inch; we rasterise at DENSITY× that (= DENSITY·72
@@ -68,7 +74,8 @@ const COLLAGE_DENSITY = 2.5;
 const MAX_IMG_PX = 3000;
 
 // ── Brand palette ──
-const MOSS = rgb(0.388, 0.478, 0.373); // #637a5f
+// Moss/gold are deliberately rare now — quiet ink & grey type on white carry the
+// interior; a single gold hairline marks the one accent moment (the total).
 const INK = rgb(0.165, 0.149, 0.125); // #2a2620
 const MUTED = rgb(0.42, 0.4, 0.36);
 const FAINT = rgb(0.55, 0.53, 0.49);
@@ -319,31 +326,32 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     });
   };
 
-  // Content-page header: colour logo top-left, running ref top-right.
+  // Content-page header: small colour logo top-left, running ref top-right — kept
+  // light and quiet so it never competes with the page's content.
   const header = (p: PDFPage) => {
-    const lw = 84;
+    const lw = 72;
     const lh = (logoDark.height / logoDark.width) * lw;
     p.drawImage(logoDark, { x: M, y: H - M - lh + 6, width: lw, height: lh });
-    textRight(p, doc.ref, W - M, H - M - 4, { size: 8.5, color: FAINT });
+    textRight(p, doc.ref, W - M, H - M - 2, { size: 8, color: FAINT });
   };
 
-  // Slim footer: hairline + brand + centred page number. Called on every content
-  // page so the document reads as one considered, paginated piece.
+  // Calm footer: a pale hairline, quiet brand + email, plain page number. Called
+  // on every content page so the document reads as one considered, paginated piece.
   const footer = (p: PDFPage, pageNum: number) => {
     p.drawLine({
-      start: { x: M, y: M - 6 },
-      end: { x: W - M, y: M - 6 },
-      thickness: 0.6,
+      start: { x: M, y: M - 12 },
+      end: { x: W - M, y: M - 12 },
+      thickness: 0.5,
       color: LINE,
     });
     let bx = M;
     for (const ch of "LÍQUEN EVENTS") {
-      p.drawText(ch, { x: bx, y: M - 20, font: f.bold, size: 7, color: FAINT });
-      bx += f.bold.widthOfTextAtSize(ch, 7) + 1.2;
+      p.drawText(ch, { x: bx, y: M - 26, font: f.bold, size: 6.5, color: FAINT });
+      bx += f.bold.widthOfTextAtSize(ch, 6.5) + 1.4;
     }
-    textRight(p, SITE.email, W - M, M - 20, { size: 7.5, color: FAINT });
-    textCenter(p, `— ${String(pageNum).padStart(2, "0")} —`, W / 2, M - 20, {
-      size: 8,
+    textRight(p, SITE.email, W - M, M - 26, { size: 7, color: FAINT });
+    textCenter(p, String(pageNum).padStart(2, "0"), W / 2, M - 26, {
+      size: 7.5,
       color: FAINT,
     });
   };
@@ -354,24 +362,31 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     pageNo += 1;
     header(p);
     footer(p, pageNo);
-    return H - M - 78;
+    return H - M - 84;
   };
 
-  // Section header: gold eyebrow (letter-spaced) + serif title + a short moss
-  // rule. The one consistent "voice" for every section start.
-  const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = GOLD) => {
-    const sz = 8;
+  // Quiet uppercase eyebrow/label — pale grey by default so it whispers rather
+  // than shouts. The one consistent "voice" for small labels across the document.
+  const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = FAINT) => {
+    const sz = T_CAPTION;
     let cx = x;
     for (const ch of winAnsiSafe(s.toUpperCase())) {
       p.drawText(ch, { x: cx, y, font: f.bold, size: sz, color });
-      cx += f.bold.widthOfTextAtSize(ch, sz) + 1.6;
+      cx += f.bold.widthOfTextAtSize(ch, sz) + 2;
     }
   };
+  // Section header: a small quiet eyebrow, the serif title, and a very thin, short
+  // pale hairline. No colour, no weight — the title alone carries the section.
   const sectionHeader = (p: PDFPage, kicker: string, title: string, y: number): number => {
     eyebrow(p, kicker, M, y);
-    text(p, title, M, y - 22, { font: f.serifB, size: 21, color: INK });
-    p.drawRectangle({ x: M, y: y - 34, width: 46, height: 2, color: MOSS });
-    return y - 52;
+    text(p, title, M, y - 24, { font: f.serifB, size: T_DISPLAY, color: INK });
+    p.drawLine({
+      start: { x: M, y: y - 36 },
+      end: { x: M + 32, y: y - 36 },
+      thickness: 0.6,
+      color: LINE,
+    });
+    return y - 58;
   };
 
   // ── Page 1 — Cover ──
@@ -454,22 +469,23 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     y = sectionHeader(p, "A Proposta", "Apresentação", y);
 
     // Client / couple name in serif — the personal headline of the document.
-    text(p, org ? "Cliente" : "Noivos", M, y, { font: f.bold, size: 8, color: GOLD });
-    text(p, doc.clientNames, M, y - 22, { font: f.serif, size: 22, color: INK });
-    y -= 48;
+    eyebrow(p, org ? "Cliente" : "Noivos", M, y);
+    text(p, doc.clientNames, M, y - 24, { font: f.serif, size: T_DISPLAY, color: INK });
+    y -= 52;
 
     // Warm opening — a short, personalised welcome sets the tone before the facts.
+    // Kept to a comfortable measure so it never runs edge to edge.
     const evento = (doc.eventType || "evento").toLowerCase();
     const nomes = doc.clientNames || (org ? "Cliente" : "Noivos");
     const welcome =
       `Caros ${nomes}, foi com muito gosto que preparámos esta proposta para o vosso ${evento}. ` +
       "Reunimos aqui a nossa visão, pensada ao pormenor para tornar este momento único. " +
       "Estamos ao vosso lado em cada passo.";
-    for (const ln of wrap(f.serifIt, welcome, 11.5, MEASURE + 90)) {
+    for (const ln of wrap(f.serifIt, welcome, 11.5, MEASURE)) {
       text(p, ln, M, y, { font: f.serifIt, size: 11.5, color: MUTED });
-      y -= 16;
+      y -= 17;
     }
-    y -= 18;
+    y -= 26;
 
     // Event details as a calm tinted band of labelled columns.
     const details: [string, string][] = [
@@ -481,49 +497,44 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       ...(!org && doc.time ? ([["Hora", doc.time]] as [string, string][]) : []),
     ];
     if (details.length) {
-      const cols = Math.min(3, details.length);
+      // Flat, borderless key–value row: tiny grey label over a quiet serif value,
+      // generously spaced, framed by a single pale hairline above. No fill, no bar.
+      const cols = Math.min(4, details.length);
       const rows = Math.ceil(details.length / cols);
-      const pad = 16;
-      const bandH = rows * 40 + pad;
-      p.drawRectangle({
-        x: M,
-        y: y - bandH,
-        width: W - 2 * M,
-        height: bandH,
-        color: rgb(0.973, 0.968, 0.957),
-      });
-      p.drawRectangle({ x: M, y: y - bandH, width: 2.5, height: bandH, color: MOSS });
-      const colW = (W - 2 * M - pad * 2) / cols;
+      const colW = (W - 2 * M) / cols;
+      const rowH = 48;
+      p.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.5, color: LINE });
+      const top = y - 24;
       details.forEach(([k, v], i) => {
         const r = Math.floor(i / cols);
         const c = i % cols;
-        const cxp = M + pad + c * colW;
-        const cyp = y - pad - r * 40;
-        eyebrow(p, k, cxp, cyp - 8);
-        for (const [j, ln] of wrap(f.reg, v, 10.5, colW - 10)
+        const cxp = M + c * colW;
+        const cyp = top - r * rowH;
+        eyebrow(p, k, cxp, cyp);
+        for (const [j, ln] of wrap(f.reg, v, 11, colW - 16)
           .slice(0, 2)
           .entries()) {
-          text(p, ln, cxp, cyp - 24 - j * 12, { font: f.serif, size: 11.5, color: INK });
+          text(p, ln, cxp, cyp - 16 - j * 13, { font: f.serif, size: 11.5, color: INK });
         }
       });
-      y -= bandH + 26;
+      y = top - (rows - 1) * rowH - 42;
     }
 
     y = sectionHeader(p, "O que propomos", "Serviços", y);
-    const descSize = org ? 9.5 : 10;
+    const descSize = org ? 9.5 : T_BODY;
     for (const g of doc.serviceGroups) {
       ensure(30);
-      // Group title in serif with a moss ordinal marker for a designed feel.
-      if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: 12, color: MOSS });
-      const letterW = g.letter ? f.serifB.widthOfTextAtSize(winAnsiSafe(g.letter) + " ", 12) : 0;
+      // Group title in serif; the ordinal marker stays quiet grey, not coloured.
+      if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: T_SUB, color: MUTED });
+      const letterW = g.letter ? f.serifB.widthOfTextAtSize(winAnsiSafe(g.letter) + " ", T_SUB) : 0;
       text(p, g.title, M + letterW, y, {
         font: f.serifB,
-        size: 12,
+        size: T_SUB,
         color: INK,
       });
-      y -= 20;
+      y -= 22;
       for (const it of g.items) {
-        p.drawCircle({ x: M + 12, y: y + 3, size: 1.4, color: MOSS });
+        p.drawCircle({ x: M + 12, y: y + 3, size: 1.2, color: FAINT });
         if (it.desc) {
           // Sanitiza aqui também: `lab` é medido diretamente com
           // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
@@ -555,22 +566,22 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     let y = H - M - 64;
     y = sectionHeader(p, "Como avançamos", "Cronograma de Organização", y);
     for (const phase of doc.cronograma) {
-      if (y - 24 < M) {
+      if (y - 24 < M + 24) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
       }
-      text(p, phase.title, M, y, { font: f.serifB, size: 12, color: INK });
-      y -= 18;
+      text(p, phase.title, M, y, { font: f.serifB, size: T_SUB, color: INK });
+      y -= 20;
       for (const it of phase.items) {
-        const lines = wrap(f.reg, it, 10, W - 2 * M - 24);
-        p.drawCircle({ x: M + 12, y: y + 3, size: 1.4, color: INK });
+        const lines = wrap(f.reg, it, T_BODY, MEASURE + 120);
+        p.drawCircle({ x: M + 12, y: y + 3, size: 1.2, color: FAINT });
         for (const ln of lines) {
-          text(p, ln, M + 24, y, { size: 10 });
+          text(p, ln, M + 24, y, { size: T_BODY });
           y -= 15;
         }
       }
-      y -= 10;
+      y -= 14;
     }
   }
 
@@ -579,8 +590,8 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     if (!mb.images || mb.images.length === 0) continue;
     const p = pdf.addPage([W, H]);
     frame(p);
-    eyebrow(p, "Inspiração", M, H - M - 44);
-    text(p, mb.title, M, H - M - 72, { font: f.serifIt, size: 26, color: INK });
+    eyebrow(p, "Inspiração", M, H - M - 48);
+    text(p, mb.title, M, H - M - 76, { font: f.serifIt, size: 24, color: INK });
     await drawCollage(pdf, p, mb, f, textFns(text, textRight));
   }
 
@@ -598,35 +609,37 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     const totalStr = orgT ? (doc.totalEstimatedText ?? "") : doc.totalText;
     const totalLbl = orgT ? "Total Estimado" : doc.totalLabel;
     const boxW = MEASURE;
-    const boxH = 58;
-    const drawTotalBox = (pg: PDFPage, ty: number) => {
-      pg.drawRectangle({ x: M, y: ty - boxH, width: boxW, height: boxH, color: DARK });
-      pg.drawRectangle({ x: M, y: ty - boxH, width: 3, height: boxH, color: MOSS });
-      let lx = M + 22;
-      for (const ch of winAnsiSafe(totalLbl.toUpperCase())) {
-        pg.drawText(ch, { x: lx, y: ty - 24, font: f.bold, size: 8, color: rgb(0.72, 0.6, 0.34) });
-        lx += f.bold.widthOfTextAtSize(ch, 8) + 1.6;
-      }
+    const boxH = 50;
+    // Flat, typographic total: a single thin gold hairline (the one accent moment
+    // in the interior), a quiet grey label and the amount in serif ink. No fill.
+    const drawTotal = (pg: PDFPage, ty: number) => {
+      pg.drawLine({
+        start: { x: M, y: ty },
+        end: { x: M + boxW, y: ty },
+        thickness: 1,
+        color: GOLD,
+      });
+      eyebrow(pg, totalLbl, M, ty - 24);
       const amount = totalStr || "—";
       pg.drawText(winAnsiSafe(amount), {
-        x: M + boxW - 22 - f.serifB.widthOfTextAtSize(winAnsiSafe(amount), 23),
-        y: ty - 38,
+        x: M + boxW - f.serifB.widthOfTextAtSize(winAnsiSafe(amount), 22),
+        y: ty - 32,
         font: f.serifB,
-        size: 23,
-        color: CREAM,
+        size: 22,
+        color: INK,
       });
     };
 
-    // Column header row.
+    // Column header row — quiet grey labels, one pale rule.
     eyebrow(p, "Item", M, y);
     textRight(p, orgT ? "Preço Estimado" : "Preço", M + boxW, y, {
       font: f.bold,
-      size: 8,
-      color: GOLD,
+      size: T_CAPTION,
+      color: FAINT,
     });
-    y -= 10;
+    y -= 12;
     p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
-    y -= 20;
+    y -= 22;
 
     // Start a fresh page when the next row (or block) won't fit above the footer.
     const budgetBreak = (need: number) => {
@@ -646,16 +659,16 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       }
     } else {
       for (const it of doc.budgetItems) {
-        budgetBreak(19);
-        p.drawCircle({ x: M + 3, y: y + 3, size: 1.3, color: MOSS });
+        budgetBreak(20);
+        p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
         text(p, it, M + 14, y, { size: 10.5, color: INK });
-        y -= 19;
+        y -= 20;
       }
     }
 
     budgetBreak(boxH + 24);
-    y -= 12;
-    drawTotalBox(p, y);
+    y -= 16;
+    drawTotal(p, y);
     y -= boxH + 20;
 
     // Payment schedule with the actual amounts (30% sinal / 70% saldo) — the
@@ -692,20 +705,19 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     const rx = M + 490;
     const rW = W - M - rx;
     const rHead = (t: string) => {
-      text(firstBudgetPage, t, rx, ry, { font: f.serifB, size: 12, color: INK });
-      firstBudgetPage.drawRectangle({ x: rx, y: ry - 7, width: 26, height: 1.5, color: MOSS });
+      text(firstBudgetPage, t, rx, ry, { font: f.serifB, size: T_SUB, color: INK });
       ry -= 22;
     };
     rHead("Notas importantes");
     ry = bullets(firstBudgetPage, doc.notasImportantes, rx, ry, rW, f, 8.5);
-    ry -= 14;
+    ry -= 16;
     rHead("Condições de reserva");
-    text(firstBudgetPage, "Incluído na proposta", rx, ry, { font: f.bold, size: 7.5, color: GOLD });
-    ry -= 13;
+    eyebrow(firstBudgetPage, "Incluído na proposta", rx, ry);
+    ry -= 14;
     ry = bullets(firstBudgetPage, doc.incluido, rx, ry, rW, f, 8.5);
-    ry -= 8;
-    text(firstBudgetPage, "Não incluído", rx, ry, { font: f.bold, size: 7.5, color: GOLD });
-    ry -= 13;
+    ry -= 10;
+    eyebrow(firstBudgetPage, "Não incluído", rx, ry);
+    ry -= 14;
     bullets(firstBudgetPage, doc.naoIncluido, rx, ry, rW, f, 8.5);
   }
 
@@ -734,12 +746,12 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
         }
       }
       const x = colX[col];
-      p.drawCircle({ x: x + 3, y: y + 3, size: 1.3, color: MOSS });
+      p.drawCircle({ x: x + 3, y: y + 3, size: 1.2, color: FAINT });
       for (const ln of lines) {
         text(p, ln, x + 14, y, { size: 9 });
         y -= 12;
       }
-      y -= 6;
+      y -= 8;
     }
   }
 
@@ -750,32 +762,31 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     let y = H - M - 64;
     const maxW = MEASURE; // capped reading measure
     const subHead = (title: string) => {
-      if (y - 40 < M) {
+      if (y - 40 < M + 24) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
       }
-      text(p, title, M, y, { font: f.serifB, size: 15, color: INK });
-      p.drawRectangle({ x: M, y: y - 8, width: 32, height: 1.5, color: MOSS });
-      y -= 26;
+      text(p, title, M, y, { font: f.serifB, size: T_SUB, color: INK });
+      y -= 24;
     };
     const section = (title: string, items: string[], size = 9) => {
       subHead(title);
       for (const it of items) {
         const lines = wrap(f.reg, it, size, maxW - 16);
-        if (y - lines.length * 12 < M + 10) {
+        if (y - lines.length * 12 < M + 24) {
           p = pdf.addPage([W, H]);
           frame(p);
           y = H - M - 64;
         }
-        p.drawCircle({ x: M + 3, y: y + 3, size: 1.3, color: MOSS });
+        p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
         for (const ln of lines) {
           text(p, ln, M + 14, y, { size });
           y -= 12;
         }
-        y -= 5;
+        y -= 6;
       }
-      y -= 14;
+      y -= 18;
     };
 
     // Próximos passos — the clear "what happens next", with the validity date.
@@ -787,14 +798,14 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       `Esta proposta é válida até ${validUntil}.`,
     ]) {
       const lines = wrap(f.reg, line, 10, maxW - 16);
-      p.drawCircle({ x: M + 3, y: y + 3, size: 1.3, color: MOSS });
+      p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
       for (const ln of lines) {
         text(p, ln, M + 14, y, { size: 10 });
         y -= 14;
       }
       y -= 4;
     }
-    y -= 14;
+    y -= 18;
 
     section("Observações Gerais", doc.observacoesGerais);
     section("Faseamento do Pagamento", doc.faseamento);
@@ -930,7 +941,7 @@ function bullets(
 ): number {
   for (const it of items) {
     const lines = wrap(f.reg, it, size, maxW - 12);
-    p.drawCircle({ x: x + 2, y: y + 3, size: 1.2, color: INK });
+    p.drawCircle({ x: x + 2, y: y + 3, size: 1.1, color: FAINT });
     for (const ln of lines) {
       p.drawText(ln, { x: x + 11, y, font: f.reg, size, color: INK });
       y -= size + 3;
