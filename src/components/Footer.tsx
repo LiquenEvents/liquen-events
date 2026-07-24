@@ -65,7 +65,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
               height={128}
               className="h-20 sm:h-24 w-auto object-contain"
             />
-            <p className="mt-7 font-display text-2xl sm:text-[2rem] leading-[1.25] text-white/95 max-w-xl">
+            <p className="mt-7 max-w-xl text-white font-semibold uppercase tracking-display text-[18px] sm:text-[21px] leading-snug">
               {t.footer.sloganLine1} {t.footer.sloganLine2}
             </p>
             <TrackedLink
