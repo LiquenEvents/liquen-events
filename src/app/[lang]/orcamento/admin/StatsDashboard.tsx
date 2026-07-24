@@ -57,20 +57,13 @@ function Kpi({
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${small ? "p-4" : "p-5"} ${
-        accent ? "bg-[#1b2119] border-[#2d3829]" : "bg-white border-foreground/[0.08] shadow-sm"
+        accent
+          ? "bg-[#4d6350]/[0.05] border-[#4d6350]/20"
+          : "bg-white border-foreground/[0.08] shadow-sm"
       }`}
     >
-      {accent && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 85% 15%, rgba(99,122,95,0.25) 0%, transparent 60%)",
-          }}
-        />
-      )}
       <p
-        className={`font-bold leading-none mb-2 relative ${accent ? "text-[#8aad85]" : "text-foreground/82"}`}
+        className={`font-bold leading-none mb-2 relative ${accent ? "text-[#4d6350]" : "text-foreground/82"}`}
         style={{
           fontFamily: "var(--font-playfair)",
           fontSize: small ? "clamp(18px, 1.9vw, 24px)" : "clamp(22px, 2.6vw, 34px)",
@@ -79,7 +72,7 @@ function Kpi({
         {value}
       </p>
       <p
-        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-white/30" : "text-foreground/30"}`}
+        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-[#4d6350]/60" : "text-foreground/30"}`}
       >
         {label}
       </p>

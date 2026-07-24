@@ -77,7 +77,7 @@ export default function FollowUps({ onOpenQuote }: Props) {
     <Card padding="none" className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-foreground/[0.07] px-5 sm:px-6 py-4">
         <p className="bo-eyebrow">Seguimentos automáticos</p>
-        <span className="rounded-full bg-[#1b2119] px-2 py-0.5 text-[10px] tabular-nums text-white/80">
+        <span className="rounded-full bg-[#4d6350]/10 px-2 py-0.5 text-[10px] tabular-nums text-[#4d6350]">
           {items.length}
         </span>
       </div>

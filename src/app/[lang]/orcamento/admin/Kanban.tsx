@@ -127,31 +127,19 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
         {[
           { v: String(summary.active), l: "Pedidos ativos" },
           { v: eur(summary.proposta), l: "Em proposta" },
-          { v: eur(summary.ganho), l: "Ganho", dark: true },
+          { v: eur(summary.ganho), l: "Ganho" },
           { v: `${summary.winRate}%`, l: "Taxa de conversão" },
-        ].map((k) =>
-          k.dark ? (
-            <div key={k.l} className="rounded-2xl border border-[#2d3829] bg-[#1b2119] p-4 sm:p-5">
-              <p
-                className="font-display font-semibold leading-none mb-2 text-[#8aad85]"
-                style={{ fontSize: "clamp(20px, 2vw, 28px)" }}
-              >
-                {k.v}
-              </p>
-              <p className="text-[10px] tracking-[0.18em] uppercase text-white/35">{k.l}</p>
-            </div>
-          ) : (
-            <Card key={k.l} padding="sm" className="p-4 sm:p-5">
-              <p
-                className="font-display font-semibold leading-none mb-2 text-foreground/85 tabular-nums"
-                style={{ fontSize: "clamp(20px, 2vw, 28px)" }}
-              >
-                {k.v}
-              </p>
-              <p className="text-[10px] tracking-[0.18em] uppercase text-foreground/40">{k.l}</p>
-            </Card>
-          ),
-        )}
+        ].map((k) => (
+          <Card key={k.l} padding="sm" className="p-4 sm:p-5">
+            <p
+              className="font-display font-semibold leading-none mb-2 text-foreground/85 tabular-nums"
+              style={{ fontSize: "clamp(20px, 2vw, 28px)" }}
+            >
+              {k.v}
+            </p>
+            <p className="text-[10px] tracking-[0.18em] uppercase text-foreground/40">{k.l}</p>
+          </Card>
+        ))}
       </div>
 
       <div className="flex gap-3.5 overflow-x-auto pb-4 scroll-hide">

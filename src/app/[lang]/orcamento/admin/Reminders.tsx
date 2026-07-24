@@ -215,7 +215,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
     <Card padding="none" className="overflow-hidden">
       <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
         <p className="bo-eyebrow">Lembretes</p>
-        <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
+        <span className="text-[10px] tabular-nums bg-[#4d6350]/10 text-[#4d6350] rounded-full px-2 py-0.5">
           {reminders.length}
         </span>
       </div>

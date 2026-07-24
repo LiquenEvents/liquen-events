@@ -852,7 +852,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 </span>
               )}
               {data.needAction.length > 0 && (
-                <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
+                <span className="text-[10px] tabular-nums bg-[#4d6350]/10 text-[#4d6350] rounded-full px-2 py-0.5">
                   {data.needAction.length}
                 </span>
               )}
