@@ -553,33 +553,18 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             key={k.l}
             onClick={k.go}
             aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
-            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-all duration-200 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 ${FOCUS_RING} ${
-              k.dark
-                ? "bg-[#1b2119] border-[#2d3829] hover:border-[#3d4a37]"
-                : "bg-white border-foreground/[0.08] shadow-sm hover:shadow-md hover:border-foreground/15"
-            }`}
+            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-colors duration-200 motion-reduce:transition-none bg-[var(--bo-surface)] border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
-            {k.dark && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage:
-                    "radial-gradient(circle at 85% 15%, rgba(99,122,95,0.25) 0%, transparent 60%)",
-                }}
-              />
-            )}
             <div className="flex items-start justify-between gap-2 relative">
               <p
-                className={`font-bold leading-none mb-2 ${k.dark ? "text-[#8aad85]" : "text-foreground/82"}`}
+                className="font-bold leading-none mb-2 text-[var(--bo-text)]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.4vw, 30px)" }}
               >
                 {k.v}
               </p>
               {k.delta && <Delta now={k.delta.now} prev={k.delta.prev} />}
             </div>
-            <p
-              className={`text-[9px] tracking-[0.25em] uppercase relative font-medium ${k.dark ? "text-white/45" : "text-foreground/45"}`}
-            >
+            <p className="text-[9px] tracking-[0.25em] uppercase relative font-medium text-[var(--bo-text-faint)]">
               {k.l}
             </p>
           </button>
