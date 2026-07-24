@@ -43,13 +43,6 @@ const serviceSlugs = [
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   const t = getDictionary(locale);
   const stripPool = STRIP_POOL.map((src) => ({ src, blurDataURL: blurFor(src).blurDataURL }));
-  const pages: [string, string][] = [
-    [t.nav.sobre, "/sobre"],
-    [t.nav.servicos, "/servicos"],
-    [t.nav.galeria, "/galeria"],
-    [t.nav.clientes, "/clientes"],
-    [t.nav.contacto, "/contacto"],
-  ];
   return (
     <footer className="relative bg-transparent overflow-hidden">
       {/* ── Photo strip — full bleed, 4-col grid; rotates per entry ── */}
@@ -75,12 +68,6 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 height={128}
                 className="object-contain mb-4 h-14 sm:h-16 w-auto"
               />
-              <p className="text-foreground/72 text-[13px] leading-[1.7] max-w-[260px] mb-5">
-                {t.footer.sloganLine1}
-                <br />
-                {t.footer.sloganLine2}
-              </p>
-
               {/* Social icons — sem o antigo badge "disponível": nada de pontos
                   a pulsar (idioma SpaceX = sem ornamentos animados). */}
               <div className="flex items-center gap-5 mt-1">
@@ -152,21 +139,6 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
             {/* Pages */}
             <div className="md:col-span-3">
               <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mb-4">
-                {t.footer.paginas}
-              </p>
-              <ul className="flex flex-col gap-2.5">
-                {pages.map(([label, href]) => (
-                  <li key={href}>
-                    <Link
-                      href={localizeHref(href, locale)}
-                      className="link-line text-[13px] text-foreground/72 hover:text-moss transition-colors duration-300"
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-foreground/78 text-[10px] tracking-[0.42em] uppercase mt-6 mb-4">
                 {t.footer.servicosTitulo}
               </p>
               <ul className="flex flex-col gap-2.5">
