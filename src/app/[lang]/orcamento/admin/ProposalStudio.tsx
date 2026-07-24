@@ -113,12 +113,20 @@ const STEPS: { id: Step; n: string; label: string }[] = [
 /** Numa proposta nova/vazia, semeia um grupo de serviços com um item — para que
  *  o estúdio não abra como uma parede de botões "+ Adicionar" vazios. Nunca
  *  toca num rascunho que já tenha conteúdo. */
-function seedDefaults(d: StudioDoc): StudioDoc {
-  if (d.serviceGroups.length > 0) return d;
-  return {
-    ...d,
-    serviceGroups: [{ letter: "a)", title: "", items: [{ label: "", desc: "" }] }],
-  };
+function seedDefaults(d: StudioDoc, quotedPrice?: number): StudioDoc {
+  let next = d;
+  if (next.serviceGroups.length === 0) {
+    next = {
+      ...next,
+      serviceGroups: [{ letter: "a)", title: "", items: [{ label: "", desc: "" }] }],
+    };
+  }
+  // Preço único: a proposta parte do "Preço final (sem IVA)" do pedido — o valor
+  // não se escreve outra vez aqui. Como esse preço é SEM IVA, o modo é "acrescer".
+  if (next.totalAmount == null && typeof quotedPrice === "number" && quotedPrice > 0) {
+    next = { ...next, totalAmount: quotedPrice, totalVatMode: "acrescer" };
+  }
+  return next;
 }
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
@@ -182,7 +190,12 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     }
     // Só semeia defaults quando NÃO havia rascunho guardado — um rascunho
     // existente (mesmo sem grupos) nunca é sobrescrito.
-    if (!hadDraft) setDoc(seedDefaults);
+    if (!hadDraft) {
+      setDoc((d) => seedDefaults(d, quote.quotedPrice));
+      if (typeof quote.quotedPrice === "number" && quote.quotedPrice > 0) {
+        setTotalInput(String(quote.quotedPrice));
+      }
+    }
     hydrated.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -303,8 +316,12 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     } catch {
       /* ignore */
     }
-    setDoc(seedDefaults(initialDoc(quote)));
-    setTotalInput("");
+    setDoc(seedDefaults(initialDoc(quote), quote.quotedPrice));
+    setTotalInput(
+      typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
+        ? String(quote.quotedPrice)
+        : "",
+    );
     setAssetUrls({});
     setRefEdited(false);
     setConfirmSend(false);
@@ -1066,6 +1083,11 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           texto do PDF é composto a partir daqui. */}
         <Section title="Total, IVA e validade">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
+              O valor parte do <strong className="font-semibold">Preço final</strong> do pedido —
+              não é preciso escrevê-lo outra vez. Altere aqui só se esta proposta tiver um valor
+              diferente.
+            </p>
             <Field
               label={vatMode === "acrescer" ? "Valor (base, sem IVA)" : "Valor total (com IVA)"}
               inputMode="decimal"
