@@ -133,7 +133,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
           </div>
 
           {/* Serviços + Contacto — centred on mobile, two columns from sm up */}
-          <div className="border-t border-white/12 py-10 grid grid-cols-1 sm:grid-cols-2 gap-8 text-center sm:text-left">
+          <div className="border-t border-white/12 py-10 flex flex-col sm:flex-row sm:justify-between gap-8 text-center sm:text-left">
             <div>
               <p className="text-white/55 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.servicosTitulo}
@@ -151,7 +151,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 ))}
               </ul>
             </div>
-            <div>
+            <div className="sm:text-right">
               <p className="text-white/55 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.contacto}
               </p>
