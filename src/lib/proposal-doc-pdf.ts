@@ -392,18 +392,8 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     }
 
     const cx = W / 2;
-    // Thin cream frame inset from the trim — a quiet mark of craft. Border only:
-    // a DARK fill here would repaint the whole interior and hide the two side
-    // photos, leaving just the centre band showing.
-    const inset = 22;
-    p.drawRectangle({
-      x: inset,
-      y: inset,
-      width: W - 2 * inset,
-      height: H - 2 * inset,
-      borderColor: rgb(0.32, 0.34, 0.31),
-      borderWidth: 0.6,
-    });
+    // No border frame around the cover — removed on request for a cleaner,
+    // edge-to-edge look (the two side photos run to the trim).
 
     // White logo, upper area.
     const lw = 148;
@@ -838,17 +828,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
-    // Border only — a DARK fill here would repaint the interior and hide the
-    // side photos, exactly as on the front cover.
-    const inset = 22;
-    p.drawRectangle({
-      x: inset,
-      y: inset,
-      width: W - 2 * inset,
-      height: H - 2 * inset,
-      borderColor: rgb(0.32, 0.34, 0.31),
-      borderWidth: 0.6,
-    });
+    // No border frame — removed on request, matching the front cover.
 
     const cx = W / 2;
     // Keep every line inside the centre band so text never spills onto the
