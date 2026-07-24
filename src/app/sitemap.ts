@@ -2,12 +2,21 @@ import type { MetadataRoute } from "next";
 import { execFileSync } from "node:child_process";
 import { SITE } from "@/lib/site";
 import { SERVICES } from "@/lib/services-data";
+import { PHOTOS } from "@/app/[lang]/galeria/photos-data";
 
 const base = SITE.url;
 
 // Absolute URL for an image in /public/imagens (ASCII names only — see the
 // project notes on the optimizer 400ing on accented/space filenames).
 const img = (file: string) => `${base}/imagens/${file}`;
+
+// Absolutise a "/imagens/…"-style public path into a full URL for the sitemap.
+const abs = (src: string) => (src.startsWith("http") ? src : `${base}${src}`);
+
+// Every gallery photo, as absolute URLs, so Google discovers the whole
+// portfolio for Google Images (not just a hand-picked few). Google allows up
+// to 1000 <image> per URL; the gallery sits comfortably under that.
+const galleryImages = PHOTOS.map((p) => abs(p.src));
 
 /**
  * Real last-modified date for a route, from the last git commit that
@@ -91,11 +100,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       sourceFile: "src/app/[lang]/galeria/page.tsx",
       changeFrequency: "weekly",
       priority: 0.7,
-      images: [
-        img("DaniGui_Preview20.jpg"),
-        img("stephanie-mizio-560.jpg"),
-        img("JOAO_E_PEDRO_1Y1A3204.jpg"),
-      ],
+      // The full portfolio — every gallery photo, so Google can index them all.
+      images: galleryImages,
     },
     {
       path: "/clientes",
@@ -125,7 +131,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     sourceFile: "src/lib/services-data.ts",
     changeFrequency: "monthly",
     priority: 0.85,
-    images: [s.hero.startsWith("http") ? s.hero : `${base}${s.hero}`],
+    // Hero + the service's supporting gallery, so each service page surfaces
+    // its own set of photos in Google Images.
+    images: [s.hero, ...s.gallery].map(abs),
   }));
 
   // Each language version gets its own <url> entry (not just an hreflang
