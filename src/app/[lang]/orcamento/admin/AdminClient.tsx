@@ -7,6 +7,7 @@ import {
   useRef,
   useCallback,
   useDeferredValue,
+  memo,
   type ReactNode,
 } from "react";
 import Image from "next/image";
@@ -233,6 +234,190 @@ interface Props {
   initialQuotes: Quote[];
   userName?: string;
 }
+
+// Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
+// can render it too — it's pure (status + the module-level STATUS_OPTIONS).
+function statusBadge(status: QuoteStatus): ReactNode {
+  const s = STATUS_OPTIONS.find((o) => o.id === status);
+  return (
+    <span
+      className={`text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm ${s?.color ?? "bg-foreground/8 text-foreground/30"}`}
+    >
+      {s?.label ?? status}
+    </span>
+  );
+}
+
+// One quote card in the pedidos list. Extracted to MODULE scope and wrapped in
+// React.memo so that typing in the detail edit panel — which only changes
+// AdminClient's editX state — no longer reconciles all ~50 cards on every
+// keystroke. All props are stable across a keystroke (the quote object comes
+// from the memoised visibleQuotes; isCurrent/isSelected are booleans; todayStr
+// is a stable string; onOpen/onToggle are stable callbacks), so memo skips
+// re-rendering each row. Saves, selection and filtering still update the list
+// because they change these props (via visibleQuotes / the booleans).
+const QuoteCard = memo(function QuoteCard({
+  q,
+  isCurrent,
+  isSelected,
+  todayStr,
+  onOpen,
+  onToggle,
+}: {
+  q: Quote;
+  isCurrent: boolean;
+  isSelected: boolean;
+  todayStr: string;
+  onOpen: (q: Quote) => void;
+  onToggle: (id: string) => void;
+}) {
+  const cat = CATEGORIES.find((c) => c.id === q.category);
+  const et =
+    q.category && q.eventType
+      ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType)
+      : null;
+  // Lead parado: status ativo sem atividade há 14+ dias
+  const lastActivity = q.lastUpdated ?? q.submittedAt;
+  const daysSince = Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86400000);
+  const isStale =
+    (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
+    daysSince >= 14;
+  return (
+    <div className="relative">
+      <label
+        className="absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggle(q.id)}
+          className="w-4 h-4 accent-[#4d6350] cursor-pointer"
+          aria-label={`Selecionar pedido de ${q.name}`}
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => onOpen(q)}
+        className={`w-full text-left p-5 pl-12 rounded-xl border transition-all duration-200 ${
+          isCurrent
+            ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
+            : isSelected
+              ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
+              : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <p className="text-foreground/75 text-sm font-semibold truncate">{q.name}</p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <p className="text-foreground/70 text-xs truncate">{q.email}</p>
+              {q.assignedTo && (
+                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
+                  {q.assignedTo}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {statusBadge(q.status)}
+            {isStale && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold bg-amber-500/10 text-amber-600"
+                title={`Sem atividade há ${daysSince} dias`}
+              >
+                <span className="w-1 h-1 rounded-full bg-current" />
+                {daysSince}d parado
+              </span>
+            )}
+            {q.followUpAt &&
+              q.followUpAt <= todayStr &&
+              q.status !== "aceite" &&
+              q.status !== "rejeitado" && (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
+                    q.followUpAt < todayStr
+                      ? "bg-[#b5654a]/15 text-[#b5654a]"
+                      : "bg-[#637a5f]/15 text-[#4d6350]"
+                  }`}
+                  title={q.followUpAt < todayStr ? "Seguimento em atraso" : "Seguimento hoje"}
+                >
+                  <span className="w-1 h-1 rounded-full bg-current" />
+                  Seguir
+                </span>
+              )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-foreground/70 text-[10px]">
+          <span>{cat?.label ?? "—"}</span>
+          {et && (
+            <>
+              <span className="w-px h-2.5 bg-foreground/12" />
+              <span>{et.label}</span>
+            </>
+          )}
+          <span className="w-px h-2.5 bg-foreground/12" />
+          <span>{q.guests} convidados</span>
+          {(() => {
+            const cd = eventCountdown(q.date);
+            if (!cd || cd.tone === "past") return null;
+            return (
+              <>
+                <span className="w-px h-2.5 bg-foreground/12" />
+                <span
+                  className={
+                    cd.tone === "today" || cd.tone === "soon"
+                      ? "text-[#b5654a] font-medium"
+                      : "text-foreground/70"
+                  }
+                >
+                  {cd.label}
+                </span>
+              </>
+            );
+          })()}
+        </div>
+        {q.tags && q.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2.5">
+            {q.tags.slice(0, 4).map((t) => (
+              <span
+                key={t}
+                className="px-2 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[9px] font-medium tracking-wide"
+              >
+                {t}
+              </span>
+            ))}
+            {q.tags.length > 4 && (
+              <span className="text-foreground/30 text-[9px] px-1">+{q.tags.length - 4}</span>
+            )}
+          </div>
+        )}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
+          <span className="text-foreground/40 text-[9px] font-mono tracking-tight" title={q.id}>
+            Ref. {shortRef(q.id)}
+          </span>
+          <div className="flex items-center gap-3">
+            {q.quotedPrice ? (
+              <span className="text-[#4d6350] text-xs font-semibold">
+                {formatPrice(q.quotedPrice)}
+              </span>
+            ) : q.priceBreakdown?.total ? (
+              <span className="text-foreground/70 text-xs">
+                ≈ {formatPrice(q.priceBreakdown.rangeMin)}–{formatPrice(q.priceBreakdown.rangeMax)}
+              </span>
+            ) : null}
+            <span className="text-foreground/70 text-[10px]">
+              {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
+                day: "numeric",
+                month: "short",
+              })}
+            </span>
+          </div>
+        </div>
+      </button>
+    </div>
+  );
+});
 
 export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
@@ -596,6 +781,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     const target = detailNextAction(q).tab;
     setDetailTab(target === "gestao" ? "comunicacao" : target);
   }
+  // Stable identity for the memoised QuoteCard's onOpen prop. openQuote is a
+  // plain function (closes over discardGuard and many setters), so its reference
+  // changes every render — passing it directly would defeat QuoteCard's memo.
+  // A ref that always points at the latest openQuote keeps behaviour identical
+  // while giving the row a callback whose identity never changes.
+  const openQuoteRef = useRef(openQuote);
+  // Keep the ref pointing at the latest openQuote (updated in an effect, not
+  // during render). onOpen fires from a click, which is always after commit, so
+  // it reads the current closure.
+  useEffect(() => {
+    openQuoteRef.current = openQuote;
+  });
+  const openQuoteStable = useCallback((q: Quote) => openQuoteRef.current(q), []);
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
   // The date is intentionally left blank — it's a new event to schedule.
@@ -1046,17 +1244,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           </span>
         )}
       </button>
-    );
-  }
-
-  function statusBadge(status: QuoteStatus) {
-    const s = STATUS_OPTIONS.find((o) => o.id === status);
-    return (
-      <span
-        className={`text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm ${s?.color ?? "bg-foreground/8 text-foreground/30"}`}
-      >
-        {s?.label ?? status}
-      </span>
     );
   }
 
@@ -1922,171 +2109,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     />
                   </div>
                 )}
-                {visibleQuotes.map((q) => {
-                  const cat = CATEGORIES.find((c) => c.id === q.category);
-                  const et =
-                    q.category && q.eventType
-                      ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType)
-                      : null;
-                  const isSel = selectedIds.has(q.id);
-                  // Lead parado: status ativo sem atividade há 14+ dias
-                  const lastActivity = q.lastUpdated ?? q.submittedAt;
-                  const daysSince = Math.floor(
-                    (Date.now() - new Date(lastActivity).getTime()) / 86400000,
-                  );
-                  const isStale =
-                    (q.status === "pendente" ||
-                      q.status === "em_revisao" ||
-                      q.status === "cotado") &&
-                    daysSince >= 14;
-                  return (
-                    <div key={q.id} className="relative">
-                      <label
-                        className="absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSel}
-                          onChange={() => toggleSelect(q.id)}
-                          className="w-4 h-4 accent-[#4d6350] cursor-pointer"
-                          aria-label={`Selecionar pedido de ${q.name}`}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => openQuote(q)}
-                        className={`w-full text-left p-5 pl-12 rounded-xl border transition-all duration-200 ${
-                          selected?.id === q.id
-                            ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
-                            : isSel
-                              ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
-                              : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <div className="min-w-0">
-                            <p className="text-foreground/75 text-sm font-semibold truncate">
-                              {q.name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <p className="text-foreground/70 text-xs truncate">{q.email}</p>
-                              {q.assignedTo && (
-                                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
-                                  {q.assignedTo}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            {statusBadge(q.status)}
-                            {isStale && (
-                              <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold bg-amber-500/10 text-amber-600"
-                                title={`Sem atividade há ${daysSince} dias`}
-                              >
-                                <span className="w-1 h-1 rounded-full bg-current" />
-                                {daysSince}d parado
-                              </span>
-                            )}
-                            {q.followUpAt &&
-                              q.followUpAt <= todayStr &&
-                              q.status !== "aceite" &&
-                              q.status !== "rejeitado" && (
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
-                                    q.followUpAt < todayStr
-                                      ? "bg-[#b5654a]/15 text-[#b5654a]"
-                                      : "bg-[#637a5f]/15 text-[#4d6350]"
-                                  }`}
-                                  title={
-                                    q.followUpAt < todayStr
-                                      ? "Seguimento em atraso"
-                                      : "Seguimento hoje"
-                                  }
-                                >
-                                  <span className="w-1 h-1 rounded-full bg-current" />
-                                  Seguir
-                                </span>
-                              )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 text-foreground/70 text-[10px]">
-                          <span>{cat?.label ?? "—"}</span>
-                          {et && (
-                            <>
-                              <span className="w-px h-2.5 bg-foreground/12" />
-                              <span>{et.label}</span>
-                            </>
-                          )}
-                          <span className="w-px h-2.5 bg-foreground/12" />
-                          <span>{q.guests} convidados</span>
-                          {(() => {
-                            const cd = eventCountdown(q.date);
-                            if (!cd || cd.tone === "past") return null;
-                            return (
-                              <>
-                                <span className="w-px h-2.5 bg-foreground/12" />
-                                <span
-                                  className={
-                                    cd.tone === "today" || cd.tone === "soon"
-                                      ? "text-[#b5654a] font-medium"
-                                      : "text-foreground/70"
-                                  }
-                                >
-                                  {cd.label}
-                                </span>
-                              </>
-                            );
-                          })()}
-                        </div>
-                        {q.tags && q.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2.5">
-                            {q.tags.slice(0, 4).map((t) => (
-                              <span
-                                key={t}
-                                className="px-2 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[9px] font-medium tracking-wide"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                            {q.tags.length > 4 && (
-                              <span className="text-foreground/30 text-[9px] px-1">
-                                +{q.tags.length - 4}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
-                          <span
-                            className="text-foreground/40 text-[9px] font-mono tracking-tight"
-                            title={q.id}
-                          >
-                            Ref. {shortRef(q.id)}
-                          </span>
-                          <div className="flex items-center gap-3">
-                            {q.quotedPrice ? (
-                              <span className="text-[#4d6350] text-xs font-semibold">
-                                {formatPrice(q.quotedPrice)}
-                              </span>
-                            ) : q.priceBreakdown?.total ? (
-                              <span className="text-foreground/70 text-xs">
-                                ≈ {formatPrice(q.priceBreakdown.rangeMin)}–
-                                {formatPrice(q.priceBreakdown.rangeMax)}
-                              </span>
-                            ) : null}
-                            <span className="text-foreground/70 text-[10px]">
-                              {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
-                                day: "numeric",
-                                month: "short",
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
+                {visibleQuotes.map((q) => (
+                  <QuoteCard
+                    key={q.id}
+                    q={q}
+                    isCurrent={selected?.id === q.id}
+                    isSelected={selectedIds.has(q.id)}
+                    todayStr={todayStr}
+                    onOpen={openQuoteStable}
+                    onToggle={toggleSelect}
+                  />
+                ))}
                 {filtered.length > visibleCount && (
                   <button
                     type="button"
