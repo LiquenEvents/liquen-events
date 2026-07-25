@@ -1062,22 +1062,25 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   «Total».
                 </p>
                 <div className="flex flex-col gap-2">
-                  <div className="flex gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                    <span className="flex-1">Descrição</span>
-                    <span className="w-36">Valor (texto)</span>
+                  <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                    <span>Descrição</span>
+                    <span className="text-right">Valor (texto)</span>
                     <span className="w-5" />
                   </div>
                   {(doc.budgetExtras ?? []).map((ex, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <div
+                      key={i}
+                      className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                    >
                       <input
-                        className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                        className="bo-input px-2.5 py-2 text-xs text-foreground/75"
                         value={ex.label}
                         onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
                         placeholder="Deslocação da equipa Líquen"
                         aria-label="Descrição da linha adicional"
                       />
                       <input
-                        className="bo-input w-36 px-2.5 py-2 text-xs text-foreground/75 text-right"
+                        className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
                         value={ex.valueText}
                         onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
                         placeholder="896,00 €"
@@ -1102,22 +1105,25 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           ) : (
             <>
               <div className="flex flex-col gap-2 mb-3">
-                <div className="flex gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                  <span className="flex-1">Item</span>
-                  <span className="w-28">Valor</span>
+                <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                  <span>Item</span>
+                  <span className="text-right">Valor</span>
                   <span className="w-5" />
                 </div>
                 {(doc.budgetRows ?? []).map((r, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div
+                    key={i}
+                    className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                  >
                     <input
-                      className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                      className="bo-input px-2.5 py-2 text-xs text-foreground/75"
                       value={r.item}
                       onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
                       placeholder="Coordenação do dia"
                       aria-label="Item"
                     />
                     <input
-                      className="bo-input w-28 px-2.5 py-2 text-xs text-foreground/75 text-right"
+                      className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
                       value={r.price}
                       onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
                       placeholder="1.500,00 €"
