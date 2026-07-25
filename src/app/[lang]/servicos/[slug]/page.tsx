@@ -245,7 +245,11 @@ export default async function ServiceDetailPage({
       {svc.slug === "casamentos" && (
         <section
           className="relative overflow-hidden border-t border-foreground/8 flex items-end"
-          style={{ minHeight: "clamp(360px, 60vh, 640px)" }}
+          style={{
+            minHeight: "clamp(360px, 60vh, 640px)",
+            contentVisibility: "auto",
+            containIntrinsicSize: "auto clamp(360px, 60vh, 640px)",
+          }}
         >
           <Image
             src="/imagens/viaturas-classicas.jpg"
@@ -354,7 +358,12 @@ export default async function ServiceDetailPage({
             alt=""
             fill
             sizes="100vw"
-            quality={75}
+            // Match the hero's quality={82} for the SAME source image: a different
+            // quality would resolve to a second /_next/image URL and re-fetch +
+            // re-decode the full-bleed photo. Same value → the already-decoded
+            // hero asset is reused. The FAQ veil is near-opaque, so 82 vs 75 is
+            // invisible here anyway.
+            quality={82}
             className="object-cover object-center"
             {...blurFor(svc.hero)}
           />

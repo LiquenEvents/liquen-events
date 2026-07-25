@@ -102,7 +102,17 @@ function ServiceBand({
   return (
     // Shorter on phones (≈46svh) so 8 stacked service bands don't become an
     // endless scroll; full cinematic height from lg up.
-    <section className="relative overflow-hidden flex items-end min-h-[46svh] lg:min-h-[clamp(480px,60vh,680px)]">
+    <section
+      className="relative overflow-hidden flex items-end min-h-[46svh] lg:min-h-[clamp(480px,60vh,680px)]"
+      // Match the sibling panels: skip layout/paint while off-screen. The `auto`
+      // keyword self-corrects to the real height (incl. the 46svh mobile case)
+      // after first render, so no scroll-jump; the big image decode defers to
+      // when the band nears view.
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "auto clamp(480px, 60vh, 680px)",
+      }}
+    >
       <Parallax speed={0.12} className="absolute inset-0">
         <Image
           src={service.image}

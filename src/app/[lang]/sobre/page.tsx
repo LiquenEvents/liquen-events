@@ -100,7 +100,9 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           alt=""
           fill
           sizes="100vw"
-          quality={72}
+          // Sits under a ~84%-opaque flat dark veil (it's a texture, not a subject),
+          // so quality 50 halves its decode with no perceptible change.
+          quality={50}
           className="absolute inset-0 object-cover object-left"
         />
         <div
@@ -212,7 +214,8 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           alt=""
           fill
           sizes="100vw"
-          quality={72}
+          // Under a ~86%-opaque flat veil (texture, not subject) → quality 50.
+          quality={50}
           className="absolute inset-0 object-cover object-center"
         />
         <div

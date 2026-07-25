@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -365,6 +365,14 @@ export default function OrcamentoForm({
     if (nome.trim()) lines.push(`${to.labelNome}: ${nome.trim()}`);
     return lines.join("\n");
   }
+  // Memoise the WhatsApp link so it isn't rebuilt + URL-encoded on every
+  // keystroke (the link sits idle off to the side); only recompute when a field
+  // that feeds it changes.
+  const waLink = useMemo(
+    () => waHref(waMessage()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eventType, dateFlexible, data, pessoas, local, nome, to, t],
+  );
 
   // Arrow-key navigation for the event-type radiogroup (WAI-ARIA radio pattern).
   const onRadioKey = (e: React.KeyboardEvent) => {
@@ -404,7 +412,6 @@ export default function OrcamentoForm({
           blurDataURL={panelBlur}
           alt={t.common.imageAlt.orcamentoPanel}
           fill
-          priority
           sizes="(max-width: 1024px) 0vw, 45vw"
           quality={75}
           className="object-cover"
@@ -527,7 +534,7 @@ export default function OrcamentoForm({
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-5 py-3 rounded-full text-[11px] tracking-[0.1em] uppercase border transition-all duration-200 ${
+                      className={`px-5 py-3 rounded-full text-[11px] tracking-[0.1em] uppercase border transition-[background-color,border-color,color,box-shadow] duration-200 ${
                         active
                           ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
                           : "border-foreground/12 text-foreground/60 hover:border-moss/40 hover:text-foreground/85"
@@ -719,7 +726,7 @@ export default function OrcamentoForm({
                 )}
               </button>
               <a
-                href={waHref(waMessage())}
+                href={waLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track("WhatsAppClick", { source: "form" })}

@@ -123,7 +123,15 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           esquerda sobre um scrim. Os títulos são <h2> (h1 do herói → h2 por
           capítulo), mantendo a hierarquia de headings. */}
       {services.map((s, i, arr) => (
-        <section key={s.title} className="relative h-[86svh] min-h-[560px] w-full overflow-hidden">
+        <section
+          key={s.title}
+          className="relative h-[86svh] min-h-[560px] w-full overflow-hidden"
+          // Skip layout/paint (and pause the scroll-chevron animation) for these
+          // full-bleed chapters while they're off-screen; the height is
+          // deterministic so contain-intrinsic-size matches → no scroll-jump, and
+          // each chapter's big image decode is deferred to when it nears view.
+          style={{ contentVisibility: "auto", containIntrinsicSize: "auto 86svh" }}
+        >
           {/* The photograph settles in as the chapter enters — a slow cinematic
               zoom-out (scale 1.08 → 1) with a fade. Pure transform + opacity, so
               it's GPU-composited and stays buttery at 60fps on these full-bleed
@@ -198,7 +206,11 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {/* ── CTA — full-screen closing panel (matches /servicos) ── */}
       <section
         className="relative overflow-hidden flex items-center py-28 lg:py-40"
-        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+        style={{
+          minHeight: "clamp(560px, 90vh, 900px)",
+          contentVisibility: "auto",
+          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
+        }}
       >
         <Image
           src="/imagens/JOAO_E_PEDRO_1Y1A4463.jpg"
