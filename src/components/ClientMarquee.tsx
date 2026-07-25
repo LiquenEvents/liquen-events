@@ -29,7 +29,7 @@ function Mark({
 
   if (failed || !logo) {
     return (
-      <div className="flex-shrink-0 flex items-center h-11" {...hidden}>
+      <div className="flex-shrink-0 flex items-center h-8 sm:h-11" {...hidden}>
         <span className="text-foreground/68 text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase whitespace-nowrap">
           {name}
         </span>
@@ -41,7 +41,7 @@ function Mark({
   const d = logoDimsFor(logo);
 
   return (
-    <div className="flex-shrink-0 flex items-center justify-center h-12" {...hidden}>
+    <div className="flex-shrink-0 flex items-center justify-center h-8 sm:h-12" {...hidden}>
       <Image
         src={logo}
         alt={duplicate ? "" : name}
@@ -51,12 +51,14 @@ function Mark({
         // width and serves a ~640–1280px file for a logo rendered ≤170px wide.
         // Declaring the CSS cap switches it to a viewport/DPR-aware srcset that
         // picks a correctly-small candidate — same pixels, far fewer bytes.
-        sizes="(max-width: 640px) 140px, 170px"
+        sizes="(max-width: 640px) 120px, 170px"
         // Rendered as flat black silhouettes (brightness-0), so encoder quality
         // is imperceptible — 50 just trims the bytes of every logo in the strip.
         quality={50}
         style={{ height: `${h}px` }}
-        className="w-auto max-w-[140px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
+        // Slimmer strip on mobile: cap the logo height (max-h) so the whole band
+        // reads as a fine line on a phone, full size from sm+.
+        className="w-auto max-h-[22px] sm:max-h-none max-w-[120px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
         onError={() => setFailed(true)}
       />
     </div>
@@ -71,6 +73,22 @@ export default function ClientMarquee() {
   // off-screen IntersectionObserver pause below — user pause is applied via an
   // inline animation-play-state, which wins over the observer's class either way.
   const [userPaused, setUserPaused] = useState(false);
+
+  // Shuffle the logo order once per visit so a DIFFERENT set of clients leads
+  // each time — otherwise the same first few always hold the prime, first-
+  // visible slot and the rest are rarely seen before the visitor scrolls on.
+  // Starts as the server order (SSR-safe: initial client render matches), then
+  // reshuffles after mount; the marquee still cycles the full set within a view.
+  const [order, setOrder] = useState(clientLogos);
+  useEffect(() => {
+    const a = [...clientLogos];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOrder(a);
+  }, []);
 
   // Pause the infinite scroll while the band is off-screen — no point
   // compositing a wide moving strip the user can't see (battery / GPU).
@@ -90,7 +108,7 @@ export default function ClientMarquee() {
   }, []);
 
   return (
-    <div className="relative py-7 border-y border-foreground/8 overflow-hidden">
+    <div className="relative py-3.5 sm:py-7 border-y border-foreground/8 overflow-hidden">
       {/* sr-only heading so heading-navigation users find the client band. */}
       <h2 className="sr-only">{t.nav.clientes}</h2>
       <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
@@ -100,8 +118,8 @@ export default function ClientMarquee() {
         className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap"
         style={userPaused ? { animationPlayState: "paused" } : undefined}
       >
-        {[...clientLogos, ...clientLogos].map((c, i) => (
-          <Mark key={i} name={c.name} logo={c.logo} duplicate={i >= clientLogos.length} />
+        {[...order, ...order].map((c, i) => (
+          <Mark key={i} name={c.name} logo={c.logo} duplicate={i >= order.length} />
         ))}
       </div>
       {/* Pause/resume control. Hidden from the reduced-motion path — there the
