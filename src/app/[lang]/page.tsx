@@ -164,7 +164,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 </h2>
                 <Link
                   href={localizeHref(s.href, locale)}
-                  className="mt-8 inline-flex items-center gap-3 border border-white/70 text-white text-[11px] tracking-[0.3em] uppercase px-8 py-3.5 hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                  className="mt-6 sm:mt-8 inline-flex items-center gap-2 sm:gap-3 border border-white/70 text-white text-[10px] sm:text-[11px] tracking-[0.18em] sm:tracking-[0.3em] uppercase px-5 py-2.5 sm:px-8 sm:py-3.5 hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 >
                   {t.common.verServicos}
                   <span aria-hidden>→</span>
