@@ -107,7 +107,7 @@ export const pt = {
     ogLocale: "pt_PT",
     homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Decoração de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em Portugal. Do conceito ao último detalhe — peça orçamento.",
+      "A Líquen Events é uma empresa especializada em planear e executar eventos únicos, transformando as suas ideias em experiências memoráveis.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
       "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
