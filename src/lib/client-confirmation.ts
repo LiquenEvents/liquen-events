@@ -5,8 +5,8 @@ import type { Locale } from "./i18n/config";
 /**
  * Confirmation email sent to the CLIENT right after a form submission
  * (quote request or contact message). The team notification is separate —
- * this one manages the client's expectations ("we reply within 24h") and
- * gives them the reference number to quote back. Localized to the locale
+ * this one reassures the client that their request was received and gives
+ * them the reference number to quote back. Localized to the locale
  * the visitor was browsing in.
  */
 interface ConfirmationArgs {
@@ -22,9 +22,8 @@ const COPY = {
       ref ? `Recebemos o seu pedido de orçamento (${ref})` : "Recebemos a sua mensagem",
     greeting: (name: string) => `Olá ${name},`,
     bodyQuote:
-      "Obrigado pelo seu pedido de orçamento. Já o recebemos e vamos analisá-lo com atenção — entramos em contacto em menos de 24 horas (dias úteis) com uma proposta à medida.",
-    bodyContact:
-      "Obrigado pela sua mensagem. Já a recebemos — respondemos em menos de 24 horas (dias úteis).",
+      "Obrigado pelo seu pedido de orçamento. Já o recebemos e vamos analisá-lo com atenção — entramos em contacto consigo com uma proposta à medida.",
+    bodyContact: "Obrigado pela sua mensagem. Já a recebemos e respondemos com toda a atenção.",
     reference: "A sua referência",
     footer: "Líquen Events · Évora, Alentejo",
     noreply: "Se precisar de acrescentar algo, basta responder a este email.",
@@ -34,9 +33,8 @@ const COPY = {
       ref ? `We've received your quote request (${ref})` : "We've received your message",
     greeting: (name: string) => `Hello ${name},`,
     bodyQuote:
-      "Thank you for your quote request. We've received it and will review it carefully — we'll get back to you within 24 hours (business days) with a tailored proposal.",
-    bodyContact:
-      "Thank you for your message. We've received it and will reply within 24 hours (business days).",
+      "Thank you for your quote request. We've received it and will review it carefully — we'll get back to you with a tailored proposal.",
+    bodyContact: "Thank you for your message. We've received it and will reply with care.",
     reference: "Your reference",
     footer: "Líquen Events · Évora, Alentejo, Portugal",
     noreply: "If you'd like to add anything, simply reply to this email.",

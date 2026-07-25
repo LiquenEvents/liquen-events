@@ -122,10 +122,10 @@ export const pt = {
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
+      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Receba uma proposta à medida para o seu evento.",
     orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em 24 horas úteis.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — e receba uma proposta à medida.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -161,8 +161,7 @@ export const pt = {
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Tem um evento",
     ctaTitleLine2: "em mente?",
-    ctaText:
-      "Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas úteis.",
+    ctaText: "Conte-nos a sua ideia. Ouvimos a sua visão e respondemos com uma proposta à medida.",
   },
 
   sobre: {
@@ -310,7 +309,7 @@ export const pt = {
       ctaTitleLine1: "Peça o seu",
       ctaTitleMoss: "orçamento.",
       ctaText:
-        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais diretos.",
+        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida. Para uma pergunta rápida, use um dos canais diretos.",
       ctaButton: "Pedir orçamento",
     },
     testimonialsEyebrow: "O que dizem os nossos clientes",
@@ -320,7 +319,7 @@ export const pt = {
         title: "Recebemos o seu pedido",
         desc: "Analisamos o seu pedido e preparamos uma resposta à medida.",
       },
-      { title: "Entramos em contacto", desc: "Em menos de 24 horas úteis, marcamos uma conversa." },
+      { title: "Entramos em contacto", desc: "Marcamos uma conversa para conhecer a sua visão." },
       { title: "Proposta à medida", desc: "Proposta detalhada, com orçamento transparente." },
       { title: "Começamos a criar", desc: "Tratamos de cada detalhe para um evento inesquecível." },
     ],
@@ -338,7 +337,7 @@ export const pt = {
       heroTitleMoss: "extraordinário",
       infoEyebrow: "Encontre-nos",
       emailLabel: "E-mail",
-      emailSub: "Respondemos em menos de 24 horas úteis",
+      emailSub: "Respondemos a cada pedido com atenção",
       phoneLabel: "Telefone",
       phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
@@ -347,8 +346,7 @@ export const pt = {
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
       googleLink: "Ver no Google · Deixar avaliação",
-      promise:
-        "Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta personalizada.",
+      promise: "Respondemos a todos os pedidos com uma proposta personalizada.",
       promiseSign: "— Equipa Líquen Events",
       stepLabels: ["Evento", "Dados", "Detalhes", "Mensagem"],
       eventCards: [
@@ -388,7 +386,7 @@ export const pt = {
       voltar: "Voltar",
       enviar: "Enviar Pedido",
       enviando: "A enviar…",
-      resposta24: "Resposta em 24h",
+      resposta24: "Proposta à medida",
       errNome: "Indique o seu nome",
       errEmail: "E-mail inválido",
       error: "Não foi possível enviar. Tente novamente ou contacte-nos pelo WhatsApp.",
@@ -398,8 +396,8 @@ export const pt = {
       successThanks: "Obrigado",
       successText: ". Em breve entraremos em contacto para avançarmos juntos no seu evento.",
       successSteps: [
-        { n: "01", t: "Analisamos o seu pedido", d: "Nas próximas horas" },
-        { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas úteis" },
+        { n: "01", t: "Analisamos o seu pedido", d: "Com toda a atenção" },
+        { n: "02", t: "Entramos em contacto", d: "Em breve" },
         { n: "03", t: "Enviamos proposta à medida", d: "Personalizada para si" },
       ],
       successWhatsApp: "Acompanhar pelo WhatsApp",
@@ -419,7 +417,7 @@ export const pt = {
       },
       {
         q: "Como funciona o processo de orçamentação?",
-        a: "Após o primeiro contacto e uma conversa inicial (sem compromisso), preparamos uma proposta detalhada com orçamento transparente. Não há surpresas nem custos escondidos.",
+        a: "Após o primeiro contacto e uma conversa inicial, preparamos uma proposta detalhada com orçamento transparente. Não há surpresas nem custos escondidos.",
       },
       {
         q: "Trabalham com diferentes orçamentos?",
@@ -437,8 +435,8 @@ export const pt = {
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
     titleMoss: "a sua ideia",
-    lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
-    processHint: "Pedido → Proposta em 24h → Reunião",
+    lead: "Ouvimos a sua visão e respondemos com uma proposta à medida para o seu evento.",
+    processHint: "Pedido → Proposta → Reunião",
     eventTypeLabels: [
       "Casamento",
       "Corporativo",
@@ -470,7 +468,7 @@ export const pt = {
     ouWhatsApp: "ou pelo WhatsApp",
     error: "Não foi possível enviar. Tente novamente ou fale connosco pelo WhatsApp.",
     requiredNote: "Os campos marcados com * são obrigatórios.",
-    submitReassure: "Sem compromisso · Resposta em menos de 24 horas úteis.",
+    submitReassure: "Uma proposta à medida, pensada ao detalhe.",
     privacyPre: "Ao enviar, aceita a nossa ",
     privacyLinkLabel: "Política de Privacidade",
     privacyPost: ". Não partilhamos os seus dados.",
@@ -545,8 +543,7 @@ export const pt = {
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Vamos dar vida",
     ctaTitleMoss: "à sua ideia?",
-    ctaText:
-      "Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
+    ctaText: "Fale connosco. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
     ctaGaleria: "Ver a galeria",
     galleryAlt: [
       "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
@@ -570,7 +567,7 @@ export const pt = {
     successEyebrow: "Pedido enviado com sucesso",
     titleLine1: "Recebemos o",
     titleMoss: "vosso pedido.",
-    lead: "A nossa equipa irá analisar o pedido e entrar em contacto em menos de 24 horas úteis com uma proposta personalizada.",
+    lead: "A nossa equipa irá analisar o pedido e entrar em contacto com uma proposta personalizada.",
     refLabel: "Referência do Pedido",
     categoria: "Categoria",
     tipo: "Tipo",
