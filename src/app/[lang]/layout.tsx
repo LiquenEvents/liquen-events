@@ -11,6 +11,7 @@ import Analytics from "@/components/Analytics";
 import LeadSourceCapture from "@/components/LeadSourceCapture";
 import PageTransition from "@/components/PageTransition";
 import HeroWarm from "@/components/HeroWarm";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import SmoothScroll from "@/components/motion/SmoothScroll";
 import { getDictionary, htmlLang, normalizeLocale, LOCALES, pickChromeDict } from "@/lib/i18n";
@@ -206,6 +207,7 @@ export default async function RootLayout({
             <Analytics />
             <LeadSourceCapture />
             <HeroWarm />
+            <ServiceWorkerRegister />
             <a
               href="#conteudo"
               className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-white focus:rounded-md focus:text-sm"
