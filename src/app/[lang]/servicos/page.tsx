@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
+import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -200,7 +201,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           very top behind the transparent navbar (no white strip / hairline). */}
       <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+          <HeroImage
             src="/imagens/EW1_1330.jpg"
             alt={t.common.imageAlt.servicosEndOfDay}
             fill

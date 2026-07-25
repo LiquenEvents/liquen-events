@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "pregen": "node scripts/pregen-heroes.mjs",
+    "build": "node scripts/pregen-heroes.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

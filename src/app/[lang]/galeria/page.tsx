@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import HeroImage from "@/components/HeroImage";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import GaleriaClient from "./GaleriaClient";
@@ -74,7 +75,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           very top behind the transparent navbar (no white strip / hairline). */}
       <section className="relative -mt-24 min-h-[100svh] lg:min-h-[80svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+          <HeroImage
             src="/imagens/DaniGui_Preview20.jpg"
             alt={t.common.imageAlt.galeriaHeader}
             fill
