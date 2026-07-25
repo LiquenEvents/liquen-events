@@ -106,7 +106,7 @@ function FloatingField({
       className={`ff group${floatAlways ? " ff--float" : ""}${className ? ` ${className}` : ""}`}
     >
       {children}
-      <label htmlFor={htmlFor} className="ff-label font-medium">
+      <label htmlFor={htmlFor} className="ff-label font-normal">
         {label}
         {required && (
           <span aria-hidden className="text-gold-text">
@@ -442,7 +442,7 @@ export default function OrcamentoForm({
   // focus; border-b at /55 clears the 3:1 non-text-contrast floor (WCAG 1.4.11)
   // and focus switches it to solid moss.
   const ffInputCls =
-    "ff-input field-line w-full bg-transparent border-b border-foreground/55 text-base text-foreground focus:outline-none focus:border-moss";
+    "ff-input field-line w-full bg-transparent border-b border-foreground/45 text-sm text-foreground focus:outline-none focus:border-moss";
   const labelCls =
     "block text-[10.5px] font-medium text-foreground/60 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
@@ -524,7 +524,7 @@ export default function OrcamentoForm({
             onFocusCapture={markStart}
             aria-busy={sending}
             noValidate
-            className="orc-reveal flex flex-col gap-11"
+            className="orc-reveal flex flex-col gap-9"
           >
             {/* Required-fields key, before the fields so the '*' is explained
                 first (WCAG 3.3.2 Labels or Instructions). */}
@@ -582,10 +582,10 @@ export default function OrcamentoForm({
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-5 py-3 rounded-full text-[11px] tracking-[0.1em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
+                      className={`px-4 py-2 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                         active
                           ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
-                          : "border-foreground/12 text-foreground/60 hover:border-moss/40 hover:text-foreground/85"
+                          : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
                       }`}
                     >
                       {to.eventTypeLabels[i] ?? o.label}

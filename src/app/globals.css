@@ -631,37 +631,39 @@ body:has([data-orcamento-mode]) .scroll-progress {
   position: relative;
 }
 .ff-input {
-  padding-top: 1.55rem;
-  padding-bottom: 0.55rem;
+  padding-top: 1.3rem;
+  padding-bottom: 0.35rem;
 }
 .ff-label {
   position: absolute;
   left: 0;
-  top: 1.55rem;
-  font-size: 1rem;
+  top: 1.3rem;
+  font-size: 0.875rem;
   line-height: 1;
-  color: color-mix(in srgb, var(--color-foreground) 50%, transparent);
+  color: color-mix(in srgb, var(--color-foreground) 42%, transparent);
   pointer-events: none;
   transform-origin: left center;
   white-space: nowrap;
   transition:
-    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
-    color 0.24s ease;
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.3s ease;
 }
 .ff:has(.ff-input:focus) .ff-label,
 .ff:has(.ff-input:not(:placeholder-shown)) .ff-label,
 .ff--float .ff-label {
-  transform: translateY(-1.55rem) scale(0.66);
-  letter-spacing: 0.16em;
+  /* Small, quiet, gray micro-label (Apple-like) — the moss accent stays on the
+     underline, not the label. */
+  transform: translateY(-1.3rem) scale(0.7);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--color-moss-dark);
+  color: color-mix(in srgb, var(--color-foreground) 50%, transparent);
 }
 /* Hide the example placeholder until focus so only the resting label shows. */
 .ff-input::placeholder {
   color: transparent;
 }
 .ff-input:focus::placeholder {
-  color: color-mix(in srgb, var(--color-foreground) 55%, transparent);
+  color: color-mix(in srgb, var(--color-foreground) 40%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
   .ff-label {
