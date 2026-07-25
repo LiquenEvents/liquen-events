@@ -101,13 +101,13 @@ export default function StickyCTA() {
       <Link
         href={localizeHref("/orcamento", locale)}
         onClick={() => track("CTAClick", { source: "sticky" })}
-        className="group flex items-center gap-3 px-6 py-3.5 bg-[#0c0e0b]/90 border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
+        className="group flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-6 sm:py-3.5 bg-[#0c0e0b]/90 border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
       >
-        <span className="text-[10px] tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
+        <span className="text-[9px] sm:text-[10px] tracking-[0.18em] sm:tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
           {t.footer.pedirOrcamento}
         </span>
         <span
-          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo text-sm"
+          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo text-xs sm:text-sm"
           aria-hidden
         >
           →
