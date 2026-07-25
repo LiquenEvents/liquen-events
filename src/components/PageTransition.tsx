@@ -5,14 +5,23 @@ import { useEffect, useState } from "react";
 import { ViewTransition } from "./vt";
 
 /**
- * Route transitions. With React <ViewTransition> available (Next 16 +
- * experimental.viewTransition), navigations animate via the browser's View
- * Transitions API as a short, opacity-only cross-fade. The Navbar still tags
- * links `nav-forward`/`nav-back` by menu order (mapped to vt-page-fwd/bwd
- * below), but all three now resolve to the same fade in globals.css — animating
- * TRANSFORM on a full-page snapshot stuttered on image-heavy heroes, so the
- * entrance is opacity-only for maximum fluidity. Without the API, falls back to
- * the original CSS route-fade.
+ * Route transitions.
+ *
+ * We deliberately DON'T use the browser's View Transitions API for route
+ * changes. That API snapshots the whole outgoing AND incoming page into
+ * compositor layers, freezing the document while it captures — and on our
+ * image-heavy heroes (e.g. /sobre's full-bleed 100svh photo) that capture
+ * collides with the new route hydrating and decoding its hero, so the
+ * transition visibly stuttered no matter how cheap the animated property was.
+ *
+ * Instead every navigation runs a single lightweight CSS fade on ONLY the
+ * incoming content (`.route-fade` in globals.css): no whole-page snapshot, no
+ * frozen document, no dual-layer capture — just one composited opacity animation
+ * on the new page. That's the cheapest possible transition and stays 60fps even
+ * while the new route is still settling. (To bring the View Transitions path
+ * back — directional slides, shared-element morphs — flip USE_VIEW_TRANSITIONS
+ * to true; the implementation below and the ::view-transition-* rules in
+ * globals.css are kept intact.)
  *
  * Entrances are applied ONLY on client-side navigations — never on the very
  * first paint. Animating the initial page would hold the LCP hero invisible
@@ -20,6 +29,11 @@ import { ViewTransition } from "./vt";
  * pathname once: the landing render stays static (matches SSR — no hydration
  * mismatch), every subsequent route animates.
  */
+// Master switch for the route-level View Transitions API path. OFF for maximum
+// transition fluidity — see the note above. The Navbar still tags links
+// nav-forward/nav-back and the vt-page* CSS rules remain, so re-enabling is a
+// one-line change.
+const USE_VIEW_TRANSITIONS = false;
 export default function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePublicPathname();
   const [entryPath] = useState(pathname);
@@ -44,7 +58,7 @@ export default function PageTransition({ children }: { children: React.ReactNode
 
   const isNavigation = pathname !== entryPath;
 
-  if (!ViewTransition || !vtCapable) {
+  if (!USE_VIEW_TRANSITIONS || !ViewTransition || !vtCapable) {
     return (
       <div key={pathname} className={isNavigation ? "route-fade" : undefined}>
         {children}

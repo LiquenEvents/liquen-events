@@ -643,22 +643,26 @@ body[data-menu-open] .whatsapp-fixed {
   animation: word-rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) var(--word-delay, 0ms) both;
 }
 
-/* ── Route transition (Pixel-Matters-style page reveal) ── */
+/* ── Route transition — the ONLY page-change animation (View Transitions API is
+   off; see PageTransition.tsx). A single opacity fade on the incoming page:
+   OPACITY-ONLY (no translateY) so there's zero transform — nothing to create a
+   containing block for fixed overlays, and the browser composites the fade on
+   its own layer, so it stays 60fps even while the new route is still hydrating
+   and decoding its hero. This is the cheapest possible page transition. ── */
 @keyframes route-fade {
   from {
     opacity: 0;
-    transform: translateY(14px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 .route-fade {
-  /* `backwards` (not `both`): applies the start state before the animation but
-     does NOT leave a lingering transform afterwards — a persistent transform
-     would create a containing block and break position:fixed overlays inside. */
-  animation: route-fade 0.42s var(--ease-out) backwards;
+  /* No will-change here: the class lingers on the page container for the whole
+     visit, so a static will-change would pin a full-page compositor layer the
+     entire time (hurting scroll). Browsers already auto-promote an animating
+     opacity to its own layer for the run, which is exactly the duration we want. */
+  animation: route-fade 0.34s var(--ease-out) backwards;
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
