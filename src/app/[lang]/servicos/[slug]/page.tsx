@@ -122,7 +122,7 @@ export default async function ServiceDetailPage({
             fill
             priority
             sizes="100vw"
-            quality={82}
+            quality={75}
             className="object-cover hero-settle"
           />
         </Parallax>
@@ -358,12 +358,11 @@ export default async function ServiceDetailPage({
             alt=""
             fill
             sizes="100vw"
-            // Match the hero's quality={82} for the SAME source image: a different
+            // Match the hero's quality for the SAME source image: a different
             // quality would resolve to a second /_next/image URL and re-fetch +
             // re-decode the full-bleed photo. Same value → the already-decoded
-            // hero asset is reused. The FAQ veil is near-opaque, so 82 vs 75 is
-            // invisible here anyway.
-            quality={82}
+            // hero asset is reused.
+            quality={75}
             className="object-cover object-center"
             {...blurFor(svc.hero)}
           />

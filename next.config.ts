@@ -24,12 +24,12 @@ const nextConfig: NextConfig = {
     // image on each page — while everything else stays ≤75. 50/72/75 keep the
     // gallery + body imagery lean.
     qualities: [50, 65, 72, 75, 82],
-    // Added 2048/2560 so 4K / retina screens get a sharp cover instead of a
-    // 1920 upscale. WebP (not AVIF — see the note above) so the cold encode of
-    // these larger sizes stays fast; smaller screens are unaffected (they pick a
-    // smaller width from the srcset). The cover sources are ~2.1–2.6k, so 2560 is
-    // at/near native — no synthetic upscaling.
-    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920, 2048, 2560],
+    // Cap at 2048 (dropped 2560): only the full-bleed heroes ever reached the
+    // 2560 candidate, and cold-encoding that on first view is what kept the hero
+    // blur placeholder on screen the longest before the sharp image "opened".
+    // 2048 is still sharp on 4K (a slight, imperceptible upscale) and its cold
+    // WebP encode + download are meaningfully faster, so the blur clears sooner.
+    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920, 2048],
     imageSizes: [16, 32, 64, 96, 128, 256, 384],
     minimumCacheTTL: 31_536_000,
     // Serve images inline instead of as attachment downloads

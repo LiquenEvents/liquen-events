@@ -70,7 +70,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             fill
             priority
             sizes="100vw"
-            quality={82}
+            quality={75}
             className="object-cover hero-settle"
           />
         </Parallax>
