@@ -393,8 +393,10 @@ export default function OrcamentoForm({
 
   const inputCls =
     // border-b at /55 clears the 3:1 non-text-contrast floor so the field is
-    // identifiable (WCAG 1.4.11); focus switches to solid moss.
-    "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/65 focus:outline-none focus:border-moss transition-colors duration-300";
+    // identifiable (WCAG 1.4.11); focus switches to solid moss. `field-line`
+    // (globals.css) draws a hairline moss underline in on focus for a premium,
+    // still-minimal affordance on top of the instant border colour change.
+    "field-line w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/65 focus:outline-none focus:border-moss";
   const labelCls =
     "block text-[10.5px] font-medium text-foreground/60 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
@@ -476,7 +478,7 @@ export default function OrcamentoForm({
             onFocusCapture={markStart}
             aria-busy={sending}
             noValidate
-            className="flex flex-col gap-11"
+            className="orc-reveal flex flex-col gap-11"
           >
             {/* Required-fields key, before the fields so the '*' is explained
                 first (WCAG 3.3.2 Labels or Instructions). */}
@@ -534,7 +536,7 @@ export default function OrcamentoForm({
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-5 py-3 rounded-full text-[11px] tracking-[0.1em] uppercase border transition-[background-color,border-color,color,box-shadow] duration-200 ${
+                      className={`px-5 py-3 rounded-full text-[11px] tracking-[0.1em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                         active
                           ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
                           : "border-foreground/12 text-foreground/60 hover:border-moss/40 hover:text-foreground/85"
@@ -631,7 +633,9 @@ export default function OrcamentoForm({
                   onBlur={() => setTouched((prev) => ({ ...prev, nome: true }))}
                   aria-invalid={!!nomeErr}
                   aria-describedby={nomeErr ? "of-nome-err" : undefined}
-                  className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
+                  className={`${inputCls} ${
+                    nomeErr ? "border-gold/60" : nome.trim().length >= 2 ? "border-moss/50" : ""
+                  }`}
                   placeholder={to.phNome}
                 />
                 {nomeErr && (
@@ -658,7 +662,9 @@ export default function OrcamentoForm({
                   onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                   aria-invalid={!!emailErr}
                   aria-describedby={emailErr ? "of-email-err" : undefined}
-                  className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
+                  className={`${inputCls} ${
+                    emailErr ? "border-gold/60" : /\S+@\S+\.\S+/.test(email) ? "border-moss/50" : ""
+                  }`}
                   placeholder={to.phEmail}
                 />
                 {emailErr && (

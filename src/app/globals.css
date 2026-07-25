@@ -602,6 +602,70 @@ body:has([data-orcamento-mode]) .scroll-progress {
   display: none !important;
 }
 
+/* ── Orçamento form: refined, ultra-minimal field + entrance details ──
+   A hairline moss underline that DRAWS IN left→right on focus (over the resting
+   border), and a subtle staggered fade/rise for the fields on load. Motion is
+   opacity/transform + a 2px background line only — no layout shift, negligible
+   cost — and the entrance is gated behind prefers-reduced-motion. */
+.field-line {
+  background-image: linear-gradient(var(--color-moss), var(--color-moss));
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: 0% 2px;
+  transition:
+    background-size 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease;
+}
+.field-line:focus {
+  background-size: 100% 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .orc-reveal > * {
+    animation: orc-field-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .orc-reveal > *:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .orc-reveal > *:nth-child(2) {
+    animation-delay: 0.05s;
+  }
+  .orc-reveal > *:nth-child(3) {
+    animation-delay: 0.08s;
+  }
+  .orc-reveal > *:nth-child(4) {
+    animation-delay: 0.13s;
+  }
+  .orc-reveal > *:nth-child(5) {
+    animation-delay: 0.18s;
+  }
+  .orc-reveal > *:nth-child(6) {
+    animation-delay: 0.23s;
+  }
+  .orc-reveal > *:nth-child(7) {
+    animation-delay: 0.28s;
+  }
+  .orc-reveal > *:nth-child(8) {
+    animation-delay: 0.33s;
+  }
+  .orc-reveal > *:nth-child(9) {
+    animation-delay: 0.38s;
+  }
+  .orc-reveal > *:nth-child(n + 10) {
+    animation-delay: 0.42s;
+  }
+  @keyframes orc-field-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
 /* ── Hero parallax drift, driven on the compositor ──
    Opt-in via <Parallax drift>. Where scroll-driven animations exist (and motion
    is welcome), the hero layer drifts as its section scrolls through the viewport
