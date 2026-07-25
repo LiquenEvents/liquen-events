@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useDeferredValue } from "react";
 import type { Supplier } from "@/lib/orcamento/types";
 import { downloadCsv, dateStamp } from "./export";
 import { SkeletonCard } from "./Skeleton";
@@ -46,6 +46,8 @@ export default function Fornecedores() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Defer so the filter/row reconcile runs off the keystroke; input stays instant.
+  const dSearch = useDeferredValue(search);
   const [cat, setCat] = useState("Todos");
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -134,7 +136,7 @@ export default function Fornecedores() {
     .filter((s) => {
       if (cat === "Preferidos" && !s.preferred) return false;
       if (cat !== "Todos" && cat !== "Preferidos" && s.category !== cat) return false;
-      const q = search.trim().toLowerCase();
+      const q = dSearch.trim().toLowerCase();
       if (
         q &&
         ![s.name, s.email, s.phone, s.location, s.notes]

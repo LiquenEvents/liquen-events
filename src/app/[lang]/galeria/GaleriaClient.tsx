@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { createPortal, flushSync } from "react-dom";
 import Image from "next/image";
 import type { Label } from "./photos-data";
@@ -224,7 +225,13 @@ export default function GaleriaClient({
   // coincidam (sem hydration mismatch); o efeito ajusta para o valor real. Espelha
   // os breakpoints antigos (columns-1 / sm:columns-2 / md:columns-3).
   const [cols, setCols] = useState(1);
-  useEffect(() => {
+  // Measure the real column count in a LAYOUT effect (before the browser paints),
+  // not a passive effect. SSR + the hydration render still use cols=1 (no
+  // mismatch), but the correction to 2/3 now lands before first paint — so a
+  // tablet/desktop visitor never sees the masonry painted in one full-width
+  // column and then re-pack into 2–3 columns (that 1→N repack was a big CLS on
+  // landing at /galeria). Runs as a passive effect on the server (no-op there).
+  useIsomorphicLayoutEffect(() => {
     const sm = window.matchMedia("(min-width: 640px)");
     const md = window.matchMedia("(min-width: 768px)");
     const apply = () => setCols(md.matches ? 3 : sm.matches ? 2 : 1);

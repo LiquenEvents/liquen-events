@@ -250,7 +250,15 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           <section
             id={cat.id}
             className="relative overflow-hidden scroll-mt-[60px] flex items-end"
-            style={{ minHeight: "clamp(500px, 80vh, 820px)" }}
+            // content-visibility skips paint+layout for this full-bleed panel
+            // while it's off-screen; contain-intrinsic-size is pinned to the SAME
+            // min-height so the reserved space matches the real height (no
+            // scroll-jump). Unsupported browsers ignore both and render normally.
+            style={{
+              minHeight: "clamp(500px, 80vh, 820px)",
+              contentVisibility: "auto",
+              containIntrinsicSize: "auto clamp(500px, 80vh, 820px)",
+            }}
           >
             <Parallax speed={0.12} className="absolute inset-0">
               <Image
@@ -294,7 +302,11 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}
       <section
         className="relative overflow-hidden"
-        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+        style={{
+          minHeight: "clamp(560px, 90vh, 900px)",
+          contentVisibility: "auto",
+          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
+        }}
       >
         <Image
           src="/imagens/J&A-68.jpg"
@@ -337,7 +349,11 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       {/* ── CTA — full-screen closing panel ── */}
       <section
         className="relative overflow-hidden flex items-center py-28 lg:py-40"
-        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+        style={{
+          minHeight: "clamp(560px, 90vh, 900px)",
+          contentVisibility: "auto",
+          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
+        }}
       >
         <Image
           src="/imagens/M&F0497.jpg"

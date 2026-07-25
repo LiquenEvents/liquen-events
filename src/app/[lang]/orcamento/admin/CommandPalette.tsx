@@ -134,7 +134,7 @@ export default function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12vh]"
+      className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12dvh]"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm" />
@@ -173,7 +173,7 @@ export default function CommandPalette({
           </kbd>
         </div>
 
-        <div className="max-h-[52vh] overflow-y-auto p-2">
+        <div className="max-h-[52dvh] overflow-y-auto overscroll-contain p-2">
           {results.length === 0 && (
             <p className="py-10 text-center text-sm text-foreground/45">
               Sem resultados para “{query.trim()}”.
