@@ -80,6 +80,15 @@ const categoryMeta = [
   },
 ];
 
+// Shared veil for every full-bleed service panel (category intros + service
+// bands) so they read as ONE continuous, softly-fading sequence rather than a
+// stack of separate photos. Lighter than before (bottom 0.72, not 0.90) so the
+// images stay bright and the seams don't turn into a hard black band; a gentle
+// 0.30 fade at the very top blends each image into the bottom of the panel above
+// it — the "continuous fade between images" look, kept light.
+const PANEL_VEIL =
+  "linear-gradient(to top, rgba(8,8,8,0.72) 0%, rgba(8,8,8,0.12) 42%, rgba(8,8,8,0) 62%, rgba(8,8,8,0.30) 100%)";
+
 /* ── Full-screen service band — one image, one service (SpaceX-style) ── */
 function ServiceBand({
   service,
@@ -108,7 +117,7 @@ function ServiceBand({
       {/* Image-first (SpaceX-style): the photo reads fully at the top, and only
           the bottom — where the number/title/description sit — darkens enough to
           keep the white text legible. No heavy full-panel veil. */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+      <div className="absolute inset-0" style={{ backgroundImage: PANEL_VEIL }} />
       {/* A big bold uppercase headline, a one-line description, and the ghost
           outline button. The mono chapter index was removed on request. */}
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-12 lg:pb-16">
@@ -254,7 +263,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {...blurFor(cat.band)}
               />
             </Parallax>
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+            <div className="absolute inset-0" style={{ backgroundImage: PANEL_VEIL }} />
             {/* The descriptive sentence IS the headline now — the uppercase
                 category label and the ghost "Ver detalhes" button were dropped
                 so the panel reads as a single elegant statement. Navigation into
