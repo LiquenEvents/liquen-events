@@ -110,15 +110,6 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             </div>
           </AnimateIn>
         </div>
-
-        <div className="absolute bottom-8 right-6 lg:right-16 z-10 hidden sm:flex flex-col items-center gap-3 anim-3">
-          <span className="text-white/75 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
-            {t.home.scroll}
-          </span>
-          <div className="h-10 w-px overflow-hidden">
-            <div className="w-full h-full bg-gradient-to-b from-white/50 to-transparent animate-scroll-line" />
-          </div>
-        </div>
       </section>
 
       {/* ── Clients marquee ── */}
@@ -167,7 +158,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               <Reveal as="div" stagger={0.08} start="top 92%">
                 <h2
                   className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
-                  style={{ fontSize: "clamp(28px, 4.6vw, 56px)" }}
+                  style={{ fontSize: "clamp(24px, 3.4vw, 42px)" }}
                 >
                   {s.title}
                 </h2>
