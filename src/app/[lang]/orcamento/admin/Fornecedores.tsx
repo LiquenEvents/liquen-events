@@ -132,26 +132,32 @@ export default function Fornecedores() {
     () => ["Todos", "Preferidos", ...Array.from(new Set(suppliers.map((s) => s.category)))],
     [suppliers],
   );
-  const filtered = suppliers
-    .filter((s) => {
-      if (cat === "Preferidos" && !s.preferred) return false;
-      if (cat !== "Todos" && cat !== "Preferidos" && s.category !== cat) return false;
-      const q = dSearch.trim().toLowerCase();
-      if (
-        q &&
-        ![s.name, s.email, s.phone, s.location, s.notes]
-          .filter(Boolean)
-          .some((v) => v!.toLowerCase().includes(q))
-      )
-        return false;
-      return true;
-    })
-    .slice()
-    .sort((a, b) => {
-      if (a.preferred && !b.preferred) return -1;
-      if (!a.preferred && b.preferred) return 1;
-      return a.name.localeCompare(b.name);
-    });
+  // Memoised: the filter+sort over all suppliers was recomputed on every render
+  // (incl. typing in the add/edit forms), not just when the inputs changed.
+  const filtered = useMemo(
+    () =>
+      suppliers
+        .filter((s) => {
+          if (cat === "Preferidos" && !s.preferred) return false;
+          if (cat !== "Todos" && cat !== "Preferidos" && s.category !== cat) return false;
+          const q = dSearch.trim().toLowerCase();
+          if (
+            q &&
+            ![s.name, s.email, s.phone, s.location, s.notes]
+              .filter(Boolean)
+              .some((v) => v!.toLowerCase().includes(q))
+          )
+            return false;
+          return true;
+        })
+        .slice()
+        .sort((a, b) => {
+          if (a.preferred && !b.preferred) return -1;
+          if (!a.preferred && b.preferred) return 1;
+          return a.name.localeCompare(b.name);
+        }),
+    [suppliers, cat, dSearch],
+  );
 
   return (
     <div>
