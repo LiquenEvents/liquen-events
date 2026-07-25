@@ -8,6 +8,7 @@ import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
 import Analytics from "@/components/Analytics";
+import SpeculationRules from "@/components/SpeculationRules";
 import LeadSourceCapture from "@/components/LeadSourceCapture";
 import PageTransition from "@/components/PageTransition";
 import HeroWarm from "@/components/HeroWarm";
@@ -204,6 +205,7 @@ export default async function RootLayout({
           <SmoothScroll>
             {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
             <StructuredData locale={locale} />
+            <SpeculationRules />
             <Analytics />
             <LeadSourceCapture />
             <HeroWarm />
