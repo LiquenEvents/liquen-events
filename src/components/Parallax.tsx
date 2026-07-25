@@ -148,9 +148,15 @@ interface Props {
   /** Fraction of the element's distance-from-viewport-centre to counter-move.
       0.1–0.2 is cinematic; beyond that it reads as a gimmick. */
   speed?: number;
+  /** Opt into the CSS scroll-driven drift (compositor, zero main-thread cost;
+      see .parallax-drift in globals.css). Gated there by @supports +
+      prefers-reduced-motion, so it's pure progressive enhancement — unsupported
+      browsers just show the static image. Independent of the (disabled) JS
+      path above. */
+  drift?: boolean;
 }
 
-export default function Parallax({ children, className = "", speed = 0.12 }: Props) {
+export default function Parallax({ children, className = "", speed = 0.12, drift = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -193,7 +199,7 @@ export default function Parallax({ children, className = "", speed = 0.12 }: Pro
   }, [speed]);
 
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={`${className}${drift ? " parallax-drift" : ""}`}>
       {children}
     </div>
   );

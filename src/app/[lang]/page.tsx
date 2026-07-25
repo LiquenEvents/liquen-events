@@ -41,7 +41,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed
           behind the transparent fixed navbar. */}
       <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
-        <Parallax speed={0.14} className="absolute inset-0">
+        <Parallax speed={0.14} drift className="absolute inset-0">
           <HeroImage
             src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
             {...blurFor("/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg")}

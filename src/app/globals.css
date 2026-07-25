@@ -602,6 +602,40 @@ body:has([data-orcamento-mode]) .scroll-progress {
   display: none !important;
 }
 
+/* ── Hero parallax drift, driven on the compositor ──
+   Opt-in via <Parallax drift>. Where scroll-driven animations exist (and motion
+   is welcome), the hero layer drifts as its section scrolls through the viewport
+   — tied to the element's own view() timeline, so it runs on the compositor with
+   NO scroll listener and NO main-thread work (unlike the old JS parallax, which
+   is why that one was retired). A small scale(1.06) gives 3% headroom each side
+   so the ±2.4% drift never exposes an edge. Unsupported browsers / reduced-
+   motion show the static image.
+
+   Timeline is scroll(root) — NOT view() — on purpose: the hero sits inside an
+   overflow-hidden section, which is itself a scroll container, so view() would
+   resolve against that non-scrolling ancestor and never advance. scroll(root)
+   binds to the document scroller directly; every page's hero is its first
+   section, so a 0 → 100vh range covers the hero's passage on all of them. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .parallax-drift {
+      transform: scale(1.06);
+      will-change: transform;
+      animation: parallax-drift-kf linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 100vh;
+    }
+    @keyframes parallax-drift-kf {
+      from {
+        transform: scale(1.06) translateY(-2.4%);
+      }
+      to {
+        transform: scale(1.06) translateY(2.4%);
+      }
+    }
+  }
+}
+
 /* ── Scroll progress bar driven on the compositor ──
    Where scroll-driven animations exist, the bar's fill is tied straight to the
    document scroll timeline — no scroll listener, no rAF, no main-thread work; it
