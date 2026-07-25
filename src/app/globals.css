@@ -675,27 +675,17 @@ body[data-menu-open] .whatsapp-fixed {
 @keyframes route-fade {
   from {
     opacity: 0;
-    /* A gentle rise + hair of zoom-out settle — the incoming page glides up and
-       resolves, rather than a flat cross-fade. Pure transform + opacity, so it's
-       GPU-composited and stays 60fps (the fluidity is unchanged; only the shape
-       of the motion is prettier). The fixed chrome — navbar, WhatsApp, sticky
-       CTA — lives OUTSIDE this container (in the layout), so the transform never
-       affects it; `backwards` also drops the transform once the run ends, so no
-       containing block lingers for any fixed child. */
-    transform: translateY(22px) scale(0.992);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 .route-fade {
   /* No will-change here: the class lingers on the page container for the whole
      visit, so a static will-change would pin a full-page compositor layer the
      entire time (hurting scroll). Browsers already auto-promote an animating
-     transform/opacity to their own layer for the run, which is exactly the
-     duration we want. */
-  animation: route-fade 0.52s var(--ease-out) backwards;
+     opacity to its own layer for the run, which is exactly the duration we want. */
+  animation: route-fade 0.34s var(--ease-out) backwards;
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
