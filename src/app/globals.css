@@ -455,6 +455,24 @@ body::before {
   animation: lb-photo-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Opening a photo: a slightly deeper zoom-in than the between-photos lb-photo-in,
+   so the photo visibly "grows" as it opens. Transform + opacity only → fully
+   GPU-composited, no snapshot (this replaced the View Transition morph, which
+   snapshotted the whole full-screen layer and stuttered). */
+@keyframes lb-open-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.lb-open-in {
+  animation: lb-open-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ── Lightbox cinematográfico — slideshow ── */
 /* Ken Burns: deriva lenta enquanto a foto está em exibição no slideshow. */
 @keyframes lb-kenburns {
@@ -947,7 +965,8 @@ body:has([data-orcamento-mode]) .eyebrow {
     animation: none;
     transform: scale(1.06);
   }
-  .lb-photo-in {
+  .lb-photo-in,
+  .lb-open-in {
     animation: none;
   }
   .lb-kenburns {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from "react";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
-import { createPortal, flushSync } from "react-dom";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import type { Label } from "./photos-data";
 import { collectionFor } from "./collections";
@@ -483,17 +483,18 @@ export default function GaleriaClient({
   // Lightbox navigation (through entire pool, not just shown)
   // Abrir/fechar dentro de startTransition ativa o morph <ViewTransition>;
   // navegar (←/→) fica fora — usa o lb-photo-in clássico entre fotos.
-  const openAt = useCallback(
-    (idx: number) => {
-      // Nomear a miniatura ANTES de capturar o snapshot "antes" do morph.
-      // flushSync força esse commit já; sem isto o setMorphSrc seria agrupado
-      // com o setLb e o snapshot "antes" ainda não teria o nome → sem morph.
-      flushSync(() => setMorphSrc(pool[idx].src));
-      setJustOpened(true);
-      startTransition(() => setLb(idx));
-    },
-    [pool],
-  );
+  const openAt = useCallback((idx: number) => {
+    // Open with a plain state update — NOT a View Transition. The VT morph
+    // snapshotted the whole full-screen lightbox layer and, via flushSync, forced
+    // a synchronous re-render of the entire grid to name the tapped tile — the
+    // two costs that made opening stutter. Now the lightbox just mounts and its
+    // photo eases in with the composited `lb-open-in` zoom (see globals.css):
+    // transform + opacity only, no snapshot, no grid reconcile. `justOpened`
+    // selects that deeper open zoom; ←/→ set it false and use the subtler
+    // lb-photo-in between photos.
+    setJustOpened(true);
+    setLb(idx);
+  }, []);
   const close = useCallback(() => {
     // Fecho FIÁVEL com animação de saída via CSS (não ViewTransition). Com a
     // camada de motion ativa, o ViewTransition de fecho do React revelou-se
@@ -1175,7 +1176,7 @@ function Lightbox({
               // "black → pop" gap so the photo is ready as the open animation runs.
               priority
               className={`object-contain ${
-                playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
+                playing ? "lb-kenburns" : justOpened ? "lb-open-in" : "lb-photo-in"
               }`}
               {...blurProps(pool[index])}
             />
