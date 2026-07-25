@@ -221,7 +221,10 @@ const Tile = memo(function Tile({
           alt={alt}
           fill
           sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
-          quality={72}
+          // 65 (was 72): thumbnails, so a lean file that loads fast on the grid
+          // burst matters more than the last few % of sharpness — the full-res
+          // photo opens in the lightbox. Smaller download + faster cold encode.
+          quality={65}
           className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
           loading={eager ? "eager" : "lazy"}
           {...blurProps(photo)}
@@ -1207,8 +1210,12 @@ function Lightbox({
               src={pool[index].src}
               alt={altText(pool[index].src, pool[index].label)}
               fill
-              sizes="90vw"
-              quality={75}
+              // Cap the requested candidate at 1920px (via min()): on a 4K/retina
+              // screen 90vw would otherwise pick the 2560 candidate — a slow cold
+              // WebP encode + a big download on open. 1920 is still sharp for a
+              // full-screen photo and encodes/downloads much faster.
+              sizes="min(90vw, 1920px)"
+              quality={72}
               // priority: the full-res lightbox photo is a DIFFERENT srcset
               // candidate than the tile thumbnail, so opening starts a cold fetch.
               // Fetching it high-priority (instead of default) shortens the
@@ -1240,8 +1247,8 @@ function Lightbox({
               src={pool[(index + 1) % pool.length].src}
               alt=""
               fill
-              sizes="90vw"
-              quality={75}
+              sizes="min(90vw, 1920px)"
+              quality={72}
               loading="eager"
             />
           )}
