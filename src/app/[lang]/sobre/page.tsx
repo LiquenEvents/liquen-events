@@ -100,7 +100,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           alt=""
           fill
           sizes="100vw"
-          quality={70}
+          quality={72}
           className="absolute inset-0 object-cover object-left"
         />
         <div
@@ -208,7 +208,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           alt=""
           fill
           sizes="100vw"
-          quality={70}
+          quality={72}
           className="absolute inset-0 object-cover object-center"
         />
         <div

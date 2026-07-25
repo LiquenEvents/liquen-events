@@ -32,7 +32,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
         alt=""
         fill
         sizes="100vw"
-        quality={70}
+        quality={72}
         // Frame lower-centre so the long table (foreground of the photo) is the
         // part that shows, instead of the middle band of the building.
         className="absolute inset-0 object-cover object-[50%_68%]"
