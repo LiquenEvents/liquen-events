@@ -66,9 +66,9 @@ const categoryMeta = [
     band: "/imagens/DaniGui_Preview20.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
-      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
+      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
     ],
   },
   {
@@ -87,7 +87,7 @@ const categoryMeta = [
 // 0.30 fade at the very top blends each image into the bottom of the panel above
 // it — the "continuous fade between images" look, kept light.
 const PANEL_VEIL =
-  "linear-gradient(to top, rgba(8,8,8,0.72) 0%, rgba(8,8,8,0.12) 42%, rgba(8,8,8,0) 62%, rgba(8,8,8,0.30) 100%)";
+  "linear-gradient(to top, rgba(8,8,8,0.75) 0%, rgba(8,8,8,0.20) 38%, rgba(8,8,8,0.16) 58%, rgba(8,8,8,0.55) 100%)";
 
 /* ── Full-screen service band — one image, one service (SpaceX-style) ── */
 function ServiceBand({

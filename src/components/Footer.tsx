@@ -41,7 +41,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
         aria-hidden
         className="absolute inset-0"
         style={{
-          backgroundImage: "linear-gradient(to bottom, rgba(7,8,7,0.55), rgba(7,8,7,0.8))",
+          backgroundImage: "linear-gradient(to bottom, rgba(7,8,7,0.42), rgba(7,8,7,0.66))",
         }}
       />
       {/* Soft top fade (no hard line): the footer image eases in from the dark

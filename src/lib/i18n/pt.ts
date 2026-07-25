@@ -513,16 +513,16 @@ export const pt = {
             desc: "O vosso dia mais especial — coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
           },
           {
-            title: "Aluguer de Viaturas Clássicas",
-            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
-          },
-          {
             title: "Batizados & Comunhões",
             desc: "Celebrações familiares íntimas e cheias de significado, organizadas com carinho.",
           },
           {
             title: "Festas de Aniversário",
             desc: "Festas temáticas ou clássicas para todas as idades. Cada aniversário é uma história.",
+          },
+          {
+            title: "Aluguer de Viaturas Clássicas",
+            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
           },
         ],
       },

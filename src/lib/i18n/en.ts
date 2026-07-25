@@ -502,16 +502,16 @@ export const en: Dict = {
             desc: "Your most special day — coordination, decoration, photography and catering. We handle it all so you can simply live it.",
           },
           {
-            title: "Classic Car Rental",
-            desc: "Classic cars with a driver for a dream arrival — from the bride's entrance to guest transport.",
-          },
-          {
             title: "Christenings & Communions",
             desc: "Intimate, meaningful family celebrations, organised with care.",
           },
           {
             title: "Birthday Parties",
             desc: "Themed or classic parties for all ages. Every birthday is a story.",
+          },
+          {
+            title: "Classic Car Rental",
+            desc: "Classic cars with a driver for a dream arrival — from the bride's entrance to guest transport.",
           },
         ],
       },
