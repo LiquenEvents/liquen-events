@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -171,6 +171,67 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   );
 }
 
+// One masonry tile, memoised. Infinite-scroll appends re-run GaleriaClient's
+// render; without memo, React reconciled every already-mounted tile's next/image
+// subtree on each append (hundreds of them to add 24). All props here are stable
+// across an append for existing tiles (the photo object comes from the memoised
+// pool; strings/flags/idx don't change; onOpen and registerTile are useCallback-
+// stable), so memo lets existing tiles bail out — only the new page's tiles
+// render. (No VTWrap / open-index gate anymore: the open morph was replaced by a
+// composited CSS zoom, so a tile no longer depends on which photo is open.)
+const Tile = memo(function Tile({
+  photo,
+  idx,
+  alt,
+  caption,
+  sub,
+  hiddenSm,
+  eager,
+  revealDelay,
+  onOpen,
+  registerTile,
+}: {
+  photo: Photo;
+  idx: number;
+  alt: string;
+  caption: string;
+  sub?: string;
+  hiddenSm: boolean;
+  eager: boolean;
+  revealDelay: number;
+  onOpen: (idx: number) => void;
+  registerTile: (el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      ref={registerTile}
+      className={`g-reveal${hiddenSm ? " sm:hidden" : ""}`}
+      style={{ "--reveal-delay": `${revealDelay}ms` } as React.CSSProperties}
+    >
+      <button
+        onClick={() => onOpen(idx)}
+        data-ripple
+        data-cap={caption}
+        data-sub={sub}
+        className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
+        style={{ aspectRatio: photo.aspectRatio }}
+      >
+        <Image
+          src={photo.src}
+          alt={alt}
+          fill
+          sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
+          quality={72}
+          className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+          loading={eager ? "eager" : "lazy"}
+          {...blurProps(photo)}
+        />
+        <HoverOverlay caption={caption} sub={sub} />
+      </button>
+    </div>
+  );
+});
+
 export default function GaleriaClient({
   photos,
   dict,
@@ -268,7 +329,6 @@ export default function GaleriaClient({
   const tileName = (src: string, active: boolean) =>
     active && morphSrc === src ? vtId(src) : undefined;
   const mosaicName = (idx: number) => tileName(visible[idx].src, idx === 0 || isSm === true);
-  const masonryName = (idx: number, src: string) => tileName(src, idx < 5 ? isSm === false : true);
   // O lightbox (portal, listeners de teclado/gesto, trap de foco, slideshow,
   // pré-carga de vizinhos) vive num componente-filho `Lightbox` que só é montado
   // quando `lb !== null`. Assim, nada da sua configuração — refs, efeitos,
@@ -712,51 +772,24 @@ export default function GaleriaClient({
           <div className="flex items-start gap-0.5">
             {masonryColumns.map((col, ci) => (
               <div key={ci} className="flex min-w-0 flex-1 flex-col gap-0.5">
-                {col.map(({ p, idx }, j) => (
-                  <div
-                    key={p.src}
-                    ref={registerTile}
-                    className={`g-reveal${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
-                    style={{ "--reveal-delay": `${(j % 3) * 60}ms` } as React.CSSProperties}
-                  >
-                    <button
-                      onClick={() => openAt(idx)}
-                      data-ripple
-                      data-cap={caption(p.src, p.label).caption}
-                      data-sub={caption(p.src, p.label).sub}
-                      className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
-                      style={{ aspectRatio: p.aspectRatio }}
-                    >
-                      {lb !== idx && (
-                        <VTWrap
-                          name={collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)}
-                        >
-                          <Image
-                            src={p.src}
-                            alt={altText(p.src, p.label)}
-                            fill
-                            // Match the real column count (1 col <640px, 2 cols
-                            // 640–767px, 3 cols ≥768px). The old value declared
-                            // 50vw on phones where a tile is actually full-width,
-                            // under-fetching and softening the flagship gallery
-                            // photos on mobile — the majority of visitors.
-                            sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
-                            // 72 for the masonry thumbnails — crisp portfolio work
-                            // (the photos are the product). Slightly below the
-                            // lightbox's 75 since tiles render at ~33vw, but well
-                            // above a lossy look. Speed comes from WebP-only encode,
-                            // not from starving quality, so this stays fast.
-                            quality={72}
-                            className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                            loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
-                            {...blurProps(p)}
-                          />
-                        </VTWrap>
-                      )}
-                      <HoverOverlay {...caption(p.src, p.label)} />
-                    </button>
-                  </div>
-                ))}
+                {col.map(({ p, idx }, j) => {
+                  const cap = caption(p.src, p.label);
+                  return (
+                    <Tile
+                      key={p.src}
+                      photo={p}
+                      idx={idx}
+                      alt={altText(p.src, p.label)}
+                      caption={cap.caption}
+                      sub={cap.sub}
+                      hiddenSm={!collectionFilter && idx < 5}
+                      eager={!!collectionFilter && idx === 0}
+                      revealDelay={(j % 3) * 60}
+                      onOpen={openAt}
+                      registerTile={registerTile}
+                    />
+                  );
+                })}
               </div>
             ))}
           </div>
