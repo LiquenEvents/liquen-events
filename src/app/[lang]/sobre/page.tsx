@@ -218,10 +218,16 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         />
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-36">
           <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] gap-14 lg:gap-24 items-center">
-            {/* Portrait — flat and borderless, uncovered with the mask-wipe. */}
+            {/* Portrait — settles in with a smooth cinematic zoom (scale+fade,
+                GPU-composited) instead of the clip-path wipe, which repainted and
+                stuttered. loading="eager" fetches it during page load (it's small
+                and properly sized) so it's already decoded when the reader scrolls
+                here — no "pop-in" while the reveal plays; the blur placeholder
+                covers any remaining gap. */}
             <Reveal
               as="div"
-              variant="mask"
+              variant="zoom"
+              duration={0.9}
               className="relative mx-auto w-full max-w-xs lg:max-w-none"
             >
               <div className="relative aspect-[3/4] overflow-hidden">
@@ -229,6 +235,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
                   src="/imagens/catarina-gaspar.jpg"
                   alt={t.common.imageAlt.sobreFounder}
                   fill
+                  loading="eager"
                   sizes="(max-width: 1024px) 80vw, 34vw"
                   quality={75}
                   className="object-cover object-[50%_18%]"
