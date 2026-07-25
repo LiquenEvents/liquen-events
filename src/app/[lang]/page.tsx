@@ -22,6 +22,14 @@ const serviceLinks = [
   { image: "/imagens/DaniGui_JantarFesta_26.jpg", href: "/servicos#celebracoes" },
 ];
 
+// Same "continuous fade between images" veil as /serviços (PANEL_VEIL there):
+// darkens the bottom (0.75 — keeps the caption legible) AND fades in at the very
+// top (0.55), so each full-bleed chapter blends into the one above instead of
+// meeting it at a hard seam. The old scrim darkened only the bottom (top 0.05),
+// which left a visible bright/dark edge between stacked panels.
+const PANEL_VEIL =
+  "linear-gradient(to top, rgba(8,8,8,0.75) 0%, rgba(8,8,8,0.20) 38%, rgba(8,8,8,0.16) 58%, rgba(8,8,8,0.55) 100%)";
+
 export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
@@ -150,10 +158,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           {/* A imagética da SpaceX é escura por natureza; as nossas fotos podem
               ser claras, por isso um scrim inferior-esquerdo mantém a legenda
               maiúscula legível sem depender de sombra no texto. */}
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/20 to-[#080808]/5"
-          />
+          <div aria-hidden className="absolute inset-0" style={{ backgroundImage: PANEL_VEIL }} />
           <div className="absolute inset-x-0 bottom-0">
             <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pb-[11svh] lg:pb-[13svh]">
               {/* The caption composes itself in a 3-beat cadence (gold eyebrow →
