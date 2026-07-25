@@ -7,10 +7,12 @@ import { ViewTransition } from "./vt";
 /**
  * Route transitions. With React <ViewTransition> available (Next 16 +
  * experimental.viewTransition), navigations animate via the browser's View
- * Transitions API: a soft rise by default, and a DIRECTIONAL slide when the
- * link carries a `nav-forward`/`nav-back` transition type (the Navbar tags its
- * links by menu order, so moving "deeper" in the menu slides left, returning
- * slides right). Without the API, falls back to the original CSS route-fade.
+ * Transitions API as a short, opacity-only cross-fade. The Navbar still tags
+ * links `nav-forward`/`nav-back` by menu order (mapped to vt-page-fwd/bwd
+ * below), but all three now resolve to the same fade in globals.css — animating
+ * TRANSFORM on a full-page snapshot stuttered on image-heavy heroes, so the
+ * entrance is opacity-only for maximum fluidity. Without the API, falls back to
+ * the original CSS route-fade.
  *
  * Entrances are applied ONLY on client-side navigations — never on the very
  * first paint. Animating the initial page would hold the LCP hero invisible

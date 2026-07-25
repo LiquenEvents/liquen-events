@@ -662,71 +662,40 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
-   .vt-page       navegação sem direção: o conteúdo antigo sobe/desvanece,
-                  o novo chega de baixo (assimétrico: sair rápido, chegar calmo)
-   .vt-page-fwd/bwd  deslize direcional conforme a ordem do menu
+   .vt-page / .vt-page-fwd / .vt-page-bwd  todas as navegações usam UM cross-fade
+                  curto só de opacidade — ver nota de fluidez abaixo.
    .gallery-morph  par thumbnail→lightbox (blur a meio esconde interpolação) */
-::view-transition-old(.vt-page) {
-  animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both vt-depart;
+
+/* Fluidez da entrada de página: a API de View Transitions tira um "snapshot" da
+   página inteira (no /sobre, um herói full-bleed de 100svh) e anima-o. Animar
+   TRANSFORM nesse snapshot gigante — o antigo deslize direcional de translateX
+   56px, ou o translateY do departing — obriga o compositor a mover um raster do
+   tamanho do ecrã ao mesmo tempo que a página nova hidrata, descodifica o herói
+   e corre os seus próprios reveals: é aí que "trava". Uma animação SÓ de opacity
+   é o trabalho mais barato que o compositor tem (alpha, sem re-layout nem mexer
+   geometria), por isso todas as rotas passam a um cross-fade curto de opacidade.
+   Sem translateX/translateY nos snapshots, janela de sobreposição mínima → a
+   entrada fica fluida em qualquer página. (Recuperar o deslize direcional:
+   devolver translateX aos keyframes vt-in-*/
+vt-out-* e apontá-los aqui.) */
+::view-transition-old(.vt-page),
+::view-transition-old(.vt-page-fwd),
+::view-transition-old(.vt-page-bwd) {
+  animation: 140ms linear both vt-fade-out;
 }
-::view-transition-new(.vt-page) {
-  /* Shorter arrive (was 480ms + 90ms ≈ 570ms) so navigation feels immediate
-     rather than heavy. No incoming delay — dead time before anything moves reads
-     as lag. The old page still departs quickly (200ms). */
-  animation: 360ms var(--ease-out) both vt-arrive;
-}
-@keyframes vt-depart {
-  to {
-    opacity: 0;
-    transform: translateY(-14px);
-  }
+::view-transition-new(.vt-page),
+::view-transition-new(.vt-page-fwd),
+::view-transition-new(.vt-page-bwd) {
+  animation: 280ms var(--ease-out) both vt-arrive;
 }
 @keyframes vt-arrive {
-  /* Pure fade — no translateY. The incoming page's own reveals (AnimateIn /
-     Reveal) already rise the hero caption ~28px; when the whole route ALSO rose
-     22px at a different duration the two stacked and read "mushy" at the moment
-     the new page should feel crisp. The fade now hands off cleanly to the
-     on-page rise. (Directional vt-page-fwd/bwd keep their translateX — different
-     axis, no clash.) */
+  /* Pure fade — no translateY/translateX. The incoming page's own reveals
+     (AnimateIn / Reveal) already rise/zoom the hero content; a transform on the
+     whole-page snapshot on top of that both stacked ("mushy") and cost a
+     full-viewport composited move. Opacity-only hands off cleanly to the on-page
+     reveals and stays 60fps. */
   from {
     opacity: 0;
-  }
-}
-
-::view-transition-old(.vt-page-fwd) {
-  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-left;
-}
-::view-transition-new(.vt-page-fwd) {
-  animation: 380ms var(--ease-out) both vt-in-right;
-}
-::view-transition-old(.vt-page-bwd) {
-  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-right;
-}
-::view-transition-new(.vt-page-bwd) {
-  animation: 380ms var(--ease-out) both vt-in-left;
-}
-@keyframes vt-out-left {
-  to {
-    opacity: 0;
-    transform: translateX(-56px);
-  }
-}
-@keyframes vt-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(56px);
-  }
-}
-@keyframes vt-out-right {
-  to {
-    opacity: 0;
-    transform: translateX(56px);
-  }
-}
-@keyframes vt-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-56px);
   }
 }
 
