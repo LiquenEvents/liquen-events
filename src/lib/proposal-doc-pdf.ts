@@ -634,7 +634,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
         thickness: 1,
         color: GOLD,
       });
-      eyebrow(pg, totalLbl, M, ty - 24);
+      text(pg, totalLbl, M, ty - 26, { font: f.serifB, size: 13, color: INK });
       const amount = totalStr || "—";
       pg.drawText(winAnsiSafe(amount), {
         x: M + boxW - f.serifB.widthOfTextAtSize(winAnsiSafe(amount), 22),
@@ -645,14 +645,15 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       });
     };
 
-    // Column header row — quiet grey labels, one pale rule.
-    eyebrow(p, "Item", M, y);
-    textRight(p, orgT ? "Preço Estimado" : "Preço", M + boxW, y, {
-      font: f.bold,
-      size: T_CAPTION,
-      color: FAINT,
+    // Column header row — bold sentence-case (matching the studio's sample
+    // proposals: "Item" / "Preço Estimado (€)"), one pale rule underneath.
+    text(p, "Item", M, y, { font: f.serifB, size: 11, color: INK });
+    textRight(p, orgT ? "Preço Estimado (€)" : "Preço (€)", M + boxW, y, {
+      font: f.serifB,
+      size: 11,
+      color: INK,
     });
-    y -= 12;
+    y -= 14;
     p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
     y -= 22;
 
