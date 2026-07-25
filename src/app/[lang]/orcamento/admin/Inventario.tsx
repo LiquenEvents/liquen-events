@@ -487,68 +487,49 @@ export default function Inventario() {
           />
         </Card>
       ) : (
-        <Card padding="none" className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-foreground/[0.08]">
-                {["Nome", "Categoria", "Qtd", "Estado", "Localização", ""].map((h, idx) => (
-                  <th
-                    key={h || "acoes"}
-                    className={`bo-eyebrow text-foreground/35 font-medium px-4 py-3.5 ${idx === 2 ? "text-right" : "text-left"} ${idx === 5 ? "text-right" : ""}`}
-                  >
-                    {idx === 5 ? "Ações" : h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+        <>
+          {/* Mobile: one card per item with stacked fields (the 6-column table
+              scrolls sideways and its inline-edit inputs overflow a phone). */}
+          <Card padding="none" className="md:hidden">
+            <ul className="divide-y divide-foreground/[0.06]">
               {filtered.map((i) =>
                 editingId === i.id ? (
-                  <tr
-                    key={i.id}
-                    className="border-b border-foreground/[0.06] bg-foreground/[0.015]"
-                  >
-                    <td className="px-4 py-2">
-                      <input
-                        value={editForm.name}
-                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        placeholder="Nome *"
-                        aria-label="Nome"
-                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <select
-                        value={editForm.category}
-                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                        aria-label="Categoria"
-                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
-                      >
-                        {PROP_CATEGORIES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-2">
+                  <li key={i.id} className="flex flex-col gap-2.5 bg-foreground/[0.015] p-4">
+                    <input
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      placeholder="Nome *"
+                      aria-label="Nome"
+                      className="bo-input w-full px-2.5 py-2 text-sm text-foreground/80"
+                    />
+                    <select
+                      value={editForm.category}
+                      onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                      aria-label="Categoria"
+                      className="bo-input w-full px-2.5 py-2 text-sm text-foreground/70"
+                    >
+                      {PROP_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
                       <input
                         type="number"
                         min={0}
                         value={editForm.quantity}
                         onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
                         aria-label="Quantidade"
-                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-20 text-right"
+                        className="bo-input w-24 px-2.5 py-2 text-right text-sm text-foreground/80"
                       />
-                    </td>
-                    <td className="px-4 py-2">
                       <select
                         value={editForm.condition}
                         onChange={(e) =>
                           setEditForm({ ...editForm, condition: e.target.value as Condition })
                         }
                         aria-label="Estado"
-                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
+                        className="bo-input flex-1 px-2.5 py-2 text-sm text-foreground/70"
                       >
                         {CONDITIONS.map((c) => (
                           <option key={c} value={c}>
@@ -556,102 +537,238 @@ export default function Inventario() {
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        value={editForm.location}
-                        onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                        placeholder="Localização"
-                        aria-label="Localização"
-                        className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => saveEdit(i.id)}
-                          loading={saving}
-                          disabled={!editForm.name.trim() || saving}
-                        >
-                          Guardar
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                    </div>
+                    <input
+                      value={editForm.location}
+                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                      placeholder="Localização"
+                      aria-label="Localização"
+                      className="bo-input w-full px-2.5 py-2 text-sm text-foreground/80"
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => saveEdit(i.id)}
+                        loading={saving}
+                        disabled={!editForm.name.trim() || saving}
+                      >
+                        Guardar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </li>
                 ) : (
-                  <tr
-                    key={i.id}
-                    className="group border-b border-foreground/[0.06] motion-safe:transition-colors hover:bg-foreground/[0.015]"
-                  >
-                    <td className="px-4 py-3.5">
-                      <p className="text-foreground/80 font-medium">{i.name}</p>
-                      {i.notes && (
-                        <p className="text-foreground/40 text-xs mt-0.5 line-clamp-1">{i.notes}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-[#4d6350]/70 text-[11px] tracking-[0.1em] uppercase">
-                      {i.category}
-                    </td>
-                    <td className="px-4 py-3.5 text-right text-foreground/70 tabular-nums whitespace-nowrap">
-                      {i.quantity}
-                      {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <ConditionChip condition={i.condition} />
-                    </td>
-                    <td className="px-4 py-3.5 text-foreground/50">{i.location || "—"}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => startEdit(i)}
-                          className="text-foreground/25 hover:text-[#4d6350] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
-                          aria-label="Editar"
-                        >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => remove(i.id)}
-                          className="text-foreground/25 hover:text-[#8a2a22] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
-                          aria-label="Remover"
-                        >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M18 6 6 18M6 6l12 12" />
-                          </svg>
-                        </button>
+                  <li key={i.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground/80">{i.name}</p>
+                        {i.notes && (
+                          <p className="mt-0.5 line-clamp-1 text-xs text-foreground/40">
+                            {i.notes}
+                          </p>
+                        )}
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.1em] text-[#4d6350]/70">
+                          {i.category}
+                          {i.location ? (
+                            <span className="text-foreground/35"> · {i.location}</span>
+                          ) : null}
+                        </p>
                       </div>
-                    </td>
-                  </tr>
+                      <div className="shrink-0 text-right">
+                        <p className="tabular-nums text-foreground/75">
+                          {i.quantity}
+                          {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
+                        </p>
+                        <div className="mt-1">
+                          <ConditionChip condition={i.condition} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => startEdit(i)}>
+                        Editar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => remove(i.id)}>
+                        Remover
+                      </Button>
+                    </div>
+                  </li>
                 ),
               )}
-            </tbody>
-          </table>
-        </Card>
+            </ul>
+          </Card>
+
+          {/* Desktop: the full inventory table */}
+          <Card padding="none" className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-foreground/[0.08]">
+                  {["Nome", "Categoria", "Qtd", "Estado", "Localização", ""].map((h, idx) => (
+                    <th
+                      key={h || "acoes"}
+                      className={`bo-eyebrow text-foreground/35 font-medium px-4 py-3.5 ${idx === 2 ? "text-right" : "text-left"} ${idx === 5 ? "text-right" : ""}`}
+                    >
+                      {idx === 5 ? "Ações" : h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((i) =>
+                  editingId === i.id ? (
+                    <tr
+                      key={i.id}
+                      className="border-b border-foreground/[0.06] bg-foreground/[0.015]"
+                    >
+                      <td className="px-4 py-2">
+                        <input
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          placeholder="Nome *"
+                          aria-label="Nome"
+                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={editForm.category}
+                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                          aria-label="Categoria"
+                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
+                        >
+                          {PROP_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="number"
+                          min={0}
+                          value={editForm.quantity}
+                          onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                          aria-label="Quantidade"
+                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-20 text-right"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={editForm.condition}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, condition: e.target.value as Condition })
+                          }
+                          aria-label="Estado"
+                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
+                        >
+                          {CONDITIONS.map((c) => (
+                            <option key={c} value={c}>
+                              {CONDITION_LABEL[c]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          value={editForm.location}
+                          onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                          placeholder="Localização"
+                          aria-label="Localização"
+                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => saveEdit(i.id)}
+                            loading={saving}
+                            disabled={!editForm.name.trim() || saving}
+                          >
+                            Guardar
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr
+                      key={i.id}
+                      className="group border-b border-foreground/[0.06] motion-safe:transition-colors hover:bg-foreground/[0.015]"
+                    >
+                      <td className="px-4 py-3.5">
+                        <p className="text-foreground/80 font-medium">{i.name}</p>
+                        {i.notes && (
+                          <p className="text-foreground/40 text-xs mt-0.5 line-clamp-1">
+                            {i.notes}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-[#4d6350]/70 text-[11px] tracking-[0.1em] uppercase">
+                        {i.category}
+                      </td>
+                      <td className="px-4 py-3.5 text-right text-foreground/70 tabular-nums whitespace-nowrap">
+                        {i.quantity}
+                        {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <ConditionChip condition={i.condition} />
+                      </td>
+                      <td className="px-4 py-3.5 text-foreground/50">{i.location || "—"}</td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => startEdit(i)}
+                            className="text-foreground/25 hover:text-[#4d6350] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            aria-label="Editar"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => remove(i.id)}
+                            className="text-foreground/25 hover:text-[#8a2a22] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            aria-label="Remover"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M18 6 6 18M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </Card>
+        </>
       )}
     </div>
   );
