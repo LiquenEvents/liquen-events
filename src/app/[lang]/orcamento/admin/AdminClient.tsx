@@ -1375,7 +1375,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             safe-area inset) so the last row never hides under the tab bar. */}
         <div className="flex-1 min-w-0 flex flex-col pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)] pt-safe">
+          <header className="sticky top-0 z-20 bg-white/95 border-b border-[var(--bo-hairline)] pt-safe">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
               {/* Mobile menu — opens the full nav drawer without depending on the
                   bottom-nav "Mais" (which is hidden while a quote drawer is open). */}
@@ -2110,7 +2110,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
                     className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-x-hidden overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
                   >
-                    <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white/95 px-5 pt-5 backdrop-blur-sm sm:px-7">
+                    <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-5 pt-5 sm:px-7">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <h2
@@ -3182,7 +3182,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           alterações por guardar, seja qual for a secção onde o
                           utilizador está. Nunca mais um "guardar" escondido. */}
                       {isDirty && (
-                        <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white/95 px-5 py-3 backdrop-blur-sm sm:-mx-7 sm:-mb-8 sm:px-7">
+                        <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white px-5 py-3 sm:-mx-7 sm:-mb-8 sm:px-7">
                           <div className="flex items-center justify-between gap-3">
                             <p
                               role="status"

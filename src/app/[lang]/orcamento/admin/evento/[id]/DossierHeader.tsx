@@ -143,7 +143,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
   const zone = zoneFor(next.kind);
 
   return (
-    <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07]">
+    <header className="sticky top-0 z-20 bg-white/97 border-b border-foreground/[0.07]">
       <div className="px-4 sm:px-6 lg:px-10 py-5 flex flex-col gap-5">
         {/* Linha 1 — voltar + título + próxima ação */}
         <div className="flex flex-col lg:flex-row lg:items-start gap-5">

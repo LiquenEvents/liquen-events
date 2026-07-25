@@ -1281,7 +1281,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
 
       {/* Ação principal — muda conforme o passo, para haver sempre UMA próxima
           ação óbvia. */}
-      <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/85 px-1 py-3 backdrop-blur">
+      <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/95 px-1 py-3">
         {step === "conteudo" && (
           <>
             <p className="mr-auto text-xs text-foreground/45">

@@ -1157,30 +1157,29 @@ function Lightbox({
           </VTWrap>
         </div>
 
-        {/* Pré-carrega os vizinhos (anterior/seguinte) para que ← → seja
-            instantâneo — fetch na mesma resolução do visor, fora de ecrã.
-            Só em rede boa: em Save-Data / 2g / 3g é ignorado para não gastar
-            dados com imagens grandes que talvez nunca sejam vistas. */}
+        {/* Pré-carrega só o vizinho SEGUINTE (o sentido de navegação dominante)
+            para que → seja instantâneo — antes carregávamos anterior E seguinte,
+            o que num ecrã 4K/retina disparava TRÊS descodificações concorrentes
+            de imagens de ecrã inteiro por cada abertura/passo (a interação mais
+            pesada do site). Fora de ecrã e a `45vw` (candidato mais pequeno, é só
+            um fetch especulativo, não a imagem mostrada), reduz para metade o
+            pico de descodificação/upload por passo. Só em rede boa (Save-Data /
+            2g / 3g ignora). O vizinho anterior carrega no próprio ← — raro. */}
         <div
           aria-hidden
           className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
         >
-          {preloadNeighbours &&
-            Array.from(
-              new Set([(index - 1 + pool.length) % pool.length, (index + 1) % pool.length]),
-            )
-              .filter((i) => i !== index)
-              .map((i) => (
-                <Image
-                  key={i}
-                  src={pool[i].src}
-                  alt=""
-                  fill
-                  sizes="90vw"
-                  quality={75}
-                  loading="eager"
-                />
-              ))}
+          {preloadNeighbours && pool.length > 1 && (
+            <Image
+              key={(index + 1) % pool.length}
+              src={pool[(index + 1) % pool.length].src}
+              alt=""
+              fill
+              sizes="45vw"
+              quality={75}
+              loading="eager"
+            />
+          )}
         </div>
 
         {/* Botão próxima */}

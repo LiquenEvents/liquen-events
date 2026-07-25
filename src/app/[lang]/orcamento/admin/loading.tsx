@@ -42,7 +42,7 @@ export default function AdminLoading() {
       {/* ── Main column ── */}
       <div className="flex-1 min-w-0">
         {/* Header (matches the sticky white bar) */}
-        <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
+        <header className="sticky top-0 z-20 bg-white/97 border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
           <div className="min-w-0">
             <div className="bo-skeleton h-2 w-28 mb-3" />
             <div className="bo-skeleton h-6 w-52" />

@@ -846,28 +846,32 @@ vt-out-* e apontá-los aqui.) */
 }
 
 /* Skeleton loader — a soft shimmering placeholder block. Used while a view or
-   its data is still loading, so the layout settles instead of flashing text. */
+   its data is still loading, so the layout settles instead of flashing text.
+   The sweep is a pseudo-element stripe moved with transform: translateX
+   (GPU-composited), NOT an animated background-position (which is not
+   compositor-animatable and repaints the skeleton every frame — costly when
+   many skeletons show during an admin load). */
 @keyframes bo-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
   100% {
-    background-position: 200% 0;
+    transform: translateX(100%);
   }
 }
 .bo-skeleton {
+  position: relative;
+  overflow: hidden;
   border-radius: 0.5rem;
-  background: linear-gradient(
-    90deg,
-    rgba(42, 38, 32, 0.05) 25%,
-    rgba(42, 38, 32, 0.09) 37%,
-    rgba(42, 38, 32, 0.05) 63%
-  );
-  background-size: 200% 100%;
+  background: rgba(42, 38, 32, 0.06);
+}
+.bo-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(42, 38, 32, 0.07) 50%, transparent 100%);
+  transform: translateX(-100%);
   animation: bo-shimmer 1.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .bo-skeleton {
+  .bo-skeleton::after {
     animation: none;
   }
 }
