@@ -930,6 +930,12 @@ function Lightbox({
   const backdropRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
 
+  // Gate the next-photo preload on the CURRENT photo having loaded, so opening
+  // (and each ←/→ step) decodes only the visible photo first — no hero-vs-
+  // neighbour decode contention in the open/step frame. Resets per photo.
+  const [heroLoaded, setHeroLoaded] = useState(false);
+  useEffect(() => setHeroLoaded(false), [index]);
+
   const labelText = (l: Label) => dict.labels[l];
   const altText = (src: string, l: Label) => {
     const base = dict.alt[l];
@@ -1208,6 +1214,7 @@ function Lightbox({
               // Fetching it high-priority (instead of default) shortens the
               // "black → pop" gap so the photo is ready as the open animation runs.
               priority
+              onLoad={() => setHeroLoaded(true)}
               className={`object-contain ${
                 playing ? "lb-kenburns" : justOpened ? "lb-open-in" : "lb-photo-in"
               }`}
@@ -1227,7 +1234,7 @@ function Lightbox({
           aria-hidden
           className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
         >
-          {preloadNeighbours && pool.length > 1 && (
+          {preloadNeighbours && pool.length > 1 && heroLoaded && (
             <Image
               key={(index + 1) % pool.length}
               src={pool[(index + 1) % pool.length].src}
