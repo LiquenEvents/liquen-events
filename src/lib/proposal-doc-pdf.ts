@@ -70,13 +70,14 @@ const T_CAPTION = 7.5; // eyebrows / captions (uppercase)
 
 // ── Image rendering quality knobs ──
 // Point boxes are drawn at 72pt/inch; we rasterise at DENSITY× that (= DENSITY·72
-// dpi) so photos stay crisp on screen and in print. Cover strips are large and
-// prominent → 3× (216 dpi). Mood-board cells are many and smaller → 2.5× (180 dpi)
-// keeps the PDF lean. Capped at MAX_IMG_PX so we never upscale-and-bloat past the
-// source (the client caps cover uploads at 3000px, boards at 1600px).
-const COVER_DENSITY = 3;
-const COLLAGE_DENSITY = 2.5;
-const MAX_IMG_PX = 3000;
+// dpi). These are tuned for FAST generation + a lean file (the studio felt slow
+// generating): cover strips at 2.2× (≈158 dpi) stay crisp as the hero; mood-board
+// cells at 1.8× (≈130 dpi) are many + small so a lower density is invisible but
+// cuts sharp CPU and PDF size a lot. Capped at MAX_IMG_PX so we never upscale past
+// the source (the client caps cover uploads at 3000px, boards at 1600px).
+const COVER_DENSITY = 2.2;
+const COLLAGE_DENSITY = 1.8;
+const MAX_IMG_PX = 2200;
 
 // ── Brand palette ──
 // Moss/gold are deliberately rare now — quiet ink & grey type on white carry the
@@ -211,7 +212,10 @@ async function drawCoverImage(
     const cropped = await sharp(input)
       .rotate() // bake EXIF orientation so phone photos aren't sideways
       .resize(tw, th, { fit: "cover", position: "attention", kernel: "lanczos3" })
-      .jpeg({ quality: 90, mozjpeg: true, chromaSubsampling: "4:4:4" })
+      // 84 + 4:2:0 is standard high-quality web JPEG — visually indistinguishable
+      // from 90/4:4:4 for photos, but encodes faster and roughly halves the bytes,
+      // so the PDF generates and downloads noticeably quicker.
+      .jpeg({ quality: 84, mozjpeg: true, chromaSubsampling: "4:2:0" })
       .toBuffer();
     const img = await embedImage(doc, cropped);
     if (img) {
