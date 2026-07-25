@@ -107,7 +107,7 @@ export const en: Dict = {
     ogLocale: "en_GB",
     homeTitle: "Event & Wedding Decoration in Évora | Líquen Events",
     homeDescription:
-      "Wedding decoration, corporate events and celebrations in Évora, the Alentejo and across Portugal. From concept to the last detail — request a quote.",
+      "Líquen Events is a company specialising in planning and delivering one-of-a-kind events, turning your ideas into unforgettable experiences.",
     sobreTitle: "Event Decoration Company in the Alentejo",
     sobreDescription:
       "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
