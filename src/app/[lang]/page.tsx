@@ -162,7 +162,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               <Reveal as="div" stagger={0.08} start="top 92%">
                 <h2
                   className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
-                  style={{ fontSize: "clamp(36px, 6.5vw, 78px)" }}
+                  style={{ fontSize: "clamp(28px, 4.6vw, 56px)" }}
                 >
                   {s.title}
                 </h2>
