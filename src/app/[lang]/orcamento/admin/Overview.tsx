@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, memo } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
+
+// Memoised so editing the revenue goal or the team notes (local Overview state)
+// doesn't re-render these two heavier panels every keystroke — their props
+// (quotes, onOpen) don't change during that typing, so memo lets them bail out.
+const MemoReminders = memo(Reminders);
+const MemoAgenda = memo(Agenda);
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Novo", color: "#8a8a82" },
@@ -718,10 +724,10 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       </div>
 
       {/* Reminders — derived urgent items */}
-      <Reminders quotes={quotes} onOpen={onOpen} />
+      <MemoReminders quotes={quotes} onOpen={onOpen} />
 
       {/* Agenda — events, calendar entries, tasks & payments due */}
-      <Agenda quotes={quotes} onOpen={onOpen} />
+      <MemoAgenda quotes={quotes} onOpen={onOpen} />
 
       {/* Pipeline funnel + financial pulse */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

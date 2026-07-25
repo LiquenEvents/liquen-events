@@ -112,6 +112,131 @@ interface Props {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
+// Add-event dialog with LOCAL form state. Extracted from Calendario so typing a
+// title/time/note re-renders only this small dialog — not the parent and its
+// 42-cell month grid + upcoming list. onCreate persists the completed payload
+// (the parent appends the result and closes the modal on success).
+function AddEventModal({
+  date,
+  dateLabel,
+  onClose,
+  onCreate,
+}: {
+  date: string;
+  dateLabel: string;
+  onClose: () => void;
+  onCreate: (payload: {
+    title: string;
+    kind: CalendarEventKind;
+    time: string;
+    note: string;
+    date: string;
+  }) => Promise<boolean>;
+}) {
+  const [form, setForm] = useState<{
+    title: string;
+    kind: CalendarEventKind;
+    time: string;
+    note: string;
+  }>({ title: "", kind: "evento", time: "", note: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    const title = form.title.trim();
+    if (!title || saving) return;
+    setSaving(true);
+    const ok = await onCreate({ ...form, title, date });
+    // On success the parent unmounts us (modalDate → null). On failure keep the
+    // dialog open so the user can retry (the parent already toasted the error).
+    if (!ok) setSaving(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Adicionar ao calendário — ${dateLabel}`}
+        className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="bo-eyebrow mb-1.5">Novo no calendário</p>
+            <p className="text-foreground/75 text-sm capitalize">{dateLabel}</p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
+          >
+            ×
+          </button>
+        </div>
+
+        <fieldset className="mb-4">
+          <legend className="bo-eyebrow mb-2">Tipo</legend>
+          <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={form.kind === k}
+                onClick={() => setForm((f) => ({ ...f, kind: k }))}
+                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-foreground/15 hover:border-foreground/30"}`}
+                style={
+                  form.kind === k
+                    ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
+                    : undefined
+                }
+              >
+                {KIND_META[k].label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <Field
+          autoFocus
+          label="Título"
+          value={form.title}
+          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="Ex.: Reunião com fornecedor"
+        />
+
+        <div className="mt-3 flex gap-2">
+          <Field
+            label="Hora"
+            type="time"
+            value={form.time}
+            onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+            containerClassName="w-32"
+          />
+          <Field
+            label="Nota"
+            value={form.note}
+            onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+            placeholder="Opcional"
+            containerClassName="flex-1"
+          />
+        </div>
+
+        <Button
+          fullWidth
+          onClick={submit}
+          loading={saving}
+          disabled={!form.title.trim()}
+          className="mt-4"
+        >
+          {saving ? "A guardar…" : "Adicionar ao calendário"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function Calendario({ quotes, onOpen }: Props) {
   const { toast } = useToast();
   const [cursor, setCursor] = useState(() => {
@@ -124,13 +249,6 @@ export default function Calendario({ quotes, onOpen }: Props) {
   const [modalDate, setModalDate] = useState<string | null>(null);
   // Day peek: the day whose events are expanded in the panel under the grid.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [form, setForm] = useState<{
-    title: string;
-    kind: CalendarEventKind;
-    time: string;
-    note: string;
-  }>({ title: "", kind: "evento", time: "", note: "" });
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch("/api/calendario", { cache: "no-store" })
@@ -139,26 +257,31 @@ export default function Calendario({ quotes, onOpen }: Props) {
       .catch(() => {});
   }, []);
 
-  async function addEvent() {
-    const title = form.title.trim();
-    if (!title || !modalDate || saving) return;
-    setSaving(true);
+  // The add form now lives in <AddEventModal> with LOCAL state, so typing a
+  // title no longer re-renders this component (and its 42-cell grid) per
+  // keystroke. This just persists a completed payload and appends the result.
+  async function createEvent(payload: {
+    title: string;
+    kind: CalendarEventKind;
+    time: string;
+    note: string;
+    date: string;
+  }): Promise<boolean> {
     try {
       const res = await fetch("/api/calendario", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, title, date: modalDate }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error();
       const ev = await res.json();
       setEvents((prev) => [...prev, ev]);
       toast("Adicionado ao calendário", "success");
       setModalDate(null);
-      setForm({ title: "", kind: "evento", time: "", note: "" });
+      return true;
     } catch {
       toast("Não foi possível guardar", "error");
-    } finally {
-      setSaving(false);
+      return false;
     }
   }
 
@@ -182,7 +305,6 @@ export default function Calendario({ quotes, onOpen }: Props) {
   // Open the "add event" modal for a given day (shared by click + keyboard).
   function openAdd(key: string) {
     setModalDate(key);
-    setForm({ title: "", kind: "evento", time: "", note: "" });
   }
 
   // Month navigation always goes through here so the day peek never lingers
@@ -723,93 +845,16 @@ export default function Calendario({ quotes, onOpen }: Props) {
         </Card>
       </div>
 
-      {/* Add-event modal */}
+      {/* Add-event modal — keyed by date so it mounts fresh (and autofocuses)
+          each open. Its form state is local, so typing never touches the grid. */}
       {modalDate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setModalDate(null)}
-        >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Adicionar ao calendário — ${modalDateLabel}`}
-            className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4 mb-5">
-              <div>
-                <p className="bo-eyebrow mb-1.5">Novo no calendário</p>
-                <p className="text-foreground/75 text-sm capitalize">{modalDateLabel}</p>
-              </div>
-              <button
-                onClick={() => setModalDate(null)}
-                aria-label="Fechar"
-                className="text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
-              >
-                ×
-              </button>
-            </div>
-
-            <fieldset className="mb-4">
-              <legend className="bo-eyebrow mb-2">Tipo</legend>
-              <div className="flex flex-wrap gap-1.5">
-                {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    aria-pressed={form.kind === k}
-                    onClick={() => setForm((f) => ({ ...f, kind: k }))}
-                    className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-foreground/15 hover:border-foreground/30"}`}
-                    style={
-                      form.kind === k
-                        ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
-                        : undefined
-                    }
-                  >
-                    {KIND_META[k].label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <Field
-              autoFocus
-              label="Título"
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              onKeyDown={(e) => e.key === "Enter" && addEvent()}
-              placeholder="Ex.: Reunião com fornecedor"
-            />
-
-            <div className="mt-3 flex gap-2">
-              <Field
-                label="Hora"
-                type="time"
-                value={form.time}
-                onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-                containerClassName="w-32"
-              />
-              <Field
-                label="Nota"
-                value={form.note}
-                onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-                placeholder="Opcional"
-                containerClassName="flex-1"
-              />
-            </div>
-
-            <Button
-              fullWidth
-              onClick={addEvent}
-              loading={saving}
-              disabled={!form.title.trim()}
-              className="mt-4"
-            >
-              {saving ? "A guardar…" : "Adicionar ao calendário"}
-            </Button>
-          </div>
-        </div>
+        <AddEventModal
+          key={modalDate}
+          date={modalDate}
+          dateLabel={modalDateLabel}
+          onClose={() => setModalDate(null)}
+          onCreate={createEvent}
+        />
       )}
     </>
   );
