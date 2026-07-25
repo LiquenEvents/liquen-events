@@ -458,7 +458,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             </p>
             <h2
               className="text-cream font-bold uppercase tracking-display leading-tight mb-6"
-              style={{ fontSize: "clamp(36px, 5vw, 72px)" }}
+              style={{ fontSize: "clamp(28px, 4.2vw, 52px)" }}
             >
               {t.contacto.whatsappTitleLine1}
               <br />

@@ -305,7 +305,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             </p>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
-              style={{ fontSize: "clamp(40px, 7vw, 96px)" }}
+              style={{ fontSize: "clamp(30px, 5vw, 66px)" }}
             >
               {t.sobre.ctaTitleLine1}
               <br />

@@ -244,7 +244,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           <AnimateIn>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
-              style={{ fontSize: "clamp(44px, 8vw, 116px)" }}
+              style={{ fontSize: "clamp(32px, 5.5vw, 78px)" }}
             >
               <span className="block">{t.home.ctaTitleLine1}</span>
               <span className="block text-moss">{t.home.ctaTitleLine2}</span>

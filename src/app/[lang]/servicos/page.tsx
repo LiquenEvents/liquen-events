@@ -391,7 +391,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             </p>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
-              style={{ fontSize: "clamp(44px, 8vw, 110px)" }}
+              style={{ fontSize: "clamp(32px, 5.5vw, 74px)" }}
             >
               {ts.ctaTitleLine1}
               <br />

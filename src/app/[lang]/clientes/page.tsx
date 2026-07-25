@@ -318,7 +318,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             </p>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.88] mb-6"
-              style={{ fontSize: "clamp(50px, 9vw, 128px)" }}
+              style={{ fontSize: "clamp(34px, 6vw, 84px)" }}
             >
               {t.clientes.ctaTitleLine1}
               <br />

@@ -468,7 +468,7 @@ export default async function ServiceDetailPage({
           <AnimateIn>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.95] mb-12 max-w-2xl"
-              style={{ fontSize: "clamp(36px, 5.5vw, 76px)" }}
+              style={{ fontSize: "clamp(28px, 4.4vw, 54px)" }}
             >
               {t.servicoDetalhe.ctaTitle}
             </h2>
