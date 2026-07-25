@@ -19,6 +19,16 @@ export default function ScrollProgress() {
   useEffect(() => {
     const bar = barRef.current;
     if (!bar) return;
+
+    // Fast path: where scroll-driven animations exist, let CSS drive the bar
+    // off the main thread (see .scroll-progress-bar in globals.css). We just
+    // flip the attribute that arms that rule and attach NO scroll/resize/rAF
+    // work at all. The two paths are mutually exclusive.
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline: scroll()")) {
+      bar.dataset.cssDriven = "true";
+      return;
+    }
+
     let teardown: (() => void) | undefined;
     // Defer the whole setup (a scrollHeight measure + scroll/resize listeners +
     // a ResizeObserver on <body>) to idle. It's a decorative bar the user hasn't
@@ -84,7 +94,7 @@ export default function ScrollProgress() {
     <div className="scroll-progress fixed top-0 left-0 right-0 z-[60] h-[2px] pointer-events-none">
       <div
         ref={barRef}
-        className="h-full bg-gradient-to-r from-moss-dark via-moss to-moss-light origin-left"
+        className="scroll-progress-bar h-full bg-gradient-to-r from-moss-dark via-moss to-moss-light origin-left"
         style={{ transform: "scaleX(0)", transition: "transform 0.1s linear" }}
       />
     </div>

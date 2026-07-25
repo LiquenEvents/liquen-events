@@ -602,6 +602,30 @@ body:has([data-orcamento-mode]) .scroll-progress {
   display: none !important;
 }
 
+/* ── Scroll progress bar driven on the compositor ──
+   Where scroll-driven animations exist, the bar's fill is tied straight to the
+   document scroll timeline — no scroll listener, no rAF, no main-thread work; it
+   runs on the compositor. ScrollProgress.tsx feature-detects support, sets
+   data-css-driven, and skips its JS path entirely. Unsupported browsers keep
+   that JS fallback (transform written once per rAF). */
+@supports (animation-timeline: scroll()) {
+  .scroll-progress-bar[data-css-driven="true"] {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: none;
+    animation: scroll-progress-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+  @keyframes scroll-progress-grow {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
 /* ── Back-office: full-screen tool surface (clean & minimal) ── */
 body.admin-mode nav[data-public-nav] {
   display: none !important;
