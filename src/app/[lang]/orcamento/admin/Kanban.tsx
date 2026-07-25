@@ -173,7 +173,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                 </span>
               </div>
 
-              <div className="px-2 pb-2 flex flex-col gap-2 min-h-[120px] max-h-[calc(100vh-18rem)] overflow-y-auto">
+              <div className="px-2 pb-2 flex flex-col gap-2 min-h-[120px] max-h-[calc(100dvh-18rem)] overflow-y-auto overscroll-contain">
                 {items.map((q) => {
                   const daysSinceUpdate = Math.floor(
                     (Date.now() - new Date(q.lastUpdated ?? q.submittedAt).getTime()) / 86400000,

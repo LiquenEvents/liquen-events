@@ -348,6 +348,14 @@ body::before {
   background-size: 300px 300px;
   opacity: 0.022;
 }
+/* The grain is imperceptible on dense phone screens, and a top-most full-viewport
+   fixed layer can defeat mobile partial-invalidation fast paths on scroll — drop
+   it on touch, mirroring how Parallax/WebGL are disabled on coarse pointers. */
+@media (pointer: coarse) {
+  body::before {
+    display: none;
+  }
+}
 
 /* ── Underline slide animation ── */
 .link-line {
@@ -368,9 +376,15 @@ body::before {
      underline lagged the colour by ~150ms). */
   transition: transform 0.3s var(--ease-out);
 }
-.link-line:hover::after {
-  transform-origin: left;
-  transform: scaleX(1);
+/* Gated to real hover devices: without this, tapping a link on a phone latches
+   the :hover state (underline stays drawn) until you tap elsewhere — reads as
+   stuck UI. Tailwind's hover: utilities are already (hover:hover)-gated; these
+   hand-written rules must match. Zero change on desktop. */
+@media (hover: hover) {
+  .link-line:hover::after {
+    transform-origin: left;
+    transform: scaleX(1);
+  }
 }
 
 /* Active nav link — permanent moss underline */
@@ -751,8 +765,10 @@ vt-out-* e apontá-los aqui.) */
     transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.4s ease;
 }
-.lift:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* ── Light sweep on primary CTAs — subtle premium shimmer on hover ── */
@@ -776,7 +792,13 @@ vt-out-* e apontá-los aqui.) */
   transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
-.btn-shine:hover::after,
+/* :focus-visible stays ungated (keyboard users get the sweep on any device);
+   only :hover is gated so it doesn't latch on tap. */
+@media (hover: hover) {
+  .btn-shine:hover::after {
+    transform: translateX(130%);
+  }
+}
 .btn-shine:focus-visible::after {
   transform: translateX(130%);
 }
@@ -1199,11 +1221,14 @@ body:has([data-orcamento-mode]) .eyebrow {
   transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
-.cl-cell:hover {
-  background-color: rgba(99, 122, 95, 0.045);
-}
-.cl-cell:hover::before {
-  opacity: 1;
+/* Gated to hover devices so the logo-wall recolor/lift doesn't stick on tap. */
+@media (hover: hover) {
+  .cl-cell:hover {
+    background-color: rgba(99, 122, 95, 0.045);
+  }
+  .cl-cell:hover::before {
+    opacity: 1;
+  }
 }
 
 /* On hover the logo lifts + swells a touch, and the black silhouette crossfades
@@ -1213,14 +1238,16 @@ body:has([data-orcamento-mode]) .eyebrow {
   display: inline-flex;
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.cl-cell:hover .cl-logo {
-  transform: translateY(-2px) scale(1.045);
-}
 .cl-black {
   transition: opacity 0.5s ease;
 }
-.cl-cell:hover .cl-black {
-  opacity: 0;
+@media (hover: hover) {
+  .cl-cell:hover .cl-logo {
+    transform: translateY(-2px) scale(1.045);
+  }
+  .cl-cell:hover .cl-black {
+    opacity: 0;
+  }
 }
 .cl-moss {
   position: absolute;
@@ -1236,8 +1263,10 @@ body:has([data-orcamento-mode]) .eyebrow {
   mask-size: contain;
   pointer-events: none;
 }
-.cl-cell:hover .cl-moss {
-  opacity: 1;
+@media (hover: hover) {
+  .cl-cell:hover .cl-moss {
+    opacity: 1;
+  }
 }
 
 /* Entrance reveal. The hidden "from" state exists only once JS arms it

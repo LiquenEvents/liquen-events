@@ -2108,7 +2108,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     role={isDetailOverlay ? "dialog" : undefined}
                     aria-modal={isDetailOverlay ? true : undefined}
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-x-hidden overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-[100dvh] xl:max-h-[calc(100vh-7rem)] overflow-x-hidden overflow-y-auto overscroll-contain shadow-lg xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
                   >
                     <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-5 pt-5 sm:px-7">
                       <div className="flex items-start justify-between gap-4">

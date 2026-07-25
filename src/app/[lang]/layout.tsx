@@ -73,6 +73,13 @@ const archivo = Archivo({
   subsets: ["latin"],
   display: "swap",
   adjustFontFallback: true,
+  // Archivo is used ONLY inside .admin-mode (the back office). Its CSS variable
+  // is attached to <html> for the whole site, so with the default preload:true
+  // next/font emitted a high-priority <link rel="preload"> for it on every
+  // PUBLIC page — a font marketing visitors never render, competing with the
+  // hero LCP. preload:false fetches it on demand (still display:"swap"); the
+  // back office is unaffected. No visual change on either surface.
+  preload: false,
   fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Arial", "sans-serif"],
 });
 
