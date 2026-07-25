@@ -1212,9 +1212,15 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       {/* ══════════ /PASSO 1 ══════════ */}
 
       {/* ══════════ PASSO 2 · Pré-visualizar ══════════ */}
-      <div hidden={step !== "prever"}>
-        <PreviewSummary doc={doc} assetUrls={assetUrls} money={money} split={split} />
-      </div>
+      {/* Only mount the preview while it's the active step. It was previously
+          kept mounted (just `hidden`), so its filter/map over every service
+          group + budget line re-ran on EVERY keystroke in the content step —
+          the main source of typing lag on large proposals. */}
+      {step === "prever" && (
+        <div>
+          <PreviewSummary doc={doc} assetUrls={assetUrls} money={money} split={split} />
+        </div>
+      )}
 
       {/* ══════════ PASSO 3 · Enviar ══════════ */}
       <div hidden={step !== "enviar"}>
