@@ -211,6 +211,7 @@ const MobileMenu = memo(function MobileMenu({
               <Link
                 key={link.href}
                 href={localizeHref(link.href, locale)}
+                prefetch
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
                 className={`group flex items-center justify-between py-3 sm:py-4 transition-colors duration-300 ${
@@ -470,6 +471,10 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={localizeHref(link.href, locale)}
+                // Full prefetch (not the default "up to the loading boundary"):
+                // the public pages are static, so this warms the ENTIRE page so a
+                // click swaps instantly — no fetch pause, no loading-screen flash.
+                prefetch
                 transitionTypes={navTypes(link.href)}
                 aria-current={isActive(link.href) ? "page" : undefined}
                 className={`link-line py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
