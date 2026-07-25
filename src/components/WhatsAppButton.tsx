@@ -71,12 +71,12 @@ export default function WhatsAppButton() {
       // Invisible during the 1.5s reveal delay / at the footer — keep it out of
       // the tab order and a11y tree until it's actually shown (WCAG 2.4.3).
       inert={!show}
-      // bg passa de #25D366 (verde-marca WhatsApp) para #0c7f3a: com texto
-      // branco, #25D366 dá só 1.98:1 (falha AA); #0c7f3a dá 5.11:1. Continua
-      // claramente verde/WhatsApp e o glow do hover mantém o verde-marca.
+      // Verde-musgo da marca Líquen (bg-moss → hover bg-moss-dark), igual aos
+      // CTAs principais do site, em vez do verde-WhatsApp — mantém a identidade
+      // visual coerente. O brilho do hover acompanha em musgo.
       // Icon-only (a compact circle) below sm so it never collides with the
       // bottom-left "Pedir orçamento" pill on small phones; full label from sm up.
-      className={`whatsapp-fixed fixed z-50 flex items-center justify-center gap-2.5 p-3.5 sm:pl-4 sm:pr-5 sm:py-[13px] bg-[#0c7f3a] text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-[#25D366]/25 hover:scale-105 transition-all duration-500 ${
+      className={`whatsapp-fixed fixed z-50 flex items-center justify-center gap-2.5 p-3.5 sm:pl-4 sm:pr-5 sm:py-[13px] bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
       style={{
