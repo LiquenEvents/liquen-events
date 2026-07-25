@@ -673,19 +673,27 @@ body[data-menu-open] .whatsapp-fixed {
    its own layer, so it stays 60fps even while the new route is still hydrating
    and decoding its hero. This is the cheapest possible page transition. ── */
 @keyframes route-fade {
+  /* TRANSFORM-ONLY (no opacity): the incoming page eases from a hair over-scaled
+     to rest — a gentle "settle in". Because opacity stays 1 the whole time, the
+     page is always opaque, so the light background is never revealed → no white
+     flash (that was the problem with a fade-in). Starting ABOVE 1 (1.015, not
+     below) means the page slightly overflows rather than leaving a sub-pixel gap
+     that would flash the background at the edges. */
   from {
-    opacity: 0;
+    transform: scale(1.015);
   }
   to {
-    opacity: 1;
+    transform: scale(1);
   }
 }
 .route-fade {
   /* No will-change here: the class lingers on the page container for the whole
      visit, so a static will-change would pin a full-page compositor layer the
      entire time (hurting scroll). Browsers already auto-promote an animating
-     opacity to its own layer for the run, which is exactly the duration we want. */
-  animation: route-fade 0.34s var(--ease-out) backwards;
+     transform to its own layer for the run, which is exactly the duration we
+     want. `backwards` drops the transform once the run ends, so no containing
+     block lingers for any fixed child. */
+  animation: route-fade 0.4s var(--ease-out) backwards;
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
