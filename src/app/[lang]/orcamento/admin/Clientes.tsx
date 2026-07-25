@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useDeferredValue } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { downloadCsv, dateStamp } from "./export";
@@ -53,6 +53,11 @@ interface Props {
 
 export default function Clientes({ quotes, onOpen }: Props) {
   const [search, setSearch] = useState("");
+  // Defer the search term so the O(n) aggregate-and-filter over the full lead
+  // history (and the row reconcile) runs off the keystroke: the input stays
+  // instant, the list catches up a tick later. Same pattern as the main
+  // AdminClient quote search.
+  const dSearch = useDeferredValue(search);
   const [sort, setSort] = useState<"recent" | "value" | "pipeline">("recent");
   const [vipOnly, setVipOnly] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
@@ -95,7 +100,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
 
     if (vipOnly) list = list.filter((c) => c.totalWon >= 10000 || c.wonCount >= 2);
 
-    const s = search.trim().toLowerCase();
+    const s = dSearch.trim().toLowerCase();
     if (s)
       list = list.filter((c) =>
         [c.name, c.email, c.phone, c.company]
@@ -111,7 +116,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
           : (a, b) => +new Date(b.lastAt) - +new Date(a.lastAt),
     );
     return list;
-  }, [quotes, search, sort, vipOnly]);
+  }, [quotes, dSearch, sort, vipOnly]);
 
   const isVip = (c: Client) => c.totalWon >= 10000 || c.wonCount >= 2;
 

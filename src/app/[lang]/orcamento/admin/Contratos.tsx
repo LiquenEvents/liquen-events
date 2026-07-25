@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, useDeferredValue } from "react";
 // `import type` é totalmente apagado no build, por isso puxar a forma do store
 // server-only nunca arrasta o guard `server-only` (→ repository → fs) para o
 // bundle cliente. O tipo vive no módulo client-safe `contract-types`.
@@ -56,6 +56,8 @@ export default function Contratos() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
+  const dSearch = useDeferredValue(search);
   const [status, setStatus] = useState<"all" | ContractStatus>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -74,7 +76,7 @@ export default function Contratos() {
   }, [toast]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = dSearch.trim().toLowerCase();
     return contracts.filter((c) => {
       if (status !== "all" && c.status !== status) return false;
       if (
@@ -86,7 +88,7 @@ export default function Contratos() {
         return false;
       return true;
     });
-  }, [contracts, search, status]);
+  }, [contracts, dSearch, status]);
 
   const aceites = useMemo(() => contracts.filter((c) => c.status === "aceite").length, [contracts]);
 

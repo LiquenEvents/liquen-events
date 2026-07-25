@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button } from "./ui";
@@ -139,12 +139,17 @@ export default function EmailTemplates() {
   const dirty = selected ? subject !== selected.subject || effectiveBody !== baselineBody : false;
 
   // Live preview: subject + body with example merge values, exactly as the send
-  // path resolves them.
+  // path resolves them. The preview body is DEFERRED: rebuilding it resets the
+  // iframe's srcDoc, which forces the browser to reparse a whole HTML document +
+  // reflow — doing that per keystroke made composing an email stutter. The
+  // contentEditable stays instant; the iframe catches up after a typing pause.
+  // (`dirty`/save use the immediate effectiveBody, so save-state stays exact.)
   const previewSubject = renderPreview(subject);
+  const deferredBody = useDeferredValue(effectiveBody);
   const previewSrcDoc = useMemo(() => {
-    const rendered = renderPreview(effectiveBody);
+    const rendered = renderPreview(deferredBody);
     return `<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0}body{padding:20px;background:#f7f4ee;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}</style></head><body>${rendered}</body></html>`;
-  }, [effectiveBody]);
+  }, [deferredBody]);
 
   function insertMerge(field: string) {
     const token = `{${field}}`;

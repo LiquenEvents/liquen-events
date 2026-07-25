@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useDeferredValue } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
@@ -101,6 +101,8 @@ export default function Inventario() {
   const [items, setItems] = useState<PropItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
+  const dSearch = useDeferredValue(search);
   const [cat, setCat] = useState("Todas");
   const [cond, setCond] = useState<"Todos" | Condition>("Todos");
   const [adding, setAdding] = useState(false);
@@ -226,7 +228,7 @@ export default function Inventario() {
   );
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = dSearch.trim().toLowerCase();
     return items
       .filter((i) => {
         if (cat !== "Todas" && i.category !== cat) return false;
@@ -242,7 +244,7 @@ export default function Inventario() {
       })
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [items, search, cat, cond]);
+  }, [items, dSearch, cat, cond]);
 
   // Category totals (over the filtered set): distinct items + summed quantity.
   const totals = useMemo(() => {

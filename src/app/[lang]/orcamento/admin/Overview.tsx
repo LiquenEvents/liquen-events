@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
@@ -238,14 +238,23 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     }
   }, []);
 
+  // Keep the textarea instant (setTeamNotes now), but DEBOUNCE the localStorage
+  // write: a synchronous setItem on every keystroke serialises + commits to
+  // storage on the main thread per character, which hitches typing under storage
+  // pressure. Persist ~500ms after the last keystroke instead.
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function persistNotes(v: string) {
     setTeamNotes(v);
-    try {
-      localStorage.setItem("liquen-team-notes", v);
-    } catch {
-      /* ignore */
-    }
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem("liquen-team-notes", v);
+      } catch {
+        /* ignore */
+      }
+    }, 500);
   }
+  useEffect(() => () => void (notesTimer.current && clearTimeout(notesTimer.current)), []);
 
   useEffect(() => {
     try {
