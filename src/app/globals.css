@@ -620,6 +620,55 @@ body:has([data-orcamento-mode]) .scroll-progress {
   background-size: 100% 2px;
 }
 
+/* ── Floating labels (orçamento) ──
+   The label rests inside the field like a placeholder, then floats up + shrinks
+   to the small uppercase micro-label on focus or once the field has a value
+   (detected with :placeholder-shown via :has). The real example placeholder is
+   hidden until focus so it never collides with the resting label. `.ff--float`
+   forces the floated state for controls where :placeholder-shown is unreliable
+   (the native date input). Transform/opacity only — cheap, no layout shift. */
+.ff {
+  position: relative;
+}
+.ff-input {
+  padding-top: 1.55rem;
+  padding-bottom: 0.55rem;
+}
+.ff-label {
+  position: absolute;
+  left: 0;
+  top: 1.55rem;
+  font-size: 1rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-foreground) 50%, transparent);
+  pointer-events: none;
+  transform-origin: left center;
+  white-space: nowrap;
+  transition:
+    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.24s ease;
+}
+.ff:has(.ff-input:focus) .ff-label,
+.ff:has(.ff-input:not(:placeholder-shown)) .ff-label,
+.ff--float .ff-label {
+  transform: translateY(-1.55rem) scale(0.66);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-moss-dark);
+}
+/* Hide the example placeholder until focus so only the resting label shows. */
+.ff-input::placeholder {
+  color: transparent;
+}
+.ff-input:focus::placeholder {
+  color: color-mix(in srgb, var(--color-foreground) 55%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-label {
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .orc-reveal > * {
     animation: orc-field-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
