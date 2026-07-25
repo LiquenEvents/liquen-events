@@ -68,14 +68,15 @@ export default function PageTransition({ children }: { children: React.ReactNode
   // Admin/orçamento run full-screen; don't animate their heavy surfaces.
   if (pathname.startsWith("/orcamento")) return <>{children}</>;
 
-  const isNavigation = pathname !== entryPath;
-
   if (!USE_VIEW_TRANSITIONS || !ViewTransition || !vtCapable) {
-    return (
-      <div key={pathname} className={isNavigation ? "route-fade" : undefined}>
-        {children}
-      </div>
-    );
+    // Instant swap — NO opacity fade. An opacity fade-in of the incoming page
+    // reveals the light page background beneath it for the first frames (a white
+    // flash), because the new page starts transparent. Swapping instantly is both
+    // the most fluid option (no animation delay) and flash-free: the new page —
+    // which opens on an opaque dark hero — replaces the old one immediately. The
+    // key still remounts the subtree so per-page state resets cleanly. (For
+    // non-prefetched routes, loading.tsx shows a dark screen, also flash-free.)
+    return <div key={pathname}>{children}</div>;
   }
 
   // Keyed by pathname: the old route's tree exits, the new one enters — the
