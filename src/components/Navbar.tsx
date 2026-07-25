@@ -9,7 +9,8 @@ import LanguageToggle from "./LanguageToggle";
 import Magnetic from "@/components/motion/Magnetic";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 import { SITE } from "@/lib/site";
-import { localizeHref, type ChromeDict, type Locale } from "@/lib/i18n";
+import { localizeHref, type Locale } from "@/lib/i18n/config";
+import type { ChromeDict } from "@/lib/i18n";
 import { track } from "@/lib/track";
 
 // House easing — the same expressive cubic-bézier used across the site's

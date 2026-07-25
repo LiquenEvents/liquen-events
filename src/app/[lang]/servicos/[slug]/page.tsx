@@ -306,9 +306,14 @@ export default async function ServiceDetailPage({
         {/* Full-bleed mosaic (no horizontal padding): the photos run edge to
             edge, separated only by a 1px hairline of the surface showing
             through — keeps tile boundaries legible where similar photos meet. */}
+        {/* zoom (transform+opacity, GPU-composited), NOT mask: a clip-path wipe
+            repaints each tile every frame, and here it staggered across 6 freshly
+            decoded full-bleed photos as you scrolled in — the clearest remaining
+            scroll stutter on the service pages. zoom is the same "settle in"
+            reveal the home/service bands already use, with zero repaint. */}
         <Reveal
           as="div"
-          variant="mask"
+          variant="zoom"
           stagger={0.08}
           className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
         >

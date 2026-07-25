@@ -612,10 +612,7 @@ body[data-menu-open] .whatsapp-fixed {
   pointer-events: none;
 }
 
-/* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. Pair with
-      Parallax (translate on the wrapper) — separate elements, so the two
-      transforms never fight. `both` keeps the final scale as the resting
-      state, preserving drift headroom for the parallax. ── */
+/* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. ── */
 @keyframes hero-settle {
   from {
     transform: scale(1.14);
@@ -624,8 +621,20 @@ body[data-menu-open] .whatsapp-fixed {
     transform: scale(1.06);
   }
 }
+/* Resting (settled) state is the DEFAULT — no animation. The 2.2s scale only
+   PLAYS on the very first page load (html:not([data-navigated]), stamped by
+   PageTransition on the first client navigation). Client-to-client navigations
+   then arrive already settled, so the Ken-Burns scale never re-runs on top of
+   the incoming hero's decode + the route fade — that overlap was a real
+   per-navigation jank source, and hero-settle's old Parallax partner is now
+   disabled so it had been running solo on every nav. */
 .hero-settle {
-  animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform: scale(1.06);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-navigated]) .hero-settle {
+    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }
 
 /* ── Word-rise hero animation ── */

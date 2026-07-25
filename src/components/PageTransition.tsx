@@ -2,6 +2,7 @@
 
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useEffect, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { ViewTransition } from "./vt";
 
 /**
@@ -52,6 +53,17 @@ export default function PageTransition({ children }: { children: React.ReactNode
           "function",
     );
   }, []);
+
+  // Stamp <html data-navigated> on the first client navigation (before paint, so
+  // even that navigation's destination hero is covered). Hero pages run their
+  // Ken-Burns settle on the INITIAL load only; once the user has navigated,
+  // incoming heroes arrive already-settled (see .hero-settle in globals.css), so
+  // the 2.2s scale never competes with the new page's image decode + route fade.
+  useIsomorphicLayoutEffect(() => {
+    if (pathname !== entryPath) {
+      document.documentElement.setAttribute("data-navigated", "");
+    }
+  }, [pathname, entryPath]);
 
   // Admin/orçamento run full-screen; don't animate their heavy surfaces.
   if (pathname.startsWith("/orcamento")) return <>{children}</>;

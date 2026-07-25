@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
-import { localizeHref } from "@/lib/i18n";
+import { localizeHref } from "@/lib/i18n/config";
 import { track } from "@/lib/track";
 
 // Run `cb` when the browser is idle, falling back to a short timeout where
@@ -91,14 +91,17 @@ export default function StickyCTA() {
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
-      {/* Squared ghost chip in the site's SpaceX idiom: dark translucent
-          backing (backdrop blur kept — it floats over photos as well as paper)
-          with a white hairline that fills solid white on hover, text inverting
-          to near-black. */}
+      {/* Squared ghost chip in the site's SpaceX idiom: dark backing with a
+          white hairline that fills solid white on hover, text inverting to
+          near-black. Backdrop-blur dropped on purpose — this chip is fixed and
+          visible while you scroll, and a backdrop-filter re-samples + re-blurs
+          the moving pixels behind it EVERY scroll frame (the textbook scroll
+          jank). At /90 opacity the backing is effectively solid over both photos
+          and paper, so the blur was imperceptible anyway. */}
       <Link
         href={localizeHref("/orcamento", locale)}
         onClick={() => track("CTAClick", { source: "sticky" })}
-        className="group flex items-center gap-3 px-6 py-3.5 bg-[#0c0e0b]/75 backdrop-blur-md border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
+        className="group flex items-center gap-3 px-6 py-3.5 bg-[#0c0e0b]/90 border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
       >
         <span className="text-[10px] tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
           {t.footer.pedirOrcamento}
