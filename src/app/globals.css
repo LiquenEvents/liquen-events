@@ -738,16 +738,14 @@ vt-out-* e apontá-los aqui.) */
 }
 
 ::view-transition-group(.gallery-morph) {
-  animation-duration: 420ms;
+  /* Only the group animates — a composited transform of the thumbnail→fullscreen
+     box (position + size), plus the default GPU cross-fade of the image pair.
+     The previous `vt-morph-blur` animated filter: blur(2px) on the image pair,
+     which forced a full-frame REPAINT of a large photo every frame — the reason
+     opening a photo stuttered. Dropping it keeps the expand-morph but makes it
+     60fps. Slightly shorter, too, so it feels snappier. */
+  animation-duration: 340ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-::view-transition-image-pair(.gallery-morph) {
-  animation-name: vt-morph-blur;
-}
-@keyframes vt-morph-blur {
-  30% {
-    filter: blur(2px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
