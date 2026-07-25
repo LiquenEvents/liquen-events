@@ -939,6 +939,16 @@ function Lightbox({
   const [heroLoaded, setHeroLoaded] = useState(false);
   useEffect(() => setHeroLoaded(false), [index]);
 
+  // Defer the (secondary) thumbnail strip to the frame AFTER the lightbox
+  // opens, so the open commit only has to mount the hero photo — not also a row
+  // of thumbnail <Image>s. Keeps the open frame light on low-end phones; the
+  // strip fades in a frame later. Double rAF = after the first paint.
+  const [chromeReady, setChromeReady] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setChromeReady(true)));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   const labelText = (l: Label) => dict.labels[l];
   const altText = (src: string, l: Label) => {
     const base = dict.alt[l];
@@ -1269,29 +1279,31 @@ function Lightbox({
         </button>
       </div>
 
-      {/* Strip de thumbnails */}
+      {/* Strip de thumbnails — deferido para o frame seguinte à abertura para
+          não pesar no commit de abertura (ver chromeReady). */}
       <div
         className="lb-chrome flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {stripIdx.map((idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              setJustOpened(false);
-              setLb(idx);
-            }}
-            aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
-            aria-current={idx === index ? "true" : undefined}
-            className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
-              idx === index
-                ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
-                : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
-            }`}
-          >
-            <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
-          </button>
-        ))}
+        {chromeReady &&
+          stripIdx.map((idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                setJustOpened(false);
+                setLb(idx);
+              }}
+              aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
+              aria-current={idx === index ? "true" : undefined}
+              className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
+                idx === index
+                  ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
+                  : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
+              }`}
+            >
+              <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+            </button>
+          ))}
       </div>
 
       {/* Dicas teclado */}
