@@ -125,7 +125,7 @@ function ServiceBand({
           <div className="max-w-2xl">
             <h3
               className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
-              style={{ fontSize: "clamp(28px, 4.5vw, 56px)" }}
+              style={{ fontSize: "clamp(24px, 3.6vw, 44px)" }}
             >
               {service.title}
             </h3>
