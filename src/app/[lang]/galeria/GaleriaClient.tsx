@@ -197,7 +197,17 @@ export default function GaleriaClient({
   // mostra a ordem por defeito), por isso é adiado para idle: a grelha só se
   // re-baralha depois de a hidratação assentar, libertando o TTI.
   useEffect(
-    () => onIdle(() => setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36))),
+    () =>
+      onIdle(() => {
+        // Don't re-interleave once the visitor has engaged — reshuffling tiles
+        // they're already looking at would visibly jump the grid. And run it as a
+        // non-urgent transition so the one-time reorder yields to the main thread
+        // instead of blocking a frame.
+        if (typeof window !== "undefined" && window.scrollY > 0) return;
+        startTransition(() =>
+          setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36)),
+        );
+      }),
     [],
   );
   const [fading, setFading] = useState(false);
@@ -414,7 +424,10 @@ export default function GaleriaClient({
     const filtered = cat === "Todos" ? photos : photos.filter((p) => p.label === cat);
     return interleaveByCollection(filtered, orderSeed);
   }, [cat, collectionFilter, photos, orderSeed]);
-  const visible = pool.slice(0, shown);
+  // Memoised so `masonryColumns` (which depends on `visible`) doesn't recompute
+  // on every unrelated render (lightbox open/close, hover, showTop…): a plain
+  // pool.slice() made a fresh array reference each render and defeated that memo.
+  const visible = useMemo(() => pool.slice(0, shown), [pool, shown]);
 
   // Masonry manual: distribui as fotos por `cols` colunas equilibradas, sempre
   // para a coluna MAIS CURTA (usando a altura real de cada tile = H/W do
@@ -1130,7 +1143,7 @@ function Lightbox({
             prev();
           }}
           aria-label={dict.lbPrev}
-          className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -1156,6 +1169,11 @@ function Lightbox({
               fill
               sizes="90vw"
               quality={75}
+              // priority: the full-res lightbox photo is a DIFFERENT srcset
+              // candidate than the tile thumbnail, so opening starts a cold fetch.
+              // Fetching it high-priority (instead of default) shortens the
+              // "black → pop" gap so the photo is ready as the open animation runs.
+              priority
               className={`object-contain ${
                 playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
               }`}
@@ -1165,13 +1183,12 @@ function Lightbox({
         </div>
 
         {/* Pré-carrega só o vizinho SEGUINTE (o sentido de navegação dominante)
-            para que → seja instantâneo — antes carregávamos anterior E seguinte,
-            o que num ecrã 4K/retina disparava TRÊS descodificações concorrentes
-            de imagens de ecrã inteiro por cada abertura/passo (a interação mais
-            pesada do site). Fora de ecrã e a `45vw` (candidato mais pequeno, é só
-            um fetch especulativo, não a imagem mostrada), reduz para metade o
-            pico de descodificação/upload por passo. Só em rede boa (Save-Data /
-            2g / 3g ignora). O vizinho anterior carrega no próprio ← — raro. */}
+            para que → seja instantâneo. Usa `sizes="90vw"` — o MESMO candidato que
+            a foto mostrada — para o browser acertar no recurso exato em cache no
+            passo seguinte (com 45vw carregava um URL diferente e o → voltava a
+            descodificar do zero). Só um vizinho (não os dois), fora de ecrã, e só
+            em rede boa (Save-Data / 2g / 3g ignora). O anterior carrega no ← —
+            raro. */}
         <div
           aria-hidden
           className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
@@ -1182,7 +1199,7 @@ function Lightbox({
               src={pool[(index + 1) % pool.length].src}
               alt=""
               fill
-              sizes="45vw"
+              sizes="90vw"
               quality={75}
               loading="eager"
             />
@@ -1196,7 +1213,7 @@ function Lightbox({
             next();
           }}
           aria-label={dict.lbNext}
-          className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
