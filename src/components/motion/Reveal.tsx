@@ -4,7 +4,7 @@ import { useRef, type ElementType, type ReactNode } from "react";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 
-type Variant = "rise" | "fade" | "mask";
+type Variant = "rise" | "fade" | "mask" | "zoom";
 
 /**
  * Scroll-reveal primitive driven by pure CSS transitions + a shared
@@ -130,6 +130,14 @@ export default function Reveal({
         t.style.clipPath = "inset(0 0 100% 0)";
         t.style.transform = `translateY(${y * 0.5}px)`;
         t.style.willChange = "clip-path, transform";
+      } else if (variant === "zoom") {
+        // Cinematic settle: a slightly over-scaled, faded image eases to rest.
+        // Pure transform+opacity → GPU-composited, so it stays 60fps smooth even
+        // on full-bleed photos (unlike a clip-path wipe, which repaints).
+        t.style.opacity = "0";
+        t.style.transform = "scale(1.08)";
+        t.style.transformOrigin = "center";
+        t.style.willChange = "transform, opacity";
       } else if (variant === "fade") {
         t.style.opacity = "0";
       } else {
@@ -147,6 +155,10 @@ export default function Reveal({
         t.style.transition = `clip-path ${duration}s ${EASE} ${d}s, transform ${duration}s ${EASE} ${d}s`;
         t.style.clipPath = "inset(0 0 0% 0)";
         t.style.transform = "translateY(0px)";
+      } else if (variant === "zoom") {
+        t.style.transition = `opacity ${duration}s ${EASE} ${d}s, transform ${duration}s ${EASE} ${d}s`;
+        t.style.opacity = "1";
+        t.style.transform = "scale(1)";
       } else if (variant === "fade") {
         t.style.transition = `opacity ${duration}s ${EASE} ${d}s`;
         t.style.opacity = "1";

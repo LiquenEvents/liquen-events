@@ -125,12 +125,18 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           capítulo), mantendo a hierarquia de headings. */}
       {services.map((s, i, arr) => (
         <section key={s.title} className="relative h-[86svh] min-h-[560px] w-full overflow-hidden">
-          {/* The photograph is UNVEILED as the chapter enters — a bottom-up clip
-              mask (the same cinematic wipe used on the editorial images in /sobre)
-              instead of a hard cut. One-shot, compositor-driven (clip-path +
-              transform), and reduced-motion-safe (Reveal renders the finished
-              state). start="top 92%" so it completes before the panel centres. */}
-          <Reveal as="div" variant="mask" className="absolute inset-0" start="top 82%">
+          {/* The photograph settles in as the chapter enters — a slow cinematic
+              zoom-out (scale 1.08 → 1) with a fade. Pure transform + opacity, so
+              it's GPU-composited and stays buttery at 60fps on these full-bleed
+              photos (the old clip-path wipe repainted and stuttered). One-shot and
+              reduced-motion-safe (Reveal renders the finished state). */}
+          <Reveal
+            as="div"
+            variant="zoom"
+            duration={1.15}
+            className="absolute inset-0"
+            start="top 88%"
+          >
             <Image
               src={s.image}
               alt=""
