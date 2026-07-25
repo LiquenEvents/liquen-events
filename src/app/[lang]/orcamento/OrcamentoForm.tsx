@@ -388,11 +388,14 @@ export default function OrcamentoForm({
     // identifiable (WCAG 1.4.11); focus switches to solid moss.
     "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/65 focus:outline-none focus:border-moss transition-colors duration-300";
   const labelCls =
-    "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-dark";
+    "block text-[10.5px] font-medium text-foreground/60 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
+  // lg:pt-20 clears the tall at-rest navbar (≈164px logo lockup vs the global
+  // main pt-24=96px), so the left image panel starts BELOW the header instead of
+  // the logo sitting on top of the photo.
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr]">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] lg:pt-20">
       {/* ── Painel imagem (esquerda) ── */}
       <aside className="relative hidden lg:block overflow-hidden">
         <Image
@@ -524,10 +527,10 @@ export default function OrcamentoForm({
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-4 py-3.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
+                      className={`px-5 py-3 rounded-full text-[11px] tracking-[0.1em] uppercase border transition-all duration-200 ${
                         active
-                          ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
-                          : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
+                          ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
+                          : "border-foreground/12 text-foreground/60 hover:border-moss/40 hover:text-foreground/85"
                       }`}
                     >
                       {to.eventTypeLabels[i] ?? o.label}
