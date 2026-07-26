@@ -175,6 +175,34 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  async redirects() {
+    // Legacy URLs from the previous (Wix) site that Google still has indexed →
+    // the equivalent page on the rebuilt site, so old search results and
+    // bookmarks land on real content instead of a 404, and Google transfers the
+    // old pages' ranking onto the new URLs. permanent → 308 (Google treats it
+    // like a 301). Both the decoded and %-encoded forms of the accented paths
+    // are listed because the incoming pathname can arrive either way.
+    const APEX = "https://liquen-events.com";
+    return [
+      { source: "/eventos", destination: `${APEX}/servicos`, permanent: true },
+      { source: "/serviços", destination: `${APEX}/servicos`, permanent: true },
+      { source: "/servi%C3%A7os", destination: `${APEX}/servicos`, permanent: true },
+      { source: "/contactos", destination: `${APEX}/contacto`, permanent: true },
+      { source: "/portfólio-de-eventos", destination: `${APEX}/galeria`, permanent: true },
+      { source: "/portf%C3%B3lio-de-eventos", destination: `${APEX}/galeria`, permanent: true },
+      // Safety net: once www.liquen-events.com's DNS points here, forward every
+      // remaining www request to the same path on the canonical apex host (the
+      // one the whole site treats as canonical, SITE.url). Vercel's own domain
+      // redirect normally covers this too — this just guarantees it in code.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.liquen-events.com" }],
+        destination: `${APEX}/:path*`,
+        permanent: true,
+      },
+    ];
+  },
 };
 
 // Wrap with the bundle analyzer (run `npm run analyze` to open the report).
