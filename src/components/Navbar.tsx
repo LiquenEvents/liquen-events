@@ -188,7 +188,7 @@ const MobileMenu = memo(function MobileMenu({
       // browser's URL bar is showing, so an inset-0 overlay pushed the bottom
       // block (contacts) behind the browser chrome. dvh tracks the visible area,
       // keeping the contacts on screen as the URL bar shows/hides.
-      className={`lg:hidden fixed inset-x-0 top-0 h-[100dvh] -z-10 flex flex-col bg-[#0c0e0b] transition-[opacity,visibility] duration-500 ${
+      className={`lg:hidden fixed inset-x-0 top-0 h-[100dvh] -z-10 flex flex-col bg-moss-dark transition-[opacity,visibility] duration-500 ${
         isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
       }`}
     >
@@ -328,7 +328,11 @@ export default function Navbar() {
   // Scrim de legibilidade — SÓ sobre o hero escuro no topo (barra transparente)
   // ou com o menu aberto. Uma vez em scroll a barra ganha fundo sólido próprio,
   // pelo que o gradiente deixaria apenas uma sombra a sangrar para o conteúdo.
-  const showScrim = (!scrolled && overDarkHero) || isOpen;
+  // No top scrim while the mobile menu is open: the menu carries its own moss
+  // background, so the dark hero-legibility gradient would just paint an ugly
+  // darker band across the top of the green. The bar's contents (logo, close)
+  // are already light (see `light` below) and read fine on the moss.
+  const showScrim = !isOpen && !scrolled && overDarkHero;
   // Tratamento claro (texto/traços brancos) da barra — SÓ sobre o hero escuro no
   // topo (barra transparente) ou com o menu mobile aberto. Em scroll a barra
   // passa a CLARA (surface), por isso os links voltam ao tratamento escuro (moss)
