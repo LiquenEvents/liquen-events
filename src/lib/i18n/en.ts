@@ -74,7 +74,8 @@ export const en: Dict = {
     retomar: "Resume testimonial rotation",
     pausarLogos: "Pause logo marquee",
     retomarLogos: "Resume logo marquee",
-    whatsappPrefill: "Hi, I'd like to know more about your event decoration services.",
+    whatsappPrefill:
+      "Hi! I'd like to know more about Líquen Events' event decoration and planning, and how you could help with mine.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
@@ -533,7 +534,8 @@ export const en: Dict = {
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Shall we bring",
     ctaTitleMoss: "your idea to life?",
-    ctaText: "Talk to us. We listen to your idea and present a proposal tailored to you.",
+    ctaText:
+      "Talk to us. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
     galleryAlt: [
       "Outdoor wedding decorated by Líquen Events in the Alentejo",
