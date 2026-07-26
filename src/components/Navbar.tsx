@@ -261,7 +261,7 @@ const MobileMenu = memo(function MobileMenu({
             SpaceX "Upcoming Launches", adaptado à Líquen). Imagens só montam com
             o menu aberto para não descarregarem em todas as páginas. */}
         <div className="mt-10" style={reveal(80 + 6 * 60)}>
-          <p className="mb-3 text-[11px] tracking-[0.26em] uppercase text-white/45">
+          <p className="mb-4 text-white font-semibold uppercase tracking-display leading-snug text-[18px] sm:text-[21px]">
             {featuredHeader}
           </p>
           <div className="border-t border-white/12">
