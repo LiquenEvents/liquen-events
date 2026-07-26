@@ -344,12 +344,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {ts.seoEyebrow}
               </p>
               <h2
-                className="text-cream font-bold uppercase tracking-display leading-[1.04] mb-7 max-w-3xl"
-                style={{ fontSize: "clamp(32px, 5vw, 76px)" }}
+                className="text-cream font-bold uppercase tracking-display leading-[1.06] mb-6 max-w-3xl"
+                style={{ fontSize: "clamp(26px, 3.6vw, 52px)" }}
               >
                 {ts.seoTitle}
               </h2>
-              <p className="text-cream/75 text-base lg:text-lg leading-[1.85] max-w-xl">
+              <p className="text-cream/75 text-sm lg:text-base leading-[1.8] max-w-xl">
                 {ts.seoText}
               </p>
             </AnimateIn>
