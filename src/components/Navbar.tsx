@@ -202,7 +202,7 @@ const MobileMenu = memo(function MobileMenu({
         // justify-center centres the links in the space between the (compact)
         // top bar and the footer block; pt-24 keeps the first link clear of the
         // open-state logo. Compact link padding keeps everything on one screen.
-        className="relative flex-1 flex flex-col justify-center px-8 pt-28"
+        className="relative flex-1 flex flex-col justify-center px-8 pt-48"
       >
         <div className="w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
@@ -445,7 +445,7 @@ export default function Navbar() {
             // Three bar heights: a taller bar while the mobile menu is OPEN so it
             // can carry a prominent centred logo (the menu's pt clears it); the
             // compact 72px bar once the page is scrolled; the full 140px at rest.
-            isOpen ? "h-[112px]" : scrolled ? "h-[76px]" : "h-[164px]"
+            isOpen ? "h-[184px]" : scrolled ? "h-[76px]" : "h-[164px]"
           }`}
         >
           {/* Logo: horizontally centred on mobile (absolute, out of flow), and
@@ -460,7 +460,7 @@ export default function Navbar() {
               width={300}
               height={179}
               priority
-              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[80px] sm:h-[88px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[132px] sm:h-[152px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
             />
           </Link>
 
