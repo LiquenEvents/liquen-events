@@ -261,7 +261,7 @@ const MobileMenu = memo(function MobileMenu({
             SpaceX "Upcoming Launches", adaptado à Líquen). Imagens só montam com
             o menu aberto para não descarregarem em todas as páginas. */}
         <div className="mt-10" style={reveal(80 + 6 * 60)}>
-          <p className="mb-4 text-white font-semibold uppercase tracking-display leading-snug text-[18px] sm:text-[21px]">
+          <p className="mb-3 text-[11px] tracking-[0.26em] uppercase text-white/45">
             {featuredHeader}
           </p>
           <div className="border-t border-white/12">
@@ -279,10 +279,7 @@ const MobileMenu = memo(function MobileMenu({
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span
-                    className="block text-base leading-snug text-white"
-                    style={{ fontFamily: "var(--font-playfair)" }}
-                  >
+                  <span className="block text-base leading-snug text-white font-semibold uppercase tracking-display">
                     {s.title}
                   </span>
                   <span className="mt-1 block text-[10px] tracking-[0.18em] uppercase text-white/45">
