@@ -8,7 +8,6 @@ import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
 import Magnetic from "@/components/motion/Magnetic";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
-import { SITE } from "@/lib/site";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
 import type { ChromeDict } from "@/lib/i18n";
 import { track } from "@/lib/track";
@@ -17,48 +16,6 @@ import { track } from "@/lib/track";
 // reveals (galeria, heroes, link-line). Kept as a constant so the mobile-menu
 // cascade shares the exact motion signature of the rest of the brand.
 const MENU_EASE = "cubic-bezier(0.16,1,0.3,1)";
-
-// ── Hairline stroke icons for the overlay's contact + social block. Language-
-// neutral affordances (an envelope reads the same in PT and EN), drawn to match
-// the site's thin-line motif. Purely decorative — labelled by their parent <a>. ──
-// memo: these four are prop-less, so memoizing lets React skip reconciling their
-// SVG subtrees entirely when the Navbar re-renders on scroll (scrolled/hidden).
-const IconInstagram = memo(function IconInstagram() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.35"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" />
-      <circle cx="12" cy="12" r="3.7" />
-      <circle cx="17" cy="7" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
-  );
-});
-const IconFacebook = memo(function IconFacebook() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.35"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M14.5 8.5V6.8c0-.8.3-1.3 1.4-1.3h1.4V2.7A18 18 0 0 0 15 2.5c-2.3 0-3.9 1.4-3.9 4v2h-2.6v3h2.6v8h3.4v-8h2.4l.5-3Z" />
-    </svg>
-  );
-});
 
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
@@ -311,19 +268,21 @@ const MobileMenu = memo(function MobileMenu({
         </div>
       </div>
 
-      {/* Bloco inferior — CTA de contorno + contactos, monocromático e sóbrio.
-          paddingBottom soma o safe-area-inset-bottom (home indicator). */}
+      {/* Bloco inferior — apenas o CTA de contorno, compacto e ancorado ao fundo
+          do ecrã. Sem redes sociais aqui (já vivem no rodapé do site) para o
+          menu respirar e caber tudo. paddingBottom soma o safe-area-inset-bottom
+          (home indicator). */}
       <div
-        className="relative shrink-0 px-8 flex flex-col gap-5"
+        className="relative shrink-0 px-8"
         style={{
-          paddingBottom: "calc(2rem + env(safe-area-inset-bottom))",
+          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
           ...reveal(80 + 5 * 60 + 40),
         }}
       >
         <Link
           href={localizeHref("/orcamento", locale)}
           onClick={() => track("CTAClick", { source: "nav-mobile" })}
-          className="group flex items-center justify-between w-full border border-white/25 px-6 py-4 text-white text-[11px] tracking-[0.3em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
+          className="group flex items-center justify-between w-full border border-white/25 px-5 py-2.5 text-white text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
         >
           <span>{t.nav.pedirOrcamento}</span>
           <span
@@ -334,29 +293,6 @@ const MobileMenu = memo(function MobileMenu({
             →
           </span>
         </Link>
-
-        <div className="flex items-center">
-          <div className="flex items-center gap-1 -ml-2.5">
-            <a
-              href={SITE.instagram}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Instagram (${t.common.newWindow})`}
-              className="inline-flex h-11 w-11 items-center justify-center text-white/40 hover:text-white transition-colors"
-            >
-              <IconInstagram />
-            </a>
-            <a
-              href={SITE.facebook}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Facebook (${t.common.newWindow})`}
-              className="inline-flex h-11 w-11 items-center justify-center text-white/40 hover:text-white transition-colors"
-            >
-              <IconFacebook />
-            </a>
-          </div>
-        </div>
       </div>
     </div>
   );

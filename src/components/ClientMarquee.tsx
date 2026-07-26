@@ -29,7 +29,7 @@ function Mark({
 
   if (failed || !logo) {
     return (
-      <div className="flex-shrink-0 flex items-center h-8 sm:h-11" {...hidden}>
+      <div className="flex-shrink-0 flex items-center h-8 sm:h-10" {...hidden}>
         <span className="text-foreground/68 text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase whitespace-nowrap">
           {name}
         </span>
@@ -41,7 +41,7 @@ function Mark({
   const d = logoDimsFor(logo);
 
   return (
-    <div className="flex-shrink-0 flex items-center justify-center h-8 sm:h-12" {...hidden}>
+    <div className="flex-shrink-0 flex items-center justify-center h-8 sm:h-10" {...hidden}>
       <Image
         src={logo}
         alt={duplicate ? "" : name}
@@ -56,9 +56,10 @@ function Mark({
         // is imperceptible — 50 just trims the bytes of every logo in the strip.
         quality={50}
         style={{ height: `${h}px` }}
-        // Slimmer strip on mobile: cap the logo height (max-h) so the whole band
-        // reads as a fine line on a phone, full size from sm+.
-        className="w-auto max-h-[22px] sm:max-h-none max-w-[120px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
+        // Slimmer strip on every breakpoint: cap the logo height (max-h) so the
+        // whole band reads as a fine line — 22px on a phone, 34px from sm+ (was
+        // uncapped, which let the band grow much taller on desktop).
+        className="w-auto max-h-[22px] sm:max-h-[34px] max-w-[120px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
         onError={() => setFailed(true)}
       />
     </div>
@@ -108,7 +109,7 @@ export default function ClientMarquee() {
   }, []);
 
   return (
-    <div className="relative py-3.5 sm:py-7 border-y border-foreground/8 overflow-hidden">
+    <div className="relative py-3.5 sm:py-4 border-y border-foreground/8 overflow-hidden">
       {/* sr-only heading so heading-navigation users find the client band. */}
       <h2 className="sr-only">{t.nav.clientes}</h2>
       <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
