@@ -74,7 +74,8 @@ export const pt = {
     retomar: "Retomar rotação dos testemunhos",
     pausarLogos: "Pausar desfile de logótipos",
     retomarLogos: "Retomar desfile de logótipos",
-    whatsappPrefill: "Olá, gostaria de saber mais sobre a decoração de eventos.",
+    whatsappPrefill:
+      "Olá! Gostaria de saber mais sobre a decoração e organização de eventos da Líquen Events e como podem ajudar-me a planear o meu.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
