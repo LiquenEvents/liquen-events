@@ -902,8 +902,7 @@ body[data-menu-open] .whatsapp-fixed {
    geometria), por isso todas as rotas passam a um cross-fade curto de opacidade.
    Sem translateX/translateY nos snapshots, janela de sobreposição mínima → a
    entrada fica fluida em qualquer página. (Recuperar o deslize direcional:
-   devolver translateX aos keyframes vt-in-*/
-vt-out-* e apontá-los aqui.) */
+   devolver translateX aos keyframes vt-in-* / vt-out-* e apontá-los aqui.) */
 ::view-transition-old(.vt-page),
 ::view-transition-old(.vt-page-fwd),
 ::view-transition-old(.vt-page-bwd) {

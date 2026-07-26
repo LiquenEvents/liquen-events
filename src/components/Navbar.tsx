@@ -216,10 +216,13 @@ const MobileMenu = memo(function MobileMenu({
           numeração, sem serif, sem brilhos nem dourados. A tipografia sans
           maiúscula muito espaçada e o espaço branco fazem todo o trabalho; o
           único acento é um filete branco que cresce no item ativo. */}
-      {/* Conteúdo com scroll (links + serviços em destaque). pt-48 limpa o
-          logótipo grande (barra aberta h-184); a barra tem fundo moss quando o
-          menu está aberto, por isso o conteúdo desliza por trás dela sem se ver. */}
-      <div className="relative flex-1 overflow-y-auto overscroll-contain px-8 pt-48 pb-6">
+      {/* Conteúdo com scroll (links + serviços em destaque). pt-40 limpa o
+          logótipo (barra aberta h-150); a barra tem fundo moss quando o menu
+          está aberto, por isso o conteúdo desliza por trás dela sem se ver.
+          min-h-0 é essencial: sem ele um filho flex com overflow-y-auto cresce
+          até à altura do conteúdo (min-height:auto) em vez de fazer scroll
+          interno — e o rodapé (CTA + redes) acabava por sobrepor os cartões. */}
+      <div className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-8 pt-40 pb-6">
         <nav aria-label={t.nav.menuLabel} className="w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
             const active = isActive(link.href);
@@ -230,7 +233,7 @@ const MobileMenu = memo(function MobileMenu({
                 prefetch
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center justify-between py-3 sm:py-4 transition-colors duration-300 ${
+                className={`group flex items-center justify-between py-2.5 sm:py-3 transition-colors duration-300 ${
                   active ? "text-white" : "text-white/55 hover:text-white"
                 }`}
                 style={reveal(80 + i * 60)}
@@ -260,7 +263,7 @@ const MobileMenu = memo(function MobileMenu({
         {/* Serviços em destaque — cartão com foto + título + seta (idioma
             SpaceX "Upcoming Launches", adaptado à Líquen). Imagens só montam com
             o menu aberto para não descarregarem em todas as páginas. */}
-        <div className="mt-10" style={reveal(80 + 6 * 60)}>
+        <div className="mt-6" style={reveal(80 + 6 * 60)}>
           <p className="mb-3 text-[11px] tracking-[0.26em] uppercase text-white/45">
             {featuredHeader}
           </p>
@@ -275,7 +278,14 @@ const MobileMenu = memo(function MobileMenu({
               >
                 <span className="relative h-14 w-14 flex-shrink-0 overflow-hidden bg-white/5">
                   {isOpen && (
-                    <Image src={s.img} alt="" fill sizes="56px" quality={55} className="object-cover" />
+                    <Image
+                      src={s.img}
+                      alt=""
+                      fill
+                      sizes="56px"
+                      quality={55}
+                      className="object-cover"
+                    />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -506,7 +516,9 @@ export default function Navbar() {
             // Three bar heights: a taller bar while the mobile menu is OPEN so it
             // can carry a prominent centred logo (the menu's pt clears it); the
             // compact 72px bar once the page is scrolled; the full 140px at rest.
-            isOpen ? "h-[184px]" : scrolled ? "h-[76px]" : "h-[164px]"
+            // The open bar is kept trim (150px) so the menu below has room for
+            // the links + both service cards + the CTA without overflowing.
+            isOpen ? "h-[150px]" : scrolled ? "h-[76px]" : "h-[164px]"
           }`}
         >
           {/* Logo: horizontally centred on mobile (absolute, out of flow), and
@@ -521,7 +533,7 @@ export default function Navbar() {
               width={300}
               height={179}
               priority
-              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[132px] sm:h-[152px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
+              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[104px] sm:h-[120px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
             />
           </Link>
 
