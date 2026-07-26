@@ -91,19 +91,19 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 ))}
               </h1>
               <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">
-                {/* Primary hero actions. text-[11px] + py-2 gives a comfortable
-                    reading size and a ≥40px tap target on phones (the underline
-                    keeps the minimal look); tightens back to 10px from sm up. */}
+                {/* Primary hero actions. Small 9px label on phones (the py-2
+                    still keeps a ≥40px tap target and the underline keeps the
+                    minimal look); 10px from sm up. */}
                 <TrackedLink
                   href={localizeHref("/orcamento", locale)}
                   trackProps={{ source: "hero" }}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[11px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
                 >
                   {t.common.pedirOrcamento} <span aria-hidden>→</span>
                 </TrackedLink>
                 <Link
                   href={localizeHref("/galeria", locale)}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[11px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
                 >
                   {t.common.verGaleria} <span aria-hidden>→</span>
                 </Link>
