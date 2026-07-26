@@ -119,6 +119,26 @@ const MobileMenu = memo(function MobileMenu({
     { href: "/clientes", label: t.nav.clientes },
   ];
 
+  // Featured services block at the foot of the menu (SpaceX "Upcoming Launches"
+  // idiom, adapted): two flagship services with a small photo, title + eyebrow
+  // and an arrow. Labels are kept inline (locale-switched) so this menu-only
+  // copy doesn't have to ride the shared chrome dictionary.
+  const featuredHeader = locale === "en" ? "Our services" : "Os nossos serviços";
+  const featured = [
+    {
+      href: "/servicos/casamentos",
+      img: "/imagens/EW1_1100.jpg",
+      title: locale === "en" ? "Weddings" : "Casamentos",
+      sub: locale === "en" ? "Decoration & coordination" : "Decoração e coordenação",
+    },
+    {
+      href: "/servicos/eventos-corporativos",
+      img: "/imagens/EW1_1332.jpg",
+      title: locale === "en" ? "Corporate Events" : "Eventos Corporativos",
+      sub: locale === "en" ? "For companies" : "Para empresas",
+    },
+  ];
+
   // A section stays "current" while the visitor is on any page beneath it, so a
   // service-detail route (/servicos/casamentos) keeps the Serviços item lit.
   const isActive = (href: string) =>
@@ -196,15 +216,11 @@ const MobileMenu = memo(function MobileMenu({
           numeração, sem serif, sem brilhos nem dourados. A tipografia sans
           maiúscula muito espaçada e o espaço branco fazem todo o trabalho; o
           único acento é um filete branco que cresce no item ativo. */}
-      <nav
-        aria-label={t.nav.menuLabel}
-        // No scroll — the whole menu is sized to fit the viewport. flex-1 +
-        // justify-center centres the links in the space between the (compact)
-        // top bar and the footer block; pt-24 keeps the first link clear of the
-        // open-state logo. Compact link padding keeps everything on one screen.
-        className="relative flex-1 flex flex-col justify-center px-8 pt-48"
-      >
-        <div className="w-full">
+      {/* Conteúdo com scroll (links + serviços em destaque). pt-48 limpa o
+          logótipo grande (barra aberta h-184); a barra tem fundo moss quando o
+          menu está aberto, por isso o conteúdo desliza por trás dela sem se ver. */}
+      <div className="relative flex-1 overflow-y-auto overscroll-contain px-8 pt-48 pb-6">
+        <nav aria-label={t.nav.menuLabel} className="w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
             const active = isActive(link.href);
             return (
@@ -239,8 +255,54 @@ const MobileMenu = memo(function MobileMenu({
               </Link>
             );
           })}
+        </nav>
+
+        {/* Serviços em destaque — cartão com foto + título + seta (idioma
+            SpaceX "Upcoming Launches", adaptado à Líquen). Imagens só montam com
+            o menu aberto para não descarregarem em todas as páginas. */}
+        <div className="mt-10" style={reveal(80 + 6 * 60)}>
+          <p className="mb-3 text-[11px] tracking-[0.26em] uppercase text-white/45">
+            {featuredHeader}
+          </p>
+          <div className="border-t border-white/12">
+            {featured.map((s) => (
+              <Link
+                key={s.href}
+                href={localizeHref(s.href, locale)}
+                prefetch
+                transitionTypes={navTypes(s.href)}
+                className="group flex items-center gap-4 border-b border-white/12 py-3"
+              >
+                <span className="relative h-14 w-14 flex-shrink-0 overflow-hidden bg-white/5">
+                  {isOpen && (
+                    <Image src={s.img} alt="" fill sizes="56px" quality={55} className="object-cover" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className="block text-base leading-snug text-white"
+                    style={{ fontFamily: "var(--font-playfair)" }}
+                  >
+                    {s.title}
+                  </span>
+                  <span className="mt-1 block text-[10px] tracking-[0.18em] uppercase text-white/45">
+                    {s.sub}
+                  </span>
+                </span>
+                <span
+                  aria-hidden
+                  className={`flex-shrink-0 text-white/50 group-hover:text-white ${
+                    reduce ? "" : "transition-transform duration-300 group-hover:translate-x-1"
+                  }`}
+                  style={{ transitionTimingFunction: MENU_EASE }}
+                >
+                  →
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
-      </nav>
+      </div>
 
       {/* Bloco inferior — CTA de contorno + contactos, monocromático e sóbrio.
           paddingBottom soma o safe-area-inset-bottom (home indicator). */}
@@ -423,9 +485,11 @@ export default function Navbar() {
         // `fixed inset-0` do menu mobile à altura da barra em vez do viewport
         // (além do custo de re-desfocar a cada frame de scroll). A 95% de opacidade
         // já é praticamente sólida, pelo que o blur seria impercetível.
-        scrolled
-          ? "bg-surface/95 border-b border-foreground/10 shadow-sm shadow-black/5"
-          : "bg-transparent border-b border-transparent"
+        isOpen
+          ? "bg-moss-dark border-b border-transparent"
+          : scrolled
+            ? "bg-surface/95 border-b border-foreground/10 shadow-sm shadow-black/5"
+            : "bg-transparent border-b border-transparent"
       }`}
     >
       {/* Legibility scrim — only over dark hero images, fades to nothing */}
