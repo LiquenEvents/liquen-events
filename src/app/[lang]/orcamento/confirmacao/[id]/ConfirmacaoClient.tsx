@@ -10,6 +10,7 @@ import AnimateIn from "@/components/AnimateIn";
 import { localizeHref } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
 import { track } from "@/lib/track";
+import { reportLeadConversion } from "@/lib/ads-conversion";
 
 const STATUS_COLORS: Record<string, string> = {
   pendente: "text-moss-dark",
@@ -66,7 +67,10 @@ export default function ConfirmacaoClient({
   // was previously invisible). Once per mount; inert without Plausible.
   useEffect(() => {
     track("QuoteConfirmed");
-  }, []);
+    // Google Ads / GA4 lead conversion — landing here is the successful submit.
+    // Deduped by quote id so a refresh/re-open in the same tab won't recount.
+    reportLeadConversion(id);
+  }, [id]);
   useEffect(() => {
     if (!loading) h1Ref.current?.focus();
   }, [loading]);
