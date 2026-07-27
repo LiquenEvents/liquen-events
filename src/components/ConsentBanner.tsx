@@ -33,10 +33,10 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
   const [show, setShow] = useState(false);
   const pathname = usePathname();
   // The consent bar governs Google's public-visitor tracking; it has no place
-  // over the authenticated back office (/portal/…), where it would also sit on
-  // top of the mobile nav. Staying out of that surface keeps it a marketing-
-  // site concern only.
-  const isBackOffice = pathname?.includes("/portal") ?? false;
+  // over the authenticated back office (…/orcamento/admin[/…], locale-prefixed
+  // in EN), where it would also sit on top of the mobile nav and intercept its
+  // clicks. Staying out of that surface keeps it a marketing-site concern only.
+  const isBackOffice = pathname?.includes("/orcamento/admin") ?? false;
 
   useEffect(() => {
     // Only surface the bar when no choice has been stored yet. Wrapped in
