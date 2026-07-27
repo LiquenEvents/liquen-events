@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
-import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
+import {
+  createContractIfAbsent,
+  newContractId,
+  getAcceptedContractByQuote,
+} from "@/lib/contracts-store";
 import { TERMS_VERSION, DEFAULT_TERMS, termsToPlainText } from "@/lib/contract-terms";
 import {
   createInvoice,
@@ -91,40 +95,56 @@ export async function POST(request: NextRequest) {
 
     const accepted = action === "aceitar";
 
-    // Guard against accepting a SUPERSEDED proposal. Creating a revised proposal
-    // does not withdraw the previous one (both stay "enviada"), and the old signed
-    // link lives on in the client's inbox. Accepting it would bind Líquen to the
-    // stale (often cheaper) price and, worse, could mint a 2nd contract for a quote
-    // whose newer proposal was already accepted. So an accept only stands for the
-    // NEWEST offered proposal: if any sibling that was actually sent (status is not
-    // a never-offered "rascunho") is newer, this link is stale. Declining a stale
-    // proposal stays harmless, so the guard only gates acceptance.
-    if (accepted) {
-      try {
-        const siblings = await listProposalsForQuote(proposal.quoteId);
-        const mine = Date.parse(proposal.createdAt);
-        const superseded = siblings.some(
-          (p) =>
-            p.id !== proposal.id &&
-            p.status !== "rascunho" &&
-            !Number.isNaN(Date.parse(p.createdAt)) &&
-            (Number.isNaN(mine) || Date.parse(p.createdAt) > mine),
+    // A DECLINE must never cancel a booking that is already confirmed. Creating a
+    // revised proposal leaves the previous one "enviada" and its signed link lives
+    // on in the client's inbox (forwardable). Without this, a client who accepted
+    // proposal B (minting a contract + 30% sinal invoice) could later click
+    // "Recusar" on an older proposal A and flip the SAME quote back to "rejeitado",
+    // fabricating a "recusada" audit entry over a binding, invoiced deal and making
+    // the team think the deal was lost. If the quote already has an accepted
+    // contract, refuse the decline outright — change nothing.
+    if (!accepted) {
+      const acceptedContract = await getAcceptedContractByQuote(proposal.quoteId);
+      if (acceptedContract) {
+        return NextResponse.json(
+          { error: "Este evento já está confirmado e não pode ser recusado. Contacte-nos." },
+          { status: 409 },
         );
-        if (superseded) {
-          return NextResponse.json(
-            {
-              error:
-                "Existe uma proposta mais recente para este evento. Use o link mais recente ou contacte-nos.",
-            },
-            { status: 409 },
-          );
-        }
-      } catch (e) {
-        // A lookup failure must not block a legitimate accept — log and proceed.
-        log.error("proposta: verificação de proposta mais recente falhou", e, {
-          id: proposal.quoteId,
-        });
       }
+    }
+
+    // Guard against answering a SUPERSEDED proposal. Creating a revised proposal
+    // does not withdraw the previous one (both stay "enviada"), and the old signed
+    // link lives on in the client's inbox. Only the NEWEST offered proposal can be
+    // answered — accepting a stale one would bind Líquen to the old (often cheaper)
+    // price, and declining a stale one would let the client drive the quote's status
+    // off a newer, still-open offer. If any sibling that was actually sent (status
+    // is not a never-offered "rascunho") is newer, this link is stale for BOTH
+    // accept and decline.
+    try {
+      const siblings = await listProposalsForQuote(proposal.quoteId);
+      const mine = Date.parse(proposal.createdAt);
+      const superseded = siblings.some(
+        (p) =>
+          p.id !== proposal.id &&
+          p.status !== "rascunho" &&
+          !Number.isNaN(Date.parse(p.createdAt)) &&
+          (Number.isNaN(mine) || Date.parse(p.createdAt) > mine),
+      );
+      if (superseded) {
+        return NextResponse.json(
+          {
+            error:
+              "Existe uma proposta mais recente para este evento. Use o link mais recente ou contacte-nos.",
+          },
+          { status: 409 },
+        );
+      }
+    } catch (e) {
+      // A lookup failure must not block a legitimate answer — log and proceed.
+      log.error("proposta: verificação de proposta mais recente falhou", e, {
+        id: proposal.quoteId,
+      });
     }
     // Accepting is a binding commitment, so it must carry an explicit agreement
     // to the Termos & Condições plus the name of who is accepting (the signature

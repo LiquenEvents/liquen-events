@@ -44,9 +44,15 @@ vi.mock("@/lib/rate-limit", () => ({
 // touch the repository/filesystem. `getContractByProposal` defaults to null so
 // the accept path creates a fresh contract + sinal invoice; the idempotency test
 // overrides it to return an existing one.
-const contractsDb = vi.hoisted(() => ({ existing: null as Record<string, unknown> | null }));
+const contractsDb = vi.hoisted(() => ({
+  existing: null as Record<string, unknown> | null,
+  acceptedByQuote: null as Record<string, unknown> | null,
+}));
 vi.mock("@/lib/contracts-store", () => {
   const getContractByProposal = vi.fn(async () => contractsDb.existing);
+  // The decline guard looks up whether the quote already has an accepted
+  // contract; default null so ordinary declines proceed.
+  const getAcceptedContractByQuote = vi.fn(async () => contractsDb.acceptedByQuote);
   const createContract = vi.fn(async (c: Record<string, unknown>) => c);
   // Espelha o helper real sobre os primitivos mockados: regista via
   // createContract e só reporta created:true quando não pré-existia contrato —
@@ -59,6 +65,7 @@ vi.mock("@/lib/contracts-store", () => {
   });
   return {
     getContractByProposal,
+    getAcceptedContractByQuote,
     createContract,
     createContractIfAbsent,
     newContractId: vi.fn(() => "contract-id"),
@@ -114,6 +121,7 @@ beforeEach(() => {
   proposalsDb.store.clear();
   quotesDb.store.clear();
   contractsDb.existing = null;
+  contractsDb.acceptedByQuote = null;
   vi.clearAllMocks();
 });
 
@@ -422,6 +430,20 @@ describe("POST /api/proposta", () => {
     expect(json.status).toBe("rejeitada");
     expect(proposalsDb.store.get("p4")?.status).toBe("rejeitada");
     expect(quotesDb.store.get("q-p4")).toMatchObject({ status: "rejeitado" });
+  });
+
+  it("refuses to decline an old proposal once the booking is confirmed (no quote downgrade)", async () => {
+    // Client accepted the newer proposal (contract + sinal exist), then clicks
+    // "Recusar" on an older still-"enviada" link. The decline must NOT flip the
+    // already-confirmed quote back to "rejeitado" nor touch the old proposal.
+    seedProposal("p-old", { quoteId: "q-conf", createdAt: "2026-02-01T10:00:00.000Z" });
+    quotesDb.store.set("q-conf", { id: "q-conf", status: "aceite" });
+    contractsDb.acceptedByQuote = { id: "c1", quoteId: "q-conf", status: "aceite" };
+
+    const res = await POST(postReq({ token: createProposalToken("p-old"), action: "recusar" }));
+    expect(res.status).toBe(409);
+    expect(proposalsDb.store.get("p-old")?.status).toBe("enviada");
+    expect(quotesDb.store.get("q-conf")).toMatchObject({ status: "aceite" });
   });
 
   it("is idempotent: a second response returns the recorded one without re-updating", async () => {
