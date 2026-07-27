@@ -129,7 +129,12 @@ export async function POST(request: NextRequest) {
     // Accepting is a binding commitment, so it must carry an explicit agreement
     // to the Termos & Condições plus the name of who is accepting (the signature
     // recorded in the contract). Declining requires neither.
-    const acceptedName = typeof body?.acceptedName === "string" ? body.acceptedName.trim() : "";
+    // Bound the name: this endpoint is unauthenticated (a valid signed link is
+    // the only gate), so cap the length like every zod-validated field to stop
+    // a link-holder from persisting a multi-megabyte string into the contract
+    // and the activity log.
+    const acceptedName =
+      typeof body?.acceptedName === "string" ? body.acceptedName.trim().slice(0, 120) : "";
     if (accepted && (body?.acceptedTerms !== true || !acceptedName)) {
       return NextResponse.json({ error: "É necessário aceitar as condições." }, { status: 400 });
     }

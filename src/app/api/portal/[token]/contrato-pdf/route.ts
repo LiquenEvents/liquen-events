@@ -3,10 +3,13 @@ import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { renderContractPdf } from "@/lib/contract-pdf";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
 
 // pdf-lib precisa do runtime Node.
 export const runtime = "nodejs";
+// Limita cada render para um documento lento não prender um worker.
+export const maxDuration = 20;
 
 /**
  * Contrato assinado do cliente, público-por-token, para o portal. Mesmo modelo
@@ -17,8 +20,13 @@ export const runtime = "nodejs";
  * desconhecido, ou nenhum contrato aceite — para o link nunca revelar se um id
  * existe. Um contrato pendente não conta: só se descarrega o que foi assinado.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+
+  // Token de 1 ano e reencaminhável: limita por IP para um link não poder ser
+  // repetido em ciclo e sobrecarregar a geração de PDF.
+  const limited = await rateLimit(`portal-pdf:${clientIp(request)}`, 12, 60_000);
+  if (!limited.ok) return new NextResponse(null, { status: 429 });
 
   const claim = readPortalToken(token);
   if (!claim) return new NextResponse(null, { status: 404 });

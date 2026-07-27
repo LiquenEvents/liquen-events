@@ -27,7 +27,9 @@ import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 type Cat = "empresas" | "particulares" | null;
 
 // Local draft so a visitor who navigates away and returns doesn't lose what
-// they typed. Stored on the visitor's own device; cleared on a successful send.
+// they typed. Stored in sessionStorage (tab-scoped) so this personal data is
+// gone when the tab closes — no lingering contact details on a shared/public
+// device; also cleared on a successful send.
 const DRAFT_KEY = "liquen-orcamento-draft";
 
 // A stable id for THIS enquiry, so a retried submit (lost response → resubmit,
@@ -176,14 +178,16 @@ export default function OrcamentoForm({
   const firstSave = useRef(true);
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(DRAFT_KEY);
+      const saved = sessionStorage.getItem(DRAFT_KEY);
       if (!saved) return;
       const d = JSON.parse(saved) as Record<string, string>;
-      // Don't keep personal contact data on the device indefinitely: an
-      // abandoned draft purges itself after 7 days (awkward on shared devices).
+      // The draft lives in sessionStorage, so it is already gone when the tab
+      // closes — the personal contact data can't linger on a shared/public
+      // device. The 7-day stamp is kept as a secondary guard within a very
+      // long-lived tab.
       const ts = Number(d._ts);
       if (ts && Date.now() - ts > 7 * 24 * 60 * 60 * 1000) {
-        localStorage.removeItem(DRAFT_KEY);
+        sessionStorage.removeItem(DRAFT_KEY);
         return;
       }
       if (d.eventType) setEventType(d.eventType);
@@ -249,7 +253,7 @@ export default function OrcamentoForm({
     const d = draftRef.current;
     if (!d) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, _ts: Date.now() }));
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, _ts: Date.now() }));
     } catch {
       /* ignora */
     }
@@ -370,7 +374,7 @@ export default function OrcamentoForm({
       // trava o flush de ciclo de vida para o unmount da navegação não o repor.
       submittedRef.current = true;
       try {
-        localStorage.removeItem(DRAFT_KEY);
+        sessionStorage.removeItem(DRAFT_KEY);
         // Retire this enquiry's idempotency id so a genuinely NEW enquiry later
         // gets a fresh one (and doesn't dedup against the just-sent lead).
         localStorage.removeItem(SUBMISSION_KEY);

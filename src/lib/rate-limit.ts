@@ -1,5 +1,4 @@
 import "server-only";
-import type { NextRequest } from "next/server";
 
 /**
  * Rate limiter for public endpoints (anti-spam).
@@ -16,7 +15,9 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>();
 
-export function clientIp(req: NextRequest): string {
+// Accepts a plain Request (NextRequest extends it) — only the headers are read,
+// so route handlers typed with either can pass their request straight through.
+export function clientIp(req: Request): string {
   // Prefer headers the hosting platform sets itself (Vercel overwrites these
   // per request); a client-supplied x-forwarded-for is trivially forged and
   // would let a bot rotate "IPs" past the rate limit, so it comes last.

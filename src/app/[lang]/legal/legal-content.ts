@@ -45,7 +45,7 @@ function privacyPt(): LegalDoc {
           "Origem da visita: se chegar ao site através de uma ligação com parâmetros de campanha (UTM) ou a partir de outro site, podemos registar essa proveniência, associada ao pedido, para percebermos como nos encontrou.",
           "Dados técnicos recolhidos automaticamente para segurança e estatística: endereço IP (de forma efémera, para limitação de abusos) e informação básica do pedido.",
           "Dados de análise e de publicidade (apenas com o seu consentimento): se aceitar os cookies no aviso apresentado, utilizamos o Google Analytics e o Google Ads. Estes serviços recolhem identificadores associados a cookies, informação do dispositivo e do navegador e as páginas e interações no site, para medirmos a audiência e a eficácia da nossa publicidade. Se recusar, não são colocados cookies nem recolhida informação associada a cookies; o Google poderá ainda receber sinais técnicos agregados e sem cookies (por exemplo, país e tipo de página), que utiliza para modelação estatística e que não permitem identificá-lo individualmente.",
-          "Rascunho do formulário: para não perder o que escreve, o formulário de pedido de orçamento guarda temporariamente as suas respostas no armazenamento local do navegador (localStorage), apenas no seu dispositivo. Pode limpá-lo a qualquer momento nas definições do navegador; não é enviado enquanto não submeter o pedido.",
+          "Rascunho do formulário: para não perder o que escreve, o formulário de pedido de orçamento guarda temporariamente as suas respostas no armazenamento de sessão do navegador (sessionStorage), apenas no seu dispositivo e apenas durante a sessão — são apagadas ao fechar o separador. Pode também limpá-lo a qualquer momento nas definições do navegador; nada é enviado enquanto não submeter o pedido.",
         ],
       },
       {
@@ -209,7 +209,7 @@ function privacyEn(): LegalDoc {
           "Visit source: if you reach the site via a link carrying campaign parameters (UTM) or from another website, we may record that origin, linked to your request, to understand how you found us.",
           "Technical data collected automatically for security and statistics: IP address (ephemerally, for abuse limiting) and basic request information.",
           "Analytics and advertising data (only with your consent): if you accept cookies in the notice shown, we use Google Analytics and Google Ads. These services collect cookie-based identifiers, device and browser information and the pages and interactions on the site, so we can measure our audience and the effectiveness of our advertising. If you decline, no cookies are set and no cookie-based information is collected; Google may still receive aggregated, cookieless signals (for example, country and page type) that it uses for statistical modelling and that do not identify you individually.",
-          "Form draft: so you don't lose what you type, the quote-request form temporarily saves your answers in the browser's local storage (localStorage), on your device only. You can clear it at any time in your browser settings; nothing is sent until you submit the request.",
+          "Form draft: so you don't lose what you type, the quote-request form temporarily saves your answers in the browser's session storage (sessionStorage), on your device only and only for the session — they are cleared when you close the tab. You can also clear it at any time in your browser settings; nothing is sent until you submit the request.",
         ],
       },
       {

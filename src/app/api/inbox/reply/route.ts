@@ -22,10 +22,15 @@ const replySchema = z.object({
       (v) => !/[\r\n]/.test(v) && /[^\s@]+@[^\s@]+\.[^\s@]+/.test(v),
       "Destinatário inválido",
     ),
-  // TODO(qa): `subject` isn't CRLF-guarded like `to`. Not provably exploitable —
-  // nodemailer encodes/sanitizes header values so a newline here can't inject a
-  // second header — but a defence-in-depth `!/[\r\n]/` refine would mirror `to`.
-  subject: z.string().trim().max(200).optional(),
+  // `subject` mirrors `to`'s CRLF guard: nodemailer already encodes header
+  // values, but rejecting newlines here is defence-in-depth against header
+  // injection and keeps the two header fields consistent.
+  subject: z
+    .string()
+    .trim()
+    .max(200)
+    .refine((v) => !/[\r\n]/.test(v), "Assunto inválido")
+    .optional(),
   message: z.string().trim().min(1, "Mensagem obrigatória").max(10_000),
 });
 
