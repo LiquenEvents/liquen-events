@@ -80,14 +80,30 @@ function privacyPt(): LegalDoc {
         ],
       },
       {
-        heading: "7. Os seus direitos",
+        heading: "7. Segurança dos dados",
+        body: [
+          "Adotamos medidas técnicas e organizativas adequadas para proteger os seus dados contra o acesso não autorizado, a perda, a alteração ou a divulgação indevida — por exemplo, o acesso restrito à informação e a utilização de ligações encriptadas (HTTPS).",
+          "Nenhum sistema é totalmente inviolável; caso ocorra uma violação de dados que implique risco elevado para os seus direitos, cumpriremos os deveres de comunicação previstos no RGPD.",
+        ],
+      },
+      {
+        heading: "8. Os seus direitos",
         body: [
           "Tem o direito de aceder, retificar, apagar, limitar e opor-se ao tratamento dos seus dados, bem como o direito à portabilidade e a retirar o consentimento a qualquer momento, sem afetar a licitude do tratamento anterior.",
+          "Não tomamos decisões exclusivamente automatizadas, incluindo a definição de perfis, que produzam efeitos jurídicos na sua esfera ou que o afetem de forma significativa e similar.",
           `Para exercer estes direitos, contacte-nos através de ${SITE.email}. Tem ainda o direito de apresentar reclamação junto da Comissão Nacional de Proteção de Dados (CNPD).`,
         ],
       },
       {
-        heading: "8. Cookies",
+        heading: "9. Direitos de imagem",
+        body: [
+          "Nos eventos que organizamos podem ser captadas fotografias e vídeos. Algumas destas imagens poderão ser publicadas no nosso portefólio — neste site e nas nossas redes sociais — para divulgar o nosso trabalho.",
+          "A publicação de imagens em que seja identificável assenta no seu consentimento, recolhido de forma específica (por exemplo, no contrato de prestação de serviços ou em autorização própria). Pode não autorizar essa utilização, sem que isso afete a prestação dos nossos serviços.",
+          `Pode, a qualquer momento, retirar o consentimento e pedir a remoção de imagens em que seja identificável, através de ${SITE.email}. Removê-las-emos, num prazo razoável, dos canais que controlamos — note-se que imagens eventualmente já partilhadas ou reproduzidas por terceiros podem não estar sob o nosso controlo.`,
+        ],
+      },
+      {
+        heading: "10. Cookies",
         body: [
           "Cookies estritamente necessários ao funcionamento (por exemplo, a memória do idioma escolhido e o registo da sua preferência de cookies) — não requerem consentimento.",
           "Cookies de análise e de publicidade (Google Analytics e Google Ads) — só são ativados se os aceitar no aviso de cookies apresentado na primeira visita. Servem para medir as visitas e a eficácia da nossa publicidade e podem implicar a partilha de dados com o Google (ver secções 5 e 6). Utilizamos o Modo de Consentimento da Google: enquanto não aceitar, não são colocados cookies de análise nem de publicidade.",
@@ -96,7 +112,7 @@ function privacyPt(): LegalDoc {
         ],
       },
       {
-        heading: "9. Alterações a esta política",
+        heading: "11. Alterações a esta política",
         body: [
           "Podemos atualizar esta política para refletir alterações legais ou dos nossos serviços. A versão em vigor é sempre a publicada nesta página, com a respetiva data de atualização.",
         ],
@@ -138,7 +154,9 @@ function termsPt(): LegalDoc {
       {
         heading: "5. Limitação de responsabilidade",
         body: [
-          "Envidamos os melhores esforços para manter a informação do site correta e atualizada, mas não garantimos a ausência de erros ou interrupções. Não nos responsabilizamos por danos decorrentes da utilização do site ou de sites de terceiros para os quais existam ligações.",
+          "Envidamos os melhores esforços para manter a informação do site correta, atualizada e disponível, mas não garantimos a ausência de erros ou imprecisões, nem que o site esteja permanentemente acessível ou livre de interrupções. O conteúdo do site tem caráter informativo e não dispensa a confirmação connosco.",
+          "Na medida máxima permitida pela lei, não nos responsabilizamos por danos indiretos decorrentes da utilização ou da impossibilidade de utilização do site, nem pelo conteúdo de sites de terceiros para os quais existam ligações.",
+          "Estes termos regem a utilização do site. As condições da prestação de serviços de eventos (âmbito, preços, pagamentos, prazos e responsabilidades) regem-se pelo contrato específico celebrado com o cliente, que prevalece em caso de divergência.",
         ],
       },
       {
@@ -208,14 +226,30 @@ function privacyEn(): LegalDoc {
         ],
       },
       {
-        heading: "7. Your rights",
+        heading: "7. Data security",
+        body: [
+          "We put in place appropriate technical and organisational measures to protect your data against unauthorised access, loss, alteration or improper disclosure — for example, restricted access to information and the use of encrypted connections (HTTPS).",
+          "No system is entirely secure; should a data breach occur that is likely to result in a high risk to your rights, we will comply with the notification duties set out in the GDPR.",
+        ],
+      },
+      {
+        heading: "8. Your rights",
         body: [
           "You have the right to access, rectify, erase, restrict and object to the processing of your data, as well as the right to data portability and to withdraw consent at any time, without affecting the lawfulness of prior processing.",
+          "We do not carry out solely automated decision-making, including profiling, that produces legal effects concerning you or similarly significantly affects you.",
           `To exercise these rights, contact us at ${SITE.email}. You also have the right to lodge a complaint with the Portuguese Data Protection Authority (CNPD).`,
         ],
       },
       {
-        heading: "8. Cookies",
+        heading: "9. Image rights",
+        body: [
+          "At the events we organise, photographs and video may be taken. Some of these images may be published in our portfolio — on this website and on our social media — to showcase our work.",
+          "Publishing images in which you are identifiable is based on your consent, obtained specifically (for example, in the service contract or in a separate authorisation). You may decline this use without it affecting the delivery of our services.",
+          `You may, at any time, withdraw your consent and ask us to remove images in which you are identifiable, by contacting ${SITE.email}. We will remove them, within a reasonable period, from the channels we control — note that images already shared or reproduced by third parties may be outside our control.`,
+        ],
+      },
+      {
+        heading: "10. Cookies",
         body: [
           "Strictly necessary cookies for the site to work (for example, remembering your chosen language and recording your cookie preference) — these do not require consent.",
           "Analytics and advertising cookies (Google Analytics and Google Ads) — these are only activated if you accept them in the cookie notice shown on your first visit. They are used to measure visits and the effectiveness of our advertising and may involve sharing data with Google (see sections 5 and 6). We use Google Consent Mode: until you accept, no analytics or advertising cookies are set.",
@@ -224,7 +258,7 @@ function privacyEn(): LegalDoc {
         ],
       },
       {
-        heading: "9. Changes to this policy",
+        heading: "11. Changes to this policy",
         body: [
           "We may update this policy to reflect legal or service changes. The version in force is always the one published on this page, with its update date.",
         ],
@@ -266,7 +300,9 @@ function termsEn(): LegalDoc {
       {
         heading: "5. Limitation of liability",
         body: [
-          "We make our best efforts to keep the site's information correct and up to date, but we do not guarantee the absence of errors or interruptions. We are not liable for damages arising from use of the site or of third-party sites to which links exist.",
+          "We make our best efforts to keep the site's information correct, up to date and available, but we do not guarantee the absence of errors or inaccuracies, nor that the site is permanently accessible or free of interruptions. The site's content is informational and does not replace confirmation with us.",
+          "To the maximum extent permitted by law, we are not liable for indirect damages arising from the use of, or inability to use, the site, nor for the content of third-party sites to which links exist.",
+          "These terms govern the use of the website. The conditions for the provision of event services (scope, prices, payments, deadlines and responsibilities) are governed by the specific contract entered into with the client, which prevails in the event of any conflict.",
         ],
       },
       {
