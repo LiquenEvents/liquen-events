@@ -39,20 +39,21 @@ function privacyPt(): LegalDoc {
       {
         heading: "2. Que dados recolhemos",
         body: [
-          "Dados que nos fornece diretamente ao preencher o formulário de contacto ou de pedido de orçamento: nome, e-mail, telefone, tipo e data do evento, número de convidados, orçamento aproximado e a mensagem que nos enviar.",
-          "Dados de aceitação de propostas e contratação: se aceitar uma proposta através da ligação que lhe enviamos, registamos o nome indicado por quem aceita, a data e hora e o endereço IP, como prova da aceitação dos Termos e Condições.",
+          "Dados que nos fornece diretamente ao preencher o formulário de pedido de orçamento: nome, e-mail, telefone, tipo e data do evento, localidade ou região do evento, número de convidados e a mensagem que nos enviar. O fornecimento destes dados é facultativo, mas necessário para lhe respondermos e elaborarmos um orçamento — sem eles não conseguimos dar seguimento ao pedido.",
+          "Dados de aceitação de propostas e contratação: se aceitar uma proposta através da ligação que lhe enviamos, registamos o nome indicado por quem aceita, a data e hora e o endereço IP, como prova da aceitação da proposta de prestação de serviços.",
           "Dados de faturação e pagamentos do seu evento (valores, faturas de sinal e de saldo e o estado dos pagamentos), acessíveis na sua área de cliente e conservados para cumprimento das obrigações fiscais.",
           "Origem da visita: se chegar ao site através de uma ligação com parâmetros de campanha (UTM) ou a partir de outro site, podemos registar essa proveniência, associada ao pedido, para percebermos como nos encontrou.",
           "Dados técnicos recolhidos automaticamente para segurança e estatística: endereço IP (de forma efémera, para limitação de abusos) e informação básica do pedido.",
-          "Dados de análise e de publicidade (apenas com o seu consentimento): se aceitar os cookies no aviso apresentado, utilizamos o Google Analytics e o Google Ads. Estes serviços recolhem identificadores associados a cookies, informação do dispositivo e do navegador e as páginas e interações no site, para medirmos a audiência e a eficácia da nossa publicidade. Se recusar os cookies, estes dados não são recolhidos.",
+          "Dados de análise e de publicidade (apenas com o seu consentimento): se aceitar os cookies no aviso apresentado, utilizamos o Google Analytics e o Google Ads. Estes serviços recolhem identificadores associados a cookies, informação do dispositivo e do navegador e as páginas e interações no site, para medirmos a audiência e a eficácia da nossa publicidade. Se recusar, não são colocados cookies nem recolhida informação associada a cookies; o Google poderá ainda receber sinais técnicos agregados e sem cookies (por exemplo, país e tipo de página), que utiliza para modelação estatística e que não permitem identificá-lo individualmente.",
           "Rascunho do formulário: para não perder o que escreve, o formulário de pedido de orçamento guarda temporariamente as suas respostas no armazenamento local do navegador (localStorage), apenas no seu dispositivo. Pode limpá-lo a qualquer momento nas definições do navegador; não é enviado enquanto não submeter o pedido.",
         ],
       },
       {
         heading: "3. Finalidades e fundamento legal",
         body: [
-          "Responder a pedidos de contacto e elaborar orçamentos — com base no seu consentimento e nas diligências pré-contratuais que solicita (art. 6.º, n.º 1, al. a) e b) do RGPD).",
+          "Responder a pedidos e elaborar orçamentos — diligências pré-contratuais que solicita (art. 6.º, n.º 1, al. b) do RGPD) e, quanto a mensagens que não visem a contratação, o nosso interesse legítimo em responder-lhe (al. f)).",
           "Gerir a relação com clientes e a prestação dos nossos serviços de organização de eventos — execução do contrato (al. b).",
+          "Medir a audiência do site e a eficácia da nossa publicidade (Google Analytics e Google Ads) — com base no seu consentimento (al. a)), quando aceita os cookies.",
           "Garantir a segurança do site e prevenir abusos — interesse legítimo (al. f).",
           "Cumprir obrigações legais, nomeadamente fiscais e contabilísticas — obrigação legal (al. c).",
         ],
@@ -60,15 +61,15 @@ function privacyPt(): LegalDoc {
       {
         heading: "4. Prazos de conservação",
         body: [
-          "Conservamos os dados de pedidos de contacto e orçamento apenas durante o tempo necessário para lhe responder e, caso avance, durante a relação contratual.",
-          "Dados associados a faturação e obrigações fiscais são conservados pelos prazos legais aplicáveis. Findos os prazos, os dados são eliminados ou anonimizados.",
+          "Conservamos os dados de pedidos de orçamento apenas durante o tempo necessário para lhe responder e, caso avance, durante a relação contratual. Pedidos que não deem origem a contrato são eliminados no prazo máximo de 12 meses após o último contacto.",
+          "Dados associados a faturação e obrigações fiscais e contabilísticas são conservados pelos prazos legais aplicáveis (em regra, 10 anos). Findos os prazos, os dados são eliminados ou anonimizados.",
         ],
       },
       {
         heading: "5. Subcontratantes e partilha de dados",
         body: [
           "Não vendemos os seus dados. Podemos recorrer a prestadores de serviços que os tratam em nosso nome e sob instruções, com garantias de segurança adequadas: alojamento e infraestrutura do site, envio e receção de e-mail, e base de dados. Sempre que aplicável, celebramos contratos de subcontratação nos termos do art. 28.º do RGPD.",
-          "Recorremos ainda ao Google (Google Ireland Limited) para estatísticas de utilização (Google Analytics) e para medição e otimização de publicidade (Google Ads) — mas apenas quando aceita os cookies respetivos no aviso de cookies. Se recusar, estes dados não são partilhados.",
+          "Recorremos ainda ao Google (Google Ireland Limited) para estatísticas de utilização (Google Analytics) e para medição e otimização de publicidade (Google Ads) — mas apenas quando aceita os cookies respetivos no aviso de cookies. Se recusar, não são colocados cookies nem partilhados identificadores; o Google poderá ainda receber sinais agregados e sem cookies para modelação estatística, que não o identificam individualmente.",
           "Poderemos divulgar dados quando exigido por lei ou por autoridade competente.",
         ],
       },
@@ -100,15 +101,17 @@ function privacyPt(): LegalDoc {
           "Nos eventos que organizamos podem ser captadas fotografias e vídeos. Algumas destas imagens poderão ser publicadas no nosso portefólio — neste site e nas nossas redes sociais — para divulgar o nosso trabalho.",
           "A publicação de imagens em que seja identificável assenta no seu consentimento, recolhido de forma específica (por exemplo, no contrato de prestação de serviços ou em autorização própria). Pode não autorizar essa utilização, sem que isso afete a prestação dos nossos serviços.",
           `Pode, a qualquer momento, retirar o consentimento e pedir a remoção de imagens em que seja identificável, através de ${SITE.email}. Removê-las-emos, num prazo razoável, dos canais que controlamos — note-se que imagens eventualmente já partilhadas ou reproduzidas por terceiros podem não estar sob o nosso controlo.`,
+          "As imagens são utilizadas exclusivamente para divulgar o nosso trabalho, no nosso site e nas nossas redes sociais, não sendo cedidas a terceiros para fins promocionais próprios destes. Nos eventos podem estar presentes menores: a captação e a publicação de imagens de menores identificáveis dependem do consentimento prévio dos respetivos representantes legais (pais ou tutores), que pode ser retirado a qualquer momento.",
         ],
       },
       {
         heading: "10. Cookies",
         body: [
-          "Cookies estritamente necessários ao funcionamento (por exemplo, a memória do idioma escolhido e o registo da sua preferência de cookies) — não requerem consentimento.",
+          "Cookies estritamente necessários ao funcionamento — por exemplo «liquen-lang», que guarda o idioma escolhido — não requerem consentimento. A sua preferência de cookies é guardada no armazenamento local do navegador (localStorage), na chave «liquen-consent», e não num cookie.",
           "Cookies de análise e de publicidade (Google Analytics e Google Ads) — só são ativados se os aceitar no aviso de cookies apresentado na primeira visita. Servem para medir as visitas e a eficácia da nossa publicidade e podem implicar a partilha de dados com o Google (ver secções 5 e 6). Utilizamos o Modo de Consentimento da Google: enquanto não aceitar, não são colocados cookies de análise nem de publicidade.",
           "Pode recusar, ou alterar a sua escolha a qualquer momento, através da ligação «Gerir cookies» no rodapé do site. Recusar os cookies não essenciais não afeta o funcionamento do site.",
-          "Principais cookies utilizados: «liquen-consent» (guarda a sua escolha de cookies, apenas no seu navegador); «_ga» e «_ga_*» (Google Analytics — distinguem visitantes e sessões, até 2 anos); «_gcl_au» (Google Ads — medição de conversões, cerca de 90 dias). Os cookies de análise e de publicidade só existem se os tiver aceitado.",
+          "Principais cookies e armazenamento utilizados: «liquen-lang» (cookie de idioma, cerca de 1 ano); «liquen-consent» (a sua escolha de cookies, guardada no localStorage do navegador); «_ga» e «_ga_*» (Google Analytics — distinguem visitantes e sessões, até 2 anos); «_gcl_au» (Google Ads — medição de conversões, cerca de 90 dias). Os cookies de análise e de publicidade só existem se os tiver aceitado.",
+          "Para funcionamento offline, o site pode guardar no seu dispositivo uma cópia de páginas e recursos (cache do navegador), que não contém dados pessoais. A área reservada da equipa utiliza ainda cookies de sessão estritamente necessários, que não são colocados aos visitantes do site.",
         ],
       },
       {
@@ -130,7 +133,8 @@ function termsPt(): LegalDoc {
       {
         heading: "1. Objeto",
         body: [
-          `Este site apresenta os serviços de organização e planeamento de eventos da ${SITE.legalName} e permite o envio de pedidos de contacto e de orçamento. O envio de um pedido não constitui, por si só, um contrato — a prestação de serviços é formalizada em documento próprio.`,
+          `Este site apresenta os serviços de organização e planeamento de eventos da ${SITE.legalName} e permite o envio de pedidos de orçamento. O envio de um pedido não constitui, por si só, um contrato — a prestação de serviços é formalizada em documento próprio.`,
+          "Quando aceita uma proposta através da ligação que lhe enviamos, registamos o nome indicado por quem aceita, a data e a hora e o endereço IP, como prova dessa aceitação. Esse registo respeita à aceitação da proposta de prestação de serviços, cujas condições se regem pelo contrato referido na secção 5, e não por estes termos de utilização do site.",
         ],
       },
       {
@@ -156,13 +160,27 @@ function termsPt(): LegalDoc {
         body: [
           "Envidamos os melhores esforços para manter a informação do site correta, atualizada e disponível, mas não garantimos a ausência de erros ou imprecisões, nem que o site esteja permanentemente acessível ou livre de interrupções. O conteúdo do site tem caráter informativo e não dispensa a confirmação connosco.",
           "Na medida máxima permitida pela lei, não nos responsabilizamos por danos indiretos decorrentes da utilização ou da impossibilidade de utilização do site, nem pelo conteúdo de sites de terceiros para os quais existam ligações.",
+          "Nada nestes termos exclui ou limita a responsabilidade que a lei não permita afastar, designadamente por dolo ou culpa grave e por danos causados à vida ou à integridade física, nem quaisquer direitos que assistam ao cliente na qualidade de consumidor, que permanecem integralmente salvaguardados.",
           "Estes termos regem a utilização do site. As condições da prestação de serviços de eventos (âmbito, preços, pagamentos, prazos e responsabilidades) regem-se pelo contrato específico celebrado com o cliente, que prevalece em caso de divergência.",
         ],
       },
       {
         heading: "6. Lei aplicável e foro",
         body: [
-          "Estes termos regem-se pela lei portuguesa. Para a resolução de qualquer litígio é competente o foro da comarca da sede da empresa, com renúncia a qualquer outro.",
+          "Estes termos regem-se pela lei portuguesa. Em caso de litígio, é competente o tribunal determinado nos termos da lei aplicável; tratando-se de um consumidor, é competente o tribunal do seu domicílio, nos termos legalmente previstos.",
+        ],
+      },
+      {
+        heading: "7. Resolução alternativa de litígios de consumo",
+        body: [
+          "Em caso de litígio de consumo, pode recorrer a uma entidade de resolução alternativa de litígios de consumo (RAL). A entidade de competência genérica a nível nacional é o CNIACC — Centro Nacional de Informação e Arbitragem de Conflitos de Consumo (www.cniacc.pt).",
+          "A lista atualizada das entidades de RAL competentes está disponível no Portal do Consumidor, em www.consumidor.gov.pt.",
+        ],
+      },
+      {
+        heading: "8. Alterações a estes termos",
+        body: [
+          "Podemos atualizar estes termos para refletir alterações legais ou dos nossos serviços. A versão em vigor é sempre a publicada nesta página, com a respetiva data de atualização; a utilização do site após essa publicação vale como conhecimento da versão em vigor.",
         ],
       },
     ],
@@ -185,20 +203,21 @@ function privacyEn(): LegalDoc {
       {
         heading: "2. What data we collect",
         body: [
-          "Data you provide directly when filling in the contact or quote-request form: name, e-mail, phone, event type and date, number of guests, approximate budget and the message you send us.",
-          "Proposal-acceptance and contracting data: if you accept a proposal through the link we send you, we record the name given by whoever accepts, the date and time and the IP address, as proof of acceptance of the Terms and Conditions.",
+          "Data you provide directly when filling in the quote-request form: name, e-mail, phone, event type and date, event location or region, number of guests and the message you send us. Providing this data is optional but necessary for us to reply and prepare a quote — without it we cannot act on your request.",
+          "Proposal-acceptance and contracting data: if you accept a proposal through the link we send you, we record the name given by whoever accepts, the date and time and the IP address, as proof of acceptance of the service proposal.",
           "Billing and payment data for your event (amounts, deposit and balance invoices and payment status), available in your client area and retained to meet tax obligations.",
           "Visit source: if you reach the site via a link carrying campaign parameters (UTM) or from another website, we may record that origin, linked to your request, to understand how you found us.",
           "Technical data collected automatically for security and statistics: IP address (ephemerally, for abuse limiting) and basic request information.",
-          "Analytics and advertising data (only with your consent): if you accept cookies in the notice shown, we use Google Analytics and Google Ads. These services collect cookie-based identifiers, device and browser information and the pages and interactions on the site, so we can measure our audience and the effectiveness of our advertising. If you decline cookies, this data is not collected.",
+          "Analytics and advertising data (only with your consent): if you accept cookies in the notice shown, we use Google Analytics and Google Ads. These services collect cookie-based identifiers, device and browser information and the pages and interactions on the site, so we can measure our audience and the effectiveness of our advertising. If you decline, no cookies are set and no cookie-based information is collected; Google may still receive aggregated, cookieless signals (for example, country and page type) that it uses for statistical modelling and that do not identify you individually.",
           "Form draft: so you don't lose what you type, the quote-request form temporarily saves your answers in the browser's local storage (localStorage), on your device only. You can clear it at any time in your browser settings; nothing is sent until you submit the request.",
         ],
       },
       {
         heading: "3. Purposes and legal basis",
         body: [
-          "Responding to contact requests and preparing quotes — based on your consent and the pre-contractual steps you request (Art. 6(1)(a) and (b) GDPR).",
+          "Responding to requests and preparing quotes — pre-contractual steps you request (Art. 6(1)(b) GDPR) and, for messages not aimed at contracting, our legitimate interest in replying to you (f).",
           "Managing the client relationship and delivering our event-planning services — performance of a contract (b).",
+          "Measuring the site's audience and the effectiveness of our advertising (Google Analytics and Google Ads) — based on your consent (a), when you accept cookies.",
           "Ensuring the security of the site and preventing abuse — legitimate interest (f).",
           "Complying with legal obligations, notably tax and accounting — legal obligation (c).",
         ],
@@ -206,15 +225,15 @@ function privacyEn(): LegalDoc {
       {
         heading: "4. Retention periods",
         body: [
-          "We keep contact and quote-request data only for as long as needed to respond and, if you proceed, for the duration of the contractual relationship.",
-          "Data linked to invoicing and tax obligations is kept for the applicable legal periods. Once those periods lapse, data is deleted or anonymised.",
+          "We keep quote-request data only for as long as needed to respond and, if you proceed, for the duration of the contractual relationship. Requests that do not lead to a contract are deleted within a maximum of 12 months after the last contact.",
+          "Data linked to invoicing and tax and accounting obligations is kept for the applicable legal periods (as a rule, 10 years). Once those periods lapse, data is deleted or anonymised.",
         ],
       },
       {
         heading: "5. Processors and data sharing",
         body: [
           "We do not sell your data. We may use service providers who process it on our behalf and under our instructions, with appropriate security safeguards: website hosting and infrastructure, sending and receiving e-mail, and database. Where applicable, we enter into processing agreements under Art. 28 GDPR.",
-          "We also use Google (Google Ireland Limited) for usage statistics (Google Analytics) and for advertising measurement and optimisation (Google Ads) — but only when you accept the relevant cookies in the cookie notice. If you decline, this data is not shared.",
+          "We also use Google (Google Ireland Limited) for usage statistics (Google Analytics) and for advertising measurement and optimisation (Google Ads) — but only when you accept the relevant cookies in the cookie notice. If you decline, no cookies are set and no identifiers are shared; Google may still receive aggregated, cookieless signals for statistical modelling that do not identify you individually.",
           "We may disclose data where required by law or by a competent authority.",
         ],
       },
@@ -246,15 +265,17 @@ function privacyEn(): LegalDoc {
           "At the events we organise, photographs and video may be taken. Some of these images may be published in our portfolio — on this website and on our social media — to showcase our work.",
           "Publishing images in which you are identifiable is based on your consent, obtained specifically (for example, in the service contract or in a separate authorisation). You may decline this use without it affecting the delivery of our services.",
           `You may, at any time, withdraw your consent and ask us to remove images in which you are identifiable, by contacting ${SITE.email}. We will remove them, within a reasonable period, from the channels we control — note that images already shared or reproduced by third parties may be outside our control.`,
+          "Images are used solely to showcase our work, on our website and social media, and are not transferred to third parties for their own promotional purposes. Minors may be present at events: capturing and publishing identifiable images of minors depends on the prior consent of their legal representatives (parents or guardians), which may be withdrawn at any time.",
         ],
       },
       {
         heading: "10. Cookies",
         body: [
-          "Strictly necessary cookies for the site to work (for example, remembering your chosen language and recording your cookie preference) — these do not require consent.",
+          "Strictly necessary cookies for the site to work — for example “liquen-lang”, which remembers your chosen language — do not require consent. Your cookie preference is stored in the browser's local storage (localStorage), under the key “liquen-consent”, not in a cookie.",
           "Analytics and advertising cookies (Google Analytics and Google Ads) — these are only activated if you accept them in the cookie notice shown on your first visit. They are used to measure visits and the effectiveness of our advertising and may involve sharing data with Google (see sections 5 and 6). We use Google Consent Mode: until you accept, no analytics or advertising cookies are set.",
           "You can decline, or change your choice at any time, via the “Manage cookies” link in the site footer. Declining non-essential cookies does not affect how the site works.",
-          "Main cookies used: “liquen-consent” (stores your cookie choice, in your browser only); “_ga” and “_ga_*” (Google Analytics — distinguish visitors and sessions, up to 2 years); “_gcl_au” (Google Ads — conversion measurement, about 90 days). Analytics and advertising cookies only exist if you have accepted them.",
+          "Main cookies and storage used: “liquen-lang” (language cookie, about 1 year); “liquen-consent” (your cookie choice, stored in the browser's localStorage); “_ga” and “_ga_*” (Google Analytics — distinguish visitors and sessions, up to 2 years); “_gcl_au” (Google Ads — conversion measurement, about 90 days). Analytics and advertising cookies only exist if you have accepted them.",
+          "For offline use, the site may store a copy of pages and resources on your device (browser cache), which contains no personal data. The team's restricted area also uses strictly necessary session cookies, which are not set for site visitors.",
         ],
       },
       {
@@ -276,7 +297,8 @@ function termsEn(): LegalDoc {
       {
         heading: "1. Purpose",
         body: [
-          `This site presents the event organisation and planning services of ${SITE.legalName} and allows contact and quote requests to be sent. Sending a request does not, in itself, constitute a contract — the provision of services is formalised in a separate document.`,
+          `This site presents the event organisation and planning services of ${SITE.legalName} and allows quote requests to be sent. Sending a request does not, in itself, constitute a contract — the provision of services is formalised in a separate document.`,
+          "When you accept a proposal through the link we send you, we record the name given by whoever accepts, the date and time and the IP address, as proof of that acceptance. This record concerns acceptance of the service proposal, whose conditions are governed by the contract referred to in section 5, and not by these website terms of use.",
         ],
       },
       {
@@ -302,13 +324,27 @@ function termsEn(): LegalDoc {
         body: [
           "We make our best efforts to keep the site's information correct, up to date and available, but we do not guarantee the absence of errors or inaccuracies, nor that the site is permanently accessible or free of interruptions. The site's content is informational and does not replace confirmation with us.",
           "To the maximum extent permitted by law, we are not liable for indirect damages arising from the use of, or inability to use, the site, nor for the content of third-party sites to which links exist.",
+          "Nothing in these terms excludes or limits liability that the law does not allow to be excluded, in particular for wilful misconduct or gross negligence and for damage to life or physical integrity, nor any rights you may have as a consumer, which remain fully safeguarded.",
           "These terms govern the use of the website. The conditions for the provision of event services (scope, prices, payments, deadlines and responsibilities) are governed by the specific contract entered into with the client, which prevails in the event of any conflict.",
         ],
       },
       {
         heading: "6. Governing law and jurisdiction",
         body: [
-          "These terms are governed by Portuguese law. Any dispute shall be subject to the courts of the company's registered seat, with express waiver of any other.",
+          "These terms are governed by Portuguese law. In the event of a dispute, the competent court is the one determined under applicable law; where you are a consumer, the court of your domicile is competent, as legally provided.",
+        ],
+      },
+      {
+        heading: "7. Alternative consumer dispute resolution",
+        body: [
+          "In the event of a consumer dispute, you may turn to an alternative consumer dispute resolution (ADR) body. The nationally competent body of general jurisdiction is CNIACC — Centro Nacional de Informação e Arbitragem de Conflitos de Consumo (www.cniacc.pt).",
+          "The up-to-date list of competent ADR bodies is available on the Portuguese Consumer Portal, at www.consumidor.gov.pt.",
+        ],
+      },
+      {
+        heading: "8. Changes to these terms",
+        body: [
+          "We may update these terms to reflect legal or service changes. The version in force is always the one published on this page, with its update date; using the site after such publication counts as awareness of the version in force.",
         ],
       },
     ],

@@ -13,14 +13,14 @@ type Gtag = (...args: unknown[]) => void;
 
 const COPY = {
   pt: {
-    text: "Usamos cookies para medir a eficácia da nossa publicidade. Pode aceitar ou recusar — a sua escolha fica guardada.",
+    text: "Usamos cookies do Google para estatísticas de visitas (Google Analytics) e para medir a eficácia da nossa publicidade (Google Ads). Pode aceitar ou recusar — a sua escolha fica guardada.",
     more: "Saber mais",
     accept: "Aceitar",
     decline: "Recusar",
     aria: "Aviso de cookies",
   },
   en: {
-    text: "We use cookies to measure how well our ads perform. You can accept or decline — your choice is remembered.",
+    text: "We use Google cookies for visit statistics (Google Analytics) and to measure how well our ads perform (Google Ads). You can accept or decline — your choice is remembered.",
     more: "Learn more",
     accept: "Accept",
     decline: "Decline",
@@ -94,11 +94,15 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
             {t.more}
           </Link>
         </p>
+        {/* Accept and Decline are given equal visual weight (same border, size
+            and contrast). CNPD cookie guidance requires refusing to be as easy
+            and as prominent as accepting — a low-contrast "decline" would be a
+            dark pattern that undermines freely-given consent. */}
         <div className="flex flex-shrink-0 items-center gap-2.5">
           <button
             type="button"
             onClick={() => choose(false)}
-            className="px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/70 transition-colors hover:text-white"
+            className="border border-white/70 px-5 py-2 text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
           >
             {t.decline}
           </button>
