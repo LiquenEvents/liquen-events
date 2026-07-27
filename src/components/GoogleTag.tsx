@@ -7,7 +7,7 @@ import Script from "next/script";
 // remarketing, and GA4 for analytics + the `generate_lead` key event that gets
 // imported into Ads as the "Pedido de orçamento" conversion.
 export const GOOGLE_ADS_ID = "AW-16724349653";
-export const GA4_ID = "G-WH8B0Y53X3";
+export const GA4_ID = "G-29CZZ76H6F";
 
 // Consent Mode v2 bootstrap. Emitted as a PLAIN inline <script> (not
 // next/script beforeInteractive) so it executes synchronously in document
