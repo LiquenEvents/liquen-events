@@ -66,7 +66,11 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
 
   return (
     <div
-      role="dialog"
+      // role="region" (a labelled landmark), NOT "dialog": the bar is
+      // non-modal — it doesn't trap focus or block the page, so a dialog role
+      // would be a false modal claim. It also kept colliding with the real
+      // modal dialogs on the page (gallery lightbox) under getByRole('dialog').
+      role="region"
       aria-label={t.aria}
       className="fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 backdrop-blur-sm px-5 py-4 sm:px-8"
       style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
