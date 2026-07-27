@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 // `import type` is fully erased at build time, so pulling the shape from the
 // server-only store never drags its runtime `server-only` guard into this
@@ -11,6 +11,7 @@ import { eur2 } from "./util";
 import { splitThirtySeventy } from "@/lib/money";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Field, Segmented } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 type Status = Invoice["status"];
 type Kind = Invoice["kind"];
@@ -56,8 +57,11 @@ interface Props {
 
 export default function Faturas({ quotes }: Props) {
   const { toast } = useToast();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: invoices = [],
+    setData: setInvoices,
+    loading,
+  } = useCachedList<Invoice[]>("faturas", "/api/faturas");
   const [filter, setFilter] = useState<Status | "all">("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -79,19 +83,6 @@ export default function Faturas({ quotes }: Props) {
   // Datas + IVA têm valores predefinidos sensatos (IVA 23%, emissão hoje), por
   // isso ficam recolhidos: o essencial de uma fatura é cliente + valor.
   const [showDates, setShowDates] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/faturas", { cache: "no-store" });
-        if (res.ok) setInvoices(await res.json());
-      } catch {
-        toast("Não foi possível carregar as faturas", "error");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [toast]);
 
   async function onPickQuote(id: string) {
     setQuoteId(id);

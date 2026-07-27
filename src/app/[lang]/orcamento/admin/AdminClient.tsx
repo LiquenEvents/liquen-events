@@ -32,6 +32,8 @@ import {
   printEventDossier,
   downloadEventIcs,
 } from "./export";
+import { prefetchList } from "./useCachedList";
+import { onIdle } from "@/lib/onIdle";
 import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
@@ -513,6 +515,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   useEffect(() => {
     document.body.classList.add("admin-mode");
     return () => document.body.classList.remove("admin-mode");
+  }, []);
+
+  // Warm the caches of the high-traffic API views during idle after first
+  // paint, so the first click on Propostas / Faturas / Tarefas / Calendário is
+  // instant instead of a cold round-trip. Uses the same shared cache the views
+  // read from (useCachedList), so a warmed view renders immediately with no
+  // skeleton. Cheap + non-blocking; skipped if already cached/in-flight.
+  useEffect(() => {
+    return onIdle(() => {
+      prefetchList("propostas", "/api/propostas");
+      prefetchList("faturas", "/api/faturas");
+      prefetchList("tarefas", "/api/tarefas");
+      prefetchList("calendario", "/api/calendario");
+    });
   }, []);
 
   // Restore the last view the user was on (per device). Done in an effect so it

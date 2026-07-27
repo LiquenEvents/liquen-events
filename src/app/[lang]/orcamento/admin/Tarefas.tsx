@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#b5654a" },
@@ -17,8 +18,11 @@ const AREAS = ["Comercial", "Produção", "Decoração", "Financeiro", "Logísti
 
 export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: string }) {
   const { toast } = useToast();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: tasks = [],
+    setData: setTasks,
+    loading,
+  } = useCachedList<Task[]>("tarefas", "/api/tarefas");
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
 
@@ -81,17 +85,6 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       toast("Não foi possível guardar as alterações. Tente novamente.", "error");
     }
   }
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/tarefas", { cache: "no-store" });
-        if (res.ok) setTasks(await res.json());
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   async function add() {
     const t = title.trim();

@@ -1,15 +1,15 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, useDeferredValue } from "react";
+import { Fragment, useMemo, useState, useDeferredValue } from "react";
 // `import type` é totalmente apagado no build, por isso puxar a forma do store
 // server-only nunca arrasta o guard `server-only` (→ repository → fs) para o
 // bundle cliente. O tipo vive no módulo client-safe `contract-types`.
 import type { Contract, ContractStatus } from "@/lib/contract-types";
 import { TERMS_VERSION } from "@/lib/contract-terms";
 import { SkeletonList } from "./Skeleton";
-import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Toolbar } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
@@ -52,28 +52,15 @@ function StatusChip({ status }: { status: ContractStatus }) {
 }
 
 export default function Contratos() {
-  const { toast } = useToast();
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: contracts = [], loading } = useCachedList<Contract[]>(
+    "contratos",
+    "/api/contratos",
+  );
   const [search, setSearch] = useState("");
   // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
   const dSearch = useDeferredValue(search);
   const [status, setStatus] = useState<"all" | ContractStatus>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/contratos", { cache: "no-store" });
-        if (res.ok) setContracts(await res.json());
-        else toast("Não foi possível carregar os contratos.", "error");
-      } catch {
-        toast("Erro de ligação ao carregar os contratos.", "error");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [toast]);
 
   const filtered = useMemo(() => {
     const q = dSearch.trim().toLowerCase();

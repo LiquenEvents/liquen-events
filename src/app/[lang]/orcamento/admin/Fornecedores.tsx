@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, useDeferredValue } from "react";
+import { useMemo, useState, useDeferredValue } from "react";
 import type { Supplier } from "@/lib/orcamento/types";
 import { downloadCsv, dateStamp } from "./export";
 import { SkeletonCard } from "./Skeleton";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 const CATEGORIES = [
   "Catering",
@@ -43,8 +44,11 @@ const PlusIcon = (
 );
 
 export default function Fornecedores() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: suppliers = [],
+    setData: setSuppliers,
+    loading,
+  } = useCachedList<Supplier[]>("fornecedores", "/api/fornecedores");
   const [search, setSearch] = useState("");
   // Defer so the filter/row reconcile runs off the keystroke; input stays instant.
   const dSearch = useDeferredValue(search);
@@ -53,17 +57,6 @@ export default function Fornecedores() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/fornecedores", { cache: "no-store" });
-        if (res.ok) setSuppliers(await res.json());
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   async function add() {
     if (!form.name.trim()) return;

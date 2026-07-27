@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { randomId } from "./util";
+import { useCachedList } from "./useCachedList";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -43,46 +44,15 @@ interface Props {
 
 export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props) {
   const { toast } = useToast();
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const {
+    data: proposals = [],
+    setData: setProposals,
+    loading,
+    error: loadError,
+    refresh: retryLoad,
+  } = useCachedList<Proposal[]>("propostas", "/api/propostas");
   const [filter, setFilter] = useState<ProposalStatus | "all">("all");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
-
-  // No `setLoading(true)`/`setLoadError(false)` here — the initial state already
-  // is "loading, no error", and doing it synchronously would fire setState from
-  // inside the mount effect. The retry button resets those before re-calling.
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/propostas", { cache: "no-store" });
-      if (!res.ok) {
-        setLoadError(true);
-        return;
-      }
-      setProposals(await res.json());
-      setLoadError(false);
-    } catch {
-      // Falha de rede — mostramos um estado de erro com botão para tentar de novo
-      // em vez de fingir que não há propostas.
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Wrapped in an async IIFE (not a direct `load()`) so the effect body has no
-    // synchronous setState — same shape as before, keeps the lint clean.
-    void (async () => {
-      await load();
-    })();
-  }, [load]);
-
-  const retryLoad = useCallback(() => {
-    setLoading(true);
-    setLoadError(false);
-    void load();
-  }, [load]);
 
   // Índice id→pedido: evita um varrimento linear de todos os pedidos por cada
   // linha da lista (e dentro de `updateStatus`).

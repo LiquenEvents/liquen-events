@@ -6,6 +6,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const MONTHS = [
@@ -245,17 +246,13 @@ export default function Calendario({ quotes, onOpen }: Props) {
   });
 
   // Standalone calendar entries (reuniões, marcações, bloqueios…)
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const { data: events = [], setData: setEvents } = useCachedList<CalendarEvent[]>(
+    "calendario",
+    "/api/calendario",
+  );
   const [modalDate, setModalDate] = useState<string | null>(null);
   // Day peek: the day whose events are expanded in the panel under the grid.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/calendario", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => Array.isArray(d) && setEvents(d))
-      .catch(() => {});
-  }, []);
 
   // The add form now lives in <AddEventModal> with LOCAL state, so typing a
   // title no longer re-renders this component (and its 42-cell grid) per

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useDeferredValue } from "react";
+import { useMemo, useState, useDeferredValue } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 type Condition = PropItem["condition"];
 
@@ -98,8 +99,11 @@ function ConditionChip({ condition }: { condition: Condition }) {
 
 export default function Inventario() {
   const { toast } = useToast();
-  const [items, setItems] = useState<PropItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: items = [],
+    setData: setItems,
+    loading,
+  } = useCachedList<PropItem[]>("inventario", "/api/inventario");
   const [search, setSearch] = useState("");
   // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
   const dSearch = useDeferredValue(search);
@@ -112,20 +116,6 @@ export default function Inventario() {
   const [saving, setSaving] = useState(false);
   // A repartição por categoria é detalhe — o total é o que importa ao relance.
   const [showCatTotals, setShowCatTotals] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/inventario", { cache: "no-store" });
-        if (res.ok) setItems(await res.json());
-        else toast("Não foi possível carregar o inventário.", "error");
-      } catch {
-        toast("Erro de ligação ao carregar o inventário.", "error");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [toast]);
 
   async function add() {
     const payload = toPayload(form);
