@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
 
@@ -30,6 +31,12 @@ const COPY = {
 
 export default function ConsentBanner({ locale }: { locale: Locale }) {
   const [show, setShow] = useState(false);
+  const pathname = usePathname();
+  // The consent bar governs Google's public-visitor tracking; it has no place
+  // over the authenticated back office (/portal/…), where it would also sit on
+  // top of the mobile nav. Staying out of that surface keeps it a marketing-
+  // site concern only.
+  const isBackOffice = pathname?.includes("/portal") ?? false;
 
   useEffect(() => {
     // Only surface the bar when no choice has been stored yet. Wrapped in
@@ -70,7 +77,7 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
     setShow(false);
   };
 
-  if (!show) return null;
+  if (isBackOffice || !show) return null;
   const t = COPY[locale === "en" ? "en" : "pt"];
 
   return (
