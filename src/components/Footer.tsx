@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import TrackedLink from "@/components/TrackedLink";
+import ManageCookiesLink from "@/components/ManageCookiesLink";
 import { blurFor } from "@/lib/blur";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { WHATSAPP_HREF } from "@/data";
@@ -193,6 +194,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
               >
                 {t.footer.termos}
               </Link>
+              <ManageCookiesLink locale={locale} />
             </div>
           </div>
         </div>

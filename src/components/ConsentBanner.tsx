@@ -44,6 +44,15 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
     }
   }, []);
 
+  // Re-open on demand from the "Gerir cookies" footer link, so a visitor can
+  // change or withdraw their choice at any time (RGPD: withdrawing consent must
+  // be as easy as giving it).
+  useEffect(() => {
+    const open = () => setShow(true);
+    window.addEventListener("liquen:open-consent", open);
+    return () => window.removeEventListener("liquen:open-consent", open);
+  }, []);
+
   const choose = (granted: boolean) => {
     const value = granted ? "granted" : "denied";
     try {

@@ -43,7 +43,8 @@ function privacyPt(): LegalDoc {
           "Dados de aceitação de propostas e contratação: se aceitar uma proposta através da ligação que lhe enviamos, registamos o nome indicado por quem aceita, a data e hora e o endereço IP, como prova da aceitação dos Termos e Condições.",
           "Dados de faturação e pagamentos do seu evento (valores, faturas de sinal e de saldo e o estado dos pagamentos), acessíveis na sua área de cliente e conservados para cumprimento das obrigações fiscais.",
           "Origem da visita: se chegar ao site através de uma ligação com parâmetros de campanha (UTM) ou a partir de outro site, podemos registar essa proveniência, associada ao pedido, para percebermos como nos encontrou.",
-          "Dados técnicos recolhidos automaticamente e de forma agregada para segurança e estatística: endereço IP (de forma efémera, para limitação de abusos) e informação básica do pedido. Utilizamos estatísticas de visita sem cookies e sem identificação individual.",
+          "Dados técnicos recolhidos automaticamente para segurança e estatística: endereço IP (de forma efémera, para limitação de abusos) e informação básica do pedido.",
+          "Dados de análise e de publicidade (apenas com o seu consentimento): se aceitar os cookies no aviso apresentado, utilizamos o Google Analytics e o Google Ads. Estes serviços recolhem identificadores associados a cookies, informação do dispositivo e do navegador e as páginas e interações no site, para medirmos a audiência e a eficácia da nossa publicidade. Se recusar os cookies, estes dados não são recolhidos.",
           "Rascunho do formulário: para não perder o que escreve, o formulário de pedido de orçamento guarda temporariamente as suas respostas no armazenamento local do navegador (localStorage), apenas no seu dispositivo. Pode limpá-lo a qualquer momento nas definições do navegador; não é enviado enquanto não submeter o pedido.",
         ],
       },
@@ -67,6 +68,7 @@ function privacyPt(): LegalDoc {
         heading: "5. Subcontratantes e partilha de dados",
         body: [
           "Não vendemos os seus dados. Podemos recorrer a prestadores de serviços que os tratam em nosso nome e sob instruções, com garantias de segurança adequadas: alojamento e infraestrutura do site, envio e receção de e-mail, e base de dados. Sempre que aplicável, celebramos contratos de subcontratação nos termos do art. 28.º do RGPD.",
+          "Recorremos ainda ao Google (Google Ireland Limited) para estatísticas de utilização (Google Analytics) e para medição e otimização de publicidade (Google Ads) — mas apenas quando aceita os cookies respetivos no aviso de cookies. Se recusar, estes dados não são partilhados.",
           "Poderemos divulgar dados quando exigido por lei ou por autoridade competente.",
         ],
       },
@@ -74,6 +76,7 @@ function privacyPt(): LegalDoc {
         heading: "6. Transferências internacionais",
         body: [
           "Alguns prestadores podem tratar dados fora do Espaço Económico Europeu. Nesses casos, asseguramos garantias adequadas (por exemplo, cláusulas contratuais-tipo da Comissão Europeia) para proteger os seus dados.",
+          "Em concreto, se aceitar os cookies de análise e publicidade, o Google poderá tratar dados nos Estados Unidos, ao abrigo dessas garantias (cláusulas contratuais-tipo e/ou o EU-US Data Privacy Framework).",
         ],
       },
       {
@@ -84,10 +87,12 @@ function privacyPt(): LegalDoc {
         ],
       },
       {
-        heading: "8. Cookies e estatísticas",
+        heading: "8. Cookies",
         body: [
-          "Este site não utiliza cookies de rastreamento publicitário. Caso estejam ativas, as estatísticas de visita são recolhidas de forma anónima e sem cookies, não permitindo identificá-lo individualmente.",
-          "Os cookies estritamente necessários ao funcionamento (por exemplo, a memória do idioma escolhido) não requerem consentimento.",
+          "Cookies estritamente necessários ao funcionamento (por exemplo, a memória do idioma escolhido e o registo da sua preferência de cookies) — não requerem consentimento.",
+          "Cookies de análise e de publicidade (Google Analytics e Google Ads) — só são ativados se os aceitar no aviso de cookies apresentado na primeira visita. Servem para medir as visitas e a eficácia da nossa publicidade e podem implicar a partilha de dados com o Google (ver secções 5 e 6). Utilizamos o Modo de Consentimento da Google: enquanto não aceitar, não são colocados cookies de análise nem de publicidade.",
+          "Pode recusar, ou alterar a sua escolha a qualquer momento, através da ligação «Gerir cookies» no rodapé do site. Recusar os cookies não essenciais não afeta o funcionamento do site.",
+          "Principais cookies utilizados: «liquen-consent» (guarda a sua escolha de cookies, apenas no seu navegador); «_ga» e «_ga_*» (Google Analytics — distinguem visitantes e sessões, até 2 anos); «_gcl_au» (Google Ads — medição de conversões, cerca de 90 dias). Os cookies de análise e de publicidade só existem se os tiver aceitado.",
         ],
       },
       {
@@ -166,7 +171,8 @@ function privacyEn(): LegalDoc {
           "Proposal-acceptance and contracting data: if you accept a proposal through the link we send you, we record the name given by whoever accepts, the date and time and the IP address, as proof of acceptance of the Terms and Conditions.",
           "Billing and payment data for your event (amounts, deposit and balance invoices and payment status), available in your client area and retained to meet tax obligations.",
           "Visit source: if you reach the site via a link carrying campaign parameters (UTM) or from another website, we may record that origin, linked to your request, to understand how you found us.",
-          "Technical data collected automatically and in aggregate for security and statistics: IP address (ephemerally, for abuse limiting) and basic request information. We use cookieless visit statistics with no individual identification.",
+          "Technical data collected automatically for security and statistics: IP address (ephemerally, for abuse limiting) and basic request information.",
+          "Analytics and advertising data (only with your consent): if you accept cookies in the notice shown, we use Google Analytics and Google Ads. These services collect cookie-based identifiers, device and browser information and the pages and interactions on the site, so we can measure our audience and the effectiveness of our advertising. If you decline cookies, this data is not collected.",
           "Form draft: so you don't lose what you type, the quote-request form temporarily saves your answers in the browser's local storage (localStorage), on your device only. You can clear it at any time in your browser settings; nothing is sent until you submit the request.",
         ],
       },
@@ -190,6 +196,7 @@ function privacyEn(): LegalDoc {
         heading: "5. Processors and data sharing",
         body: [
           "We do not sell your data. We may use service providers who process it on our behalf and under our instructions, with appropriate security safeguards: website hosting and infrastructure, sending and receiving e-mail, and database. Where applicable, we enter into processing agreements under Art. 28 GDPR.",
+          "We also use Google (Google Ireland Limited) for usage statistics (Google Analytics) and for advertising measurement and optimisation (Google Ads) — but only when you accept the relevant cookies in the cookie notice. If you decline, this data is not shared.",
           "We may disclose data where required by law or by a competent authority.",
         ],
       },
@@ -197,6 +204,7 @@ function privacyEn(): LegalDoc {
         heading: "6. International transfers",
         body: [
           "Some providers may process data outside the European Economic Area. In such cases we ensure appropriate safeguards (for example, the European Commission's standard contractual clauses) to protect your data.",
+          "In particular, if you accept analytics and advertising cookies, Google may process data in the United States, under those safeguards (standard contractual clauses and/or the EU-US Data Privacy Framework).",
         ],
       },
       {
@@ -207,10 +215,12 @@ function privacyEn(): LegalDoc {
         ],
       },
       {
-        heading: "8. Cookies and statistics",
+        heading: "8. Cookies",
         body: [
-          "This site does not use advertising tracking cookies. Where enabled, visit statistics are collected anonymously and without cookies, and do not allow individual identification.",
-          "Cookies strictly necessary for the site to work (for example, remembering your chosen language) do not require consent.",
+          "Strictly necessary cookies for the site to work (for example, remembering your chosen language and recording your cookie preference) — these do not require consent.",
+          "Analytics and advertising cookies (Google Analytics and Google Ads) — these are only activated if you accept them in the cookie notice shown on your first visit. They are used to measure visits and the effectiveness of our advertising and may involve sharing data with Google (see sections 5 and 6). We use Google Consent Mode: until you accept, no analytics or advertising cookies are set.",
+          "You can decline, or change your choice at any time, via the “Manage cookies” link in the site footer. Declining non-essential cookies does not affect how the site works.",
+          "Main cookies used: “liquen-consent” (stores your cookie choice, in your browser only); “_ga” and “_ga_*” (Google Analytics — distinguish visitors and sessions, up to 2 years); “_gcl_au” (Google Ads — conversion measurement, about 90 days). Analytics and advertising cookies only exist if you have accepted them.",
         ],
       },
       {
