@@ -322,7 +322,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         {!t.done && (
           <button
             onClick={() => startEditTask(t)}
-            className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+            className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
             aria-label="Editar tarefa"
           >
             <svg
@@ -341,7 +341,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         )}
         <button
           onClick={() => remove(t.id)}
-          className="text-foreground/20 hover:text-[#b5654a] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+          className="text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
           aria-label="Eliminar"
         >
           <svg
