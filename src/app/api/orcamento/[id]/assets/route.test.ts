@@ -20,6 +20,12 @@ vi.mock("@/lib/proposal-storage", () => ({
   listProposalImages: st.list,
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
+// The route reads image dimensions via sharp to reject decompression bombs.
+// Test fixtures are dummy bytes, so mock sharp to report a normal-sized image
+// (individual dimension-cap behaviour is covered where it matters, not here).
+vi.mock("sharp", () => ({
+  default: () => ({ metadata: async () => ({ width: 1200, height: 800 }) }),
+}));
 
 import { GET, POST } from "./route";
 

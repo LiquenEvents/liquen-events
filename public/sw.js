@@ -9,7 +9,9 @@
    whole /orcamento surface (auth'd back office + live quote flow) are never
    touched, so nothing dynamic is ever served stale. Bump CACHE to invalidate. */
 
-const CACHE = "liquen-cache-v1";
+// v2: stop caching the private token-gated client pages (/portal, /proposta).
+// Bumping the name purges any v1 cache that may already hold such a page.
+const CACHE = "liquen-cache-v2";
 
 // Best-effort precache so a first-ever offline load still has a shell to show.
 // Kept tiny; large heroes are cached lazily as they're requested.
@@ -43,7 +45,13 @@ function isBypassed(url) {
   return (
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/orcamento") ||
-    url.pathname.startsWith("/en/orcamento")
+    url.pathname.startsWith("/en/orcamento") ||
+    // Private, token-gated client pages — their HTML carries personal data and
+    // financials, so it must never be written to on-disk Cache Storage.
+    url.pathname.startsWith("/portal") ||
+    url.pathname.startsWith("/en/portal") ||
+    url.pathname.startsWith("/proposta") ||
+    url.pathname.startsWith("/en/proposta")
   );
 }
 

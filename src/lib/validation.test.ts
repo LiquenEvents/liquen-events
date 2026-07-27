@@ -121,9 +121,9 @@ describe("quoteFormSchema", () => {
 });
 
 describe("pushSubscriptionSchema", () => {
-  it("accepts a well-formed https subscription", () => {
+  it("accepts a well-formed https subscription from a known push service", () => {
     const r = pushSubscriptionSchema.safeParse({
-      endpoint: "https://push.example.com/abc",
+      endpoint: "https://fcm.googleapis.com/fcm/send/abc123",
       keys: { p256dh: "key", auth: "auth" },
     });
     expect(r.success).toBe(true);
@@ -131,7 +131,15 @@ describe("pushSubscriptionSchema", () => {
 
   it("rejects a non-https endpoint", () => {
     const r = pushSubscriptionSchema.safeParse({
-      endpoint: "http://push.example.com/abc",
+      endpoint: "http://fcm.googleapis.com/fcm/send/abc",
+      keys: { p256dh: "key", auth: "auth" },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects an endpoint on an unknown host (SSRF guard)", () => {
+    const r = pushSubscriptionSchema.safeParse({
+      endpoint: "https://attacker.example.com/abc",
       keys: { p256dh: "key", auth: "auth" },
     });
     expect(r.success).toBe(false);

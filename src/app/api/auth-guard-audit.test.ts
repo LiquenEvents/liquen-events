@@ -252,14 +252,14 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./inventario/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
-  { path: "./orcamento/[id]/assets/route", methods: ["POST"] },
+  { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/fatura/route", methods: ["POST"] },
   { path: "./orcamento/[id]/mensagem/route", methods: ["POST"] },
   { path: "./orcamento/[id]/proposta/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/proposta-doc/route", methods: ["POST"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
   { path: "./propostas/route", methods: ["GET"] },
-  { path: "./propostas/[id]/route", methods: ["PATCH"] },
+  { path: "./propostas/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./push/subscribe/route", methods: ["GET", "POST", "DELETE"] },
   { path: "./tarefas/route", methods: ["GET", "POST"] },
   { path: "./tarefas/[id]/route", methods: ["PATCH", "DELETE"] },
@@ -315,6 +315,16 @@ describe("PUBLIC routes stay reachable without a session", () => {
     const fn = await handler("./security/csp-report/route", "POST");
     const res = await fn(req("POST", "/api/security/csp-report", { "csp-report": {} }), ctx());
     // Public report sink: 204 accepted (or 429 if rate-limited) — never an auth wall.
+    expect([204, 429]).toContain(res.status);
+  });
+
+  it("POST /api/vitals accepts a Web Vitals beacon unauthenticated", async () => {
+    const fn = await handler("./vitals/route", "POST");
+    const res = await fn(
+      req("POST", "/api/vitals", { name: "LCP", value: 1234, rating: "good" }),
+      ctx(),
+    );
+    // Public RUM sink (browsers beacon here): 204 accepted (or 429 if rate-limited).
     expect([204, 429]).toContain(res.status);
   });
 

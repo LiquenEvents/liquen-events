@@ -66,7 +66,13 @@ export function proxy(req: NextRequest) {
         }
       }
     }
-    const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+    // Don't trust a client-supplied request id verbatim (it's reflected into the
+    // response header and request-scoped logs — a raw value could inject into
+    // logs or spoof correlation). Accept it only if it's a short, safe token;
+    // otherwise mint our own.
+    const incomingId = req.headers.get("x-request-id");
+    const requestId =
+      incomingId && /^[A-Za-z0-9._-]{1,64}$/.test(incomingId) ? incomingId : crypto.randomUUID();
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set("x-request-id", requestId);
     const res = NextResponse.next({ request: { headers: requestHeaders } });

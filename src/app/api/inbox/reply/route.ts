@@ -19,7 +19,10 @@ const replySchema = z.object({
     .min(3)
     .max(320)
     .refine(
-      (v) => !/[\r\n]/.test(v) && /[^\s@]+@[^\s@]+\.[^\s@]+/.test(v),
+      // Single recipient only: no CR/LF (header injection) and no comma/semicolon
+      // (which would smuggle a recipient list past the "one reply" intent and
+      // undermine the anti-bulk-mail guard).
+      (v) => !/[\r\n,;]/.test(v) && /[^\s@]+@[^\s@]+\.[^\s@]+/.test(v),
       "Destinatário inválido",
     ),
   // `subject` mirrors `to`'s CRLF guard: nodemailer already encodes header
