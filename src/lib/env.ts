@@ -71,6 +71,14 @@ export function validateEnv(): void {
     else missing.push(`${check.name} — ${check.enables}`);
   }
 
+  // SESSION_SECRET must be a real key, not merely present: the token/session
+  // signers require ≥ 32 chars and otherwise fall back to a weaker derived key.
+  // Flag a too-short secret in production so it's fixed, not silently downgraded.
+  const sessionSecret = process.env.SESSION_SECRET ?? process.env.ADMIN_SESSION_SECRET;
+  if (isProd && sessionSecret && sessionSecret.length < 32) {
+    missingCritical.push("SESSION_SECRET — demasiado curto; use 32+ caracteres aleatórios");
+  }
+
   if (missingCritical.length) {
     log.error("Missing critical environment variables in production", undefined, {
       missing: missingCritical,
