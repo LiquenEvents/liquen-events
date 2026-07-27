@@ -43,9 +43,13 @@ export default function GoogleTag() {
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: CONSENT_BOOTSTRAP }} />
+      {/* lazyOnload (browser idle, after load) — mirrors the Plausible loader:
+          keeps the ad tag off the critical path so it never competes with
+          hydration or an interaction. The Consent Mode default above is set
+          inline (synchronously) regardless, so consent ordering is unaffected. */}
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
-        strategy="afterInteractive"
+        strategy="lazyOnload"
       />
     </>
   );

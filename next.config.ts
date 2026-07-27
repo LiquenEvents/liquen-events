@@ -74,9 +74,9 @@ const nextConfig: NextConfig = {
     // ad stack allows — no wildcards beyond the analytics beacon regions.
     const gaScript = " https://www.googletagmanager.com";
     const gaImg =
-      " https://www.googletagmanager.com https://www.google.com https://www.google.pt https://googleads.g.doubleclick.net";
+      " https://www.googletagmanager.com https://www.google.com https://www.google.pt https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com";
     const gaConnect =
-      " https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://googleads.g.doubleclick.net https://www.googleadservices.com https://www.google.com";
+      " https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://googleads.g.doubleclick.net https://www.googleadservices.com https://www.google.com https://pagead2.googlesyndication.com";
     const gaFrame = "https://td.doubleclick.net https://www.googletagmanager.com";
 
     // Image hosts the BROWSER loads via <img>: proposal cover/mood-board images
