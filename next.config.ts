@@ -66,6 +66,19 @@ const nextConfig: NextConfig = {
     }
     const plausible = plausibleOrigin ? ` ${plausibleOrigin}` : "";
 
+    // Google tag (gtag.js) for Google Ads conversion measurement + remarketing
+    // (see GoogleTag.tsx / Consent Mode). These are the hosts the browser talks
+    // to once the tag is active: the loader (googletagmanager.com), the pixel/
+    // beacon endpoints (google-analytics + doubleclick + googleadservices), and
+    // the conversion-linker iframe (td.doubleclick.net). Kept as tight as the
+    // ad stack allows — no wildcards beyond the analytics beacon regions.
+    const gaScript = " https://www.googletagmanager.com";
+    const gaImg =
+      " https://www.googletagmanager.com https://www.google.com https://www.google.pt https://googleads.g.doubleclick.net";
+    const gaConnect =
+      " https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://googleads.g.doubleclick.net https://www.googleadservices.com https://www.google.com";
+    const gaFrame = "https://td.doubleclick.net https://www.googletagmanager.com";
+
     // Image hosts the BROWSER loads via <img>: proposal cover/mood-board images
     // are served as signed URLs from Supabase Storage, and the (optional) gallery
     // CDN. Without these in img-src the browser blocks them and the thumbnail
@@ -99,7 +112,7 @@ const nextConfig: NextConfig = {
     // event beacon (when enabled); dev keeps ws/https open for HMR.
     const connectSrc = isDev
       ? "connect-src 'self' https: wss: ws:"
-      : `connect-src 'self'${plausible}`;
+      : `connect-src 'self'${plausible}${gaConnect}`;
 
     // Content-Security-Policy. Next's runtime still relies on inline bootstrap
     // scripts and we use inline styles throughout, so script/style keep
@@ -109,13 +122,14 @@ const nextConfig: NextConfig = {
     // 'unsafe-eval' is dev-only (React refresh).
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}${gaScript}`,
       "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: blob:${imgExtra}`,
+      `img-src 'self' data: blob:${imgExtra}${gaImg}`,
       "font-src 'self' data:",
       connectSrc,
       "worker-src 'self'",
       "manifest-src 'self'",
+      `frame-src 'self' ${gaFrame}`,
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

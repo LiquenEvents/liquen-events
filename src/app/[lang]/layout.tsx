@@ -8,6 +8,8 @@ import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
 import Analytics from "@/components/Analytics";
+import GoogleTag from "@/components/GoogleTag";
+import ConsentBanner from "@/components/ConsentBanner";
 import SpeculationRules from "@/components/SpeculationRules";
 import LeadSourceCapture from "@/components/LeadSourceCapture";
 import PageTransition from "@/components/PageTransition";
@@ -208,6 +210,7 @@ export default async function RootLayout({
             <StructuredData locale={locale} />
             <SpeculationRules />
             <Analytics />
+            <GoogleTag />
             <LeadSourceCapture />
             <HeroWarm />
             <ServiceWorkerRegister />
@@ -229,6 +232,7 @@ export default async function RootLayout({
             </main>
             <Footer locale={locale} />
             <WhatsAppButton />
+            <ConsentBanner locale={locale} />
           </SmoothScroll>
         </LocaleProvider>
       </body>
