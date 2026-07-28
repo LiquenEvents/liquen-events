@@ -183,6 +183,11 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     { kind: "board"; bi: number } | { kind: "cover"; idx: number } | null
   >(null);
   const hydrated = useRef(false);
+  /** `updatedAt` do rascunho do servidor tal como o lemos — é com isto que o
+   *  servidor deteta que alguém gravou por cima entretanto. */
+  const serverStamp = useRef<string | null>(null);
+  /** Já avisámos desta gravação cruzada? (uma vez chega; não a cada gravação) */
+  const warnedOverwrite = useRef(false);
 
   // ── Restore draft on mount ──
   useEffect(() => {
@@ -229,6 +234,49 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── O rascunho que está no SERVIDOR ──
+  // A cópia local abre primeiro (é instantânea e funciona sem rede); logo a
+  // seguir vai-se buscar a do servidor e, se for mais recente, é essa que
+  // vale. É isto que faz começar no portátil e continuar no tablet — e que
+  // impede limpar o histórico de apagar trabalho.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const draft = data?.draft;
+        if (!active || !draft?.doc || typeof draft.doc !== "object") return;
+        serverStamp.current = typeof draft.updatedAt === "string" ? draft.updatedAt : null;
+
+        let localStamp = 0;
+        try {
+          localStamp = Number(localStorage.getItem(`${DRAFT_KEY}:at`) ?? 0);
+        } catch {
+          /* localStorage indisponível — fica a valer a do servidor */
+        }
+        // A local só ganha se for MESMO mais recente; em empate vale a do
+        // servidor, que é a que os outros dispositivos veem.
+        if (localStamp > Date.parse(draft.updatedAt ?? 0)) return;
+        setDoc((d) => {
+          const merged = { ...d, ...(draft.doc as Partial<StudioDoc>) };
+          return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
+        });
+        const amount = (draft.doc as { totalAmount?: unknown }).totalAmount;
+        if (typeof amount === "number") setTotalInput(String(amount));
+      } catch {
+        /* sem rede: continua-se com a cópia local, como antes */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote.id]);
+
   // ── Hydrate signed URLs for images already in this draft ──
   // Fills in signed URLs for any image already used in the draft (covers / mood
   // boards) so thumbnails render even on a fresh device or after the cached URL
@@ -273,6 +321,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     const t = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
+        localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
         localStorage.setItem(
           SIDE_KEY,
           JSON.stringify({ urls: assetUrls, themeOrigins, refEdited }),
@@ -280,9 +329,38 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       } catch {
         /* quota / unavailable — non-fatal */
       }
-    }, 500);
+      // E no servidor, que é o que sobrevive à mudança de dispositivo. Falhar
+      // aqui não interrompe o trabalho: a cópia local continua a valer e a
+      // gravação seguinte tenta de novo.
+      void (async () => {
+        try {
+          const res = await fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ doc, baseUpdatedAt: serverStamp.current }),
+          });
+          if (!res.ok) return;
+          const data = await res.json().catch(() => null);
+          if (typeof data?.updatedAt === "string") serverStamp.current = data.updatedAt;
+          // Alguém gravou entre a nossa leitura e esta escrita. A nossa versão
+          // fica (a última vence), mas dizê-lo é o mínimo — desaparecer com o
+          // trabalho de outra pessoa em silêncio, não.
+          if (data?.overwrote && !warnedOverwrite.current) {
+            warnedOverwrite.current = true;
+            toast(
+              data.previousBy
+                ? `Este rascunho tinha sido alterado por ${data.previousBy} noutro sítio. Ficou a sua versão.`
+                : "Este rascunho tinha sido alterado noutro sítio. Ficou a sua versão.",
+              "info",
+            );
+          }
+        } catch {
+          /* offline — a cópia local guarda o trabalho até haver rede */
+        }
+      })();
+    }, 800);
     return () => clearTimeout(t);
-  }, [doc, assetUrls, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY]);
+  }, [doc, assetUrls, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY, quote.id, toast]);
 
   const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
 
@@ -344,10 +422,18 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     if (!window.confirm("Limpar todo o rascunho da proposta? Não pode ser anulado.")) return;
     try {
       localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(`${DRAFT_KEY}:at`);
       localStorage.removeItem(SIDE_KEY);
     } catch {
       /* ignore */
     }
+    // E no servidor — senão o rascunho limpo aqui reaparecia no dispositivo
+    // seguinte, que é precisamente o que guardá-lo lá veio resolver.
+    serverStamp.current = null;
+    warnedOverwrite.current = false;
+    void fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, { method: "DELETE" }).catch(() => {
+      /* sem rede: fica para a próxima limpeza; nada se perde por isso */
+    });
     setDoc(seedDefaults(initialDoc(quote), quote.quotedPrice));
     setTotalInput(
       typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
