@@ -32,8 +32,13 @@ export interface ThemeImage {
 
 /** O que a lista de temas precisa para desenhar um cartão. */
 export interface ThemeSummary extends ProposalTheme {
-  /** Nº de fotos na pasta do tema. */
-  imageCount: number;
+  /** Nº de fotos na pasta do tema, ou `null` quando a pasta NÃO pôde ser lida
+   *  (Storage em baixo). Distinguir os dois casos evita mostrar "0 fotos" —
+   *  que a equipa leria como "as minhas fotos desapareceram" — quando o que
+   *  aconteceu foi uma falha temporária de leitura. */
+  imageCount: number | null;
+  /** A contagem é um MÍNIMO: a listagem da pasta bateu no limite por página. */
+  truncated?: boolean;
   /** URL assinado da primeira foto, usada como capa do cartão. */
   coverUrl?: string;
 }
