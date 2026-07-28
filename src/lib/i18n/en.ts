@@ -534,8 +534,7 @@ export const en: Dict = {
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Shall we bring",
     ctaTitleMoss: "your idea to life?",
-    ctaText:
-      "Talk to us. We listen to your idea and present a proposal tailored to you.",
+    ctaText: "Talk to us. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
     galleryAlt: [
       "Outdoor wedding decorated by Líquen Events in the Alentejo",
@@ -580,6 +579,9 @@ export const en: Dict = {
       { label: "Event production", desc: "We take care of everything for you." },
     ],
     contactIntro: "For any questions, you can contact us directly:",
+    notFoundTitle: "We couldn't find this request",
+    notFoundBody:
+      "The link may be incomplete or no longer valid. If you sent a request and didn't receive our confirmation email, get in touch — we'll sort it out the same day.",
     voltarInicio: "Back to Home",
     novoPedido: "New Request",
     dateLocale: "en-GB",

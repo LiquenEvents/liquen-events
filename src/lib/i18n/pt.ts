@@ -589,6 +589,9 @@ export const pt = {
       { label: "Produção do evento", desc: "Tomamos conta de tudo para si." },
     ],
     contactIntro: "Para qualquer questão, pode contactar-nos diretamente:",
+    notFoundTitle: "Não encontrámos este pedido",
+    notFoundBody:
+      "A ligação pode estar incompleta ou já não ser válida. Se enviaram um pedido e não receberam a nossa confirmação por email, falem connosco — resolvemos no próprio dia.",
     voltarInicio: "Voltar ao Início",
     novoPedido: "Novo Pedido",
     dateLocale: "pt-PT",

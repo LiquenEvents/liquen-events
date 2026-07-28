@@ -11,6 +11,7 @@ import { localizeHref } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
 import { track } from "@/lib/track";
 import { reportLeadConversion } from "@/lib/ads-conversion";
+import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 
 const STATUS_COLORS: Record<string, string> = {
   pendente: "text-moss-dark",
@@ -53,7 +54,11 @@ export default function ConfirmacaoClient({
   const { locale, t } = useTranslations();
   const tc = confirmacao;
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Three states, not two. "unknown" = we could neither read the hand-off nor
+  // find the quote server-side, so this id is bogus/expired: we must NOT render
+  // a celebratory success page (and must NOT report a conversion) for it.
+  const [pageState, setPageState] = useState<"loading" | "ok" | "unknown">("loading");
+  const loading = pageState === "loading";
   // After the client-side hand-off from the form, move focus to the confirmation
   // heading so the success is announced and keyboard focus isn't stranded on
   // <body> (WCAG 2.4.3 Focus Order).
@@ -64,25 +69,34 @@ export default function ConfirmacaoClient({
   useEffect(() => setMounted(true), []);
   // Funnel completion: reaching this page IS the successful submit landing, so
   // fire it here to measure submit → confirmation (the back half of the funnel
-  // was previously invisible). Once per mount; inert without Plausible.
+  // was previously invisible).
+  //
+  // CRITICAL: gated on a CONFIRMED quote (`status === "ok"`). Firing on mount
+  // meant any URL under this route — a mistyped link, a stale link to a deleted
+  // quote, or the throwaway id the honeypot hands a bot — reported a
+  // `generate_lead` to Google Ads, poisoning smart bidding with phantom
+  // conversions. Both events are deduped by quote id so a refresh or a re-open
+  // in the same tab can't double-count.
   useEffect(() => {
-    track("QuoteConfirmed");
-    // Google Ads / GA4 lead conversion — landing here is the successful submit.
-    // Read the just-submitted contact data (saved by the form) synchronously so
-    // Enhanced Conversions can hash+match it; reportLeadConversion only uses it
-    // when the visitor consented. Deduped by quote id against refresh/re-open.
+    if (pageState !== "ok") return;
     let user: { email?: string; phone?: string } | undefined;
     try {
+      if (sessionStorage.getItem(`liquen-confirmed-${id}`)) return;
+      sessionStorage.setItem(`liquen-confirmed-${id}`, "1");
       const cached = sessionStorage.getItem(`liquen-quote-${id}`);
       if (cached) {
         const q = JSON.parse(cached) as { email?: string; phone?: string };
         user = { email: q.email, phone: q.phone };
       }
     } catch {
-      /* storage blocked — fire the conversion without enhanced data */
+      /* storage blocked — still report once for this mount */
     }
+    track("QuoteConfirmed");
+    // Enhanced Conversions: reportLeadConversion only uses the contact data when
+    // the visitor consented, and passes the id as transaction_id so Google
+    // dedupes server-side across tabs and devices too.
     reportLeadConversion(id, user);
-  }, [id]);
+  }, [id, pageState]);
   useEffect(() => {
     if (!loading) h1Ref.current?.focus();
   }, [loading]);
@@ -95,17 +109,17 @@ export default function ConfirmacaoClient({
       const cached = sessionStorage.getItem(`liquen-quote-${id}`);
       if (cached) {
         setQuote(JSON.parse(cached));
-        setLoading(false);
+        setPageState("ok");
         return;
       }
     } catch {
       /* ignore */
     }
 
-    // 2) Fall back to the API (works when persisted server-side, e.g. dev).
-    //    Bounded by a timeout so a stalled connection can't leave the page on
-    //    the "loading…" text indefinitely — it settles into the generic
-    //    confirmation instead.
+    // 2) Fall back to the API — the quote IS persisted server-side in
+    //    production, so this is the normal path for a reload, a second device,
+    //    or a forwarded link. Bounded by a timeout so a stalled connection
+    //    can't leave the page on "a carregar…" indefinitely.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     (async () => {
@@ -114,12 +128,21 @@ export default function ConfirmacaoClient({
           cache: "no-store",
           signal: controller.signal,
         });
-        if (res.ok && !cancelled) setQuote(await res.json());
+        // Read the body BEFORE re-checking `cancelled`, then guard the write —
+        // otherwise a response for a previous id could land on the new one.
+        if (!res.ok) {
+          if (!cancelled) setPageState("unknown");
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) {
+          setQuote(data);
+          setPageState("ok");
+        }
       } catch {
-        /* ignore — generic confirmation will be shown */
+        if (!cancelled) setPageState("unknown");
       } finally {
         clearTimeout(timeout);
-        if (!cancelled) setLoading(false);
       }
     })();
 
@@ -183,6 +206,41 @@ export default function ConfirmacaoClient({
         >
           {tc.loading}
         </p>
+      </div>
+    );
+  }
+
+  // No hand-off AND no such quote server-side: this id is bogus or expired.
+  // Show an honest panel — never the celebratory success page, which would
+  // claim a request was received that never existed (and used to report a
+  // phantom Google Ads conversion for it).
+  if (pageState === "unknown") {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center px-6 py-24">
+        <div className="max-w-md text-center">
+          <h1
+            ref={h1Ref}
+            tabIndex={-1}
+            className="font-display text-[clamp(26px,4vw,36px)] leading-[1.15] text-foreground focus:outline-none"
+          >
+            {tc.notFoundTitle}
+          </h1>
+          <p className="mt-5 text-[15px] leading-[1.8] text-foreground/72">{tc.notFoundBody}</p>
+          <div className="mt-8 flex flex-col items-center gap-3 text-[14px]">
+            <a href={`mailto:${SITE.email}`} className="link-line text-moss-dark">
+              {SITE.email}
+            </a>
+            <a href={`tel:${SITE.phone}`} className="link-line text-moss-dark">
+              {SITE.phoneDisplay}
+            </a>
+          </div>
+          <Link
+            href={localizeHref("/", locale)}
+            className={`${OUTLINE_LIGHT_BUTTON_CLASS} mt-10 inline-flex`}
+          >
+            {tc.voltarInicio}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -279,7 +337,7 @@ export default function ConfirmacaoClient({
 
       {/* Celebration petals — drift down once, in front but featherlight. */}
       {mounted && (
-        <div aria-hidden className="pointer-events-none absolute inset-0 z-[5] overflow-hidden">
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-[5] overflow-hidden">
           {PETALS.map((p, i) => (
             <span
               key={i}
@@ -568,7 +626,7 @@ export default function ConfirmacaoClient({
             </Link>
             <Link
               href={localizeHref("/orcamento", locale)}
-              className="text-[11px] tracking-[0.2em] uppercase text-foreground/55 hover:text-moss transition-colors"
+              className="text-[11px] tracking-[0.2em] uppercase text-foreground/70 hover:text-moss transition-colors"
             >
               {tc.novoPedido}
             </Link>

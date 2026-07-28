@@ -80,5 +80,8 @@ export function reportLeadConversion(dedupeKey?: string, user?: LeadUserData): v
     if (Object.keys(userData).length) gtag("set", "user_data", userData);
   }
 
-  gtag("event", "generate_lead");
+  // `transaction_id` is the key Google Ads dedupes on SERVER-side, so the same
+  // quote reported from a second tab, a forwarded link or another device counts
+  // once. The local sessionStorage guard above only covers the current tab.
+  gtag("event", "generate_lead", dedupeKey ? { transaction_id: dedupeKey } : {});
 }
