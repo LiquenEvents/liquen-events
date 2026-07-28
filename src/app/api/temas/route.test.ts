@@ -5,17 +5,24 @@ import type { ProposalTheme } from "@/lib/theme-types";
 // A lista de temas junta a base de dados (metadados) ao Storage (contagem de
 // fotos). Mockamos ambos para testar o guarda de admin, a validação do nome, a
 // recusa de duplicados e o facto de a contagem vir mesmo da pasta.
+//
+// Do Storage mockamos a LISTAGEM (`listThemeFiles`, sem assinaturas) e a
+// assinatura em bloco (`signThemePaths`): é essa a divisão que faz a lista
+// custar uma assinatura por tema em vez de uma por foto.
 const st = vi.hoisted(() => ({
   authed: false,
   throwOnList: false,
   themes: [] as ProposalTheme[],
-  images: {} as Record<string, { path: string; url: string }[]>,
+  files: {} as Record<string, { names: string[]; ok: boolean; truncated: boolean }>,
   create: vi.fn(async (input: { name: string; notes?: string }) => ({
     id: "t-new",
     createdAt: "2026-07-28T00:00:00.000Z",
     updatedAt: "2026-07-28T00:00:00.000Z",
     ...input,
   })),
+  sign: vi.fn(
+    async (paths: string[]) => new Map(paths.map((p) => [p, `https://signed/${p}`] as const)),
+  ),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
@@ -27,8 +34,22 @@ vi.mock("@/lib/themes-store", () => ({
   }),
   createTheme: st.create,
 }));
-vi.mock("@/lib/theme-storage", () => ({
-  listThemeImages: vi.fn(async (id: string) => st.images[id] ?? []),
+vi.mock("@/lib/theme-storage", async () => {
+  // As funções puras (pasta, normalização do nome) são as reais; só o acesso
+  // ao Storage é substituído.
+  const real = await vi.importActual<typeof import("@/lib/theme-storage")>("@/lib/theme-storage");
+  return {
+    ...real,
+    listThemeFiles: vi.fn(
+      async (id: string) => st.files[id] ?? { names: [], ok: true, truncated: false },
+    ),
+    signThemePaths: st.sign,
+  };
+});
+// Mesmo reconhecedor de 23505 do módulo real, sem arrastar a loja de faturas.
+vi.mock("@/lib/invoices-store", () => ({
+  isUniqueViolation: (err: unknown) =>
+    !!err && typeof err === "object" && (err as { code?: string }).code === "23505",
 }));
 
 import { GET, POST } from "./route";
@@ -48,11 +69,18 @@ const theme = (id: string, name: string): ProposalTheme => ({
   updatedAt: "2026-01-01T00:00:00.000Z",
 });
 
+const folder = (names: string[], over: Partial<{ ok: boolean; truncated: boolean }> = {}) => ({
+  names,
+  ok: true,
+  truncated: false,
+  ...over,
+});
+
 beforeEach(() => {
   st.authed = false;
   st.throwOnList = false;
   st.themes = [];
-  st.images = {};
+  st.files = {};
   vi.clearAllMocks();
 });
 
@@ -71,17 +99,51 @@ describe("GET /api/temas", () => {
   it("junta a contagem de fotos e a capa vindas do Storage", async () => {
     st.authed = true;
     st.themes = [theme("t-1", "Terracotta"), theme("t-2", "Itália")];
-    st.images = {
-      "t-1": [
-        { path: "t-1/a.jpg", url: "https://signed/a" },
-        { path: "t-1/b.jpg", url: "https://signed/b" },
-      ],
-    };
+    st.files = { "t-1": folder(["a.jpg", "b.jpg"]) };
     const body = await (await GET(req("GET"))).json();
-    expect(body[0]).toMatchObject({ id: "t-1", imageCount: 2, coverUrl: "https://signed/a" });
-    // Sem Storage / sem fotos o tema aparece à mesma, com zero.
+    expect(body[0]).toMatchObject({
+      id: "t-1",
+      imageCount: 2,
+      coverUrl: "https://signed/t-1/a.jpg",
+    });
+    // Pasta vazia é mesmo zero (≠ ilegível), e o tema aparece à mesma.
     expect(body[1]).toMatchObject({ id: "t-2", imageCount: 0 });
     expect(body[1].coverUrl).toBeUndefined();
+  });
+
+  it("assina SÓ as capas, num único pedido para todos os temas", async () => {
+    st.authed = true;
+    st.themes = [theme("t-1", "Terracotta"), theme("t-2", "Itália")];
+    st.files = { "t-1": folder(["a.jpg", "b.jpg", "c.jpg"]), "t-2": folder(["d.jpg"]) };
+    await GET(req("GET"));
+    expect(st.sign).toHaveBeenCalledTimes(1);
+    expect(st.sign).toHaveBeenCalledWith(["t-1/a.jpg", "t-2/d.jpg"]);
+  });
+
+  it("uma pasta ILEGÍVEL não é '0 fotos' nem derruba os outros temas", async () => {
+    st.authed = true;
+    st.themes = [theme("t-1", "Terracotta"), theme("t-2", "Itália")];
+    st.files = {
+      "t-1": { names: [], ok: false, truncated: false },
+      "t-2": folder(["d.jpg"]),
+    };
+    const body = await (await GET(req("GET"))).json();
+    expect(body[0]).toMatchObject({ id: "t-1", imageCount: null });
+    expect(body[0].coverUrl).toBeUndefined();
+    expect(body[1]).toMatchObject({
+      id: "t-2",
+      imageCount: 1,
+      coverUrl: "https://signed/t-2/d.jpg",
+    });
+    expect(st.sign).toHaveBeenCalledWith(["t-2/d.jpg"]);
+  });
+
+  it("marca como mínimo a contagem de uma pasta que bateu no limite da página", async () => {
+    st.authed = true;
+    st.themes = [theme("t-1", "Terracotta")];
+    st.files = { "t-1": folder(["a.jpg"], { truncated: true }) };
+    const body = await (await GET(req("GET"))).json();
+    expect(body[0]).toMatchObject({ imageCount: 1, truncated: true });
   });
 
   it("devolve 500 tratado (não um throw cru) quando a base de dados falha", async () => {
@@ -119,6 +181,23 @@ describe("POST /api/temas", () => {
     const res = await POST(req("POST", { name: "  terracotta " }));
     expect(res.status).toBe(409);
     expect(st.create).not.toHaveBeenCalled();
+  });
+
+  it("recusa um nome duplicado só pelos ACENTOS (Italia ≠ Itália era um tema a mais)", async () => {
+    st.authed = true;
+    st.themes = [theme("t-1", "Itália")];
+    const res = await POST(req("POST", { name: "Italia" }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('Já existe um tema com um nome equivalente a "Italia".');
+    expect(st.create).not.toHaveBeenCalled();
+  });
+
+  it("traduz o 23505 do índice único num 409 (corrida entre a verificação e o insert)", async () => {
+    st.authed = true;
+    st.create.mockRejectedValueOnce(Object.assign(new Error("dup"), { code: "23505" }));
+    const res = await POST(req("POST", { name: "Itália" }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('Já existe um tema com um nome equivalente a "Itália".');
   });
 
   it("corta um nome absurdamente longo em vez de o guardar inteiro", async () => {

@@ -47,5 +47,31 @@ export interface ThemeSummary extends ProposalTheme {
 export const MAX_THEME_NAME = 60;
 export const MAX_THEME_NOTES = 300;
 
+/**
+ * Compara nomes de temas como a equipa os lê: sem acentos, sem maiúsculas e
+ * sem espaços a mais. "Itália", "italia" e "  ITALIA " são o MESMO tema — sem
+ * isto a biblioteca enche-se de pares quase iguais que ninguém distingue no
+ * seletor da proposta. É a forma normalizada que as rotas comparam antes de
+ * escrever (o índice único da base de dados é o backstop, ver db/schema.sql).
+ *
+ * Vive neste módulo — e não no do Storage — para o formulário de criação poder
+ * usar exatamente a mesma regra e avisar antes de enviar, em vez de a equipa
+ * levar com o 409 depois de escrever o nome todo.
+ */
+export function normalizedThemeName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** A recusa que as rotas devolvem quando o nome colide com um tema existente.
+ *  Uma só definição: a mensagem é lida pela equipa e testada nas duas rotas. */
+export function themeNameTakenError(name: string): string {
+  return `Já existe um tema com um nome equivalente a "${name}".`;
+}
+
 /** Quantas fotos podem ser importadas para uma proposta de uma só vez. */
 export const MAX_IMPORT_BATCH = 40;

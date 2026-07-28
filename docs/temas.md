@@ -43,10 +43,19 @@ sítio certo.
   mudar o tema, trocar fotos ou eliminá-lo — as propostas enviadas continuam
   iguais.
 - **Eliminar um tema apaga as fotos desse tema** (só as da biblioteca, ver
-  ponto acima). A ação pede confirmação e não pode ser anulada.
-- **Um tema não tem limite prático de fotos**; a lista mostra as 500 mais
-  recentes.
-- Podem ser adicionadas até **40 fotos de uma vez** a uma proposta.
+  ponto acima). A ação pede confirmação e não pode ser anulada. Se as fotos não
+  puderem ser apagadas naquele momento, o tema **não** é eliminado e aparece um
+  aviso — repetir a ação mais tarde conclui-a, em vez de deixar fotos perdidas.
+- **"Fotos indisponíveis"** num tema quer dizer que a pasta não pôde ser lida
+  agora (falha temporária), **não** que as fotos desapareceram. Recarregue daqui
+  a pouco.
+- **Um tema não tem limite prático de fotos**; a grelha mostra as 500 mais
+  recentes, e nesse caso a contagem aparece como "500+".
+- Podem ser adicionadas até **40 fotos de uma vez** a uma proposta — o seletor
+  avisa quando chega ao limite, antes de tentar.
+- **A capa tem dois lugares fixos**, esquerda e direita: a foto que escolher
+  para a direita sai à direita no PDF, mesmo que o lugar da esquerda fique
+  vazio.
 
 ## Por trás (para quem mexe no código)
 

@@ -51,4 +51,18 @@ describe("renderStoredProposalDocPdf", () => {
     expect(fetchProposalImageBytes).toHaveBeenCalledWith("storage/mb-2.jpg");
     expect(fetchProposalImageBytes).toHaveBeenCalledTimes(4);
   });
+
+  it('gera na mesma com a capa preenchida só de um lado (a outra posição é "")', async () => {
+    // A capa chega SEMPRE com duas posições ("" = vazia) — ver
+    // `normaliseCoverImages`. Uma posição vazia, ou bytes que não são imagem,
+    // não podem rebentar a geração: o documento sai à mesma.
+    fetchProposalImageBytes.mockImplementation(async (ref) =>
+      ref === "storage/cover-2.jpg" ? Buffer.from("não sou uma imagem") : null,
+    );
+    const out = await renderStoredProposalDocPdf({
+      ...storedDoc(),
+      coverImages: ["", "storage/cover-2.jpg"],
+    });
+    expect(out.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  });
 });

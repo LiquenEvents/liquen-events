@@ -22,7 +22,13 @@ const SIGNED_TTL = 60 * 60 * 24 * 365 * 10;
 
 let bucketReady = false;
 
-async function ensureBucket(): Promise<boolean> {
+/**
+ * Exported so the theme→proposal copy (`copyThemeImageToProposal`) can make
+ * sure the destination bucket exists once per batch before Storage copies
+ * into it — that path never calls `uploadProposalImage`, so nothing else
+ * would create it.
+ */
+export async function ensureBucket(): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return false;
   if (bucketReady) return true;

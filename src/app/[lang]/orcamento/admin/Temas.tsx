@@ -53,6 +53,18 @@ const FolderIcon = (
   </svg>
 );
 
+/**
+ * Quantas fotos tem o tema, em português e sem mentir:
+ * `null` = a pasta NÃO pôde ser lida (dizer "0 fotos" leria-se como "as minhas
+ * fotos desapareceram"); `truncated` = a listagem bateu no limite por página,
+ * portanto a contagem é um MÍNIMO ("500+ fotos").
+ */
+function photoCountLabel(count: number | null, truncated?: boolean): string {
+  if (count === null) return "Fotos indisponíveis";
+  if (truncated) return `${count}+ fotos`;
+  return `${count} ${count === 1 ? "foto" : "fotos"}`;
+}
+
 export default function Temas() {
   const { toast } = useToast();
   const [themes, setThemes] = useState<ThemeSummary[]>([]);
@@ -78,6 +90,9 @@ export default function Temas() {
   }, [toast]);
 
   async function create() {
+    // O Enter no campo do nome não passa pelo botão (que já está desativado
+    // enquanto grava): sem esta guarda, dois Enter seguidos criavam dois temas.
+    if (saving) return;
     const name = newName.trim();
     if (!name) return;
     setSaving(true);
@@ -106,31 +121,53 @@ export default function Temas() {
     }
   }
 
+  /** Repõe UM tema depois de um DELETE falhado. Repor a lista inteira (o
+   *  "snapshot" de antes do pedido) fazia desaparecer os temas criados no
+   *  entretanto — e ressuscitava os que tivessem sido eliminados. */
+  function restoreTheme(t: ThemeSummary) {
+    setThemes((prev) =>
+      prev.some((x) => x.id === t.id)
+        ? prev
+        : [...prev, t].sort((a, b) => a.name.localeCompare(b.name, "pt")),
+    );
+  }
+
   async function removeTheme(t: ThemeSummary) {
+    // Quantas fotos se perdem pode ser desconhecido (pasta ilegível) ou apenas
+    // um mínimo (listagem truncada) — a frase tem de continuar a fazer sentido.
+    const photos =
+      t.imageCount === null
+        ? " e as fotos que tiver lá dentro"
+        : t.imageCount > 0
+          ? ` e as suas ${t.imageCount}${t.truncated ? "+" : ""} fotos`
+          : "";
     if (
-      !confirm(
-        `Eliminar o tema "${t.name}"${t.imageCount ? ` e as suas ${t.imageCount} fotos` : ""}? ` +
+      !window.confirm(
+        `Eliminar o tema "${t.name}"${photos}? ` +
           "As propostas já feitas com estas fotos não são afetadas. Esta ação não pode ser anulada.",
       )
     )
       return;
-    const snapshot = themes;
     setThemes((prev) => prev.filter((x) => x.id !== t.id));
     if (openId === t.id) setOpenId(null);
     try {
       const res = await fetch(`/api/temas/${t.id}`, { method: "DELETE" });
-      if (res.ok) toast("Tema eliminado.", "success");
-      else {
-        setThemes(snapshot);
-        toast("Não foi possível eliminar o tema.", "error");
+      if (res.ok) {
+        toast("Tema eliminado.", "success");
+        return;
       }
+      restoreTheme(t);
+      toast("Não foi possível eliminar o tema.", "error");
     } catch {
-      setThemes(snapshot);
+      restoreTheme(t);
       toast("Erro de ligação ao eliminar.", "error");
     }
   }
 
-  /** Mantém a contagem/capa do cartão certas depois de mexer nas fotos. */
+  /** Mantém a contagem/capa do cartão certas depois de mexer nas fotos. A pasta
+   *  é a fonte de verdade, por isso a contagem passa a ser a real; `truncated`
+   *  mantém-se (uma contagem tirada de uma listagem truncada continua a ser um
+   *  mínimo) e um `imageCount` que estava a `null` fica finalmente conhecido. */
   function syncCounts(id: string, images: ThemeImage[]) {
     setThemes((prev) =>
       prev.map((t) =>
@@ -164,7 +201,7 @@ export default function Temas() {
       <Toolbar
         className="mb-6"
         start={
-          <p className="max-w-xl text-sm leading-relaxed text-foreground/55">
+          <p className="bo-text-muted max-w-xl text-sm leading-relaxed">
             Guarde aqui as fotos por tema. Depois, no estúdio de propostas, é só escolher o tema e
             as fotos entram no mood board.
           </p>
@@ -189,6 +226,7 @@ export default function Temas() {
               required
               maxLength={MAX_THEME_NAME}
               value={newName}
+              disabled={saving}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Ex.: Terracotta, Itália, Branco & Verde"
               onKeyDown={(e) => {
@@ -242,18 +280,20 @@ export default function Temas() {
                   <img
                     src={t.coverUrl}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-foreground/25">
+                  <div className="flex h-full w-full items-center justify-center text-foreground/40">
                     {FolderIcon}
                   </div>
                 )}
               </div>
               <div className="px-4 py-3">
                 <p className="font-display text-[15px] text-foreground/85">{t.name}</p>
-                <p className="mt-0.5 text-xs text-foreground/40">
-                  {t.imageCount} {t.imageCount === 1 ? "foto" : "fotos"}
+                <p className="bo-text-muted mt-0.5 text-xs">
+                  {photoCountLabel(t.imageCount, t.truncated)}
                   {t.notes ? ` · ${t.notes}` : ""}
                 </p>
               </div>
@@ -282,50 +322,93 @@ function ThemeFolder({
   const { toast } = useToast();
   const [images, setImages] = useState<ThemeImage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  /** Lotes a decorrer — não um booleano: com dois lotes ao mesmo tempo, o
+   *  primeiro a acabar desligava o indicador do outro. */
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [name, setName] = useState(theme.name);
   const [renaming, setRenaming] = useState(false);
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Um PATCH de cada vez: confirmar o nome com o Enter dispara também o onBlur. */
+  const renamingBusy = useRef(false);
+  /** Passa a falso ao sair da pasta — um lote que só termine depois disso não
+   *  pode voltar a escrever no estado deste ecrã. */
+  const alive = useRef(true);
+  /** Profundidade do arrasto: entrar numa foto dispara `dragleave` no
+   *  contentor, e a moldura piscava a cada célula por baixo do ponteiro. */
+  const dragDepth = useRef(0);
 
   useEffect(() => {
-    let alive = true;
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  // `onImagesChange` é recriada a cada render do pai; guardá-la numa ref deixa
+  // o efeito de notificação depender só da lista de fotos.
+  const notify = useRef(onImagesChange);
+  useEffect(() => {
+    notify.current = onImagesChange;
+  });
+
+  useEffect(() => {
+    let active = true;
     (async () => {
       try {
         const res = await fetch(`/api/temas/${theme.id}/imagens`, { cache: "no-store" });
         if (!res.ok) throw new Error("falhou");
         const data = await res.json();
-        if (!alive) return;
-        const list: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
-        setImages(list);
-        onImagesChange(list);
+        if (!active) return;
+        setImages(Array.isArray(data?.images) ? data.images : []);
       } catch {
-        if (alive) toast("Não foi possível carregar as fotos do tema.", "error");
+        // Sem lista não se avisa o pai: o cartão guarda a contagem que veio do
+        // servidor (que pode ser "Fotos indisponíveis") em vez de dizer "0".
+        if (active) toast("Não foi possível carregar as fotos do tema.", "error");
       } finally {
-        if (alive) setLoading(false);
+        if (active) setLoading(false);
       }
     })();
     return () => {
-      alive = false;
+      active = false;
     };
-    // onImagesChange é recriada a cada render do pai; só o tema importa aqui.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme.id, toast]);
+
+  /** UM único sítio a avisar o pai (contagem + capa do cartão). Avisar também
+   *  dentro do upload e da remoção punha o cartão a par de uma lista já
+   *  ultrapassada — a contagem ficava a divergir da grelha. */
+  const lastNotified = useRef<ThemeImage[] | null>(null);
+  useEffect(() => {
+    if (lastNotified.current === images) return;
+    // A primeira lista é a vazia de arranque, ainda antes de a pasta ser lida:
+    // avisar aqui escrevia "0 fotos" no cartão sem se saber nada.
+    const first = lastNotified.current === null;
+    lastNotified.current = images;
+    if (!first) notify.current(images);
+  }, [images]);
 
   /** Um ficheiro por pedido: o limite de corpo do alojamento (~4,5 MB) rebenta
    *  com um lote inteiro de fotos de telemóvel, e um ficheiro mau nunca deve
    *  deitar fora os restantes. */
   async function upload(files: File[]) {
     if (files.length === 0) return;
-    setUploading(true);
-    setProgress({ done: 0, total: files.length });
-    const added: ThemeImage[] = [];
+    setUploadingCount((n) => n + 1);
+    // Os totais somam-se: dois lotes a decorrer mostram um só "A carregar 3/7…".
+    setProgress((p) => ({ done: p?.done ?? 0, total: (p?.total ?? 0) + files.length }));
+    let added = 0;
     const errors: string[] = [];
     try {
       for (const f of files) {
+        if (!alive.current) return;
         try {
-          const prepared = await prepareImageForUpload(f, "board");
+          // Preset "cover" e não "board": uma foto da biblioteca tem DOIS
+          // destinos possíveis — uma célula de mood board ou uma imagem de
+          // CAPA, impressa em grande. Guardá-la com 1600 px degradava-a para
+          // sempre (o original nunca mais existe); resolução a mais numa célula
+          // pequena não custa nada. Ficam ~2,5–3,5 MB, dentro do limite de
+          // ~4,5 MB — exatamente o que as capas carregadas à mão já enviam.
+          const prepared = await prepareImageForUpload(f, "cover");
           const form = new FormData();
           form.append("files", prepared);
           const res = await fetch(`/api/temas/${theme.id}/imagens`, {
@@ -336,34 +419,38 @@ function ThemeFolder({
           if (!res.ok) throw new Error(data?.error || `Falha ao carregar "${f.name}".`);
           const im: ThemeImage | undefined = data?.images?.[0];
           if (!im) throw new Error(`Falha ao carregar "${f.name}".`);
-          added.push(im);
+          if (!alive.current) return;
+          // Cada foto entra na grelha assim que chega. Juntar o lote todo e no
+          // fim fazer `[...lote, ...images]` lia um `images` velho: dois lotes
+          // em paralelo perdiam fotos e uma foto removida entretanto voltava.
+          setImages((prev) => [im, ...prev]);
+          added += 1;
         } catch (e) {
           errors.push(e instanceof Error ? e.message : `Falha ao carregar "${f.name}".`);
         } finally {
-          setProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+          if (alive.current) setProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
         }
-      }
-      if (added.length > 0) {
-        const next = [...added, ...images];
-        setImages(next);
-        onImagesChange(next);
       }
       if (errors.length > 0) {
         toast(
           errors.length === files.length
             ? errors[0]
-            : `${added.length} de ${files.length} carregadas. ${errors[0]}`,
+            : `${added} de ${files.length} carregadas. ${errors[0]}`,
           "error",
         );
       } else {
         toast(
-          `${added.length} ${added.length === 1 ? "foto adicionada" : "fotos adicionadas"} a "${theme.name}".`,
+          `${added} ${added === 1 ? "foto adicionada" : "fotos adicionadas"} a "${theme.name}".`,
           "success",
         );
       }
     } finally {
-      setUploading(false);
-      setProgress(null);
+      if (alive.current) {
+        setUploadingCount((n) => Math.max(0, n - 1));
+        // Só o último lote apaga o contador: `done === total` só acontece
+        // quando já não falta nenhum ficheiro de nenhum dos lotes.
+        setProgress((p) => (p && p.done >= p.total ? null : p));
+      }
     }
   }
 
@@ -378,30 +465,42 @@ function ThemeFolder({
     if (files.length) upload(files);
   }
 
-  async function removeImage(path: string) {
-    const snapshot = images;
-    const next = images.filter((i) => i.path !== path);
-    setImages(next);
-    onImagesChange(next);
+  async function removeImage(im: ThemeImage, index: number) {
+    if (!window.confirm("Remover esta foto do tema? Esta ação não pode ser anulada.")) return;
+    setImages((prev) => prev.filter((i) => i.path !== im.path));
     try {
-      const res = await fetch(`/api/temas/${theme.id}/imagens?path=${encodeURIComponent(path)}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/temas/${theme.id}/imagens?path=${encodeURIComponent(im.path)}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!res.ok) throw new Error("falhou");
     } catch {
-      setImages(snapshot);
-      onImagesChange(snapshot);
+      if (!alive.current) return;
+      // Repor SÓ esta foto, no sítio onde estava. Repor a lista inteira deitava
+      // fora as fotos que um lote a decorrer tivesse entretanto acrescentado.
+      setImages((prev) => {
+        if (prev.some((i) => i.path === im.path)) return prev;
+        const next = [...prev];
+        next.splice(Math.min(index, next.length), 0, im);
+        return next;
+      });
       toast("Não foi possível remover a foto.", "error");
     }
   }
 
   async function rename() {
+    // O Enter fecha o campo e o onBlur dispara logo a seguir: sem esta guarda
+    // saíam dois PATCH iguais para o servidor.
+    if (renamingBusy.current) return;
     const trimmed = name.trim();
     if (!trimmed || trimmed === theme.name) {
       setName(theme.name);
       setRenaming(false);
       return;
     }
+    renamingBusy.current = true;
     try {
       const res = await fetch(`/api/temas/${theme.id}`, {
         method: "PATCH",
@@ -420,6 +519,7 @@ function ThemeFolder({
       setName(theme.name);
       toast("Erro de ligação ao renomear.", "error");
     } finally {
+      renamingBusy.current = false;
       setRenaming(false);
     }
   }
@@ -458,15 +558,15 @@ function ThemeFolder({
               {theme.name}
             </button>
           )}
-          <span className="text-xs text-foreground/40">
-            {images.length} {images.length === 1 ? "foto" : "fotos"}
+          <span className="bo-text-muted text-xs">
+            {loading ? "A ler a pasta…" : photoCountLabel(images.length, theme.truncated)}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <Button
             size="sm"
             iconLeft={PlusIcon}
-            loading={uploading}
+            loading={uploadingCount > 0}
             onClick={() => inputRef.current?.click()}
           >
             {progress ? `A carregar ${progress.done}/${progress.total}…` : "Adicionar fotos"}
@@ -490,13 +590,19 @@ function ThemeFolder({
       />
 
       <div
-        onDragOver={(e) => {
+        onDragEnter={(e) => {
           e.preventDefault();
+          dragDepth.current += 1;
           setDrag(true);
         }}
-        onDragLeave={() => setDrag(false)}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={() => {
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setDrag(false);
+        }}
         onDrop={(e) => {
           e.preventDefault();
+          dragDepth.current = 0;
           setDrag(false);
           pick(e.dataTransfer.files);
         }}
@@ -512,27 +618,36 @@ function ThemeFolder({
           </div>
         ) : images.length === 0 ? (
           <div className="py-12 text-center">
-            <p className="text-sm text-foreground/55">
+            <p className="bo-text-muted text-sm">
               Arraste para aqui as fotos deste tema, ou use “Adicionar fotos”.
             </p>
-            <p className="mt-1 text-xs text-foreground/35">
-              JPG, PNG ou WEBP · também HEIC do iPhone
-            </p>
+            <p className="bo-text-muted mt-1 text-xs">JPG, PNG ou WEBP · também HEIC do iPhone</p>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
-            {images.map((im) => (
+            {images.map((im, i) => (
               <div
                 key={im.path}
                 className="group relative aspect-square overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]"
               >
+                {/* A célula já tem `aspect-square`, por isso adiar a foto não
+                    salta nada; uma pasta com centenas de fotos deixa de as
+                    pedir todas de uma vez. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={im.url} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={im.url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
                 <button
                   type="button"
-                  onClick={() => removeImage(im.path)}
-                  aria-label="Remover foto"
-                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-xs leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                  onClick={() => removeImage(im, i)}
+                  aria-label={`Remover foto ${i + 1} de ${images.length}`}
+                  // Num ecrã tátil não há "passar o rato": aí o × está sempre
+                  // visível, senão a foto não se conseguia remover de todo.
+                  className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                 >
                   ×
                 </button>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
+import { PDFArray, PDFDocument, PDFRawStream, decodePDFRawStream, type PDFObject } from "pdf-lib";
 import { renderProposalDocPdf } from "./proposal-doc-pdf";
 import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
 
@@ -9,7 +10,56 @@ import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
  * mantém o teste rápido e determinístico. Carregamos os bytes com
  * `PDFDocument.load`, confirmamos `%PDF-` e uma contagem de páginas plausível, e
  * exercitamos os dois templates do estúdio: "decoracao" e "organizacao".
+ *
+ * A exceção é a capa: aí o que interessa é o LADO onde cada foto sai impressa,
+ * por isso esse teste desenha uma imagem a sério e lê a posição no conteúdo da
+ * página (ver `coverPhotoXs`).
  */
+
+/** Dimensões da página do documento (A4 paisagem), iguais às do gerador. */
+const PAGE_W = 841.89;
+const PAGE_H = 595.28;
+
+/** Conteúdo (operadores) de uma página, já descomprimido. */
+function pageContent(pdf: PDFDocument, index: number): string {
+  const page = pdf.getPage(index);
+  const contents = page.node.Contents();
+  const parts: (PDFObject | undefined)[] =
+    contents instanceof PDFArray ? contents.asArray() : [contents];
+  let out = "";
+  for (const part of parts) {
+    const stream = page.node.context.lookup(part);
+    if (stream instanceof PDFRawStream) {
+      out += Buffer.from(decodePDFRawStream(stream).decode()).toString("latin1");
+    }
+  }
+  return out;
+}
+
+/** pdf-lib escreve, antes de cada imagem, três matrizes: translação, rotação e
+ *  escala (largura/altura de desenho). */
+const PLACEMENT =
+  /1 0 0 1 (-?[\d.]+) (-?[\d.]+) cm\s+1 0 0 1 0 0 cm\s+(-?[\d.]+) 0 0 (-?[\d.]+) 0 0 cm/g;
+
+/** Os X onde foram desenhadas as fotos de CAPA — as únicas imagens que ocupam a
+ *  altura toda da página, o que as distingue do logótipo e do resto. */
+function coverPhotoXs(content: string): number[] {
+  const xs: number[] = [];
+  for (const m of content.matchAll(PLACEMENT)) {
+    if (Math.abs(Number(m[4]) - PAGE_H) < 1) xs.push(Number(m[1]));
+  }
+  return xs;
+}
+
+/** Uma foto minúscula, em retrato como as fotos de capa reais. */
+async function photoB64(): Promise<string> {
+  const bytes = await sharp({
+    create: { width: 120, height: 240, channels: 3, background: { r: 90, g: 110, b: 90 } },
+  })
+    .jpeg()
+    .toBuffer();
+  return bytes.toString("base64");
+}
 
 /** Doc mínimo do template Decoração (total agrupado + mood boards). */
 function decoracaoDoc(): ProposalDoc {
@@ -93,6 +143,30 @@ describe("renderProposalDocPdf", () => {
     expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
     const parsed = await PDFDocument.load(bytes);
     expect(parsed.getPageCount()).toBeGreaterThan(3);
+  });
+
+  it("BUG-GUARD: a foto do slot 1 é impressa à DIREITA (e a do slot 0 à esquerda)", async () => {
+    // O bug: escolher UMA foto para a capa da direita imprimia-a à esquerda,
+    // porque o array da capa era compactado e a foto passava a estar no índice
+    // 0. Com as duas posições fixas ("" = vazia), o lado é sempre o escolhido.
+    const photo = await photoB64();
+
+    const onlyRight = await renderProposalDocPdf({ ...decoracaoDoc(), coverImages: ["", photo] });
+    const xsRight = coverPhotoXs(pageContent(await PDFDocument.load(onlyRight), 0));
+    expect(xsRight).toHaveLength(1);
+    expect(xsRight[0]).toBeGreaterThan(PAGE_W / 2);
+
+    const onlyLeft = await renderProposalDocPdf({ ...decoracaoDoc(), coverImages: [photo, ""] });
+    const xsLeft = coverPhotoXs(pageContent(await PDFDocument.load(onlyLeft), 0));
+    expect(xsLeft).toHaveLength(1);
+    expect(xsLeft[0]).toBeLessThan(PAGE_W / 2);
+
+    // Com as duas preenchidas, uma de cada lado.
+    const both = await renderProposalDocPdf({ ...decoracaoDoc(), coverImages: [photo, photo] });
+    const xsBoth = coverPhotoXs(pageContent(await PDFDocument.load(both), 0));
+    expect(xsBoth).toHaveLength(2);
+    expect(xsBoth[0]).toBeLessThan(PAGE_W / 2);
+    expect(xsBoth[1]).toBeGreaterThan(PAGE_W / 2);
   });
 
   it("does NOT throw on client text Helvetica can't encode (emoji/CJK)", async () => {

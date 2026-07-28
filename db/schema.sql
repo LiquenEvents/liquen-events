@@ -217,6 +217,26 @@ create table if not exists public.proposal_themes (
 
 create index if not exists proposal_themes_name_idx on public.proposal_themes (name);
 
+-- Um tema por nome — a garantia fica na própria base de dados. As rotas
+-- POST /api/temas e PATCH /api/temas/[id] já recusam um nome repetido, mas
+-- entre essa leitura e a escrita cabe outra criação: só este índice impede
+-- que duas fiquem lá as duas. Quem perde apanha um 23505, que as rotas
+-- traduzem para o mesmo 409 de nome duplicado.
+--
+-- Compara lower(btrim(name)) — maiúsculas e espaços à volta não fazem um tema
+-- novo. Os ACENTOS não entram aqui (precisaria da extensão `unaccent`, que
+-- nem todas as instalações têm): a verificação da aplicação é mais estrita e
+-- é ela que impede "Itália" ao lado de "Italia".
+--
+-- ATENÇÃO: numa base já em uso, este índice NÃO se aplica se já existirem
+-- duplicados — a criação falha e o resto do ficheiro não corre. Encontre-os e
+-- renomeie/apague primeiro:
+--   select lower(btrim(name)) as nome, count(*), array_agg(id)
+--     from public.proposal_themes
+--    group by 1 having count(*) > 1;
+create unique index if not exists proposal_themes_name_uk
+  on public.proposal_themes (lower(btrim(name)));
+
 -- ── Contratos / aceitação de Termos & Condições ─────────────────
 -- Registo, por proposta, da aceitação das condições pelo cliente ao confirmar
 -- a proposta no link público: quem aceitou, quando, de que IP, a versão dos

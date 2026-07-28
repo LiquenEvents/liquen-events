@@ -4,7 +4,9 @@ import {
   DEFAULT_VAT_RATE,
   DEFAULT_CONDICOES_GERAIS,
   DEFAULT_NOTAS_IMPORTANTES,
+  COVER_SLOTS,
   detectVatMode,
+  normaliseCoverImages,
   parseMoneyText,
   resolveProposalMoney,
   resolveValidUntil,
@@ -241,7 +243,8 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(doc.cronograma).toEqual([]);
     expect(doc.budgetItems).toEqual([]);
     expect(doc.budgetRows).toEqual([]);
-    expect(doc.coverImages).toEqual([]);
+    // A capa sai sempre com as duas POSIÇÕES, vazias mas presentes.
+    expect(doc.coverImages).toEqual(["", ""]);
   });
 
   it("substitutes {DATA} and {CONVIDADOS} in the general conditions", () => {
@@ -281,5 +284,44 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(DEFAULT_CONDICOES_GERAIS).toEqual(snapshot);
     // The template still carries the raw tokens for the next caller.
     expect(DEFAULT_CONDICOES_GERAIS.some((s) => s.includes("{DATA}"))).toBe(true);
+  });
+
+  it("BUG-GUARD: normalises the cover to two POSITIONS so a right-slot photo stays right", () => {
+    // Draft antigo com um buraco à esquerda: a foto tem de continuar na posição 1.
+    const doc = withProposalDefaults(
+      base({ coverImages: [null, "storage/direita.jpg"] as unknown as string[] }),
+    );
+    expect(doc.coverImages).toEqual(["", "storage/direita.jpg"]);
+  });
+});
+
+describe("proposal-doc — normaliseCoverImages", () => {
+  it("always emits exactly COVER_SLOTS positions", () => {
+    expect(COVER_SLOTS).toBe(2);
+    expect(normaliseCoverImages()).toEqual(["", ""]);
+    expect(normaliseCoverImages(null)).toEqual(["", ""]);
+    expect(normaliseCoverImages([])).toEqual(["", ""]);
+    expect(normaliseCoverImages(["a", "b"])).toEqual(["a", "b"]);
+  });
+
+  it("keeps legacy sparse / short drafts on the side they were chosen for", () => {
+    // `[null, "b"]` e `[undefined, "b"]` — o que ficava no localStorage depois
+    // de escolher só a capa da direita, ou de remover a da esquerda.
+    expect(normaliseCoverImages([null, "b"])).toEqual(["", "b"]);
+    expect(normaliseCoverImages([undefined, "b"])).toEqual(["", "b"]);
+    // Curto: só a esquerda estava preenchida.
+    expect(normaliseCoverImages(["a"])).toEqual(["a", ""]);
+  });
+
+  it("ignores anything past the two slots and never returns a hole", () => {
+    expect(normaliseCoverImages(["a", "b", "c"])).toEqual(["a", "b"]);
+    expect(normaliseCoverImages(["a", "b"]).every((s) => typeof s === "string")).toBe(true);
+  });
+
+  it("returns a fresh array (callers write into it)", () => {
+    const input = ["a", "b"];
+    const out = normaliseCoverImages(input);
+    out[0] = "z";
+    expect(input[0]).toBe("a");
   });
 });

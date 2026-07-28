@@ -120,6 +120,9 @@ export interface ProposalDoc {
   validUntilDays?: number;
 
   // ── Cover (two flanking photos around the dark logo panel) ──
+  /** SEMPRE {@link COVER_SLOTS} posições: `[esquerda, direita]`, com `""` numa
+   *  posição vazia. É a POSIÇÃO que decide o lado onde a foto é impressa, por
+   *  isso o array nunca se compacta — ver {@link normaliseCoverImages}. */
   coverImages: ImageData[];
 
   // ── Fixed boilerplate (defaults below; overridable per event) ──
@@ -186,6 +189,30 @@ export const DEFAULT_CANCELAMENTO: string[] = [
   "Se o cancelamento do evento ocorrer após as 14h do oitavo dia útil antes da data do evento, a Líquen Events terá direito a receber o montante total estipulado para o evento, acrescido de IVA, sendo a denúncia, em qualquer um dos casos, apenas válida se for efetuada por escrito, por email, valendo para tal a data e hora de receção do mesmo.",
   "Para qualquer eventual conflito recorrer-se-á ao Centro de Arbitragem de Conflitos de Consumo de Lisboa.",
 ];
+
+/** A capa tem duas fotos, uma de cada lado do painel escuro: `coverImages[0]`
+ *  imprime à ESQUERDA e `coverImages[1]` à DIREITA. */
+export const COVER_SLOTS = 2;
+
+/**
+ * Devolve as imagens de capa com exatamente {@link COVER_SLOTS} posições, `""`
+ * onde não há foto.
+ *
+ * O lado onde uma foto sai impressa é dado pela sua POSIÇÃO no array, por isso
+ * um buraco não pode encolher o array: um rascunho antigo guardado como
+ * `[null, "foto"]` (ou `["foto"]` depois de se remover a capa da esquerda)
+ * colapsava para `["foto"]` e a foto escolhida para a DIREITA saía à esquerda.
+ * Aceita as duas formas — a antiga (esparsa/curta) e a nova de 2 posições — e
+ * emite sempre a normalizada; o `""` só é descartado na geração do PDF.
+ */
+export function normaliseCoverImages(
+  images?: readonly (ImageData | null | undefined)[] | null,
+): ImageData[] {
+  return Array.from({ length: COVER_SLOTS }, (_, i) => {
+    const v = images?.[i];
+    return typeof v === "string" ? v : "";
+  });
+}
 
 /** Extrai o primeiro número monetário de texto livre pt-PT
  *  ("3.000,00 € + IVA" → 3000; "14.700,00 €" → 14700). Só isto — a
@@ -319,7 +346,9 @@ export function withProposalDefaults(
     cronograma: doc.cronograma ?? [],
     budgetItems: doc.budgetItems ?? [],
     budgetRows: doc.budgetRows ?? [],
-    coverImages: doc.coverImages ?? [],
+    // A capa sai sempre com as 2 posições preenchidas ("" = vazia), venha o
+    // rascunho na forma antiga (esparsa/curta) ou já na nova.
+    coverImages: normaliseCoverImages(doc.coverImages),
     notasImportantes: doc.notasImportantes ?? DEFAULT_NOTAS_IMPORTANTES,
     incluido: doc.incluido ?? DEFAULT_INCLUIDO,
     naoIncluido: doc.naoIncluido ?? DEFAULT_NAO_INCLUIDO,

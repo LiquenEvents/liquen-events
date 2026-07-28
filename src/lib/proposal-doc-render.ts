@@ -4,14 +4,19 @@ import { renderProposalDocPdf } from "@/lib/proposal-doc-pdf";
 import { fetchProposalImageBytes } from "@/lib/proposal-storage";
 
 /** Replace every image reference (cover + mood boards) with inline base64 so the
- *  storage-agnostic generator can embed them. Missing images are dropped. */
+ *  storage-agnostic generator can embed them. A missing mood-board image is
+ *  dropped (the collage has no fixed slots); a missing COVER image keeps its
+ *  position, because the two cover slots are left and right. */
 async function resolveImages(doc: ProposalDoc): Promise<ProposalDoc> {
   const toB64 = async (ref: string): Promise<string | null> => {
     const bytes = await fetchProposalImageBytes(ref);
     return bytes ? bytes.toString("base64") : null;
   };
-  const cover = (await Promise.all((doc.coverImages ?? []).map(toB64))).filter(
-    (s): s is string => !!s,
+  // A capa tem 2 POSIÇÕES fixas. Uma referência vazia — ou que não resolve —
+  // fica "" NA SUA POSIÇÃO em vez de desaparecer: compactar a lista fazia a
+  // foto escolhida para a DIREITA sair impressa à esquerda.
+  const cover = await Promise.all(
+    (doc.coverImages ?? []).map(async (ref) => (ref ? ((await toB64(ref)) ?? "") : "")),
   );
   const moodBoards = await Promise.all(
     (doc.moodBoards ?? []).map(async (mb) => ({

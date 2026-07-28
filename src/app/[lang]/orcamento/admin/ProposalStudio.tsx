@@ -7,6 +7,7 @@ import {
   resolveProposalMoney,
   detectVatMode,
   parseMoneyText,
+  normaliseCoverImages,
   DEFAULT_VALID_DAYS,
   type VatMode,
 } from "@/lib/proposal-doc";
@@ -98,7 +99,8 @@ function initialDoc(quote: Quote): StudioDoc {
     budgetRows: [],
     totalEstimatedText: "",
     budgetNote: "",
-    coverImages: [],
+    // Duas posições fixas: [capa esquerda, capa direita].
+    coverImages: normaliseCoverImages(),
   };
   base.ref = buildRef(base);
   return base;
@@ -147,7 +149,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
-          setDoc((d) => ({ ...d, ...parsed }));
+          // Rascunhos antigos guardaram a capa esparsa (`[null, "foto"]`) ou
+          // curta (`["foto"]`) — normalizar já aqui garante que a foto da
+          // direita continua na posição da direita.
+          setDoc((d) => {
+            const merged = { ...d, ...parsed };
+            return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
+          });
           if (typeof parsed.totalAmount === "number") setTotalInput(String(parsed.totalAmount));
         }
       }
@@ -460,15 +468,19 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   // ── Cover images (two slots) ──
+  // A capa tem duas POSIÇÕES fixas: [0] imprime à esquerda, [1] à direita. Por
+  // isso escreve-se sempre na posição e nunca se encolhe o array — compactá-lo
+  // fazia a foto da direita saltar para a esquerda no PDF.
   function setCoverAt(idx: number, path: string) {
     setDoc((d) => {
-      const cover = [...(d.coverImages ?? [])];
+      const cover = normaliseCoverImages(d.coverImages);
       cover[idx] = path;
       return { ...d, coverImages: cover };
     });
   }
+  /** Esvazia a posição (`""`), mantendo a outra capa do lado onde está. */
   function removeCoverAt(idx: number) {
-    setDoc((d) => ({ ...d, coverImages: (d.coverImages ?? []).filter((_, i) => i !== idx) }));
+    setCoverAt(idx, "");
   }
 
   // ── Cronograma (organizacao) ──
@@ -725,7 +737,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                 ) : (
                   <>
                     <UploadArea
-                      label={`Capa ${idx + 1}`}
+                      // O lado é fixo: a posição 0 imprime à esquerda do painel
+                      // do logótipo, a 1 à direita.
+                      label={idx === 0 ? "Capa esquerda" : "Capa direita"}
                       busy={!!uploading[`cover-${idx}`]}
                       multiple={false}
                       onFiles={(files) =>
