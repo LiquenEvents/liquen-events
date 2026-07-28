@@ -308,3 +308,27 @@ describe("a tabela ainda não existe na base de dados", () => {
     expect((await GET(req("GET"))).status).toBe(503);
   });
 });
+
+// ── Publicado sem base de dados nenhuma ────────────────────────────────────
+// Em produção a aplicação RECUSA escrever num ficheiro efémero (perder-se-ia
+// no deploy seguinte, depois de dizer à equipa que tinha guardado). Isso é uma
+// instalação incompleta, não uma avaria — e tem de o dizer.
+describe("a base de dados não está ligada", () => {
+  const refused = new Error("Persistence unavailable: Supabase not configured in production");
+
+  it("o POST explica que faltam as chaves, em vez de 'Erro interno'", async () => {
+    st.authed = true;
+    st.create.mockRejectedValueOnce(refused);
+    const res = await POST(req("POST", { name: "Terracotta" }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/base de dados não está ligada/i);
+  });
+
+  it("o GET diz o mesmo", async () => {
+    st.authed = true;
+    st.throwOnList = refused;
+    const res = await GET(req("GET"));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/Supabase/);
+  });
+});

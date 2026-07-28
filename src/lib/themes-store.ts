@@ -29,6 +29,7 @@ export const mapper: Mapper<ProposalTheme> = {
     name: t.name,
     notes: t.notes || null,
     ...("coverPath" in t ? { cover_path: t.coverPath || null } : {}),
+    ...("photoOrder" in t ? { photo_order: t.photoOrder?.length ? t.photoOrder : null } : {}),
     created_at: t.createdAt || new Date().toISOString(),
     updated_at: t.updatedAt || new Date().toISOString(),
   }),
@@ -39,6 +40,15 @@ export const mapper: Mapper<ProposalTheme> = {
     name: String(r.name ?? ""),
     notes: (r.notes as string) ?? undefined,
     ...(typeof r.cover_path === "string" && r.cover_path ? { coverPath: r.cover_path } : {}),
+    // A coluna é jsonb; uma base sem ela (ou com null) lê-se como "sem ordem
+    // manual", que é exatamente o comportamento de antes desta funcionalidade.
+    ...(Array.isArray(r.photo_order) && r.photo_order.length
+      ? {
+          photoOrder: (r.photo_order as unknown[]).filter(
+            (p): p is string => typeof p === "string",
+          ),
+        }
+      : {}),
     createdAt: String(r.created_at ?? new Date().toISOString()),
     updatedAt: String(r.updated_at ?? r.created_at ?? new Date().toISOString()),
   }),

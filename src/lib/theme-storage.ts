@@ -392,6 +392,30 @@ export function signThemeThumbs(paths: string[]): Promise<Map<string, string>> {
 }
 
 /**
+ * Os caminhos de uma página, já com a ordem manual à frente (puro — testado).
+ *
+ * A pasta do Storage devolve sempre as mais recentes primeiro. Quando o tema
+ * tem fotos arrumadas à mão, essas passam a valer como um PREFIXO da lista, e
+ * o resto continua atrás pela ordem de sempre. É isto que permite arrastar
+ * meia dúzia de fotos boas para a frente sem guardar uma cópia do catálogo.
+ *
+ * Devolve também `storageSkip`: quantas fotos NÃO arrumadas é preciso saltar
+ * na pasta para chegar ao ponto certo — é o que mantém a paginação barata,
+ * porque só se lê a pasta a partir daí.
+ */
+export function planOrderedPage(
+  order: readonly string[],
+  limit: number,
+  offset: number,
+): { fromOrder: string[]; storageSkip: number; needFromStorage: number } {
+  const fromOrder = order.slice(offset, offset + limit);
+  // Depois de esgotado o prefixo arrumado, a pasta continua de onde ficou —
+  // descontando as fotos arrumadas, que já foram mostradas lá à frente.
+  const storageSkip = Math.max(0, offset - order.length);
+  return { fromOrder, storageSkip, needFromStorage: limit - fromOrder.length };
+}
+
+/**
  * Uma PÁGINA das fotos de um tema, mais recentes primeiro, com URL assinado do
  * original e — quando existe — da miniatura.
  *
@@ -408,16 +432,40 @@ export async function listThemeImagePage(
   themeId: string,
   limit = THEME_PAGE_SIZE,
   offset = 0,
+  order: readonly string[] = [],
 ): Promise<ThemeImagePage> {
   const size = Math.min(Math.max(1, Math.trunc(limit) || THEME_PAGE_SIZE), MAX_THEME_PAGE_SIZE);
   const from = Math.max(0, Math.trunc(offset) || 0);
-
-  const listed = await listThemeFiles(themeId, size, from);
-  // Pasta ilegível: NÃO é "tema sem fotos". Quem chama tem de o dizer assim.
-  if (!listed.ok) return { ok: false, images: [], total: 0, truncated: false };
-
   const folder = themeFolder(themeId);
-  const paths = listed.names.map((n) => `${folder}/${n}`);
+
+  // Sem ordem manual, o caminho é o de sempre: uma leitura da pasta, uma
+  // página. Com ordem manual, as arrumadas vêm à frente e a pasta continua
+  // atrás — saltando as que já foram mostradas no prefixo.
+  const arranged = order.filter((p) => themeIdOfPath(p) === folder);
+  const plan = planOrderedPage(arranged, size, from);
+  const arrangedSet = new Set(arranged);
+
+  let paths: string[] = [...plan.fromOrder];
+  let listed: ThemeFileList = { names: [], ok: true, truncated: false };
+  if (plan.needFromStorage > 0) {
+    listed = await listThemeFiles(
+      themeId,
+      plan.needFromStorage + arrangedSet.size,
+      plan.storageSkip,
+    );
+    // Pasta ilegível: NÃO é "tema sem fotos". Quem chama tem de o dizer assim.
+    if (!listed.ok) return { ok: false, images: [], total: 0, truncated: false };
+    for (const name of listed.names) {
+      if (paths.length >= size) break;
+      const path = `${folder}/${name}`;
+      // As arrumadas já saíram no prefixo — mostrá-las outra vez aqui era
+      // repeti-las a meio da grelha.
+      if (arrangedSet.has(path)) continue;
+      paths.push(path);
+    }
+  } else {
+    paths = paths.slice(0, size);
+  }
   const [urls, thumbs] = await Promise.all([
     signThemePaths(paths),
     paths.length > 0 ? signThemeThumbs(paths) : Promise.resolve(new Map<string, string>()),
@@ -432,7 +480,11 @@ export async function listThemeImagePage(
   // Primeira página que não veio cheia: a pasta acabou aqui, o total já é este
   // e não se gasta nem mais uma ida ao Storage (o caso normal de um tema
   // pequeno). Caso contrário conta-se a sério.
-  if (from === 0 && !listed.truncated) {
+  //
+  // Com ordem manual esta conta deixa de fechar — a página mistura o prefixo
+  // arrumado com a pasta —, por isso aí conta-se sempre. É o preço, uma
+  // chamada, de um tema que alguém arrumou à mão.
+  if (arranged.length === 0 && from === 0 && !listed.truncated) {
     return { ok: true, images, total: listed.names.length, truncated: false };
   }
   const counted = await countThemeFiles(themeId);
@@ -440,7 +492,7 @@ export async function listThemeImagePage(
   // já ter sido lida. Nos dois casos o que sabemos ao certo é que existem pelo
   // menos as que já vimos: devolve-se isso, marcado como mínimo, em vez de um
   // total mais pequeno do que a própria página.
-  const floor = from + listed.names.length;
+  const floor = from + paths.length;
   return {
     ok: true,
     images,

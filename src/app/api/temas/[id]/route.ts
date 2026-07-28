@@ -3,7 +3,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import { getTheme, updateTheme, deleteTheme, listThemes } from "@/lib/themes-store";
 import { deleteThemeFolder, isThemePath, themeIdOfPath, themeFolder } from "@/lib/theme-storage";
 import { isUniqueViolation } from "@/lib/invoices-store";
-import { isMissingTable } from "@/lib/repository";
+import { isMissingTable, isPersistenceUnavailable } from "@/lib/repository";
 import {
   MAX_THEME_NAME,
   MAX_THEME_NOTES,
@@ -22,6 +22,12 @@ export const dynamic = "force-dynamic";
 const NAO_INSTALADO =
   "A Biblioteca de Temas ainda não está criada na base de dados. No Supabase → SQL Editor, " +
   "cole e corra o ficheiro db/schema.sql (pode repetir-se sem risco) e tente de novo.";
+
+/** A base de dados não está sequer ligada — outra instalação incompleta, com
+ *  outra resolução (as chaves do Supabase), por isso outra frase. */
+const SEM_BASE_DE_DADOS =
+  "A base de dados não está ligada nesta instalação, por isso os temas não podem ser guardados. " +
+  "Faltam as chaves do Supabase (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).";
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -83,6 +89,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (isMissingTable(err)) {
       return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });
     }
+    if (isPersistenceUnavailable(err)) {
+      return NextResponse.json({ error: SEM_BASE_DE_DADOS }, { status: 503 });
+    }
     log.error("temas PATCH falhou", err, { id });
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
@@ -121,6 +130,9 @@ export async function DELETE(
   } catch (err) {
     if (isMissingTable(err)) {
       return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });
+    }
+    if (isPersistenceUnavailable(err)) {
+      return NextResponse.json({ error: SEM_BASE_DE_DADOS }, { status: 503 });
     }
     log.error("temas DELETE falhou", err, { id });
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

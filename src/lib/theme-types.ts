@@ -23,6 +23,19 @@ export interface ProposalTheme {
   /** Foto ESCOLHIDA para o cartão do tema (caminho no bucket, `<tema>/<f>.jpg`).
    *  Ausente = o cartão usa a foto mais recente da pasta, como antes. */
   coverPath?: string;
+  /**
+   * As fotos que a equipa ARRUMOU à mão, pela ordem que escolheu — e só essas.
+   *
+   * A pasta continua a ser a única fonte de verdade do que EXISTE; isto é
+   * apenas a ordem preferida de um prefixo dela. Tudo o que não está aqui vem
+   * a seguir, das mais recentes para as mais antigas, como sempre veio. Guardar
+   * só o que foi arrumado é o que faz isto caber numa linha: arrastar seis
+   * fotos boas para a frente custa seis caminhos, não uma cópia do catálogo.
+   *
+   * Um caminho que já não exista na pasta é simplesmente ignorado ao listar —
+   * apagar uma foto nunca deixa a ordem inválida.
+   */
+  photoOrder?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -75,6 +88,15 @@ export interface ThemeSummary extends ProposalTheme {
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */
 export const MAX_THEME_NAME = 60;
 export const MAX_THEME_NOTES = 300;
+
+/**
+ * Quantas fotos podem ficar com ordem manual num tema.
+ *
+ * Não é um limite de fotos por tema (esse não existe): é o tamanho do prefixo
+ * arrumado à mão. Arrumar as primeiras centenas cobre o uso real — pôr as
+ * melhores à frente — e mantém a linha do tema pequena e a listagem barata.
+ */
+export const MAX_PHOTO_ORDER = 500;
 
 /**
  * Compara nomes de temas como a equipa os lê: sem acentos, sem maiúsculas e

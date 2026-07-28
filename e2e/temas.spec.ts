@@ -161,11 +161,18 @@ test.describe("Biblioteca de Temas", () => {
       // with instructions instead of creating anything, and the screen says so.
       // That's an environment gap, not a regression — skip, don't fail.
       const addPhotos = page.getByRole("button", { name: /Adicionar fotos/i });
-      const notInstalled = page.getByText(/ainda não está criada na base de dados/i);
+      // Duas instalações incompletas, ambas legítimas e ambas explicadas no
+      // ecrã: a tabela por criar (falta correr o db/schema.sql) e a base de
+      // dados nem sequer ligada (faltam as chaves do Supabase — é o caso do
+      // CI, onde a aplicação RECUSA escrever em vez de guardar num ficheiro
+      // efémero). Nenhuma é uma regressão: salta-se, não se falha.
+      const notInstalled = page.getByText(
+        /ainda não está criada na base de dados|base de dados não está ligada/i,
+      );
       await expect(addPhotos.or(notInstalled).first()).toBeVisible();
       test.skip(
         (await notInstalled.count()) > 0,
-        "Biblioteca de Temas não instalada nesta base de dados (falta correr o db/schema.sql).",
+        "Biblioteca de Temas indisponível nesta instalação (falta o db/schema.sql ou as chaves do Supabase).",
       );
       await expect(addPhotos).toBeVisible();
       await expect(page.getByRole("button", { name: literal(themeName) })).toBeVisible();

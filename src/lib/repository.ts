@@ -109,6 +109,24 @@ export function isMissingTable(err: unknown): boolean {
   );
 }
 
+/**
+ * A escrita foi RECUSADA por não haver base de dados ligada em produção (ver
+ * `assertWritableInProd`): gravar num ficheiro efémero seria perder os dados no
+ * deploy seguinte e dizer à equipa que ficaram guardados.
+ *
+ * Tal como a tabela em falta, isto não é uma avaria — é uma instalação
+ * incompleta, e quem está do outro lado merece ouvir isso em vez de "Erro
+ * interno".
+ */
+export function isPersistenceUnavailable(err: unknown): boolean {
+  return (
+    !!err &&
+    typeof err === "object" &&
+    typeof (err as { message?: unknown }).message === "string" &&
+    (err as { message: string }).message.startsWith("Persistence unavailable")
+  );
+}
+
 // ── Supabase backend ──────────────────────────────────────────────────────
 export class SupabaseBackend<T> implements Backend<T> {
   constructor(

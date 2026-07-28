@@ -227,6 +227,13 @@ create index if not exists proposal_themes_name_idx on public.proposal_themes (n
 -- responde 503 a pedir este passo.
 alter table public.proposal_themes add column if not exists cover_path text;
 
+-- Ordem manual das fotos de um tema: só os caminhos que a equipa ARRUMOU à
+-- mão, pela ordem escolhida. A pasta do Storage continua a ser a única fonte
+-- de verdade do que existe — isto é a ordem preferida de um prefixo dela, e
+-- tudo o que não estiver aqui continua a vir das mais recentes para as mais
+-- antigas. Sem a coluna, o tema simplesmente não tem ordem manual.
+alter table public.proposal_themes add column if not exists photo_order jsonb;
+
 -- Um tema por nome — a garantia fica na própria base de dados. As rotas
 -- POST /api/temas e PATCH /api/temas/[id] já recusam um nome repetido, mas
 -- entre essa leitura e a escrita cabe outra criação: só este índice impede
