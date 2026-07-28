@@ -17,6 +17,8 @@ vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(async () => ({ sent: true })),
   esc: (v: unknown) => String(v ?? ""),
+  // The confirmation send points replyTo at the monitored inbox.
+  MAIL_TO: "equipa@liquen-events.test",
 }));
 vi.mock("@/lib/push", () => ({ sendPushToAll: vi.fn(async () => ({ sent: 0 })) }));
 vi.mock("@/lib/rate-limit", () => ({

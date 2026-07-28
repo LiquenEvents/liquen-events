@@ -58,6 +58,8 @@ interface SendArgs {
   replyTo?: string;
   to?: string; // overrides the default MAIL_TO (e.g. send to the client)
   attachments?: Attachment[];
+  /** Extra RFC-5322 headers (e.g. Auto-Submitted on an auto-reply). */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -71,6 +73,7 @@ export async function sendMail({
   replyTo,
   to,
   attachments,
+  headers,
 }: SendArgs): Promise<{ sent: boolean }> {
   const transport = getTransport();
   if (!transport) {
@@ -99,6 +102,7 @@ export async function sendMail({
     text,
     replyTo,
     attachments: attach,
+    headers,
   });
   return { sent: true };
 }

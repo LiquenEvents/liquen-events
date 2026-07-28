@@ -7,7 +7,7 @@ import {
   BUDGET_RANGES,
   URGENCY_OPTIONS,
 } from "@/lib/orcamento/data";
-import { sendMail, esc } from "@/lib/mail";
+import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
@@ -434,7 +434,29 @@ export async function POST(request: NextRequest) {
     // Confirmation to the client, in the language they were browsing in (best-effort).
     try {
       const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
-      const confirmation = buildClientConfirmation({ locale, name: form.name, referenceId: id });
+      // Feed the builder what the client actually told us, so the email mirrors
+      // their event back in prose instead of being a generic acknowledgement.
+      // Only the free-text `location` is passed — never the internal pricing
+      // bucket (LOCATION_LABELS), which would read as "your venue is a rural
+      // area". Weddings/christenings are organised by a couple → plural register.
+      const confirmation = buildClientConfirmation({
+        locale,
+        name: form.name,
+        referenceId: id,
+        event: {
+          typeLabel:
+            (form.category && form.eventType
+              ? EVENT_TYPES_BY_CATEGORY[form.category]?.find((e) => e.id === form.eventType)?.label
+              : undefined) ||
+            form.eventName ||
+            (form.category ? CATEGORIES.find((c) => c.id === form.category)?.label : undefined) ||
+            undefined,
+          date: form.date,
+          guests: form.guests || undefined,
+          location: form.location?.trim() || undefined,
+          plural: form.eventType === "casamentos" || form.eventType === "batizados",
+        },
+      });
       // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
       // without a ceiling the endpoint could be abused to bombard a victim's
       // inbox from Líquen's sender reputation (a mail-bomb amplifier). 5/day per
@@ -442,7 +464,27 @@ export async function POST(request: NextRequest) {
       // confirmation — the lead is already persisted and the team notified.
       const emailKey = `confirm:${form.email.trim().toLowerCase()}`;
       if ((await rateLimit(emailKey, 5, 24 * 60 * 60_000)).ok) {
-        await sendMail({ to: form.email, ...confirmation });
+        const sentRes = await sendMail({
+          to: form.email,
+          // The body invites a reply ("basta responder a este email"), so point
+          // replies explicitly at the monitored inbox. Without this they only
+          // land correctly by coincidence — because MAIL_FROM happens to equal
+          // MAIL_TO today — and a hot lead's reply would vanish the moment a
+          // separate sending identity is configured.
+          replyTo: MAIL_TO,
+          headers: {
+            "Auto-Submitted": "auto-generated", // RFC 3834 — don't auto-reply to us
+            "X-Auto-Response-Suppress": "OOF, AutoReply", // Exchange/Outlook
+          },
+          ...confirmation,
+        });
+        // sendMail resolves {sent:false} (no throw) when SMTP is unconfigured,
+        // so without this the client silently gets nothing and nobody knows.
+        if (!sentRes.sent) {
+          log.error("orcamento: confirmação ao cliente NÃO enviada — verificar SMTP", undefined, {
+            id,
+          });
+        }
       } else {
         log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
       }
