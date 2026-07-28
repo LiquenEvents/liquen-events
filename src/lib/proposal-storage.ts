@@ -111,6 +111,25 @@ export async function listProposalImages(quoteId: string): Promise<UploadedImage
   }
 }
 
+// Hard cap on a single fetched image, so a hostile/huge URL can't buffer an
+// unbounded response into memory during a PDF render.
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
+// The only legitimate source of a REMOTE image URL in a proposal doc is a
+// Supabase Storage signed URL, so remote fetches are restricted to that host.
+// This is an anti-SSRF allow-list: without it, a URL stored in a doc (authored
+// in the back office) could point the server at an internal/metadata address
+// (e.g. 169.254.169.254) or another intranet service.
+function allowedRemoteHost(): string | null {
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve an image reference to raw bytes for embedding in the PDF. Accepts a
  * bucket storage path, a full http(s) URL, or a base64 (optionally data:-URI)
@@ -127,12 +146,31 @@ export async function fetchProposalImageBytes(ref: string): Promise<Buffer | nul
       return null;
     }
   }
-  // Absolute URL (e.g. a signed URL).
+  // Absolute URL (e.g. a Supabase signed URL). SSRF guard: only https, only the
+  // configured Supabase Storage host, no following redirects, a request timeout,
+  // and a hard size cap.
   if (/^https?:\/\//i.test(ref)) {
+    let parsed: URL;
     try {
-      const res = await fetch(ref);
+      parsed = new URL(ref);
+    } catch {
+      return null;
+    }
+    const allowedHost = allowedRemoteHost();
+    if (parsed.protocol !== "https:" || !allowedHost || parsed.host !== allowedHost) {
+      log.error("proposal-storage: remote image host não permitido (SSRF guard)", null, {
+        host: parsed.host,
+      });
+      return null;
+    }
+    try {
+      const res = await fetch(ref, { redirect: "error", signal: AbortSignal.timeout(8000) });
       if (!res.ok) return null;
-      return Buffer.from(await res.arrayBuffer());
+      const declared = Number(res.headers.get("content-length") ?? "0");
+      if (declared && declared > MAX_IMAGE_BYTES) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.byteLength > MAX_IMAGE_BYTES) return null;
+      return buf;
     } catch {
       return null;
     }

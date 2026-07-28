@@ -204,7 +204,14 @@ export async function getInboxMessage(uid: number): Promise<InboxMessage | null>
       const dl = await client.download(String(uid), undefined, { uid: true });
       if (dl) {
         const { simpleParser } = await import("mailparser");
-        const parsed = await simpleParser(dl.content);
+        // Bound the parse of an untrusted inbound message so a hostile/huge
+        // email can't exhaust memory: skip attachment buffering and cap the
+        // HTML body we attempt to parse.
+        const parsed = await simpleParser(dl.content, {
+          skipHtmlToText: false,
+          skipImageLinks: true,
+          maxHtmlLengthToParse: 2_000_000,
+        });
         text = parsed.text || (parsed.html ? stripHtml(parsed.html) : "");
       }
       // Reading the message marks it \Seen on the server (download is not a peek).

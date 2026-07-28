@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, memo } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
+
+// Memoised so editing the revenue goal or the team notes (local Overview state)
+// doesn't re-render these two heavier panels every keystroke — their props
+// (quotes, onOpen) don't change during that typing, so memo lets them bail out.
+const MemoReminders = memo(Reminders);
+const MemoAgenda = memo(Agenda);
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Novo", color: "#8a8a82" },
@@ -238,14 +244,23 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     }
   }, []);
 
+  // Keep the textarea instant (setTeamNotes now), but DEBOUNCE the localStorage
+  // write: a synchronous setItem on every keystroke serialises + commits to
+  // storage on the main thread per character, which hitches typing under storage
+  // pressure. Persist ~500ms after the last keystroke instead.
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function persistNotes(v: string) {
     setTeamNotes(v);
-    try {
-      localStorage.setItem("liquen-team-notes", v);
-    } catch {
-      /* ignore */
-    }
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem("liquen-team-notes", v);
+      } catch {
+        /* ignore */
+      }
+    }, 500);
   }
+  useEffect(() => () => void (notesTimer.current && clearTimeout(notesTimer.current)), []);
 
   useEffect(() => {
     try {
@@ -281,7 +296,8 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       bits.push(
         `${data.needAction.length} pedido${data.needAction.length !== 1 ? "s" : ""} a precisar de atenção`,
       );
-    if (bits.length === 0) return "Tudo em dia. Nada urgente por agora.";
+    // Minimalista: só fala quando há algo a pedir ação — sem frases de enchimento.
+    if (bits.length === 0) return "";
     return `Tem ${bits.join(" e ")}.`;
   })();
 
@@ -410,7 +426,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
           >
             {greeting}, {userName}.
           </h2>
-          <p className="text-foreground/40 text-sm mt-2">{headline}</p>
+          {headline && <p className="text-foreground/40 text-sm mt-2">{headline}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {quickActions.map((a, i) => (
@@ -552,39 +568,19 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             key={k.l}
             onClick={k.go}
             aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
-            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-all duration-200 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 ${FOCUS_RING} ${
-              k.dark
-                ? "bg-[#1b2119] border-[#2d3829] hover:border-[#3d4a37]"
-                : "bg-white border-foreground/[0.08] shadow-sm hover:shadow-md hover:border-foreground/15"
-            }`}
+            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-colors duration-200 motion-reduce:transition-none bg-[var(--bo-surface)] border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
-            {k.dark && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage:
-                    "radial-gradient(circle at 85% 15%, rgba(99,122,95,0.25) 0%, transparent 60%)",
-                }}
-              />
-            )}
             <div className="flex items-start justify-between gap-2 relative">
               <p
-                className={`font-bold leading-none mb-2 ${k.dark ? "text-[#8aad85]" : "text-foreground/82"}`}
+                className="font-bold leading-none mb-2 text-[var(--bo-text)]"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.4vw, 30px)" }}
               >
                 {k.v}
               </p>
               {k.delta && <Delta now={k.delta.now} prev={k.delta.prev} />}
             </div>
-            <p
-              className={`text-[9px] tracking-[0.25em] uppercase relative font-medium ${k.dark ? "text-white/45" : "text-foreground/45"}`}
-            >
+            <p className="text-[9px] tracking-[0.25em] uppercase relative font-medium text-[var(--bo-text-faint)]">
               {k.l}
-            </p>
-            <p
-              className={`text-[10px] mt-1 relative leading-tight ${k.dark ? "text-white/25" : "text-foreground/28"}`}
-            >
-              {k.hint}
             </p>
           </button>
         ))}
@@ -673,9 +669,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             )}
           </>
         ) : (
-          <p className="text-foreground/40 text-xs py-1">
-            Defina uma meta mensal para acompanhar o progresso de receita.
-          </p>
+          <p className="text-foreground/40 text-xs py-1">Sem meta definida.</p>
         )}
       </div>
 
@@ -725,17 +719,15 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             {teamNotes}
           </p>
         ) : (
-          <p className="text-foreground/40 text-xs">
-            Sem notas. Clique em &ldquo;Adicionar nota&rdquo; para começar.
-          </p>
+          <p className="text-foreground/40 text-xs">Sem notas.</p>
         )}
       </div>
 
       {/* Reminders — derived urgent items */}
-      <Reminders quotes={quotes} onOpen={onOpen} />
+      <MemoReminders quotes={quotes} onOpen={onOpen} />
 
       {/* Agenda — events, calendar entries, tasks & payments due */}
-      <Agenda quotes={quotes} onOpen={onOpen} />
+      <MemoAgenda quotes={quotes} onOpen={onOpen} />
 
       {/* Pipeline funnel + financial pulse */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -875,7 +867,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 </span>
               )}
               {data.needAction.length > 0 && (
-                <span className="text-[10px] tabular-nums bg-[#1b2119] text-white/80 rounded-full px-2 py-0.5">
+                <span className="text-[10px] tabular-nums bg-[#4d6350]/10 text-[#4d6350] rounded-full px-2 py-0.5">
                   {data.needAction.length}
                 </span>
               )}

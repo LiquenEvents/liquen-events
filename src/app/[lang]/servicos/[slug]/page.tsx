@@ -120,7 +120,7 @@ export default async function ServiceDetailPage({
             {...blurFor(svc.hero)}
             alt=""
             fill
-            preload
+            priority
             sizes="100vw"
             quality={75}
             className="object-cover hero-settle"
@@ -245,7 +245,11 @@ export default async function ServiceDetailPage({
       {svc.slug === "casamentos" && (
         <section
           className="relative overflow-hidden border-t border-foreground/8 flex items-end"
-          style={{ minHeight: "clamp(360px, 60vh, 640px)" }}
+          style={{
+            minHeight: "clamp(360px, 60vh, 640px)",
+            contentVisibility: "auto",
+            containIntrinsicSize: "auto clamp(360px, 60vh, 640px)",
+          }}
         >
           <Image
             src="/imagens/viaturas-classicas.jpg"
@@ -306,9 +310,14 @@ export default async function ServiceDetailPage({
         {/* Full-bleed mosaic (no horizontal padding): the photos run edge to
             edge, separated only by a 1px hairline of the surface showing
             through — keeps tile boundaries legible where similar photos meet. */}
+        {/* zoom (transform+opacity, GPU-composited), NOT mask: a clip-path wipe
+            repaints each tile every frame, and here it staggered across 6 freshly
+            decoded full-bleed photos as you scrolled in — the clearest remaining
+            scroll stutter on the service pages. zoom is the same "settle in"
+            reveal the home/service bands already use, with zero repaint. */}
         <Reveal
           as="div"
-          variant="mask"
+          variant="zoom"
           stagger={0.08}
           className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
         >
@@ -349,6 +358,10 @@ export default async function ServiceDetailPage({
             alt=""
             fill
             sizes="100vw"
+            // Match the hero's quality for the SAME source image: a different
+            // quality would resolve to a second /_next/image URL and re-fetch +
+            // re-decode the full-bleed photo. Same value → the already-decoded
+            // hero asset is reused.
             quality={75}
             className="object-cover object-center"
             {...blurFor(svc.hero)}
@@ -454,7 +467,7 @@ export default async function ServiceDetailPage({
           <AnimateIn>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.95] mb-12 max-w-2xl"
-              style={{ fontSize: "clamp(36px, 5.5vw, 76px)" }}
+              style={{ fontSize: "clamp(28px, 4.4vw, 54px)" }}
             >
               {t.servicoDetalhe.ctaTitle}
             </h2>

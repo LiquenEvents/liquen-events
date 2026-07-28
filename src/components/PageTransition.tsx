@@ -2,15 +2,27 @@
 
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useEffect, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { ViewTransition } from "./vt";
 
 /**
- * Route transitions. With React <ViewTransition> available (Next 16 +
- * experimental.viewTransition), navigations animate via the browser's View
- * Transitions API: a soft rise by default, and a DIRECTIONAL slide when the
- * link carries a `nav-forward`/`nav-back` transition type (the Navbar tags its
- * links by menu order, so moving "deeper" in the menu slides left, returning
- * slides right). Without the API, falls back to the original CSS route-fade.
+ * Route transitions.
+ *
+ * We deliberately DON'T use the browser's View Transitions API for route
+ * changes. That API snapshots the whole outgoing AND incoming page into
+ * compositor layers, freezing the document while it captures — and on our
+ * image-heavy heroes (e.g. /sobre's full-bleed 100svh photo) that capture
+ * collides with the new route hydrating and decoding its hero, so the
+ * transition visibly stuttered no matter how cheap the animated property was.
+ *
+ * Instead every navigation runs a single lightweight CSS fade on ONLY the
+ * incoming content (`.route-fade` in globals.css): no whole-page snapshot, no
+ * frozen document, no dual-layer capture — just one composited opacity animation
+ * on the new page. That's the cheapest possible transition and stays 60fps even
+ * while the new route is still settling. (To bring the View Transitions path
+ * back — directional slides, shared-element morphs — flip USE_VIEW_TRANSITIONS
+ * to true; the implementation below and the ::view-transition-* rules in
+ * globals.css are kept intact.)
  *
  * Entrances are applied ONLY on client-side navigations — never on the very
  * first paint. Animating the initial page would hold the LCP hero invisible
@@ -18,6 +30,11 @@ import { ViewTransition } from "./vt";
  * pathname once: the landing render stays static (matches SSR — no hydration
  * mismatch), every subsequent route animates.
  */
+// Master switch for the route-level View Transitions API path. OFF for maximum
+// transition fluidity — see the note above. The Navbar still tags links
+// nav-forward/nav-back and the vt-page* CSS rules remain, so re-enabling is a
+// one-line change.
+const USE_VIEW_TRANSITIONS = false;
 export default function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePublicPathname();
   const [entryPath] = useState(pathname);
@@ -37,12 +54,30 @@ export default function PageTransition({ children }: { children: React.ReactNode
     );
   }, []);
 
+  // Stamp <html data-navigated> on the first client navigation (before paint, so
+  // even that navigation's destination hero is covered). Hero pages run their
+  // Ken-Burns settle on the INITIAL load only; once the user has navigated,
+  // incoming heroes arrive already-settled (see .hero-settle in globals.css), so
+  // the 2.2s scale never competes with the new page's image decode + route fade.
+  useIsomorphicLayoutEffect(() => {
+    if (pathname !== entryPath) {
+      document.documentElement.setAttribute("data-navigated", "");
+    }
+  }, [pathname, entryPath]);
+
   // Admin/orçamento run full-screen; don't animate their heavy surfaces.
   if (pathname.startsWith("/orcamento")) return <>{children}</>;
 
   const isNavigation = pathname !== entryPath;
 
-  if (!ViewTransition || !vtCapable) {
+  if (!USE_VIEW_TRANSITIONS || !ViewTransition || !vtCapable) {
+    // A subtle TRANSFORM-ONLY entrance (see .route-fade in globals.css): the
+    // incoming page eases from a hair over-scaled to rest. It never touches
+    // opacity, so the page is fully opaque the whole time — no white flash (the
+    // flash came from fading in over the light background). Composited transform
+    // → 60fps, and it reads smoother than a hard cut. The key remounts the
+    // subtree so per-page state resets; non-prefetched routes still show the dark
+    // loading.tsx.
     return (
       <div key={pathname} className={isNavigation ? "route-fade" : undefined}>
         {children}

@@ -4,10 +4,13 @@ import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
 
 // pdf-lib + sharp need the Node runtime.
 export const runtime = "nodejs";
+// Cap a single render so a slow/large document can't tie up a worker forever.
+export const maxDuration = 20;
 
 /**
  * Public-by-token proposal PDF for the client portal. Same trust model as the
@@ -23,8 +26,14 @@ export const runtime = "nodejs";
  * acceptance the team may draft a revision; the client must still download the
  * exact document they agreed to — never a later internal draft.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+
+  // Rendering inlines and re-encodes every image (pdf-lib + sharp) — expensive.
+  // The token is long-lived (1 year) and forwardable, so throttle per IP to
+  // stop a held link being replayed in a loop to exhaust CPU/memory.
+  const limited = await rateLimit(`portal-pdf:${clientIp(request)}`, 12, 60_000);
+  if (!limited.ok) return new NextResponse(null, { status: 429 });
 
   const claim = readPortalToken(token);
   if (!claim) return new NextResponse(null, { status: 404 });

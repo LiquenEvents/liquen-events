@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from "react";
-import { createPortal, flushSync } from "react-dom";
+import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import type { Label } from "./photos-data";
 import { collectionFor } from "./collections";
@@ -170,6 +171,70 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   );
 }
 
+// One masonry tile, memoised. Infinite-scroll appends re-run GaleriaClient's
+// render; without memo, React reconciled every already-mounted tile's next/image
+// subtree on each append (hundreds of them to add 24). All props here are stable
+// across an append for existing tiles (the photo object comes from the memoised
+// pool; strings/flags/idx don't change; onOpen and registerTile are useCallback-
+// stable), so memo lets existing tiles bail out — only the new page's tiles
+// render. (No VTWrap / open-index gate anymore: the open morph was replaced by a
+// composited CSS zoom, so a tile no longer depends on which photo is open.)
+const Tile = memo(function Tile({
+  photo,
+  idx,
+  alt,
+  caption,
+  sub,
+  hiddenSm,
+  eager,
+  revealDelay,
+  onOpen,
+  registerTile,
+}: {
+  photo: Photo;
+  idx: number;
+  alt: string;
+  caption: string;
+  sub?: string;
+  hiddenSm: boolean;
+  eager: boolean;
+  revealDelay: number;
+  onOpen: (idx: number) => void;
+  registerTile: (el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      ref={registerTile}
+      className={`g-reveal${hiddenSm ? " sm:hidden" : ""}`}
+      style={{ "--reveal-delay": `${revealDelay}ms` } as React.CSSProperties}
+    >
+      <button
+        onClick={() => onOpen(idx)}
+        data-ripple
+        data-cap={caption}
+        data-sub={sub}
+        className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
+        style={{ aspectRatio: photo.aspectRatio }}
+      >
+        <Image
+          src={photo.src}
+          alt={alt}
+          fill
+          sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
+          // 65 (was 72): thumbnails, so a lean file that loads fast on the grid
+          // burst matters more than the last few % of sharpness — the full-res
+          // photo opens in the lightbox. Smaller download + faster cold encode.
+          quality={65}
+          className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+          loading={eager ? "eager" : "lazy"}
+          {...blurProps(photo)}
+        />
+        <HoverOverlay caption={caption} sub={sub} />
+      </button>
+    </div>
+  );
+});
+
 export default function GaleriaClient({
   photos,
   dict,
@@ -196,7 +261,17 @@ export default function GaleriaClient({
   // mostra a ordem por defeito), por isso é adiado para idle: a grelha só se
   // re-baralha depois de a hidratação assentar, libertando o TTI.
   useEffect(
-    () => onIdle(() => setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36))),
+    () =>
+      onIdle(() => {
+        // Don't re-interleave once the visitor has engaged — reshuffling tiles
+        // they're already looking at would visibly jump the grid. And run it as a
+        // non-urgent transition so the one-time reorder yields to the main thread
+        // instead of blocking a frame.
+        if (typeof window !== "undefined" && window.scrollY > 0) return;
+        startTransition(() =>
+          setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36)),
+        );
+      }),
     [],
   );
   const [fading, setFading] = useState(false);
@@ -224,7 +299,13 @@ export default function GaleriaClient({
   // coincidam (sem hydration mismatch); o efeito ajusta para o valor real. Espelha
   // os breakpoints antigos (columns-1 / sm:columns-2 / md:columns-3).
   const [cols, setCols] = useState(1);
-  useEffect(() => {
+  // Measure the real column count in a LAYOUT effect (before the browser paints),
+  // not a passive effect. SSR + the hydration render still use cols=1 (no
+  // mismatch), but the correction to 2/3 now lands before first paint — so a
+  // tablet/desktop visitor never sees the masonry painted in one full-width
+  // column and then re-pack into 2–3 columns (that 1→N repack was a big CLS on
+  // landing at /galeria). Runs as a passive effect on the server (no-op there).
+  useIsomorphicLayoutEffect(() => {
     const sm = window.matchMedia("(min-width: 640px)");
     const md = window.matchMedia("(min-width: 768px)");
     const apply = () => setCols(md.matches ? 3 : sm.matches ? 2 : 1);
@@ -251,7 +332,6 @@ export default function GaleriaClient({
   const tileName = (src: string, active: boolean) =>
     active && morphSrc === src ? vtId(src) : undefined;
   const mosaicName = (idx: number) => tileName(visible[idx].src, idx === 0 || isSm === true);
-  const masonryName = (idx: number, src: string) => tileName(src, idx < 5 ? isSm === false : true);
   // O lightbox (portal, listeners de teclado/gesto, trap de foco, slideshow,
   // pré-carga de vizinhos) vive num componente-filho `Lightbox` que só é montado
   // quando `lb !== null`. Assim, nada da sua configuração — refs, efeitos,
@@ -407,7 +487,10 @@ export default function GaleriaClient({
     const filtered = cat === "Todos" ? photos : photos.filter((p) => p.label === cat);
     return interleaveByCollection(filtered, orderSeed);
   }, [cat, collectionFilter, photos, orderSeed]);
-  const visible = pool.slice(0, shown);
+  // Memoised so `masonryColumns` (which depends on `visible`) doesn't recompute
+  // on every unrelated render (lightbox open/close, hover, showTop…): a plain
+  // pool.slice() made a fresh array reference each render and defeated that memo.
+  const visible = useMemo(() => pool.slice(0, shown), [pool, shown]);
 
   // Masonry manual: distribui as fotos por `cols` colunas equilibradas, sempre
   // para a coluna MAIS CURTA (usando a altura real de cada tile = H/W do
@@ -463,17 +546,18 @@ export default function GaleriaClient({
   // Lightbox navigation (through entire pool, not just shown)
   // Abrir/fechar dentro de startTransition ativa o morph <ViewTransition>;
   // navegar (←/→) fica fora — usa o lb-photo-in clássico entre fotos.
-  const openAt = useCallback(
-    (idx: number) => {
-      // Nomear a miniatura ANTES de capturar o snapshot "antes" do morph.
-      // flushSync força esse commit já; sem isto o setMorphSrc seria agrupado
-      // com o setLb e o snapshot "antes" ainda não teria o nome → sem morph.
-      flushSync(() => setMorphSrc(pool[idx].src));
-      setJustOpened(true);
-      startTransition(() => setLb(idx));
-    },
-    [pool],
-  );
+  const openAt = useCallback((idx: number) => {
+    // Open with a plain state update — NOT a View Transition. The VT morph
+    // snapshotted the whole full-screen lightbox layer and, via flushSync, forced
+    // a synchronous re-render of the entire grid to name the tapped tile — the
+    // two costs that made opening stutter. Now the lightbox just mounts and its
+    // photo eases in with the composited `lb-open-in` zoom (see globals.css):
+    // transform + opacity only, no snapshot, no grid reconcile. `justOpened`
+    // selects that deeper open zoom; ←/→ set it false and use the subtler
+    // lb-photo-in between photos.
+    setJustOpened(true);
+    setLb(idx);
+  }, []);
   const close = useCallback(() => {
     // Fecho FIÁVEL com animação de saída via CSS (não ViewTransition). Com a
     // camada de motion ativa, o ViewTransition de fecho do React revelou-se
@@ -691,51 +775,24 @@ export default function GaleriaClient({
           <div className="flex items-start gap-0.5">
             {masonryColumns.map((col, ci) => (
               <div key={ci} className="flex min-w-0 flex-1 flex-col gap-0.5">
-                {col.map(({ p, idx }, j) => (
-                  <div
-                    key={p.src}
-                    ref={registerTile}
-                    className={`g-reveal${!collectionFilter && idx < 5 ? " sm:hidden" : ""}`}
-                    style={{ "--reveal-delay": `${(j % 3) * 60}ms` } as React.CSSProperties}
-                  >
-                    <button
-                      onClick={() => openAt(idx)}
-                      data-ripple
-                      data-cap={caption(p.src, p.label).caption}
-                      data-sub={caption(p.src, p.label).sub}
-                      className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
-                      style={{ aspectRatio: p.aspectRatio }}
-                    >
-                      {lb !== idx && (
-                        <VTWrap
-                          name={collectionFilter ? tileName(p.src, true) : masonryName(idx, p.src)}
-                        >
-                          <Image
-                            src={p.src}
-                            alt={altText(p.src, p.label)}
-                            fill
-                            // Match the real column count (1 col <640px, 2 cols
-                            // 640–767px, 3 cols ≥768px). The old value declared
-                            // 50vw on phones where a tile is actually full-width,
-                            // under-fetching and softening the flagship gallery
-                            // photos on mobile — the majority of visitors.
-                            sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
-                            // 72 for the masonry thumbnails — crisp portfolio work
-                            // (the photos are the product). Slightly below the
-                            // lightbox's 75 since tiles render at ~33vw, but well
-                            // above a lossy look. Speed comes from WebP-only encode,
-                            // not from starving quality, so this stays fast.
-                            quality={72}
-                            className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                            loading={collectionFilter && idx === 0 ? "eager" : "lazy"}
-                            {...blurProps(p)}
-                          />
-                        </VTWrap>
-                      )}
-                      <HoverOverlay {...caption(p.src, p.label)} />
-                    </button>
-                  </div>
-                ))}
+                {col.map(({ p, idx }, j) => {
+                  const cap = caption(p.src, p.label);
+                  return (
+                    <Tile
+                      key={p.src}
+                      photo={p}
+                      idx={idx}
+                      alt={altText(p.src, p.label)}
+                      caption={cap.caption}
+                      sub={cap.sub}
+                      hiddenSm={!collectionFilter && idx < 5}
+                      eager={!!collectionFilter && idx === 0}
+                      revealDelay={(j % 3) * 60}
+                      onOpen={openAt}
+                      registerTile={registerTile}
+                    />
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -875,6 +932,22 @@ function Lightbox({
   const photoLayerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
+
+  // Gate the next-photo preload on the CURRENT photo having loaded, so opening
+  // (and each ←/→ step) decodes only the visible photo first — no hero-vs-
+  // neighbour decode contention in the open/step frame. Resets per photo.
+  const [heroLoaded, setHeroLoaded] = useState(false);
+  useEffect(() => setHeroLoaded(false), [index]);
+
+  // Defer the (secondary) thumbnail strip to the frame AFTER the lightbox
+  // opens, so the open commit only has to mount the hero photo — not also a row
+  // of thumbnail <Image>s. Keeps the open frame light on low-end phones; the
+  // strip fades in a frame later. Double rAF = after the first paint.
+  const [chromeReady, setChromeReady] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setChromeReady(true)));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const labelText = (l: Label) => dict.labels[l];
   const altText = (src: string, l: Label) => {
@@ -1123,7 +1196,7 @@ function Lightbox({
             prev();
           }}
           aria-label={dict.lbPrev}
-          className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -1147,40 +1220,48 @@ function Lightbox({
               src={pool[index].src}
               alt={altText(pool[index].src, pool[index].label)}
               fill
-              sizes="90vw"
-              quality={75}
+              // Cap the requested candidate at 1920px (via min()): on a 4K/retina
+              // screen 90vw would otherwise pick the 2560 candidate — a slow cold
+              // WebP encode + a big download on open. 1920 is still sharp for a
+              // full-screen photo and encodes/downloads much faster.
+              sizes="min(90vw, 1920px)"
+              quality={72}
+              // priority: the full-res lightbox photo is a DIFFERENT srcset
+              // candidate than the tile thumbnail, so opening starts a cold fetch.
+              // Fetching it high-priority (instead of default) shortens the
+              // "black → pop" gap so the photo is ready as the open animation runs.
+              priority
+              onLoad={() => setHeroLoaded(true)}
               className={`object-contain ${
-                playing ? "lb-kenburns" : justOpened && ViewTransition ? "" : "lb-photo-in"
+                playing ? "lb-kenburns" : justOpened ? "lb-open-in" : "lb-photo-in"
               }`}
               {...blurProps(pool[index])}
             />
           </VTWrap>
         </div>
 
-        {/* Pré-carrega os vizinhos (anterior/seguinte) para que ← → seja
-            instantâneo — fetch na mesma resolução do visor, fora de ecrã.
-            Só em rede boa: em Save-Data / 2g / 3g é ignorado para não gastar
-            dados com imagens grandes que talvez nunca sejam vistas. */}
+        {/* Pré-carrega só o vizinho SEGUINTE (o sentido de navegação dominante)
+            para que → seja instantâneo. Usa `sizes="90vw"` — o MESMO candidato que
+            a foto mostrada — para o browser acertar no recurso exato em cache no
+            passo seguinte (com 45vw carregava um URL diferente e o → voltava a
+            descodificar do zero). Só um vizinho (não os dois), fora de ecrã, e só
+            em rede boa (Save-Data / 2g / 3g ignora). O anterior carrega no ← —
+            raro. */}
         <div
           aria-hidden
           className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
         >
-          {preloadNeighbours &&
-            Array.from(
-              new Set([(index - 1 + pool.length) % pool.length, (index + 1) % pool.length]),
-            )
-              .filter((i) => i !== index)
-              .map((i) => (
-                <Image
-                  key={i}
-                  src={pool[i].src}
-                  alt=""
-                  fill
-                  sizes="90vw"
-                  quality={75}
-                  loading="eager"
-                />
-              ))}
+          {preloadNeighbours && pool.length > 1 && heroLoaded && (
+            <Image
+              key={(index + 1) % pool.length}
+              src={pool[(index + 1) % pool.length].src}
+              alt=""
+              fill
+              sizes="min(90vw, 1920px)"
+              quality={72}
+              loading="eager"
+            />
+          )}
         </div>
 
         {/* Botão próxima */}
@@ -1190,7 +1271,7 @@ function Lightbox({
             next();
           }}
           aria-label={dict.lbNext}
-          className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/8 backdrop-blur-md text-white/75 ring-1 ring-white/10 hover:bg-white/15 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
@@ -1198,29 +1279,31 @@ function Lightbox({
         </button>
       </div>
 
-      {/* Strip de thumbnails */}
+      {/* Strip de thumbnails — deferido para o frame seguinte à abertura para
+          não pesar no commit de abertura (ver chromeReady). */}
       <div
         className="lb-chrome flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {stripIdx.map((idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              setJustOpened(false);
-              setLb(idx);
-            }}
-            aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
-            aria-current={idx === index ? "true" : undefined}
-            className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
-              idx === index
-                ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
-                : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
-            }`}
-          >
-            <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
-          </button>
-        ))}
+        {chromeReady &&
+          stripIdx.map((idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                setJustOpened(false);
+                setLb(idx);
+              }}
+              aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
+              aria-current={idx === index ? "true" : undefined}
+              className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
+                idx === index
+                  ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
+                  : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
+              }`}
+            >
+              <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+            </button>
+          ))}
       </div>
 
       {/* Dicas teclado */}

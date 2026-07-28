@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { FollowUp } from "@/lib/followups";
-import { useToast } from "./Toast";
 import { Button, Card, EmptyState } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 interface Props {
   /** Optional: open the originating quote/pedido when a row's action is clicked. */
@@ -45,28 +44,7 @@ function duenessLabel(f: FollowUp): string {
 
 /** Prioritised, rule-based follow-up list grouped by severity. */
 export default function FollowUps({ onOpenQuote }: Props) {
-  const { toast } = useToast();
-  const [items, setItems] = useState<FollowUp[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/followups", { cache: "no-store" });
-        if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as FollowUp[];
-        if (alive) setItems(Array.isArray(data) ? data : []);
-      } catch {
-        if (alive) toast("Não foi possível carregar os seguimentos.", "error");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [toast]);
+  const { data: items = [], loading } = useCachedList<FollowUp[]>("followups", "/api/followups");
 
   const groups = SEVERITY_ORDER.map((sev) => ({
     sev,
@@ -77,7 +55,7 @@ export default function FollowUps({ onOpenQuote }: Props) {
     <Card padding="none" className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-foreground/[0.07] px-5 sm:px-6 py-4">
         <p className="bo-eyebrow">Seguimentos automáticos</p>
-        <span className="rounded-full bg-[#1b2119] px-2 py-0.5 text-[10px] tabular-nums text-white/80">
+        <span className="rounded-full bg-[#4d6350]/10 px-2 py-0.5 text-[10px] tabular-nums text-[#4d6350]">
           {items.length}
         </span>
       </div>

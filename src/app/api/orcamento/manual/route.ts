@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
     // Bound every free-text field (defense-in-depth against storage abuse), the
     // same way the public quote schema does — admin-only, but still validated.
     const str = (v: unknown, max: number) => String(v ?? "").slice(0, max);
+    // Same bound as `str` but also strips CR/LF — for values that end up in an
+    // email header (the recipient address) or that were previously unbounded.
+    const strLine = (v: unknown, max: number) =>
+      str(v, max)
+        .replace(/[\r\n]+/g, " ")
+        .trim();
     const name = str(b.name, 120).trim();
     if (!name) {
       return NextResponse.json({ error: "O nome é obrigatório." }, { status: 400 });
@@ -73,7 +79,7 @@ export async function POST(request: NextRequest) {
       notes: str(b.notes, 5000),
       referralSource: str(b.referralSource, 120) || "Contacto direto",
       name,
-      email: str(b.email, 200),
+      email: strLine(b.email, 200),
       phone: str(b.phone, 40),
       company: str(b.company, 160),
       nif: "",

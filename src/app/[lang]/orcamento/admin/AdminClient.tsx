@@ -7,6 +7,7 @@ import {
   useRef,
   useCallback,
   useDeferredValue,
+  memo,
   type ReactNode,
 } from "react";
 import Image from "next/image";
@@ -15,6 +16,7 @@ import { usePathname } from "next/navigation";
 import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
+import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
@@ -30,12 +32,14 @@ import {
   printEventDossier,
   downloadEventIcs,
 } from "./export";
+import { prefetchList } from "./useCachedList";
+import { onIdle } from "@/lib/onIdle";
 import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
-import { Button, SectionCard } from "./ui";
+import { Button, SectionCard, Segmented } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -46,7 +50,6 @@ import {
   Tarefas,
   Fornecedores,
   StatsDashboard,
-  Inbox,
   ProposalBuilder,
   ProposalStudio,
   ProductionPlan,
@@ -109,13 +112,13 @@ type DetailTab = "producao" | "financeiro" | "comunicacao";
 type DetailTarget = DetailTab | "gestao";
 
 // The pedido's tool tabs, each with an icon and a plain-language hint so it's
-// obvious what you do there. The tablist renders icon + label, and a single
-// explainer line under it shows the active tab's hint.
+// obvious what you do there. The tablist renders one card per tab (icon +
+// label + the hint as a one-line description inside the card).
 const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode }[] = [
   {
     id: "producao",
     label: "Produção",
-    hint: "Prepare o evento: tarefas e checklist. Abra o plano, o cronograma e os convidados quando precisar.",
+    hint: "Prepare o evento: tarefas, checklist, plano e convidados.",
     icon: (
       <svg
         width="15"
@@ -227,7 +230,6 @@ const VIEW_KEYS: Record<string, View> = {
   t: "tarefas",
   f: "fornecedores",
   e: "estatisticas",
-  i: "inbox",
 };
 const VIEW_STORAGE_KEY = "liquen-admin-view";
 
@@ -235,6 +237,190 @@ interface Props {
   initialQuotes: Quote[];
   userName?: string;
 }
+
+// Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
+// can render it too — it's pure (status + the module-level STATUS_OPTIONS).
+function statusBadge(status: QuoteStatus): ReactNode {
+  const s = STATUS_OPTIONS.find((o) => o.id === status);
+  return (
+    <span
+      className={`text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm ${s?.color ?? "bg-foreground/8 text-foreground/30"}`}
+    >
+      {s?.label ?? status}
+    </span>
+  );
+}
+
+// One quote card in the pedidos list. Extracted to MODULE scope and wrapped in
+// React.memo so that typing in the detail edit panel — which only changes
+// AdminClient's editX state — no longer reconciles all ~50 cards on every
+// keystroke. All props are stable across a keystroke (the quote object comes
+// from the memoised visibleQuotes; isCurrent/isSelected are booleans; todayStr
+// is a stable string; onOpen/onToggle are stable callbacks), so memo skips
+// re-rendering each row. Saves, selection and filtering still update the list
+// because they change these props (via visibleQuotes / the booleans).
+const QuoteCard = memo(function QuoteCard({
+  q,
+  isCurrent,
+  isSelected,
+  todayStr,
+  onOpen,
+  onToggle,
+}: {
+  q: Quote;
+  isCurrent: boolean;
+  isSelected: boolean;
+  todayStr: string;
+  onOpen: (q: Quote) => void;
+  onToggle: (id: string) => void;
+}) {
+  const cat = CATEGORIES.find((c) => c.id === q.category);
+  const et =
+    q.category && q.eventType
+      ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType)
+      : null;
+  // Lead parado: status ativo sem atividade há 14+ dias
+  const lastActivity = q.lastUpdated ?? q.submittedAt;
+  const daysSince = Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86400000);
+  const isStale =
+    (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
+    daysSince >= 14;
+  return (
+    <div className="relative">
+      <label
+        className="absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggle(q.id)}
+          className="w-4 h-4 accent-[#4d6350] cursor-pointer"
+          aria-label={`Selecionar pedido de ${q.name}`}
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => onOpen(q)}
+        className={`w-full text-left p-5 pl-12 rounded-xl border transition-all duration-200 ${
+          isCurrent
+            ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
+            : isSelected
+              ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
+              : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <p className="text-foreground/75 text-sm font-semibold truncate">{q.name}</p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <p className="text-foreground/70 text-xs truncate">{q.email}</p>
+              {q.assignedTo && (
+                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
+                  {q.assignedTo}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {statusBadge(q.status)}
+            {isStale && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold bg-amber-500/10 text-amber-600"
+                title={`Sem atividade há ${daysSince} dias`}
+              >
+                <span className="w-1 h-1 rounded-full bg-current" />
+                {daysSince}d parado
+              </span>
+            )}
+            {q.followUpAt &&
+              q.followUpAt <= todayStr &&
+              q.status !== "aceite" &&
+              q.status !== "rejeitado" && (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
+                    q.followUpAt < todayStr
+                      ? "bg-[#b5654a]/15 text-[#b5654a]"
+                      : "bg-[#637a5f]/15 text-[#4d6350]"
+                  }`}
+                  title={q.followUpAt < todayStr ? "Seguimento em atraso" : "Seguimento hoje"}
+                >
+                  <span className="w-1 h-1 rounded-full bg-current" />
+                  Seguir
+                </span>
+              )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-foreground/70 text-[10px]">
+          <span>{cat?.label ?? "—"}</span>
+          {et && (
+            <>
+              <span className="w-px h-2.5 bg-foreground/12" />
+              <span>{et.label}</span>
+            </>
+          )}
+          <span className="w-px h-2.5 bg-foreground/12" />
+          <span>{q.guests} convidados</span>
+          {(() => {
+            const cd = eventCountdown(q.date);
+            if (!cd || cd.tone === "past") return null;
+            return (
+              <>
+                <span className="w-px h-2.5 bg-foreground/12" />
+                <span
+                  className={
+                    cd.tone === "today" || cd.tone === "soon"
+                      ? "text-[#b5654a] font-medium"
+                      : "text-foreground/70"
+                  }
+                >
+                  {cd.label}
+                </span>
+              </>
+            );
+          })()}
+        </div>
+        {q.tags && q.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2.5">
+            {q.tags.slice(0, 4).map((t) => (
+              <span
+                key={t}
+                className="px-2 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[9px] font-medium tracking-wide"
+              >
+                {t}
+              </span>
+            ))}
+            {q.tags.length > 4 && (
+              <span className="text-foreground/30 text-[9px] px-1">+{q.tags.length - 4}</span>
+            )}
+          </div>
+        )}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
+          <span className="text-foreground/40 text-[9px] font-mono tracking-tight" title={q.id}>
+            Ref. {shortRef(q.id)}
+          </span>
+          <div className="flex items-center gap-3">
+            {q.quotedPrice ? (
+              <span className="text-[#4d6350] text-xs font-semibold">
+                {formatPrice(q.quotedPrice)}
+              </span>
+            ) : q.priceBreakdown?.total ? (
+              <span className="text-foreground/70 text-xs">
+                ≈ {formatPrice(q.priceBreakdown.rangeMin)}–{formatPrice(q.priceBreakdown.rangeMax)}
+              </span>
+            ) : null}
+            <span className="text-foreground/70 text-[10px]">
+              {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
+                day: "numeric",
+                month: "short",
+              })}
+            </span>
+          </div>
+        </div>
+      </button>
+    </div>
+  );
+});
 
 export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
@@ -330,6 +516,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   useEffect(() => {
     document.body.classList.add("admin-mode");
     return () => document.body.classList.remove("admin-mode");
+  }, []);
+
+  // Warm the caches of the high-traffic API views during idle after first
+  // paint, so the first click on Propostas / Faturas / Tarefas / Calendário is
+  // instant instead of a cold round-trip. Uses the same shared cache the views
+  // read from (useCachedList), so a warmed view renders immediately with no
+  // skeleton. Cheap + non-blocking; skipped if already cached/in-flight.
+  useEffect(() => {
+    return onIdle(() => {
+      prefetchList("propostas", "/api/propostas");
+      prefetchList("faturas", "/api/faturas");
+      prefetchList("tarefas", "/api/tarefas");
+      prefetchList("calendario", "/api/calendario");
+    });
   }, []);
 
   // Restore the last view the user was on (per device). Done in an effect so it
@@ -598,6 +798,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     const target = detailNextAction(q).tab;
     setDetailTab(target === "gestao" ? "comunicacao" : target);
   }
+  // Stable identity for the memoised QuoteCard's onOpen prop. openQuote is a
+  // plain function (closes over discardGuard and many setters), so its reference
+  // changes every render — passing it directly would defeat QuoteCard's memo.
+  // A ref that always points at the latest openQuote keeps behaviour identical
+  // while giving the row a callback whose identity never changes.
+  const openQuoteRef = useRef(openQuote);
+  // Keep the ref pointing at the latest openQuote (updated in an effect, not
+  // during render). onOpen fires from a click, which is always after commit, so
+  // it reads the current closure.
+  useEffect(() => {
+    openQuoteRef.current = openQuote;
+  });
+  const openQuoteStable = useCallback((q: Quote) => openQuoteRef.current(q), []);
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
   // The date is intentionally left blank — it's a new event to schedule.
@@ -1020,16 +1233,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium motion-safe:transition-colors duration-150 ${
+        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
           active
-            ? "bg-[var(--bo-tint-accent)] text-[var(--bo-accent)]"
-            : "text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
+            ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
+            : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
         }`}
       >
         <span
           className={`shrink-0 motion-safe:transition-colors duration-150 ${
             active
-              ? "text-[var(--bo-accent)]"
+              ? "text-[var(--bo-text)]"
               : "text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
           }`}
         >
@@ -1051,17 +1264,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     );
   }
 
-  function statusBadge(status: QuoteStatus) {
-    const s = STATUS_OPTIONS.find((o) => o.id === status);
-    return (
-      <span
-        className={`text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm ${s?.color ?? "bg-foreground/8 text-foreground/30"}`}
-      >
-        {s?.label ?? status}
-      </span>
-    );
-  }
-
   const VIEW_TITLES: Record<View, string> = {
     overview: "Visão Geral",
     pedidos: "Pedidos",
@@ -1078,11 +1280,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Faturas",
     contratos: "Contratos",
     "modelos-email": "Modelos de email",
-    inbox: "Mensagens",
   };
 
   const VIEW_SUB: Record<View, string> = {
-    overview: "O resumo do seu dia",
+    // Vazio de propósito: a própria Visão Geral já abre com data + saudação —
+    // um eyebrow extra aqui era só mais texto.
+    overview: "",
     pedidos: "Pedidos de orçamento recebidos",
     kanban: "Arraste os pedidos entre fases",
     clientes: "Histórico por cliente",
@@ -1097,7 +1300,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     faturas: "Livro de faturação e pagamentos",
     contratos: "Aceitações de condições e estado de cada contrato",
     "modelos-email": "Emails reutilizáveis da equipa",
-    inbox: "Mensagens recebidas",
   };
 
   return (
@@ -1130,7 +1332,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         >
           {/* Mobile close */}
           <button
-            className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
+            className="lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
             onClick={() => setNavOpen(false)}
             aria-label="Fechar menu"
           >
@@ -1153,7 +1355,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               alt="Líquen Events"
               width={300}
               height={179}
-              preload
+              priority
               className="h-12 w-auto object-contain"
             />
             <span className="text-[var(--bo-text-faint)] text-[9px] tracking-[0.3em] uppercase mt-2">
@@ -1181,7 +1383,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     type="button"
                     onClick={() => setMoreNavOpen((o) => !o)}
                     aria-expanded={expanded}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
                   >
                     <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
                       <svg
@@ -1322,7 +1524,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 { id: "overview", label: "Visão Geral" },
                 { id: "pedidos", label: "Pedidos" },
                 { id: "propostas", label: "Propostas" },
-                { id: "inbox", label: "Mensagens" },
               ] as const
             ).map((item) => {
               const navItem = NAV.find((n) => n.id === item.id)!;
@@ -1353,7 +1554,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               onClick={() => setNavOpen(true)}
               aria-label="Mais destinos"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
-                !["overview", "pedidos", "propostas", "inbox"].includes(view)
+                !["overview", "pedidos", "propostas"].includes(view)
                   ? "text-[var(--bo-accent)]"
                   : "text-[var(--bo-text-faint)]"
               }`}
@@ -1376,14 +1577,36 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         </nav>
 
         {/* ── Main ── */}
-        <div className="flex-1 min-w-0 flex flex-col pb-16 lg:pb-0">
+        {/* Bottom padding clears the real mobile nav height (56px + the notch
+            safe-area inset) so the last row never hides under the tab bar. */}
+        <div className="flex-1 min-w-0 flex flex-col pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border-b border-[var(--bo-hairline)]">
-            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
+          <header className="sticky top-0 z-20 bg-white/95 border-b border-[var(--bo-hairline)] pt-safe">
+            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
+              {/* Mobile menu — opens the full nav drawer without depending on the
+                  bottom-nav "Mais" (which is hidden while a quote drawer is open). */}
+              <button
+                onClick={() => setNavOpen(true)}
+                aria-label="Abrir menu"
+                className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] transition-colors"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+                </svg>
+              </button>
               <div className="min-w-0">
-                <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
-                  {VIEW_SUB[view]}
-                </p>
+                {VIEW_SUB[view] && (
+                  <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
+                    {VIEW_SUB[view]}
+                  </p>
+                )}
                 <h1
                   className="text-foreground/88 font-bold leading-none"
                   style={{
@@ -1399,7 +1622,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   onClick={() => setAjudaOpen(true)}
                   aria-label="Ajuda e glossário"
                   title="Ajuda e glossário"
-                  className="w-9 h-9 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
+                  className="w-10 h-10 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
                   <svg
                     width="16"
@@ -1420,7 +1643,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <NotificationBell />
                 <button
                   onClick={() => setPaletteOpen(true)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-foreground/60 transition-colors"
+                  className="hidden sm:flex items-center gap-2 px-3 py-2 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
                   title="Pesquisar (Ctrl K)"
                 >
                   <svg
@@ -1435,7 +1658,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <path d="m21 21-4.3-4.3" strokeLinecap="round" />
                   </svg>
                   <span className="hidden md:inline">Pesquisar</span>
-                  <kbd className="text-[8px] border border-foreground/12 rounded px-1 py-0.5 ml-0.5">
+                  <kbd className="text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
                     ⌘K
                   </kbd>
                 </button>
@@ -1443,7 +1666,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   onClick={refresh}
                   disabled={refreshing}
                   aria-label="Atualizar pedidos"
-                  className="group flex items-center gap-2 px-3 py-2 bg-foreground/[0.04] border border-foreground/[0.08] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-foreground/[0.07] hover:text-[#4d6350] transition-colors"
+                  className="group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
                 >
                   <svg
                     width="13"
@@ -1612,13 +1835,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "modelos-email" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <EmailTemplates />
-            </div>
-          )}
-
-          {/* ── Inbox ── */}
-          {view === "inbox" && (
-            <div className={`${VIEW_WRAP} view-in`}>
-              <Inbox />
             </div>
           )}
 
@@ -1919,171 +2135,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     />
                   </div>
                 )}
-                {visibleQuotes.map((q) => {
-                  const cat = CATEGORIES.find((c) => c.id === q.category);
-                  const et =
-                    q.category && q.eventType
-                      ? EVENT_TYPES_BY_CATEGORY[q.category]?.find((e) => e.id === q.eventType)
-                      : null;
-                  const isSel = selectedIds.has(q.id);
-                  // Lead parado: status ativo sem atividade há 14+ dias
-                  const lastActivity = q.lastUpdated ?? q.submittedAt;
-                  const daysSince = Math.floor(
-                    (Date.now() - new Date(lastActivity).getTime()) / 86400000,
-                  );
-                  const isStale =
-                    (q.status === "pendente" ||
-                      q.status === "em_revisao" ||
-                      q.status === "cotado") &&
-                    daysSince >= 14;
-                  return (
-                    <div key={q.id} className="relative">
-                      <label
-                        className="absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSel}
-                          onChange={() => toggleSelect(q.id)}
-                          className="w-4 h-4 accent-[#4d6350] cursor-pointer"
-                          aria-label={`Selecionar pedido de ${q.name}`}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => openQuote(q)}
-                        className={`w-full text-left p-5 pl-12 rounded-xl border transition-all duration-200 ${
-                          selected?.id === q.id
-                            ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
-                            : isSel
-                              ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
-                              : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <div className="min-w-0">
-                            <p className="text-foreground/75 text-sm font-semibold truncate">
-                              {q.name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <p className="text-foreground/70 text-xs truncate">{q.email}</p>
-                              {q.assignedTo && (
-                                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
-                                  {q.assignedTo}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            {statusBadge(q.status)}
-                            {isStale && (
-                              <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold bg-amber-500/10 text-amber-600"
-                                title={`Sem atividade há ${daysSince} dias`}
-                              >
-                                <span className="w-1 h-1 rounded-full bg-current" />
-                                {daysSince}d parado
-                              </span>
-                            )}
-                            {q.followUpAt &&
-                              q.followUpAt <= todayStr &&
-                              q.status !== "aceite" &&
-                              q.status !== "rejeitado" && (
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
-                                    q.followUpAt < todayStr
-                                      ? "bg-[#b5654a]/15 text-[#b5654a]"
-                                      : "bg-[#637a5f]/15 text-[#4d6350]"
-                                  }`}
-                                  title={
-                                    q.followUpAt < todayStr
-                                      ? "Seguimento em atraso"
-                                      : "Seguimento hoje"
-                                  }
-                                >
-                                  <span className="w-1 h-1 rounded-full bg-current" />
-                                  Seguir
-                                </span>
-                              )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 text-foreground/70 text-[10px]">
-                          <span>{cat?.label ?? "—"}</span>
-                          {et && (
-                            <>
-                              <span className="w-px h-2.5 bg-foreground/12" />
-                              <span>{et.label}</span>
-                            </>
-                          )}
-                          <span className="w-px h-2.5 bg-foreground/12" />
-                          <span>{q.guests} convidados</span>
-                          {(() => {
-                            const cd = eventCountdown(q.date);
-                            if (!cd || cd.tone === "past") return null;
-                            return (
-                              <>
-                                <span className="w-px h-2.5 bg-foreground/12" />
-                                <span
-                                  className={
-                                    cd.tone === "today" || cd.tone === "soon"
-                                      ? "text-[#b5654a] font-medium"
-                                      : "text-foreground/70"
-                                  }
-                                >
-                                  {cd.label}
-                                </span>
-                              </>
-                            );
-                          })()}
-                        </div>
-                        {q.tags && q.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2.5">
-                            {q.tags.slice(0, 4).map((t) => (
-                              <span
-                                key={t}
-                                className="px-2 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[9px] font-medium tracking-wide"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                            {q.tags.length > 4 && (
-                              <span className="text-foreground/30 text-[9px] px-1">
-                                +{q.tags.length - 4}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
-                          <span
-                            className="text-foreground/40 text-[9px] font-mono tracking-tight"
-                            title={q.id}
-                          >
-                            Ref. {shortRef(q.id)}
-                          </span>
-                          <div className="flex items-center gap-3">
-                            {q.quotedPrice ? (
-                              <span className="text-[#4d6350] text-xs font-semibold">
-                                {formatPrice(q.quotedPrice)}
-                              </span>
-                            ) : q.priceBreakdown?.total ? (
-                              <span className="text-foreground/70 text-xs">
-                                ≈ {formatPrice(q.priceBreakdown.rangeMin)}–
-                                {formatPrice(q.priceBreakdown.rangeMax)}
-                              </span>
-                            ) : null}
-                            <span className="text-foreground/70 text-[10px]">
-                              {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
-                                day: "numeric",
-                                month: "short",
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
+                {visibleQuotes.map((q) => (
+                  <QuoteCard
+                    key={q.id}
+                    q={q}
+                    isCurrent={selected?.id === q.id}
+                    isSelected={selectedIds.has(q.id)}
+                    todayStr={todayStr}
+                    onOpen={openQuoteStable}
+                    onToggle={toggleSelect}
+                  />
+                ))}
                 {filtered.length > visibleCount && (
                   <button
                     type="button"
@@ -2105,9 +2167,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     role={isDetailOverlay ? "dialog" : undefined}
                     aria-modal={isDetailOverlay ? true : undefined}
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-screen xl:max-h-[calc(100vh-7rem)] overflow-x-hidden overflow-y-auto shadow-2xl xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-[100dvh] xl:max-h-[calc(100vh-7rem)] overflow-x-hidden overflow-y-auto overscroll-contain shadow-lg xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
                   >
-                    <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white/95 px-5 pt-5 backdrop-blur-sm sm:px-7">
+                    <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-5 pt-5 sm:px-7">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <h2
@@ -2769,17 +2831,42 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <div
                         id="detail-tools"
                         ref={toolsRef}
-                        className="flex scroll-mt-24 flex-col gap-6"
+                        className="flex scroll-mt-24 flex-col gap-7 border-t border-foreground/[0.08] pt-8"
                       >
-                        {/* Section tabs — Arrow keys move between tabs (WAI-ARIA
-                              tablist pattern). */}
+                        {/* Section header — the command centre of the pedido. */}
+                        <div className="flex flex-col gap-1.5">
+                          <p className="bo-eyebrow">Ferramentas do pedido</p>
+                          <p className="text-xs leading-relaxed text-foreground/55">
+                            Tudo o que precisa para preparar, cobrar e propor — num só lugar.
+                          </p>
+                        </div>
+
+                        {/* Section tabs as cards — Arrow keys move between tabs
+                            (WAI-ARIA tablist pattern). Each card carries the tab's
+                            plain-language hint plus its live counter as a pill. */}
                         <div
                           role="tablist"
                           aria-label="Secções do pedido"
-                          className="flex gap-1 overflow-x-auto border-b border-foreground/[0.08]"
+                          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
                         >
                           {DETAIL_TABS.map((tab, i, arr) => {
                             const active = detailTab === tab.id;
+                            // Contador por cartão: "N por fazer" (checklist) na
+                            // Produção e "falta €X" no Financeiro — visão imediata
+                            // sem abrir cada separador.
+                            let badge: string | null = null;
+                            if (tab.id === "producao") {
+                              const todo = (selected.checklist ?? []).filter((c) => !c.done).length;
+                              badge = todo > 0 ? `${todo} por fazer` : null;
+                            } else if (tab.id === "financeiro") {
+                              const gross = contractedAmounts(selected).gross;
+                              const paid = (selected.payments ?? []).reduce(
+                                (s, p) => s + (p.paid ? p.amount : 0),
+                                0,
+                              );
+                              const out = Math.max(0, gross - paid);
+                              badge = out > 0 ? `falta ${eur(out)}` : null;
+                            }
                             return (
                               <button
                                 key={tab.id}
@@ -2801,329 +2888,352 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     );
                                   tabs?.[nextIdx]?.focus();
                                 }}
-                                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] motion-safe:transition-colors focus:outline-none focus-visible:bg-[#4d6350]/[0.06] ${
+                                className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                   active
-                                    ? "border-[#4d6350] text-foreground/85"
-                                    : "border-transparent text-foreground/40 hover:text-foreground/65"
+                                    ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-[0_2px_12px_rgba(77,99,80,0.10)]"
+                                    : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] hover:shadow-sm"
                                 }`}
                               >
                                 <span
                                   aria-hidden
-                                  className={active ? "text-[#4d6350]" : "text-foreground/35"}
+                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
+                                    active
+                                      ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
+                                      : "bg-foreground/[0.05] text-foreground/55"
+                                  }`}
                                 >
                                   {tab.icon}
                                 </span>
-                                {tab.label}
+                                <span className="flex min-w-0 flex-col gap-1">
+                                  <span
+                                    className={`text-xs font-semibold uppercase tracking-[0.08em] ${
+                                      active ? "text-foreground/85" : "text-foreground/70"
+                                    }`}
+                                  >
+                                    {tab.label}
+                                  </span>
+                                  <span className="text-[11px] leading-relaxed text-foreground/50">
+                                    {tab.hint}
+                                  </span>
+                                </span>
+                                {badge && (
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
+                                      active
+                                        ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                        : "bg-foreground/[0.07] text-foreground/55"
+                                    }`}
+                                  >
+                                    {badge}
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
                         </div>
-                        {/* Plain-language explainer for the active tab. */}
-                        <p className="text-[11px] leading-relaxed text-foreground/55">
-                          {DETAIL_TABS.find((t) => t.id === detailTab)?.hint}
-                        </p>
 
                         {/* Coluna única — as ferramentas do separador ativo */}
                         <div className="flex min-w-0 flex-col gap-6">
-                          {detailTab === "producao" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-producao"
-                              aria-labelledby="detail-tab-producao"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Preparação — the daily driver (tarefas + checklist),
+                          {/* Keep-alive: os três painéis ficam sempre montados e só
+                              escondidos (`hidden`), para nunca se perder trabalho a
+                              meio (mensagem por enviar, proposta em edição) ao trocar
+                              de separador. */}
+                          <div
+                            role="tabpanel"
+                            id="detail-panel-producao"
+                            aria-labelledby="detail-tab-producao"
+                            tabIndex={0}
+                            hidden={detailTab !== "producao"}
+                            className="flex flex-col gap-6 focus:outline-none"
+                          >
+                            {/* Preparação — the daily driver (tarefas + checklist),
                                   always open and first. */}
-                              <p className="bo-eyebrow text-foreground/45">Preparação</p>
+                            <p className="bo-eyebrow text-foreground/45">Preparação</p>
 
-                              {/* Tasks linked to this event */}
-                              <EventTasks
-                                key={`tasks-${selected.id}`}
-                                quote={selected}
-                                userName={userName}
-                              />
+                            {/* Tasks linked to this event */}
+                            <EventTasks
+                              key={`tasks-${selected.id}`}
+                              quote={selected}
+                              userName={userName}
+                            />
 
-                              {/* Production checklist */}
-                              <EventChecklist
-                                key={`cl-${selected.id}`}
-                                quote={selected}
-                                onChange={(checklist) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, checklist } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                                }}
-                              />
+                            {/* Production checklist */}
+                            <EventChecklist
+                              key={`cl-${selected.id}`}
+                              quote={selected}
+                              onChange={(checklist) => {
+                                setQuotes((prev) =>
+                                  prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                              }}
+                            />
 
-                              {/* Plano &amp; dia do evento — occasional tools, collapsed so
+                            {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child
                                   mounted (hidden via CSS), so fetch/PATCH lifecycles are
                                   untouched. */}
-                              <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                  <svg
-                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                  >
-                                    <path
-                                      d="m9 6 6 6-6 6"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                  Plano de decoração, cronograma e convidados
-                                </summary>
-                                <div className="flex flex-col gap-6 pt-6">
-                                  {/* Decor production plan (sourcing → strike) */}
-                                  <ProductionPlan
-                                    key={`prod-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(productionPlan) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, productionPlan } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev ? { ...prev, productionPlan } : prev,
-                                      );
-                                    }}
+                            <details className="group border-t border-foreground/10 pt-4">
+                              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <svg
+                                  className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                >
+                                  <path
+                                    d="m9 6 6 6-6 6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                   />
+                                </svg>
+                                Plano de decoração, cronograma e convidados
+                              </summary>
+                              <div className="flex flex-col gap-6 pt-6">
+                                {/* Decor production plan (sourcing → strike) */}
+                                <ProductionPlan
+                                  key={`prod-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(productionPlan) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, productionPlan } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, productionPlan } : prev,
+                                    );
+                                  }}
+                                />
 
-                                  {/* Day-of run sheet */}
-                                  <EventTimeline
-                                    key={`tl-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(timeline) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, timeline } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                                    }}
-                                  />
+                                {/* Day-of run sheet */}
+                                <EventTimeline
+                                  key={`tl-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(timeline) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, timeline } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                                  }}
+                                />
 
-                                  {/* Guest list / RSVP */}
-                                  <GuestList
-                                    key={`guests-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(guestList) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, guestList } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                                    }}
-                                  />
-                                </div>
-                              </details>
-                            </div>
-                          )}
+                                {/* Guest list / RSVP */}
+                                <GuestList
+                                  key={`guests-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(guestList) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, guestList } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                                  }}
+                                />
+                              </div>
+                            </details>
+                          </div>
 
-                          {detailTab === "financeiro" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-financeiro"
-                              aria-labelledby="detail-tab-financeiro"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Payments & invoicing */}
-                              <PaymentsPanel
-                                key={`pay-${selected.id}`}
-                                quote={selected}
-                                showLedger
-                                onChange={(payments) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, payments } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                                }}
-                                onContractRef={(ref) => {
-                                  const contractRef = ref || undefined;
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, contractRef } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
-                                }}
-                              />
+                          <div
+                            role="tabpanel"
+                            id="detail-panel-financeiro"
+                            aria-labelledby="detail-tab-financeiro"
+                            tabIndex={0}
+                            hidden={detailTab !== "financeiro"}
+                            className="flex flex-col gap-6 focus:outline-none"
+                          >
+                            {/* Cobrança — payments first (the key action), costs
+                                  below. Eyebrow mirrors the other two panels. */}
+                            <p className="bo-eyebrow text-foreground/45">Pagamentos e faturação</p>
 
-                              {/* Suppliers booked for this event + budget vs actual cost */}
-                              <EventCosts
-                                key={`costs-${selected.id}`}
-                                quote={selected}
-                                onChange={(eventSuppliers) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) =>
-                                    prev ? { ...prev, eventSuppliers } : prev,
-                                  );
-                                }}
-                              />
-                            </div>
-                          )}
+                            {/* Payments & invoicing */}
+                            <PaymentsPanel
+                              key={`pay-${selected.id}`}
+                              quote={selected}
+                              showLedger
+                              onChange={(payments) => {
+                                setQuotes((prev) =>
+                                  prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                              }}
+                              onContractRef={(ref) => {
+                                const contractRef = ref || undefined;
+                                setQuotes((prev) =>
+                                  prev.map((q) =>
+                                    q.id === selected.id ? { ...q, contractRef } : q,
+                                  ),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
+                              }}
+                            />
 
-                          {detailTab === "comunicacao" && (
-                            <div
-                              role="tabpanel"
-                              id="detail-panel-comunicacao"
-                              aria-labelledby="detail-tab-comunicacao"
-                              tabIndex={0}
-                              className="flex flex-col gap-6 focus:outline-none"
-                            >
-                              {/* Step 1 — the proposal. One tool at a time: the detailed
+                            {/* Suppliers booked for this event + budget vs actual cost */}
+                            <EventCosts
+                              key={`costs-${selected.id}`}
+                              quote={selected}
+                              onChange={(eventSuppliers) => {
+                                setQuotes((prev) =>
+                                  prev.map((q) =>
+                                    q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                  ),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, eventSuppliers } : prev));
+                              }}
+                            />
+                          </div>
+
+                          <div
+                            role="tabpanel"
+                            id="detail-panel-comunicacao"
+                            aria-labelledby="detail-tab-comunicacao"
+                            tabIndex={0}
+                            hidden={detailTab !== "comunicacao"}
+                            className="flex flex-col gap-6 focus:outline-none"
+                          >
+                            {/* Step 1 — the proposal. One tool at a time: the detailed
                                   Studio by default, or the quick price-table Builder —
-                                  never both stacked on screen. */}
+                                  never both stacked on screen. The mode is an explicit,
+                                  calm segmented choice so a newcomer sees both exist. */}
+                            <div className="flex flex-wrap items-center justify-between gap-3">
                               <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
-                              {!showBuilder ? (
-                                <>
-                                  <ProposalStudio
-                                    key={`studio-${selected.id}`}
-                                    quote={selected}
-                                    onSent={() => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev ? { ...prev, status: "cotado" } : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: "Proposta enviada ao cliente (Studio)",
-                                        },
-                                      ]);
-                                    }}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowBuilder(true)}
-                                    className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
-                                  >
-                                    Prefiro uma proposta rápida (tabela de preços) →
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <ProposalBuilder
-                                    quote={selected}
-                                    onSent={(total) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id
-                                            ? { ...q, status: "cotado", quotedPrice: total }
-                                            : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev
-                                          ? { ...prev, status: "cotado", quotedPrice: total }
-                                          : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: `Proposta enviada — ${eur(total)}`,
-                                        },
-                                      ]);
-                                    }}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowBuilder(false)}
-                                    className="self-start text-[11px] tracking-[0.08em] text-foreground/55 underline underline-offset-2 transition-opacity hover:opacity-75"
-                                  >
-                                    ← Voltar à proposta detalhada (com imagens)
-                                  </button>
-                                </>
-                              )}
-
-                              {/* Step 2 — talk to the client. */}
-                              <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
-                                2 · Falar com o cliente
-                              </p>
-                              <ClientMessenger
-                                key={selected.id}
-                                quote={selected}
-                                onSent={(messages) => {
-                                  const prev_count = selected.messages?.length ?? 0;
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, messages } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                                  if (messages.length > prev_count) {
+                              <Segmented
+                                ariaLabel="Tipo de proposta"
+                                size="sm"
+                                value={showBuilder ? "rapida" : "detalhada"}
+                                onChange={(v) => setShowBuilder(v === "rapida")}
+                                options={[
+                                  { value: "detalhada", label: "Detalhada" },
+                                  { value: "rapida", label: "Rápida" },
+                                ]}
+                              />
+                            </div>
+                            <p className="-mt-3 text-xs leading-relaxed text-foreground/45">
+                              {showBuilder
+                                ? "Rápida — uma tabela de preços simples, sem imagens nem PDF."
+                                : "Detalhada — proposta completa em PDF, com capa, serviços e imagens."}
+                            </p>
+                            {!showBuilder ? (
+                              <>
+                                <ProposalStudio
+                                  key={`studio-${selected.id}`}
+                                  quote={selected}
+                                  onSent={() => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev ? { ...prev, status: "cotado" } : prev,
+                                    );
+                                    setEditStatus("cotado");
                                     appendActivity(selected.id, [
                                       {
                                         id: randomId(),
                                         at: new Date().toISOString(),
-                                        kind: "message_sent",
+                                        kind: "proposal_sent",
                                         actor: userName,
-                                        summary: "Mensagem enviada ao cliente",
+                                        summary: "Proposta enviada ao cliente (Studio)",
                                       },
                                     ]);
-                                  }
-                                }}
-                              />
+                                  }}
+                                />
+                              </>
+                            ) : (
+                              <>
+                                <ProposalBuilder
+                                  quote={selected}
+                                  onSent={(total) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id
+                                          ? { ...q, status: "cotado", quotedPrice: total }
+                                          : q,
+                                      ),
+                                    );
+                                    setSelected((prev) =>
+                                      prev
+                                        ? { ...prev, status: "cotado", quotedPrice: total }
+                                        : prev,
+                                    );
+                                    setEditStatus("cotado");
+                                    appendActivity(selected.id, [
+                                      {
+                                        id: randomId(),
+                                        at: new Date().toISOString(),
+                                        kind: "proposal_sent",
+                                        actor: userName,
+                                        summary: `Proposta enviada — ${eur(total)}`,
+                                      },
+                                    ]);
+                                  }}
+                                />
+                              </>
+                            )}
 
-                              {/* Activity history — de-emphasised, collapsed by default. */}
-                              <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                  <svg
-                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                  >
-                                    <path
-                                      d="m9 6 6 6-6 6"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                  Histórico de atividade
-                                </summary>
-                                <div className="pt-6">
-                                  <ActivityLog
-                                    quote={selected}
-                                    actor={userName}
-                                    onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                            {/* Step 2 — talk to the client. */}
+                            <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
+                              2 · Falar com o cliente
+                            </p>
+                            <ClientMessenger
+                              key={selected.id}
+                              quote={selected}
+                              onSent={(messages) => {
+                                const prev_count = selected.messages?.length ?? 0;
+                                setQuotes((prev) =>
+                                  prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
+                                );
+                                setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                if (messages.length > prev_count) {
+                                  appendActivity(selected.id, [
+                                    {
+                                      id: randomId(),
+                                      at: new Date().toISOString(),
+                                      kind: "message_sent",
+                                      actor: userName,
+                                      summary: "Mensagem enviada ao cliente",
+                                    },
+                                  ]);
+                                }
+                              }}
+                            />
+
+                            {/* Activity history — de-emphasised, collapsed by default. */}
+                            <details className="group border-t border-foreground/10 pt-4">
+                              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <svg
+                                  className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                >
+                                  <path
+                                    d="m9 6 6 6-6 6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                   />
-                                </div>
-                              </details>
-                            </div>
-                          )}
+                                </svg>
+                                Histórico de atividade
+                              </summary>
+                              <div className="pt-6">
+                                <ActivityLog
+                                  quote={selected}
+                                  actor={userName}
+                                  onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                />
+                              </div>
+                            </details>
+                          </div>
                         </div>
                       </div>
 
@@ -3131,7 +3241,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           alterações por guardar, seja qual for a secção onde o
                           utilizador está. Nunca mais um "guardar" escondido. */}
                       {isDirty && (
-                        <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white/95 px-5 py-3 backdrop-blur-sm sm:-mx-7 sm:-mb-8 sm:px-7">
+                        <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white px-5 py-3 sm:-mx-7 sm:-mb-8 sm:px-7">
                           <div className="flex items-center justify-between gap-3">
                             <p
                               role="status"

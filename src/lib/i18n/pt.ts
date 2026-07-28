@@ -74,7 +74,8 @@ export const pt = {
     retomar: "Retomar rotação dos testemunhos",
     pausarLogos: "Pausar desfile de logótipos",
     retomarLogos: "Retomar desfile de logótipos",
-    whatsappPrefill: "Olá, gostaria de saber mais sobre a decoração de eventos.",
+    whatsappPrefill:
+      "Olá! Gostaria de saber mais sobre a decoração e organização de eventos da Líquen Events e como podem ajudar-me a planear o meu.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
@@ -107,7 +108,7 @@ export const pt = {
     ogLocale: "pt_PT",
     homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "Decoração de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em Portugal. Do conceito ao último detalhe — peça orçamento.",
+      "A Líquen Events é uma empresa especializada em planear e executar eventos únicos, transformando as suas ideias em experiências memoráveis.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
       "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
@@ -122,10 +123,10 @@ export const pt = {
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
+      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Receba uma proposta à medida para o seu evento.",
     orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em 24 horas úteis.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — e receba uma proposta à medida.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -161,8 +162,7 @@ export const pt = {
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Tem um evento",
     ctaTitleLine2: "em mente?",
-    ctaText:
-      "Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas úteis.",
+    ctaText: "Conte-nos a sua ideia. Ouvimos a sua visão e respondemos com uma proposta à medida.",
   },
 
   sobre: {
@@ -310,7 +310,7 @@ export const pt = {
       ctaTitleLine1: "Peça o seu",
       ctaTitleMoss: "orçamento.",
       ctaText:
-        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais diretos.",
+        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida. Para uma pergunta rápida, use um dos canais diretos.",
       ctaButton: "Pedir orçamento",
     },
     testimonialsEyebrow: "O que dizem os nossos clientes",
@@ -320,7 +320,7 @@ export const pt = {
         title: "Recebemos o seu pedido",
         desc: "Analisamos o seu pedido e preparamos uma resposta à medida.",
       },
-      { title: "Entramos em contacto", desc: "Em menos de 24 horas úteis, marcamos uma conversa." },
+      { title: "Entramos em contacto", desc: "Marcamos uma conversa para conhecer a sua visão." },
       { title: "Proposta à medida", desc: "Proposta detalhada, com orçamento transparente." },
       { title: "Começamos a criar", desc: "Tratamos de cada detalhe para um evento inesquecível." },
     ],
@@ -338,7 +338,7 @@ export const pt = {
       heroTitleMoss: "extraordinário",
       infoEyebrow: "Encontre-nos",
       emailLabel: "E-mail",
-      emailSub: "Respondemos em menos de 24 horas úteis",
+      emailSub: "Respondemos a cada pedido com atenção",
       phoneLabel: "Telefone",
       phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
@@ -347,8 +347,7 @@ export const pt = {
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
       googleLink: "Ver no Google · Deixar avaliação",
-      promise:
-        "Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta personalizada.",
+      promise: "Respondemos a todos os pedidos com uma proposta personalizada.",
       promiseSign: "— Equipa Líquen Events",
       stepLabels: ["Evento", "Dados", "Detalhes", "Mensagem"],
       eventCards: [
@@ -388,7 +387,7 @@ export const pt = {
       voltar: "Voltar",
       enviar: "Enviar Pedido",
       enviando: "A enviar…",
-      resposta24: "Resposta em 24h",
+      resposta24: "Proposta à medida",
       errNome: "Indique o seu nome",
       errEmail: "E-mail inválido",
       error: "Não foi possível enviar. Tente novamente ou contacte-nos pelo WhatsApp.",
@@ -398,8 +397,8 @@ export const pt = {
       successThanks: "Obrigado",
       successText: ". Em breve entraremos em contacto para avançarmos juntos no seu evento.",
       successSteps: [
-        { n: "01", t: "Analisamos o seu pedido", d: "Nas próximas horas" },
-        { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas úteis" },
+        { n: "01", t: "Analisamos o seu pedido", d: "Com toda a atenção" },
+        { n: "02", t: "Entramos em contacto", d: "Em breve" },
         { n: "03", t: "Enviamos proposta à medida", d: "Personalizada para si" },
       ],
       successWhatsApp: "Acompanhar pelo WhatsApp",
@@ -419,7 +418,7 @@ export const pt = {
       },
       {
         q: "Como funciona o processo de orçamentação?",
-        a: "Após o primeiro contacto e uma conversa inicial (sem compromisso), preparamos uma proposta detalhada com orçamento transparente. Não há surpresas nem custos escondidos.",
+        a: "Após o primeiro contacto e uma conversa inicial, preparamos uma proposta detalhada com orçamento transparente. Não há surpresas nem custos escondidos.",
       },
       {
         q: "Trabalham com diferentes orçamentos?",
@@ -437,8 +436,8 @@ export const pt = {
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
     titleMoss: "a sua ideia",
-    lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
-    processHint: "Pedido → Proposta em 24h → Reunião",
+    lead: "Ouvimos a sua visão e respondemos com uma proposta à medida para o seu evento.",
+    processHint: "Pedido → Proposta → Reunião",
     eventTypeLabels: [
       "Casamento",
       "Corporativo",
@@ -455,13 +454,17 @@ export const pt = {
     labelNome: "Nome",
     labelEmail: "E-mail",
     labelTelefone: "Telefone",
-    labelMensagem: "Mensagem",
+    // The one field that decides whether the proposal can be designed or only
+    // priced. Asked as a question, not a form label.
+    labelMensagem: "Como imagina o seu evento?",
     phPessoas: "Ex.: 120",
     phLocal: "Ex.: Évora, Alentejo…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",
     phTelefone: "+351 9XX XXX XXX",
-    phMensagem: "Conte-nos o que imagina para o seu evento — local, ambiente, detalhes especiais…",
+    phMensagem: "Estilo, cores, ambiente, inspirações que guardou…",
+    hintMensagem:
+      "Quanto mais nos contar sobre o estilo que tem em mente — as cores, o ambiente, referências que guardou — mais à medida sai a proposta. É por aqui que a começamos a desenhar.",
     errNome: "Indique o seu nome",
     errEmail: "E-mail inválido",
     errTipo: "Selecione o tipo de evento.",
@@ -470,7 +473,7 @@ export const pt = {
     ouWhatsApp: "ou pelo WhatsApp",
     error: "Não foi possível enviar. Tente novamente ou fale connosco pelo WhatsApp.",
     requiredNote: "Os campos marcados com * são obrigatórios.",
-    submitReassure: "Sem compromisso · Resposta em menos de 24 horas úteis.",
+    submitReassure: "Uma proposta à medida, pensada ao detalhe.",
     privacyPre: "Ao enviar, aceita a nossa ",
     privacyLinkLabel: "Política de Privacidade",
     privacyPost: ". Não partilhamos os seus dados.",
@@ -513,16 +516,16 @@ export const pt = {
             desc: "O vosso dia mais especial — coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
           },
           {
-            title: "Aluguer de Viaturas Clássicas",
-            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
-          },
-          {
             title: "Batizados & Comunhões",
             desc: "Celebrações familiares íntimas e cheias de significado, organizadas com carinho.",
           },
           {
             title: "Festas de Aniversário",
             desc: "Festas temáticas ou clássicas para todas as idades. Cada aniversário é uma história.",
+          },
+          {
+            title: "Aluguer de Viaturas Clássicas",
+            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
           },
         ],
       },
@@ -545,8 +548,7 @@ export const pt = {
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Vamos dar vida",
     ctaTitleMoss: "à sua ideia?",
-    ctaText:
-      "Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
+    ctaText: "Fale connosco. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
     ctaGaleria: "Ver a galeria",
     galleryAlt: [
       "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
@@ -569,8 +571,16 @@ export const pt = {
     },
     successEyebrow: "Pedido enviado com sucesso",
     titleLine1: "Recebemos o",
-    titleMoss: "vosso pedido.",
-    lead: "A nossa equipa irá analisar o pedido e entrar em contacto em menos de 24 horas úteis com uma proposta personalizada.",
+    // Register follows the event: plural for a couple/family (casamentos,
+    // batizados), singular formal otherwise — the same rule as the email.
+    titleMoss: "seu pedido.",
+    titleMossPlural: "vosso pedido.",
+    lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento — antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
+    countdown: "Faltam {days} dias para a data do evento.",
+    highSeasonNote:
+      "De maio a outubro o Alentejo enche — as melhores quintas fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
+    recapTitle: "O que nos contou",
+    recapTitlePlural: "O que nos contaram",
     refLabel: "Referência do Pedido",
     categoria: "Categoria",
     tipo: "Tipo",
@@ -580,17 +590,30 @@ export const pt = {
     local: "Local",
     mensagem: "Mensagem",
     adicionais: "Serviços Adicionais",
+    openDate: "Ainda a definir",
+    openDateNote:
+      "Sem data fechada temos margem para sugerir fins de semana com melhor disponibilidade — e, muitas vezes, melhor preço.",
     noDataNote:
       "Guarde a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto consigo brevemente.",
+    noDataNotePlural:
+      "Guardem a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto convosco brevemente.",
     footerNote: "Proposta formal enviada após análise do pedido pela nossa equipa.",
     proximosPassos: "Próximos passos",
     steps: [
       { label: "Análise do pedido", desc: "A nossa equipa analisa todos os detalhes." },
       { label: "Proposta personalizada", desc: "Enviamos uma proposta detalhada por email." },
       { label: "Reunião de briefing", desc: "Marcamos uma reunião para alinhar a visão." },
-      { label: "Produção do evento", desc: "Tomamos conta de tudo para si." },
+      { label: "Produção do evento", desc: "Tomamos conta de tudo, do início ao fim." },
     ],
     contactIntro: "Para qualquer questão, pode contactar-nos diretamente:",
+    contactIntroPlural: "Para qualquer questão, podem contactar-nos diretamente:",
+    contactWhatsapp: "Falar por WhatsApp",
+    contactWhatsappSub: "O caminho mais rápido até nós.",
+    notFoundTitle: "Não encontrámos este pedido",
+    // No quote here, so the register is unknown — singular formal is the safe
+    // form for an anonymous visitor.
+    notFoundBody:
+      "A ligação pode estar incompleta ou já não ser válida. Se enviou um pedido e não recebeu a nossa confirmação por email, fale connosco — resolvemos no próprio dia.",
     voltarInicio: "Voltar ao Início",
     novoPedido: "Novo Pedido",
     dateLocale: "pt-PT",
@@ -598,8 +621,10 @@ export const pt = {
     signOff: "Com carinho,",
     signName: "Catarina & a equipa Líquen",
     saveDate: "Guardar a data no calendário",
-    whileTitle: "Enquanto preparamos a vossa proposta",
-    whileLead: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
+    whileTitle: "Enquanto preparamos a sua proposta",
+    whileTitlePlural: "Enquanto preparamos a vossa proposta",
+    whileLead: "Fique à vontade para conhecer um pouco do nosso mundo.",
+    whileLeadPlural: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
     exploreGaleria: "Ver a galeria",
     exploreGaleriaSub: "Casamentos e eventos que criámos",
     exploreInsta: "Seguir no Instagram",

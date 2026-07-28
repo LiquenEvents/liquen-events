@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import HeroImage from "@/components/HeroImage";
 import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -22,6 +23,14 @@ const serviceLinks = [
   { image: "/imagens/DaniGui_JantarFesta_26.jpg", href: "/servicos#celebracoes" },
 ];
 
+// Same "continuous fade between images" veil as /serviços (PANEL_VEIL there):
+// darkens the bottom (0.75 — keeps the caption legible) AND fades in at the very
+// top (0.55), so each full-bleed chapter blends into the one above instead of
+// meeting it at a hard seam. The old scrim darkened only the bottom (top 0.05),
+// which left a visible bright/dark edge between stacked panels.
+const PANEL_VEIL =
+  "linear-gradient(to top, rgba(8,8,8,0.75) 0%, rgba(8,8,8,0.20) 38%, rgba(8,8,8,0.16) 58%, rgba(8,8,8,0.55) 100%)";
+
 export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
   const locale = normalizeLocale((await params).lang);
   const t = getDictionary(locale);
@@ -32,13 +41,13 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed
           behind the transparent fixed navbar. */}
       <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
-        <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+        <Parallax speed={0.14} drift className="absolute inset-0">
+          <HeroImage
             src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
             {...blurFor("/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg")}
             alt={t.common.imageAlt.homeHero}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={75}
             className="object-cover object-center hero-settle"
@@ -82,34 +91,25 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 ))}
               </h1>
               <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">
-                {/* Primary hero actions. text-[11px] + py-2 gives a comfortable
-                    reading size and a ≥40px tap target on phones (the underline
-                    keeps the minimal look); tightens back to 10px from sm up. */}
+                {/* Primary hero actions. Small 9px label on phones (the py-2
+                    still keeps a ≥40px tap target and the underline keeps the
+                    minimal look); 10px from sm up. */}
                 <TrackedLink
                   href={localizeHref("/orcamento", locale)}
                   trackProps={{ source: "hero" }}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[11px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
                 >
                   {t.common.pedirOrcamento} <span aria-hidden>→</span>
                 </TrackedLink>
                 <Link
                   href={localizeHref("/galeria", locale)}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[11px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
+                  className="inline-flex items-center gap-1.5 text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
                 >
                   {t.common.verGaleria} <span aria-hidden>→</span>
                 </Link>
               </div>
             </div>
           </AnimateIn>
-        </div>
-
-        <div className="absolute bottom-8 right-6 lg:right-16 z-10 hidden sm:flex flex-col items-center gap-3 anim-3">
-          <span className="text-white/75 text-[9px] tracking-[0.5em] uppercase [writing-mode:vertical-rl]">
-            {t.home.scroll}
-          </span>
-          <div className="h-10 w-px overflow-hidden">
-            <div className="w-full h-full bg-gradient-to-b from-white/50 to-transparent animate-scroll-line" />
-          </div>
         </div>
       </section>
 
@@ -124,13 +124,27 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           esquerda sobre um scrim. Os títulos são <h2> (h1 do herói → h2 por
           capítulo), mantendo a hierarquia de headings. */}
       {services.map((s, i, arr) => (
-        <section key={s.title} className="relative h-[86svh] min-h-[560px] w-full overflow-hidden">
-          {/* The photograph is UNVEILED as the chapter enters — a bottom-up clip
-              mask (the same cinematic wipe used on the editorial images in /sobre)
-              instead of a hard cut. One-shot, compositor-driven (clip-path +
-              transform), and reduced-motion-safe (Reveal renders the finished
-              state). start="top 92%" so it completes before the panel centres. */}
-          <Reveal as="div" variant="mask" className="absolute inset-0" start="top 82%">
+        <section
+          key={s.title}
+          className="relative h-[86svh] min-h-[560px] w-full overflow-hidden"
+          // Skip layout/paint (and pause the scroll-chevron animation) for these
+          // full-bleed chapters while they're off-screen; the height is
+          // deterministic so contain-intrinsic-size matches → no scroll-jump, and
+          // each chapter's big image decode is deferred to when it nears view.
+          style={{ contentVisibility: "auto", containIntrinsicSize: "auto 86svh" }}
+        >
+          {/* The photograph settles in as the chapter enters — a slow cinematic
+              zoom-out (scale 1.08 → 1) with a fade. Pure transform + opacity, so
+              it's GPU-composited and stays buttery at 60fps on these full-bleed
+              photos (the old clip-path wipe repainted and stuttered). One-shot and
+              reduced-motion-safe (Reveal renders the finished state). */}
+          <Reveal
+            as="div"
+            variant="zoom"
+            duration={1.15}
+            className="absolute inset-0"
+            start="top 88%"
+          >
             <Image
               src={s.image}
               alt=""
@@ -144,10 +158,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           {/* A imagética da SpaceX é escura por natureza; as nossas fotos podem
               ser claras, por isso um scrim inferior-esquerdo mantém a legenda
               maiúscula legível sem depender de sombra no texto. */}
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-gradient-to-t from-[#080808]/85 via-[#080808]/20 to-[#080808]/5"
-          />
+          <div aria-hidden className="absolute inset-0" style={{ backgroundImage: PANEL_VEIL }} />
           <div className="absolute inset-x-0 bottom-0">
             <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 pb-[11svh] lg:pb-[13svh]">
               {/* The caption composes itself in a 3-beat cadence (gold eyebrow →
@@ -156,13 +167,13 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               <Reveal as="div" stagger={0.08} start="top 92%">
                 <h2
                   className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
-                  style={{ fontSize: "clamp(36px, 6.5vw, 78px)" }}
+                  style={{ fontSize: "clamp(24px, 3.4vw, 42px)" }}
                 >
                   {s.title}
                 </h2>
                 <Link
                   href={localizeHref(s.href, locale)}
-                  className="mt-8 inline-flex items-center gap-3 border border-white/70 text-white text-[11px] tracking-[0.3em] uppercase px-8 py-3.5 hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                  className="mt-6 sm:mt-8 inline-flex items-center gap-2 sm:gap-3 border border-white/70 text-white text-[10px] sm:text-[11px] tracking-[0.18em] sm:tracking-[0.3em] uppercase px-5 py-2.5 sm:px-8 sm:py-3.5 hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 >
                   {t.common.verServicos}
                   <span aria-hidden>→</span>
@@ -195,17 +206,21 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
       {/* ── CTA — full-screen closing panel (matches /servicos) ── */}
       <section
-        className="relative overflow-hidden border-t border-foreground/8 flex items-center py-28 lg:py-40"
-        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+        className="relative overflow-hidden flex items-center py-28 lg:py-40"
+        style={{
+          minHeight: "clamp(560px, 90vh, 900px)",
+          contentVisibility: "auto",
+          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
+        }}
       >
         <Image
-          src="/imagens/JOAO_E_PEDRO_1Y1A3450.jpg"
+          src="/imagens/JOAO_E_PEDRO_1Y1A4463.jpg"
           alt={t.common.imageAlt.homeWedding}
           fill
           sizes="100vw"
           quality={75}
           className="object-cover object-center"
-          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A3450.jpg")}
+          {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A4463.jpg")}
         />
         {/* Wash + gradient merged into one layer (gradient listed first = on
             top, matching the former div order). Same look, one paint pass. */}
@@ -230,7 +245,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           <AnimateIn>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
-              style={{ fontSize: "clamp(44px, 8vw, 116px)" }}
+              style={{ fontSize: "clamp(32px, 5.5vw, 78px)" }}
             >
               <span className="block">{t.home.ctaTitleLine1}</span>
               <span className="block text-moss">{t.home.ctaTitleLine2}</span>

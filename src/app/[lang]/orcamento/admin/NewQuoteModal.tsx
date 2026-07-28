@@ -94,7 +94,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-2xl"
+        className="relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -130,7 +130,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
         </div>
 
         {/* ── Body ── */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-4 gap-y-5 overflow-y-auto px-7 pb-7 sm:grid-cols-2 sm:px-9">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-4 gap-y-5 overflow-y-auto overscroll-contain px-7 pb-7 sm:grid-cols-2 sm:px-9">
           {duplicates.length > 0 && (
             <div className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] p-3.5">
               <svg

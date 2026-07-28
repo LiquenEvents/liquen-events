@@ -31,7 +31,6 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
       { keys: ["G", "T"], label: "Tarefas" },
       { keys: ["G", "F"], label: "Fornecedores" },
       { keys: ["G", "E"], label: "Estatísticas" },
-      { keys: ["G", "I"], label: "Inbox" },
     ],
   },
   {
@@ -81,7 +80,7 @@ export default function ShortcutsModal({ open, onClose }: Props) {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6 px-6 py-6 max-h-[70vh] overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6 px-6 py-6 max-h-[70dvh] overflow-y-auto overscroll-contain">
           {GROUPS.map((g) => (
             <div key={g.title}>
               <p className="text-foreground/30 text-[10px] tracking-[0.25em] uppercase mb-3">

@@ -102,14 +102,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // anulado para `paga`, ou casava com o anulado ignorando o ativo existente.
     const activeLedger = ledger.filter((inv) => inv.status !== "anulada");
     const isSinalOrSaldo = invoiceKind === "sinal" || invoiceKind === "saldo";
+    // For ad-hoc payments, dedupe by the payment MARKER when one is supplied:
+    // two distinct payments of the same value must each get their own numbered
+    // document, so we must NOT fall back to a kind+amount match when a fresh
+    // paymentRef is present (that reused/overwrote an unrelated same-amount
+    // invoice). The kind+amount heuristic is reserved for legacy records that
+    // carry no marker.
     let invoice =
       (isSinalOrSaldo
         ? activeLedger.find((inv) => inv.kind === invoiceKind)
-        : activeLedger.find(
-            (inv) =>
-              (!!paymentRef && (inv.note ?? "").includes(paymentRef)) ||
-              (inv.kind === invoiceKind && inv.amount === amount),
-          )) ?? null;
+        : paymentRef
+          ? activeLedger.find((inv) => (inv.note ?? "").includes(paymentRef))
+          : activeLedger.find((inv) => inv.kind === invoiceKind && inv.amount === amount)) ?? null;
 
     if (invoice) {
       // Documento já emitido: reaproveitamos o MESMO número — nunca criamos um

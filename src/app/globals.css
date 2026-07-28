@@ -126,19 +126,20 @@ body.admin-mode {
   --bo-lh-body: 1.6;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
-  /* SpaceX-style engineered look: the back office uses the technical Archivo
-     grotesque everywhere (loaded via next/font as --font-spacex). Redefining
-     --font-playfair INSIDE .admin-mode means both the `font-display` class and
-     any inline `var(--font-playfair)` resolve to it too — the public marketing
-     site (outside .admin-mode) keeps Playfair/Inter untouched. */
+  /* Calm "ChatGPT-app" look: the back office uses one clean humanist sans
+     (Inter, already loaded via next/font) for BOTH working text and headings.
+     Redefining --font-playfair INSIDE .admin-mode means the `font-display`
+     class and any inline `var(--font-playfair)` resolve to Inter too, so the
+     display titles read as a quiet modern sans instead of a serif or the old
+     technical grotesque — the public marketing site (outside .admin-mode)
+     keeps Playfair/Inter untouched. */
   --font-playfair:
-    var(--font-spacex), var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 
-  /* Technical grotesque for all working admin text; system-ui stack behind it so
+  /* Clean humanist sans for all working admin text; system-ui stack behind it so
      there is never a network dependency. */
   font-family:
-    var(--font-spacex),
     var(--font-inter),
     ui-sans-serif,
     system-ui,
@@ -149,24 +150,37 @@ body.admin-mode {
     Arial,
     sans-serif;
   line-height: var(--bo-lh-body);
-  /* Uppercase, mission-control aesthetic across the whole interface. Positive
-     tracking so caps breathe (never the cramped negative tracking used for
-     lowercase UI text). Data the team TYPES or reads literally (inputs, emails,
-     phone numbers, the ref id) is exempted below so nothing is mangled. */
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  /* Sentence case, quiet. A hair of negative tracking gives UI text the crisp,
+     modern feel of a product app (ChatGPT/Linear) — NOT the shouty uppercase
+     mission-control look this interface used to force on every element. */
+  letter-spacing: var(--bo-tracking-tight);
 }
 
-/* Display / working headings: slightly wider tracking now that they're caps. */
+/* Display / working headings: tighter tracking for the calm modern-sans look. */
 body.admin-mode :is(h1, h2, h3, h4),
 body.admin-mode .font-display {
-  letter-spacing: 0.015em;
+  letter-spacing: -0.02em;
 }
 
-/* Keep real DATA in its true case — uppercasing an email, a client's name mid-
-   typing, a phone number or a reference id reads as broken, not premium. These
-   opt out of the global uppercase (the SpaceX look stays on all the chrome:
-   labels, headings, buttons, menus, values). */
+/* ── ChatGPT-calm typography ──────────────────────────────────────────────
+   The back office used to SHOUT: besides the old global uppercase (removed
+   above), individual buttons, labels and eyebrows STILL request `uppercase`
+   and wide `tracking-*` inline, across ~15 screens. Rather than edit every
+   call site, neutralise it here — scoped to .admin-mode, so the public
+   marketing site keeps its editorial caps. Every admin screen now reads in
+   calm sentence case with quiet spacing, like a modern product app (ChatGPT/
+   Linear). Data fields keep their true case via the block below. */
+body.admin-mode .uppercase,
+body.admin-mode .bo-eyebrow,
+body.admin-mode .eyebrow {
+  text-transform: none;
+  letter-spacing: 0.005em;
+}
+
+/* Keep real DATA in its true case — an email, a client's name mid-typing, a
+   phone number or a reference id must never be transformed. (Now that the
+   interface is sentence case this is mostly redundant, but it also resets the
+   letter-spacing on typed fields, so it stays.) */
 body.admin-mode input,
 body.admin-mode textarea,
 body.admin-mode select,
@@ -228,6 +242,25 @@ body.admin-mode .bo-text-faint {
     0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
 }
+/* The quote confirmation is the one public page whose ground is cream
+   (#f7f4ee) rather than white. That single step down drops the at-rest navbar's
+   moss links from 4.69:1 to 4.27:1 — under WCAG AA for their 11px size. Rebind
+   the moss token INSIDE the header on that page only, so the nav deepens to
+   moss-dark (6.1:1) as one coherent set (links, borders, the CTA outline) while
+   every white page keeps the navbar exactly as it was. */
+body:has([data-cream-page]) [data-public-nav] {
+  --color-moss: var(--color-moss-dark);
+}
+
+/* Opt-out for elements focused PROGRAMMATICALLY as a screen-reader landing
+   point — a heading moved into focus after a route change is not a control, and
+   the ring above drew a hard box around it for every visitor. Needed as a real
+   rule (not a Tailwind utility) because the base rule above is unlayered, and
+   unlayered styles beat anything in Tailwind's `utilities` layer. */
+.focus-quiet:focus-visible {
+  box-shadow: none;
+}
+
 /* Windows High Contrast / forced-colors mode strips box-shadows, so the ring
    above disappears and keyboard focus becomes invisible. Restore a real system
    outline there (CanvasText adapts to the user's chosen contrast theme). */
@@ -334,6 +367,14 @@ body::before {
   background-size: 300px 300px;
   opacity: 0.022;
 }
+/* The grain is imperceptible on dense phone screens, and a top-most full-viewport
+   fixed layer can defeat mobile partial-invalidation fast paths on scroll — drop
+   it on touch, mirroring how Parallax/WebGL are disabled on coarse pointers. */
+@media (pointer: coarse) {
+  body::before {
+    display: none;
+  }
+}
 
 /* ── Underline slide animation ── */
 .link-line {
@@ -354,9 +395,15 @@ body::before {
      underline lagged the colour by ~150ms). */
   transition: transform 0.3s var(--ease-out);
 }
-.link-line:hover::after {
-  transform-origin: left;
-  transform: scaleX(1);
+/* Gated to real hover devices: without this, tapping a link on a phone latches
+   the :hover state (underline stays drawn) until you tap elsewhere — reads as
+   stuck UI. Tailwind's hover: utilities are already (hover:hover)-gated; these
+   hand-written rules must match. Zero change on desktop. */
+@media (hover: hover) {
+  .link-line:hover::after {
+    transform-origin: left;
+    transform: scaleX(1);
+  }
 }
 
 /* Active nav link — permanent moss underline */
@@ -425,6 +472,24 @@ body::before {
 }
 .lb-photo-in {
   animation: lb-photo-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Opening a photo: a slightly deeper zoom-in than the between-photos lb-photo-in,
+   so the photo visibly "grows" as it opens. Transform + opacity only → fully
+   GPU-composited, no snapshot (this replaced the View Transition morph, which
+   snapshotted the whole full-screen layer and stuttered). */
+@keyframes lb-open-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.lb-open-in {
+  animation: lb-open-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── Lightbox cinematográfico — slideshow ── */
@@ -556,6 +621,179 @@ body:has([data-orcamento-mode]) .scroll-progress {
   display: none !important;
 }
 
+/* ── Orçamento form: refined, ultra-minimal field + entrance details ──
+   A hairline moss underline that DRAWS IN left→right on focus (over the resting
+   border), and a subtle staggered fade/rise for the fields on load. Motion is
+   opacity/transform + a 2px background line only — no layout shift, negligible
+   cost — and the entrance is gated behind prefers-reduced-motion. */
+.field-line {
+  background-image: linear-gradient(var(--color-moss), var(--color-moss));
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: 0% 2px;
+  transition:
+    background-size 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease;
+}
+.field-line:focus {
+  background-size: 100% 2px;
+}
+
+/* ── Floating labels (orçamento) ──
+   The label rests inside the field like a placeholder, then floats up + shrinks
+   to the small uppercase micro-label on focus or once the field has a value
+   (detected with :placeholder-shown via :has). The real example placeholder is
+   hidden until focus so it never collides with the resting label. `.ff--float`
+   forces the floated state for controls where :placeholder-shown is unreliable
+   (the native date input). Transform/opacity only — cheap, no layout shift. */
+.ff {
+  position: relative;
+}
+.ff-input {
+  padding-top: 1.3rem;
+  padding-bottom: 0.35rem;
+}
+.ff-label {
+  position: absolute;
+  left: 0;
+  top: 1.3rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-foreground) 42%, transparent);
+  pointer-events: none;
+  transform-origin: left center;
+  white-space: nowrap;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.3s ease;
+}
+.ff:has(.ff-input:focus) .ff-label,
+.ff:has(.ff-input:not(:placeholder-shown)) .ff-label,
+.ff--float .ff-label {
+  /* Small, quiet, gray micro-label (Apple-like) — the moss accent stays on the
+     underline, not the label. */
+  transform: translateY(-1.3rem) scale(0.7);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-foreground) 50%, transparent);
+}
+/* Hide the example placeholder until focus so only the resting label shows. */
+.ff-input::placeholder {
+  color: transparent;
+}
+.ff-input:focus::placeholder {
+  color: color-mix(in srgb, var(--color-foreground) 40%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-label {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .orc-reveal > * {
+    animation: orc-field-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .orc-reveal > *:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .orc-reveal > *:nth-child(2) {
+    animation-delay: 0.05s;
+  }
+  .orc-reveal > *:nth-child(3) {
+    animation-delay: 0.08s;
+  }
+  .orc-reveal > *:nth-child(4) {
+    animation-delay: 0.13s;
+  }
+  .orc-reveal > *:nth-child(5) {
+    animation-delay: 0.18s;
+  }
+  .orc-reveal > *:nth-child(6) {
+    animation-delay: 0.23s;
+  }
+  .orc-reveal > *:nth-child(7) {
+    animation-delay: 0.28s;
+  }
+  .orc-reveal > *:nth-child(8) {
+    animation-delay: 0.33s;
+  }
+  .orc-reveal > *:nth-child(9) {
+    animation-delay: 0.38s;
+  }
+  .orc-reveal > *:nth-child(n + 10) {
+    animation-delay: 0.42s;
+  }
+  @keyframes orc-field-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* ── Hero parallax drift, driven on the compositor ──
+   Opt-in via <Parallax drift>. Where scroll-driven animations exist (and motion
+   is welcome), the hero layer drifts as its section scrolls through the viewport
+   — tied to the element's own view() timeline, so it runs on the compositor with
+   NO scroll listener and NO main-thread work (unlike the old JS parallax, which
+   is why that one was retired). A small scale(1.06) gives 3% headroom each side
+   so the ±2.4% drift never exposes an edge. Unsupported browsers / reduced-
+   motion show the static image.
+
+   Timeline is scroll(root) — NOT view() — on purpose: the hero sits inside an
+   overflow-hidden section, which is itself a scroll container, so view() would
+   resolve against that non-scrolling ancestor and never advance. scroll(root)
+   binds to the document scroller directly; every page's hero is its first
+   section, so a 0 → 100vh range covers the hero's passage on all of them. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .parallax-drift {
+      transform: scale(1.06);
+      will-change: transform;
+      animation: parallax-drift-kf linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 100vh;
+    }
+    @keyframes parallax-drift-kf {
+      from {
+        transform: scale(1.06) translateY(-2.4%);
+      }
+      to {
+        transform: scale(1.06) translateY(2.4%);
+      }
+    }
+  }
+}
+
+/* ── Scroll progress bar driven on the compositor ──
+   Where scroll-driven animations exist, the bar's fill is tied straight to the
+   document scroll timeline — no scroll listener, no rAF, no main-thread work; it
+   runs on the compositor. ScrollProgress.tsx feature-detects support, sets
+   data-css-driven, and skips its JS path entirely. Unsupported browsers keep
+   that JS fallback (transform written once per rAF). */
+@supports (animation-timeline: scroll()) {
+  .scroll-progress-bar[data-css-driven="true"] {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: none;
+    animation: scroll-progress-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+  @keyframes scroll-progress-grow {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
 /* ── Back-office: full-screen tool surface (clean & minimal) ── */
 body.admin-mode nav[data-public-nav] {
   display: none !important;
@@ -598,10 +836,7 @@ body[data-menu-open] .whatsapp-fixed {
   pointer-events: none;
 }
 
-/* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. Pair with
-      Parallax (translate on the wrapper) — separate elements, so the two
-      transforms never fight. `both` keeps the final scale as the resting
-      state, preserving drift headroom for the parallax. ── */
+/* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. ── */
 @keyframes hero-settle {
   from {
     transform: scale(1.14);
@@ -610,8 +845,20 @@ body[data-menu-open] .whatsapp-fixed {
     transform: scale(1.06);
   }
 }
+/* Resting (settled) state is the DEFAULT — no animation. The 2.2s scale only
+   PLAYS on the very first page load (html:not([data-navigated]), stamped by
+   PageTransition on the first client navigation). Client-to-client navigations
+   then arrive already settled, so the Ken-Burns scale never re-runs on top of
+   the incoming hero's decode + the route fade — that overlap was a real
+   per-navigation jank source, and hero-settle's old Parallax partner is now
+   disabled so it had been running solo on every nav. */
 .hero-settle {
-  animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform: scale(1.06);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-navigated]) .hero-settle {
+    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }
 
 /* ── Word-rise hero animation ── */
@@ -629,90 +876,70 @@ body[data-menu-open] .whatsapp-fixed {
   animation: word-rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) var(--word-delay, 0ms) both;
 }
 
-/* ── Route transition (Pixel-Matters-style page reveal) ── */
+/* ── Route transition — the ONLY page-change animation (View Transitions API is
+   off; see PageTransition.tsx). A single opacity fade on the incoming page:
+   OPACITY-ONLY (no translateY) so there's zero transform — nothing to create a
+   containing block for fixed overlays, and the browser composites the fade on
+   its own layer, so it stays 60fps even while the new route is still hydrating
+   and decoding its hero. This is the cheapest possible page transition. ── */
 @keyframes route-fade {
+  /* TRANSFORM-ONLY (no opacity): the incoming page eases from a hair over-scaled
+     to rest — a gentle "settle in". Because opacity stays 1 the whole time, the
+     page is always opaque, so the light background is never revealed → no white
+     flash (that was the problem with a fade-in). Starting ABOVE 1 (1.015, not
+     below) means the page slightly overflows rather than leaving a sub-pixel gap
+     that would flash the background at the edges. */
   from {
-    opacity: 0;
-    transform: translateY(14px);
+    transform: scale(1.015);
   }
   to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: scale(1);
   }
 }
 .route-fade {
-  /* `backwards` (not `both`): applies the start state before the animation but
-     does NOT leave a lingering transform afterwards — a persistent transform
-     would create a containing block and break position:fixed overlays inside. */
-  animation: route-fade 0.42s var(--ease-out) backwards;
+  /* No will-change here: the class lingers on the page container for the whole
+     visit, so a static will-change would pin a full-page compositor layer the
+     entire time (hurting scroll). Browsers already auto-promote an animating
+     transform to its own layer for the run, which is exactly the duration we
+     want. `backwards` drops the transform once the run ends, so no containing
+     block lingers for any fixed child. */
+  animation: route-fade 0.4s var(--ease-out) backwards;
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
-   .vt-page       navegação sem direção: o conteúdo antigo sobe/desvanece,
-                  o novo chega de baixo (assimétrico: sair rápido, chegar calmo)
-   .vt-page-fwd/bwd  deslize direcional conforme a ordem do menu
+   .vt-page / .vt-page-fwd / .vt-page-bwd  todas as navegações usam UM cross-fade
+                  curto só de opacidade — ver nota de fluidez abaixo.
    .gallery-morph  par thumbnail→lightbox (blur a meio esconde interpolação) */
-::view-transition-old(.vt-page) {
-  animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both vt-depart;
+
+/* Fluidez da entrada de página: a API de View Transitions tira um "snapshot" da
+   página inteira (no /sobre, um herói full-bleed de 100svh) e anima-o. Animar
+   TRANSFORM nesse snapshot gigante — o antigo deslize direcional de translateX
+   56px, ou o translateY do departing — obriga o compositor a mover um raster do
+   tamanho do ecrã ao mesmo tempo que a página nova hidrata, descodifica o herói
+   e corre os seus próprios reveals: é aí que "trava". Uma animação SÓ de opacity
+   é o trabalho mais barato que o compositor tem (alpha, sem re-layout nem mexer
+   geometria), por isso todas as rotas passam a um cross-fade curto de opacidade.
+   Sem translateX/translateY nos snapshots, janela de sobreposição mínima → a
+   entrada fica fluida em qualquer página. (Recuperar o deslize direcional:
+   devolver translateX aos keyframes vt-in-* / vt-out-* e apontá-los aqui.) */
+::view-transition-old(.vt-page),
+::view-transition-old(.vt-page-fwd),
+::view-transition-old(.vt-page-bwd) {
+  animation: 140ms linear both vt-fade-out;
 }
-::view-transition-new(.vt-page) {
-  /* Shorter arrive (was 480ms + 90ms ≈ 570ms) so navigation feels immediate
-     rather than heavy. No incoming delay — dead time before anything moves reads
-     as lag. The old page still departs quickly (200ms). */
-  animation: 360ms var(--ease-out) both vt-arrive;
-}
-@keyframes vt-depart {
-  to {
-    opacity: 0;
-    transform: translateY(-14px);
-  }
+::view-transition-new(.vt-page),
+::view-transition-new(.vt-page-fwd),
+::view-transition-new(.vt-page-bwd) {
+  animation: 280ms var(--ease-out) both vt-arrive;
 }
 @keyframes vt-arrive {
-  /* Pure fade — no translateY. The incoming page's own reveals (AnimateIn /
-     Reveal) already rise the hero caption ~28px; when the whole route ALSO rose
-     22px at a different duration the two stacked and read "mushy" at the moment
-     the new page should feel crisp. The fade now hands off cleanly to the
-     on-page rise. (Directional vt-page-fwd/bwd keep their translateX — different
-     axis, no clash.) */
+  /* Pure fade — no translateY/translateX. The incoming page's own reveals
+     (AnimateIn / Reveal) already rise/zoom the hero content; a transform on the
+     whole-page snapshot on top of that both stacked ("mushy") and cost a
+     full-viewport composited move. Opacity-only hands off cleanly to the on-page
+     reveals and stays 60fps. */
   from {
     opacity: 0;
-  }
-}
-
-::view-transition-old(.vt-page-fwd) {
-  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-left;
-}
-::view-transition-new(.vt-page-fwd) {
-  animation: 380ms var(--ease-out) both vt-in-right;
-}
-::view-transition-old(.vt-page-bwd) {
-  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-right;
-}
-::view-transition-new(.vt-page-bwd) {
-  animation: 380ms var(--ease-out) both vt-in-left;
-}
-@keyframes vt-out-left {
-  to {
-    opacity: 0;
-    transform: translateX(-56px);
-  }
-}
-@keyframes vt-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(56px);
-  }
-}
-@keyframes vt-out-right {
-  to {
-    opacity: 0;
-    transform: translateX(56px);
-  }
-}
-@keyframes vt-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-56px);
   }
 }
 
@@ -728,16 +955,14 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 ::view-transition-group(.gallery-morph) {
-  animation-duration: 420ms;
+  /* Only the group animates — a composited transform of the thumbnail→fullscreen
+     box (position + size), plus the default GPU cross-fade of the image pair.
+     The previous `vt-morph-blur` animated filter: blur(2px) on the image pair,
+     which forced a full-frame REPAINT of a large photo every frame — the reason
+     opening a photo stuttered. Dropping it keeps the expand-morph but makes it
+     60fps. Slightly shorter, too, so it feels snappier. */
+  animation-duration: 340ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-::view-transition-image-pair(.gallery-morph) {
-  animation-name: vt-morph-blur;
-}
-@keyframes vt-morph-blur {
-  30% {
-    filter: blur(2px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -755,8 +980,10 @@ body[data-menu-open] .whatsapp-fixed {
     transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.4s ease;
 }
-.lift:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* ── Light sweep on primary CTAs — subtle premium shimmer on hover ── */
@@ -780,7 +1007,13 @@ body[data-menu-open] .whatsapp-fixed {
   transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
-.btn-shine:hover::after,
+/* :focus-visible stays ungated (keyboard users get the sweep on any device);
+   only :hover is gated so it doesn't latch on tap. */
+@media (hover: hover) {
+  .btn-shine:hover::after {
+    transform: translateX(130%);
+  }
+}
 .btn-shine:focus-visible::after {
   transform: translateX(130%);
 }
@@ -850,28 +1083,32 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 /* Skeleton loader — a soft shimmering placeholder block. Used while a view or
-   its data is still loading, so the layout settles instead of flashing text. */
+   its data is still loading, so the layout settles instead of flashing text.
+   The sweep is a pseudo-element stripe moved with transform: translateX
+   (GPU-composited), NOT an animated background-position (which is not
+   compositor-animatable and repaints the skeleton every frame — costly when
+   many skeletons show during an admin load). */
 @keyframes bo-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
   100% {
-    background-position: 200% 0;
+    transform: translateX(100%);
   }
 }
 .bo-skeleton {
+  position: relative;
+  overflow: hidden;
   border-radius: 0.5rem;
-  background: linear-gradient(
-    90deg,
-    rgba(42, 38, 32, 0.05) 25%,
-    rgba(42, 38, 32, 0.09) 37%,
-    rgba(42, 38, 32, 0.05) 63%
-  );
-  background-size: 200% 100%;
+  background: rgba(42, 38, 32, 0.06);
+}
+.bo-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(42, 38, 32, 0.07) 50%, transparent 100%);
+  transform: translateX(-100%);
   animation: bo-shimmer 1.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .bo-skeleton {
+  .bo-skeleton::after {
     animation: none;
   }
 }
@@ -919,7 +1156,8 @@ body:has([data-orcamento-mode]) .eyebrow {
     animation: none;
     transform: scale(1.06);
   }
-  .lb-photo-in {
+  .lb-photo-in,
+  .lb-open-in {
     animation: none;
   }
   .lb-kenburns {
@@ -997,47 +1235,6 @@ body:has([data-orcamento-mode]) .eyebrow {
   .confirm-check {
     animation: none;
     stroke-dashoffset: 0;
-  }
-}
-
-/* Chegada celebrativa da confirmação — pétalas botânicas que caem uma vez, nas
-   cores da marca. Só transform/opacity (compositor). Cada pétala recebe posição,
-   cor, duração e atraso por style inline. Reduced-motion: nada cai. */
-@keyframes petal-fall {
-  0% {
-    transform: translate3d(0, -8vh, 0) rotate(0deg);
-    opacity: 0;
-  }
-  8% {
-    opacity: var(--petal-op, 0.85);
-  }
-  90% {
-    opacity: var(--petal-op, 0.85);
-  }
-  100% {
-    transform: translate3d(var(--petal-x, 20px), 96vh, 0) rotate(var(--petal-rot, 320deg));
-    opacity: 0;
-  }
-}
-.petal {
-  position: absolute;
-  top: 0;
-  border-radius: 62% 38% 54% 46% / 58% 44% 56% 42%;
-  /* No explicit will-change: the browser already promotes an element with an
-     active transform/opacity animation, so this only pinned 16 compositor
-     layers AFTER the one-shot fall finished (fill-mode: both leaves them
-     mounted). Dropping it keeps the animation identical, no lingering layers. */
-  /* Longhands (not the `animation` shorthand): a var() in the shorthand's time
-     slots makes Lightning CSS drop the whole rule. Duration/delay come per-petal
-     via inline style; the keyframe still reads --petal-x/rot/op fine. */
-  animation-name: petal-fall;
-  animation-timing-function: cubic-bezier(0.37, 0.2, 0.63, 0.9);
-  animation-fill-mode: both;
-  animation-iteration-count: 1;
-}
-@media (prefers-reduced-motion: reduce) {
-  .petal {
-    display: none;
   }
 }
 
@@ -1199,11 +1396,14 @@ body:has([data-orcamento-mode]) .eyebrow {
   transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
-.cl-cell:hover {
-  background-color: rgba(99, 122, 95, 0.045);
-}
-.cl-cell:hover::before {
-  opacity: 1;
+/* Gated to hover devices so the logo-wall recolor/lift doesn't stick on tap. */
+@media (hover: hover) {
+  .cl-cell:hover {
+    background-color: rgba(99, 122, 95, 0.045);
+  }
+  .cl-cell:hover::before {
+    opacity: 1;
+  }
 }
 
 /* On hover the logo lifts + swells a touch, and the black silhouette crossfades
@@ -1213,14 +1413,16 @@ body:has([data-orcamento-mode]) .eyebrow {
   display: inline-flex;
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.cl-cell:hover .cl-logo {
-  transform: translateY(-2px) scale(1.045);
-}
 .cl-black {
   transition: opacity 0.5s ease;
 }
-.cl-cell:hover .cl-black {
-  opacity: 0;
+@media (hover: hover) {
+  .cl-cell:hover .cl-logo {
+    transform: translateY(-2px) scale(1.045);
+  }
+  .cl-cell:hover .cl-black {
+    opacity: 0;
+  }
 }
 .cl-moss {
   position: absolute;
@@ -1236,8 +1438,10 @@ body:has([data-orcamento-mode]) .eyebrow {
   mask-size: contain;
   pointer-events: none;
 }
-.cl-cell:hover .cl-moss {
-  opacity: 1;
+@media (hover: hover) {
+  .cl-cell:hover .cl-moss {
+    opacity: 1;
+  }
 }
 
 /* Entrance reveal. The hidden "from" state exists only once JS arms it

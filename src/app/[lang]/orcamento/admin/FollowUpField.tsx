@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 import { todayKey } from "./util";
@@ -27,6 +27,8 @@ function plusDays(n: number): string {
 export default function FollowUpField({ quote, onChange }: Props) {
   const { toast } = useToast();
   const [value, setValue] = useState<string>(quote.followUpAt ?? "");
+  const id = useId();
+  const hintId = `${id}-hint`;
 
   function persist(next: string | undefined) {
     // Otimista com reversão: falha do servidor repõe o estado e avisa.
@@ -53,14 +55,16 @@ export default function FollowUpField({ quote, onChange }: Props) {
 
   return (
     <div>
-      <label className="block text-[10px] text-foreground/28 tracking-[0.3em] uppercase mb-2">
+      <label htmlFor={id} className="bo-eyebrow mb-2 block">
         Seguimento
       </label>
       <div className="flex items-center gap-2">
         <input
+          id={id}
           type="date"
           value={value}
           onChange={(e) => persist(e.target.value || undefined)}
+          aria-describedby={value ? hintId : undefined}
           className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
         />
         {value && (
@@ -81,7 +85,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
           <button
             key={p.label}
             onClick={() => persist(plusDays(p.days))}
-            className="px-2.5 py-1 rounded-full bg-foreground/[0.05] text-foreground/45 text-[10px] hover:bg-foreground/[0.09] hover:text-foreground/70 transition-colors"
+            className="px-2.5 py-1 rounded-full bg-foreground/[0.05] text-foreground/45 text-[11px] hover:bg-foreground/[0.09] hover:text-foreground/70 transition-colors"
           >
             {p.label}
           </button>
@@ -89,6 +93,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
       </div>
       {value && (
         <p
+          id={hintId}
           className={`text-[10px] mt-2 ${overdue ? "text-[#b5654a]" : isToday ? "text-[#4d6350]" : "text-foreground/35"}`}
         >
           {overdue

@@ -242,6 +242,7 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(doc.moodBoards).toEqual([]);
     expect(doc.cronograma).toEqual([]);
     expect(doc.budgetItems).toEqual([]);
+    expect(doc.budgetExtras).toEqual([]);
     expect(doc.budgetRows).toEqual([]);
     // A capa sai sempre com as duas POSIÇÕES, vazias mas presentes.
     expect(doc.coverImages).toEqual(["", ""]);

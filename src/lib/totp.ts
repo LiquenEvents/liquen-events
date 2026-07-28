@@ -45,8 +45,14 @@ export function totp(secretB32: string, atSeconds = Date.now() / 1000): string {
 }
 
 /**
- * Verify a 6-digit token against a base32 secret, allowing ±`window` 30s steps
- * for clock drift. Constant-time comparison.
+ * Verify a 6-digit token against a base32 secret. Accepts the current step and
+ * up to `window` PAST steps for clock drift, but NOT future steps — accepting a
+ * not-yet-current code needlessly widens the guess/replay window for no real
+ * usability gain. Constant-time comparison.
+ *
+ * Note: this does not consume codes, so a code stays valid for the rest of its
+ * step (~30s) and could be replayed within that window; true single-use would
+ * require persisting the last-used step per user.
  */
 export function verifyTotp(secretB32: string, token: string, window = 1): boolean {
   const t = (token ?? "").replace(/\s/g, "");
@@ -55,7 +61,7 @@ export function verifyTotp(secretB32: string, token: string, window = 1): boolea
   if (secret.length === 0) return false;
   const step = Math.floor(Date.now() / 1000 / 30);
   const provided = Buffer.from(t);
-  for (let w = -window; w <= window; w++) {
+  for (let w = -window; w <= 0; w++) {
     const expected = Buffer.from(hotp(secret, step + w));
     if (expected.length === provided.length && crypto.timingSafeEqual(expected, provided)) {
       return true;

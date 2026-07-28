@@ -49,6 +49,9 @@ interface Attachment {
   filename: string;
   content: Buffer | Uint8Array;
   contentType?: string;
+  /** Set to reference the part from the HTML as <img src="cid:…">. Inline
+   *  images render even when the client blocks remote ones. */
+  cid?: string;
 }
 
 interface SendArgs {
@@ -58,6 +61,8 @@ interface SendArgs {
   replyTo?: string;
   to?: string; // overrides the default MAIL_TO (e.g. send to the client)
   attachments?: Attachment[];
+  /** Extra RFC-5322 headers (e.g. Auto-Submitted on an auto-reply). */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -71,6 +76,7 @@ export async function sendMail({
   replyTo,
   to,
   attachments,
+  headers,
 }: SendArgs): Promise<{ sent: boolean }> {
   const transport = getTransport();
   if (!transport) {
@@ -90,6 +96,7 @@ export async function sendMail({
     filename: a.filename,
     content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content),
     contentType: a.contentType,
+    cid: a.cid,
   }));
   await transport.sendMail({
     from,
@@ -99,6 +106,7 @@ export async function sendMail({
     text,
     replyTo,
     attachments: attach,
+    headers,
   });
   return { sent: true };
 }
@@ -109,5 +117,6 @@ export function esc(value: unknown): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

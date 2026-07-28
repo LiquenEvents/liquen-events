@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import type { Dict } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
+import { QUOTE_EVENT_OPTIONS } from "@/lib/orcamento/data";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -24,10 +25,10 @@ import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
  * corretos; "Outro" viaja apenas como `eventName`.
  */
 
-type Cat = "empresas" | "particulares" | null;
-
 // Local draft so a visitor who navigates away and returns doesn't lose what
-// they typed. Stored on the visitor's own device; cleared on a successful send.
+// they typed. Stored in sessionStorage (tab-scoped) so this personal data is
+// gone when the tab closes — no lingering contact details on a shared/public
+// device; also cleared on a successful send.
 const DRAFT_KEY = "liquen-orcamento-draft";
 
 // A stable id for THIS enquiry, so a retried submit (lost response → resubmit,
@@ -63,20 +64,54 @@ function ensureSubmissionId(): string {
   }
 }
 
-interface EventOption {
-  label: string;
-  category: Cat;
-  eventType: string | null;
-}
+// Single source of truth, shared with the confirmation page so both resolve the
+// same option index (and therefore the same localized label).
+const EVENT_TYPES = QUOTE_EVENT_OPTIONS;
 
-const EVENT_TYPES: EventOption[] = [
-  { label: "Casamento", category: "particulares", eventType: "casamentos" },
-  { label: "Corporativo", category: "empresas", eventType: "conferencias" },
-  { label: "Aniversário", category: "particulares", eventType: "aniversarios" },
-  { label: "Batizado / Comunhão", category: "particulares", eventType: "batizados" },
-  { label: "Jantar de Gala", category: "particulares", eventType: "jantares_gala" },
-  { label: "Outro", category: null, eventType: null },
-];
+// Floating-label field wrapper. The control is passed as children (keeping all
+// its own attrs/refs/aria); the label overlays it and floats up on focus/value
+// via CSS (.ff / .ff-label in globals.css). `floatAlways` forces the floated
+// state for the native date input, whose :placeholder-shown is unreliable.
+function FloatingField({
+  htmlFor,
+  label,
+  required,
+  floatAlways,
+  error,
+  errorId,
+  className,
+  children,
+}: {
+  htmlFor: string;
+  label: string;
+  required?: boolean;
+  floatAlways?: boolean;
+  error?: string;
+  errorId?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`ff group${floatAlways ? " ff--float" : ""}${className ? ` ${className}` : ""}`}
+    >
+      {children}
+      <label htmlFor={htmlFor} className="ff-label font-normal">
+        {label}
+        {required && (
+          <span aria-hidden className="text-gold-text">
+            &nbsp;*
+          </span>
+        )}
+      </label>
+      {error && errorId && (
+        <p id={errorId} role="alert" className="mt-2 text-[11px] tracking-wide text-gold-text">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 // `panelBlur` (the left-panel image's blur placeholder) is resolved on the
 // SERVER page and passed in as a single string, so this client component never
@@ -131,14 +166,16 @@ export default function OrcamentoForm({
   const firstSave = useRef(true);
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(DRAFT_KEY);
+      const saved = sessionStorage.getItem(DRAFT_KEY);
       if (!saved) return;
       const d = JSON.parse(saved) as Record<string, string>;
-      // Don't keep personal contact data on the device indefinitely: an
-      // abandoned draft purges itself after 7 days (awkward on shared devices).
+      // The draft lives in sessionStorage, so it is already gone when the tab
+      // closes — the personal contact data can't linger on a shared/public
+      // device. The 7-day stamp is kept as a secondary guard within a very
+      // long-lived tab.
       const ts = Number(d._ts);
       if (ts && Date.now() - ts > 7 * 24 * 60 * 60 * 1000) {
-        localStorage.removeItem(DRAFT_KEY);
+        sessionStorage.removeItem(DRAFT_KEY);
         return;
       }
       if (d.eventType) setEventType(d.eventType);
@@ -204,7 +241,7 @@ export default function OrcamentoForm({
     const d = draftRef.current;
     if (!d) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, _ts: Date.now() }));
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, _ts: Date.now() }));
     } catch {
       /* ignora */
     }
@@ -325,7 +362,7 @@ export default function OrcamentoForm({
       // trava o flush de ciclo de vida para o unmount da navegação não o repor.
       submittedRef.current = true;
       try {
-        localStorage.removeItem(DRAFT_KEY);
+        sessionStorage.removeItem(DRAFT_KEY);
         // Retire this enquiry's idempotency id so a genuinely NEW enquiry later
         // gets a fresh one (and doesn't dedup against the just-sent lead).
         localStorage.removeItem(SUBMISSION_KEY);
@@ -365,6 +402,14 @@ export default function OrcamentoForm({
     if (nome.trim()) lines.push(`${to.labelNome}: ${nome.trim()}`);
     return lines.join("\n");
   }
+  // Memoise the WhatsApp link so it isn't rebuilt + URL-encoded on every
+  // keystroke (the link sits idle off to the side); only recompute when a field
+  // that feeds it changes.
+  const waLink = useMemo(
+    () => waHref(waMessage()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eventType, dateFlexible, data, pessoas, local, nome, to, t],
+  );
 
   // Arrow-key navigation for the event-type radiogroup (WAI-ARIA radio pattern).
   const onRadioKey = (e: React.KeyboardEvent) => {
@@ -383,16 +428,22 @@ export default function OrcamentoForm({
     radioRefs.current[next]?.focus();
   };
 
-  const inputCls =
-    // border-b at /55 clears the 3:1 non-text-contrast floor so the field is
-    // identifiable (WCAG 1.4.11); focus switches to solid moss.
-    "w-full bg-transparent border-b border-foreground/55 pb-3.5 text-base text-foreground placeholder-foreground/65 focus:outline-none focus:border-moss transition-colors duration-300";
+  // Floating-label input: `.ff-input` (globals.css) owns the vertical padding so
+  // the label has room to float, and the placeholder colour is handled there
+  // (hidden until focus). `field-line` draws the hairline moss underline in on
+  // focus; border-b at /55 clears the 3:1 non-text-contrast floor (WCAG 1.4.11)
+  // and focus switches it to solid moss.
+  const ffInputCls =
+    "ff-input field-line w-full bg-transparent border-b border-foreground/45 text-sm text-foreground focus:outline-none focus:border-moss";
   const labelCls =
-    "block text-[10px] text-foreground/68 tracking-[0.4em] uppercase mb-3.5 transition-colors duration-300 group-focus-within:text-moss-dark";
+    "block text-[10.5px] font-medium text-foreground/60 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
+  // lg:pt-20 clears the tall at-rest navbar (≈164px logo lockup vs the global
+  // main pt-24=96px), so the left image panel starts BELOW the header instead of
+  // the logo sitting on top of the photo.
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr]">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] lg:pt-20">
       {/* ── Painel imagem (esquerda) ── */}
       <aside className="relative hidden lg:block overflow-hidden">
         <Image
@@ -401,7 +452,6 @@ export default function OrcamentoForm({
           blurDataURL={panelBlur}
           alt={t.common.imageAlt.orcamentoPanel}
           fill
-          preload
           sizes="(max-width: 1024px) 0vw, 45vw"
           quality={75}
           className="object-cover"
@@ -466,7 +516,7 @@ export default function OrcamentoForm({
             onFocusCapture={markStart}
             aria-busy={sending}
             noValidate
-            className="flex flex-col gap-11"
+            className="orc-reveal flex flex-col gap-9"
           >
             {/* Required-fields key, before the fields so the '*' is explained
                 first (WCAG 3.3.2 Labels or Instructions). */}
@@ -524,10 +574,10 @@ export default function OrcamentoForm({
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-4 py-3.5 rounded-full text-xs tracking-[0.12em] uppercase border transition-all duration-200 ${
+                      className={`px-4 py-2 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                         active
-                          ? "bg-moss border-moss text-white shadow-lg shadow-moss/20"
-                          : "border-foreground/15 text-foreground/68 hover:border-foreground/35 hover:text-foreground/80"
+                          ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
+                          : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
                       }`}
                     >
                       {to.eventTypeLabels[i] ?? o.label}
@@ -544,19 +594,18 @@ export default function OrcamentoForm({
 
             {/* Data + Nº de pessoas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
-              <div className="group">
-                <label htmlFor="of-data" className={labelCls}>
-                  {to.labelData}
-                </label>
-                <input
-                  id="of-data"
-                  type="date"
-                  min={minDate}
-                  value={data}
-                  disabled={dateFlexible}
-                  onChange={(e) => setData(e.target.value)}
-                  className={`${inputCls} [color-scheme:light] ${dateFlexible ? "opacity-40" : ""}`}
-                />
+              <div>
+                <FloatingField htmlFor="of-data" label={to.labelData} floatAlways>
+                  <input
+                    id="of-data"
+                    type="date"
+                    min={minDate}
+                    value={data}
+                    disabled={dateFlexible}
+                    onChange={(e) => setData(e.target.value)}
+                    className={`${ffInputCls} [color-scheme:light] ${dateFlexible ? "opacity-40" : ""}`}
+                  />
+                </FloatingField>
                 <label className="mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
                   <input
                     type="checkbox"
@@ -567,10 +616,7 @@ export default function OrcamentoForm({
                   <span className="text-[11px] tracking-wide">{to.dateFlexibleLabel}</span>
                 </label>
               </div>
-              <div className="group">
-                <label htmlFor="of-pessoas" className={labelCls}>
-                  {to.labelPessoas}
-                </label>
+              <FloatingField htmlFor="of-pessoas" label={to.labelPessoas}>
                 <input
                   id="of-pessoas"
                   type="text"
@@ -579,37 +625,34 @@ export default function OrcamentoForm({
                   maxLength={6}
                   value={pessoas}
                   onChange={(e) => setPessoas(e.target.value.replace(/[^0-9]/g, ""))}
-                  className={inputCls}
+                  className={ffInputCls}
                   placeholder={to.phPessoas}
                 />
-              </div>
+              </FloatingField>
             </div>
 
             {/* Local / região (opcional) */}
-            <div className="group">
-              <label htmlFor="of-local" className={labelCls}>
-                {to.labelLocal}
-              </label>
+            <FloatingField htmlFor="of-local" label={to.labelLocal}>
               <input
                 id="of-local"
                 type="text"
                 autoComplete="address-level2"
                 value={local}
                 onChange={(e) => setLocal(e.target.value)}
-                className={inputCls}
+                className={ffInputCls}
                 placeholder={to.phLocal}
               />
-            </div>
+            </FloatingField>
 
             {/* Nome + Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
-              <div className="group">
-                <label htmlFor="of-nome" className={labelCls}>
-                  {to.labelNome}
-                  <span aria-hidden className="text-gold-text">
-                    &nbsp;*
-                  </span>
-                </label>
+              <FloatingField
+                htmlFor="of-nome"
+                label={to.labelNome}
+                required
+                error={nomeErr}
+                errorId="of-nome-err"
+              >
                 <input
                   id="of-nome"
                   ref={nomeRef}
@@ -621,22 +664,19 @@ export default function OrcamentoForm({
                   onBlur={() => setTouched((prev) => ({ ...prev, nome: true }))}
                   aria-invalid={!!nomeErr}
                   aria-describedby={nomeErr ? "of-nome-err" : undefined}
-                  className={`${inputCls} ${nomeErr ? "border-gold/60" : ""}`}
+                  className={`${ffInputCls} ${
+                    nomeErr ? "border-gold/60" : nome.trim().length >= 2 ? "border-moss/50" : ""
+                  }`}
                   placeholder={to.phNome}
                 />
-                {nomeErr && (
-                  <p id="of-nome-err" role="alert" className={hintCls}>
-                    {nomeErr}
-                  </p>
-                )}
-              </div>
-              <div className="group">
-                <label htmlFor="of-email" className={labelCls}>
-                  {to.labelEmail}
-                  <span aria-hidden className="text-gold-text">
-                    &nbsp;*
-                  </span>
-                </label>
+              </FloatingField>
+              <FloatingField
+                htmlFor="of-email"
+                label={to.labelEmail}
+                required
+                error={emailErr}
+                errorId="of-email-err"
+              >
                 <input
                   id="of-email"
                   ref={emailRef}
@@ -648,22 +688,16 @@ export default function OrcamentoForm({
                   onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                   aria-invalid={!!emailErr}
                   aria-describedby={emailErr ? "of-email-err" : undefined}
-                  className={`${inputCls} ${emailErr ? "border-gold/60" : ""}`}
+                  className={`${ffInputCls} ${
+                    emailErr ? "border-gold/60" : /\S+@\S+\.\S+/.test(email) ? "border-moss/50" : ""
+                  }`}
                   placeholder={to.phEmail}
                 />
-                {emailErr && (
-                  <p id="of-email-err" role="alert" className={hintCls}>
-                    {emailErr}
-                  </p>
-                )}
-              </div>
+              </FloatingField>
             </div>
 
             {/* Telefone */}
-            <div className="group">
-              <label htmlFor="of-telefone" className={labelCls}>
-                {to.labelTelefone}
-              </label>
+            <FloatingField htmlFor="of-telefone" label={to.labelTelefone}>
               <input
                 id="of-telefone"
                 type="tel"
@@ -671,24 +705,38 @@ export default function OrcamentoForm({
                 autoComplete="tel"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
-                className={inputCls}
+                className={ffInputCls}
                 placeholder={to.phTelefone}
               />
-            </div>
+            </FloatingField>
 
-            {/* Mensagem */}
-            <div className="group">
-              <label htmlFor="of-mensagem" className={labelCls}>
-                {to.labelMensagem}
-              </label>
-              <textarea
-                id="of-mensagem"
-                value={mensagem}
-                onChange={(e) => setMensagem(e.target.value)}
-                rows={4}
-                className={`${inputCls} resize-none`}
-                placeholder={to.phMensagem}
-              />
+            {/* Mensagem — the field the proposal is actually built from.
+                A quote can be priced from the date and the headcount; it can
+                only be DESIGNED from what the client pictures. It used to be
+                labelled "Mensagem" with no reason to fill it, so most arrived
+                empty and every proposal started from a blank page. It now asks
+                a question, says plainly what the answer buys, and is tall
+                enough to look like somewhere to write. Deliberately still
+                optional: making it required would cost leads at the last step,
+                which is a worse trade than a short answer. */}
+            <div>
+              <FloatingField htmlFor="of-mensagem" label={to.labelMensagem}>
+                <textarea
+                  id="of-mensagem"
+                  value={mensagem}
+                  onChange={(e) => setMensagem(e.target.value)}
+                  rows={6}
+                  aria-describedby="of-mensagem-hint"
+                  className={`${ffInputCls} resize-y min-h-[132px]`}
+                  placeholder={to.phMensagem}
+                />
+              </FloatingField>
+              <p
+                id="of-mensagem-hint"
+                className="mt-2.5 text-[12px] leading-relaxed text-foreground/70"
+              >
+                {to.hintMensagem}
+              </p>
             </div>
 
             {/* Ações */}
@@ -716,7 +764,7 @@ export default function OrcamentoForm({
                 )}
               </button>
               <a
-                href={waHref(waMessage())}
+                href={waLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track("WhatsAppClick", { source: "form" })}

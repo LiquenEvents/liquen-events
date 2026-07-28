@@ -1,15 +1,15 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, useDeferredValue } from "react";
 // `import type` é totalmente apagado no build, por isso puxar a forma do store
 // server-only nunca arrasta o guard `server-only` (→ repository → fs) para o
 // bundle cliente. O tipo vive no módulo client-safe `contract-types`.
 import type { Contract, ContractStatus } from "@/lib/contract-types";
 import { TERMS_VERSION } from "@/lib/contract-terms";
 import { SkeletonList } from "./Skeleton";
-import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Toolbar } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
@@ -52,29 +52,18 @@ function StatusChip({ status }: { status: ContractStatus }) {
 }
 
 export default function Contratos() {
-  const { toast } = useToast();
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: contracts = [], loading } = useCachedList<Contract[]>(
+    "contratos",
+    "/api/contratos",
+  );
   const [search, setSearch] = useState("");
+  // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
+  const dSearch = useDeferredValue(search);
   const [status, setStatus] = useState<"all" | ContractStatus>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/contratos", { cache: "no-store" });
-        if (res.ok) setContracts(await res.json());
-        else toast("Não foi possível carregar os contratos.", "error");
-      } catch {
-        toast("Erro de ligação ao carregar os contratos.", "error");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [toast]);
-
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = dSearch.trim().toLowerCase();
     return contracts.filter((c) => {
       if (status !== "all" && c.status !== status) return false;
       if (
@@ -86,7 +75,7 @@ export default function Contratos() {
         return false;
       return true;
     });
-  }, [contracts, search, status]);
+  }, [contracts, dSearch, status]);
 
   const aceites = useMemo(() => contracts.filter((c) => c.status === "aceite").length, [contracts]);
 
@@ -230,133 +219,198 @@ export default function Contratos() {
             }
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-foreground/[0.08] text-foreground/40">
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Pedido</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite em</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite por</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-left">Termos</th>
-                  <th className="bo-eyebrow px-4 py-3.5 text-right">Contrato</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-foreground/[0.06]">
-                {filtered.map((c) => {
-                  const isOpen = expanded === c.id;
-                  return (
-                    <Fragment key={c.id}>
-                      <tr
-                        className={`hover:bg-foreground/[0.02] transition-colors ${
-                          c.status === "pendente" ? "opacity-70" : ""
-                        }`}
-                      >
-                        <td className="px-4 py-3.5">
-                          <p className="max-w-[200px] truncate font-medium text-foreground/80">
-                            {c.clientName || "—"}
+          <>
+            {/* Mobile: one card per contract — no sideways scrolling */}
+            <ul className="divide-y divide-foreground/[0.06] md:hidden">
+              {filtered.map((c) => {
+                const isOpen = expanded === c.id;
+                return (
+                  <li key={c.id} className={`p-4 ${c.status === "pendente" ? "opacity-70" : ""}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground/80" title={c.clientName}>
+                          {c.clientName || "—"}
+                        </p>
+                        {c.clientEmail && (
+                          <p className="mt-0.5 truncate text-xs text-foreground/40">
+                            {c.clientEmail}
                           </p>
-                          {c.clientEmail && (
-                            <p className="mt-0.5 max-w-[200px] truncate text-xs text-foreground/40">
-                              {c.clientEmail}
-                            </p>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-foreground/50">
-                          {c.quoteId || "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3.5">
-                          <StatusChip status={c.status} />
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
-                          {c.status === "aceite" ? fmtDateTime(c.acceptedAt) : "—"}
-                        </td>
-                        <td
-                          className="max-w-[160px] truncate px-4 py-3.5 text-foreground/65"
-                          title={c.acceptedName ?? undefined}
+                        )}
+                      </div>
+                      <div className="shrink-0">
+                        <StatusChip status={c.status} />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-foreground/45">
+                      {c.status === "aceite" ? (
+                        <>
+                          Aceite {fmtDateTime(c.acceptedAt)}
+                          {c.acceptedName && <> · por {c.acceptedName}</>}
+                        </>
+                      ) : (
+                        <>
+                          Pedido {c.quoteId || "—"} · versão {c.termsVersion}
+                        </>
+                      )}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setExpanded(isOpen ? null : c.id)}
+                        aria-expanded={isOpen}
+                      >
+                        {isOpen ? "Fechar" : "Ver termos"}
+                      </Button>
+                      <a
+                        href={`/api/contratos/${c.id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-9 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+                        title="Descarregar contrato em PDF"
+                      >
+                        PDF
+                      </a>
+                    </div>
+                    {isOpen && (
+                      <div className="mt-3">
+                        <ContractDetails c={c} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: the full contracts table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-foreground/[0.08] text-foreground/40">
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Pedido</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite em</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite por</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-left">Termos</th>
+                    <th className="bo-eyebrow px-4 py-3.5 text-right">Contrato</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-foreground/[0.06]">
+                  {filtered.map((c) => {
+                    const isOpen = expanded === c.id;
+                    return (
+                      <Fragment key={c.id}>
+                        <tr
+                          className={`hover:bg-foreground/[0.02] transition-colors ${
+                            c.status === "pendente" ? "opacity-70" : ""
+                          }`}
                         >
-                          {c.acceptedName || "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-foreground/45">
-                          Versão {c.termsVersion}
-                        </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <div className="inline-flex items-center justify-end gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setExpanded(isOpen ? null : c.id)}
-                              aria-expanded={isOpen}
-                            >
-                              {isOpen ? "Fechar" : "Ver termos"}
-                            </Button>
-                            {/* Prova em papel do contrato — abre o PDF numa nova aba. */}
-                            <a
-                              href={`/api/contratos/${c.id}/pdf`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex h-8 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
-                              title="Descarregar contrato em PDF"
-                            >
-                              PDF
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                      {isOpen && (
-                        <tr className="bg-foreground/[0.015]">
-                          <td colSpan={7} className="px-4 py-4">
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-4">
-                              <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  Proposta
-                                </p>
-                                <p className="text-foreground/60 font-mono text-[11px] break-all">
-                                  {c.proposalId || "—"}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  Criado em
-                                </p>
-                                <p className="text-foreground/60">{fmtDateTime(c.createdAt)}</p>
-                              </div>
-                              <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  Versão dos termos
-                                </p>
-                                <p className="text-foreground/60">Versão {c.termsVersion}</p>
-                              </div>
-                              {/* IP é dado de auditoria — discreto, não em destaque. */}
-                              <div>
-                                <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-0.5">
-                                  IP de quem aceitou
-                                </p>
-                                <p className="text-foreground/45 font-mono text-[11px] break-all">
-                                  {c.acceptedIp || "—"}
-                                </p>
-                              </div>
-                            </div>
-                            <p className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase mb-1.5">
-                              Termos aceites (cópia guardada)
+                          <td className="px-4 py-3.5">
+                            <p className="max-w-[200px] truncate font-medium text-foreground/80">
+                              {c.clientName || "—"}
                             </p>
-                            <div className="max-h-72 overflow-y-auto rounded-lg border border-foreground/10 bg-white p-4">
-                              <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-foreground/60">
-                                {c.termsSnapshot || "Sem cópia dos termos guardada."}
-                              </pre>
+                            {c.clientEmail && (
+                              <p className="mt-0.5 max-w-[200px] truncate text-xs text-foreground/40">
+                                {c.clientEmail}
+                              </p>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-foreground/50">
+                            {c.quoteId || "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3.5">
+                            <StatusChip status={c.status} />
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
+                            {c.status === "aceite" ? fmtDateTime(c.acceptedAt) : "—"}
+                          </td>
+                          <td
+                            className="max-w-[160px] truncate px-4 py-3.5 text-foreground/65"
+                            title={c.acceptedName ?? undefined}
+                          >
+                            {c.acceptedName || "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-foreground/45">
+                            Versão {c.termsVersion}
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setExpanded(isOpen ? null : c.id)}
+                                aria-expanded={isOpen}
+                              >
+                                {isOpen ? "Fechar" : "Ver termos"}
+                              </Button>
+                              {/* Prova em papel do contrato — abre o PDF numa nova aba. */}
+                              <a
+                                href={`/api/contratos/${c.id}/pdf`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-8 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+                                title="Descarregar contrato em PDF"
+                              >
+                                PDF
+                              </a>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        {isOpen && (
+                          <tr className="bg-foreground/[0.015]">
+                            <td colSpan={7} className="px-4 py-4">
+                              <ContractDetails c={c} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
     </div>
+  );
+}
+
+/** Expanded contract details — audit fields + the saved copy of the accepted
+ *  terms. Shared by the desktop table's expand row and the mobile card. */
+function ContractDetails({ c }: { c: Contract }) {
+  return (
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-4">
+        <div>
+          <p className="bo-eyebrow text-foreground/40 mb-1">Proposta</p>
+          <p className="text-foreground/60 font-mono text-[11px] break-all">
+            {c.proposalId || "—"}
+          </p>
+        </div>
+        <div>
+          <p className="bo-eyebrow text-foreground/40 mb-1">Criado em</p>
+          <p className="text-foreground/60">{fmtDateTime(c.createdAt)}</p>
+        </div>
+        <div>
+          <p className="bo-eyebrow text-foreground/40 mb-1">Versão dos termos</p>
+          <p className="text-foreground/60">Versão {c.termsVersion}</p>
+        </div>
+        {/* IP é dado de auditoria — discreto, não em destaque. */}
+        <div>
+          <p className="bo-eyebrow text-foreground/40 mb-1">IP de quem aceitou</p>
+          <p className="text-foreground/45 font-mono text-[11px] break-all">
+            {c.acceptedIp || "—"}
+          </p>
+        </div>
+      </div>
+      <p className="bo-eyebrow text-foreground/40 mb-2">Termos aceites (cópia guardada)</p>
+      <div className="max-h-72 overflow-y-auto rounded-lg border border-foreground/10 bg-white p-4">
+        <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-foreground/60">
+          {c.termsSnapshot || "Sem cópia dos termos guardada."}
+        </pre>
+      </div>
+    </>
   );
 }

@@ -92,9 +92,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Quotes awaiting a first reply for 24h+. The site promises a reply
-    //    "within 24 business hours" in several places, so the safety-net digest
-    //    must flag a lead once it crosses that line — not wait a second day.
+    // 3. Quotes awaiting a first reply for 24h+. Internal follow-up target: the
+    //    safety-net digest flags a lead once a day has passed without a reply so
+    //    nothing slips — this is a team cadence, not a promise made to clients.
     const oneDayAgo = Date.now() - 864e5;
     const awaiting = quotes.filter(
       (q) =>

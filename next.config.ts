@@ -20,8 +20,16 @@ const nextConfig: NextConfig = {
     // the whole point of the desktop-fluidity pass. Once encoded, both are cached
     // immutably for a year, so the size delta only ever costs the first visitor.
     formats: ["image/webp"],
-    qualities: [50, 72, 75],
-    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
+    // 82 is used ONLY by the full-bleed page covers (heroes) — the crispest LCP
+    // image on each page — while everything else stays ≤75. 50/72/75 keep the
+    // gallery + body imagery lean.
+    qualities: [50, 65, 72, 75, 82],
+    // Cap at 2048 (dropped 2560): only the full-bleed heroes ever reached the
+    // 2560 candidate, and cold-encoding that on first view is what kept the hero
+    // blur placeholder on screen the longest before the sharp image "opened".
+    // 2048 is still sharp on 4K (a slight, imperceptible upscale) and its cold
+    // WebP encode + download are meaningfully faster, so the blur clears sooner.
+    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920, 2048],
     imageSizes: [16, 32, 64, 96, 128, 256, 384],
     minimumCacheTTL: 31_536_000,
     // Serve images inline instead of as attachment downloads
@@ -58,6 +66,19 @@ const nextConfig: NextConfig = {
     }
     const plausible = plausibleOrigin ? ` ${plausibleOrigin}` : "";
 
+    // Google tag (gtag.js) for Google Ads conversion measurement + remarketing
+    // (see GoogleTag.tsx / Consent Mode). These are the hosts the browser talks
+    // to once the tag is active: the loader (googletagmanager.com), the pixel/
+    // beacon endpoints (google-analytics + doubleclick + googleadservices), and
+    // the conversion-linker iframe (td.doubleclick.net). Kept as tight as the
+    // ad stack allows — no wildcards beyond the analytics beacon regions.
+    const gaScript = " https://www.googletagmanager.com";
+    const gaImg =
+      " https://www.googletagmanager.com https://www.google.com https://www.google.pt https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com";
+    const gaConnect =
+      " https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://googleads.g.doubleclick.net https://www.googleadservices.com https://www.google.com https://pagead2.googlesyndication.com";
+    const gaFrame = "https://td.doubleclick.net https://www.googletagmanager.com";
+
     // Image hosts the BROWSER loads via <img>: proposal cover/mood-board images
     // are served as signed URLs from Supabase Storage, and the (optional) gallery
     // CDN. Without these in img-src the browser blocks them and the thumbnail
@@ -91,7 +112,7 @@ const nextConfig: NextConfig = {
     // event beacon (when enabled); dev keeps ws/https open for HMR.
     const connectSrc = isDev
       ? "connect-src 'self' https: wss: ws:"
-      : `connect-src 'self'${plausible}`;
+      : `connect-src 'self'${plausible}${gaConnect}`;
 
     // Content-Security-Policy. Next's runtime still relies on inline bootstrap
     // scripts and we use inline styles throughout, so script/style keep
@@ -101,13 +122,14 @@ const nextConfig: NextConfig = {
     // 'unsafe-eval' is dev-only (React refresh).
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}${gaScript}`,
       "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: blob:${imgExtra}`,
+      `img-src 'self' data: blob:${imgExtra}${gaImg}`,
       "font-src 'self' data:",
       connectSrc,
       "worker-src 'self'",
       "manifest-src 'self'",
+      `frame-src 'self' ${gaFrame}`,
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -164,6 +186,34 @@ const nextConfig: NextConfig = {
         // they only change on a deploy, so a long immutable TTL is safe.
         source: "/:file(og-liquen.jpg|icon-192.png|icon-512.png|icon-maskable-512.png)",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
+  },
+
+  async redirects() {
+    // Legacy URLs from the previous (Wix) site that Google still has indexed →
+    // the equivalent page on the rebuilt site, so old search results and
+    // bookmarks land on real content instead of a 404, and Google transfers the
+    // old pages' ranking onto the new URLs. permanent → 308 (Google treats it
+    // like a 301). Both the decoded and %-encoded forms of the accented paths
+    // are listed because the incoming pathname can arrive either way.
+    const APEX = "https://liquen-events.com";
+    return [
+      { source: "/eventos", destination: `${APEX}/servicos`, permanent: true },
+      { source: "/serviços", destination: `${APEX}/servicos`, permanent: true },
+      { source: "/servi%C3%A7os", destination: `${APEX}/servicos`, permanent: true },
+      { source: "/contactos", destination: `${APEX}/contacto`, permanent: true },
+      { source: "/portfólio-de-eventos", destination: `${APEX}/galeria`, permanent: true },
+      { source: "/portf%C3%B3lio-de-eventos", destination: `${APEX}/galeria`, permanent: true },
+      // Safety net: once www.liquen-events.com's DNS points here, forward every
+      // remaining www request to the same path on the canonical apex host (the
+      // one the whole site treats as canonical, SITE.url). Vercel's own domain
+      // redirect normally covers this too — this just guarantees it in code.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.liquen-events.com" }],
+        destination: `${APEX}/:path*`,
+        permanent: true,
       },
     ];
   },

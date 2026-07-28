@@ -53,7 +53,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
           </button>
         </div>
 
-        <div className="px-6 py-6 max-h-[72vh] overflow-y-auto">
+        <div className="px-6 py-6 max-h-[72dvh] overflow-y-auto overscroll-contain">
           {/* ── Boas-vindas ── */}
           <p className="text-foreground/55 text-sm leading-relaxed mb-6">
             Bem-vindo(a). Esta janela explica, em poucas palavras, como funciona o back-office e o

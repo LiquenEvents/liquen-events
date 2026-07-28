@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 import { isAuthed } from "@/lib/admin-auth";
 import { uploadProposalImage, listProposalImages } from "@/lib/proposal-storage";
 import { isDatabaseConfigured } from "@/lib/supabase";
@@ -7,6 +8,11 @@ import { log } from "@/lib/logger";
 export const runtime = "nodejs";
 
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB per image
+// Pixel-dimension cap: a byte cap alone doesn't stop a decompression bomb (a
+// tiny PNG can decode to gigapixels), which would exhaust memory when the PDF
+// renderer later decodes it. 50 MP (~8660×5773) is far beyond any real photo we
+// embed. Rejected at the door so a bomb can never be stored.
+const MAX_PIXELS = 50_000_000;
 const OK_TYPES = /^image\/(jpe?g|png|webp)$/i;
 
 /**
@@ -72,6 +78,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
     const bytes = Buffer.from(await file.arrayBuffer());
+    // Reject decompression bombs by pixel count before the image is ever stored
+    // or later decoded by the PDF renderer. sharp reads dimensions from the
+    // header without fully decoding, so this is cheap.
+    try {
+      const meta = await sharp(bytes).metadata();
+      const pixels = (meta.width ?? 0) * (meta.height ?? 0);
+      if (!pixels || pixels > MAX_PIXELS) {
+        return NextResponse.json(
+          { error: `Imagem com dimensões inválidas ou demasiado grandes: ${file.name}.` },
+          { status: 413 },
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { error: `Não foi possível processar a imagem: ${file.name}.` },
+        { status: 415 },
+      );
+    }
     const res = await uploadProposalImage(id, bytes, file.type);
     if (!res) {
       log.error("assets: upload falhou", null, { id, name: file.name });

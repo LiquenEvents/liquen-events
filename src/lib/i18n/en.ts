@@ -74,7 +74,8 @@ export const en: Dict = {
     retomar: "Resume testimonial rotation",
     pausarLogos: "Pause logo marquee",
     retomarLogos: "Resume logo marquee",
-    whatsappPrefill: "Hi, I'd like to know more about your event decoration services.",
+    whatsappPrefill:
+      "Hi! I'd like to know more about Líquen Events' event decoration and planning, and how you could help with mine.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
@@ -107,7 +108,7 @@ export const en: Dict = {
     ogLocale: "en_GB",
     homeTitle: "Event & Wedding Decoration in Évora | Líquen Events",
     homeDescription:
-      "Wedding decoration, corporate events and celebrations in Évora, the Alentejo and across Portugal. From concept to the last detail — request a quote.",
+      "Líquen Events is a company specialising in planning and delivering one-of-a-kind events, turning your ideas into unforgettable experiences.",
     sobreTitle: "Event Decoration Company in the Alentejo",
     sobreDescription:
       "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
@@ -122,10 +123,10 @@ export const en: Dict = {
       "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
     contactoTitle: "Contact — Request Your Event Quote",
     contactoDescription:
-      "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. We reply within 24 business hours with a tailored proposal.",
+      "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. Receive a tailored proposal for your event.",
     orcamentoTitle: "Request a Quote — Weddings & Events",
     orcamentoDescription:
-      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 business hours.",
+      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — and receive a tailored proposal.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -158,8 +159,7 @@ export const en: Dict = {
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Have an event",
     ctaTitleLine2: "in mind?",
-    ctaText:
-      "Tell us your idea. No commitment — we reply with a tailored proposal in under 24 business hours.",
+    ctaText: "Tell us your idea. We listen to your vision and reply with a tailored proposal.",
   },
 
   sobre: {
@@ -299,7 +299,7 @@ export const en: Dict = {
       ctaTitleLine1: "Request your",
       ctaTitleMoss: "quote.",
       ctaText:
-        "Tell us about your event — we reply with a tailored proposal within 24 business hours. For a quick question, use one of the direct channels.",
+        "Tell us about your event — we reply with a tailored proposal. For a quick question, use one of the direct channels.",
       ctaButton: "Request a quote",
     },
     testimonialsEyebrow: "What our clients say",
@@ -309,7 +309,7 @@ export const en: Dict = {
         title: "We receive your request",
         desc: "We review your request and prepare a tailored response.",
       },
-      { title: "We get in touch", desc: "Within 24 business hours, we set up a conversation." },
+      { title: "We get in touch", desc: "We set up a conversation to understand your vision." },
       { title: "Tailored proposal", desc: "A detailed proposal with transparent pricing." },
       { title: "We start creating", desc: "We handle every detail for an unforgettable event." },
     ],
@@ -327,7 +327,7 @@ export const en: Dict = {
       heroTitleMoss: "extraordinary",
       infoEyebrow: "Find us",
       emailLabel: "E-mail",
-      emailSub: "We reply within 24 business hours",
+      emailSub: "We reply to every request with care",
       phoneLabel: "Phone",
       phoneSub: "Call or message us",
       locationLabel: "Location",
@@ -336,7 +336,7 @@ export const en: Dict = {
       quoteLink: "Request a quote for your event",
       whatsappLink: "Chat on WhatsApp",
       googleLink: "See on Google · Leave a review",
-      promise: "We reply to every request within 24 business hours, with a personalised proposal.",
+      promise: "We reply to every request with a personalised proposal.",
       promiseSign: "— The Líquen Events team",
       stepLabels: ["Event", "Details", "Specifics", "Message"],
       eventCards: [
@@ -376,7 +376,7 @@ export const en: Dict = {
       voltar: "Back",
       enviar: "Send Request",
       enviando: "Sending…",
-      resposta24: "Reply within 24h",
+      resposta24: "Tailored proposal",
       errNome: "Please enter your name",
       errEmail: "Invalid email",
       error: "We couldn't send your message. Please try again or contact us on WhatsApp.",
@@ -386,8 +386,8 @@ export const en: Dict = {
       successThanks: "Thank you",
       successText: ". We'll be in touch shortly to move forward with your event together.",
       successSteps: [
-        { n: "01", t: "We review your request", d: "In the next few hours" },
-        { n: "02", t: "We get in touch", d: "Within 24 business hours" },
+        { n: "01", t: "We review your request", d: "With full attention" },
+        { n: "02", t: "We get in touch", d: "Soon" },
         { n: "03", t: "We send a tailored proposal", d: "Personalised for you" },
       ],
       successWhatsApp: "Follow up on WhatsApp",
@@ -407,7 +407,7 @@ export const en: Dict = {
       },
       {
         q: "How does the quoting process work?",
-        a: "After the first contact and an initial conversation (no commitment), we prepare a detailed proposal with transparent pricing. No surprises, no hidden costs.",
+        a: "After the first contact and an initial conversation, we prepare a detailed proposal with transparent pricing. No surprises, no hidden costs.",
       },
       {
         q: "Do you work with different budgets?",
@@ -425,8 +425,8 @@ export const en: Dict = {
     eyebrow: "Quote request",
     titleLine1: "Tell us",
     titleMoss: "your idea",
-    lead: "No commitment. We reply with a tailored proposal in under 24 business hours.",
-    processHint: "Request → Proposal in 24h → Meeting",
+    lead: "We listen to your vision and reply with a tailored proposal for your event.",
+    processHint: "Request → Proposal → Meeting",
     eventTypeLabels: [
       "Wedding",
       "Corporate",
@@ -443,14 +443,15 @@ export const en: Dict = {
     labelNome: "Name",
     labelEmail: "Email",
     labelTelefone: "Phone",
-    labelMensagem: "Message",
+    labelMensagem: "How do you picture your event?",
     phPessoas: "e.g. 120",
     phLocal: "e.g. Évora, Alentejo…",
     phNome: "Your name",
     phEmail: "email@example.com",
     phTelefone: "+351 9XX XXX XXX",
-    phMensagem:
-      "Tell us what you have in mind for your event — venue, atmosphere, special details…",
+    phMensagem: "Style, colours, atmosphere, inspiration you've saved…",
+    hintMensagem:
+      "The more you tell us about the style you have in mind — the colours, the mood, references you've saved — the more tailored the proposal. This is where we start designing it.",
     errNome: "Please enter your name",
     errEmail: "Invalid email",
     errTipo: "Please select the event type.",
@@ -459,7 +460,7 @@ export const en: Dict = {
     ouWhatsApp: "or via WhatsApp",
     error: "We couldn't send your request. Please try again or reach us on WhatsApp.",
     requiredNote: "Fields marked with * are required.",
-    submitReassure: "No commitment · Reply within 24 business hours.",
+    submitReassure: "A tailored proposal, crafted in detail.",
     privacyPre: "By submitting, you accept our ",
     privacyLinkLabel: "Privacy Policy",
     privacyPost: ". We never share your details.",
@@ -502,16 +503,16 @@ export const en: Dict = {
             desc: "Your most special day — coordination, decoration, photography and catering. We handle it all so you can simply live it.",
           },
           {
-            title: "Classic Car Rental",
-            desc: "Classic cars with a driver for a dream arrival — from the bride's entrance to guest transport.",
-          },
-          {
             title: "Christenings & Communions",
             desc: "Intimate, meaningful family celebrations, organised with care.",
           },
           {
             title: "Birthday Parties",
             desc: "Themed or classic parties for all ages. Every birthday is a story.",
+          },
+          {
+            title: "Classic Car Rental",
+            desc: "Classic cars with a driver for a dream arrival — from the bride's entrance to guest transport.",
           },
         ],
       },
@@ -534,8 +535,7 @@ export const en: Dict = {
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Shall we bring",
     ctaTitleMoss: "your idea to life?",
-    ctaText:
-      "Talk to us. No commitment, no cost. We listen to your idea and present a proposal tailored to you.",
+    ctaText: "Talk to us. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
     galleryAlt: [
       "Outdoor wedding decorated by Líquen Events in the Alentejo",
@@ -558,8 +558,16 @@ export const en: Dict = {
     },
     successEyebrow: "Request sent successfully",
     titleLine1: "We've received",
+    // English has no T/V distinction, so the plural variants are identical —
+    // kept for key parity with pt, where the register genuinely changes.
     titleMoss: "your request.",
-    lead: "Our team will review your request and get in touch within 24 business hours with a personalised proposal.",
+    titleMossPlural: "your request.",
+    lead: "We'll read everything carefully, check availability for the date and think about what makes sense for this event — before we reply. What follows isn't an automatic price, it's the beginning of a proposal built for you.",
+    countdown: "{days} days to go until the event.",
+    highSeasonNote:
+      "May to October is the busy season in the Alentejo — the best estates close their calendars far in advance. It's worth not leaving it too long.",
+    recapTitle: "What you told us",
+    recapTitlePlural: "What you told us",
     refLabel: "Request Reference",
     categoria: "Category",
     tipo: "Type",
@@ -569,7 +577,12 @@ export const en: Dict = {
     local: "Location",
     mensagem: "Message",
     adicionais: "Additional Services",
+    openDate: "Still to be decided",
+    openDateNote:
+      "With no fixed date we have room to suggest weekends with better availability — and often a better price.",
     noDataNote:
+      "Save the reference above. We've sent the details to our team and will be in touch shortly.",
+    noDataNotePlural:
       "Save the reference above. We've sent the details to our team and will be in touch shortly.",
     footerNote: "A formal proposal is sent after our team reviews your request.",
     proximosPassos: "Next steps",
@@ -580,6 +593,12 @@ export const en: Dict = {
       { label: "Event production", desc: "We take care of everything for you." },
     ],
     contactIntro: "For any questions, you can contact us directly:",
+    contactIntroPlural: "For any questions, you can contact us directly:",
+    contactWhatsapp: "Chat on WhatsApp",
+    contactWhatsappSub: "The fastest way to reach us.",
+    notFoundTitle: "We couldn't find this request",
+    notFoundBody:
+      "The link may be incomplete or no longer valid. If you sent a request and didn't receive our confirmation email, get in touch — we'll sort it out the same day.",
     voltarInicio: "Back to Home",
     novoPedido: "New Request",
     dateLocale: "en-GB",
@@ -588,7 +607,9 @@ export const en: Dict = {
     signName: "Catarina & the Líquen team",
     saveDate: "Add the date to your calendar",
     whileTitle: "While we prepare your proposal",
+    whileTitlePlural: "While we prepare your proposal",
     whileLead: "Feel free to get to know a little of our world.",
+    whileLeadPlural: "Feel free to get to know a little of our world.",
     exploreGaleria: "View the gallery",
     exploreGaleriaSub: "Weddings and events we've created",
     exploreInsta: "Follow on Instagram",

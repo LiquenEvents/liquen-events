@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 // `import type` is fully erased at build time, so pulling the shape from the
 // server-only store never drags its runtime `server-only` guard into this
@@ -11,6 +11,7 @@ import { eur2 } from "./util";
 import { splitThirtySeventy } from "@/lib/money";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Field, Segmented } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 type Status = Invoice["status"];
 type Kind = Invoice["kind"];
@@ -56,8 +57,11 @@ interface Props {
 
 export default function Faturas({ quotes }: Props) {
   const { toast } = useToast();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: invoices = [],
+    setData: setInvoices,
+    loading,
+  } = useCachedList<Invoice[]>("faturas", "/api/faturas");
   const [filter, setFilter] = useState<Status | "all">("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -76,19 +80,9 @@ export default function Faturas({ quotes }: Props) {
   const [issuedAt, setIssuedAt] = useState(today());
   const [dueAt, setDueAt] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/faturas", { cache: "no-store" });
-        if (res.ok) setInvoices(await res.json());
-      } catch {
-        toast("Não foi possível carregar as faturas", "error");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [toast]);
+  // Datas + IVA têm valores predefinidos sensatos (IVA 23%, emissão hoje), por
+  // isso ficam recolhidos: o essencial de uma fatura é cliente + valor.
+  const [showDates, setShowDates] = useState(false);
 
   async function onPickQuote(id: string) {
     setQuoteId(id);
@@ -438,24 +432,54 @@ export default function Faturas({ quotes }: Props) {
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0,00"
             />
-            <Field
-              label="IVA (%)"
-              type="number"
-              value={vatRate}
-              onChange={(e) => setVatRate(e.target.value)}
-            />
-            <Field
-              label="Emissão"
-              type="date"
-              value={issuedAt}
-              onChange={(e) => setIssuedAt(e.target.value)}
-            />
-            <Field
-              label="Vencimento (opcional)"
-              type="date"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
-            />
+          </div>
+
+          {/* Datas e IVA — recolhidas por omissão (têm valores predefinidos) */}
+          <div className="mt-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDates((s) => !s)}
+              aria-expanded={showDates}
+              iconRight={
+                <svg
+                  className={`motion-safe:transition-transform ${showDates ? "rotate-180" : ""}`}
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              }
+            >
+              Datas e IVA
+            </Button>
+            {showDates && (
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field
+                  label="IVA (%)"
+                  type="number"
+                  value={vatRate}
+                  onChange={(e) => setVatRate(e.target.value)}
+                />
+                <Field
+                  label="Emissão"
+                  type="date"
+                  value={issuedAt}
+                  onChange={(e) => setIssuedAt(e.target.value)}
+                />
+                <Field
+                  label="Vencimento (opcional)"
+                  type="date"
+                  value={dueAt}
+                  onChange={(e) => setDueAt(e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           {splitBlocked && existingSinal ? (

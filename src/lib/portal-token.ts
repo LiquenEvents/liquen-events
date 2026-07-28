@@ -28,7 +28,7 @@ let randomFallbackSecret: string | null = null;
 
 function secret(): string {
   const s = process.env.SESSION_SECRET ?? process.env.ADMIN_SESSION_SECRET;
-  if (s && s.length >= 16) return s;
+  if (s && s.length >= 32) return s;
   if (process.env.NODE_ENV === "production") {
     const hash = process.env.ADMIN_PASSWORD_HASH;
     if (hash) {

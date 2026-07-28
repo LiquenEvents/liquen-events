@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
+import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -66,9 +67,9 @@ const categoryMeta = [
     band: "/imagens/DaniGui_Preview20.jpg",
     services: [
       { slug: "casamentos", image: "/imagens/stephanie-mizio-760.jpg" },
-      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
       { slug: "batizados-e-comunhoes", image: "/imagens/DaniGui_JantarFesta_26.jpg" },
       { slug: "festas-e-aniversarios", image: "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg" },
+      { slug: "aluguer-de-viaturas-classicas", image: "/imagens/viaturas-classicas.jpg" },
     ],
   },
   {
@@ -79,6 +80,15 @@ const categoryMeta = [
     services: [{ slug: "eventos-corporativos", image: "/imagens/EW1_1405.jpg" }],
   },
 ];
+
+// Shared veil for every full-bleed service panel (category intros + service
+// bands) so they read as ONE continuous, softly-fading sequence rather than a
+// stack of separate photos. Lighter than before (bottom 0.72, not 0.90) so the
+// images stay bright and the seams don't turn into a hard black band; a gentle
+// 0.30 fade at the very top blends each image into the bottom of the panel above
+// it — the "continuous fade between images" look, kept light.
+const PANEL_VEIL =
+  "linear-gradient(to top, rgba(8,8,8,0.75) 0%, rgba(8,8,8,0.20) 38%, rgba(8,8,8,0.16) 58%, rgba(8,8,8,0.55) 100%)";
 
 /* ── Full-screen service band — one image, one service (SpaceX-style) ── */
 function ServiceBand({
@@ -93,7 +103,17 @@ function ServiceBand({
   return (
     // Shorter on phones (≈46svh) so 8 stacked service bands don't become an
     // endless scroll; full cinematic height from lg up.
-    <section className="relative overflow-hidden flex items-end min-h-[46svh] lg:min-h-[clamp(480px,60vh,680px)]">
+    <section
+      className="relative overflow-hidden flex items-end min-h-[46svh] lg:min-h-[clamp(480px,60vh,680px)]"
+      // Match the sibling panels: skip layout/paint while off-screen. The `auto`
+      // keyword self-corrects to the real height (incl. the 46svh mobile case)
+      // after first render, so no scroll-jump; the big image decode defers to
+      // when the band nears view.
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "auto clamp(480px, 60vh, 680px)",
+      }}
+    >
       <Parallax speed={0.12} className="absolute inset-0">
         <Image
           src={service.image}
@@ -108,7 +128,7 @@ function ServiceBand({
       {/* Image-first (SpaceX-style): the photo reads fully at the top, and only
           the bottom — where the number/title/description sit — darkens enough to
           keep the white text legible. No heavy full-panel veil. */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+      <div className="absolute inset-0" style={{ backgroundImage: PANEL_VEIL }} />
       {/* A big bold uppercase headline, a one-line description, and the ghost
           outline button. The mono chapter index was removed on request. */}
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-12 lg:pb-16">
@@ -116,7 +136,7 @@ function ServiceBand({
           <div className="max-w-2xl">
             <h3
               className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
-              style={{ fontSize: "clamp(28px, 4.5vw, 56px)" }}
+              style={{ fontSize: "clamp(20px, 2.8vw, 34px)" }}
             >
               {service.title}
             </h3>
@@ -181,11 +201,11 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           very top behind the transparent navbar (no white strip / hairline). */}
       <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+          <HeroImage
             src="/imagens/EW1_1330.jpg"
             alt={t.common.imageAlt.servicosEndOfDay}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={75}
             className="object-cover object-center hero-settle"
@@ -232,71 +252,6 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
         </div>
       </section>
 
-      {/* ── Como trabalhamos — a nossa assinatura ──
-          A light editorial break after the cinematic hero that finally renders
-          the studio's signature approach (decoration + coordination + production)
-          — copy that already existed in the dictionary but was never on screen.
-          Gives the page words and a differentiator before the service panels. */}
-      <section className="relative overflow-hidden border-t border-white/10 py-20 lg:py-28">
-        <Image
-          src="/imagens/hd-edited.jpg"
-          alt=""
-          fill
-          sizes="100vw"
-          quality={75}
-          className="object-cover object-center"
-          {...blurFor("/imagens/hd-edited.jpg")}
-        />
-        {/* Moderate veil: this is a text section over a mood image, so it needs
-            more cover than the photo panels while still letting the scene read. */}
-        {/* Wash + gradient merged (gradient listed first = on top). Same look. */}
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(to top, rgba(8,8,8,0.8), rgba(8,8,8,0.4), rgba(8,8,8,0.65)), linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55))",
-          }}
-        />
-        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16">
-          <AnimateIn>
-            <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-6 flex items-center gap-3">
-              <span className="w-8 h-px bg-gold flex-shrink-0" />
-              {ts.philoEyebrow}
-            </p>
-            <h2
-              className="text-white font-bold uppercase tracking-display leading-[1.05] max-w-3xl"
-              style={{ fontSize: "clamp(28px, 4vw, 52px)" }}
-            >
-              {ts.philoTitle}
-            </h2>
-          </AnimateIn>
-          {/* Processo em três passos: títulos em caixa alta com tracking-display
-              e filetes hairline (border-white/15) a separar cada passo — sem
-              cantos arredondados, sem floreados. Os números foram removidos a
-              pedido. Vertical no telemóvel, três colunas a partir de md. */}
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 border-t border-white/15">
-            {ts.philoPillars.map((p, i) => (
-              <AnimateIn key={p.title} delay={i * 90}>
-                <div
-                  className={`flex flex-col py-10 md:py-14 md:px-10 ${
-                    i === 0
-                      ? "md:pl-0"
-                      : "border-t border-white/15 md:border-t-0 md:border-l md:border-white/15"
-                  }`}
-                >
-                  <h3 className="text-white font-bold uppercase tracking-display text-lg lg:text-xl mb-4">
-                    {p.title}
-                  </h3>
-                  <p className="text-white/70 text-[13px] leading-[1.7] tracking-display uppercase max-w-xs">
-                    {p.text}
-                  </p>
-                </div>
-              </AnimateIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Service categories ── */}
       {categories.map((cat) => (
         <div key={cat.id}>
@@ -306,7 +261,15 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           <section
             id={cat.id}
             className="relative overflow-hidden scroll-mt-[60px] flex items-end"
-            style={{ minHeight: "clamp(500px, 80vh, 820px)" }}
+            // content-visibility skips paint+layout for this full-bleed panel
+            // while it's off-screen; contain-intrinsic-size is pinned to the SAME
+            // min-height so the reserved space matches the real height (no
+            // scroll-jump). Unsupported browsers ignore both and render normally.
+            style={{
+              minHeight: "clamp(500px, 80vh, 820px)",
+              contentVisibility: "auto",
+              containIntrinsicSize: "auto clamp(500px, 80vh, 820px)",
+            }}
           >
             <Parallax speed={0.12} className="absolute inset-0">
               <Image
@@ -319,7 +282,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {...blurFor(cat.band)}
               />
             </Parallax>
-            <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+            <div className="absolute inset-0" style={{ backgroundImage: PANEL_VEIL }} />
             {/* The descriptive sentence IS the headline now — the uppercase
                 category label and the ghost "Ver detalhes" button were dropped
                 so the panel reads as a single elegant statement. Navigation into
@@ -349,8 +312,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
       {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}
       <section
-        className="relative overflow-hidden border-t border-foreground/8"
-        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+        className="relative overflow-hidden"
+        style={{
+          minHeight: "clamp(560px, 90vh, 900px)",
+          contentVisibility: "auto",
+          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
+        }}
       >
         <Image
           src="/imagens/J&A-68.jpg"
@@ -377,12 +344,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
                 {ts.seoEyebrow}
               </p>
               <h2
-                className="text-cream font-bold uppercase tracking-display leading-[1.04] mb-7 max-w-3xl"
-                style={{ fontSize: "clamp(32px, 5vw, 76px)" }}
+                className="text-cream font-bold uppercase tracking-display leading-[1.06] mb-6 max-w-3xl"
+                style={{ fontSize: "clamp(26px, 3.6vw, 52px)" }}
               >
                 {ts.seoTitle}
               </h2>
-              <p className="text-cream/75 text-base lg:text-lg leading-[1.85] max-w-xl">
+              <p className="text-cream/75 text-sm lg:text-base leading-[1.8] max-w-xl">
                 {ts.seoText}
               </p>
             </AnimateIn>
@@ -392,8 +359,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
       {/* ── CTA — full-screen closing panel ── */}
       <section
-        className="relative overflow-hidden border-t border-foreground/8 flex items-center py-28 lg:py-40"
-        style={{ minHeight: "clamp(560px, 90vh, 900px)" }}
+        className="relative overflow-hidden flex items-center py-28 lg:py-40"
+        style={{
+          minHeight: "clamp(560px, 90vh, 900px)",
+          contentVisibility: "auto",
+          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
+        }}
       >
         <Image
           src="/imagens/M&F0497.jpg"
@@ -421,7 +392,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             </p>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.9] mb-6"
-              style={{ fontSize: "clamp(44px, 8vw, 110px)" }}
+              style={{ fontSize: "clamp(32px, 5.5vw, 74px)" }}
             >
               {ts.ctaTitleLine1}
               <br />

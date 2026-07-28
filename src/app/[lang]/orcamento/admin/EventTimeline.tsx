@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
+import { printRunSheet } from "./export";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import { Button, Field, EmptyState } from "./ui";
 
@@ -37,12 +38,17 @@ function sortByTime(items: TimelineItem[]): TimelineItem[] {
   return [...items].sort((a, b) => timeRank(a.time) - timeRank(b.time));
 }
 
+type EditableField = "time" | "title" | "owner";
+
 export default function EventTimeline({ quote, onChange }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<TimelineItem[]>(quote.timeline ?? []);
   const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState("");
+  // Edição inline de um campo de uma linha: commit em blur/Enter, Escape cancela.
+  const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null);
+  const [draft, setDraft] = useState("");
 
   function persist(next: TimelineItem[]) {
     const sorted = sortByTime(next);
@@ -80,14 +86,65 @@ export default function EventTimeline({ quote, onChange }: Props) {
     persist(items.filter((i) => i.id !== id));
   }
 
+  function startEdit(id: string, field: EditableField, current: string) {
+    setEditing({ id, field });
+    setDraft(current);
+  }
+  function commitEdit() {
+    if (!editing) return;
+    const { id, field } = editing;
+    setEditing(null); // fecha já — o blur que se segue não volta a fazer commit
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    const v = draft.trim();
+    if (field === "owner") {
+      const next = v || undefined;
+      if (next === item.owner) return;
+      persist(items.map((i) => (i.id === id ? { ...i, owner: next } : i)));
+      return;
+    }
+    // Hora/título vazios cancelam em vez de gravar uma linha inválida.
+    if (!v || v === item[field]) return;
+    persist(items.map((i) => (i.id === id ? { ...i, [field]: v } : i)));
+  }
+  function editKeys(e: React.KeyboardEvent) {
+    if (e.key === "Enter") commitEdit();
+    if (e.key === "Escape") setEditing(null);
+  }
+
   return (
     <section className="border-t border-foreground/10 pt-6">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Cronograma do Dia</p>
         {items.length > 0 && (
-          <span className="shrink-0 rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
-            {items.length} {items.length === 1 ? "momento" : "momentos"}
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+              {items.length} {items.length === 1 ? "momento" : "momentos"}
+            </span>
+            <button
+              type="button"
+              onClick={() => printRunSheet(quote)}
+              title="Imprimir guião do dia"
+              aria-label="Imprimir guião do dia"
+              className="rounded-lg p-1.5 text-foreground/40 hover:bg-foreground/[0.06] hover:text-foreground/75 motion-safe:transition-colors"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 9V3h12v6" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="7" rx="1" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
 
@@ -124,13 +181,72 @@ export default function EventTimeline({ quote, onChange }: Props) {
                 key={i.id}
                 className="group relative flex items-start gap-3 rounded-xl py-2.5 pr-1 hover:bg-foreground/[0.02]"
               >
-                <span className="w-12 shrink-0 pt-0.5 text-right text-xs font-semibold tabular-nums text-[#4d6350]">
-                  {i.time}
-                </span>
+                {editing?.id === i.id && editing.field === "time" ? (
+                  <input
+                    type="time"
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={commitEdit}
+                    onKeyDown={editKeys}
+                    aria-label="Editar hora"
+                    className="bo-input w-[100px] shrink-0 px-2 py-0.5 text-xs tabular-nums text-foreground/80"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startEdit(i.id, "time", i.time)}
+                    title="Editar hora"
+                    className="w-12 shrink-0 rounded-md pt-0.5 text-right text-xs font-semibold tabular-nums text-[#4d6350] decoration-dotted underline-offset-2 hover:underline"
+                  >
+                    {i.time}
+                  </button>
+                )}
                 <span className="relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#4d6350] ring-4 ring-white" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-snug text-foreground/80">{i.title}</p>
-                  {i.owner && <p className="mt-0.5 text-xs text-foreground/45">{i.owner}</p>}
+                  {editing?.id === i.id && editing.field === "title" ? (
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={editKeys}
+                      aria-label="Editar momento"
+                      className="bo-input w-full px-2 py-0.5 text-sm text-foreground/80"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEdit(i.id, "title", i.title)}
+                      title="Editar momento"
+                      className="block w-full rounded-md text-left text-sm leading-snug text-foreground/80 decoration-dotted underline-offset-2 hover:underline"
+                    >
+                      {i.title}
+                    </button>
+                  )}
+                  {editing?.id === i.id && editing.field === "owner" ? (
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={editKeys}
+                      aria-label="Editar responsável"
+                      placeholder="Responsável"
+                      className="bo-input mt-1 w-full px-2 py-0.5 text-xs text-foreground/70"
+                    />
+                  ) : (
+                    i.owner && (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(i.id, "owner", i.owner ?? "")}
+                        title="Editar responsável"
+                        className="mt-0.5 block w-full rounded-md text-left text-xs text-foreground/45 decoration-dotted underline-offset-2 hover:underline"
+                      >
+                        {i.owner}
+                      </button>
+                    )
+                  )}
                 </div>
                 <button
                   onClick={() => remove(i.id)}
@@ -185,8 +301,8 @@ export default function EventTimeline({ quote, onChange }: Props) {
           value={owner}
           onChange={(e) => setOwner(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="Resp."
-          containerClassName="w-24"
+          placeholder="Responsável"
+          containerClassName="w-40"
         />
         <Button variant="primary" onClick={add} disabled={!title.trim() || !time}>
           Adicionar

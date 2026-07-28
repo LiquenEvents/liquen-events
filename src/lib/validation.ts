@@ -226,13 +226,29 @@ export const supplierUpdateSchema = z
   })
   .partial();
 
+// Hosts of the real browser push services. The server later POSTs to the stored
+// endpoint, so restricting it to these known services prevents a blind-SSRF
+// where a crafted subscription points the server at an internal/arbitrary URL.
+const PUSH_ENDPOINT_HOST =
+  /(?:^|\.)(?:fcm\.googleapis\.com|android\.googleapis\.com|web\.push\.apple\.com|push\.services\.mozilla\.com|notify\.windows\.com|push\.services\.microsoft\.com)$/i;
+
+function isKnownPushEndpoint(v: string): boolean {
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" && PUSH_ENDPOINT_HOST.test(u.host);
+  } catch {
+    return false;
+  }
+}
+
 // Web Push subscription — sanitise this network-provided object into a strict,
 // known-good shape before it is ever persisted.
 export const pushSubscriptionSchema = z.object({
   endpoint: z
     .string()
     .regex(/^https:\/\/[^\s]+$/i, "endpoint inválido")
-    .max(1000),
+    .max(1000)
+    .refine(isKnownPushEndpoint, "endpoint de push não reconhecido"),
   keys: z.object({
     p256dh: z.string().min(1).max(300),
     auth: z.string().min(1).max(300),

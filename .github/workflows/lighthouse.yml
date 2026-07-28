@@ -37,7 +37,10 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
-      - name: Run Lighthouse CI
+      - name: Run Lighthouse CI (desktop)
         run: |
           npm install -g @lhci/cli@0.14.x
-          lhci autorun
+          lhci autorun --config=lighthouserc.json
+
+      - name: Run Lighthouse CI (mobile)
+        run: lhci autorun --config=lighthouserc.mobile.json

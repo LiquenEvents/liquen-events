@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import {
   withProposalDefaults,
@@ -90,20 +90,48 @@ function initialDoc(quote: Quote): StudioDoc {
     guests: quote.guests ? `${quote.guests} pax` : "",
     ceremony: "",
     time: "",
+    weddingPlanners: "",
     serviceGroups: [],
     moodBoards: [],
     cronograma: [],
     budgetItems: [],
+    budgetExtras: [],
     totalLabel: "Valor Total Decoração",
     totalText: "",
     budgetRows: [],
     totalEstimatedText: "",
     budgetNote: "",
-    // Duas posições fixas: [capa esquerda, capa direita].
     coverImages: normaliseCoverImages(),
   };
   base.ref = buildRef(base);
   return base;
+}
+
+/** Passos do fluxo guiado do estúdio. */
+type Step = "conteudo" | "prever" | "enviar";
+const STEPS: { id: Step; n: string; label: string }[] = [
+  { id: "conteudo", n: "1", label: "Conteúdo" },
+  { id: "prever", n: "2", label: "Pré-visualizar" },
+  { id: "enviar", n: "3", label: "Enviar" },
+];
+
+/** Numa proposta nova/vazia, semeia um grupo de serviços com um item — para que
+ *  o estúdio não abra como uma parede de botões "+ Adicionar" vazios. Nunca
+ *  toca num rascunho que já tenha conteúdo. */
+function seedDefaults(d: StudioDoc, quotedPrice?: number): StudioDoc {
+  let next = d;
+  if (next.serviceGroups.length === 0) {
+    next = {
+      ...next,
+      serviceGroups: [{ letter: "a)", title: "", items: [{ label: "", desc: "" }] }],
+    };
+  }
+  // Preço único: a proposta parte do "Preço final (sem IVA)" do pedido — o valor
+  // não se escreve outra vez aqui. Como esse preço é SEM IVA, o modo é "acrescer".
+  if (next.totalAmount == null && typeof quotedPrice === "number" && quotedPrice > 0) {
+    next = { ...next, totalAmount: quotedPrice, totalVatMode: "acrescer" };
+  }
+  return next;
 }
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
@@ -136,6 +164,11 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
   const [confirmSend, setConfirmSend] = useState(false);
+  // Depois de um envio bem-sucedido, o formulário NÃO fica pronto a re-disparar:
+  // mostra um estado de confirmação e exige uma escolha consciente para reenviar.
+  const [sent, setSent] = useState(false);
+  // Fluxo guiado: Conteúdo → Pré-visualizar → Enviar.
+  const [step, setStep] = useState<Step>("conteudo");
   // Qual o destino das fotos escolhidas na biblioteca de temas (null = fechado).
   const [picker, setPicker] = useState<
     { kind: "board"; bi: number } | { kind: "cover"; idx: number } | null
@@ -144,14 +177,16 @@ export default function ProposalStudio({ quote, onSent }: Props) {
 
   // ── Restore draft on mount ──
   useEffect(() => {
+    let hadDraft = false;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
+          hadDraft = true;
           // Rascunhos antigos guardaram a capa esparsa (`[null, "foto"]`) ou
-          // curta (`["foto"]`) — normalizar já aqui garante que a foto da
-          // direita continua na posição da direita.
+          // curta (`["foto"]`) — normalizar já aqui mantém a foto da direita
+          // na posição da direita.
           setDoc((d) => {
             const merged = { ...d, ...parsed };
             return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
@@ -167,6 +202,14 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       }
     } catch {
       /* ignore corrupt draft */
+    }
+    // Só semeia defaults quando NÃO havia rascunho guardado — um rascunho
+    // existente (mesmo sem grupos) nunca é sobrescrito.
+    if (!hadDraft) {
+      setDoc((d) => seedDefaults(d, quote.quotedPrice));
+      if (typeof quote.quotedPrice === "number" && quote.quotedPrice > 0) {
+        setTotalInput(String(quote.quotedPrice));
+      }
     }
     hydrated.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,11 +331,17 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     } catch {
       /* ignore */
     }
-    setDoc(initialDoc(quote));
-    setTotalInput("");
+    setDoc(seedDefaults(initialDoc(quote), quote.quotedPrice));
+    setTotalInput(
+      typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
+        ? String(quote.quotedPrice)
+        : "",
+    );
     setAssetUrls({});
     setRefEdited(false);
     setConfirmSend(false);
+    setSent(false);
+    setStep("conteudo");
     toast("Rascunho limpo", "info");
   }
 
@@ -376,12 +425,14 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       for (const im of images) if (im.path && im.url) next[im.path] = im.url;
       return next;
     });
-    if (picker?.kind === "board")
+    if (picker?.kind === "board") {
       addBoardImages(
         picker.bi,
         images.map((im) => im.path),
       );
-    else if (picker?.kind === "cover") setCoverAt(picker.idx, images[0].path);
+    } else if (picker?.kind === "cover") {
+      setCoverAt(picker.idx, images[0].path);
+    }
   }
 
   // ── Service groups ──
@@ -468,9 +519,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   // ── Cover images (two slots) ──
-  // A capa tem duas POSIÇÕES fixas: [0] imprime à esquerda, [1] à direita. Por
-  // isso escreve-se sempre na posição e nunca se encolhe o array — compactá-lo
-  // fazia a foto da direita saltar para a esquerda no PDF.
+  // A capa tem DUAS posições fixas: a 0 imprime à esquerda do painel do
+  // logótipo, a 1 à direita. Escrever na posição (em vez de compactar a lista)
+  // é o que garante que a foto escolhida para a direita sai à direita.
   function setCoverAt(idx: number, path: string) {
     setDoc((d) => {
       const cover = normaliseCoverImages(d.coverImages);
@@ -478,7 +529,6 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       return { ...d, coverImages: cover };
     });
   }
-  /** Esvazia a posição (`""`), mantendo a outra capa do lado onde está. */
   function removeCoverAt(idx: number) {
     setCoverAt(idx, "");
   }
@@ -533,6 +583,23 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
   function removeBudgetItem(i: number) {
     setDoc((d) => ({ ...d, budgetItems: d.budgetItems.filter((_, j) => j !== i) }));
+  }
+
+  // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
+  function addBudgetExtra() {
+    setDoc((d) => ({
+      ...d,
+      budgetExtras: [...(d.budgetExtras ?? []), { label: "", valueText: "" }],
+    }));
+  }
+  function updateBudgetExtra(i: number, p: Partial<{ label: string; valueText: string }>) {
+    setDoc((d) => ({
+      ...d,
+      budgetExtras: (d.budgetExtras ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)),
+    }));
+  }
+  function removeBudgetExtra(i: number) {
+    setDoc((d) => ({ ...d, budgetExtras: (d.budgetExtras ?? []).filter((_, j) => j !== i) }));
   }
 
   // ── Budget: organizacao (per-item rows) ──
@@ -603,6 +670,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       } else {
         toast(data?.emailError || "Proposta gerada (email não enviado)", "info");
       }
+      // Trava contra reenvio acidental: o passo Enviar passa a mostrar a
+      // confirmação "Proposta enviada ✓" em vez do botão pronto a disparar.
+      setSent(true);
       onSent?.();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro ao enviar a proposta.", "error");
@@ -612,7 +682,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   const isDeco = doc.template !== "organizacao";
-  const canSend = !!doc.ref.trim() && !!doc.clientNames.trim();
+  // Também exige um total > 0: uma proposta a €0 seria enviada e poluiria os
+  // indicadores (total enviado, taxa de aceitação) com um negócio vazio.
+  const canSend = !!doc.ref.trim() && !!doc.clientNames.trim() && money.gross > 0;
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -629,540 +701,725 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         </Button>
       </div>
 
-      {/* Template selector */}
-      <div className="mb-4">
-        <Segmented
-          ariaLabel="Modelo da proposta"
-          value={isDeco ? "decoracao" : "organizacao"}
-          onChange={setTemplate}
-          options={[
-            { value: "decoracao", label: "Decoração" },
-            { value: "organizacao", label: "Organização" },
-          ]}
-        />
-      </div>
+      {/* Passos do fluxo — sempre visível, dá o sentido de "onde estou / o que
+          fazer a seguir". Clicável para saltar entre passos. */}
+      <StepNav step={step} onSelect={setStep} sent={sent} />
 
-      {/* Event fields */}
-      <Section title="Evento">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field
-            label="Clientes"
-            value={doc.clientNames}
-            onChange={(e) => patch({ clientNames: e.target.value })}
-            placeholder="Maria & Zé"
+      {/* ══════════ PASSO 1 · Conteúdo ══════════ */}
+      <div hidden={step !== "conteudo"}>
+        {/* Template selector */}
+        <div className="mb-4">
+          <Segmented
+            ariaLabel="Modelo da proposta"
+            value={isDeco ? "decoracao" : "organizacao"}
+            onChange={setTemplate}
+            options={[
+              { value: "decoracao", label: "Decoração" },
+              { value: "organizacao", label: "Organização" },
+            ]}
           />
-          <Field
-            label="Tipo de evento"
-            value={doc.eventType}
-            onChange={(e) => patch({ eventType: e.target.value })}
-            placeholder="Casamento"
-          />
-          <Field
-            label="Data"
-            value={doc.eventDate}
-            onChange={(e) => patch({ eventDate: e.target.value })}
-            placeholder="12 de setembro de 2026"
-          />
-          <Field
-            label="Local"
-            value={doc.location}
-            onChange={(e) => patch({ location: e.target.value })}
-            placeholder="Monte da Oliveirinha, Évora"
-          />
-          <Field
-            label="Convidados"
-            value={doc.guests}
-            onChange={(e) => patch({ guests: e.target.value })}
-            placeholder="150 pax"
-          />
-          {isDeco && (
-            <>
-              <Field
-                label="Cerimónia"
-                value={doc.ceremony ?? ""}
-                onChange={(e) => patch({ ceremony: e.target.value })}
-                placeholder="Civil, simbólica"
-              />
-              <Field
-                label="Hora"
-                value={doc.time ?? ""}
-                onChange={(e) => patch({ time: e.target.value })}
-                placeholder="A definir"
-              />
-            </>
-          )}
         </div>
 
-        {/* Reference (advanced) */}
-        <div className="mt-4">
-          {refEdited && (
-            <div className="mb-1.5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setRefEdited(false);
-                  setDoc((d) => ({ ...d, ref: buildRef(d) }));
-                }}
-                className={ADD_BTN}
-              >
-                ↺ Automática
-              </button>
-            </div>
-          )}
-          <Field
-            label="Título interno (opcional)"
-            value={doc.ref}
-            onChange={(e) => {
-              setRefEdited(true);
-              patch({ ref: e.target.value });
-            }}
-            hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
-          />
-        </div>
-      </Section>
+        {/* Event fields */}
+        <Section title="Evento">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field
+              label="Clientes"
+              value={doc.clientNames}
+              onChange={(e) => patch({ clientNames: e.target.value })}
+              placeholder="Maria & Zé"
+            />
+            <Field
+              label="Tipo de evento"
+              value={doc.eventType}
+              onChange={(e) => patch({ eventType: e.target.value })}
+              placeholder="Casamento"
+            />
+            <Field
+              label="Data"
+              value={doc.eventDate}
+              onChange={(e) => patch({ eventDate: e.target.value })}
+              placeholder="12 de setembro de 2026"
+            />
+            <Field
+              label="Local"
+              value={doc.location}
+              onChange={(e) => patch({ location: e.target.value })}
+              placeholder="Monte da Oliveirinha, Évora"
+            />
+            <Field
+              label="Convidados"
+              value={doc.guests}
+              onChange={(e) => patch({ guests: e.target.value })}
+              placeholder="150 pax"
+            />
+            {isDeco && (
+              <>
+                <Field
+                  label="Cerimónia"
+                  value={doc.ceremony ?? ""}
+                  onChange={(e) => patch({ ceremony: e.target.value })}
+                  placeholder="Civil, simbólica"
+                />
+                <Field
+                  label="Hora"
+                  value={doc.time ?? ""}
+                  onChange={(e) => patch({ time: e.target.value })}
+                  placeholder="A definir"
+                />
+                <Field
+                  label="Wedding Planners (opcional)"
+                  value={doc.weddingPlanners ?? ""}
+                  onChange={(e) => patch({ weddingPlanners: e.target.value })}
+                  placeholder="Equipa AMARA"
+                />
+              </>
+            )}
+          </div>
 
-      {/* Cover images */}
-      <Section title="Imagens de capa (2)">
-        <div className="grid grid-cols-2 gap-3">
-          {[0, 1].map((idx) => {
-            const path = doc.coverImages?.[idx];
-            return (
-              <div key={idx}>
-                {path ? (
-                  <Thumb
-                    url={assetUrls[path]}
-                    onRemove={() => removeCoverAt(idx)}
-                    className="aspect-[4/3]"
-                  />
-                ) : (
-                  <>
-                    <UploadArea
-                      // O lado é fixo: a posição 0 imprime à esquerda do painel
-                      // do logótipo, a 1 à direita.
-                      label={idx === 0 ? "Capa esquerda" : "Capa direita"}
-                      busy={!!uploading[`cover-${idx}`]}
-                      multiple={false}
-                      onFiles={(files) =>
-                        handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
-                          setCoverAt(idx, paths[0]),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      className={`${ADD_BTN} mt-1.5`}
-                      onClick={() => setPicker({ kind: "cover", idx })}
-                    >
-                      Da biblioteca de temas
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      {/* Service groups */}
-      <Section title="Serviços">
-        <div className="flex flex-col gap-3">
-          {doc.serviceGroups.map((g, gi) => (
-            <div
-              key={gi}
-              className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  className="bo-input w-12 px-2 py-2 text-xs text-foreground/70 text-center"
-                  value={g.letter ?? ""}
-                  onChange={(e) => updateGroup(gi, { letter: e.target.value })}
-                  placeholder="a)"
-                  aria-label="Letra do grupo (a, b, c…)"
-                />
-                <input
-                  className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
-                  value={g.title}
-                  onChange={(e) => updateGroup(gi, { title: e.target.value })}
-                  placeholder="Decoração Floral de Casamento"
-                  aria-label="Título do grupo"
-                />
-                <MoveBtns
-                  onUp={() => moveGroup(gi, -1)}
-                  onDown={() => moveGroup(gi, 1)}
-                  disUp={gi === 0}
-                  disDown={gi === doc.serviceGroups.length - 1}
-                />
+          {/* Reference (advanced) */}
+          <div className="mt-4">
+            {refEdited && (
+              <div className="mb-1.5 flex justify-end">
                 <button
                   type="button"
-                  className={REMOVE_BTN}
-                  onClick={() => removeGroup(gi)}
-                  aria-label="Remover grupo"
+                  onClick={() => {
+                    setRefEdited(false);
+                    setDoc((d) => ({ ...d, ref: buildRef(d) }));
+                  }}
+                  className={ADD_BTN}
                 >
-                  ×
+                  ↺ Automática
                 </button>
               </div>
-              <div className="flex flex-col gap-2 pl-1">
-                {g.items.map((it, ii) => (
-                  <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
-                    <input
-                      className={INPUT_SM}
-                      value={it.label}
-                      onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
-                      placeholder="Reunião inicial"
-                      aria-label="Item"
+            )}
+            <Field
+              label="Título interno (opcional)"
+              value={doc.ref}
+              onChange={(e) => {
+                setRefEdited(true);
+                patch({ ref: e.target.value });
+              }}
+              hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
+            />
+          </div>
+        </Section>
+
+        {/* Cover images */}
+        <Section title="Imagens de capa (2)">
+          <div className="grid grid-cols-2 gap-3">
+            {[0, 1].map((idx) => {
+              const path = doc.coverImages?.[idx];
+              return (
+                <div key={idx}>
+                  {path ? (
+                    <Thumb
+                      url={assetUrls[path]}
+                      onRemove={() => removeCoverAt(idx)}
+                      className="aspect-[4/3]"
                     />
-                    {!isDeco && (
+                  ) : (
+                    <>
+                      <UploadArea
+                        // O lado é fixo: a posição 0 imprime à esquerda do
+                        // painel do logótipo, a 1 à direita.
+                        label={idx === 0 ? "Capa esquerda" : "Capa direita"}
+                        busy={!!uploading[`cover-${idx}`]}
+                        multiple={false}
+                        onFiles={(files) =>
+                          handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
+                            setCoverAt(idx, paths[0]),
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        className={`${ADD_BTN} mt-1.5`}
+                        onClick={() => setPicker({ kind: "cover", idx })}
+                      >
+                        Da biblioteca de temas
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+
+        {/* Service groups */}
+        <Section title="Serviços">
+          <div className="flex flex-col gap-3">
+            {doc.serviceGroups.map((g, gi) => (
+              <div
+                key={gi}
+                className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    className="bo-input w-12 px-2 py-2 text-xs text-foreground/70 text-center"
+                    value={g.letter ?? ""}
+                    onChange={(e) => updateGroup(gi, { letter: e.target.value })}
+                    placeholder="a)"
+                    aria-label="Letra do grupo (a, b, c…)"
+                  />
+                  <input
+                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                    value={g.title}
+                    onChange={(e) => updateGroup(gi, { title: e.target.value })}
+                    placeholder="Decoração Floral de Casamento"
+                    aria-label="Título do grupo"
+                  />
+                  <MoveBtns
+                    onUp={() => moveGroup(gi, -1)}
+                    onDown={() => moveGroup(gi, 1)}
+                    disUp={gi === 0}
+                    disDown={gi === doc.serviceGroups.length - 1}
+                  />
+                  <button
+                    type="button"
+                    className={REMOVE_BTN}
+                    onClick={() => removeGroup(gi)}
+                    aria-label="Remover grupo"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="flex flex-col gap-2 pl-1">
+                  {g.items.map((it, ii) => (
+                    <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
                       <input
                         className={INPUT_SM}
-                        value={it.desc ?? ""}
-                        onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
-                        placeholder="Descrição"
-                        aria-label="Descrição do item"
+                        value={it.label}
+                        onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
+                        placeholder="Reunião inicial"
+                        aria-label="Item"
                       />
-                    )}
+                      {!isDeco && (
+                        <input
+                          className={INPUT_SM}
+                          value={it.desc ?? ""}
+                          onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
+                          placeholder="Descrição"
+                          aria-label="Descrição do item"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className={`${REMOVE_BTN} sm:mt-2`}
+                        onClick={() => removeServiceItem(gi, ii)}
+                        aria-label="Remover item"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className={ADD_BTN} onClick={() => addServiceItem(gi)}>
+                    + Adicionar item
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button type="button" className={`${ADD_BTN} mt-3`} onClick={addGroup}>
+            + Adicionar grupo de serviços
+          </button>
+        </Section>
+
+        {/* Mood boards — decoracao only */}
+        {isDeco && (
+          <Section title="Mood boards">
+            <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
+              grupos de imagens de inspiração para o cliente
+            </p>
+            <div className="flex flex-col gap-3">
+              {doc.moodBoards.map((b, bi) => (
+                <div
+                  key={bi}
+                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                      value={b.title}
+                      onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                      placeholder="Decoração Cerimónia"
+                      aria-label="Título do mood board"
+                    />
+                    <MoveBtns
+                      onUp={() => moveBoard(bi, -1)}
+                      onDown={() => moveBoard(bi, 1)}
+                      disUp={bi === 0}
+                      disDown={bi === doc.moodBoards.length - 1}
+                    />
                     <button
                       type="button"
-                      className={`${REMOVE_BTN} sm:mt-2`}
-                      onClick={() => removeServiceItem(gi, ii)}
+                      className={REMOVE_BTN}
+                      onClick={() => removeBoard(bi)}
+                      aria-label="Remover mood board"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <textarea
+                    className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
+                    rows={2}
+                    value={b.annotation ?? ""}
+                    onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
+                    placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
+                    aria-label="Descrição do mood board"
+                  />
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {b.images.map((path) => (
+                      <Thumb
+                        key={path}
+                        url={assetUrls[path]}
+                        onRemove={() => removeBoardImage(bi, path)}
+                        className="aspect-square"
+                      />
+                    ))}
+                    <UploadArea
+                      label="+ Imagens"
+                      busy={!!uploading[`board-${bi}`]}
+                      multiple
+                      compact
+                      onFiles={(files) =>
+                        handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
+                      }
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={`${ADD_BTN} mt-2`}
+                    onClick={() => setPicker({ kind: "board", bi })}
+                  >
+                    Escolher da biblioteca de temas
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className={`${ADD_BTN} mt-3`} onClick={addBoard}>
+              + Adicionar mood board
+            </button>
+          </Section>
+        )}
+
+        {/* Cronograma — organizacao only */}
+        {!isDeco && (
+          <Section title="Cronograma de Organização">
+            <div className="flex flex-col gap-3">
+              {(doc.cronograma ?? []).map((ph, pi) => (
+                <div
+                  key={pi}
+                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                      value={ph.title}
+                      onChange={(e) => updatePhase(pi, { title: e.target.value })}
+                      placeholder="6-12 meses antes do casamento"
+                      aria-label="Título da fase"
+                    />
+                    <MoveBtns
+                      onUp={() => movePhase(pi, -1)}
+                      onDown={() => movePhase(pi, 1)}
+                      disUp={pi === 0}
+                      disDown={pi === (doc.cronograma?.length ?? 0) - 1}
+                    />
+                    <button
+                      type="button"
+                      className={REMOVE_BTN}
+                      onClick={() => removePhase(pi)}
+                      aria-label="Remover fase"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-2 pl-1">
+                    {ph.items.map((it, ii) => (
+                      <div key={ii} className="flex items-center gap-2">
+                        <input
+                          className={INPUT_SM}
+                          value={it}
+                          onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
+                          placeholder="Definição do conceito"
+                          aria-label="Tarefa"
+                        />
+                        <button
+                          type="button"
+                          className={REMOVE_BTN}
+                          onClick={() => removePhaseItem(pi, ii)}
+                          aria-label="Remover tarefa"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
+                      + Adicionar tarefa
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
+              + Adicionar fase
+            </button>
+          </Section>
+        )}
+
+        {/* Budget */}
+        <Section title="Orçamento Proposto">
+          {isDeco ? (
+            <>
+              <div className="flex flex-col gap-2 mb-3">
+                {doc.budgetItems.map((it, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      className={INPUT_SM}
+                      value={it}
+                      onChange={(e) => updateBudgetItem(i, e.target.value)}
+                      placeholder="Decor Cerimónia"
+                      aria-label="Item de orçamento"
+                    />
+                    <button
+                      type="button"
+                      className={REMOVE_BTN}
+                      onClick={() => removeBudgetItem(i)}
                       aria-label="Remover item"
                     >
                       ×
                     </button>
                   </div>
                 ))}
-                <button type="button" className={ADD_BTN} onClick={() => addServiceItem(gi)}>
+                <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
                   + Adicionar item
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
-        <button type="button" className={`${ADD_BTN} mt-3`} onClick={addGroup}>
-          + Adicionar grupo de serviços
-        </button>
-      </Section>
-
-      {/* Mood boards — decoracao only */}
-      {isDeco && (
-        <Section title="Mood boards">
-          <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
-            grupos de imagens de inspiração para o cliente
-          </p>
-          <div className="flex flex-col gap-3">
-            {doc.moodBoards.map((b, bi) => (
-              <div
-                key={bi}
-                className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
-                    value={b.title}
-                    onChange={(e) => updateBoard(bi, { title: e.target.value })}
-                    placeholder="Decoração Cerimónia"
-                    aria-label="Título do mood board"
-                  />
-                  <MoveBtns
-                    onUp={() => moveBoard(bi, -1)}
-                    onDown={() => moveBoard(bi, 1)}
-                    disUp={bi === 0}
-                    disDown={bi === doc.moodBoards.length - 1}
-                  />
-                  <button
-                    type="button"
-                    className={REMOVE_BTN}
-                    onClick={() => removeBoard(bi)}
-                    aria-label="Remover mood board"
-                  >
-                    ×
-                  </button>
-                </div>
-                <input
-                  className={`${INPUT_SM} mb-2`}
-                  value={b.annotation ?? ""}
-                  onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
-                  placeholder="Anotação (opcional)"
-                  aria-label="Anotação"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field
+                  label="Rótulo do total"
+                  value={doc.totalLabel}
+                  onChange={(e) => patch({ totalLabel: e.target.value })}
+                  placeholder="Valor Total Decoração"
                 />
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {b.images.map((path) => (
-                    <Thumb
-                      key={path}
-                      url={assetUrls[path]}
-                      onRemove={() => removeBoardImage(bi, path)}
-                      className="aspect-square"
-                    />
-                  ))}
-                  <UploadArea
-                    label="+ Imagens"
-                    busy={!!uploading[`board-${bi}`]}
-                    multiple
-                    compact
-                    onFiles={(files) =>
-                      handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
-                    }
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={`${ADD_BTN} mt-2`}
-                  onClick={() => setPicker({ kind: "board", bi })}
-                >
-                  Escolher da biblioteca de temas
-                </button>
               </div>
-            ))}
-          </div>
-          <button type="button" className={`${ADD_BTN} mt-3`} onClick={addBoard}>
-            + Adicionar mood board
-          </button>
-        </Section>
-      )}
 
-      {/* Cronograma — organizacao only */}
-      {!isDeco && (
-        <Section title="Cronograma de Organização">
-          <div className="flex flex-col gap-3">
-            {(doc.cronograma ?? []).map((ph, pi) => (
-              <div
-                key={pi}
-                className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
-                    value={ph.title}
-                    onChange={(e) => updatePhase(pi, { title: e.target.value })}
-                    placeholder="6-12 meses antes do casamento"
-                    aria-label="Título da fase"
-                  />
-                  <MoveBtns
-                    onUp={() => movePhase(pi, -1)}
-                    onDown={() => movePhase(pi, 1)}
-                    disUp={pi === 0}
-                    disDown={pi === (doc.cronograma?.length ?? 0) - 1}
-                  />
-                  <button
-                    type="button"
-                    className={REMOVE_BTN}
-                    onClick={() => removePhase(pi)}
-                    aria-label="Remover fase"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2 pl-1">
-                  {ph.items.map((it, ii) => (
-                    <div key={ii} className="flex items-center gap-2">
+              {/* Valores adicionais — linhas mostradas por baixo do total (Deslocação,
+                  Wedding Coordinator, Tecidos, Mobiliário opção A/B, …). Só aparecem no
+                  PDF; o valor faturado e o sinal 30/70 continuam a partir do «Total» abaixo. */}
+              <div className="mt-5">
+                <span className="bo-eyebrow">Valores adicionais</span>
+                <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
+                  Linhas mostradas por baixo do total na proposta (ex.: deslocação, coordenação,
+                  tecidos). Só para o PDF — o total faturado e o sinal continuam a partir do
+                  «Total».
+                </p>
+                <div className="flex flex-col gap-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                    <span>Descrição</span>
+                    <span className="text-right">Valor (texto)</span>
+                    <span className="w-5" />
+                  </div>
+                  {(doc.budgetExtras ?? []).map((ex, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                    >
                       <input
-                        className={INPUT_SM}
-                        value={it}
-                        onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
-                        placeholder="Definição do conceito"
-                        aria-label="Tarefa"
+                        className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                        value={ex.label}
+                        onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                        placeholder="Deslocação da equipa Líquen"
+                        aria-label="Descrição da linha adicional"
+                      />
+                      <input
+                        className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
+                        value={ex.valueText}
+                        onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
+                        placeholder="896,00 €"
+                        aria-label="Valor da linha adicional"
                       />
                       <button
                         type="button"
                         className={REMOVE_BTN}
-                        onClick={() => removePhaseItem(pi, ii)}
-                        aria-label="Remover tarefa"
+                        onClick={() => removeBudgetExtra(i)}
+                        aria-label="Remover linha adicional"
                       >
                         ×
                       </button>
                     </div>
                   ))}
-                  <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
-                    + Adicionar tarefa
+                  <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
+                    + Adicionar valor adicional
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-          <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
-            + Adicionar fase
-          </button>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2 mb-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                  <span>Item</span>
+                  <span className="text-right">Valor</span>
+                  <span className="w-5" />
+                </div>
+                {(doc.budgetRows ?? []).map((r, i) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                  >
+                    <input
+                      className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                      value={r.item}
+                      onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
+                      placeholder="Coordenação do dia"
+                      aria-label="Item"
+                    />
+                    <input
+                      className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
+                      value={r.price}
+                      onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
+                      placeholder="1.500,00 €"
+                      aria-label="Valor"
+                    />
+                    <button
+                      type="button"
+                      className={REMOVE_BTN}
+                      onClick={() => removeBudgetRow(i)}
+                      aria-label="Remover linha"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
+                  + Adicionar linha
+                </button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <Field
+                  as="textarea"
+                  label="Nota do orçamento"
+                  rows={2}
+                  className="resize-none"
+                  value={doc.budgetNote ?? ""}
+                  onChange={(e) => patch({ budgetNote: e.target.value })}
+                  placeholder="Os valores são estimativas e podem ser ajustados…"
+                />
+              </div>
+            </>
+          )}
         </Section>
-      )}
 
-      {/* Budget */}
-      <Section title="Orçamento Proposto">
-        {isDeco ? (
-          <>
-            <div className="flex flex-col gap-2 mb-3">
-              {doc.budgetItems.map((it, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    className={INPUT_SM}
-                    value={it}
-                    onChange={(e) => updateBudgetItem(i, e.target.value)}
-                    placeholder="Decor Cerimónia"
-                    aria-label="Item de orçamento"
-                  />
-                  <button
-                    type="button"
-                    className={REMOVE_BTN}
-                    onClick={() => removeBudgetItem(i)}
-                    aria-label="Remover item"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
-                + Adicionar item
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field
-                label="Rótulo do total"
-                value={doc.totalLabel}
-                onChange={(e) => patch({ totalLabel: e.target.value })}
-                placeholder="Valor Total Decoração"
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-col gap-2 mb-3">
-              <div className="flex gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                <span className="flex-1">Item</span>
-                <span className="w-28">Valor</span>
-                <span className="w-5" />
-              </div>
-              {(doc.budgetRows ?? []).map((r, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
-                    value={r.item}
-                    onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
-                    placeholder="Coordenação do dia"
-                    aria-label="Item"
-                  />
-                  <input
-                    className="bo-input w-28 px-2.5 py-2 text-xs text-foreground/75 text-right"
-                    value={r.price}
-                    onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
-                    placeholder="1.500,00 €"
-                    aria-label="Valor"
-                  />
-                  <button
-                    type="button"
-                    className={REMOVE_BTN}
-                    onClick={() => removeBudgetRow(i)}
-                    aria-label="Remover linha"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
-                + Adicionar linha
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              <Field
-                as="textarea"
-                label="Nota do orçamento"
-                rows={2}
-                className="resize-none"
-                value={doc.budgetNote ?? ""}
-                onChange={(e) => patch({ budgetNote: e.target.value })}
-                placeholder="Os valores são estimativas e podem ser ajustados…"
-              />
-            </div>
-          </>
-        )}
-      </Section>
-
-      {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
+        {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
-      <Section title="Total, IVA e validade">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field
-            label={vatMode === "acrescer" ? "Valor (base, sem IVA)" : "Valor total (com IVA)"}
-            inputMode="decimal"
-            value={totalInput}
-            onChange={(e) => onTotalInput(e.target.value)}
-            placeholder="3000"
-            aria-label="Valor total"
-          />
-          <div className="flex flex-col gap-1.5">
-            <span className="bo-eyebrow">IVA</span>
-            <Segmented
-              ariaLabel="Modo de IVA"
-              value={vatMode}
-              onChange={setVatMode}
-              options={[
-                { value: "incluido", label: "IVA incluído" },
-                { value: "acrescer", label: "+ IVA (acresce)" },
-              ]}
-            />
-            <p className="text-xs leading-relaxed text-foreground/45">
-              «+ IVA» soma o IVA ao valor; «incluído» já o contém.
+        <Section title="Total, IVA e validade">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
+              O valor parte do <strong className="font-semibold">Preço final</strong> do pedido —
+              não é preciso escrevê-lo outra vez. Altere aqui só se esta proposta tiver um valor
+              diferente.
             </p>
+            <Field
+              label={vatMode === "acrescer" ? "Valor (base, sem IVA)" : "Valor total (com IVA)"}
+              inputMode="decimal"
+              value={totalInput}
+              onChange={(e) => onTotalInput(e.target.value)}
+              placeholder="3000"
+              aria-label="Valor total"
+            />
+            <div className="flex flex-col gap-1.5">
+              <span className="bo-eyebrow">IVA</span>
+              <Segmented
+                ariaLabel="Modo de IVA"
+                value={vatMode}
+                onChange={setVatMode}
+                options={[
+                  { value: "incluido", label: "IVA incluído" },
+                  { value: "acrescer", label: "+ IVA (acresce)" },
+                ]}
+              />
+              <p className="text-xs leading-relaxed text-foreground/45">
+                «+ IVA» soma o IVA ao valor; «incluído» já o contém.
+              </p>
+            </div>
+            <Field
+              label="Validade (dias)"
+              type="number"
+              min={1}
+              value={doc.validUntilDays ?? ""}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value, 10);
+                patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
+              }}
+              placeholder={String(DEFAULT_VALID_DAYS)}
+              aria-label="Dias de validade"
+            />
           </div>
-          <Field
-            label="Validade (dias)"
-            type="number"
-            min={1}
-            value={doc.validUntilDays ?? ""}
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
-            }}
-            placeholder={String(DEFAULT_VALID_DAYS)}
-            aria-label="Dias de validade"
-          />
+          {/* Prévia do desdobramento — o que será efetivamente faturado. */}
+          {money.gross > 0 && (
+            <p className="mt-4 text-xs leading-relaxed text-foreground/55">
+              Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
+              <span className="text-foreground/80">Total {eur(money.gross)}</span>
+              <br />
+              Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
+            </p>
+          )}
+        </Section>
+      </div>
+      {/* ══════════ /PASSO 1 ══════════ */}
+
+      {/* ══════════ PASSO 2 · Pré-visualizar ══════════ */}
+      {/* Only mount the preview while it's the active step. It was previously
+          kept mounted (just `hidden`), so its filter/map over every service
+          group + budget line re-ran on EVERY keystroke in the content step —
+          the main source of typing lag on large proposals. */}
+      {step === "prever" && (
+        <div>
+          <PreviewSummary doc={doc} assetUrls={assetUrls} money={money} split={split} />
         </div>
-        {/* Prévia do desdobramento — o que será efetivamente faturado. */}
-        {money.gross > 0 && (
-          <p className="mt-4 text-xs leading-relaxed text-foreground/55">
-            Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
-            <span className="text-foreground/80">Total {eur(money.gross)}</span>
-            <br />
-            Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
-          </p>
-        )}
-      </Section>
+      )}
 
-      {/* Actions */}
-      <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/85 px-1 py-3 backdrop-blur">
-        <Button
-          variant="secondary"
-          onClick={preview}
-          disabled={busy !== null}
-          loading={busy === "preview"}
-        >
-          {busy === "preview" ? "A gerar…" : "Pré-visualizar"}
-        </Button>
+      {/* ══════════ PASSO 3 · Enviar ══════════ */}
+      <div hidden={step !== "enviar"}>
+        <Section title="Enviar ao cliente">
+          {sent ? (
+            <div className="flex flex-col items-start gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] p-5">
+              <p className="flex items-center gap-2 font-display text-base text-[#4d6350]">
+                <span aria-hidden="true">✓</span> Proposta enviada
+              </p>
+              <p className="text-sm leading-relaxed text-foreground/60">
+                A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisa de
+                fazer mais nada.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSent(false);
+                  setConfirmSend(false);
+                }}
+              >
+                Enviar de novo / nova revisão
+              </Button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-foreground/60">
+                Confirme os dados abaixo. Ao enviar, o cliente recebe a proposta em PDF por email.
+              </p>
+              <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                <SummaryRow label="Para" value={quote.email || "—"} />
+                <SummaryRow label="Clientes" value={doc.clientNames || "—"} />
+                <SummaryRow
+                  label="Total (com IVA)"
+                  value={money.gross > 0 ? eur(money.gross) : "—"}
+                />
+                <SummaryRow label="Sinal 30%" value={money.gross > 0 ? eur(split.sinal) : "—"} />
+              </dl>
+              {!canSend && (
+                <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
+                  <span aria-hidden="true">⚠</span>
+                  <span>
+                    Preencha clientes, referência e um total maior que 0 (no passo «Conteúdo») antes
+                    de enviar.
+                  </span>
+                </p>
+              )}
+            </>
+          )}
+        </Section>
+      </div>
 
-        {confirmSend ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-foreground/60">
-              Enviar para {quote.email || "o cliente"}?
-            </span>
+      {/* Ação principal — muda conforme o passo, para haver sempre UMA próxima
+          ação óbvia. */}
+      <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/95 px-1 py-3">
+        {step === "conteudo" && (
+          <>
+            <p className="mr-auto text-xs text-foreground/45">
+              Preencha o conteúdo e avance para pré-visualizar.
+            </p>
             <Button
               variant="primary"
-              onClick={send}
-              disabled={busy !== null}
-              loading={busy === "send"}
+              onClick={() => setStep("prever")}
+              iconRight={<span aria-hidden="true">→</span>}
             >
-              {busy === "send" ? "A enviar…" : "Confirmar"}
+              Pré-visualizar
             </Button>
-            <Button variant="ghost" onClick={() => setConfirmSend(false)}>
-              Cancelar
+          </>
+        )}
+
+        {step === "prever" && (
+          <>
+            <Button variant="ghost" onClick={() => setStep("conteudo")}>
+              ← Conteúdo
             </Button>
-          </div>
-        ) : (
-          <Button
-            variant="primary"
-            onClick={() => setConfirmSend(true)}
-            disabled={busy !== null || !canSend}
-            title={canSend ? undefined : "Preencha clientes e referência."}
-            iconRight={<span aria-hidden="true">→</span>}
-          >
-            Gerar e enviar ao cliente
+            <Button
+              variant="secondary"
+              onClick={preview}
+              disabled={busy !== null}
+              loading={busy === "preview"}
+              className="ml-auto"
+            >
+              {busy === "preview" ? "A gerar…" : "Descarregar PDF"}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setStep("enviar")}
+              iconRight={<span aria-hidden="true">→</span>}
+            >
+              Rever e enviar
+            </Button>
+          </>
+        )}
+
+        {step === "enviar" && !sent && (
+          <>
+            <Button variant="ghost" onClick={() => setStep("prever")}>
+              ← Pré-visualizar
+            </Button>
+            {confirmSend ? (
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <span className="text-sm text-foreground/60">
+                  Enviar para {quote.email || "o cliente"}?
+                </span>
+                <Button
+                  variant="primary"
+                  onClick={send}
+                  disabled={busy !== null}
+                  loading={busy === "send"}
+                >
+                  {busy === "send" ? "A enviar…" : "Confirmar"}
+                </Button>
+                <Button variant="ghost" onClick={() => setConfirmSend(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => setConfirmSend(true)}
+                disabled={busy !== null || !canSend}
+                title={
+                  canSend
+                    ? undefined
+                    : "Preencha clientes, referência e um total maior que 0 antes de enviar."
+                }
+                iconRight={<span aria-hidden="true">→</span>}
+                className="ml-auto"
+              >
+                Gerar e enviar ao cliente
+              </Button>
+            )}
+          </>
+        )}
+
+        {step === "enviar" && sent && (
+          <Button variant="ghost" onClick={() => setStep("conteudo")}>
+            ← Voltar ao conteúdo
           </Button>
         )}
       </div>
@@ -1187,6 +1444,196 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h3 className="font-display text-base leading-tight text-foreground/90 mb-4">{title}</h3>
       {children}
     </Card>
+  );
+}
+
+/** Indicador de passos "1 · Conteúdo → 2 · Pré-visualizar → 3 · Enviar". */
+function StepNav({
+  step,
+  onSelect,
+  sent,
+}: {
+  step: Step;
+  onSelect: (s: Step) => void;
+  sent: boolean;
+}) {
+  return (
+    <nav aria-label="Passos da proposta" className="mb-5 flex flex-wrap items-center gap-1.5">
+      {STEPS.map((s, i) => {
+        const active = s.id === step;
+        return (
+          <Fragment key={s.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(s.id)}
+              aria-current={active ? "step" : undefined}
+              className={`inline-flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium motion-safe:transition-colors ${
+                active
+                  ? "bg-[#4d6350] text-white"
+                  : "text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground/80"
+              }`}
+            >
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
+                  active ? "bg-white/25 text-white" : "bg-foreground/[0.08] text-foreground/50"
+                }`}
+              >
+                {sent && s.id === "enviar" ? "✓" : s.n}
+              </span>
+              {s.label}
+            </button>
+            {i < STEPS.length - 1 && (
+              <span aria-hidden="true" className="text-foreground/20">
+                →
+              </span>
+            )}
+          </Fragment>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** Linha "rótulo → valor" para os resumos (pré-visualização e envio). */
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-foreground/[0.06] pb-1.5">
+      <dt className="text-foreground/45">{label}</dt>
+      <dd className="text-right text-foreground/85">{value}</dd>
+    </div>
+  );
+}
+
+/** Miniatura só de leitura (sem botão de remover) para o resumo. */
+function PreviewThumb({ url }: { url?: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]">
+      {url && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-[0.15em] text-foreground/30">
+          Imagem
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Resumo em página: a "forma" da proposta (capa, serviços, total sem IVA/IVA/
+ *  com IVA, sinal/saldo) sem ter de descarregar o PDF. */
+function PreviewSummary({
+  doc,
+  assetUrls,
+  money,
+  split,
+}: {
+  doc: StudioDoc;
+  assetUrls: Record<string, string>;
+  money: ReturnType<typeof resolveProposalMoney>;
+  split: ReturnType<typeof splitThirtySeventy>;
+}) {
+  const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
+  const groups = doc.serviceGroups.filter((g) => (g.title ?? "").trim() || g.items.length > 0);
+  const extras = (doc.budgetExtras ?? []).filter(
+    (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
+  );
+  return (
+    <Section title="Resumo da proposta">
+      <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
+        Esta é a forma da proposta que o cliente vai receber. Para o documento completo, use
+        «Descarregar PDF».
+      </p>
+
+      {covers.length > 0 && (
+        <div className="mb-5 grid grid-cols-2 gap-3">
+          {covers.map((path, i) => (
+            <PreviewThumb key={`${path}-${i}`} url={assetUrls[path]} />
+          ))}
+        </div>
+      )}
+
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        <SummaryRow label="Clientes" value={doc.clientNames || "—"} />
+        <SummaryRow label="Tipo de evento" value={doc.eventType || "—"} />
+        <SummaryRow label="Data" value={doc.eventDate || "—"} />
+        <SummaryRow label="Local" value={doc.location || "—"} />
+        {doc.guests ? <SummaryRow label="Convidados" value={doc.guests} /> : null}
+      </dl>
+
+      {groups.length > 0 && (
+        <div className="mt-5">
+          <p className="bo-eyebrow mb-2">Serviços</p>
+          <ul className="flex flex-col gap-1 text-sm text-foreground/75">
+            {groups.map((g, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-foreground/40">{g.letter || `${i + 1}.`}</span>
+                <span>
+                  {g.title || "(sem título)"}
+                  {g.items.length > 0 && (
+                    <span className="text-foreground/40">
+                      {" "}
+                      · {g.items.length} {g.items.length === 1 ? "item" : "itens"}
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {extras.length > 0 && (
+        <div className="mt-5">
+          <p className="bo-eyebrow mb-2">Valores adicionais</p>
+          <ul className="flex flex-col gap-1 text-sm text-foreground/75">
+            {extras.map((e, i) => (
+              <li key={i} className="flex items-baseline justify-between gap-3">
+                <span>{e.label || "—"}</span>
+                <span className="text-foreground/55">{e.valueText || "—"}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-5 rounded-2xl border border-foreground/[0.08] bg-foreground/[0.02] p-4">
+        {money.gross > 0 ? (
+          <dl className="flex flex-col gap-1.5 text-sm">
+            <div className="flex items-baseline justify-between">
+              <dt className="text-foreground/50">Sem IVA</dt>
+              <dd className="text-foreground/80">{eur(money.base)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <dt className="text-foreground/50">IVA ({Math.round(money.vatRate * 100)}%)</dt>
+              <dd className="text-foreground/80">{eur(money.vat)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between border-t border-foreground/[0.08] pt-1.5">
+              <dt className="font-medium text-foreground/70">Com IVA</dt>
+              <dd className="font-display text-base text-foreground/90">{eur(money.gross)}</dd>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between text-xs text-foreground/50">
+              <dt>Sinal 30%</dt>
+              <dd>{eur(split.sinal)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between text-xs text-foreground/50">
+              <dt>Saldo 70%</dt>
+              <dd>{eur(split.saldo)}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-sm text-foreground/50">
+            Ainda sem total. Defina o valor no passo «Conteúdo» → «Total, IVA e validade».
+          </p>
+        )}
+      </div>
+    </Section>
   );
 }
 

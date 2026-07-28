@@ -1,18 +1,25 @@
 /**
- * Tiny analytics event helper (Plausible custom events).
+ * Tiny analytics event helper. Fires each event to BOTH destinations, each
+ * inert until its tag loads, so calling `track()` anywhere is always safe:
  *
- * Completely inert unless Plausible is actually loaded (`window.plausible` is
- * only defined by Analytics.tsx when NEXT_PUBLIC_PLAUSIBLE_DOMAIN is set), so
- * calling `track()` anywhere is safe with no analytics configured — it no-ops.
- * Cookieless, no consent impact.
+ *  1. Plausible — cookieless, no consent impact (`window.plausible`, set by
+ *     Analytics.tsx only when NEXT_PUBLIC_PLAUSIBLE_DOMAIN is configured).
+ *  2. Google (GA4 + Ads) via `window.gtag` (GoogleTag.tsx). This is what lets
+ *     Google SEE high-intent actions — WhatsApp/phone clicks, CTA clicks,
+ *     quote-start — so it can optimise bidding toward them and you can build
+ *     remarketing audiences (e.g. "started a quote but didn't finish"). Consent
+ *     Mode governs whether it's cookie-based or a cookieless modelled ping, so
+ *     no consent check is needed here.
  */
 type PlausibleFn = (
   event: string,
   options?: { props?: Record<string, string | number | boolean> },
 ) => void;
+type Gtag = (...args: unknown[]) => void;
 
 export function track(event: string, props?: Record<string, string | number | boolean>): void {
   if (typeof window === "undefined") return;
-  const p = (window as unknown as { plausible?: PlausibleFn }).plausible;
-  if (typeof p === "function") p(event, props ? { props } : undefined);
+  const w = window as unknown as { plausible?: PlausibleFn; gtag?: Gtag };
+  if (typeof w.plausible === "function") w.plausible(event, props ? { props } : undefined);
+  if (typeof w.gtag === "function") w.gtag("event", event, props ?? {});
 }

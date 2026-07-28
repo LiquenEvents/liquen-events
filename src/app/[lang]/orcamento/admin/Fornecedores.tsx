@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useDeferredValue } from "react";
 import type { Supplier } from "@/lib/orcamento/types";
 import { downloadCsv, dateStamp } from "./export";
 import { SkeletonCard } from "./Skeleton";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 const CATEGORIES = [
   "Catering",
@@ -43,25 +44,19 @@ const PlusIcon = (
 );
 
 export default function Fornecedores() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: suppliers = [],
+    setData: setSuppliers,
+    loading,
+  } = useCachedList<Supplier[]>("fornecedores", "/api/fornecedores");
   const [search, setSearch] = useState("");
+  // Defer so the filter/row reconcile runs off the keystroke; input stays instant.
+  const dSearch = useDeferredValue(search);
   const [cat, setCat] = useState("Todos");
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/fornecedores", { cache: "no-store" });
-        if (res.ok) setSuppliers(await res.json());
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   async function add() {
     if (!form.name.trim()) return;
@@ -130,26 +125,32 @@ export default function Fornecedores() {
     () => ["Todos", "Preferidos", ...Array.from(new Set(suppliers.map((s) => s.category)))],
     [suppliers],
   );
-  const filtered = suppliers
-    .filter((s) => {
-      if (cat === "Preferidos" && !s.preferred) return false;
-      if (cat !== "Todos" && cat !== "Preferidos" && s.category !== cat) return false;
-      const q = search.trim().toLowerCase();
-      if (
-        q &&
-        ![s.name, s.email, s.phone, s.location, s.notes]
-          .filter(Boolean)
-          .some((v) => v!.toLowerCase().includes(q))
-      )
-        return false;
-      return true;
-    })
-    .slice()
-    .sort((a, b) => {
-      if (a.preferred && !b.preferred) return -1;
-      if (!a.preferred && b.preferred) return 1;
-      return a.name.localeCompare(b.name);
-    });
+  // Memoised: the filter+sort over all suppliers was recomputed on every render
+  // (incl. typing in the add/edit forms), not just when the inputs changed.
+  const filtered = useMemo(
+    () =>
+      suppliers
+        .filter((s) => {
+          if (cat === "Preferidos" && !s.preferred) return false;
+          if (cat !== "Todos" && cat !== "Preferidos" && s.category !== cat) return false;
+          const q = dSearch.trim().toLowerCase();
+          if (
+            q &&
+            ![s.name, s.email, s.phone, s.location, s.notes]
+              .filter(Boolean)
+              .some((v) => v!.toLowerCase().includes(q))
+          )
+            return false;
+          return true;
+        })
+        .slice()
+        .sort((a, b) => {
+          if (a.preferred && !b.preferred) return -1;
+          if (!a.preferred && b.preferred) return 1;
+          return a.name.localeCompare(b.name);
+        }),
+    [suppliers, cat, dSearch],
+  );
 
   return (
     <div>
@@ -183,7 +184,7 @@ export default function Fornecedores() {
           <>
             {suppliers.length > 0 && (
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 onClick={exportCsv}
                 title="Exportar fornecedores para CSV"
@@ -197,7 +198,7 @@ export default function Fornecedores() {
               iconLeft={adding ? undefined : PlusIcon}
               onClick={() => setAdding(!adding)}
             >
-              {adding ? "Cancelar" : "Fornecedor"}
+              {adding ? "Cancelar" : "Novo fornecedor"}
             </Button>
           </>
         }

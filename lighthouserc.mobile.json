@@ -1,0 +1,30 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run start",
+      "startServerReadyPattern": "Ready in|Local:|started server",
+      "startServerReadyTimeout": 60000,
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/servicos",
+        "http://localhost:3000/contacto",
+        "http://localhost:3000/clientes",
+        "http://localhost:3000/galeria",
+        "http://localhost:3000/sobre"
+      ],
+      "numberOfRuns": 3,
+      "settings": { "formFactor": "mobile", "screenEmulation": { "mobile": true } }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["warn", { "minScore": 0.6 }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 4000 }],
+        "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 600 }],
+        "interactive": ["warn", { "maxNumericValue": 7000 }],
+        "speed-index": ["warn", { "maxNumericValue": 5800 }]
+      }
+    },
+    "upload": { "target": "temporary-public-storage" }
+  }
+}

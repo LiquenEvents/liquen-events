@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import HeroImage from "@/components/HeroImage";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import GaleriaClient from "./GaleriaClient";
@@ -72,22 +73,23 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       {/* ── Immersive hero ── */}
       {/* -mt-24 cancels the global <main> pt-24 so the hero image runs to the
           very top behind the transparent navbar (no white strip / hairline). */}
-      <section className="relative -mt-24 min-h-[68svh] lg:min-h-[80svh] flex flex-col justify-end overflow-hidden">
+      <section className="relative -mt-24 min-h-[100svh] lg:min-h-[80svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+          <HeroImage
             src="/imagens/DaniGui_Preview20.jpg"
             alt={t.common.imageAlt.galeriaHeader}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={75}
             className="object-cover object-center hero-settle"
             {...blurFor("/imagens/DaniGui_Preview20.jpg")}
           />
         </Parallax>
-        {/* Image-first (SpaceX-style): only the bottom darkens enough to keep the
-            white caption legible — no heavy full-panel veil. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
+        {/* Image-first: a gentle bottom scrim keeps the caption legible without
+            leaving a heavy opaque band — so the cover flows straight into the
+            (dark) gallery photos below, with no black line between them. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/75 via-transparent to-transparent" />
 
         {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
             photograph owns the first screen. Still the page's single <h1>. */}
@@ -113,12 +115,12 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
       {/* Full-bleed (SpaceX-style): sem wrapper max-w/px — a masonry corre de
           borda a borda, só com o gap-0.5 interno entre fotos. O chrome dos
           filtros traz o seu próprio padding lateral (ver GaleriaClient). */}
-      <section className="py-12 lg:py-16 bg-[#0b0b0b]">
+      <section className="pb-12 lg:pb-16 bg-[#0b0b0b]">
         <GaleriaClient photos={galleryPhotos} dict={t.galeria} />
       </section>
 
       {/* ── Instagram CTA ── */}
-      <section className="relative overflow-hidden border-t border-white/8">
+      <section className="relative overflow-hidden">
         <Image
           src="/imagens/DaniGui_Adois_61.jpg"
           alt={t.common.imageAlt.galeriaInstagram}

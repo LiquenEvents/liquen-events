@@ -143,7 +143,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
   const zone = zoneFor(next.kind);
 
   return (
-    <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07]">
+    <header className="sticky top-0 z-20 bg-white/97 border-b border-foreground/[0.07]">
       <div className="px-4 sm:px-6 lg:px-10 py-5 flex flex-col gap-5">
         {/* Linha 1 — voltar + título + próxima ação */}
         <div className="flex flex-col lg:flex-row lg:items-start gap-5">
@@ -341,12 +341,14 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
           </div>
 
           {/* Cartão de próxima ação */}
-          <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-[#1b2119] rounded-2xl p-5 shadow-sm">
-            <p className="text-white/45 text-[10px] tracking-[0.16em] uppercase font-semibold mb-2">
+          <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-[#4d6350]/[0.06] border border-[#4d6350]/20 rounded-2xl p-5">
+            <p className="text-[#4d6350]/70 text-[10px] tracking-[0.16em] uppercase font-semibold mb-2">
               Próxima ação
             </p>
-            <p className="text-white/90 text-sm font-medium leading-snug mb-1.5">{next.label}</p>
-            <p className="text-white/50 text-xs leading-relaxed mb-4">{next.hint}</p>
+            <p className="text-foreground/85 text-sm font-medium leading-snug mb-1.5">
+              {next.label}
+            </p>
+            <p className="text-foreground/55 text-xs leading-relaxed mb-4">{next.hint}</p>
             {next.kind === "portal" ? (
               <a
                 href={portalUrl}

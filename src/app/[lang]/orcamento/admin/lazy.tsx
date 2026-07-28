@@ -30,7 +30,6 @@ export const Propostas = dynamic(() => import("./Propostas"), { loading: ViewLoa
 export const Tarefas = dynamic(() => import("./Tarefas"), { loading: ViewLoading });
 export const Fornecedores = dynamic(() => import("./Fornecedores"), { loading: ViewLoading });
 export const StatsDashboard = dynamic(() => import("./StatsDashboard"), { loading: ViewLoading });
-export const Inbox = dynamic(() => import("./Inbox"), { loading: ViewLoading });
 export const EmailTemplates = dynamic(() => import("./EmailTemplates"), { loading: ViewLoading });
 export const Faturas = dynamic(() => import("./Faturas"), { loading: ViewLoading });
 export const Contratos = dynamic(() => import("./Contratos"), { loading: ViewLoading });

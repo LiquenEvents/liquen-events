@@ -40,6 +40,8 @@ export default function ProductionPlan({ quote, onChange }: Props) {
   // orçamentos antigos, itens de produção que tenham ficado gravados em
   // `checklist` permanecem lá intactos até serem re-aplicados aqui.
   const [items, setItems] = useState<ChecklistItem[]>(quote.productionPlan ?? []);
+  const [newLabel, setNewLabel] = useState("");
+  const [newPhase, setNewPhase] = useState<string>(DECOR_PRODUCTION[0].key);
   const suppliers = quote.eventSuppliers ?? [];
 
   async function persist(next: ChecklistItem[]) {
@@ -72,6 +74,20 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     persist(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
   }
 
+  function removeItem(id: string) {
+    persist(items.filter((i) => i.id !== id));
+  }
+
+  // Tarefa própria: prefixa a fase escolhida (mesmo formato do seed) para o
+  // agrupamento por fase continuar a funcionar.
+  function addCustom() {
+    const label = newLabel.trim();
+    if (!label) return;
+    const phase = DECOR_PRODUCTION.find((p) => p.key === newPhase) ?? DECOR_PRODUCTION[0];
+    persist([...items, { id: randomId(), label: `${phase.label}${SEP}${label}`, done: false }]);
+    setNewLabel("");
+  }
+
   // Group the production plan by phase via the label prefix.
   const grouped = useMemo(
     () =>
@@ -90,21 +106,45 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     <div className="border-t border-foreground/10 pt-5">
       <div className="flex items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Produção Decor</p>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={applyPlan}
-          iconLeft={<span aria-hidden="true">+</span>}
-        >
-          Aplicar plano de produção
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {items.length > 0 && (
+            <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+              {items.filter((i) => i.done).length}/{items.length} do plano
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={applyPlan}
+            iconLeft={<span aria-hidden="true">+</span>}
+          >
+            Aplicar plano de produção
+          </Button>
+        </div>
       </div>
 
       {!seeded ? (
         <EmptyState
           className="px-4 py-10"
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3 3 8l9 5 9-5-9-5Z" />
+              <path d="m3 13 9 5 9-5" />
+            </svg>
+          }
           title="Plano de produção por gerar"
-          description="Use “Aplicar plano de produção” para gerar as tarefas de atelier — do sourcing das flores à desmontagem no local."
+          description="Gere as tarefas de atelier — do sourcing das flores à desmontagem no local — e ajuste-as a este evento."
+          action={{ label: "Aplicar plano de produção", onClick: applyPlan }}
         />
       ) : (
         <div className="flex flex-col gap-4 mb-4">
@@ -121,7 +161,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                     {done}/{phaseItems.length}
                   </span>
                 </div>
-                <div className="h-1 bg-foreground/6 rounded-full overflow-hidden mb-2">
+                <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mb-2">
                   <div
                     className="h-full bg-[#4d6350] rounded-full transition-all duration-500"
                     style={{ width: `${pct}%` }}
@@ -129,7 +169,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                 </div>
                 <div className="flex flex-col gap-0.5">
                   {phaseItems.map((i) => (
-                    <div key={i.id} className="flex items-center gap-2.5 py-1.5">
+                    <div key={i.id} className="group flex items-center gap-2.5 py-1.5">
                       <button
                         onClick={() => toggle(i.id)}
                         role="checkbox"
@@ -150,10 +190,18 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         )}
                       </button>
                       <span
-                        className={`flex-1 text-xs ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
+                        className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
                       >
                         {i.label.slice((phase.label + SEP).length)}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(i.id)}
+                        aria-label="Remover tarefa"
+                        className="shrink-0 text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                      >
+                        ×
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -163,8 +211,42 @@ export default function ProductionPlan({ quote, onChange }: Props) {
         </div>
       )}
 
+      {/* Adicionar uma tarefa própria a qualquer fase do plano. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select
+          value={newPhase}
+          onChange={(e) => setNewPhase(e.target.value)}
+          aria-label="Fase"
+          className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
+        >
+          {DECOR_PRODUCTION.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <input
+          value={newLabel}
+          onChange={(e) => setNewLabel(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") addCustom();
+          }}
+          placeholder="Nova tarefa (ex.: encomendar velas)"
+          aria-label="Nova tarefa de produção"
+          className="bo-input min-w-[10rem] flex-1 px-2.5 py-2 text-xs text-foreground/80"
+        />
+        <Button
+          size="sm"
+          onClick={addCustom}
+          disabled={!newLabel.trim()}
+          iconLeft={<span aria-hidden="true">+</span>}
+        >
+          Adicionar
+        </Button>
+      </div>
+
       {/* Suppliers assigned to this event — managed in Custos, shown read-only. */}
-      <div className="mt-5 pt-4 border-t border-foreground/8">
+      <div className="mt-5 pt-4 border-t border-foreground/[0.08]">
         <div className="flex items-center justify-between mb-2.5">
           <p className="text-foreground/45 text-[11px] tracking-[0.1em] uppercase">
             Fornecedores atribuídos

@@ -25,6 +25,36 @@ export const CATEGORIES: {
   },
 ];
 
+/**
+ * The six choices the public quote form offers, in display order.
+ *
+ * Shared with the confirmation page: the stored `eventType` is looked up here
+ * to get an INDEX, and the index reads the visitor's own language out of
+ * `orcamento.eventTypeLabels`. Without this an English visitor was shown the
+ * Portuguese label from EVENT_TYPES_BY_CATEGORY.
+ *
+ * Keep in step with `orcamento.eventTypeLabels` in both dictionaries — same
+ * length, same order.
+ */
+export const QUOTE_EVENT_OPTIONS: {
+  label: string;
+  category: EventCategory | null;
+  eventType: EventType | null;
+}[] = [
+  { label: "Casamento", category: "particulares", eventType: "casamentos" },
+  { label: "Corporativo", category: "empresas", eventType: "conferencias" },
+  { label: "Aniversário", category: "particulares", eventType: "aniversarios" },
+  { label: "Batizado / Comunhão", category: "particulares", eventType: "batizados" },
+  { label: "Jantar de Gala", category: "particulares", eventType: "jantares_gala" },
+  { label: "Outro", category: null, eventType: null },
+];
+
+/** Weddings and christenings are organised by a couple/a family → plural
+ *  register ("o vosso pedido"). Everything else stays singular formal. */
+export function isPluralRegister(eventType: string | null | undefined): boolean {
+  return eventType === "casamentos" || eventType === "batizados";
+}
+
 export const EVENT_TYPES_BY_CATEGORY: Record<
   EventCategory,
   {

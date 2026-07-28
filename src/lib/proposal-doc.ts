@@ -63,6 +63,23 @@ export interface BudgetRow {
   price: string;
 }
 
+/**
+ * Linha ADICIONAL de orçamento no template Decoração — apresentada por baixo do
+ * "Valor Total Decoração", tal como nas propostas reais da Líquen (Deslocação da
+ * equipa, Wedding Coordinator, Tecidos suspensos, Mobiliário opção A/B, …).
+ *
+ * É apenas de DISPLAY (texto livre pt-PT, incl. o "+ IVA" quando aplicável) —
+ * não entra no modelo de dinheiro/faturação (que continua a partir do total
+ * estruturado), do mesmo modo que `budgetItems` são só nomes. Assim a estrutura
+ * do PDF varia conforme o que cada casal pede, sem desestabilizar as finanças.
+ */
+export interface BudgetExtra {
+  /** Rótulo à esquerda, e.g. "Deslocação da equipa Líquen". */
+  label: string;
+  /** Valor à direita como texto livre, e.g. "896,00 €" ou "895,00 € + IVA". */
+  valueText: string;
+}
+
 export interface ProposalDoc {
   /** Which studio template this proposal follows — switches the apresentação
    *  heading, the pricing model, and whether a cronograma is shown. */
@@ -82,6 +99,8 @@ export interface ProposalDoc {
   guests: string; // "150 pax"
   ceremony?: string; // "Civil, simbólica"
   time?: string; // "A definir"
+  /** Wedding planners a acompanhar o evento, e.g. "Equipa AMARA" (opcional). */
+  weddingPlanners?: string;
 
   // ── 2. Serviços ──
   serviceGroups: ServiceGroup[];
@@ -97,6 +116,9 @@ export interface ProposalDoc {
   budgetItems: string[]; // item NAMES only, e.g. "Decor Cerimónia"
   totalLabel: string; // "Valor Total Decoração"
   totalText: string; // "3000,00 € + IVA" — kept as text to match the studio's format
+  /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding
+   *  Coordinator, Tecidos, Mobiliário opção A/B, …). Só DISPLAY — ver {@link BudgetExtra}. */
+  budgetExtras?: BudgetExtra[];
   // Organização template: per-item estimated values.
   budgetRows?: BudgetRow[];
   totalEstimatedText?: string; // "[Valor Total]" / "12.500,00 €"
@@ -345,6 +367,7 @@ export function withProposalDefaults(
     moodBoards: doc.moodBoards ?? [],
     cronograma: doc.cronograma ?? [],
     budgetItems: doc.budgetItems ?? [],
+    budgetExtras: doc.budgetExtras ?? [],
     budgetRows: doc.budgetRows ?? [],
     // A capa sai sempre com as 2 posições preenchidas ("" = vazia), venha o
     // rascunho na forma antiga (esparsa/curta) ou já na nova.

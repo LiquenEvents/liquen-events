@@ -3,6 +3,7 @@ import TrackedLink from "@/components/TrackedLink";
 import FAQ from "./FAQ";
 import AnimateIn from "@/components/AnimateIn";
 import Image from "next/image";
+import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import { pageMetadata } from "@/lib/page-metadata";
 import { BreadcrumbJsonLd, FaqJsonLd } from "@/components/JsonLd";
@@ -63,12 +64,12 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
         style={{ height: "65svh", minHeight: "420px" }}
       >
         <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+          <HeroImage
             src={heroImg}
             {...blurFor(heroImg)}
             alt={t.common.imageAlt.contactoHero}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={75}
             className="object-cover hero-settle"
@@ -458,7 +459,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             </p>
             <h2
               className="text-cream font-bold uppercase tracking-display leading-tight mb-6"
-              style={{ fontSize: "clamp(36px, 5vw, 72px)" }}
+              style={{ fontSize: "clamp(28px, 4.2vw, 52px)" }}
             >
               {t.contacto.whatsappTitleLine1}
               <br />

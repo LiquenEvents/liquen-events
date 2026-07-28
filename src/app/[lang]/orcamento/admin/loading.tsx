@@ -20,20 +20,20 @@ export default function AdminLoading() {
       aria-busy="true"
       aria-label="A carregar o back office"
     >
-      {/* ── Sidebar (matches the real w-64 #1b2119 rail) ── */}
-      <aside className="hidden lg:flex sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#1b2119] flex-col">
+      {/* ── Sidebar (matches the real light w-64 rail) ── */}
+      <aside className="hidden lg:flex sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#f7f7f8] border-r border-black/[0.08] flex-col">
         {/* Brand block */}
         <div className="px-5 pt-8 pb-5 flex flex-col items-center">
-          <div className="h-24 w-32 rounded-md bg-white/[0.06]" />
-          <div className="mt-3 h-1.5 w-20 rounded bg-white/[0.05]" />
+          <div className="h-24 w-32 rounded-md bg-black/[0.05]" />
+          <div className="mt-3 h-1.5 w-20 rounded bg-black/[0.04]" />
         </div>
-        <div className="mx-4 h-px bg-white/[0.07] mb-2" />
+        <div className="mx-4 h-px bg-black/[0.06] mb-2" />
         {/* Nav items */}
         <div className="flex-1 px-2.5 py-3 flex flex-col gap-1.5">
           {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-              <div className="h-4 w-4 rounded bg-white/[0.07]" />
-              <div className="h-2 w-24 rounded bg-white/[0.06]" />
+              <div className="h-4 w-4 rounded bg-black/[0.06]" />
+              <div className="h-2 w-24 rounded bg-black/[0.05]" />
             </div>
           ))}
         </div>
@@ -42,7 +42,7 @@ export default function AdminLoading() {
       {/* ── Main column ── */}
       <div className="flex-1 min-w-0">
         {/* Header (matches the sticky white bar) */}
-        <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-xl border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
+        <header className="sticky top-0 z-20 bg-white/97 border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
           <div className="min-w-0">
             <div className="bo-skeleton h-2 w-28 mb-3" />
             <div className="bo-skeleton h-6 w-52" />

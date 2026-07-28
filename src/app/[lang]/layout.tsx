@@ -8,8 +8,14 @@ import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
 import Analytics from "@/components/Analytics";
+import GoogleTag from "@/components/GoogleTag";
+import ConsentBanner from "@/components/ConsentBanner";
+import SpeculationRules from "@/components/SpeculationRules";
 import LeadSourceCapture from "@/components/LeadSourceCapture";
 import PageTransition from "@/components/PageTransition";
+import HeroWarm from "@/components/HeroWarm";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import WebVitals from "@/components/WebVitals";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import SmoothScroll from "@/components/motion/SmoothScroll";
 import { getDictionary, htmlLang, normalizeLocale, LOCALES, pickChromeDict } from "@/lib/i18n";
@@ -59,6 +65,11 @@ const inter = Inter({
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
+  // The real italic, not the browser's synthetic slant. Playfair's italic is a
+  // separate drawing (single-storey a, calligraphic f), and the sign-off, the
+  // pull-quote and the warm greeting are all set in it — a faux-oblique of the
+  // roman looked mechanical exactly where the page is trying to feel written.
+  style: ["normal", "italic"],
   display: "swap",
   adjustFontFallback: true,
   fallback: ["Georgia", "Times New Roman", "Times", "serif"],
@@ -73,6 +84,13 @@ const archivo = Archivo({
   subsets: ["latin"],
   display: "swap",
   adjustFontFallback: true,
+  // Archivo is used ONLY inside .admin-mode (the back office). Its CSS variable
+  // is attached to <html> for the whole site, so with the default preload:true
+  // next/font emitted a high-priority <link rel="preload"> for it on every
+  // PUBLIC page — a font marketing visitors never render, competing with the
+  // hero LCP. preload:false fetches it on demand (still display:"swap"); the
+  // back office is unaffected. No visual change on either surface.
+  preload: false,
   fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Arial", "sans-serif"],
 });
 
@@ -195,8 +213,13 @@ export default async function RootLayout({
           <SmoothScroll>
             {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
             <StructuredData locale={locale} />
+            <SpeculationRules />
             <Analytics />
+            <GoogleTag />
             <LeadSourceCapture />
+            <HeroWarm />
+            <ServiceWorkerRegister />
+            <WebVitals />
             <a
               href="#conteudo"
               className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-white focus:rounded-md focus:text-sm"
@@ -214,6 +237,7 @@ export default async function RootLayout({
             </main>
             <Footer locale={locale} />
             <WhatsAppButton />
+            <ConsentBanner locale={locale} />
           </SmoothScroll>
         </LocaleProvider>
       </body>

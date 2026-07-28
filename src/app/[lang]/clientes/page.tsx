@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
 import Image from "next/image";
+import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -93,11 +94,11 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           the very top behind the transparent navbar (no white strip / hairline). */}
       <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+          <HeroImage
             src="/imagens/EW1_1393.jpg"
             alt={t.common.imageAlt.clientesCorporate}
             fill
-            preload
+            priority
             sizes="100vw"
             quality={75}
             className="object-cover object-center hero-settle"
@@ -210,7 +211,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── TESTIMONIALS GRID ── */}
-      <section className="relative py-24 lg:py-28 overflow-hidden border-b border-foreground/8">
+      <section className="relative py-24 lg:py-28 overflow-hidden">
         <Image
           src={wordsImg}
           alt=""
@@ -272,10 +273,10 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       {/* ── PHOTO MOSAIC ── */}
       {/* O mosaico sangra de bordo a bordo (sem moldura max-w nem goteiras),
           à maneira SpaceX; só o eyebrow mantém a grelha de conteúdo. */}
-      <section className="py-20 lg:py-28 bg-surface border-b border-foreground/8">
+      <section className="pt-16 lg:pt-20 bg-[#0b0b0b]">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <AnimateIn className="mb-10">
-            <p className={eyebrow}>
+            <p className="text-white/70 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3">
               <span className="w-5 h-px bg-gold/50 flex-shrink-0" />
               {t.clientes.mosaicEyebrow}
             </p>
@@ -318,7 +319,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             </p>
             <h2
               className="text-white font-bold uppercase tracking-display leading-[0.88] mb-6"
-              style={{ fontSize: "clamp(50px, 9vw, 128px)" }}
+              style={{ fontSize: "clamp(34px, 6vw, 84px)" }}
             >
               {t.clientes.ctaTitleLine1}
               <br />

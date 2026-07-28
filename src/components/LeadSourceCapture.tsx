@@ -33,7 +33,14 @@ export default function LeadSourceCapture() {
       if (document.referrer) {
         try {
           const host = new URL(document.referrer).hostname;
-          if (host && host !== window.location.hostname) ref = `ref:${host}`;
+          // Skip our own infrastructure. A visit that came from the Vercel
+          // dashboard or a preview URL isn't attribution — it's us — and it
+          // reached the team's inbox as "Origem: ref:vercel.com".
+          const ours =
+            host === window.location.hostname ||
+            /(^|\.)(vercel\.app|vercel\.com|liquen-events\.com)$/i.test(host) ||
+            host === "localhost";
+          if (host && !ours) ref = `ref:${host}`;
         } catch {
           /* malformed referrer — ignore */
         }
