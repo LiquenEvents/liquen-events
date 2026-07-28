@@ -13,6 +13,8 @@ import {
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageForUpload, type ImageKind } from "./image-prep";
+import ThemePicker from "./ThemePicker";
+import type { ThemeImage } from "@/lib/theme-types";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -132,6 +134,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
   const [confirmSend, setConfirmSend] = useState(false);
+  // Qual o destino das fotos escolhidas na biblioteca de temas (null = fechado).
+  const [picker, setPicker] = useState<
+    { kind: "board"; bi: number } | { kind: "cover"; idx: number } | null
+  >(null);
   const hydrated = useRef(false);
 
   // ── Restore draft on mount ──
@@ -349,6 +355,25 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     } finally {
       setUploading((u) => ({ ...u, [key]: false }));
     }
+  }
+
+  // ── Biblioteca de temas ──
+  // As fotos escolhidas já vêm COPIADAS para a pasta desta proposta pela rota
+  // /assets/importar, com os mesmos `path` que um carregamento manual daria —
+  // por isso entram no rascunho exatamente pelo mesmo caminho.
+  function onPickedFromLibrary(images: ThemeImage[]) {
+    if (images.length === 0) return;
+    setAssetUrls((prev) => {
+      const next = { ...prev };
+      for (const im of images) if (im.path && im.url) next[im.path] = im.url;
+      return next;
+    });
+    if (picker?.kind === "board")
+      addBoardImages(
+        picker.bi,
+        images.map((im) => im.path),
+      );
+    else if (picker?.kind === "cover") setCoverAt(picker.idx, images[0].path);
   }
 
   // ── Service groups ──
@@ -698,16 +723,25 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                     className="aspect-[4/3]"
                   />
                 ) : (
-                  <UploadArea
-                    label={`Capa ${idx + 1}`}
-                    busy={!!uploading[`cover-${idx}`]}
-                    multiple={false}
-                    onFiles={(files) =>
-                      handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
-                        setCoverAt(idx, paths[0]),
-                      )
-                    }
-                  />
+                  <>
+                    <UploadArea
+                      label={`Capa ${idx + 1}`}
+                      busy={!!uploading[`cover-${idx}`]}
+                      multiple={false}
+                      onFiles={(files) =>
+                        handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
+                          setCoverAt(idx, paths[0]),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      className={`${ADD_BTN} mt-1.5`}
+                      onClick={() => setPicker({ kind: "cover", idx })}
+                    >
+                      Da biblioteca de temas
+                    </button>
+                  </>
                 )}
               </div>
             );
@@ -855,6 +889,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                     }
                   />
                 </div>
+                <button
+                  type="button"
+                  className={`${ADD_BTN} mt-2`}
+                  onClick={() => setPicker({ kind: "board", bi })}
+                >
+                  Escolher da biblioteca de temas
+                </button>
               </div>
             ))}
           </div>
@@ -1111,6 +1152,15 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           </Button>
         )}
       </div>
+
+      {picker && (
+        <ThemePicker
+          quoteId={quote.id}
+          multiple={picker.kind === "board"}
+          onClose={() => setPicker(null)}
+          onPicked={onPickedFromLibrary}
+        />
+      )}
     </div>
   );
 }

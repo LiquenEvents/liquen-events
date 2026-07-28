@@ -16,6 +16,7 @@ export type View =
   | "tarefas"
   | "fornecedores"
   | "inventario"
+  | "temas"
   | "seguimentos"
   | "estatisticas"
   | "faturas"
@@ -52,6 +53,7 @@ export const MORE_NAV: View[] = [
   "kanban",
   "clientes",
   "tarefas",
+  "temas",
   "fornecedores",
   "seguimentos",
   "estatisticas",
@@ -179,6 +181,27 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "temas",
+    label: "Temas",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path
+          d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+          strokeLinejoin="round"
+        />
+        <circle cx="9.5" cy="12" r="1.2" />
+        <path d="m6 17 3.5-3 3 2.5L16 13l3 4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

@@ -35,6 +35,7 @@ export const EmailTemplates = dynamic(() => import("./EmailTemplates"), { loadin
 export const Faturas = dynamic(() => import("./Faturas"), { loading: ViewLoading });
 export const Contratos = dynamic(() => import("./Contratos"), { loading: ViewLoading });
 export const Inventario = dynamic(() => import("./Inventario"), { loading: ViewLoading });
+export const Temas = dynamic(() => import("./Temas"), { loading: ViewLoading });
 export const Seguimentos = dynamic(() => import("./FollowUps"), { loading: ViewLoading });
 
 // ── Detail-panel tools (only needed once a quote is opened) ──

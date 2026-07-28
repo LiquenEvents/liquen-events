@@ -5,8 +5,9 @@ import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
  *
  * A companion to admin-smoke: that spec covers the always-visible CORE sidebar
  * items, this one opens the collapsed "Mais" disclosure and walks the SECONDARY
- * destinations tucked behind it (Pipeline, Clientes, Tarefas, Fornecedores,
- * Inventário, Seguimentos, Estatísticas, Modelos de email — labels from nav.tsx).
+ * destinations tucked behind it (Pipeline, Clientes, Tarefas, Temas,
+ * Fornecedores, Inventário, Seguimentos, Estatísticas, Modelos de email —
+ * labels from nav.tsx).
  * For each it asserts:
  *   1. its page heading (H1) renders, so the lazy chunk mounted (not a skeleton),
  *   2. no error boundary ("Ocorreu um erro inesperado") tripped, and
@@ -81,6 +82,7 @@ const SECONDARY_VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Pipeline$/, heading: /^Pipeline$/ },
   { nav: /^Clientes$/, heading: /^Clientes$/ },
   { nav: /^Tarefas$/, heading: /^Tarefas$/ },
+  { nav: /^Temas$/, heading: /^Temas$/ },
   { nav: /^Fornecedores$/, heading: /^Fornecedores$/ },
   { nav: /^Inventário$/, heading: /^Inventário$/ },
   { nav: /^Seguimentos$/, heading: /^Seguimentos$/ },

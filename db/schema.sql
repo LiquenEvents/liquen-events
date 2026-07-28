@@ -202,6 +202,21 @@ create table if not exists public.inventory_items (
 
 create index if not exists inventory_category_idx on public.inventory_items (category);
 
+-- ── Biblioteca de temas (fotos de inspiração reutilizáveis) ─────
+-- Só os METADADOS de cada tema ("Itália", "Terracotta"). As fotos vivem no
+-- bucket privado de Storage `theme-assets`, uma pasta por id de tema — a
+-- pasta é a única fonte de verdade do que existe, por isso não há aqui
+-- nenhuma lista de imagens que possa dessincronizar.
+create table if not exists public.proposal_themes (
+  id          text primary key,
+  name        text not null,
+  notes       text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists proposal_themes_name_idx on public.proposal_themes (name);
+
 -- ── Contratos / aceitação de Termos & Condições ─────────────────
 -- Registo, por proposta, da aceitação das condições pelo cliente ao confirmar
 -- a proposta no link público: quem aceitou, quando, de que IP, a versão dos
@@ -323,5 +338,6 @@ alter table public.email_templates enable row level security;
 alter table public.invoices    enable row level security;
 alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
+alter table public.proposal_themes enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;

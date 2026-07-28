@@ -54,6 +54,7 @@ import {
   Faturas,
   Contratos,
   Inventario,
+  Temas,
   Seguimentos,
   ClientMessenger,
   EventChecklist,
@@ -1071,6 +1072,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
+    temas: "Temas",
     seguimentos: "Seguimentos",
     estatisticas: "Estatísticas",
     faturas: "Faturas",
@@ -1089,6 +1091,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
+    temas: "Fotos de inspiração por tema, prontas para as propostas",
     seguimentos: "Seguimentos automáticos a fazer",
     estatisticas: "Métricas e desempenho",
     faturas: "Livro de faturação e pagamentos",
@@ -1569,6 +1572,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "inventario" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Inventario />
+            </div>
+          )}
+
+          {/* ── Biblioteca de temas ── */}
+          {view === "temas" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Temas />
             </div>
           )}
 
