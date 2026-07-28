@@ -152,8 +152,13 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     (form.nif ? row("NIF", esc(form.nif)) : "") +
     (referral ? row("Como nos conheceu", esc(referral)) : "");
 
-  // Colored logo, served from the production domain so it renders in any inbox.
-  const logoUrl = `${SITE.url}/logo-liquen.png`;
+  // Email-specific logo: the site PNG carries ~23% transparent padding, so at a
+  // 38px box the wordmark rendered only ~18px tall (illegible), and width/height
+  // attrs that didn't match its 1.674 ratio made Outlook stretch it. This asset
+  // is pre-trimmed onto an opaque cream plate at an exact 2:1 ratio — the plate
+  // also keeps the mark readable in Gmail's dark theme, which never inverts
+  // image pixels.
+  const logoUrl = `${SITE.url}/email/logo-liquen-email.png`;
 
   // Actions. WhatsApp is primary when there's a phone (fastest, warmest channel
   // for PT leads); otherwise the email reply is primary. Both are prefilled.
@@ -208,7 +213,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" class="em-card" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #ece7dc;border-radius:16px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
         <!-- Logo colorido -->
         <tr><td align="center" class="em-hair" style="padding:36px 40px 28px;border-bottom:1px solid #ece7dc">
-          <img src="${logoUrl}" alt="Líquen Events" width="140" height="38" style="height:38px;width:auto;display:block;border:0;margin:0 auto;font-family:Georgia,serif;font-size:20px;font-weight:600;color:#4c6150;text-decoration:none" />
+          <img src="${logoUrl}" alt="Líquen Events" width="130" height="65" style="width:130px;height:65px;display:block;border:0;margin:0 auto;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#4c6150;text-decoration:none" />
         </td></tr>
 
         <!-- Título -->
