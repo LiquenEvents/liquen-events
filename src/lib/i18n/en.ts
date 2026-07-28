@@ -443,14 +443,15 @@ export const en: Dict = {
     labelNome: "Name",
     labelEmail: "Email",
     labelTelefone: "Phone",
-    labelMensagem: "Message",
+    labelMensagem: "How do you picture your event?",
     phPessoas: "e.g. 120",
     phLocal: "e.g. Évora, Alentejo…",
     phNome: "Your name",
     phEmail: "email@example.com",
     phTelefone: "+351 9XX XXX XXX",
-    phMensagem:
-      "Tell us what you have in mind for your event — venue, atmosphere, special details…",
+    phMensagem: "Style, colours, atmosphere, inspiration you've saved…",
+    hintMensagem:
+      "The more you tell us about the style you have in mind — the colours, the mood, references you've saved — the more tailored the proposal. This is where we start designing it.",
     errNome: "Please enter your name",
     errEmail: "Invalid email",
     errTipo: "Please select the event type.",

@@ -454,13 +454,17 @@ export const pt = {
     labelNome: "Nome",
     labelEmail: "E-mail",
     labelTelefone: "Telefone",
-    labelMensagem: "Mensagem",
+    // The one field that decides whether the proposal can be designed or only
+    // priced. Asked as a question, not a form label.
+    labelMensagem: "Como imagina o seu evento?",
     phPessoas: "Ex.: 120",
     phLocal: "Ex.: Évora, Alentejo…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",
     phTelefone: "+351 9XX XXX XXX",
-    phMensagem: "Conte-nos o que imagina para o seu evento — local, ambiente, detalhes especiais…",
+    phMensagem: "Estilo, cores, ambiente, inspirações que guardou…",
+    hintMensagem:
+      "Quanto mais nos contar sobre o estilo que tem em mente — as cores, o ambiente, referências que guardou — mais à medida sai a proposta. É por aqui que a começamos a desenhar.",
     errNome: "Indique o seu nome",
     errEmail: "E-mail inválido",
     errTipo: "Selecione o tipo de evento.",

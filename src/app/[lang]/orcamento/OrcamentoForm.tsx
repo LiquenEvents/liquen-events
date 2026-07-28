@@ -710,17 +710,34 @@ export default function OrcamentoForm({
               />
             </FloatingField>
 
-            {/* Mensagem */}
-            <FloatingField htmlFor="of-mensagem" label={to.labelMensagem}>
-              <textarea
-                id="of-mensagem"
-                value={mensagem}
-                onChange={(e) => setMensagem(e.target.value)}
-                rows={4}
-                className={`${ffInputCls} resize-none`}
-                placeholder={to.phMensagem}
-              />
-            </FloatingField>
+            {/* Mensagem — the field the proposal is actually built from.
+                A quote can be priced from the date and the headcount; it can
+                only be DESIGNED from what the client pictures. It used to be
+                labelled "Mensagem" with no reason to fill it, so most arrived
+                empty and every proposal started from a blank page. It now asks
+                a question, says plainly what the answer buys, and is tall
+                enough to look like somewhere to write. Deliberately still
+                optional: making it required would cost leads at the last step,
+                which is a worse trade than a short answer. */}
+            <div>
+              <FloatingField htmlFor="of-mensagem" label={to.labelMensagem}>
+                <textarea
+                  id="of-mensagem"
+                  value={mensagem}
+                  onChange={(e) => setMensagem(e.target.value)}
+                  rows={6}
+                  aria-describedby="of-mensagem-hint"
+                  className={`${ffInputCls} resize-y min-h-[132px]`}
+                  placeholder={to.phMensagem}
+                />
+              </FloatingField>
+              <p
+                id="of-mensagem-hint"
+                className="mt-2.5 text-[12px] leading-relaxed text-foreground/70"
+              >
+                {to.hintMensagem}
+              </p>
+            </div>
 
             {/* Ações */}
             <div className="flex flex-wrap items-center gap-x-7 gap-y-4 pt-1">
