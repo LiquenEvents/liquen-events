@@ -557,8 +557,19 @@ export const en: Dict = {
     },
     successEyebrow: "Request sent successfully",
     titleLine1: "We've received",
+    // English has no T/V distinction, so the plural variants are identical —
+    // kept for key parity with pt, where the register genuinely changes.
     titleMoss: "your request.",
-    lead: "Our team will review your request and get in touch with a personalised proposal.",
+    titleMossPlural: "your request.",
+    lead: "We'll read everything carefully, check availability for the date and think about what makes sense for this event — before we reply. What follows isn't an automatic price, it's the beginning of a proposal built for you.",
+    replyByLabel: "You'll hear from us by",
+    replyByNote:
+      "Working days only. If you'd like to speak to us before then, WhatsApp is the fastest way.",
+    replyByNotePlural:
+      "Working days only. If you'd like to speak to us before then, WhatsApp is the fastest way.",
+    countdown: "{days} days to go until the event.",
+    highSeasonNote:
+      "May to October is the busy season in the Alentejo — the best estates close their calendars far in advance. It's worth not leaving it too long.",
     refLabel: "Request Reference",
     categoria: "Category",
     tipo: "Type",
@@ -568,7 +579,12 @@ export const en: Dict = {
     local: "Location",
     mensagem: "Message",
     adicionais: "Additional Services",
+    openDate: "Still to be decided",
+    openDateNote:
+      "With no fixed date we have room to suggest weekends with better availability — and often a better price.",
     noDataNote:
+      "Save the reference above. We've sent the details to our team and will be in touch shortly.",
+    noDataNotePlural:
       "Save the reference above. We've sent the details to our team and will be in touch shortly.",
     footerNote: "A formal proposal is sent after our team reviews your request.",
     proximosPassos: "Next steps",
@@ -579,6 +595,9 @@ export const en: Dict = {
       { label: "Event production", desc: "We take care of everything for you." },
     ],
     contactIntro: "For any questions, you can contact us directly:",
+    contactIntroPlural: "For any questions, you can contact us directly:",
+    contactWhatsapp: "Chat on WhatsApp",
+    contactWhatsappSub: "The fastest way to reach us.",
     notFoundTitle: "We couldn't find this request",
     notFoundBody:
       "The link may be incomplete or no longer valid. If you sent a request and didn't receive our confirmation email, get in touch — we'll sort it out the same day.",
@@ -590,7 +609,9 @@ export const en: Dict = {
     signName: "Catarina & the Líquen team",
     saveDate: "Add the date to your calendar",
     whileTitle: "While we prepare your proposal",
+    whileTitlePlural: "While we prepare your proposal",
     whileLead: "Feel free to get to know a little of our world.",
+    whileLeadPlural: "Feel free to get to know a little of our world.",
     exploreGaleria: "View the gallery",
     exploreGaleriaSub: "Weddings and events we've created",
     exploreInsta: "Follow on Instagram",

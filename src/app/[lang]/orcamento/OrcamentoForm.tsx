@@ -12,6 +12,7 @@ import type { Dict } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
+import { QUOTE_EVENT_OPTIONS } from "@/lib/orcamento/data";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -23,8 +24,6 @@ import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
  * para a taxonomia existente para que o email e o back-office mostrem rótulos
  * corretos; "Outro" viaja apenas como `eventName`.
  */
-
-type Cat = "empresas" | "particulares" | null;
 
 // Local draft so a visitor who navigates away and returns doesn't lose what
 // they typed. Stored in sessionStorage (tab-scoped) so this personal data is
@@ -65,20 +64,9 @@ function ensureSubmissionId(): string {
   }
 }
 
-interface EventOption {
-  label: string;
-  category: Cat;
-  eventType: string | null;
-}
-
-const EVENT_TYPES: EventOption[] = [
-  { label: "Casamento", category: "particulares", eventType: "casamentos" },
-  { label: "Corporativo", category: "empresas", eventType: "conferencias" },
-  { label: "Aniversário", category: "particulares", eventType: "aniversarios" },
-  { label: "Batizado / Comunhão", category: "particulares", eventType: "batizados" },
-  { label: "Jantar de Gala", category: "particulares", eventType: "jantares_gala" },
-  { label: "Outro", category: null, eventType: null },
-];
+// Single source of truth, shared with the confirmation page so both resolve the
+// same option index (and therefore the same localized label).
+const EVENT_TYPES = QUOTE_EVENT_OPTIONS;
 
 // Floating-label field wrapper. The control is passed as children (keeping all
 // its own attrs/refs/aria); the label overlays it and floats up on focus/value

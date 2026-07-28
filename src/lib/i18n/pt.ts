@@ -567,8 +567,19 @@ export const pt = {
     },
     successEyebrow: "Pedido enviado com sucesso",
     titleLine1: "Recebemos o",
-    titleMoss: "vosso pedido.",
-    lead: "A nossa equipa irá analisar o pedido e entrar em contacto com uma proposta personalizada.",
+    // Register follows the event: plural for a couple/family (casamentos,
+    // batizados), singular formal otherwise — the same rule as the email.
+    titleMoss: "seu pedido.",
+    titleMossPlural: "vosso pedido.",
+    lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento — antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
+    replyByLabel: "Damos notícias até",
+    replyByNote:
+      "Contam-se dias úteis. Se entretanto quiser falar connosco, o WhatsApp aqui ao lado é o caminho mais rápido.",
+    replyByNotePlural:
+      "Contam-se dias úteis. Se entretanto quiserem falar connosco, o WhatsApp aqui ao lado é o caminho mais rápido.",
+    countdown: "Faltam {days} dias para a data do evento.",
+    highSeasonNote:
+      "De maio a outubro o Alentejo enche — as melhores quintas fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
     refLabel: "Referência do Pedido",
     categoria: "Categoria",
     tipo: "Tipo",
@@ -578,20 +589,30 @@ export const pt = {
     local: "Local",
     mensagem: "Mensagem",
     adicionais: "Serviços Adicionais",
+    openDate: "Ainda a definir",
+    openDateNote:
+      "Sem data fechada temos margem para sugerir fins de semana com melhor disponibilidade — e, muitas vezes, melhor preço.",
     noDataNote:
       "Guarde a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto consigo brevemente.",
+    noDataNotePlural:
+      "Guardem a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto convosco brevemente.",
     footerNote: "Proposta formal enviada após análise do pedido pela nossa equipa.",
     proximosPassos: "Próximos passos",
     steps: [
       { label: "Análise do pedido", desc: "A nossa equipa analisa todos os detalhes." },
       { label: "Proposta personalizada", desc: "Enviamos uma proposta detalhada por email." },
       { label: "Reunião de briefing", desc: "Marcamos uma reunião para alinhar a visão." },
-      { label: "Produção do evento", desc: "Tomamos conta de tudo para si." },
+      { label: "Produção do evento", desc: "Tomamos conta de tudo, do início ao fim." },
     ],
     contactIntro: "Para qualquer questão, pode contactar-nos diretamente:",
+    contactIntroPlural: "Para qualquer questão, podem contactar-nos diretamente:",
+    contactWhatsapp: "Falar por WhatsApp",
+    contactWhatsappSub: "O caminho mais rápido até nós.",
     notFoundTitle: "Não encontrámos este pedido",
+    // No quote here, so the register is unknown — singular formal is the safe
+    // form for an anonymous visitor.
     notFoundBody:
-      "A ligação pode estar incompleta ou já não ser válida. Se enviaram um pedido e não receberam a nossa confirmação por email, falem connosco — resolvemos no próprio dia.",
+      "A ligação pode estar incompleta ou já não ser válida. Se enviou um pedido e não recebeu a nossa confirmação por email, fale connosco — resolvemos no próprio dia.",
     voltarInicio: "Voltar ao Início",
     novoPedido: "Novo Pedido",
     dateLocale: "pt-PT",
@@ -599,8 +620,10 @@ export const pt = {
     signOff: "Com carinho,",
     signName: "Catarina & a equipa Líquen",
     saveDate: "Guardar a data no calendário",
-    whileTitle: "Enquanto preparamos a vossa proposta",
-    whileLead: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
+    whileTitle: "Enquanto preparamos a sua proposta",
+    whileTitlePlural: "Enquanto preparamos a vossa proposta",
+    whileLead: "Fique à vontade para conhecer um pouco do nosso mundo.",
+    whileLeadPlural: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
     exploreGaleria: "Ver a galeria",
     exploreGaleriaSub: "Casamentos e eventos que criámos",
     exploreInsta: "Seguir no Instagram",

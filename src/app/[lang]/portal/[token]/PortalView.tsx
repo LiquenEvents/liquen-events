@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { Dict } from "@/lib/i18n";
+import { fill, type Dict } from "@/lib/i18n";
 import type { ProposalStatus } from "@/lib/orcamento/types";
 import { SITE } from "@/lib/site";
 
@@ -54,11 +54,6 @@ const eur = (n: number, currency = "EUR", locale = "pt-PT") =>
     currency,
     maximumFractionDigits: 2,
   }).format(n || 0);
-
-/** Fill {name}/{date}/{version} tokens in a dictionary template. */
-function fill(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, k) => values[k] ?? "");
-}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (

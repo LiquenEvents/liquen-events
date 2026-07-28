@@ -25,6 +25,14 @@ export default async function ConfirmacaoPage({
   const { lang, id } = await params;
   const t = getDictionary(normalizeLocale(lang));
   // The confirmacao namespace is passed as a prop (not via the site-wide chrome
-  // context) so it only ships on this route.
-  return <ConfirmacaoClient id={id} confirmacao={t.confirmacao} />;
+  // context) so it only ships on this route. eventTypeLabels comes along so the
+  // echoed event type is shown in the visitor's language rather than the
+  // Portuguese label baked into the pricing taxonomy.
+  return (
+    <ConfirmacaoClient
+      id={id}
+      confirmacao={t.confirmacao}
+      eventTypeLabels={t.orcamento.eventTypeLabels}
+    />
+  );
 }

@@ -242,6 +242,15 @@ body.admin-mode .bo-text-faint {
     0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
 }
+/* Opt-out for elements focused PROGRAMMATICALLY as a screen-reader landing
+   point — a heading moved into focus after a route change is not a control, and
+   the ring above drew a hard box around it for every visitor. Needed as a real
+   rule (not a Tailwind utility) because the base rule above is unlayered, and
+   unlayered styles beat anything in Tailwind's `utilities` layer. */
+.focus-quiet:focus-visible {
+  box-shadow: none;
+}
+
 /* Windows High Contrast / forced-colors mode strips box-shadows, so the ring
    above disappears and keyboard focus becomes invisible. Restore a real system
    outline there (CanvasText adapts to the user's chosen contrast theme). */

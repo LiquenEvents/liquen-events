@@ -3,12 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Quote } from "@/lib/orcamento/types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
+import {
+  CATEGORIES,
+  EVENT_TYPES_BY_CATEGORY,
+  QUOTE_EVENT_OPTIONS,
+  isPluralRegister,
+} from "@/lib/orcamento/data";
 import { SITE } from "@/lib/site";
+import { waHref } from "@/data";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
-import { localizeHref } from "@/lib/i18n";
+import { fill, localizeHref } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
+import { daysUntil, isHighSeason, longDate, replyByDate, replyByOn } from "@/lib/workdays";
 import { track } from "@/lib/track";
 import { reportLeadConversion } from "@/lib/ads-conversion";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
@@ -45,9 +53,12 @@ const PETALS = [
 export default function ConfirmacaoClient({
   id,
   confirmacao,
+  eventTypeLabels,
 }: {
   id: string;
   confirmacao: Dict["confirmacao"];
+  /** Localized labels for the form's six options, in QUOTE_EVENT_OPTIONS order. */
+  eventTypeLabels: readonly string[];
 }) {
   // locale comes from the site-wide chrome context; the confirmacao namespace
   // is passed in from this route's server page.
@@ -159,6 +170,64 @@ export default function ConfirmacaoClient({
       ? EVENT_TYPES_BY_CATEGORY[quote.category]?.find((e) => e.id === quote.eventType)
       : null;
 
+  // The event type in the VISITOR's language. The labels on the pricing
+  // taxonomy (EVENT_TYPES_BY_CATEGORY) are Portuguese-only, so an English
+  // visitor was reading "Casamentos" on an otherwise English page. Resolve the
+  // form option's index instead and read the localized label from the dict;
+  // fall back to the taxonomy for quotes created in the back office, whose
+  // event type may not be one of the six the public form offers.
+  const optIdx = quote
+    ? QUOTE_EVENT_OPTIONS.findIndex((o) =>
+        quote.eventType ? o.eventType === quote.eventType : o.label === quote.eventName,
+      )
+    : -1;
+  const typeLabel =
+    (optIdx >= 0 ? eventTypeLabels[optIdx] : undefined) ?? et?.label ?? quote?.eventName ?? "";
+
+  // Plural ("o vosso pedido") for weddings and christenings, singular formal
+  // otherwise — the same rule the confirmation email applies, so the page and
+  // the inbox address the client the same way.
+  const plural = isPluralRegister(quote?.eventType);
+  const pick = (singular: string, pl: string) => (plural ? pl : singular);
+
+  // One clock for the whole render, so the countdown and the reply-by promise
+  // can't disagree by a day if the render straddles midnight.
+  const now = useMemo(() => new Date(), []);
+  // Anchor the promise to when the request was SENT, not to when this page is
+  // being viewed — reopening the link a week later must not silently restart
+  // the two working days.
+  const sentAt = useMemo(() => {
+    const parsed = quote?.submittedAt ? new Date(quote.submittedAt) : null;
+    return parsed && !Number.isNaN(parsed.getTime()) ? parsed : now;
+  }, [quote?.submittedAt, now]);
+
+  const replyBy = useMemo(() => {
+    if (!quote) return null;
+    // Once the team has actually replied, the promise is history — showing it
+    // would contradict the status pill right above it.
+    if (quote.status !== "pendente" && quote.status !== "em_revisao") return null;
+    const on = replyByOn(sentAt);
+    const onDay = Date.UTC(on.getFullYear(), on.getMonth(), on.getDate());
+    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    // A date that has already gone by is worse than no date at all.
+    if (onDay < today) return null;
+    return replyByDate(sentAt, locale);
+  }, [quote, sentAt, now, locale]);
+
+  const eventDate = quote?.date ?? "";
+  const countdown = eventDate ? daysUntil(eventDate, now) : null;
+  const highSeason = isHighSeason(eventDate);
+
+  // The form folds a "(Data ainda a definir)" marker into `notes` so the team
+  // can segment early-stage leads. That's an internal signal — echoing it back
+  // inside the client's own message made it look like we'd mangled their text.
+  // Strip it here and let the Data row carry the meaning instead.
+  const rawNotes = quote?.notes?.trim() ?? "";
+  const openDate = !!quote && !eventDate;
+  const clientMessage = openDate
+    ? rawNotes.replace(/^\([^)\n]{1,60}\)(\n\n|$)/, "").trim()
+    : rawNotes;
+
   // "Add to calendar" — an all-day event on the client's chosen date, offered
   // as a downloadable .ics (works with Apple/Google/Outlook calendars).
   const icsHref = useMemo(() => {
@@ -169,7 +238,7 @@ export default function ConfirmacaoClient({
     const end = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(
       next.getDate(),
     ).padStart(2, "0")}`;
-    const title = `${et?.label ?? cat?.label ?? "Evento"} — Líquen Events`;
+    const title = `${typeLabel || cat?.label || "Evento"} — Líquen Events`;
     // Escape per RFC 5545 §3.3.11 — a stray comma/semicolon in the copy would
     // otherwise split the value and corrupt the event.
     const esc = (s: string) =>
@@ -195,7 +264,7 @@ export default function ConfirmacaoClient({
       "END:VCALENDAR",
     ].join("\r\n");
     return "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
-  }, [quote?.date, et, cat, id, tc.footerNote]);
+  }, [quote?.date, typeLabel, cat, id, tc.footerNote]);
 
   if (loading) {
     return (
@@ -221,7 +290,7 @@ export default function ConfirmacaoClient({
           <h1
             ref={h1Ref}
             tabIndex={-1}
-            className="font-display text-[clamp(26px,4vw,36px)] leading-[1.15] text-foreground focus:outline-none"
+            className="font-display text-[clamp(26px,4vw,36px)] leading-[1.15] text-foreground focus:outline-none focus-quiet"
           >
             {tc.notFoundTitle}
           </h1>
@@ -257,27 +326,21 @@ export default function ConfirmacaoClient({
     : tc.lead;
 
   // Only the fields we actually collect — packages/add-ons aren't part of the
-  // flow, so they never appear here.
-  const details: { label: string; value: string }[] = quote
+  // flow, so they never appear here. "Categoria" is deliberately absent: it's
+  // internal taxonomy ("Eventos Particulares"), it says nothing the type row
+  // doesn't, and it only ever existed in Portuguese.
+  const details: { label: string; value: string; note?: string }[] = quote
     ? [
-        { label: tc.categoria, value: cat?.label ?? "" },
-        { label: tc.tipo, value: et?.label ?? quote.eventName ?? "" },
+        { label: tc.tipo, value: typeLabel },
         { label: tc.convidados, value: quote.guests ? String(quote.guests) : "" },
         {
           label: tc.data,
-          value: quote.date
-            ? new Date(quote.date + "T12:00:00").toLocaleDateString(tc.dateLocale, {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })
-            : "",
+          // An open date is information, not a blank — say so, and turn it into
+          // something useful for the client.
+          value: eventDate ? longDate(eventDate, locale) : openDate ? tc.openDate : "",
+          note: !eventDate && openDate ? tc.openDateNote : undefined,
         },
         { label: tc.local, value: quote.location ?? "" },
-        // Echo back the free-text message the client wrote, so they can see it
-        // was captured (reassurance). `notes` may carry a leading "(flexible
-        // date)" marker from the form — keep it, it's still their own context.
-        { label: tc.mensagem, value: quote.notes?.trim() ?? "" },
       ].filter((d) => d.value)
     : [];
 
@@ -398,12 +461,15 @@ export default function ConfirmacaoClient({
             <h1
               ref={h1Ref}
               tabIndex={-1}
-              className="text-foreground font-bold uppercase tracking-display leading-[0.92] mb-7 focus:outline-none"
+              // Focused on arrival so the success is announced (WCAG 2.4.3). It's a
+              // heading, not a control, and the global :focus-visible ring drew a
+              // hard box around the celebratory headline — suppress it here only.
+              className="text-foreground font-bold uppercase tracking-display leading-[0.92] mb-7 focus:outline-none focus-quiet"
               style={{ fontSize: "clamp(40px, 5.4vw, 72px)" }}
             >
               {tc.titleLine1}
               <br />
-              <span className="text-moss">{tc.titleMoss}</span>
+              <span className="text-moss">{pick(tc.titleMoss, tc.titleMossPlural)}</span>
             </h1>
           </AnimateIn>
 
@@ -411,9 +477,50 @@ export default function ConfirmacaoClient({
             <p className="text-foreground/72 text-[15px] leading-[1.9] max-w-xl">{lead}</p>
           </AnimateIn>
 
-          <AnimateIn from="bottom" delay={230}>
+          {/* The promise, as a DATE. "Até 48 horas úteis" is a disclaimer the
+              client has to decode; a named weekday is something they can hold
+              us to — and it's the single thing they came to this page to know. */}
+          {replyBy && (
+            <AnimateIn from="bottom" delay={210}>
+              <div className="mt-8 max-w-xl border-l-2 border-gold/50 pl-5">
+                <p className="text-foreground/68 text-[10px] tracking-[0.32em] uppercase mb-1.5">
+                  {tc.replyByLabel}
+                </p>
+                <p
+                  className="text-moss-dark text-[clamp(20px,2.6vw,26px)] leading-tight first-letter:uppercase"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {replyBy}
+                </p>
+                <p className="mt-2.5 text-foreground/70 text-[13px] leading-relaxed">
+                  {pick(tc.replyByNote, tc.replyByNotePlural)}
+                </p>
+              </div>
+            </AnimateIn>
+          )}
+
+          {/* Perspective: two working days is nothing against 214 days of
+              planning. Shown only when there IS a date to count towards. */}
+          {(countdown !== null || (highSeason && !!eventDate)) && (
+            <AnimateIn from="bottom" delay={240}>
+              <div className="mt-6 max-w-xl flex flex-col gap-1.5">
+                {countdown !== null && (
+                  <p className="text-foreground/72 text-[13px] tabular-nums">
+                    {fill(tc.countdown, { days: String(countdown) })}
+                  </p>
+                )}
+                {highSeason && (
+                  <p className="text-foreground/65 text-[13px] leading-relaxed">
+                    {tc.highSeasonNote}
+                  </p>
+                )}
+              </div>
+            </AnimateIn>
+          )}
+
+          <AnimateIn from="bottom" delay={270}>
             <p
-              className="mt-4 text-moss-dark text-[15px] italic max-w-xl"
+              className="mt-8 text-moss-dark text-[15px] italic max-w-xl"
               style={{ fontFamily: "var(--font-playfair)" }}
             >
               {tc.greetingWarm}
@@ -456,13 +563,34 @@ export default function ConfirmacaoClient({
                       </dt>
                       <dd className="text-foreground/85 text-[15px] text-right leading-snug">
                         {d.value}
+                        {d.note && (
+                          <span className="mt-1 block text-foreground/65 text-[12px] leading-relaxed">
+                            {d.note}
+                          </span>
+                        )}
                       </dd>
                     </div>
                   ))}
                 </dl>
               ) : (
                 <div className="px-7 py-6">
-                  <p className="text-foreground/72 text-sm leading-relaxed">{tc.noDataNote}</p>
+                  <p className="text-foreground/72 text-sm leading-relaxed">
+                    {pick(tc.noDataNote, tc.noDataNotePlural)}
+                  </p>
+                </div>
+              )}
+
+              {/* The client's own words, quoted back. Stacked and left-aligned —
+                  a paragraph forced into the right-hand column of a definition
+                  row wraps into an unreadable ragged block. */}
+              {clientMessage && (
+                <div className="px-7 pb-6 pt-1">
+                  <p className="text-foreground/72 text-[10px] tracking-[0.28em] uppercase mb-2.5">
+                    {tc.mensagem}
+                  </p>
+                  <blockquote className="border-l-2 border-moss/25 pl-4 text-foreground/80 text-[14px] leading-[1.75] whitespace-pre-line">
+                    {clientMessage}
+                  </blockquote>
                 </div>
               )}
 
@@ -532,10 +660,39 @@ export default function ConfirmacaoClient({
             <AnimateIn from="bottom" delay={340}>
               <div className="rounded-2xl border border-moss/20 bg-moss/[0.06] p-7">
                 <div className="w-6 h-px bg-gold/60 mb-4" />
-                <p className="text-foreground/72 text-[13px] leading-relaxed mb-4">
-                  {tc.contactIntro}
+                <p className="text-foreground/72 text-[13px] leading-relaxed mb-5">
+                  {pick(tc.contactIntro, tc.contactIntroPlural)}
                 </p>
-                <div className="flex flex-col gap-2.5">
+
+                {/* WhatsApp, as the primary action. The floating pill is
+                    suppressed across /orcamento* so it can't cover the form's
+                    submit button — which left this page, the moment a lead is
+                    warmest, with no way to start a conversation at all. The
+                    prefill carries the reference so the team knows who's
+                    writing before they answer. */}
+                <a
+                  href={waHref(`${t.common.whatsappPrefill}\n${tc.refLabel}: ${id}`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => track("WhatsAppClick", { source: "confirmacao" })}
+                  className="group flex items-center gap-3 rounded-xl bg-moss px-4 py-3.5 text-white transition-colors hover:bg-moss-dark"
+                >
+                  <WhatsAppIcon className="h-5 w-5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-medium leading-tight">
+                      {tc.contactWhatsapp}
+                    </span>
+                    <span className="block text-[11.5px] leading-tight text-white/75 mt-0.5">
+                      {tc.contactWhatsappSub}
+                    </span>
+                  </span>
+                  <span className="ml-auto shrink-0 transition-transform duration-300 group-hover:translate-x-1">
+                    →
+                  </span>
+                  <span className="sr-only"> ({t.common.newWindow})</span>
+                </a>
+
+                <div className="mt-5 flex flex-col gap-2.5">
                   <a
                     href={`mailto:${SITE.email}`}
                     className="text-moss-dark text-[13px] hover:text-moss transition-colors"
@@ -561,9 +718,11 @@ export default function ConfirmacaoClient({
               <span className="w-6 h-px bg-gold/60 shrink-0" />
               <div>
                 <p className="text-foreground/85 text-lg font-bold uppercase tracking-display leading-tight">
-                  {tc.whileTitle}
+                  {pick(tc.whileTitle, tc.whileTitlePlural)}
                 </p>
-                <p className="text-foreground/72 text-[13px] mt-0.5">{tc.whileLead}</p>
+                <p className="text-foreground/72 text-[13px] mt-0.5">
+                  {pick(tc.whileLead, tc.whileLeadPlural)}
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
