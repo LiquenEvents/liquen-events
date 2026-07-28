@@ -78,6 +78,26 @@ export class ConflictError extends Error {
   }
 }
 
+/**
+ * A tabela ainda não existe na base de dados — quase sempre porque uma
+ * funcionalidade nova foi publicada sem se correr o `db/schema.sql`.
+ *
+ * Vale a pena distinguir isto de uma avaria: é a diferença entre dizer à equipa
+ * "Erro interno" (que não indica caminho nenhum) e "falta correr o schema no
+ * Supabase, leva um minuto". O Postgres devolve 42P01; o PostgREST responde
+ * PGRST205 quando a tabela não está na cache do esquema.
+ */
+export function isMissingTable(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: unknown }).code;
+  if (code === "42P01" || code === "PGRST205") return true;
+  const msg = (err as { message?: unknown }).message;
+  return (
+    typeof msg === "string" &&
+    /relation .* does not exist|could not find the table|schema cache/i.test(msg)
+  );
+}
+
 // ── Supabase backend ──────────────────────────────────────────────────────
 export class SupabaseBackend<T> implements Backend<T> {
   constructor(

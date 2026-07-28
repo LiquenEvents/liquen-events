@@ -74,13 +74,23 @@ export default function Temas() {
   const [newNotes, setNewNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Impedimento que a equipa PODE resolver (tipicamente: o schema ainda não foi
+  // corrido no Supabase). Fica no ecrã, com o passo a dar — um toast que
+  // desaparece não serve para uma instrução.
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/temas", { cache: "no-store" });
-        if (res.ok) setThemes(await res.json());
-        else toast("Não foi possível carregar os temas.", "error");
+        if (res.ok) {
+          setThemes(await res.json());
+          setBlocked(null);
+        } else {
+          const data = await res.json().catch(() => null);
+          if (res.status === 503 && data?.error) setBlocked(data.error);
+          else toast(data?.error || "Não foi possível carregar os temas.", "error");
+        }
       } catch {
         toast("Erro de ligação ao carregar os temas.", "error");
       } finally {
@@ -104,9 +114,11 @@ export default function Temas() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        toast(data?.error || "Não foi possível criar o tema.", "error");
+        if (res.status === 503 && data?.error) setBlocked(data.error);
+        else toast(data?.error || "Não foi possível criar o tema.", "error");
         return;
       }
+      setBlocked(null);
       const created: ThemeSummary = data;
       setThemes((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "pt")));
       setNewName("");
@@ -198,6 +210,13 @@ export default function Temas() {
 
   return (
     <div>
+      {blocked && (
+        <Card padding="sm" className="mb-6 border-[#8a6d2f]/30 bg-[#f6efe1]/60">
+          <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">Falta um passo de instalação</p>
+          <p className="text-sm leading-relaxed text-foreground/75">{blocked}</p>
+        </Card>
+      )}
+
       <Toolbar
         className="mb-6"
         start={

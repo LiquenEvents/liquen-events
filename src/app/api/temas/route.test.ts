@@ -11,7 +11,7 @@ import type { ProposalTheme } from "@/lib/theme-types";
 // custar uma assinatura por tema em vez de uma por foto.
 const st = vi.hoisted(() => ({
   authed: false,
-  throwOnList: false,
+  throwOnList: null as unknown,
   themes: [] as ProposalTheme[],
   files: {} as Record<string, { names: string[]; ok: boolean; truncated: boolean }>,
   create: vi.fn(async (input: { name: string; notes?: string }) => ({
@@ -29,7 +29,7 @@ vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/lib/themes-store", () => ({
   listThemes: vi.fn(async () => {
-    if (st.throwOnList) throw new Error("db down");
+    if (st.throwOnList) throw st.throwOnList;
     return st.themes;
   }),
   createTheme: st.create,
@@ -51,6 +51,10 @@ vi.mock("@/lib/invoices-store", () => ({
   isUniqueViolation: (err: unknown) =>
     !!err && typeof err === "object" && (err as { code?: string }).code === "23505",
 }));
+// O detetor de "tabela em falta" é o REAL: é ele que está a ser testado.
+vi.mock("@/lib/repository", async () =>
+  vi.importActual<typeof import("@/lib/repository")>("@/lib/repository"),
+);
 
 import { GET, POST } from "./route";
 
@@ -78,7 +82,7 @@ const folder = (names: string[], over: Partial<{ ok: boolean; truncated: boolean
 
 beforeEach(() => {
   st.authed = false;
-  st.throwOnList = false;
+  st.throwOnList = null;
   st.themes = [];
   st.files = {};
   vi.clearAllMocks();
@@ -148,7 +152,7 @@ describe("GET /api/temas", () => {
 
   it("devolve 500 tratado (não um throw cru) quando a base de dados falha", async () => {
     st.authed = true;
-    st.throwOnList = true;
+    st.throwOnList = new Error("db down");
     expect((await GET(req("GET"))).status).toBe(500);
   });
 });
@@ -210,5 +214,47 @@ describe("POST /api/temas", () => {
     st.authed = true;
     expect((await POST(req("POST", "{ isto não é json", true))).status).toBe(400);
     expect(st.create).not.toHaveBeenCalled();
+  });
+});
+
+// ── Publicado sem correr o schema ──────────────────────────────────────────
+// O sintoma que a equipa viu: criar um tema devolvia "Erro interno", que não
+// indica caminho nenhum. Uma tabela em falta é recuperável — e a resposta tem
+// de dizer o passo que falta.
+describe("a tabela ainda não existe na base de dados", () => {
+  const missing = Object.assign(new Error('relation "public.proposal_themes" does not exist'), {
+    code: "42P01",
+  });
+
+  it("o GET explica o passo em falta, em vez de 'Erro interno'", async () => {
+    st.authed = true;
+    st.throwOnList = missing;
+    const res = await GET(req("GET"));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/db\/schema\.sql/);
+  });
+
+  it("o POST explica o mesmo passo (foi por aqui que a equipa bateu)", async () => {
+    st.authed = true;
+    st.throwOnList = missing;
+    const res = await POST(req("POST", { name: "Terracotta" }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/Supabase/);
+    expect(st.create).not.toHaveBeenCalled();
+  });
+
+  it("reconhece também a resposta do PostgREST (cache do esquema)", async () => {
+    st.authed = true;
+    st.throwOnList = Object.assign(
+      new Error("Could not find the table 'public.proposal_themes' in the schema cache"),
+      { code: "PGRST205" },
+    );
+    expect((await GET(req("GET"))).status).toBe(503);
+  });
+
+  it("uma avaria a sério continua a ser 500 — não se disfarça de instalação", async () => {
+    st.authed = true;
+    st.throwOnList = new Error("connection reset");
+    expect((await GET(req("GET"))).status).toBe(500);
   });
 });

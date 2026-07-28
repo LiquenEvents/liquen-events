@@ -3,6 +3,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import { listThemes, createTheme } from "@/lib/themes-store";
 import { listThemeFiles, signThemePaths, themeFolder } from "@/lib/theme-storage";
 import { isUniqueViolation } from "@/lib/invoices-store";
+import { isMissingTable } from "@/lib/repository";
 import {
   MAX_THEME_NAME,
   MAX_THEME_NOTES,
@@ -14,6 +15,14 @@ import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * A biblioteca só precisa de uma tabela — quando ela falta, dizer o que fazer
+ * vale mais do que um 500 mudo. É recuperável (503), não uma avaria.
+ */
+const NAO_INSTALADO =
+  "A Biblioteca de Temas ainda não está criada na base de dados. No Supabase → SQL Editor, " +
+  "cole e corra o ficheiro db/schema.sql (pode repetir-se sem risco) e tente de novo.";
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -54,6 +63,9 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(summaries);
   } catch (err) {
+    if (isMissingTable(err)) {
+      return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });
+    }
     log.error("temas GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
@@ -87,6 +99,9 @@ export async function POST(request: NextRequest) {
     // duplicado (409), não um 500.
     if (isUniqueViolation(err)) {
       return NextResponse.json({ error: themeNameTakenError(name) }, { status: 409 });
+    }
+    if (isMissingTable(err)) {
+      return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });
     }
     log.error("temas POST falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
