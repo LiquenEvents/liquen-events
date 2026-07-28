@@ -1,60 +1,14 @@
 import type { Locale } from "./i18n/config";
 
 /**
- * Portuguese working days + the reply-by promise.
+ * Date helpers shared by the confirmation page and the confirmation email.
  *
- * Shared by the client confirmation EMAIL and the confirmation PAGE so the two
- * can never promise different dates for the same submission — the client sees
- * both within seconds of each other, and a mismatch would read as sloppy.
+ * The working-day/reply-by maths that used to live here is gone with the
+ * turnaround promise itself: the site no longer states one, so nothing was
+ * calling it.
  */
-
-// Fixed Portuguese national holidays (month-day). The moveable feasts (Carnaval,
-// Sexta-feira Santa, Páscoa, Corpo de Deus) aren't covered — the promise is
-// phrased as "até" so a rare extra day still keeps it honest.
-const PT_HOLIDAYS = new Set([
-  "1-1",
-  "4-25",
-  "5-1",
-  "6-10",
-  "8-15",
-  "10-5",
-  "11-1",
-  "12-1",
-  "12-8",
-  "12-25",
-]);
-
-export function isWorkday(d: Date): boolean {
-  const day = d.getDay();
-  if (day === 0 || day === 6) return false;
-  return !PT_HOLIDAYS.has(`${d.getMonth() + 1}-${d.getDate()}`);
-}
 
 const tag = (locale: Locale) => (locale === "en" ? "en-GB" : "pt-PT");
-
-/**
- * Two working days from `from`, as a written-out date. A concrete date is a
- * promise; a duration ("48 horas úteis") is a disclaimer — and it's genuinely
- * ambiguous in Portuguese (two days, or six?).
- */
-export function replyByOn(from: Date): Date {
-  const d = new Date(from.getTime());
-  let added = 0;
-  while (added < 2) {
-    d.setDate(d.getDate() + 1);
-    if (isWorkday(d)) added++;
-  }
-  return d;
-}
-
-export function replyByDate(from: Date, locale: Locale): string {
-  return replyByOn(from).toLocaleDateString(tag(locale), {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "Europe/Lisbon",
-  });
-}
 
 /** "2027-02-23" → "23 de fevereiro de 2027" / "23 February 2027". */
 export function longDate(iso: string, locale: Locale): string {

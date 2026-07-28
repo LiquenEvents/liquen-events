@@ -17,17 +17,20 @@ describe("buildClientConfirmation", () => {
     expect(text).toContain("LIQ-ABC-1234");
   });
 
-  it("promises a WINDOW, never a named day", () => {
-    const { html, text } = buildClientConfirmation({
+  it("states no turnaround at all — not a date, not a window", () => {
+    const { subject, html, text } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
       referenceId: "LIQ-ABC-1234",
     });
-    expect(html).toContain("48 horas úteis");
-    // A calendar date is a promise the team can miss in high season for
-    // reasons the client can't see; the window is the one they always keep.
-    expect(html).not.toMatch(/segunda-feira|terça-feira|quarta-feira|quinta-feira|sexta-feira/);
-    expect(text).toContain("48 horas úteis");
+    // In high season a number the team can't always hit does more damage than
+    // the reassurance it buys, so the email promises care instead of speed.
+    const timing =
+      /\d+\s*(horas?|dias?)\s*úteis|segunda-feira|terça-feira|quarta-feira|quinta-feira|sexta-feira/i;
+    expect(subject).not.toMatch(timing);
+    expect(html).not.toMatch(timing);
+    expect(text).not.toMatch(timing);
+    expect(html).toContain("atenção que merece");
   });
 
   it("mirrors the event back in prose and in the recap", () => {

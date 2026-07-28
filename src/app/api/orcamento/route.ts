@@ -9,6 +9,7 @@ import {
 } from "@/lib/orcamento/data";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
+import { SITE } from "@/lib/site";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
 import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";
@@ -47,17 +48,6 @@ function prettyDate(d?: string): string {
 // tel: href — keep only digits and a leading +, so the phone is tappable.
 const telHref = (phone: string) => phone.replace(/[^\d+]/g, "");
 
-/** Portuguese numbers read in 3-3-3 groups. Shown grouped, dialled unchanged —
- *  "939513151" is a string to decode; "939 513 151" is a phone number. */
-const telDisplay = (phone: string) => {
-  const raw = phone.trim();
-  const d = raw.replace(/\D/g, "");
-  const nat = d.length === 12 && d.startsWith("351") ? d.slice(3) : d;
-  if (nat.length !== 9) return raw; // not a PT number — leave exactly as typed
-  const grouped = `${nat.slice(0, 3)} ${nat.slice(3, 6)} ${nat.slice(6)}`;
-  return raw.startsWith("+") || d.length === 12 ? `+351 ${grouped}` : grouped;
-};
-
 interface BuiltEmail {
   subject: string;
   html: string;
@@ -88,10 +78,6 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const name = form.name?.trim() || "Sem nome";
   const firstName = name.split(" ")[0] || "o cliente";
   const subtitle = [et, cat].filter(Boolean).join(" · ");
-  // The label the CLIENT picked ("Casamento"), not the pricing taxonomy's
-  // plural bucket ("Casamentos"). Falls back to the taxonomy for quotes created
-  // in the back office, which have no eventName.
-  const eventLabel = form.eventName?.trim() || et || cat;
   const eventoLc = (et || cat || "evento").toLowerCase();
 
   // The date is the hero — availability decides the booking. Lead with the
@@ -144,27 +130,28 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
 
   // Detail row — hairline-separated; empty value → no row. `valueHtml` is
   // already-safe HTML (esc'd text or a link). Classes drive dark-mode overrides.
-  // A fact line. No rules, no table chrome — Apple's product pages carry a
-  // whole spec sheet on whitespace and type weight alone, and the old
-  // hairline-per-row grid read as a form to fill in rather than a lead to act
-  // on. `valueHtml` is already-safe HTML (esc'd text or a link).
   const row = (label: string, valueHtml: string) =>
     valueHtml
       ? `<tr>
-           <td class="em-muted" style="padding:0 0 13px;color:#8a8579;font-size:13px;line-height:20px;width:124px;vertical-align:top;font-weight:400">${esc(label)}</td>
-           <td class="em-strong" style="padding:0 0 13px;color:#1d1b16;font-size:15px;line-height:20px;font-weight:500">${valueHtml}</td>
+           <td class="em-hair em-muted" style="padding:11px 0;border-top:1px solid #eee8dc;color:#6b6f5a;font-size:13px;width:120px;vertical-align:top">${esc(label)}</td>
+           <td class="em-hair em-strong" style="padding:11px 0;border-top:1px solid #eee8dc;color:#2a2620;font-size:14px;font-weight:500">${valueHtml}</td>
          </tr>`
       : "";
-  // Only what decides the answer. Guests and location ride in the summary line
-  // under the name, so repeating them here would be the third time on one
-  // screen.
+  const link = (href: string, text: string) =>
+    `<a href="${href}" style="color:#4c6150;text-decoration:none">${esc(text)}</a>`;
+
+  // Decision block first (can we do it?), contact block second (how to reply).
   const eventRows =
+    row("Convidados", form.guests ? String(form.guests) : "") +
+    row("Local", esc(local)) +
     (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
-    (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "") +
-    (referral ? row("Origem", esc(referral)) : "") +
+    (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");
+  const contactRows =
+    row("Email", link(`mailto:${esc(form.email)}`, form.email)) +
+    (form.phone ? row("Telefone", link(`tel:${telHref(form.phone)}`, form.phone)) : "") +
     (form.company ? row("Empresa", esc(form.company)) : "") +
     (form.nif ? row("NIF", esc(form.nif)) : "") +
-    (estimate ? row("Estimativa", esc(estimate)) : "");
+    (referral ? row("Como nos conheceu", esc(referral)) : "");
 
   // Email-specific logo: the site PNG carries ~23% transparent padding, so at a
   // 38px box the wordmark rendered only ~18px tall (illegible), and width/height
@@ -176,14 +163,6 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   // production is promoted, and is blocked outright by clients that suppress
   // remote images by default. See lib/email-logo.
   const logoUrl = `cid:${EMAIL_LOGO_CID}`;
-
-  // The one-line summary under the name: what a colleague would say out loud.
-  // Uses the form's OWN label ("Casamento") rather than the pricing taxonomy's
-  // ("Casamentos · Eventos Particulares") — the category adds no information the
-  // type doesn't already carry.
-  const summary = [eventLabel, form.guests ? `${form.guests} convidados` : "", local]
-    .filter(Boolean)
-    .join(" · ");
 
   // Actions. WhatsApp is primary when there's a phone (fastest, warmest channel
   // for PT leads); otherwise the email reply is primary. Both are prefilled.
@@ -197,17 +176,18 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
       `Olá ${firstName},\n\nMuito obrigado pelo seu pedido de orçamento para o ${eventoLc} — foi um gosto recebê-lo.\n\n\n\nCom os melhores cumprimentos,\nEquipa Líquen Events`,
     )}`;
 
-  // ONE solid action, everything else quiet. Two equally-weighted buttons make
-  // the reader choose before they can act; the pill is the fastest channel and
-  // the other route stays a plain link beside it.
+  // Speed-to-lead nudge — urgency-aware when the client flagged it.
+  const nudge = urgencyLabel
+    ? "O cliente pediu resposta com urgência — um olá nas próximas horas faz toda a diferença."
+    : "Pedidos respondidos no próprio dia convertem muito mais.";
   const btnPrimary =
-    "display:inline-block;background:#4c6150;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;letter-spacing:-0.01em;padding:14px 30px;border-radius:980px;white-space:nowrap";
-  const btnGhost =
-    "display:inline-block;color:#4c6150;text-decoration:none;font-size:15px;font-weight:500;padding:14px 4px;white-space:nowrap";
+    "display:inline-block;background:#4c6150;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;padding:12px 24px;border-radius:10px";
+  const btnOutline =
+    "display:inline-block;background:#ffffff;border:1px solid #ece7dc;color:#3a3d30;text-decoration:none;font-size:14px;font-weight:500;padding:11px 22px;border-radius:10px";
   const actionsCell = waHref
-    ? `<td class="em-btn" style="padding-right:22px"><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>
-       <td class="em-btn"><a href="${mailtoHref}" style="${btnGhost}">Responder por email&nbsp;›</a></td>`
-    : `<td class="em-btn"><a href="${mailtoHref}" style="${btnPrimary}">Responder ao cliente</a></td>`;
+    ? `<td style="padding-right:10px"><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>
+       <td><a href="${mailtoHref}" style="${btnOutline}">Responder por email</a></td>`
+    : `<td><a href="${mailtoHref}" style="${btnPrimary}">Responder ao cliente</a></td>`;
 
   const html = `<!doctype html>
 <html lang="pt">
@@ -218,96 +198,86 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
 <meta name="supported-color-schemes" content="light dark">
 <title>Novo pedido de orçamento</title>
 <style>
-  /* The site's own typefaces. Apple Mail loads these; Gmail strips @font-face
-     entirely, which is why every stack below falls back deliberately rather
-     than by accident — Georgia is Playfair's closest stock relative, and the
-     system sans is Inter's. The team sees the brand where the client supports
-     it and something coherent everywhere else. Team email only: it's our own
-     inbox, so the remote font fetch costs no client privacy. */
-  @font-face{font-family:'Playfair Display';font-style:normal;font-weight:400;font-display:swap;src:url(https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvUDQ.ttf) format('truetype')}
-  @font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url(https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf) format('truetype')}
-  @font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url(https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf) format('truetype')}
   :root{color-scheme:light dark;supported-color-schemes:light dark}
   @media (prefers-color-scheme: dark){
-    .em-bg{background:#14160f !important}
-    .em-card{background:#1e2118 !important}
+    .em-bg{background:#161911 !important}
+    .em-card{background:#24271c !important;border-color:#3a3d30 !important}
     .em-strong{color:#f4f3ef !important}
-    .em-muted{color:#a9ab9c !important}
-    .em-hair{border-color:#343829 !important}
-    .em-quote{border-color:#8a6a1d !important}
-    .em-foot{color:#8b8d7f !important}
-  }
-  @media only screen and (max-width:620px){
-    .em-pad{padding-left:26px !important;padding-right:26px !important}
-    .em-name{font-size:27px !important}
-    .em-date{font-size:23px !important}
-    /* Stack the actions: side by side they broke the pill onto two lines. */
-    .em-btn{display:block !important;padding:0 0 6px !important}
+    .em-muted{color:#c7c9ba !important}
+    .em-hair{border-color:#3a3d30 !important}
+    .em-note{background:#1e2118 !important;border-color:#3a3d30 !important}
+    .em-foot{color:#9a9c8e !important}
   }
 </style>
 </head>
 <body class="em-bg" style="margin:0;padding:0;background:#f7f4ee">
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f7f4ee">${esc(preheader)}&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#f7f4ee;padding:44px 14px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#f7f4ee;padding:32px 12px">
     <tr><td align="center">
-      <!-- No border, no shadow: one sheet of paper, and every division below is
-           made with space instead of a line. -->
-      <table role="presentation" width="580" cellpadding="0" cellspacing="0" class="em-card" style="max-width:580px;width:100%;background:#ffffff;border-radius:22px;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-
-        <tr><td class="em-pad" align="center" style="padding:44px 46px 0">
-          <img src="${logoUrl}" alt="Líquen Events" width="112" height="56" style="width:112px;height:56px;display:block;border:0;border-radius:10px;margin:0 auto;font-family:Georgia,'Times New Roman',serif;font-size:17px;color:#4c6150;text-decoration:none" />
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" class="em-card" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #ece7dc;border-radius:16px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+        <!-- Logo colorido -->
+        <tr><td align="center" class="em-hair" style="padding:36px 40px 28px;border-bottom:1px solid #ece7dc">
+          <img src="${logoUrl}" alt="Líquen Events" width="130" height="65" style="width:130px;height:65px;display:block;border:0;margin:0 auto;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#4c6150;text-decoration:none" />
         </td></tr>
 
-        <tr><td class="em-pad" style="padding:46px 46px 0">
-          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;font-weight:600">Novo pedido${urgencyLabel ? ` · <span style="color:#8a6a1d">urgente</span>` : ""}</div>
-          <div class="em-strong em-name" style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:32px;color:#1d1b16;margin-top:16px;line-height:1.08;letter-spacing:-0.02em">${esc(name)}</div>
-          ${summary ? `<div class="em-muted" style="color:#8a8579;font-size:15px;margin-top:12px;line-height:1.5">${esc(summary)}</div>` : ""}
+        <!-- Título -->
+        <tr><td style="padding:32px 40px 0">
+          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600">Novo pedido de orçamento</div>
+          <div class="em-strong" style="font-family:Georgia,'Times New Roman',serif;font-size:27px;color:#2a2620;margin-top:14px;line-height:1.15;letter-spacing:-0.01em">${esc(name)}</div>
+          ${subtitle ? `<div class="em-muted" style="color:#8f8a7a;font-size:14px;margin-top:7px">${esc(subtitle)}</div>` : ""}
         </td></tr>
 
+        <!-- Data em destaque -->
+        <tr><td style="padding:20px 40px 0">
+          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600">Data do evento</div>
+          <div class="em-strong" style="font-family:Georgia,serif;font-size:20px;color:#2a2620;margin-top:6px">${esc(dateHero)}${isWeekend ? ` <span style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:12px;color:#63755a;font-weight:600">· fim de semana</span>` : ""}</div>
+        </td></tr>
+
+        <!-- O evento -->
+        <tr><td style="padding:24px 40px 0">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${eventRows}</table>
+        </td></tr>
+
+        <!-- Estimativa -->
         ${
-          dateHero
-            ? `<tr><td class="em-pad" style="padding:40px 46px 0">
-                 <div class="em-muted" style="color:#8a8579;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;font-weight:600">Data do evento</div>
-                 <div class="em-strong em-date" style="font-family:'Playfair Display',Georgia,serif;font-size:27px;color:#1d1b16;margin-top:10px;line-height:1.2;letter-spacing:-0.01em">${esc(dateHero)}${isWeekend ? `<span class="em-muted" style="font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;font-size:13px;color:#63755a;font-weight:600;letter-spacing:0"> · fim de semana</span>` : ""}</div>
+          estimate
+            ? `<tr><td style="padding:16px 40px 0">
+                 <div class="em-note" style="background:#f7f4ee;border:1px solid #ece7dc;border-radius:10px;padding:14px 16px">
+                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                     <td class="em-muted" style="color:#8f8a7a;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;vertical-align:middle">Orçamento estimado</td>
+                     <td class="em-strong" style="text-align:right;font-family:Georgia,serif;color:#2a2620;font-size:17px;vertical-align:middle">${esc(estimate)}</td>
+                   </tr></table>
+                 </div>
                </td></tr>`
             : ""
         }
 
-        ${
-          eventRows
-            ? `<tr><td class="em-pad" style="padding:38px 46px 0">
-                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${eventRows}</table>
-               </td></tr>`
-            : ""
-        }
+        <!-- Contacto -->
+        <tr><td style="padding:24px 40px 0">
+          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;margin-bottom:2px">Contacto</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${contactRows}</table>
+        </td></tr>
 
+        <!-- Notas -->
         ${
           form.notes
-            ? `<tr><td class="em-pad" style="padding:34px 46px 0">
-                 <div class="em-quote em-strong" style="border-left:2px solid #d6ab3a;padding-left:20px;color:#45483c;font-size:15px;line-height:1.7;white-space:pre-wrap">${esc(form.notes)}</div>
+            ? `<tr><td style="padding:24px 40px 0">
+                 <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:8px;font-weight:600">Notas do cliente</div>
+                 <div class="em-note em-strong" style="color:#45483c;font-size:14px;line-height:1.65;white-space:pre-wrap;background:#f7f4ee;border:1px solid #ece7dc;border-radius:10px;padding:14px 16px">${esc(form.notes)}</div>
                </td></tr>`
             : ""
         }
 
-        <tr><td class="em-pad" style="padding:42px 46px 0">
+        <!-- Ações -->
+        <tr><td style="padding:32px 40px 0">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>${actionsCell}</tr></table>
+          <div class="em-muted" style="color:#6b6f5a;font-size:12px;line-height:1.5;margin-top:14px">${esc(nudge)}</div>
+          <div class="em-muted" style="color:#8f8a7a;font-size:12px;line-height:1.5;margin-top:6px">Também pode responder a este email — a resposta vai direta para ${esc(firstName)}.</div>
         </td></tr>
 
-        <tr><td class="em-pad" style="padding:34px 46px 0">
-          <div style="font-size:16px;line-height:1.9">
-            <a href="mailto:${esc(form.email)}" style="color:#4c6150;text-decoration:none">${esc(form.email)}</a>${
-              form.phone
-                ? `<br><a href="tel:${telHref(form.phone)}" style="color:#4c6150;text-decoration:none">${esc(telDisplay(form.phone))}</a>`
-                : ""
-            }
-          </div>
-        </td></tr>
-
-        <tr><td class="em-pad" style="padding:38px 46px 44px">
-          <div class="em-hair em-foot" style="border-top:1px solid #ede7db;padding-top:18px;color:#a8a294;font-size:11.5px;line-height:1.7;letter-spacing:0.2px">
-            Responder a este email chega diretamente a ${esc(firstName)}.<br>
-            Ref. ${esc(id)} · ${esc(new Date().toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" }))}
-          </div>
+        <!-- Rodapé -->
+        <tr><td style="padding:26px 40px 32px">
+          <div class="em-hair em-foot" style="border-top:1px solid #ece7dc;padding-top:16px;color:#a8a294;font-size:11px;letter-spacing:0.3px">Ref. ${esc(id)} · ${esc(new Date().toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" }))}</div>
         </td></tr>
       </table>
     </td></tr>
@@ -479,11 +449,14 @@ export async function POST(request: NextRequest) {
         name: form.name,
         referenceId: id,
         event: {
+          // The client's OWN word first. The taxonomy label is a plural bucket
+          // ("Casamentos"), which this email drops into a singular sentence —
+          // "o vosso pedido para o casamentos de 25 de janeiro".
           typeLabel:
+            form.eventName?.trim() ||
             (form.category && form.eventType
               ? EVENT_TYPES_BY_CATEGORY[form.category]?.find((e) => e.id === form.eventType)?.label
               : undefined) ||
-            form.eventName ||
             (form.category ? CATEGORIES.find((c) => c.id === form.category)?.label : undefined) ||
             undefined,
           date: form.date,

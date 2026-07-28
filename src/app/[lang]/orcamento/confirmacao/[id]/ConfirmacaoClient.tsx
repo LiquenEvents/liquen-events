@@ -17,7 +17,7 @@ import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
 import { fill, localizeHref } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
-import { daysUntil, isHighSeason, longDate, replyByOn } from "@/lib/workdays";
+import { daysUntil, isHighSeason, longDate } from "@/lib/workdays";
 import { track } from "@/lib/track";
 import { reportLeadConversion } from "@/lib/ads-conversion";
 import { CONFIRMACAO_PHOTOS, type ConfirmacaoPhotoKey } from "./photos";
@@ -29,27 +29,6 @@ const STATUS_COLORS: Record<string, string> = {
   aceite: "text-moss-dark",
   rejeitado: "text-foreground/70",
 };
-
-// Celebration petals — drift down once on arrival. Fixed config (no RNG) so it's
-// deterministic; rendered client-only so it never blocks the server HTML.
-const PETALS = [
-  { l: 6, w: 16, h: 11, c: "moss-light", d: 7.5, dl: 0.1, r: 300, x: 40, o: 0.85 },
-  { l: 14, w: 12, h: 9, c: "gold", d: 8.5, dl: 1.2, r: -260, x: -30, o: 0.7 },
-  { l: 22, w: 19, h: 13, c: "moss", d: 6.8, dl: 0.5, r: 340, x: 60, o: 0.6 },
-  { l: 30, w: 13, h: 10, c: "cream-dark", d: 9, dl: 2.1, r: 220, x: -50, o: 0.95 },
-  { l: 38, w: 15, h: 10, c: "moss-light", d: 7.2, dl: 0.9, r: -300, x: 30, o: 0.75 },
-  { l: 46, w: 11, h: 9, c: "gold", d: 8, dl: 1.7, r: 280, x: 45, o: 0.65 },
-  { l: 54, w: 17, h: 13, c: "moss", d: 6.5, dl: 0.3, r: -320, x: -40, o: 0.55 },
-  { l: 62, w: 13, h: 10, c: "moss-light", d: 8.8, dl: 2.4, r: 260, x: 55, o: 0.8 },
-  { l: 70, w: 12, h: 9, c: "cream-dark", d: 7.6, dl: 1.0, r: -240, x: -35, o: 0.9 },
-  { l: 78, w: 16, h: 11, c: "gold", d: 9.2, dl: 0.7, r: 300, x: 40, o: 0.6 },
-  { l: 85, w: 15, h: 10, c: "moss", d: 7, dl: 1.9, r: -280, x: -55, o: 0.6 },
-  { l: 92, w: 12, h: 9, c: "moss-light", d: 8.2, dl: 0.4, r: 320, x: 30, o: 0.75 },
-  { l: 10, w: 10, h: 8, c: "gold", d: 9.5, dl: 3.0, r: 240, x: -30, o: 0.6 },
-  { l: 50, w: 13, h: 10, c: "cream-dark", d: 8.6, dl: 3.4, r: -300, x: 50, o: 0.85 },
-  { l: 66, w: 17, h: 13, c: "moss", d: 7.4, dl: 2.8, r: 280, x: -45, o: 0.55 },
-  { l: 34, w: 12, h: 9, c: "moss-light", d: 8, dl: 3.7, r: -260, x: 35, o: 0.75 },
-];
 
 export default function ConfirmacaoClient({
   id,
@@ -78,10 +57,6 @@ export default function ConfirmacaoClient({
   // heading so the success is announced and keyboard focus isn't stranded on
   // <body> (WCAG 2.4.3 Focus Order).
   const h1Ref = useRef<HTMLHeadingElement>(null);
-  // Client-only, so the petals play once on arrival without an SSR/hydration
-  // mismatch (the server renders none).
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
   // Funnel completion: reaching this page IS the successful submit landing, so
   // fire it here to measure submit → confirmation (the back half of the funnel
   // was previously invisible).
@@ -197,34 +172,6 @@ export default function ConfirmacaoClient({
   // One clock for the whole render, so the countdown and the reply-by promise
   // can't disagree by a day if the render straddles midnight.
   const now = useMemo(() => new Date(), []);
-  // Anchor the promise to when the request was SENT, not to when this page is
-  // being viewed — reopening the link a week later must not silently restart
-  // the two working days.
-  const sentAt = useMemo(() => {
-    const parsed = quote?.submittedAt ? new Date(quote.submittedAt) : null;
-    return parsed && !Number.isNaN(parsed.getTime()) ? parsed : now;
-  }, [quote?.submittedAt, now]);
-
-  // Whether to SHOW the reply-by promise — not what date it lands on. The page
-  // deliberately states a window ("em até 48 horas úteis") rather than naming a
-  // weekday: a calendar date is a promise the team can miss in high season for
-  // reasons the client can't see, and a named day that slips reads as a broken
-  // commitment where a window doesn't.
-  //
-  // The working-day maths is still what decides visibility: once that window
-  // has actually elapsed, repeating the promise to someone still waiting would
-  // be worse than saying nothing.
-  const showReplyBy = useMemo(() => {
-    if (!quote) return false;
-    // Once the team has replied, the promise is history — showing it would
-    // contradict the status right beside it.
-    if (quote.status !== "pendente" && quote.status !== "em_revisao") return false;
-    const on = replyByOn(sentAt);
-    const onDay = Date.UTC(on.getFullYear(), on.getMonth(), on.getDate());
-    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-    return onDay >= today;
-  }, [quote, sentAt, now]);
-
   const eventDate = quote?.date ?? "";
   const countdown = eventDate ? daysUntil(eventDate, now) : null;
   const highSeason = isHighSeason(eventDate);
@@ -408,31 +355,6 @@ export default function ConfirmacaoClient({
     // photograph still starts below the navbar, exactly as the form's own image
     // panel does, so the tall at-rest logo lockup never sits on top of it.
     <div data-cream-page className="relative -mt-24 min-h-screen overflow-hidden bg-cream pt-24">
-      {/* Celebration petals — drift down once, in front but featherlight. */}
-      {mounted && (
-        <div aria-hidden className="pointer-events-none fixed inset-0 z-[5] overflow-hidden">
-          {PETALS.map((p, i) => (
-            <span
-              key={i}
-              className="petal"
-              style={
-                {
-                  left: `${p.l}%`,
-                  width: p.w,
-                  height: p.h,
-                  background: `var(--color-${p.c})`,
-                  animationDuration: `${p.d}s`,
-                  animationDelay: `${p.dl}s`,
-                  "--petal-rot": `${p.r}deg`,
-                  "--petal-x": `${p.x}px`,
-                  "--petal-op": p.o,
-                } as React.CSSProperties
-              }
-            />
-          ))}
-        </div>
-      )}
-
       {/* ── Opening spread: the message on paper, the work beside it ──
           The photograph is the same one that fills the form's left panel, so
           the client stays inside the world they were just in instead of being
@@ -488,26 +410,6 @@ export default function ConfirmacaoClient({
               {lead}
             </p>
           </AnimateIn>
-
-          {/* The promise, as a DATE. "Até 48 horas úteis" is a disclaimer the
-              client has to decode; a named weekday is something they can hold
-              us to — and it's the single thing they came to this page to know. */}
-          {showReplyBy && (
-            <AnimateIn from="bottom" delay={210}>
-              <div className="mt-10 max-w-[34rem]">
-                <p className={microLabel}>{tc.replyByLabel}</p>
-                <p
-                  className="font-display text-moss-dark leading-[1.12] mt-2.5"
-                  style={{ fontSize: "clamp(26px, 3.2vw, 38px)" }}
-                >
-                  {tc.replyByValue}
-                </p>
-                <p className="mt-3.5 max-w-[30rem] text-foreground/65 text-[13.5px] leading-relaxed">
-                  {pick(tc.replyByNote, tc.replyByNotePlural)}
-                </p>
-              </div>
-            </AnimateIn>
-          )}
 
           {/* Perspective: two working days is nothing against 300 days of
               planning. Shown only when there IS a date to count towards. */}
