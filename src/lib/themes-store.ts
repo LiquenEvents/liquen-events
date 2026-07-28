@@ -19,17 +19,26 @@ export const mapper: Mapper<ProposalTheme> = {
   table: "proposal_themes",
   fileName: "proposal-themes.json",
   getId: (t) => t.id,
+  // `cover_path` só entra na linha quando o tema TEM capa escolhida (ou está a
+  // ser limpa). Numa base onde o `alter table` de db/schema.sql ainda não
+  // correu, a coluna não existe: escrevê-la sempre partia até um simples
+  // renomear. Assim só quem escolhe uma capa é que apanha o 503 que manda
+  // correr o schema (isMissingTable reconhece o 42703/PGRST204).
   toRow: (t) => ({
     id: t.id,
     name: t.name,
     notes: t.notes || null,
+    ...("coverPath" in t ? { cover_path: t.coverPath || null } : {}),
     created_at: t.createdAt || new Date().toISOString(),
     updated_at: t.updatedAt || new Date().toISOString(),
   }),
+  // Simétrico: sem capa gravada, a propriedade nem aparece — é o que mantém a
+  // linha acima calada nas instalações sem a coluna.
   fromRow: (r) => ({
     id: String(r.id),
     name: String(r.name ?? ""),
     notes: (r.notes as string) ?? undefined,
+    ...(typeof r.cover_path === "string" && r.cover_path ? { coverPath: r.cover_path } : {}),
     createdAt: String(r.created_at ?? new Date().toISOString()),
     updatedAt: String(r.updated_at ?? r.created_at ?? new Date().toISOString()),
   }),
@@ -61,9 +70,13 @@ export async function createTheme(input: { name: string; notes?: string }): Prom
   return theme;
 }
 
+/**
+ * Renomeia / anota / escolhe a capa. `coverPath: ""` limpa a escolha (a linha
+ * fica com `cover_path` a null e o cartão volta a mostrar a foto mais recente).
+ */
 export const updateTheme = (
   id: string,
-  patch: Partial<Pick<ProposalTheme, "name" | "notes">>,
+  patch: Partial<Pick<ProposalTheme, "name" | "notes" | "coverPath">>,
 ): Promise<ProposalTheme | null> => repo.update(id, patch);
 
 export const deleteTheme = (id: string): Promise<void> => repo.remove(id);

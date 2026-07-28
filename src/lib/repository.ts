@@ -79,22 +79,33 @@ export class ConflictError extends Error {
 }
 
 /**
- * A tabela ainda não existe na base de dados — quase sempre porque uma
- * funcionalidade nova foi publicada sem se correr o `db/schema.sql`.
+ * A tabela — ou uma COLUNA dela — ainda não existe na base de dados, quase
+ * sempre porque uma funcionalidade nova foi publicada sem se correr o
+ * `db/schema.sql`.
  *
  * Vale a pena distinguir isto de uma avaria: é a diferença entre dizer à equipa
  * "Erro interno" (que não indica caminho nenhum) e "falta correr o schema no
- * Supabase, leva um minuto". O Postgres devolve 42P01; o PostgREST responde
- * PGRST205 quando a tabela não está na cache do esquema.
+ * Supabase, leva um minuto". O Postgres devolve 42P01 (tabela) e 42703
+ * (coluna); o PostgREST responde PGRST205 quando a tabela não está na cache do
+ * esquema e PGRST204 quando é a coluna que lá não está.
+ *
+ * As colunas contam porque o schema cresce por `alter table ... add column if
+ * not exists` (ex.: `proposal_themes.cover_path`): quem publicou o código sem
+ * correr o ficheiro tem exatamente o mesmo problema e exatamente a mesma
+ * solução — e o resto da funcionalidade continua a funcionar sem a coluna.
  */
 export function isMissingTable(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const code = (err as { code?: unknown }).code;
-  if (code === "42P01" || code === "PGRST205") return true;
+  if (code === "42P01" || code === "PGRST205" || code === "42703" || code === "PGRST204") {
+    return true;
+  }
   const msg = (err as { message?: unknown }).message;
   return (
     typeof msg === "string" &&
-    /relation .* does not exist|could not find the table|schema cache/i.test(msg)
+    /relation .* does not exist|column .* does not exist|could not find the table|could not find the .* column|schema cache/i.test(
+      msg,
+    )
   );
 }
 

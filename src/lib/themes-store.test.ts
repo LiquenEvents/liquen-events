@@ -57,3 +57,34 @@ describe("themes-store mapper", () => {
     ]);
   });
 });
+
+// ── Capa escolhida ─────────────────────────────────────────────────────────
+// A coluna `cover_path` foi acrescentada depois. Numa base onde o
+// db/schema.sql ainda não correu ela não existe — e escrevê-la sem necessidade
+// partiria até um simples renomear. Daí a regra: só entra na linha quem tem
+// (ou está a limpar) uma capa.
+describe("themes-store mapper: capa do cartão", () => {
+  it("nem menciona cover_path num tema sem capa escolhida", () => {
+    expect("cover_path" in mapper.toRow(THEME)).toBe(false);
+    expect(mapper.fromRow({ id: "t-1", name: "Itália" }).coverPath).toBeUndefined();
+  });
+
+  it("faz o round-trip da capa escolhida", () => {
+    const withCover = { ...THEME, coverPath: "t-1/8f14e45f.jpg" };
+    const row = mapper.toRow(withCover);
+    expect(row.cover_path).toBe("t-1/8f14e45f.jpg");
+    expect(mapper.fromRow(row)).toEqual(withCover);
+  });
+
+  it("limpar a capa escreve null — e volta a ler-se como 'sem capa'", () => {
+    const row = mapper.toRow({ ...THEME, coverPath: "" });
+    expect(row.cover_path).toBeNull();
+    expect(mapper.fromRow(row).coverPath).toBeUndefined();
+  });
+
+  it("uma linha vinda de uma base sem a coluna lê-se sem capa (não rebenta)", () => {
+    expect(
+      mapper.fromRow({ id: "t-1", name: "Itália", cover_path: null }).coverPath,
+    ).toBeUndefined();
+  });
+});

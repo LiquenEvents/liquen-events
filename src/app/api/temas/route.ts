@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listThemes, createTheme } from "@/lib/themes-store";
-import { listThemeFiles, signThemePaths, themeFolder } from "@/lib/theme-storage";
+import { listThemeFiles, signThemePaths, themeFolder, isThemePath } from "@/lib/theme-storage";
 import { isUniqueViolation } from "@/lib/invoices-store";
 import { isMissingTable } from "@/lib/repository";
 import {
@@ -30,12 +30,18 @@ function str(v: unknown, max: number): string {
 
 /**
  * Biblioteca de Temas — lista de temas do estúdio, cada um com o nº de fotos e
- * uma capa (a foto mais recente) para o cartão. Só admin.
+ * uma capa para o cartão. Só admin.
  *
- * As contagens vêm do Storage (a pasta é a fonte de verdade), pedidas em
- * paralelo e SEM assinar nada: assinar é o passo caro, e só as capas — uma por
- * tema — precisam de URL. As assinaturas são pedidas todas de uma vez no fim,
- * num único pedido ao Storage (o bucket é o mesmo, as pastas é que diferem).
+ * O CUSTO é o que manda aqui: uma ida ao Storage por TEMA, nunca por foto.
+ * Cada tema custa uma listagem de UMA página (sem assinaturas), e as capas de
+ * todos os temas são assinadas de uma só vez no fim, num único pedido — o
+ * bucket é o mesmo, as pastas é que diferem. Desenhar cartões nunca pode
+ * significar ler pastas inteiras: com milhares de fotos por tema, a contagem
+ * do cartão é assumidamente um MÍNIMO (`truncated`, que a UI mostra como
+ * "500+"); o número exato vive no ecrã do tema, que pagina.
+ *
+ * A capa é a ESCOLHIDA (`coverPath`) e, se não houver — ou se a escolhida já
+ * tiver sido apagada e não puder ser assinada —, a foto mais recente.
  *
  * Uma pasta ilegível não derruba a lista nem se disfarça de "0 fotos": esse
  * tema aparece com `imageCount: null` (o cartão mostra "Fotos indisponíveis")
@@ -47,10 +53,18 @@ export async function GET(request: NextRequest) {
     const themes = await listThemes();
     const listings = await Promise.all(themes.map((t) => listThemeFiles(t.id)));
 
-    const covers = listings.map(({ names }, i) =>
+    // Duas hipóteses por tema — a escolhida e a mais recente —, ambas na mesma
+    // assinatura em bloco: se a escolhida já não existir, a segunda responde
+    // sem custar outra ida ao Storage.
+    const chosen = themes.map((t) =>
+      t.coverPath && isThemePath(t.coverPath) && t.coverPath.startsWith(`${themeFolder(t.id)}/`)
+        ? t.coverPath
+        : "",
+    );
+    const newest = listings.map(({ names }, i) =>
       names[0] ? `${themeFolder(themes[i].id)}/${names[0]}` : "",
     );
-    const urls = await signThemePaths(covers.filter(Boolean));
+    const urls = await signThemePaths([...new Set([...chosen, ...newest].filter(Boolean))]);
 
     const summaries: ThemeSummary[] = themes.map((t, i) => {
       const { names, ok, truncated } = listings[i];
@@ -58,7 +72,7 @@ export async function GET(request: NextRequest) {
         ...t,
         imageCount: ok ? names.length : null,
         ...(ok && truncated ? { truncated: true } : {}),
-        coverUrl: urls.get(covers[i]),
+        coverUrl: urls.get(chosen[i]) ?? urls.get(newest[i]),
       };
     });
     return NextResponse.json(summaries);

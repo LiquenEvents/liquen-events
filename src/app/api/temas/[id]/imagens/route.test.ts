@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
-import type { ProposalTheme } from "@/lib/theme-types";
+import { THEME_PAGE_SIZE, MAX_THEME_PAGE_SIZE, type ProposalTheme } from "@/lib/theme-types";
 
 // ── Fotos de um tema ───────────────────────────────────────────────────────
 // Duas coisas a fixar aqui: o caminho que chega do cliente NUNCA pode sair da
@@ -12,7 +12,12 @@ const st = vi.hoisted(() => ({
   dbConfigured: true,
   themes: [] as ProposalTheme[],
   throwOnGet: false,
-  list: vi.fn(async () => [{ path: "t-1/a.jpg", url: "https://signed/a" }]),
+  list: vi.fn(async () => ({
+    ok: true,
+    images: [{ path: "t-1/a.jpg", url: "https://signed/a", thumbUrl: "https://thumb/a" }],
+    total: 1,
+    truncated: false,
+  })),
   del: vi.fn(async () => true),
   upload: vi.fn(async (id: string) => ({ path: `${id}/nova.jpg`, url: "https://signed/nova" })),
 }));
@@ -31,7 +36,7 @@ vi.mock("@/lib/theme-storage", async () => {
   const real = await vi.importActual<typeof import("@/lib/theme-storage")>("@/lib/theme-storage");
   return {
     ...real,
-    listThemeImages: st.list,
+    listThemeImagePage: st.list,
     deleteThemeImage: st.del,
     uploadThemeImage: st.upload,
   };
@@ -45,8 +50,8 @@ function ctx(id: string): Ctx {
   return { params: Promise.resolve({ id }) };
 }
 
-function get(id = "t-1"): [NextRequest, Ctx] {
-  const url = new URL(`https://liquen.test/api/temas/${id}/imagens`);
+function get(id = "t-1", query = ""): [NextRequest, Ctx] {
+  const url = new URL(`https://liquen.test/api/temas/${id}/imagens${query}`);
   return [{ nextUrl: url, url: url.toString() } as unknown as NextRequest, ctx(id)];
 }
 
@@ -56,9 +61,10 @@ function del(path: string, id = "t-1"): [NextRequest, Ctx] {
   return [{ nextUrl: url, url: url.toString() } as unknown as NextRequest, ctx(id)];
 }
 
-function post(files: File[], id = "t-1"): [NextRequest, Ctx] {
+function post(files: File[], id = "t-1", thumbs?: File[]): [NextRequest, Ctx] {
   const form = new FormData();
   for (const f of files) form.append("files", f);
+  for (const t of thumbs ?? []) form.append("thumbs", t);
   const r = new Request(`https://liquen.test/api/temas/${id}/imagens`, {
     method: "POST",
     body: form,
@@ -91,10 +97,40 @@ describe("GET /api/temas/[id]/imagens", () => {
     expect(st.list).not.toHaveBeenCalled();
   });
 
-  it("devolve as fotos do tema", async () => {
+  it("devolve a página de fotos com o total e a miniatura de cada uma", async () => {
     const res = await GET(...get());
     expect(res.status).toBe(200);
-    expect((await res.json()).images).toHaveLength(1);
+    expect(await res.json()).toEqual({
+      ok: true,
+      images: [{ path: "t-1/a.jpg", url: "https://signed/a", thumbUrl: "https://thumb/a" }],
+      total: 1,
+      truncated: false,
+    });
+  });
+
+  it("pede ao Storage a janela do pedido", async () => {
+    await GET(...get("t-1", "?offset=120&limit=40"));
+    expect(st.list).toHaveBeenCalledWith("t-1", 40, 120);
+  });
+
+  it("sem parâmetros pede a primeira página, com o tamanho por omissão", async () => {
+    await GET(...get());
+    expect(st.list).toHaveBeenCalledWith("t-1", THEME_PAGE_SIZE, 0);
+  });
+
+  it("corta um limite absurdo e ignora lixo na query", async () => {
+    // Um ?limit=5000 mandaria assinar a biblioteca inteira num pedido.
+    await GET(...get("t-1", "?limit=5000"));
+    expect(st.list).toHaveBeenCalledWith("t-1", MAX_THEME_PAGE_SIZE, 0);
+    await GET(...get("t-1", "?limit=abc&offset=-40"));
+    expect(st.list).toHaveBeenLastCalledWith("t-1", THEME_PAGE_SIZE, 0);
+  });
+
+  it("uma pasta ilegível sai como ok:false — nunca como um tema sem fotos", async () => {
+    st.list.mockResolvedValueOnce({ ok: false, images: [], total: 0, truncated: false });
+    const res = await GET(...get());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: false, images: [] });
   });
 
   it("devolve 404 para um tema que não existe", async () => {
@@ -180,5 +216,66 @@ describe("POST /api/temas/[id]/imagens", () => {
     const res = await POST(...post([jpg(), jpg("outra.jpg")]));
     expect(res.status).toBe(200);
     expect((await res.json()).images).toHaveLength(2);
+    // Sem campo `thumbs` continua tudo a funcionar (é opcional).
+    expect(st.upload).toHaveBeenLastCalledWith("t-1", expect.any(Buffer), "image/jpeg", undefined);
+  });
+
+  it("aceita as miniaturas emparelhadas pela ordem", async () => {
+    const res = await POST(
+      ...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", [jpg("ta.jpg", 4), jpg("tb.jpg", 5)]),
+    );
+    expect(res.status).toBe(200);
+    expect(st.upload).toHaveBeenNthCalledWith(1, "t-1", expect.any(Buffer), "image/jpeg", {
+      bytes: expect.any(Buffer),
+      contentType: "image/jpeg",
+    });
+    expect(st.upload).toHaveBeenCalledTimes(2);
+  });
+
+  it("um marcador vazio significa 'esta foto vem sem miniatura'", async () => {
+    const vazio = new File([], "sem.jpg", { type: "image/jpeg" });
+    await POST(...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", [vazio, jpg("tb.jpg", 5)]));
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+    );
+    expect(st.upload).toHaveBeenNthCalledWith(
+      2,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      expect.objectContaining({ contentType: "image/jpeg" }),
+    );
+  });
+
+  it("miniaturas em número diferente das fotos são IGNORADAS, não emparelhadas à sorte", async () => {
+    // Pelo índice, uma miniatura a menos acompanharia a foto errada — uma foto
+    // com a miniatura de outra é pior do que foto nenhuma.
+    const res = await POST(...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", [jpg("ta.jpg", 4)]));
+    expect(res.status).toBe(200);
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+    );
+    expect(st.upload).toHaveBeenNthCalledWith(
+      2,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+    );
+  });
+
+  it("uma miniatura de formato ou tamanho impossíveis é descartada — a foto sobe na mesma", async () => {
+    const gif = new File([new Uint8Array(4)], "t.gif", { type: "image/gif" });
+    const res = await POST(...post([jpg()], "t-1", [gif]));
+    expect(res.status).toBe(200);
+    expect(st.upload).toHaveBeenCalledWith("t-1", expect.any(Buffer), "image/jpeg", undefined);
   });
 });

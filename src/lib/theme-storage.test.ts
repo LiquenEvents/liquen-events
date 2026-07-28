@@ -5,6 +5,8 @@ import {
   themeIdOfPath,
   contentTypeForPath,
   THEME_BUCKET,
+  THEME_THUMB_BUCKET,
+  SIGNED_TTL,
 } from "./theme-storage";
 
 /**
@@ -14,9 +16,26 @@ import {
  * Cada teste corre num módulo fresco (`vi.resetModules`) porque o
  * theme-storage memoiza a verificação do bucket entre chamadas.
  */
+const bucketState = () => ({
+  exists: true,
+  error: null as unknown,
+  createError: null as { message: string } | null,
+  gets: 0,
+  creates: 0,
+});
+
 const st = vi.hoisted(() => ({
   configured: true,
   bucket: {
+    exists: true,
+    error: null as unknown,
+    createError: null as { message: string } | null,
+    gets: 0,
+    creates: 0,
+  },
+  // O bucket das MINIATURAS é outro, com vida própria: numa instalação antiga
+  // pode nem existir, e a biblioteca tem de continuar a funcionar na mesma.
+  thumbBucket: {
     exists: true,
     error: null as unknown,
     createError: null as { message: string } | null,
@@ -31,36 +50,43 @@ const st = vi.hoisted(() => ({
   copy: vi.fn(),
   download: vi.fn(),
   upload: vi.fn(),
+  thumbList: vi.fn(),
+  thumbRemove: vi.fn(),
+  thumbSigned: vi.fn(),
+  thumbSignOne: vi.fn(),
+  thumbUpload: vi.fn(),
 }));
 
 vi.mock("./supabase", () => {
   const from = (bucket: string) => {
     st.buckets.push(bucket);
+    const thumbs = bucket === "theme-thumbs";
     return {
-      list: st.list,
-      remove: st.remove,
-      createSignedUrls: st.signed,
-      createSignedUrl: st.signOne,
+      list: thumbs ? st.thumbList : st.list,
+      remove: thumbs ? st.thumbRemove : st.remove,
+      createSignedUrls: thumbs ? st.thumbSigned : st.signed,
+      createSignedUrl: thumbs ? st.thumbSignOne : st.signOne,
       copy: st.copy,
       download: st.download,
-      upload: st.upload,
+      upload: thumbs ? st.thumbUpload : st.upload,
     };
   };
+  const stateOf = (name: string) => (name === "theme-thumbs" ? st.thumbBucket : st.bucket);
   return {
     getSupabase: () =>
       st.configured
         ? {
             storage: {
               from,
-              getBucket: async () => {
-                st.bucket.gets++;
-                return st.bucket.exists
-                  ? { data: { name: THEME_BUCKET }, error: null }
-                  : { data: null, error: st.bucket.error };
+              getBucket: async (name: string) => {
+                const b = stateOf(name);
+                b.gets++;
+                return b.exists ? { data: { name }, error: null } : { data: null, error: b.error };
               },
-              createBucket: async () => {
-                st.bucket.creates++;
-                return { data: null, error: st.bucket.createError };
+              createBucket: async (name: string) => {
+                const b = stateOf(name);
+                b.creates++;
+                return { data: null, error: b.createError };
               },
             },
           }
@@ -86,9 +112,26 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   st.configured = true;
-  st.bucket = { exists: true, error: null, createError: null, gets: 0, creates: 0 };
+  st.bucket = bucketState();
+  st.thumbBucket = bucketState();
   st.buckets = [];
   st.list.mockResolvedValue(page([]));
+  st.thumbList.mockResolvedValue(page([]));
+  st.thumbRemove.mockImplementation(async (paths: string[]) => ({
+    data: paths.map((p) => ({ name: p })),
+    error: null,
+  }));
+  // Por omissão TODAS as fotos têm miniatura; os testes que interessam mexem
+  // nisto (miniatura em falta, bucket inexistente, assinatura recusada).
+  st.thumbSigned.mockImplementation(async (paths: string[]) => ({
+    data: paths.map((path) => ({ path, signedUrl: `https://thumb/${path}` })),
+    error: null,
+  }));
+  st.thumbSignOne.mockImplementation(async (path: string) => ({
+    data: { signedUrl: `https://thumb/${path}` },
+    error: null,
+  }));
+  st.thumbUpload.mockResolvedValue({ data: { path: "ok" }, error: null });
   st.remove.mockImplementation(async (paths: string[]) => ({
     data: paths.map((p) => ({ name: p })),
     error: null,
@@ -184,6 +227,21 @@ describe("bucket", () => {
   it("é separado do bucket das propostas", () => {
     expect(THEME_BUCKET).toBe("theme-assets");
   });
+
+  it("as miniaturas vivem noutro bucket, privado e à parte", () => {
+    expect(THEME_THUMB_BUCKET).toBe("theme-thumbs");
+    expect(THEME_THUMB_BUCKET).not.toBe(THEME_BUCKET);
+  });
+});
+
+describe("validade dos URLs assinados", () => {
+  // Eram 10 anos: num bucket com milhares de fotos, cada URL que escapasse
+  // ficava a servi-las para sempre. Tem de cobrir um dia de trabalho e nada
+  // mais — as rotas voltam a assinar a cada pedido.
+  it("dura horas, não anos", () => {
+    expect(SIGNED_TTL).toBeGreaterThanOrEqual(60 * 60);
+    expect(SIGNED_TTL).toBeLessThanOrEqual(60 * 60 * 24);
+  });
 });
 
 // ── Bucket: criar só quando falta mesmo ────────────────────────────────────
@@ -272,24 +330,193 @@ describe("listThemeFiles", () => {
   });
 });
 
-// ── Listar com URL assinado (a camada fina por cima) ───────────────────────
-describe("listThemeImages", () => {
-  it("assina os caminhos de uma só vez e mantém a ordem da pasta", async () => {
-    st.list.mockResolvedValue(page(["a.jpg", "b.png"]));
-    const { listThemeImages } = await load();
-    expect(await listThemeImages("t-1")).toEqual([
-      { path: "t-1/a.jpg", url: "https://signed/t-1/a.jpg" },
-      { path: "t-1/b.png", url: "https://signed/t-1/b.png" },
-    ]);
-    expect(st.signed).toHaveBeenCalledTimes(1);
-    expect(st.signed).toHaveBeenCalledWith(["t-1/a.jpg", "t-1/b.png"], expect.any(Number));
+// ── Contar sem assinar ─────────────────────────────────────────────────────
+describe("countThemeFiles", () => {
+  it("soma as páginas até uma página curta", async () => {
+    st.list
+      .mockResolvedValueOnce(page(["a.jpg", "b.jpg"]))
+      .mockResolvedValueOnce(page(["c.jpg"]))
+      .mockResolvedValue(page([]));
+    const { countThemeFiles } = await load();
+    expect(await countThemeFiles("t-1", 5, 2)).toEqual({ total: 3, ok: true, truncated: false });
+    expect(st.signed).not.toHaveBeenCalled();
   });
 
-  it("devolve [] sem assinar nada quando a pasta é ilegível", async () => {
+  it("para no teto de páginas e diz que o total é um MÍNIMO", async () => {
+    st.list.mockResolvedValue(page(["a.jpg", "b.jpg"]));
+    const { countThemeFiles } = await load();
+    expect(await countThemeFiles("t-1", 2, 2)).toEqual({ total: 4, ok: true, truncated: true });
+    expect(st.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("uma pasta ilegível não é '0 fotos'", async () => {
     st.list.mockResolvedValue({ data: null, error: { message: "boom" } });
-    const { listThemeImages } = await load();
-    expect(await listThemeImages("t-1")).toEqual([]);
+    const { countThemeFiles } = await load();
+    expect(await countThemeFiles("t-1")).toEqual({ total: 0, ok: false, truncated: false });
+  });
+});
+
+// ── Uma página, assinada (originais + miniaturas) ──────────────────────────
+describe("listThemeImagePage", () => {
+  it("assina SÓ a página pedida, num pedido por bucket", async () => {
+    st.list.mockResolvedValue(page(["a.jpg", "b.png"]));
+    const { listThemeImagePage } = await load();
+    const res = await listThemeImagePage("t-1", 2, 0);
+    expect(res.images).toEqual([
+      { path: "t-1/a.jpg", url: "https://signed/t-1/a.jpg", thumbUrl: "https://thumb/t-1/a.jpg" },
+      { path: "t-1/b.png", url: "https://signed/t-1/b.png", thumbUrl: "https://thumb/t-1/b.png" },
+    ]);
+    expect(st.signed).toHaveBeenCalledTimes(1);
+    expect(st.thumbSigned).toHaveBeenCalledTimes(1);
+    // A MESMA chave nos dois buckets — é o que dispensa qualquer índice.
+    expect(st.signed).toHaveBeenCalledWith(["t-1/a.jpg", "t-1/b.png"], expect.any(Number));
+    expect(st.thumbSigned).toHaveBeenCalledWith(["t-1/a.jpg", "t-1/b.png"], expect.any(Number));
+  });
+
+  it("pede ao Storage exatamente a janela recebida", async () => {
+    const { listThemeImagePage } = await load();
+    await listThemeImagePage("t-1", 40, 120);
+    expect(st.list).toHaveBeenCalledWith(
+      "t-1",
+      expect.objectContaining({ limit: 40, offset: 120 }),
+    );
+  });
+
+  it("corta um limite absurdo em vez de mandar assinar a biblioteca toda", async () => {
+    const { listThemeImagePage } = await load();
+    await listThemeImagePage("t-1", 5000, -3);
+    expect(st.list).toHaveBeenCalledWith("t-1", expect.objectContaining({ limit: 200, offset: 0 }));
+  });
+
+  it("uma foto SEM miniatura fica com o original (fotos anteriores às miniaturas)", async () => {
+    st.list.mockResolvedValue(page(["velha.jpg", "nova.jpg"]));
+    // O Storage devolve erro por item para o que não existe.
+    st.thumbSigned.mockResolvedValue({
+      data: [
+        { path: "t-1/velha.jpg", signedUrl: null, error: "Object not found" },
+        { path: "t-1/nova.jpg", signedUrl: "https://thumb/t-1/nova.jpg", error: null },
+      ],
+      error: null,
+    });
+    const { listThemeImagePage } = await load();
+    const { images } = await listThemeImagePage("t-1", 10, 0);
+    expect(images[0]).toEqual({ path: "t-1/velha.jpg", url: "https://signed/t-1/velha.jpg" });
+    expect(images[1].thumbUrl).toBe("https://thumb/t-1/nova.jpg");
+  });
+
+  it("o bucket das miniaturas nem existir não estraga nada", async () => {
+    st.list.mockResolvedValue(page(["a.jpg"]));
+    st.thumbSigned.mockResolvedValue({ data: null, error: { message: "Bucket not found" } });
+    const { listThemeImagePage } = await load();
+    const { ok, images } = await listThemeImagePage("t-1", 10, 0);
+    expect(ok).toBe(true);
+    expect(images).toEqual([{ path: "t-1/a.jpg", url: "https://signed/t-1/a.jpg" }]);
+    // E não o cria: um bucket vazio não serve para nada.
+    expect(st.thumbBucket.creates).toBe(0);
+  });
+
+  it("a primeira página curta JÁ é o total — sem outra ida ao Storage", async () => {
+    st.list.mockResolvedValue(page(["a.jpg", "b.jpg"]));
+    const { listThemeImagePage } = await load();
+    expect(await listThemeImagePage("t-1", 10, 0)).toMatchObject({ total: 2, truncated: false });
+    expect(st.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("conta a pasta quando a página vem cheia — o total não é o da página", async () => {
+    st.list
+      .mockResolvedValueOnce(page(["a.jpg", "b.jpg"])) // a página pedida (cheia)
+      .mockResolvedValue(page(NAMES_500)); // a contagem, numa página só
+    const { listThemeImagePage } = await load();
+    const res = await listThemeImagePage("t-1", 2, 0);
+    expect(res.images).toHaveLength(2);
+    expect(res).toMatchObject({ total: 500, truncated: false });
+  });
+
+  it("pasta ilegível: ok=false e nada assinado (nunca 'tema sem fotos')", async () => {
+    st.list.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const { listThemeImagePage } = await load();
+    expect(await listThemeImagePage("t-1", 10, 0)).toEqual({
+      ok: false,
+      images: [],
+      total: 0,
+      truncated: false,
+    });
     expect(st.signed).not.toHaveBeenCalled();
+    expect(st.thumbSigned).not.toHaveBeenCalled();
+  });
+
+  it("página lida mas contagem falhada: total é um mínimo honesto", async () => {
+    st.list
+      .mockResolvedValueOnce(page(["a.jpg", "b.jpg"]))
+      .mockResolvedValue({ data: null, error: { message: "boom" } });
+    const { listThemeImagePage } = await load();
+    expect(await listThemeImagePage("t-1", 2, 10)).toMatchObject({
+      ok: true,
+      total: 12,
+      truncated: true,
+    });
+  });
+});
+
+// ── Miniaturas: carregar, apagar, nunca mandar em nada ─────────────────────
+describe("miniaturas", () => {
+  it("guarda a miniatura na MESMA chave, no bucket das miniaturas", async () => {
+    const { uploadThemeImage } = await load();
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", {
+      bytes: Buffer.from("mini"),
+      contentType: "image/jpeg",
+    });
+    expect(res?.path).toMatch(/^t-1\/[0-9a-f-]+\.jpg$/);
+    expect(res?.thumbUrl).toBe(`https://thumb/${res?.path}`);
+    expect(st.thumbUpload).toHaveBeenCalledWith(
+      res?.path,
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: "image/jpeg" }),
+    );
+    expect(st.buckets).toContain(THEME_THUMB_BUCKET);
+  });
+
+  it("cria o bucket das miniaturas no primeiro uso — e só nesse", async () => {
+    st.thumbBucket.exists = false;
+    const { uploadThemeImage } = await load();
+    const thumb = { bytes: Buffer.from("mini"), contentType: "image/jpeg" };
+    await Promise.all([
+      uploadThemeImage("t-1", Buffer.from("a"), "image/jpeg", thumb),
+      uploadThemeImage("t-1", Buffer.from("b"), "image/jpeg", thumb),
+    ]);
+    expect(st.thumbBucket.gets).toBe(1);
+    expect(st.thumbBucket.creates).toBe(1);
+  });
+
+  it("uma miniatura que falha NÃO deita o carregamento abaixo", async () => {
+    st.thumbUpload.mockResolvedValue({ data: null, error: { message: "sem permissões" } });
+    const { uploadThemeImage } = await load();
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", {
+      bytes: Buffer.from("mini"),
+      contentType: "image/jpeg",
+    });
+    expect(res?.url).toBeTruthy();
+    expect(res?.thumbUrl).toBeUndefined();
+  });
+
+  it("sem miniatura enviada não se toca no bucket das miniaturas", async () => {
+    const { uploadThemeImage } = await load();
+    await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg");
+    expect(st.buckets).not.toContain(THEME_THUMB_BUCKET);
+    expect(st.thumbUpload).not.toHaveBeenCalled();
+  });
+
+  it("apagar uma foto leva a miniatura com ela", async () => {
+    const { deleteThemeImage } = await load();
+    expect(await deleteThemeImage("t-1/a.jpg")).toBe(true);
+    expect(st.remove).toHaveBeenCalledWith(["t-1/a.jpg"]);
+    expect(st.thumbRemove).toHaveBeenCalledWith(["t-1/a.jpg"]);
+  });
+
+  it("a miniatura que não sai não impede apagar a foto", async () => {
+    st.thumbRemove.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const { deleteThemeImage } = await load();
+    expect(await deleteThemeImage("t-1/a.jpg")).toBe(true);
   });
 });
 
@@ -343,6 +570,30 @@ describe("deleteThemeFolder", () => {
     st.configured = false;
     const { deleteThemeFolder } = await load();
     expect(await deleteThemeFolder("t-1")).toEqual({ ok: false, removed: 0 });
+  });
+
+  it("leva também as miniaturas do tema", async () => {
+    st.list.mockResolvedValueOnce(page(["a.jpg"])).mockResolvedValue(page([]));
+    st.thumbList.mockResolvedValueOnce(page(["a.jpg"])).mockResolvedValue(page([]));
+    const { deleteThemeFolder } = await load();
+    expect(await deleteThemeFolder("t-1")).toEqual({ ok: true, removed: 1 });
+    expect(st.thumbRemove).toHaveBeenCalledWith(["t-1/a.jpg"]);
+  });
+
+  it("miniaturas que não se conseguem apagar NÃO impedem eliminar o tema", async () => {
+    st.list.mockResolvedValueOnce(page(["a.jpg"])).mockResolvedValue(page([]));
+    st.thumbList.mockResolvedValue({ data: null, error: { message: "Bucket not found" } });
+    const { deleteThemeFolder } = await load();
+    expect(await deleteThemeFolder("t-1")).toEqual({ ok: true, removed: 1 });
+  });
+
+  it("não apaga miniaturas quando as fotos ficaram por apagar", async () => {
+    // Senão a grelha do tema (que continua lá) passava a puxar originais.
+    st.list.mockResolvedValue(page(["a.jpg"]));
+    st.remove.mockResolvedValue({ data: null, error: { message: "sem permissões" } });
+    const { deleteThemeFolder } = await load();
+    expect((await deleteThemeFolder("t-1")).ok).toBe(false);
+    expect(st.thumbRemove).not.toHaveBeenCalled();
   });
 });
 

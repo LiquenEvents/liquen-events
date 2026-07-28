@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { fitWithin, keepOriginal } from "./image-prep";
+import { fitWithin, keepOriginal, needsThumb, thumbFileName, THUMB_EDGE } from "./image-prep";
 
 /**
  * Pure-logic coverage for the upload image preparation. The canvas/decode path
  * needs a real browser; these pin the sizing math and the skip heuristics that
- * decide whether a photo is re-encoded at all.
+ * decide whether a photo is re-encoded at all — and whether it also gets a
+ * thumbnail.
  */
 
 describe("fitWithin", () => {
@@ -46,5 +47,38 @@ describe("keepOriginal", () => {
     // board (≤1.0 MB) so a board of many photos stays light.
     expect(keepOriginal("image/jpeg", 1_200_000, "cover")).toBe(true);
     expect(keepOriginal("image/jpeg", 1_200_000, "board")).toBe(false);
+  });
+});
+
+describe("needsThumb", () => {
+  it("wants a thumbnail for the photos the library actually holds", () => {
+    // O que sai do preset de capa: 3000 px de lado maior.
+    expect(needsThumb(3000, 2000)).toBe(true);
+    expect(needsThumb(2000, 3000)).toBe(true);
+  });
+
+  it("skips the second file when the photo is already thumbnail-sized", () => {
+    // Sem miniatura a grelha usa o original — que, aqui, já é leve. Um segundo
+    // ficheiro só acrescentaria um upload e um objeto no bucket para limpar.
+    expect(needsThumb(THUMB_EDGE, THUMB_EDGE)).toBe(false);
+    expect(needsThumb(320, 240)).toBe(false);
+  });
+
+  it("does not bother with a thumbnail a hair smaller than the original", () => {
+    // 420 px → 400 px não poupa nada que se veja; a margem de 25 % evita-o.
+    expect(needsThumb(420, 300)).toBe(false);
+    expect(needsThumb(700, 300)).toBe(true);
+  });
+});
+
+describe("thumbFileName", () => {
+  it("marks the thumbnail and always lands on .jpg (the canvas only makes JPEG)", () => {
+    expect(thumbFileName("praia.jpg")).toBe("praia.thumb.jpg");
+    expect(thumbFileName("IMG_0042.HEIC")).toBe("IMG_0042.thumb.jpg");
+    expect(thumbFileName("sem-extensao")).toBe("sem-extensao.thumb.jpg");
+  });
+
+  it("keeps dots inside the name", () => {
+    expect(thumbFileName("casa.da.pedra.png")).toBe("casa.da.pedra.thumb.jpg");
   });
 });

@@ -217,6 +217,16 @@ create table if not exists public.proposal_themes (
 
 create index if not exists proposal_themes_name_idx on public.proposal_themes (name);
 
+-- Foto ESCOLHIDA para o cartão do tema (caminho dentro do bucket,
+-- `<id do tema>/<ficheiro>.jpg`). Sem ela o cartão mostra a foto mais recente,
+-- que muda sozinha a cada carregamento — com milhares de fotos por tema, a
+-- capa passa a ser uma decisão e não um acidente.
+-- Coluna adicionada depois da tabela: `if not exists` para o ficheiro poder ser
+-- colado outra vez inteiro. Enquanto não correr, a aplicação continua a
+-- funcionar (a capa é a foto mais recente) e só escolher uma capa é que
+-- responde 503 a pedir este passo.
+alter table public.proposal_themes add column if not exists cover_path text;
+
 -- Um tema por nome — a garantia fica na própria base de dados. As rotas
 -- POST /api/temas e PATCH /api/temas/[id] já recusam um nome repetido, mas
 -- entre essa leitura e a escrita cabe outra criação: só este índice impede

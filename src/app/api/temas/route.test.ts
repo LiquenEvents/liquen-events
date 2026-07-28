@@ -142,6 +142,35 @@ describe("GET /api/temas", () => {
     expect(st.sign).toHaveBeenCalledWith(["t-2/d.jpg"]);
   });
 
+  it("usa a capa ESCOLHIDA em vez da foto mais recente", async () => {
+    st.authed = true;
+    st.themes = [{ ...theme("t-1", "Terracotta"), coverPath: "t-1/escolhida.jpg" }];
+    st.files = { "t-1": folder(["recente.jpg", "antiga.jpg"]) };
+    const body = await (await GET(req("GET"))).json();
+    expect(body[0].coverUrl).toBe("https://signed/t-1/escolhida.jpg");
+    // As duas hipóteses vão na MESMA assinatura em bloco.
+    expect(st.sign).toHaveBeenCalledTimes(1);
+    expect(st.sign).toHaveBeenCalledWith(["t-1/escolhida.jpg", "t-1/recente.jpg"]);
+  });
+
+  it("volta à foto mais recente quando a capa escolhida já não existe", async () => {
+    st.authed = true;
+    st.themes = [{ ...theme("t-1", "Terracotta"), coverPath: "t-1/apagada.jpg" }];
+    st.files = { "t-1": folder(["recente.jpg"]) };
+    // O Storage não assina o que não existe.
+    st.sign.mockResolvedValueOnce(new Map([["t-1/recente.jpg", "https://signed/t-1/recente.jpg"]]));
+    const body = await (await GET(req("GET"))).json();
+    expect(body[0].coverUrl).toBe("https://signed/t-1/recente.jpg");
+  });
+
+  it("ignora uma capa que aponte para fora da pasta do tema", async () => {
+    st.authed = true;
+    st.themes = [{ ...theme("t-1", "Terracotta"), coverPath: "t-9/de-outro.jpg" }];
+    st.files = { "t-1": folder(["recente.jpg"]) };
+    await GET(req("GET"));
+    expect(st.sign).toHaveBeenCalledWith(["t-1/recente.jpg"]);
+  });
+
   it("marca como mínimo a contagem de uma pasta que bateu no limite da página", async () => {
     st.authed = true;
     st.themes = [theme("t-1", "Terracotta")];
@@ -256,5 +285,26 @@ describe("a tabela ainda não existe na base de dados", () => {
     st.authed = true;
     st.throwOnList = new Error("connection reset");
     expect((await GET(req("GET"))).status).toBe(500);
+  });
+
+  // O schema cresce por `alter table ... add column`: uma COLUNA em falta é o
+  // mesmo problema e a mesma solução de uma tabela em falta.
+  it("reconhece uma COLUNA em falta (cover_path) como schema por correr", async () => {
+    st.authed = true;
+    st.throwOnList = Object.assign(
+      new Error("Could not find the 'cover_path' column of 'proposal_themes' in the schema cache"),
+      { code: "PGRST204" },
+    );
+    const res = await GET(req("GET"));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/db\/schema\.sql/);
+  });
+
+  it("reconhece também o 42703 do Postgres", async () => {
+    st.authed = true;
+    st.throwOnList = Object.assign(new Error('column "cover_path" does not exist'), {
+      code: "42703",
+    });
+    expect((await GET(req("GET"))).status).toBe(503);
   });
 });

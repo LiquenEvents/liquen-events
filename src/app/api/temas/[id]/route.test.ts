@@ -119,6 +119,44 @@ describe("PATCH /api/temas/[id]", () => {
     expect((await PATCH(...patchReq({ notes: "x" }, "t-9"))).status).toBe(404);
   });
 
+  it("escolhe a capa do cartão", async () => {
+    const res = await PATCH(...patchReq({ coverPath: "t-1/8f14e45f.jpg" }));
+    expect(res.status).toBe(200);
+    expect(st.update).toHaveBeenCalledWith("t-1", { coverPath: "t-1/8f14e45f.jpg" });
+  });
+
+  it("recusa uma capa de OUTRO tema, uma travessia ou um URL — e não escreve nada", async () => {
+    expect((await PATCH(...patchReq({ coverPath: "t-2/a.jpg" }))).status).toBe(400);
+    expect(
+      (await PATCH(...patchReq({ coverPath: "../proposal-assets/q-1/privada.jpg" }))).status,
+    ).toBe(400);
+    expect((await PATCH(...patchReq({ coverPath: "https://exemplo.pt/a.jpg" }))).status).toBe(400);
+    expect((await PATCH(...patchReq({ coverPath: "t-1/nao-e-imagem.svg" }))).status).toBe(400);
+    expect(st.update).not.toHaveBeenCalled();
+  });
+
+  it("limpa a capa com uma string vazia (volta à foto mais recente)", async () => {
+    const res = await PATCH(...patchReq({ coverPath: "" }));
+    expect(res.status).toBe(200);
+    expect(st.update).toHaveBeenCalledWith("t-1", { coverPath: "" });
+    // E não é devolvido um coverPath vazio, que não é caminho nenhum.
+    expect((await res.json()).coverPath).toBeUndefined();
+  });
+
+  it("uma coluna cover_path em falta explica o passo do schema (503, não 500)", async () => {
+    st.update.mockRejectedValueOnce(
+      Object.assign(
+        new Error(
+          "Could not find the 'cover_path' column of 'proposal_themes' in the schema cache",
+        ),
+        { code: "PGRST204" },
+      ),
+    );
+    const res = await PATCH(...patchReq({ coverPath: "t-1/a.jpg" }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/db\/schema\.sql/);
+  });
+
   it("devolve 500 tratado quando a base de dados falha", async () => {
     st.throwOnList = true;
     expect((await PATCH(...patchReq({ name: "Toscana" }))).status).toBe(500);

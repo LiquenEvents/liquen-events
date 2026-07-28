@@ -20,6 +20,9 @@ export interface ProposalTheme {
   name: string;
   /** Nota interna opcional ("tons quentes, para espaços de pedra"). */
   notes?: string;
+  /** Foto ESCOLHIDA para o cartão do tema (caminho no bucket, `<tema>/<f>.jpg`).
+   *  Ausente = o cartão usa a foto mais recente da pasta, como antes. */
+  coverPath?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,8 +30,33 @@ export interface ProposalTheme {
 /** Uma foto guardada: caminho estável no bucket + URL assinado p/ pré-visualizar. */
 export interface ThemeImage {
   path: string;
+  /** URL assinado do ORIGINAL (o que vai para a proposta / para a capa). */
   url: string;
+  /** URL assinado da miniatura, quando existe. É esta que a grelha deve
+   *  mostrar: o original tem ~3000 px e 2,5–3,5 MB, e uma grelha de 100 fotos
+   *  a puxar originais são centenas de MB. As fotos carregadas ANTES de as
+   *  miniaturas existirem não têm nenhuma — nesse caso mostra-se `url`. */
+  thumbUrl?: string;
 }
+
+/** O que `GET /api/temas/[id]/imagens?offset=&limit=` devolve. */
+export interface ThemeImagePage {
+  /** A pasta foi mesmo lida. `false` = falha temporária, NÃO "tema sem fotos". */
+  ok: boolean;
+  /** Só a página pedida — só estas é que foram assinadas. */
+  images: ThemeImage[];
+  /** Total de fotos do tema. Com `truncated`, é um MÍNIMO. */
+  total: number;
+  /** A contagem bateu no teto: há mais fotos do que as contadas. */
+  truncated: boolean;
+}
+
+/** Fotos por página na grelha de um tema (o que a UI pede por omissão). */
+export const THEME_PAGE_SIZE = 60;
+
+/** Teto por página aceite pela rota — acima disto o pedido é cortado, não
+ *  recusado. Impede que um `?limit=5000` mande assinar a biblioteca toda. */
+export const MAX_THEME_PAGE_SIZE = 200;
 
 /** O que a lista de temas precisa para desenhar um cartão. */
 export interface ThemeSummary extends ProposalTheme {
@@ -39,7 +67,8 @@ export interface ThemeSummary extends ProposalTheme {
   imageCount: number | null;
   /** A contagem é um MÍNIMO: a listagem da pasta bateu no limite por página. */
   truncated?: boolean;
-  /** URL assinado da primeira foto, usada como capa do cartão. */
+  /** URL assinado da foto do cartão: a escolhida (`coverPath`) ou, sem
+   *  escolha — ou se a escolhida já não existir —, a foto mais recente. */
   coverUrl?: string;
 }
 

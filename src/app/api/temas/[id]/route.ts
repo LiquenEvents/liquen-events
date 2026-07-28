@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { getTheme, updateTheme, deleteTheme, listThemes } from "@/lib/themes-store";
-import { deleteThemeFolder } from "@/lib/theme-storage";
+import { deleteThemeFolder, isThemePath, themeIdOfPath, themeFolder } from "@/lib/theme-storage";
 import { isUniqueViolation } from "@/lib/invoices-store";
 import { isMissingTable } from "@/lib/repository";
 import {
@@ -27,14 +27,31 @@ function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
-/** Renomeia / anota um tema. */
+/**
+ * Renomeia / anota um tema e escolhe a foto do cartão.
+ *
+ * `coverPath` aceita um caminho de uma foto DESTE tema (mesma validação da
+ * remoção de fotos: uma pasta e um ficheiro, nada que saia dali) ou `null`/""
+ * para voltar à foto mais recente. Se a base de dados ainda não tiver a coluna
+ * `cover_path`, a escrita falha com 42703/PGRST204 e sai daqui o mesmo 503 que
+ * manda correr o db/schema.sql — o resto do tema continua a funcionar.
+ */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   let name = "";
   try {
     const body = await request.json().catch(() => null);
-    const patch: { name?: string; notes?: string } = {};
+    const patch: { name?: string; notes?: string; coverPath?: string } = {};
+
+    if (body?.coverPath !== undefined) {
+      const cover = typeof body.coverPath === "string" ? body.coverPath.trim() : "";
+      if (cover && (!isThemePath(cover) || themeIdOfPath(cover) !== themeFolder(id))) {
+        return NextResponse.json({ error: "Capa inválida." }, { status: 400 });
+      }
+      // "" limpa a escolha; a coluna fica a null e o cartão volta à mais recente.
+      patch.coverPath = cover;
+    }
 
     if (body?.name !== undefined) {
       name = str(body.name, MAX_THEME_NAME);
@@ -52,7 +69,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const updated = await updateTheme(id, patch);
     if (!updated) return NextResponse.json({ error: "Tema não encontrado" }, { status: 404 });
-    return NextResponse.json(updated);
+    // Capa limpa sai como ausente, não como "" — o cliente lê "sem capa
+    // escolhida" da mesma forma que num tema que nunca teve nenhuma.
+    return NextResponse.json({ ...updated, coverPath: updated.coverPath || undefined });
   } catch (err) {
     // Backstop de corrida: entre a verificação acima e a escrita, outro
     // pedido pode ter registado o mesmo nome — o índice único

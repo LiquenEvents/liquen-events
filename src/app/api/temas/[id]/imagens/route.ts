@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { getTheme } from "@/lib/themes-store";
 import {
-  listThemeImages,
+  listThemeImagePage,
   uploadThemeImage,
   deleteThemeImage,
   isThemePath,
   themeIdOfPath,
   themeFolder,
+  type ThemeThumbInput,
 } from "@/lib/theme-storage";
+import { THEME_PAGE_SIZE, MAX_THEME_PAGE_SIZE } from "@/lib/theme-types";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -16,6 +18,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB por imagem
+/** Uma miniatura acima disto é um erro do cliente, não uma miniatura. É
+ *  ignorada (fica a foto sem miniatura), nunca recusa o carregamento. */
+const MAX_THUMB_BYTES = 2 * 1024 * 1024;
 const OK_TYPES = /^image\/(jpe?g|png|webp)$/i;
 
 /**
@@ -31,7 +36,24 @@ function failed(message: string, err: unknown, id: string) {
   return NextResponse.json({ error: "Erro interno" }, { status: 500 });
 }
 
-/** As fotos de um tema, com URL assinado fresco para pré-visualizar. */
+/** Um inteiro >= 0 vindo da query string; `fallback` para tudo o resto. */
+function num(raw: string | null, fallback: number): number {
+  const n = Number(raw);
+  return raw !== null && Number.isFinite(n) && n >= 0 ? Math.trunc(n) : fallback;
+}
+
+/**
+ * UMA PÁGINA das fotos de um tema: `?offset=&limit=`.
+ *
+ * Devolve `{ ok, images, total, truncated }`. Só a página pedida é assinada —
+ * abrir um tema com 3000 fotos custa o mesmo que abrir um com 30. Cada foto
+ * traz `url` (o ORIGINAL, que é o que vai para a proposta) e, quando existe,
+ * `thumbUrl` — a miniatura, que é o que a grelha deve mostrar. As fotos
+ * carregadas antes de as miniaturas existirem vêm sem `thumbUrl`.
+ *
+ * `ok: false` (com 200) quer dizer "a pasta não pôde ser lida agora", que a UI
+ * mostra como "Fotos indisponíveis" — nunca como um tema vazio.
+ */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
@@ -40,16 +62,56 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // legítimo não pode sair daqui disfarçado de 500.
     const theme = await getTheme(id);
     if (!theme) return NextResponse.json({ error: "Tema não encontrado" }, { status: 404 });
-    return NextResponse.json({ ok: true, images: await listThemeImages(id) });
+
+    const q = request.nextUrl.searchParams;
+    // Teto rígido: um `?limit=5000` mandaria assinar a biblioteca inteira num
+    // pedido. Corta-se em silêncio (o cliente pagina), não se recusa.
+    const limit = Math.min(Math.max(1, num(q.get("limit"), THEME_PAGE_SIZE)), MAX_THEME_PAGE_SIZE);
+    const offset = num(q.get("offset"), 0);
+    return NextResponse.json(await listThemeImagePage(id, limit, offset));
   } catch (err) {
     return failed("temas imagens GET falhou", err, id);
   }
 }
 
 /**
+ * Recolhe as miniaturas que vieram no formulário, emparelhadas com os
+ * ficheiros pela ORDEM (o campo `thumbs` é opcional).
+ *
+ * Ou os dois campos têm o mesmo comprimento, ou não há emparelhamento
+ * possível: pelo índice, uma miniatura a menos passaria a acompanhar a foto
+ * errada — uma foto com a miniatura de outra é pior do que foto nenhuma. O
+ * cliente que não consiga gerar uma miniatura deve enviar um marcador vazio no
+ * lugar dela (`new Blob([])`), que aqui simplesmente não conta.
+ */
+function pairThumbs(files: File[], form: FormData): (File | null)[] {
+  const thumbs = form.getAll("thumbs").filter((f): f is File => f instanceof File);
+  if (thumbs.length === 0) return files.map(() => null);
+  if (thumbs.length !== files.length) {
+    log.warn("temas: miniaturas ignoradas (não correspondem aos ficheiros)", {
+      files: files.length,
+      thumbs: thumbs.length,
+    });
+    return files.map(() => null);
+  }
+  return thumbs.map((t) => {
+    if (t.size === 0) return null; // marcador: esta foto vem sem miniatura
+    if (!OK_TYPES.test(t.type) || t.size > MAX_THUMB_BYTES) {
+      log.warn("temas: miniatura descartada", { tipo: t.type, bytes: t.size });
+      return null;
+    }
+    return t;
+  });
+}
+
+/**
  * Carrega fotos para a pasta de um tema. Aceita multipart/form-data com um ou
- * mais `files` — o cliente comprime e envia um ficheiro por pedido (o limite de
- * corpo do alojamento é ~4,5 MB), tal como no estúdio de propostas.
+ * mais `files` e, opcionalmente, os `thumbs` correspondentes pela mesma ordem —
+ * as miniaturas são feitas no navegador, a partir do mesmo bitmap já
+ * descodificado para comprimir o original.
+ *
+ * A miniatura é um acessório: falhar a guardá-la deixa a foto sem miniatura
+ * (a grelha mostra o original), nunca faz o carregamento falhar.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -77,9 +139,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (files.length === 0) {
     return NextResponse.json({ error: "Nenhuma imagem recebida." }, { status: 400 });
   }
+  const thumbs = pairThumbs(files, form);
 
-  const uploaded: { path: string; url: string }[] = [];
-  for (const file of files) {
+  const uploaded = [];
+  for (const [i, file] of files.entries()) {
     if (!OK_TYPES.test(file.type)) {
       return NextResponse.json(
         { error: `Formato não suportado: ${file.name}. Use JPG, PNG ou WEBP.` },
@@ -93,7 +156,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
     const bytes = Buffer.from(await file.arrayBuffer());
-    const res = await uploadThemeImage(id, bytes, file.type);
+    const thumb = thumbs[i];
+    const thumbInput: ThemeThumbInput | undefined = thumb
+      ? { bytes: Buffer.from(await thumb.arrayBuffer()), contentType: thumb.type }
+      : undefined;
+    const res = await uploadThemeImage(id, bytes, file.type, thumbInput);
     if (!res) {
       log.error("temas: upload falhou", null, { id, name: file.name });
       return NextResponse.json({ error: "Falha ao guardar a imagem." }, { status: 502 });
@@ -104,7 +171,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   return NextResponse.json({ ok: true, images: uploaded });
 }
 
-/** Remove UMA foto do tema: `?path=<themeId>/<ficheiro>`. */
+/** Remove UMA foto do tema: `?path=<themeId>/<ficheiro>`. A miniatura sai com
+ *  ela (melhor esforço — uma miniatura órfã nunca impede apagar a foto). */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
