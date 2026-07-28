@@ -33,8 +33,14 @@ jobs:
         # platform-specific optional deps (a known cross-platform npm quirk).
         run: npm ci || npm install
 
+      # `--omit=dev`: audita o que é REALMENTE servido aos clientes. As
+      # ferramentas de desenvolvimento (ESLint e a sua árvore) não são
+      # publicadas, e um aviso numa delas passaria a bloquear todo o CI —
+      # incluindo lint, testes e build, que correm a seguir a este passo e
+      # deixariam de dar qualquer sinal sobre o código. As dependências de
+      # produção continuam a falhar o CI em "high" ou "critical".
       - name: Audit dependencies (fail on high/critical)
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         run: npm run lint
