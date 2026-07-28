@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { Quote } from "@/lib/orcamento/types";
 import {
   CATEGORIES,
@@ -19,7 +20,7 @@ import type { Dict } from "@/lib/i18n";
 import { daysUntil, isHighSeason, longDate, replyByDate, replyByOn } from "@/lib/workdays";
 import { track } from "@/lib/track";
 import { reportLeadConversion } from "@/lib/ads-conversion";
-import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+import { CONFIRMACAO_PHOTOS, type ConfirmacaoPhotoKey } from "./photos";
 
 const STATUS_COLORS: Record<string, string> = {
   pendente: "text-moss-dark",
@@ -54,11 +55,14 @@ export default function ConfirmacaoClient({
   id,
   confirmacao,
   eventTypeLabels,
+  blur,
 }: {
   id: string;
   confirmacao: Dict["confirmacao"];
   /** Localized labels for the form's six options, in QUOTE_EVENT_OPTIONS order. */
   eventTypeLabels: readonly string[];
+  /** Blur placeholders for CONFIRMACAO_PHOTOS, resolved server-side. */
+  blur: Record<ConfirmacaoPhotoKey, string>;
 }) {
   // locale comes from the site-wide chrome context; the confirmacao namespace
   // is passed in from this route's server page.
@@ -268,7 +272,10 @@ export default function ConfirmacaoClient({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
+      <div
+        data-cream-page
+        className="-mt-24 min-h-screen bg-cream pt-24 flex items-center justify-center"
+      >
         <p
           role="status"
           className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase animate-pulse"
@@ -285,7 +292,10 @@ export default function ConfirmacaoClient({
   // phantom Google Ads conversion for it).
   if (pageState === "unknown") {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center px-6 py-24">
+      <div
+        data-cream-page
+        className="-mt-24 min-h-screen bg-cream pt-24 flex items-center justify-center px-6 py-24"
+      >
         <div className="max-w-md text-center">
           <h1
             ref={h1Ref}
@@ -303,9 +313,12 @@ export default function ConfirmacaoClient({
               {SITE.phoneDisplay}
             </a>
           </div>
+          {/* Dark outline: this panel sits on cream, and the shared
+              shared OUTLINE_LIGHT_BUTTON_CLASS is white-on-transparent — it was
+              invisible here until you happened to hover it. */}
           <Link
             href={localizeHref("/", locale)}
-            className={`${OUTLINE_LIGHT_BUTTON_CLASS} mt-10 inline-flex`}
+            className="mt-10 inline-flex items-center gap-3 px-8 py-3.5 border border-foreground/25 text-foreground/80 text-[11px] tracking-[0.3em] uppercase hover:bg-foreground hover:text-cream hover:border-foreground transition-colors duration-300"
           >
             {tc.voltarInicio}
           </Link>
@@ -344,60 +357,50 @@ export default function ConfirmacaoClient({
       ].filter((d) => d.value)
     : [];
 
+  // Three doors out of the wait, each carrying a real photograph rather than a
+  // line-art icon: this is a company whose product IS how things look, and a
+  // wireframe glyph was the least persuasive thing we could have put here.
   const explore = [
     {
       href: localizeHref("/galeria", locale),
       label: tc.exploreGaleria,
       sub: tc.exploreGaleriaSub,
       external: false,
-      icon: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M4 16l4.5-4.5a2 2 0 0 1 2.8 0L16 16m-2-2l1.5-1.5a2 2 0 0 1 2.8 0L20 14M4 6h16v12H4z"
-        />
-      ),
+      photo: CONFIRMACAO_PHOTOS.galeria,
+      blur: blur.galeria,
+      alt: t.common.imageAlt.galeriaHeader,
     },
     {
       href: SITE.instagram,
       label: tc.exploreInsta,
       sub: tc.exploreInstaSub,
       external: true,
-      icon: (
-        <>
-          <rect x="4" y="4" width="16" height="16" rx="4" />
-          <circle cx="12" cy="12" r="3.2" />
-          <circle cx="17" cy="7" r="0.6" fill="currentColor" />
-        </>
-      ),
+      photo: CONFIRMACAO_PHOTOS.instagram,
+      blur: blur.instagram,
+      alt: t.common.imageAlt.galeriaInstagram,
     },
     {
       href: localizeHref("/clientes", locale),
       label: tc.exploreClientes,
       sub: tc.exploreClientesSub,
       external: false,
-      icon: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 21s-7-4.35-7-9.5A3.5 3.5 0 0 1 12 8a3.5 3.5 0 0 1 7 3.5C19 16.65 12 21 12 21z"
-        />
-      ),
+      photo: CONFIRMACAO_PHOTOS.clientes,
+      blur: blur.clientes,
+      alt: t.common.imageAlt.clientesCorporate,
     },
   ];
 
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-surface">
-      {/* Soft moss wash at the very top for a calm, premium arrival. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px]"
-        style={{
-          background:
-            "radial-gradient(120% 80% at 50% -20%, color-mix(in srgb, var(--color-moss) 12%, transparent), transparent 70%)",
-        }}
-      />
+  // /68 is the floor: on cream (#f7f4ee) anything lighter than ~/65 drops these
+  // 10px tracked labels under 4.5:1. The old /58 measured 3.73:1.
+  const microLabel = "text-foreground/68 text-[10px] tracking-[0.32em] uppercase";
 
+  return (
+    // -mt-24 pt-24 cancels the global <main> top padding and re-applies it
+    // INSIDE the cream ground. Without it the body's white showed as a 96px
+    // band above the page — a hard seam across the top of the spread. The
+    // photograph still starts below the navbar, exactly as the form's own image
+    // panel does, so the tall at-rest logo lockup never sits on top of it.
+    <div data-cream-page className="relative -mt-24 min-h-screen overflow-hidden bg-cream pt-24">
       {/* Celebration petals — drift down once, in front but featherlight. */}
       {mounted && (
         <div aria-hidden className="pointer-events-none fixed inset-0 z-[5] overflow-hidden">
@@ -423,58 +426,60 @@ export default function ConfirmacaoClient({
         </div>
       )}
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 lg:px-16 py-24 lg:py-28">
-        {/* ── Success header ── */}
-        <div className="flex flex-col items-start mb-16 lg:mb-20">
+      {/* ── Opening spread: the message on paper, the work beside it ──
+          The photograph is the same one that fills the form's left panel, so
+          the client stays inside the world they were just in instead of being
+          dropped onto a blank receipt. */}
+      <section className="relative grid grid-cols-1 lg:grid-cols-[1.02fr_0.98fr] lg:min-h-[88vh]">
+        <div className="relative z-10 flex flex-col justify-center px-6 sm:px-10 lg:pl-16 xl:pl-24 lg:pr-14 pt-28 pb-14 lg:py-28">
           <AnimateIn from="fade">
-            <span className="mb-9 inline-flex h-16 w-16 items-center justify-center rounded-full bg-moss/10 ring-1 ring-moss/25">
-              <svg viewBox="0 0 52 52" className="h-9 w-9" fill="none" aria-hidden>
-                <circle
-                  className="confirm-ring"
-                  cx="26"
-                  cy="26"
-                  r="24"
-                  stroke="var(--color-moss)"
-                  strokeWidth="1.5"
-                  strokeOpacity="0.45"
-                />
-                <path
-                  className="confirm-check"
-                  d="M15 27l7.5 7.5L38 18"
-                  stroke="var(--color-moss)"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
+            <svg viewBox="0 0 52 52" className="h-10 w-10 mb-8" fill="none" aria-hidden>
+              <circle
+                className="confirm-ring"
+                cx="26"
+                cy="26"
+                r="24"
+                stroke="var(--color-moss)"
+                strokeWidth="1.2"
+                strokeOpacity="0.4"
+              />
+              <path
+                className="confirm-check"
+                d="M15 27l7.5 7.5L38 18"
+                stroke="var(--color-moss)"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </AnimateIn>
 
           <AnimateIn from="bottom" delay={60}>
-            <p className="text-foreground/68 text-[10px] tracking-[0.5em] uppercase mb-6 flex items-center gap-3">
-              <span className="w-6 h-px bg-gold/60" />
+            <p className="text-gold-text text-[10px] tracking-[0.42em] uppercase mb-7 flex items-center gap-3">
+              <span className="w-8 h-px bg-gold/70 shrink-0" />
               {tc.successEyebrow}
             </p>
           </AnimateIn>
 
-          <AnimateIn from="bottom" delay={120}>
+          {/* Sentence case in Playfair, not uppercase grotesque. The old
+              headline shouted the way a receipt header shouts; this one is
+              addressed to a person. */}
+          <AnimateIn from="bottom" delay={110}>
             <h1
               ref={h1Ref}
               tabIndex={-1}
-              // Focused on arrival so the success is announced (WCAG 2.4.3). It's a
-              // heading, not a control, and the global :focus-visible ring drew a
-              // hard box around the celebratory headline — suppress it here only.
-              className="text-foreground font-bold uppercase tracking-display leading-[0.92] mb-7 focus:outline-none focus-quiet"
-              style={{ fontSize: "clamp(40px, 5.4vw, 72px)" }}
+              className="font-display font-normal text-foreground leading-[1.06] tracking-[-0.015em] text-balance focus:outline-none focus-quiet"
+              style={{ fontSize: "clamp(38px, 5.4vw, 66px)" }}
             >
-              {tc.titleLine1}
-              <br />
+              {tc.titleLine1}{" "}
               <span className="text-moss">{pick(tc.titleMoss, tc.titleMossPlural)}</span>
             </h1>
           </AnimateIn>
 
-          <AnimateIn from="bottom" delay={180}>
-            <p className="text-foreground/72 text-[15px] leading-[1.9] max-w-xl">{lead}</p>
+          <AnimateIn from="bottom" delay={160}>
+            <p className="mt-8 max-w-[34rem] text-foreground/75 text-[15.5px] leading-[1.85]">
+              {lead}
+            </p>
           </AnimateIn>
 
           {/* The promise, as a DATE. "Até 48 horas úteis" is a disclaimer the
@@ -482,125 +487,133 @@ export default function ConfirmacaoClient({
               us to — and it's the single thing they came to this page to know. */}
           {replyBy && (
             <AnimateIn from="bottom" delay={210}>
-              <div className="mt-8 max-w-xl border-l-2 border-gold/50 pl-5">
-                <p className="text-foreground/68 text-[10px] tracking-[0.32em] uppercase mb-1.5">
-                  {tc.replyByLabel}
-                </p>
+              <div className="mt-10 max-w-[34rem]">
+                <p className={microLabel}>{tc.replyByLabel}</p>
                 <p
-                  className="text-moss-dark text-[clamp(20px,2.6vw,26px)] leading-tight first-letter:uppercase"
-                  style={{ fontFamily: "var(--font-playfair)" }}
+                  className="font-display text-moss-dark leading-[1.12] mt-2.5 first-letter:uppercase"
+                  style={{ fontSize: "clamp(26px, 3.2vw, 38px)" }}
                 >
                   {replyBy}
                 </p>
-                <p className="mt-2.5 text-foreground/70 text-[13px] leading-relaxed">
+                <p className="mt-3.5 max-w-[30rem] text-foreground/65 text-[13.5px] leading-relaxed">
                   {pick(tc.replyByNote, tc.replyByNotePlural)}
                 </p>
               </div>
             </AnimateIn>
           )}
 
-          {/* Perspective: two working days is nothing against 214 days of
+          {/* Perspective: two working days is nothing against 300 days of
               planning. Shown only when there IS a date to count towards. */}
           {(countdown !== null || (highSeason && !!eventDate)) && (
-            <AnimateIn from="bottom" delay={240}>
-              <div className="mt-6 max-w-xl flex flex-col gap-1.5">
+            <AnimateIn from="bottom" delay={250}>
+              <div className="mt-9 max-w-[32rem] border-t border-foreground/12 pt-5 flex flex-col gap-2">
                 {countdown !== null && (
-                  <p className="text-foreground/72 text-[13px] tabular-nums">
+                  <p className="text-foreground/70 text-[13.5px] tabular-nums">
                     {fill(tc.countdown, { days: String(countdown) })}
                   </p>
                 )}
                 {highSeason && (
-                  <p className="text-foreground/65 text-[13px] leading-relaxed">
+                  <p className="text-foreground/70 text-[13px] leading-relaxed">
                     {tc.highSeasonNote}
                   </p>
                 )}
               </div>
             </AnimateIn>
           )}
-
-          <AnimateIn from="bottom" delay={270}>
-            <p
-              className="mt-8 text-moss-dark text-[15px] italic max-w-xl"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
-              {tc.greetingWarm}
-            </p>
-          </AnimateIn>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] items-start gap-6 lg:gap-8">
-          {/* ── Quote details ── */}
-          <AnimateIn from="bottom" delay={220}>
-            <div className="rounded-2xl border border-foreground/10 bg-white shadow-[0_1px_2px_rgba(42,38,32,0.04),0_12px_40px_-24px_rgba(42,38,32,0.25)]">
-              {/* Reference + status */}
-              <div className="flex items-start justify-between gap-4 px-7 pt-7 pb-6 border-b border-foreground/8">
-                <div>
-                  <p className="text-foreground/72 text-[10px] tracking-[0.4em] uppercase mb-2">
-                    {tc.refLabel}
-                  </p>
-                  <p className="text-foreground/80 font-mono text-[15px] tracking-tight">{id}</p>
-                </div>
+        <div className="relative min-h-[78vw] sm:min-h-[48vw] lg:min-h-0">
+          <Image
+            src={CONFIRMACAO_PHOTOS.hero}
+            alt={t.common.imageAlt.orcamentoPanel}
+            fill
+            priority
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            quality={72}
+            placeholder="blur"
+            blurDataURL={blur.hero}
+            className="object-cover"
+          />
+          {/* Feather the photograph into the paper so the split reads as one
+              spread rather than two boxes shoved together. Kept SHORT (16–20%)
+              and written as an explicit stop: a default 50% midpoint washed out
+              half the photograph. Two elements rather than responsive gradient
+              utilities because the direction flips at lg and the fade must end
+              in transparent CREAM — plain `transparent` is rgba(0,0,0,0), which
+              greys the blend on the way out. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 lg:hidden"
+            style={{ background: "linear-gradient(to bottom, #f7f4ee 0%, #f7f4ee00 16%)" }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 hidden lg:block"
+            style={{ background: "linear-gradient(to right, #f7f4ee 0%, #f7f4ee00 20%)" }}
+          />
+        </div>
+      </section>
+
+      {/* ── The dossier ── */}
+      <section className="relative z-10 px-6 sm:px-10 lg:px-16 xl:px-24 py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-16 lg:gap-24">
+          <div>
+            <AnimateIn from="bottom">
+              <div className="flex items-baseline justify-between gap-6 border-b border-foreground/20 pb-4">
+                <h2
+                  className="font-display text-foreground leading-tight"
+                  style={{ fontSize: "clamp(21px, 2.3vw, 27px)" }}
+                >
+                  {pick(tc.recapTitle, tc.recapTitlePlural)}
+                </h2>
                 <span
-                  className={`shrink-0 inline-flex items-center gap-2 rounded-full bg-moss/8 px-3 py-1.5 text-[11px] tracking-wide ${status.color}`}
+                  className={`shrink-0 inline-flex items-center gap-2 text-[11px] tracking-wide ${status.color}`}
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-current" />
                   {status.label}
                 </span>
               </div>
+            </AnimateIn>
 
-              {/* Event details — hairline-separated definition list */}
-              {details.length > 0 ? (
-                <dl className="px-7 py-2">
-                  {details.map((d, i) => (
-                    <div
-                      key={d.label}
-                      className={`flex items-baseline justify-between gap-6 py-4 ${
-                        i < details.length - 1 ? "border-b border-foreground/8" : ""
-                      }`}
-                    >
-                      <dt className="text-foreground/72 text-[10px] tracking-[0.28em] uppercase shrink-0">
-                        {d.label}
-                      </dt>
-                      <dd className="text-foreground/85 text-[15px] text-right leading-snug">
-                        {d.value}
-                        {d.note && (
-                          <span className="mt-1 block text-foreground/65 text-[12px] leading-relaxed">
-                            {d.note}
-                          </span>
-                        )}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
-                <div className="px-7 py-6">
-                  <p className="text-foreground/72 text-sm leading-relaxed">
-                    {pick(tc.noDataNote, tc.noDataNotePlural)}
-                  </p>
-                </div>
+            <AnimateIn from="bottom" delay={60}>
+              {details.length === 0 && (
+                <p className="py-5 text-foreground/70 text-sm leading-relaxed">
+                  {pick(tc.noDataNote, tc.noDataNotePlural)}
+                </p>
               )}
 
-              {/* The client's own words, quoted back. Stacked and left-aligned —
-                  a paragraph forced into the right-hand column of a definition
-                  row wraps into an unreadable ragged block. */}
-              {clientMessage && (
-                <div className="px-7 pb-6 pt-1">
-                  <p className="text-foreground/72 text-[10px] tracking-[0.28em] uppercase mb-2.5">
-                    {tc.mensagem}
-                  </p>
-                  <blockquote className="border-l-2 border-moss/25 pl-4 text-foreground/80 text-[14px] leading-[1.75] whitespace-pre-line">
-                    {clientMessage}
-                  </blockquote>
+              {/* The reference row lives INSIDE this <dl> — a dt/dd pair sitting
+                  after the closing tag is invalid markup, and assistive tech
+                  drops the pairing entirely. */}
+              <dl>
+                {details.map((d) => (
+                  <div
+                    key={d.label}
+                    className="flex items-baseline justify-between gap-8 py-5 border-b border-foreground/10"
+                  >
+                    <dt className={`${microLabel} shrink-0`}>{d.label}</dt>
+                    <dd className="text-foreground/88 text-[16px] text-right leading-snug">
+                      {d.value}
+                      {d.note && (
+                        <span className="mt-1.5 block text-foreground/70 text-[12.5px] leading-relaxed">
+                          {d.note}
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+                <div className="flex items-baseline justify-between gap-8 py-5 border-b border-foreground/10">
+                  <dt className={`${microLabel} shrink-0`}>{tc.refLabel}</dt>
+                  <dd className="text-foreground/75 font-mono text-[14px] tracking-tight">{id}</dd>
                 </div>
-              )}
+              </dl>
 
-              {/* Save the date */}
-              {icsHref && (
-                <div className="px-7 pb-5 pt-1">
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-5">
+                {icsHref && (
                   <a
                     href={icsHref}
                     download="liquen-events.ics"
-                    className="inline-flex items-center gap-2 text-moss-dark text-[12px] font-medium hover:text-moss transition-colors"
+                    className="inline-flex items-center gap-2 text-moss-dark text-[12.5px] font-medium hover:text-moss transition-colors"
                   >
                     <svg
                       className="h-4 w-4"
@@ -614,40 +627,47 @@ export default function ConfirmacaoClient({
                     </svg>
                     {tc.saveDate}
                   </a>
-                </div>
-              )}
-
-              {/* Footer note */}
-              <div className="flex items-center gap-3 px-7 py-5 border-t border-foreground/8">
-                <span className="h-1 w-1 rounded-full bg-gold shrink-0" />
-                <p className="text-foreground/72 text-[11px] leading-relaxed">{tc.footerNote}</p>
+                )}
+                <p className="text-foreground/70 text-[11.5px] leading-relaxed">{tc.footerNote}</p>
               </div>
-            </div>
-          </AnimateIn>
+            </AnimateIn>
 
-          {/* ── Next steps + contact ── */}
-          <div className="flex flex-col gap-6">
-            <AnimateIn from="bottom" delay={280}>
-              <div className="rounded-2xl border border-foreground/10 bg-white p-7">
-                <p className="text-foreground/68 text-[10px] tracking-[0.4em] uppercase mb-6">
+            {/* The client's own words, set as a pull-quote. They wrote the
+                brief; giving it the page's most beautiful type is the clearest
+                way to say it was read. */}
+            {clientMessage && (
+              <AnimateIn from="bottom" delay={100}>
+                <figure className="mt-14">
+                  <figcaption className={`${microLabel} mb-4`}>{tc.mensagem}</figcaption>
+                  <blockquote
+                    className="font-display italic text-foreground/85 leading-[1.62] whitespace-pre-line border-l border-gold/60 pl-6"
+                    style={{ fontSize: "clamp(17px, 1.9vw, 22px)" }}
+                  >
+                    {clientMessage}
+                  </blockquote>
+                </figure>
+              </AnimateIn>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-14">
+            <AnimateIn from="bottom" delay={80}>
+              <div>
+                <p className={`${microLabel} pb-4 border-b border-foreground/20`}>
                   {tc.proximosPassos}
                 </p>
-                <ol className="relative flex flex-col gap-6">
-                  {/* Connecting rail behind the numbered nodes. */}
-                  <span
-                    aria-hidden
-                    className="absolute left-[13px] top-2 bottom-2 w-px bg-foreground/10"
-                  />
+                <ol>
                   {tc.steps.map((item, i) => (
-                    <li key={i} className="relative flex gap-4">
-                      <span className="relative z-10 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-moss/30 bg-white text-moss text-[10px] font-medium tabular-nums">
+                    <li
+                      key={i}
+                      className="flex gap-5 py-5 border-b border-foreground/10 last:border-b-0"
+                    >
+                      <span className="font-display text-moss/70 text-[16px] tabular-nums shrink-0 w-4">
                         {i + 1}
                       </span>
-                      <div className="pt-0.5">
-                        <p className="text-foreground/80 text-[13px] font-medium mb-0.5">
-                          {item.label}
-                        </p>
-                        <p className="text-foreground/72 text-[11px] leading-relaxed">
+                      <div>
+                        <p className="text-foreground/85 text-[14px] font-medium">{item.label}</p>
+                        <p className="text-foreground/70 text-[12.5px] leading-relaxed mt-1">
                           {item.desc}
                         </p>
                       </div>
@@ -657,10 +677,10 @@ export default function ConfirmacaoClient({
               </div>
             </AnimateIn>
 
-            <AnimateIn from="bottom" delay={340}>
-              <div className="rounded-2xl border border-moss/20 bg-moss/[0.06] p-7">
-                <div className="w-6 h-px bg-gold/60 mb-4" />
-                <p className="text-foreground/72 text-[13px] leading-relaxed mb-5">
+            <AnimateIn from="bottom" delay={140}>
+              <div>
+                <span aria-hidden className="block w-8 h-px bg-gold/70 mb-5" />
+                <p className="text-foreground/72 text-[13.5px] leading-relaxed mb-5 max-w-[24rem]">
                   {pick(tc.contactIntro, tc.contactIntroPlural)}
                 </p>
 
@@ -675,14 +695,14 @@ export default function ConfirmacaoClient({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => track("WhatsAppClick", { source: "confirmacao" })}
-                  className="group flex items-center gap-3 rounded-xl bg-moss px-4 py-3.5 text-white transition-colors hover:bg-moss-dark"
+                  className="group flex items-center gap-3.5 bg-moss px-5 py-4 text-white shadow-lg shadow-moss/15 transition-colors hover:bg-moss-dark"
                 >
                   <WhatsAppIcon className="h-5 w-5 shrink-0" />
                   <span className="min-w-0">
                     <span className="block text-[14px] font-medium leading-tight">
                       {tc.contactWhatsapp}
                     </span>
-                    <span className="block text-[11.5px] leading-tight text-white/75 mt-0.5">
+                    <span className="block text-[11.5px] leading-tight text-white/75 mt-1">
                       {tc.contactWhatsappSub}
                     </span>
                   </span>
@@ -692,16 +712,16 @@ export default function ConfirmacaoClient({
                   <span className="sr-only"> ({t.common.newWindow})</span>
                 </a>
 
-                <div className="mt-5 flex flex-col gap-2.5">
+                <div className="mt-6 flex flex-col gap-2.5">
                   <a
                     href={`mailto:${SITE.email}`}
-                    className="text-moss-dark text-[13px] hover:text-moss transition-colors"
+                    className="text-moss-dark text-[13px] hover:text-moss transition-colors w-fit"
                   >
                     {SITE.email}
                   </a>
                   <a
                     href={`tel:${SITE.phone}`}
-                    className="text-moss-dark text-[13px] hover:text-moss transition-colors"
+                    className="text-moss-dark text-[13px] hover:text-moss transition-colors w-fit"
                   >
                     {SITE.phoneDisplay}
                   </a>
@@ -710,49 +730,62 @@ export default function ConfirmacaoClient({
             </AnimateIn>
           </div>
         </div>
+      </section>
 
-        {/* ── While you wait — explore our world ── */}
-        <AnimateIn from="bottom" delay={380}>
-          <div className="mt-16">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-6 h-px bg-gold/60 shrink-0" />
+      {/* ── While you wait — three photographs, not three icons ── */}
+      <section className="relative z-10 px-6 sm:px-10 lg:px-16 xl:px-24 pb-20 lg:pb-28">
+        <div className="mx-auto max-w-6xl">
+          <AnimateIn from="bottom">
+            <div className="flex items-start gap-4 mb-8">
+              <span aria-hidden className="w-8 h-px bg-gold/70 shrink-0 mt-3.5" />
               <div>
-                <p className="text-foreground/85 text-lg font-bold uppercase tracking-display leading-tight">
+                <h2
+                  className="font-display text-foreground leading-tight"
+                  style={{ fontSize: "clamp(21px, 2.5vw, 29px)" }}
+                >
                   {pick(tc.whileTitle, tc.whileTitlePlural)}
-                </p>
-                <p className="text-foreground/72 text-[13px] mt-0.5">
+                </h2>
+                <p className="text-foreground/70 text-[13.5px] mt-1.5">
                   {pick(tc.whileLead, tc.whileLeadPlural)}
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          </AnimateIn>
+
+          <AnimateIn from="bottom" delay={70}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
               {explore.map((c) => {
                 const inner = (
                   <>
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-moss/8 text-moss">
-                      <svg
-                        className="h-[18px] w-[18px]"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                        viewBox="0 0 24 24"
-                      >
-                        {c.icon}
-                      </svg>
-                    </span>
-                    <div className="mt-4">
-                      <p className="text-foreground/85 text-[14px] font-medium flex items-center gap-1.5">
+                    <Image
+                      src={c.photo}
+                      alt={c.alt}
+                      fill
+                      sizes="(max-width: 640px) 100vw, 33vw"
+                      quality={70}
+                      placeholder="blur"
+                      blurDataURL={c.blur}
+                      className="object-cover transition-transform duration-700 ease-expo group-hover:scale-[1.04]"
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 bg-gradient-to-t from-[#14140f]/88 via-[#14140f]/20 to-transparent"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 p-5 lg:p-6">
+                      <span className="flex items-center gap-1.5 text-cream text-[15px] font-medium">
                         {c.label}
-                        <span className="text-moss transition-transform duration-300 group-hover:translate-x-1">
+                        <span className="transition-transform duration-300 group-hover:translate-x-1">
                           →
                         </span>
-                      </p>
-                      <p className="text-foreground/72 text-[12px] mt-1 leading-relaxed">{c.sub}</p>
-                    </div>
+                      </span>
+                      <span className="block text-cream/72 text-[12px] mt-1.5 leading-relaxed">
+                        {c.sub}
+                      </span>
+                    </span>
                   </>
                 );
                 const cls =
-                  "group block rounded-2xl border border-foreground/10 bg-white p-6 transition-all duration-300 hover:border-moss/30 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_-20px_rgba(42,38,32,0.3)]";
+                  "group relative block overflow-hidden aspect-[4/5] sm:aspect-[3/4] focus:outline-none focus-visible:ring-2 focus-visible:ring-moss focus-visible:ring-offset-2 focus-visible:ring-offset-cream";
                 return c.external ? (
                   <a
                     key={c.label}
@@ -771,40 +804,46 @@ export default function ConfirmacaoClient({
                 );
               })}
             </div>
-          </div>
-        </AnimateIn>
+          </AnimateIn>
+        </div>
+      </section>
 
-        {/* ── CTA ── */}
-        <AnimateIn from="bottom" delay={430}>
-          <div className="mt-14 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <Link
-              href={localizeHref("/", locale)}
-              className="inline-flex items-center gap-2 px-9 py-4 border border-foreground/20 text-foreground/75 text-[11px] tracking-[0.2em] uppercase hover:border-foreground/40 hover:text-foreground/90 transition-colors"
-            >
-              {tc.voltarInicio}
-            </Link>
-            <Link
-              href={localizeHref("/orcamento", locale)}
-              className="text-[11px] tracking-[0.2em] uppercase text-foreground/70 hover:text-moss transition-colors"
-            >
-              {tc.novoPedido}
-            </Link>
+      {/* ── Sign-off ── */}
+      <section className="relative z-10 px-6 sm:px-10 lg:px-16 xl:px-24 pb-28">
+        <AnimateIn from="fade">
+          <div className="mx-auto max-w-6xl border-t border-foreground/15 pt-10 flex flex-col gap-10 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p
+                className="font-display italic text-moss-dark leading-snug max-w-md"
+                style={{ fontSize: "clamp(17px, 1.9vw, 21px)" }}
+              >
+                {tc.greetingWarm}
+              </p>
+              <p className="mt-7 text-foreground/70 text-[13px]">{tc.signOff}</p>
+              <p
+                className="font-display italic text-moss mt-1"
+                style={{ fontSize: "clamp(22px, 2.6vw, 28px)" }}
+              >
+                {tc.signName}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-4 shrink-0">
+              <Link
+                href={localizeHref("/", locale)}
+                className="inline-flex items-center gap-3 px-8 py-3.5 border border-foreground/25 text-foreground/80 text-[11px] tracking-[0.3em] uppercase hover:bg-foreground hover:text-cream hover:border-foreground transition-colors duration-300"
+              >
+                {tc.voltarInicio}
+              </Link>
+              <Link
+                href={localizeHref("/orcamento", locale)}
+                className="text-[11px] tracking-[0.2em] uppercase text-foreground/72 hover:text-moss transition-colors"
+              >
+                {tc.novoPedido}
+              </Link>
+            </div>
           </div>
         </AnimateIn>
-
-        {/* ── Personal sign-off ── */}
-        <AnimateIn from="fade" delay={480}>
-          <div className="mt-16 pt-8 border-t border-foreground/8">
-            <p className="text-foreground/72 text-[13px]">{tc.signOff}</p>
-            <p
-              className="text-moss text-2xl mt-1"
-              style={{ fontFamily: "var(--font-playfair)", fontStyle: "italic" }}
-            >
-              {tc.signName}
-            </p>
-          </div>
-        </AnimateIn>
-      </div>
+      </section>
     </div>
   );
 }

@@ -242,6 +242,16 @@ body.admin-mode .bo-text-faint {
     0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
 }
+/* The quote confirmation is the one public page whose ground is cream
+   (#f7f4ee) rather than white. That single step down drops the at-rest navbar's
+   moss links from 4.69:1 to 4.27:1 — under WCAG AA for their 11px size. Rebind
+   the moss token INSIDE the header on that page only, so the nav deepens to
+   moss-dark (6.1:1) as one coherent set (links, borders, the CTA outline) while
+   every white page keeps the navbar exactly as it was. */
+body:has([data-cream-page]) [data-public-nav] {
+  --color-moss: var(--color-moss-dark);
+}
+
 /* Opt-out for elements focused PROGRAMMATICALLY as a screen-reader landing
    point — a heading moved into focus after a route change is not a control, and
    the ring above drew a hard box around it for every visitor. Needed as a real

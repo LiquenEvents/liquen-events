@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import ConfirmacaoClient from "./ConfirmacaoClient";
+import { CONFIRMACAO_PHOTOS, type ConfirmacaoPhotoKey } from "./photos";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
+import { blurFor } from "@/lib/blur";
 
 // Per-quote page (carries a reference + the client's event details) — keep it
 // out of search indexes. Title is localized so an EN visitor on <html lang="en">
@@ -28,11 +30,18 @@ export default async function ConfirmacaoPage({
   // context) so it only ships on this route. eventTypeLabels comes along so the
   // echoed event type is shown in the visitor's language rather than the
   // Portuguese label baked into the pricing taxonomy.
+  // Blur placeholders are resolved here: blurFor() pulls in the whole blur map,
+  // which has no business shipping to the browser for four known images.
+  const blur = Object.fromEntries(
+    Object.entries(CONFIRMACAO_PHOTOS).map(([key, src]) => [key, blurFor(src).blurDataURL]),
+  ) as Record<ConfirmacaoPhotoKey, string>;
+
   return (
     <ConfirmacaoClient
       id={id}
       confirmacao={t.confirmacao}
       eventTypeLabels={t.orcamento.eventTypeLabels}
+      blur={blur}
     />
   );
 }

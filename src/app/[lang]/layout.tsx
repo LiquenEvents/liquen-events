@@ -65,6 +65,11 @@ const inter = Inter({
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
+  // The real italic, not the browser's synthetic slant. Playfair's italic is a
+  // separate drawing (single-storey a, calligraphic f), and the sign-off, the
+  // pull-quote and the warm greeting are all set in it — a faux-oblique of the
+  // roman looked mechanical exactly where the page is trying to feel written.
+  style: ["normal", "italic"],
   display: "swap",
   adjustFontFallback: true,
   fallback: ["Georgia", "Times New Roman", "Times", "serif"],

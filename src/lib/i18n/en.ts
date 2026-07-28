@@ -570,6 +570,8 @@ export const en: Dict = {
     countdown: "{days} days to go until the event.",
     highSeasonNote:
       "May to October is the busy season in the Alentejo — the best estates close their calendars far in advance. It's worth not leaving it too long.",
+    recapTitle: "What you told us",
+    recapTitlePlural: "What you told us",
     refLabel: "Request Reference",
     categoria: "Category",
     tipo: "Type",
