@@ -70,6 +70,7 @@ function privacyPt(): LegalDoc {
         body: [
           "Não vendemos os seus dados. Podemos recorrer a prestadores de serviços que os tratam em nosso nome e sob instruções, com garantias de segurança adequadas: alojamento e infraestrutura do site, envio e receção de e-mail, e base de dados. Sempre que aplicável, celebramos contratos de subcontratação nos termos do art. 28.º do RGPD.",
           "Recorremos ainda ao Google (Google Ireland Limited) para estatísticas de utilização (Google Analytics) e para medição e otimização de publicidade (Google Ads) — mas apenas quando aceita os cookies respetivos no aviso de cookies. Se recusar, não são colocados cookies nem partilhados identificadores; o Google poderá ainda receber sinais agregados e sem cookies para modelação estatística, que não o identificam individualmente.",
+          "Conversões Melhoradas: se aceitar os cookies e submeter um pedido de orçamento, o seu e-mail e/ou telefone podem ser partilhados com o Google apenas para medir a eficácia dos anúncios. Estes dados são encriptados (com hash) no seu navegador antes de serem enviados — o Google usa-os apenas para associar a conversão ao anúncio, nunca para o identificar publicamente. Se recusar os cookies, nada disto acontece.",
           "Poderemos divulgar dados quando exigido por lei ou por autoridade competente.",
         ],
       },
@@ -234,6 +235,7 @@ function privacyEn(): LegalDoc {
         body: [
           "We do not sell your data. We may use service providers who process it on our behalf and under our instructions, with appropriate security safeguards: website hosting and infrastructure, sending and receiving e-mail, and database. Where applicable, we enter into processing agreements under Art. 28 GDPR.",
           "We also use Google (Google Ireland Limited) for usage statistics (Google Analytics) and for advertising measurement and optimisation (Google Ads) — but only when you accept the relevant cookies in the cookie notice. If you decline, no cookies are set and no identifiers are shared; Google may still receive aggregated, cookieless signals for statistical modelling that do not identify you individually.",
+          "Enhanced Conversions: if you accept cookies and submit a quote request, your e-mail and/or phone may be shared with Google solely to measure ad effectiveness. This data is hashed in your browser before it is sent — Google uses it only to match the conversion to the ad, never to identify you publicly. If you decline cookies, none of this happens.",
           "We may disclose data where required by law or by a competent authority.",
         ],
       },

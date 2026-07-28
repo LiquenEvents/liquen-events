@@ -68,8 +68,20 @@ export default function ConfirmacaoClient({
   useEffect(() => {
     track("QuoteConfirmed");
     // Google Ads / GA4 lead conversion — landing here is the successful submit.
-    // Deduped by quote id so a refresh/re-open in the same tab won't recount.
-    reportLeadConversion(id);
+    // Read the just-submitted contact data (saved by the form) synchronously so
+    // Enhanced Conversions can hash+match it; reportLeadConversion only uses it
+    // when the visitor consented. Deduped by quote id against refresh/re-open.
+    let user: { email?: string; phone?: string } | undefined;
+    try {
+      const cached = sessionStorage.getItem(`liquen-quote-${id}`);
+      if (cached) {
+        const q = JSON.parse(cached) as { email?: string; phone?: string };
+        user = { email: q.email, phone: q.phone };
+      }
+    } catch {
+      /* storage blocked — fire the conversion without enhanced data */
+    }
+    reportLeadConversion(id, user);
   }, [id]);
   useEffect(() => {
     if (!loading) h1Ref.current?.focus();
