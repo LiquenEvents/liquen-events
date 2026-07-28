@@ -7,6 +7,12 @@ import { fetchProposalImageBytes } from "@/lib/proposal-storage";
 // fan out unbounded concurrent fetches (memory/CPU DoS during render) or embed
 // an unreasonable number of images. Each fetch is itself host-restricted, timed
 // out and size-capped in fetchProposalImageBytes.
+//
+// Este limite é também o teto do trabalho do sharp: o gerador só redimensiona
+// fotos que passaram por aqui, uma de cada vez (os desenhos são sequenciais),
+// e reaproveita por conteúdo a mesma foto desenhada mais do que uma vez. Ou
+// seja, no máximo MAX_IMAGES_PER_DOC redimensionamentos e nunca mais do que um
+// em simultâneo — bem dentro de FETCH_CONCURRENCY.
 const MAX_IMAGES_PER_DOC = 80;
 const FETCH_CONCURRENCY = 4;
 

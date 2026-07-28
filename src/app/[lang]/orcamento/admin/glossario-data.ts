@@ -90,6 +90,10 @@ export const GLOSSARY: GlossaryEntry[] = [
     def: "Um painel de imagens de referência que juntamos à proposta para mostrar o ambiente e o estilo do evento. Usa-se sobretudo nas propostas de decoração.",
   },
   {
+    term: "Temas",
+    def: "A nossa biblioteca de fotos de inspiração, arrumada por estilo — Itália, Terracotta, Branco & Verde. As fotos carregam-se uma vez em “Temas” (no menu, dentro de “Mais”) e depois entram nos mood boards e nas capas da proposta com dois cliques. Escolher fotos de um tema faz uma cópia para essa proposta: mudar ou apagar o tema mais tarde não mexe nas propostas já enviadas.",
+  },
+  {
     term: "Contrato",
     def: "O acordo em que o cliente aceita as condições por escrito. Quando está aceite, o evento fica confirmado e a data reservada.",
   },

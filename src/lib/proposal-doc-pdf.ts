@@ -14,8 +14,8 @@ import {
   type PDFImage,
 } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import sharp from "sharp";
 import { SITE } from "@/lib/site";
+import { imageContentKey, resizeToBox, type ImagePlacement } from "@/lib/proposal-image";
 import {
   type ProposalDoc,
   type MoodBoard,
@@ -68,16 +68,10 @@ const T_SUB = 13; // sub-section / group titles (serif)
 const T_BODY = 10; // body copy
 const T_CAPTION = 7.5; // eyebrows / captions (uppercase)
 
-// ── Image rendering quality knobs ──
-// Point boxes are drawn at 72pt/inch; we rasterise at DENSITY× that (= DENSITY·72
-// dpi). These are tuned for FAST generation + a lean file (the studio felt slow
-// generating): cover strips at 2.2× (≈158 dpi) stay crisp as the hero; mood-board
-// cells at 1.8× (≈130 dpi) are many + small so a lower density is invisible but
-// cuts sharp CPU and PDF size a lot. Capped at MAX_IMG_PX so we never upscale past
-// the source (the client caps cover uploads at 3000px, boards at 1600px).
-const COVER_DENSITY = 2.2;
-const COLLAGE_DENSITY = 1.8;
-const MAX_IMG_PX = 2200;
+// ── Qualidade das imagens ──
+// O orçamento de pixéis por sítio (capa vs célula de mood board) e o encode
+// vivem em `@/lib/proposal-image`, com o raciocínio de DPI. Aqui só se diz ONDE
+// cada foto é desenhada; quantos pixéis isso vale é decidido lá.
 
 // ── Brand palette ──
 // Moss/gold are deliberately rare now — quiet ink & grey type on white carry the
@@ -167,16 +161,34 @@ function drawImageCover(
   page.pushOperators(popGraphicsState());
 }
 
-/** Cover-crop a base64 image into the point box (x,y,w,h) on `page` and draw it.
+/**
+ * Cache de imagens JÁ EMBUTIDAS neste documento, por CONTEÚDO + caixa de
+ * destino. A capa é desenhada duas vezes (página 1 e contracapa) e a mesma foto
+ * pode ser escolhida para os dois lados: sem isto, a mesma fotografia era
+ * redimensionada pelo sharp e escrita no PDF até quatro vezes. Guarda-se a
+ * Promise (não o resultado) para que dois desenhos simultâneos da mesma foto
+ * partilhem o mesmo trabalho.
+ */
+type EmbedCache = Map<string, Promise<PDFImage | null>>;
+
+/** Corre `make` uma só vez por `key` dentro deste documento. */
+function once(cache: EmbedCache, key: string, make: () => Promise<PDFImage | null>) {
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const pending = make();
+  cache.set(key, pending);
+  return pending;
+}
+
+/** Recorta uma imagem base64 para a caixa (x,y,w,h) de `page` e desenha-a.
  *
- *  Primary path: sharp smart-crops to the box's EXACT aspect at `density`× and
- *  re-encodes as high-quality JPEG (mozjpeg, full 4:4:4 chroma); drawing that at
- *  the box dims cannot distort. Fallback (sharp unavailable/failed): the ORIGINAL
- *  image is embedded and drawn via `drawImageCover`, which preserves aspect ratio
- *  through clipping — so it looks like the sharp path and STILL cannot be
- *  stretched (fixing the "fotos esticadas" the studio saw on the fallback path).
- *  Any hard failure (bad bytes, non-image) draws nothing: the caller's hairline
- *  frame remains and the PDF is always produced. Never throws. */
+ *  Caminho principal: `resizeToBox` recorta ao aspeto EXATO da caixa, com os
+ *  pixéis que o sítio (`placement`) justifica, e reencoda em JPEG baseline —
+ *  desenhar isso às medidas da caixa não pode distorcer. Recurso (sharp
+ *  indisponível/falhado): embute-se o ORIGINAL e desenha-se com `drawImageCover`,
+ *  que preserva o aspeto por recorte — parece igual e continua a não poder
+ *  esticar (era o bug das "fotos esticadas"). Se nem isso resultar não desenha
+ *  nada: fica a moldura fina de quem chamou e o PDF sai sempre. Nunca lança. */
 async function drawCoverImage(
   doc: PDFDocument,
   page: PDFPage,
@@ -185,7 +197,8 @@ async function drawCoverImage(
   y: number,
   w: number,
   h: number,
-  density: number,
+  placement: ImagePlacement,
+  cache: EmbedCache,
 ): Promise<void> {
   const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
   let input: Buffer;
@@ -196,41 +209,27 @@ async function drawCoverImage(
   }
   if (input.length < 32) return;
 
-  // Target pixels = density× the point box, capped at MAX_IMG_PX so we never
-  // upscale past the source. Both dims scale together → the cover aspect (w:h)
-  // is preserved, so drawing the result at the box dims cannot stretch it.
-  let tw = Math.max(1, Math.round(w * density));
-  let th = Math.max(1, Math.round(h * density));
-  const over = Math.max(tw, th) / MAX_IMG_PX;
-  if (over > 1) {
-    tw = Math.max(1, Math.round(tw / over));
-    th = Math.max(1, Math.round(th / over));
+  // A chave inclui a caixa: a mesma foto na capa e numa célula de mood board
+  // são embutidas com resoluções diferentes, logo são objetos diferentes.
+  const content = imageContentKey(input);
+  const box = `${Math.round(w)}x${Math.round(h)}:${placement}`;
+
+  const img = await once(cache, `${content}@${box}`, async () => {
+    const cropped = await resizeToBox(input, w, h, placement);
+    return cropped ? await embedImage(doc, cropped) : null;
+  });
+  if (img) {
+    // Recortada ao aspeto exato da caixa — desenhar às medidas dela não estica.
+    page.drawImage(img, { x, y, width: w, height: h });
+    return;
   }
 
-  // Primary: sharp smart cover-crop → high-quality JPEG.
-  try {
-    const cropped = await sharp(input)
-      .rotate() // bake EXIF orientation so phone photos aren't sideways
-      .resize(tw, th, { fit: "cover", position: "attention", kernel: "lanczos3" })
-      // 84 + 4:2:0 is standard high-quality web JPEG — visually indistinguishable
-      // from 90/4:4:4 for photos, but encodes faster and roughly halves the bytes,
-      // so the PDF generates and downloads noticeably quicker.
-      .jpeg({ quality: 84, mozjpeg: true, chromaSubsampling: "4:2:0" })
-      .toBuffer();
-    const img = await embedImage(doc, cropped);
-    if (img) {
-      // Cropped to the exact box aspect — drawing at box dims cannot stretch.
-      page.drawImage(img, { x, y, width: w, height: h });
-      return;
-    }
-  } catch {
-    /* sharp unavailable/failed — fall through to the aspect-safe clip path */
-  }
-
-  // Fallback: embed the ORIGINAL bytes and cover-fit with clipping (never stretch).
-  const orig = await embedImage(doc, input);
+  // Recurso: embutir o ORIGINAL e ajustar por recorte (nunca esticar). Também
+  // vai a cache — sem isto, uma foto que o sharp não consiga tratar era escrita
+  // por inteiro no ficheiro tantas vezes quantas fosse desenhada.
+  const orig = await once(cache, `${content}@original`, () => embedImage(doc, input));
   if (orig) drawImageCover(page, orig, x, y, w, h);
-  // else: draw nothing — the caller's hairline frame still renders.
+  // senão: não desenha nada — a moldura fina de quem chamou continua lá.
 }
 
 function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
@@ -257,6 +256,9 @@ function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): s
 
 export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
+  // Uma foto = um redimensionamento e um objeto no ficheiro, por muitas vezes
+  // que seja desenhada (ver EmbedCache). Vive só durante este documento.
+  const images: EmbedCache = new Map();
   pdf.registerFontkit(fontkit);
   // Carlito — a free, metric-compatible twin of Microsoft Calibri, the font the
   // studio's real "PO Decoração" sample proposals are set in. Embedding it (from
@@ -417,8 +419,8 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, COVER_DENSITY);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, COVER_DENSITY);
+      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images);
+      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, "cover", images);
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
@@ -611,7 +613,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     frame(p);
     eyebrow(p, "Inspiração", M, H - M - 48);
     text(p, mb.title, M, H - M - 76, { font: f.serifIt, size: 24, color: INK });
-    await drawCollage(pdf, p, mb, f, textFns(text, textRight));
+    await drawCollage(pdf, p, mb, f, textFns(text, textRight), images);
   }
 
   // ── Orçamento ──
@@ -890,8 +892,8 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, COVER_DENSITY);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, COVER_DENSITY);
+      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images);
+      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, "cover", images);
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
@@ -940,6 +942,7 @@ async function drawCollage(
   mb: MoodBoard,
   f: Fonts,
   fns: ReturnType<typeof textFns>,
+  cache: EmbedCache,
 ) {
   // Wrap the annotation (description + optional flower list) to the page measure
   // up front so the collage reserves exactly the height the caption needs. Capped
@@ -956,7 +959,7 @@ async function drawCollage(
 
   // Draw one framed image into a box (cover-cropped, thin hairline frame).
   const place = async (b64: string, x: number, yBottom: number, w: number, h: number) => {
-    await drawCoverImage(pdf, p, b64, x, yBottom, w, h, COLLAGE_DENSITY);
+    await drawCoverImage(pdf, p, b64, x, yBottom, w, h, "collage", cache);
     p.drawRectangle({ x, y: yBottom, width: w, height: h, borderColor: LINE, borderWidth: 0.5 });
   };
 

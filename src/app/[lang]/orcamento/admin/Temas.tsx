@@ -187,9 +187,7 @@ export function mergePage(prev: ThemeImage[], page: ThemeImage[]): ThemeImage[] 
  *  câmara chegam por vezes com `type` vazio — aceitar também por extensão em
  *  vez de os descartar em silêncio. */
 function isImageFile(f: File): boolean {
-  return (
-    f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i.test(f.name)
-  );
+  return f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|gif|bmp|tiff?)$/i.test(f.name);
 }
 
 /**
@@ -416,9 +414,7 @@ export default function Temas() {
     if (!needle) return themes;
     // Procurar por nome E por nota: a nota ("tons quentes, para espaços de
     // pedra") é muitas vezes como a Catarina se lembra do tema.
-    return themes.filter((t) =>
-      normalizedThemeName(`${t.name} ${t.notes ?? ""}`).includes(needle),
-    );
+    return themes.filter((t) => normalizedThemeName(`${t.name} ${t.notes ?? ""}`).includes(needle));
   }, [themes, deferredSearch]);
 
   if (open) {
@@ -535,7 +531,9 @@ export default function Temas() {
             icon={FolderIcon}
             title="Ainda não há temas"
             description="Crie um tema por estilo que usa nos casamentos — Itália, Terracotta, Branco & Verde — e carregue lá as fotos de inspiração. Depois é só escolher na proposta."
-            action={{ label: "Criar tema", onClick: () => setAdding(true) }}
+            // Com o formulário já aberto, este botão seria um segundo "Criar
+            // tema" no mesmo ecrã — a apontar para o campo que está mesmo ali.
+            action={adding ? undefined : { label: "Criar tema", onClick: () => setAdding(true) }}
           />
         </Card>
       ) : visible.length === 0 ? (
@@ -702,7 +700,13 @@ function ThemeFolder({
         if (!active) return;
         const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
         setImages(page);
-        setTotal(typeof data?.total === "number" ? data.total : page.length);
+        // `ok: false` é uma pasta que NÃO pôde ser lida — o servidor manda
+        // `total: 0` porque não tem outro número para dar. Aceitá-lo como zero
+        // faria a grelha dizer "arraste aqui as fotos" a um tema que pode ter
+        // 3000 — e ela a carregá-las outra vez. `null` = não sabemos.
+        setTotal(
+          data?.ok === false ? null : typeof data?.total === "number" ? data.total : page.length,
+        );
         setTruncated(Boolean(data?.truncated));
         setPageFull(page.length >= THEME_PAGE_SIZE);
       } catch {
@@ -864,7 +868,10 @@ function ThemeFolder({
       return;
     }
     if (skipped > 0) {
-      toast(`${plural(skipped, "ficheiro ignorado", "ficheiros ignorados")} — não são imagens.`, "info");
+      toast(
+        `${plural(skipped, "ficheiro ignorado", "ficheiros ignorados")} — não são imagens.`,
+        "info",
+      );
     }
     upload(files);
   }
@@ -1095,7 +1102,8 @@ function ThemeFolder({
       ? `${images.length} de ${photoCountLabel(total, truncated)}`
       : photoCountLabel(total ?? 0, truncated);
   const selectedCount = selected.size;
-  const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  const pct =
+    progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
     <div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import {
   withProposalDefaults,
@@ -14,8 +14,7 @@ import {
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageForUpload, type ImageKind } from "./image-prep";
-import ThemePicker from "./ThemePicker";
-import type { ThemeImage } from "@/lib/theme-types";
+import ThemePicker, { type ImportedImage } from "./ThemePicker";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -160,6 +159,16 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   const [totalInput, setTotalInput] = useState<string>("");
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  // Foto NESTA proposta → foto da BIBLIOTECA de onde foi copiada.
+  //
+  // A importação copia os bytes para um uuid novo, por isso o caminho de
+  // destino não guarda memória nenhuma da origem — e sem essa memória o
+  // seletor não consegue dizer "esta já está nesta proposta", que é
+  // exatamente o que evita o mesmo ramo de eucalipto duas vezes no mesmo mood
+  // board. Vive no lado ("meta") do rascunho e não no documento: é auxiliar,
+  // não vai para o PDF, e um rascunho antigo — que não o tem — abre na mesma,
+  // apenas sem as marcas.
+  const [themeOrigins, setThemeOrigins] = useState<Record<string, string>>({});
   const [refEdited, setRefEdited] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
@@ -198,6 +207,11 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       if (rawMeta) {
         const meta = JSON.parse(rawMeta);
         if (meta?.urls && typeof meta.urls === "object") setAssetUrls(meta.urls);
+        // Rascunhos guardados antes de isto existir não têm `themeOrigins` —
+        // abrem na mesma, só sem as marcas de "já nesta proposta".
+        if (meta?.themeOrigins && typeof meta.themeOrigins === "object") {
+          setThemeOrigins(meta.themeOrigins);
+        }
         if (typeof meta?.refEdited === "boolean") setRefEdited(meta.refEdited);
       }
     } catch {
@@ -259,13 +273,16 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     const t = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
-        localStorage.setItem(SIDE_KEY, JSON.stringify({ urls: assetUrls, refEdited }));
+        localStorage.setItem(
+          SIDE_KEY,
+          JSON.stringify({ urls: assetUrls, themeOrigins, refEdited }),
+        );
       } catch {
         /* quota / unavailable — non-fatal */
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [doc, assetUrls, refEdited, DRAFT_KEY, SIDE_KEY]);
+  }, [doc, assetUrls, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY]);
 
   const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
 
@@ -338,6 +355,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         : "",
     );
     setAssetUrls({});
+    setThemeOrigins({});
     setRefEdited(false);
     setConfirmSend(false);
     setSent(false);
@@ -415,14 +433,41 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   // ── Biblioteca de temas ──
+  //
+  /** As fotos da biblioteca que já estão nesta proposta, para o seletor as
+   *  marcar. Sai do DOCUMENTO (capas + mood boards) e não do mapa de origens:
+   *  uma foto removida do rascunho deixa de contar no instante em que é
+   *  removida, mesmo que a origem fique lá guardada. */
+  const usedThemePaths = useMemo(() => {
+    if (!picker) return [];
+    const inDoc = new Set<string>();
+    for (const p of doc.coverImages ?? []) if (p) inDoc.add(p);
+    for (const b of doc.moodBoards) for (const p of b.images) inDoc.add(p);
+    const sources: string[] = [];
+    for (const p of inDoc) {
+      const from = themeOrigins[p];
+      if (from) sources.push(from);
+    }
+    return sources;
+  }, [picker, doc.coverImages, doc.moodBoards, themeOrigins]);
+
   // As fotos escolhidas já vêm COPIADAS para a pasta desta proposta pela rota
   // /assets/importar, com os mesmos `path` que um carregamento manual daria —
   // por isso entram no rascunho exatamente pelo mesmo caminho.
-  function onPickedFromLibrary(images: ThemeImage[]) {
+  //
+  // O seletor entrega as fotos LOTE A LOTE (é assim que a barra de progresso
+  // pode ser verdadeira), por isso isto corre várias vezes por importação —
+  // tudo o que faz é acrescentar, nunca substituir.
+  function onPickedFromLibrary(images: ImportedImage[]) {
     if (images.length === 0) return;
     setAssetUrls((prev) => {
       const next = { ...prev };
       for (const im of images) if (im.path && im.url) next[im.path] = im.url;
+      return next;
+    });
+    setThemeOrigins((prev) => {
+      const next = { ...prev };
+      for (const im of images) if (im.path && im.sourcePath) next[im.path] = im.sourcePath;
       return next;
     });
     if (picker?.kind === "board") {
@@ -1428,6 +1473,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         <ThemePicker
           quoteId={quote.id}
           multiple={picker.kind === "board"}
+          usedThemePaths={usedThemePaths}
           onClose={() => setPicker(null)}
           onPicked={onPickedFromLibrary}
         />

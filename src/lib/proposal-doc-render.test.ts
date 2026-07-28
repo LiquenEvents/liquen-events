@@ -52,6 +52,21 @@ describe("renderStoredProposalDocPdf", () => {
     expect(fetchProposalImageBytes).toHaveBeenCalledTimes(4);
   });
 
+  it("nunca resolve mais de 80 imagens, por muitas que o documento traga", async () => {
+    // O teto vale por duas razões: nenhuma explosão de fetches, e — porque o
+    // gerador redimensiona com o sharp cada imagem que lhe chega — nenhuma
+    // explosão de trabalho de CPU a gerar o PDF.
+    fetchProposalImageBytes.mockResolvedValue(null);
+    await renderStoredProposalDocPdf({
+      ...storedDoc(),
+      moodBoards: Array.from({ length: 40 }, (_, b) => ({
+        title: `Board ${b}`,
+        images: Array.from({ length: 10 }, (_, i) => `storage/b${b}-${i}.jpg`),
+      })),
+    });
+    expect(fetchProposalImageBytes.mock.calls.length).toBeLessThanOrEqual(80);
+  });
+
   it('gera na mesma com a capa preenchida só de um lado (a outra posição é "")', async () => {
     // A capa chega SEMPRE com duas posições ("" = vazia) — ver
     // `normaliseCoverImages`. Uma posição vazia, ou bytes que não são imagem,

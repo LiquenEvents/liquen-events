@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
-import { PDFArray, PDFDocument, PDFRawStream, decodePDFRawStream, type PDFObject } from "pdf-lib";
+import {
+  PDFArray,
+  PDFDocument,
+  PDFName,
+  PDFRawStream,
+  decodePDFRawStream,
+  type PDFObject,
+} from "pdf-lib";
 import { renderProposalDocPdf } from "./proposal-doc-pdf";
 import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
 
@@ -49,6 +56,55 @@ function coverPhotoXs(content: string): number[] {
     if (Math.abs(Number(m[4]) - PAGE_H) < 1) xs.push(Number(m[1]));
   }
   return xs;
+}
+
+/** Cada imagem embutida no PDF: bytes do stream, dimensões em pixéis e, para os
+ *  JPEG, se é baseline ou progressivo. */
+interface EmbeddedImage {
+  bytes: Buffer;
+  width: number;
+  height: number;
+  jpeg: boolean;
+}
+function embeddedImages(pdf: PDFDocument): EmbeddedImage[] {
+  const out: EmbeddedImage[] = [];
+  for (const [, obj] of pdf.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    if (String(obj.dict.get(PDFName.of("Subtype"))) !== "/Image") continue;
+    out.push({
+      bytes: Buffer.from(obj.contents),
+      width: Number(String(obj.dict.get(PDFName.of("Width")))),
+      height: Number(String(obj.dict.get(PDFName.of("Height")))),
+      jpeg: String(obj.dict.get(PDFName.of("Filter"))) === "/DCTDecode",
+    });
+  }
+  return out;
+}
+
+/** Marcador SOF: C0/C1 = baseline, C2 = progressivo. */
+function hasProgressiveMarker(buf: Buffer): boolean {
+  for (let i = 0; i < buf.length - 1; i++) {
+    if (buf[i] === 0xff && buf[i + 1] === 0xc2) return true;
+  }
+  return false;
+}
+
+/** Uma fotografia GRANDE e realista: o preset com que a biblioteca de temas
+ *  guarda as fotos (3000 px de lado maior, q0.92 → 2 a 3 MB). Ruído de baixa
+ *  frequência ampliado comprime como fotografia, não como uma mancha lisa. */
+async function bigPhoto(seed: number, portrait = false): Promise<Buffer> {
+  const sw = 500;
+  const sh = 340;
+  const raw = Buffer.alloc(sw * sh * 3);
+  let s = (seed * 2654435761) & 0x7fffffff;
+  for (let i = 0; i < raw.length; i++) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    raw[i] = (s >> 16) & 0xff;
+  }
+  return sharp(raw, { raw: { width: sw, height: sh, channels: 3 } })
+    .resize(portrait ? 2000 : 3000, portrait ? 3000 : 2000, { kernel: "lanczos3" })
+    .jpeg({ quality: 92 })
+    .toBuffer();
 }
 
 /** Uma foto minúscula, em retrato como as fotos de capa reais. */
@@ -185,6 +241,76 @@ describe("renderProposalDocPdf", () => {
     const bytes = await renderProposalDocPdf(doc);
     expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
     expect(bytes.length).toBeGreaterThan(1000);
+  });
+
+  it("PESO: fotos grandes entram no PDF ao tamanho a que são DESENHADAS", async () => {
+    // O documento gerado tem de ser uma ORDEM DE GRANDEZA mais leve do que a
+    // soma das fotos que lhe deram origem — senão a Catarina descarrega dezenas
+    // de MB e o leitor de PDF engasga-se a fazer scroll.
+    const [a, b] = await Promise.all([bigPhoto(1, true), bigPhoto(2, true)]);
+    const [c, d] = await Promise.all([bigPhoto(3), bigPhoto(4)]);
+    const b64 = (buf: Buffer) => buf.toString("base64");
+    // 2 na capa + 4 em cada um de dois mood boards = 10 colocações.
+    const placed = [a, b, a, b, c, d, c, d, a, c];
+    const sumInputs = placed.reduce((acc, buf) => acc + buf.length, 0);
+    expect(sumInputs).toBeGreaterThan(8 * 1024 * 1024); // fotos mesmo grandes
+
+    const doc = {
+      ...decoracaoDoc(),
+      coverImages: [b64(a), b64(b)],
+      moodBoards: [
+        {
+          title: "Decoração Cerimónia",
+          images: [a, b, c, d].map(b64),
+          annotation: "Tons de musgo.",
+        },
+        { title: "Copo d'água", images: [c, d, a, c].map(b64) },
+      ],
+    };
+    const bytes = await renderProposalDocPdf(doc);
+
+    expect(bytes.length * 10).toBeLessThan(sumInputs);
+    // …e continua a ser um PDF válido, com as páginas todas.
+    const parsed = await PDFDocument.load(bytes);
+    expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
+    expect(parsed.getPageCount()).toBeGreaterThan(3);
+    // Nenhuma imagem embutida passa dos pixéis que a sua caixa justifica.
+    const images = embeddedImages(parsed);
+    expect(images.length).toBeGreaterThan(0);
+    for (const im of images) expect(Math.max(im.width, im.height)).toBeLessThanOrEqual(2200);
+  }, 30_000);
+
+  it("FLUIDEZ: nenhuma imagem do PDF é um JPEG progressivo", async () => {
+    // Progressivo dentro de DCTDecode obriga o leitor a várias passagens sobre a
+    // imagem toda de cada vez que a página entra no ecrã (e o Acrobat nunca o
+    // suportou em DCTDecode) — é o que tornava o scroll "travado".
+    const photo = await photoB64();
+    const doc = {
+      ...decoracaoDoc(),
+      coverImages: [photo, photo],
+      moodBoards: [{ title: "Cerimónia", images: [photo, photo, photo] }],
+    };
+    const parsed = await PDFDocument.load(await renderProposalDocPdf(doc));
+    const jpegs = embeddedImages(parsed).filter((im) => im.jpeg);
+    expect(jpegs.length).toBeGreaterThan(0);
+    for (const im of jpegs) expect(hasProgressiveMarker(im.bytes)).toBe(false);
+  });
+
+  it("a MESMA foto usada várias vezes é escrita UMA vez no ficheiro", async () => {
+    // A capa é desenhada duas vezes (página 1 e contracapa) e a mesma foto pode
+    // ir para os dois lados: sem cache de conteúdo eram QUATRO cópias da mesma
+    // fotografia dentro do PDF.
+    const photo = await photoB64();
+    const parsed = await PDFDocument.load(
+      await renderProposalDocPdf({ ...decoracaoDoc(), coverImages: [photo, photo] }),
+    );
+    const covers = embeddedImages(parsed).filter((im) => im.jpeg && im.height > 1000);
+    expect(covers).toHaveLength(1);
+    // …e continua a ser desenhada nos dois lados das duas capas.
+    const front = coverPhotoXs(pageContent(parsed, 0));
+    const back = coverPhotoXs(pageContent(parsed, parsed.getPageCount() - 1));
+    expect(front).toHaveLength(2);
+    expect(back).toHaveLength(2);
   });
 
   it("does NOT throw on client text Helvetica can't encode (emoji/CJK)", async () => {

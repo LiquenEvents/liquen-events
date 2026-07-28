@@ -25,6 +25,10 @@ const IGNORED_CONSOLE = [
   /\[Fast Refresh\]/i,
   /favicon/i,
   /Failed to load resource: the server responded with a status of 404/i,
+  // Recursos de terceiros (analytics) inalcançáveis na rede onde o teste corre
+  // — condição do ambiente, não defeito da aplicação. Um erro lançado pelo
+  // nosso próprio código continua a falhar o passeio.
+  /net::ERR_(TUNNEL_CONNECTION_FAILED|CONNECTION_|NAME_NOT_RESOLVED|PROXY_)/i,
 ];
 
 function isIgnored(text: string): boolean {
