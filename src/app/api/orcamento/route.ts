@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Quote, QuoteFormData, PriceBreakdown } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, LOCATION_LABELS } from "@/lib/orcamento/data";
 import { sendMail, esc } from "@/lib/mail";
+import { SITE } from "@/lib/site";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
 import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";
@@ -99,17 +100,39 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     row("Convidados", form.guests ? String(form.guests) : "") +
     row("Local", esc(local));
 
+  // Colored logo, served from the production domain so it renders in any inbox.
+  const logoUrl = `${SITE.url}/logo-liquen.png`;
+  const firstName = name.split(" ")[0] || "o cliente";
+
+  // One-tap actions for whoever opens this. "Responder" opens a fresh mail to
+  // the client (replying to the email itself also works — Reply-To is the
+  // client). If there's a phone, offer a WhatsApp shortcut with a warm prefill.
+  const mailtoHref = `mailto:${esc(form.email)}?subject=${encodeURIComponent(
+    `Líquen Events — o seu pedido de orçamento${et || cat ? ` (${et || cat})` : ""}`,
+  )}`;
+  const waDigits = form.phone ? form.phone.replace(/\D/g, "") : "";
+  const waNumber = /^9\d{8}$/.test(waDigits) ? `351${waDigits}` : waDigits;
+  const waHref = waNumber
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(
+        `Olá ${firstName}, fala a equipa da Líquen Events 🌿 Recebemos o seu pedido de orçamento e teremos todo o gosto em ajudar. Quando for melhor para si, falamos sobre o seu evento?`,
+      )}`
+    : "";
+
   const html = `
-  <div style="margin:0;padding:0;background:#f6f5f2">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f5f2;padding:28px 12px">
+  <div style="margin:0;padding:0;background:#f4f3ef">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f3ef;padding:32px 12px">
       <tr><td align="center">
-        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #ecebe4;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-          <!-- Cabeçalho -->
-          <tr><td style="padding:34px 40px 0">
-            <div style="color:#a9a99f;font-size:11px;letter-spacing:3px;text-transform:uppercase">Líquen Events</div>
-            <div style="color:#a9a99f;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:26px">Novo pedido de orçamento</div>
-            <div style="font-family:Georgia,'Times New Roman',serif;font-size:25px;color:#1c1f17;margin-top:8px;line-height:1.2">${esc(name)}</div>
-            ${subtitle ? `<div style="color:#7c806f;font-size:14px;margin-top:6px">${esc(subtitle)}</div>` : ""}
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e8e7df;border-radius:16px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+          <!-- Cabeçalho: logo colorido -->
+          <tr><td align="center" style="padding:32px 40px 24px;border-bottom:1px solid #f0efe9">
+            <img src="${logoUrl}" alt="Líquen Events" height="42" style="height:42px;width:auto;display:block;border:0;margin:0 auto" />
+          </td></tr>
+
+          <!-- Título -->
+          <tr><td style="padding:30px 40px 0">
+            <div style="color:#8a9072;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;font-weight:600">Novo pedido de orçamento</div>
+            <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#1c1f17;margin-top:10px;line-height:1.22">${esc(name)}</div>
+            ${subtitle ? `<div style="color:#7c806f;font-size:14px;margin-top:7px">${esc(subtitle)}</div>` : ""}
           </td></tr>
 
           <!-- Contactos + detalhes -->
@@ -134,18 +157,30 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
             form.notes
               ? `<tr><td style="padding:24px 40px 0">
                    <div style="color:#a9a99f;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Notas do cliente</div>
-                   <div style="color:#45483c;font-size:14px;line-height:1.65;white-space:pre-wrap">${esc(form.notes)}</div>
+                   <div style="color:#45483c;font-size:14px;line-height:1.65;white-space:pre-wrap;background:#faf9f5;border:1px solid #f0efe9;border-radius:10px;padding:14px 16px">${esc(form.notes)}</div>
                  </td></tr>`
               : ""
           }
 
-          <!-- Ação -->
-          <tr><td style="padding:26px 40px 0">
-            <div style="color:#8b8f7e;font-size:13px;line-height:1.55">Responda a este email para falar diretamente com ${esc(name.split(" ")[0] || "o cliente")} — a resposta vai direta para o email do cliente.</div>
+          <!-- Ações rápidas -->
+          <tr><td style="padding:28px 40px 0">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td style="padding-right:10px">
+                <a href="${mailtoHref}" style="display:inline-block;background:#4d6350;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:9px">Responder ao cliente</a>
+              </td>
+              ${
+                waHref
+                  ? `<td>
+                       <a href="${waHref}" style="display:inline-block;background:#ffffff;border:1px solid #d9d8cd;color:#3a3d30;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:9px">WhatsApp</a>
+                     </td>`
+                  : ""
+              }
+            </tr></table>
+            <div style="color:#9a9e8c;font-size:12px;line-height:1.5;margin-top:14px">Também pode simplesmente responder a este email — a resposta vai direta para ${esc(firstName)}.</div>
           </td></tr>
 
           <!-- Rodapé -->
-          <tr><td style="padding:22px 40px 34px">
+          <tr><td style="padding:26px 40px 32px">
             <div style="border-top:1px solid #f0efe9;padding-top:16px;color:#b5b5aa;font-size:11px;letter-spacing:0.3px">Ref. ${esc(id)} · ${new Date().toLocaleString("pt-PT")}</div>
           </td></tr>
         </table>
