@@ -562,7 +562,8 @@ export const en: Dict = {
     titleMoss: "your request.",
     titleMossPlural: "your request.",
     lead: "We'll read everything carefully, check availability for the date and think about what makes sense for this event — before we reply. What follows isn't an automatic price, it's the beginning of a proposal built for you.",
-    replyByLabel: "You'll hear from us by",
+    replyByLabel: "You'll hear from us",
+    replyByValue: "Within 48 working hours",
     replyByNote:
       "Working days only. If you'd like to speak to us before then, WhatsApp is the fastest way.",
     replyByNotePlural:

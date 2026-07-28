@@ -49,6 +49,9 @@ interface Attachment {
   filename: string;
   content: Buffer | Uint8Array;
   contentType?: string;
+  /** Set to reference the part from the HTML as <img src="cid:…">. Inline
+   *  images render even when the client blocks remote ones. */
+  cid?: string;
 }
 
 interface SendArgs {
@@ -93,6 +96,7 @@ export async function sendMail({
     filename: a.filename,
     content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content),
     contentType: a.contentType,
+    cid: a.cid,
   }));
   await transport.sendMail({
     from,

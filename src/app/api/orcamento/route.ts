@@ -8,6 +8,7 @@ import {
   URGENCY_OPTIONS,
 } from "@/lib/orcamento/data";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { SITE } from "@/lib/site";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
@@ -158,7 +159,10 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   // is pre-trimmed onto an opaque cream plate at an exact 2:1 ratio — the plate
   // also keeps the mark readable in Gmail's dark theme, which never inverts
   // image pixels.
-  const logoUrl = `${SITE.url}/email/logo-liquen-email.png`;
+  // cid: — the wordmark travels inside the message. A hosted URL 404s until
+  // production is promoted, and is blocked outright by clients that suppress
+  // remote images by default. See lib/email-logo.
+  const logoUrl = `cid:${EMAIL_LOGO_CID}`;
 
   // Actions. WhatsApp is primary when there's a phone (fastest, warmest channel
   // for PT leads); otherwise the email reply is primary. Both are prefilled.
@@ -398,6 +402,7 @@ export async function POST(request: NextRequest) {
         html: email.html,
         text: email.text,
         replyTo: form.email,
+        attachments: [emailLogoAttachment()],
       });
       emailed = res.sent;
     } catch (mailErr) {
@@ -476,6 +481,7 @@ export async function POST(request: NextRequest) {
             "Auto-Submitted": "auto-generated", // RFC 3834 — don't auto-reply to us
             "X-Auto-Response-Suppress": "OOF, AutoReply", // Exchange/Outlook
           },
+          attachments: [emailLogoAttachment()],
           ...confirmation,
         });
         // sendMail resolves {sent:false} (no throw) when SMTP is unconfigured,

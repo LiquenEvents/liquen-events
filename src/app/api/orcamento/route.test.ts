@@ -66,6 +66,20 @@ describe("POST /api/orcamento", () => {
     expect(sendMailMock.mock.calls[1][0]).toMatchObject({ to: validForm.email });
   });
 
+  it("carries the wordmark INSIDE both emails, never as a hosted URL", async () => {
+    await POST(req("POST", { form: validForm }));
+    for (const [args] of sendMailMock.mock.calls) {
+      // A hosted <img> 404s until production is promoted — and by then the
+      // messages already in people's inboxes show a broken image, because the
+      // fetch happens when they open it, not when we send it.
+      expect(args.html).not.toContain("/email/logo-liquen-email.png");
+      expect(args.html).toContain("cid:liquen-logo");
+      const logo = args.attachments?.find((a) => a.cid === "liquen-logo");
+      expect(logo, "every email must attach the inline logo it references").toBeTruthy();
+      expect(logo!.content.length).toBeGreaterThan(1000);
+    }
+  });
+
   it("silently drops a honeypot hit without persisting or emailing", async () => {
     const res = await POST(req("POST", { form: validForm, website: "i-am-a-bot" }));
     expect(res.status).toBe(200);

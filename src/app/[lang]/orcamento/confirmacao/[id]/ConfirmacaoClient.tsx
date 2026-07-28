@@ -17,7 +17,7 @@ import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
 import { fill, localizeHref } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n";
-import { daysUntil, isHighSeason, longDate, replyByDate, replyByOn } from "@/lib/workdays";
+import { daysUntil, isHighSeason, longDate, replyByOn } from "@/lib/workdays";
 import { track } from "@/lib/track";
 import { reportLeadConversion } from "@/lib/ads-conversion";
 import { CONFIRMACAO_PHOTOS, type ConfirmacaoPhotoKey } from "./photos";
@@ -205,18 +205,25 @@ export default function ConfirmacaoClient({
     return parsed && !Number.isNaN(parsed.getTime()) ? parsed : now;
   }, [quote?.submittedAt, now]);
 
-  const replyBy = useMemo(() => {
-    if (!quote) return null;
-    // Once the team has actually replied, the promise is history — showing it
-    // would contradict the status pill right above it.
-    if (quote.status !== "pendente" && quote.status !== "em_revisao") return null;
+  // Whether to SHOW the reply-by promise — not what date it lands on. The page
+  // deliberately states a window ("em até 48 horas úteis") rather than naming a
+  // weekday: a calendar date is a promise the team can miss in high season for
+  // reasons the client can't see, and a named day that slips reads as a broken
+  // commitment where a window doesn't.
+  //
+  // The working-day maths is still what decides visibility: once that window
+  // has actually elapsed, repeating the promise to someone still waiting would
+  // be worse than saying nothing.
+  const showReplyBy = useMemo(() => {
+    if (!quote) return false;
+    // Once the team has replied, the promise is history — showing it would
+    // contradict the status right beside it.
+    if (quote.status !== "pendente" && quote.status !== "em_revisao") return false;
     const on = replyByOn(sentAt);
     const onDay = Date.UTC(on.getFullYear(), on.getMonth(), on.getDate());
     const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-    // A date that has already gone by is worse than no date at all.
-    if (onDay < today) return null;
-    return replyByDate(sentAt, locale);
-  }, [quote, sentAt, now, locale]);
+    return onDay >= today;
+  }, [quote, sentAt, now]);
 
   const eventDate = quote?.date ?? "";
   const countdown = eventDate ? daysUntil(eventDate, now) : null;
@@ -485,15 +492,15 @@ export default function ConfirmacaoClient({
           {/* The promise, as a DATE. "Até 48 horas úteis" is a disclaimer the
               client has to decode; a named weekday is something they can hold
               us to — and it's the single thing they came to this page to know. */}
-          {replyBy && (
+          {showReplyBy && (
             <AnimateIn from="bottom" delay={210}>
               <div className="mt-10 max-w-[34rem]">
                 <p className={microLabel}>{tc.replyByLabel}</p>
                 <p
-                  className="font-display text-moss-dark leading-[1.12] mt-2.5 first-letter:uppercase"
+                  className="font-display text-moss-dark leading-[1.12] mt-2.5"
                   style={{ fontSize: "clamp(26px, 3.2vw, 38px)" }}
                 >
-                  {replyBy}
+                  {tc.replyByValue}
                 </p>
                 <p className="mt-3.5 max-w-[30rem] text-foreground/65 text-[13.5px] leading-relaxed">
                   {pick(tc.replyByNote, tc.replyByNotePlural)}

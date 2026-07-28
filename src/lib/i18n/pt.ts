@@ -572,7 +572,8 @@ export const pt = {
     titleMoss: "seu pedido.",
     titleMossPlural: "vosso pedido.",
     lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento — antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
-    replyByLabel: "Damos notícias até",
+    replyByLabel: "Damos notícias",
+    replyByValue: "Em até 48 horas úteis",
     replyByNote:
       "Contam-se dias úteis. Se entretanto quiser falar connosco, o WhatsApp é o caminho mais rápido.",
     replyByNotePlural:
