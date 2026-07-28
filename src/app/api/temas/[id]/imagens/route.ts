@@ -68,7 +68,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // pedido. Corta-se em silêncio (o cliente pagina), não se recusa.
     const limit = Math.min(Math.max(1, num(q.get("limit"), THEME_PAGE_SIZE)), MAX_THEME_PAGE_SIZE);
     const offset = num(q.get("offset"), 0);
-    return NextResponse.json(await listThemeImagePage(id, limit, offset));
+    // A ordem arrumada à mão (se existir) manda no início da lista; a pasta
+    // continua a mandar no resto. O tema já foi lido acima, não custa nada.
+    return NextResponse.json(await listThemeImagePage(id, limit, offset, theme.photoOrder ?? []));
   } catch (err) {
     return failed("temas imagens GET falhou", err, id);
   }

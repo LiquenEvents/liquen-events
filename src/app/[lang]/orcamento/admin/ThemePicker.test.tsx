@@ -184,7 +184,10 @@ describe("ThemePicker", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(photo(TOTAL));
     expect(photo(TOTAL)).toHaveAttribute("aria-pressed", "true");
-  });
+  }, // 41 cliques numa grelha de 41 células = 41 renderizações completas do
+  // diálogo. Não é lento por acidente, é o que este teste faz — e os 5 s por
+  // omissão não chegam num runner de CI partilhado.
+  20_000);
 
   it("nas capas (uma só foto) a segunda escolha substitui a primeira", async () => {
     await openPicker(false);

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   isThemePath,
+  planOrderedPage,
   themeFolder,
   themeIdOfPath,
   contentTypeForPath,
@@ -646,5 +647,43 @@ describe("copyThemeImageToProposal", () => {
     expect(st.buckets).toEqual([]);
     expect(st.copy).not.toHaveBeenCalled();
     expect(st.download).not.toHaveBeenCalled();
+  });
+});
+
+// ── A ordem arrumada à mão manda no início da lista ────────────────────────
+describe("planOrderedPage", () => {
+  const order = ["t/a.jpg", "t/b.jpg", "t/c.jpg"];
+
+  it("serve o prefixo arrumado antes de tocar na pasta", () => {
+    expect(planOrderedPage(order, 2, 0)).toEqual({
+      fromOrder: ["t/a.jpg", "t/b.jpg"],
+      storageSkip: 0,
+      needFromStorage: 0,
+    });
+  });
+
+  it("completa a página com a pasta quando o prefixo acaba a meio", () => {
+    expect(planOrderedPage(order, 5, 0)).toEqual({
+      fromOrder: order,
+      storageSkip: 0,
+      needFromStorage: 2,
+    });
+  });
+
+  it("depois do prefixo, a pasta continua de onde ficou", () => {
+    // Offset 5 com 3 arrumadas: já se mostraram as 3 + 2 da pasta.
+    expect(planOrderedPage(order, 4, 5)).toEqual({
+      fromOrder: [],
+      storageSkip: 2,
+      needFromStorage: 4,
+    });
+  });
+
+  it("sem ordem manual é exatamente o comportamento de sempre", () => {
+    expect(planOrderedPage([], 60, 120)).toEqual({
+      fromOrder: [],
+      storageSkip: 120,
+      needFromStorage: 60,
+    });
   });
 });

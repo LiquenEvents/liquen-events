@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import {
+  MAX_PHOTO_ORDER,
   MAX_THEME_NAME,
   MAX_THEME_NOTES,
   THEME_PAGE_SIZE,
@@ -181,6 +182,21 @@ export function reinsertAt(
 export function mergePage(prev: ThemeImage[], page: ThemeImage[]): ThemeImage[] {
   const seen = new Set(prev.map((i) => i.path));
   return [...prev, ...page.filter((i) => i.path && !seen.has(i.path))];
+}
+
+/**
+ * Move um item de `from` para `to` (puro — testado).
+ *
+ * É a operação por trás do arrasto e das setas: tirar a foto de onde está e
+ * enfiá-la onde deve ficar, sem perder nem duplicar nada. Índices fora da
+ * lista devolvem-na intacta.
+ */
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
 }
 
 /** Um ficheiro largado que é (ou parece ser) uma imagem. HEIC e ficheiros de
@@ -656,6 +672,10 @@ function ThemeFolder({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [failed, setFailed] = useState<Failure[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Índice da foto que está a ser arrastada (null = arrasto parado). */
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  /** Onde ela cairia se a largasse agora — é o que desenha o espaço aberto. */
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [coverPath, setCoverPath] = useState<string | undefined>(theme.coverPath);
   const [name, setName] = useState(theme.name);
@@ -1000,6 +1020,50 @@ function ThemeFolder({
     }
   }
 
+  /**
+   * Fixa a ordem que está à vista.
+   *
+   * Guarda-se o que ESTÁ carregado (cortado no teto do servidor): essas fotos
+   * passam a ser o prefixo arrumado do tema e tudo o resto continua a vir por
+   * data, atrás delas. É o que faz "pôr as boas à frente" custar meia dúzia de
+   * caminhos em vez de uma cópia do catálogo.
+   */
+  async function persistOrder(next: ThemeImage[], previous: ThemeImage[]) {
+    try {
+      const res = await fetch(`/api/temas/${theme.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoOrder: next.slice(0, MAX_PHOTO_ORDER).map((im) => im.path) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "falhou");
+      }
+    } catch (e) {
+      // A ordem volta ao que estava: mostrar uma arrumação que o servidor não
+      // guardou seria mentir-lhe até ao próximo recarregamento.
+      if (!alive.current) return;
+      setImages(previous);
+      toast(
+        e instanceof Error && /db\/schema\.sql|base de dados/i.test(e.message)
+          ? e.message
+          : "Não foi possível guardar a nova ordem das fotos.",
+        "error",
+      );
+    }
+  }
+
+  /** Move uma foto para outra posição da grelha (arrasto, setas ou "para o início"). */
+  function moveTo(from: number, to: number) {
+    if (from === to) return;
+    setImages((prev) => {
+      const next = moveItem(prev, from, to);
+      if (next === prev) return prev;
+      void persistOrder(next, prev);
+      return next;
+    });
+  }
+
   async function removeOne(im: ThemeImage) {
     if (!window.confirm("Remover esta foto do tema? Esta ação não pode ser anulada.")) return;
     await removeImages([im]);
@@ -1306,10 +1370,39 @@ function ThemeFolder({
                 return (
                   <div
                     key={im.path}
-                    className={`group relative aspect-square overflow-hidden rounded-lg border bg-foreground/[0.04] ${
+                    draggable
+                    onDragStart={(e) => {
+                      setDragFrom(i);
+                      e.dataTransfer.effectAllowed = "move";
+                      // Alguns navegadores só iniciam o arrasto com dados lá
+                      // dentro; o valor não é usado por ninguém.
+                      e.dataTransfer.setData("text/plain", String(i));
+                    }}
+                    onDragEnd={() => {
+                      setDragFrom(null);
+                      setDragOver(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (dragFrom === null) return;
+                      // Sem isto o browser recusa a largada.
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOver !== i) setDragOver(i);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragFrom !== null) moveTo(dragFrom, i);
+                      setDragFrom(null);
+                      setDragOver(null);
+                    }}
+                    className={`group relative aspect-square overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-[opacity,box-shadow] ${
                       isSelected
                         ? "border-[#4d6350] ring-2 ring-[#4d6350]/40"
                         : "border-foreground/[0.1]"
+                    } ${dragFrom === i ? "opacity-40" : ""} ${
+                      dragOver === i && dragFrom !== null && dragFrom !== i
+                        ? "ring-2 ring-[#4d6350]"
+                        : ""
                     }`}
                   >
                     {/* A célula já tem `aspect-square`, por isso adiar a foto
@@ -1324,6 +1417,22 @@ function ThemeFolder({
                       aria-checked={isSelected}
                       aria-label={`Selecionar foto ${i + 1} de ${images.length}`}
                       onClick={(e) => toggleAt(i, e.shiftKey)}
+                      onKeyDown={(e) => {
+                        // Alt + setas move a foto. Sem o Alt, as setas continuam
+                        // a andar entre células, que é o que o teclado espera.
+                        if (!e.altKey) return;
+                        const to =
+                          e.key === "ArrowLeft" || e.key === "ArrowUp"
+                            ? i - 1
+                            : e.key === "ArrowRight" || e.key === "ArrowDown"
+                              ? i + 1
+                              : e.key === "Home"
+                                ? 0
+                                : null;
+                        if (to === null) return;
+                        e.preventDefault();
+                        moveTo(i, Math.max(0, Math.min(images.length - 1, to)));
+                      }}
                       className="absolute inset-0 h-full w-full"
                     >
                       <span
@@ -1341,6 +1450,17 @@ function ThemeFolder({
                       <span className="pointer-events-none absolute bottom-1 left-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-white">
                         Capa
                       </span>
+                    )}
+                    {i > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => moveTo(i, 0)}
+                        aria-label={`Mover a foto ${i + 1} para o início`}
+                        title="Mover para o início"
+                        className="absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      >
+                        ↑
+                      </button>
                     )}
                     <button
                       type="button"

@@ -110,20 +110,20 @@ describe("GET /api/temas/[id]/imagens", () => {
 
   it("pede ao Storage a janela do pedido", async () => {
     await GET(...get("t-1", "?offset=120&limit=40"));
-    expect(st.list).toHaveBeenCalledWith("t-1", 40, 120);
+    expect(st.list).toHaveBeenCalledWith("t-1", 40, 120, []);
   });
 
   it("sem parâmetros pede a primeira página, com o tamanho por omissão", async () => {
     await GET(...get());
-    expect(st.list).toHaveBeenCalledWith("t-1", THEME_PAGE_SIZE, 0);
+    expect(st.list).toHaveBeenCalledWith("t-1", THEME_PAGE_SIZE, 0, []);
   });
 
   it("corta um limite absurdo e ignora lixo na query", async () => {
     // Um ?limit=5000 mandaria assinar a biblioteca inteira num pedido.
     await GET(...get("t-1", "?limit=5000"));
-    expect(st.list).toHaveBeenCalledWith("t-1", MAX_THEME_PAGE_SIZE, 0);
+    expect(st.list).toHaveBeenCalledWith("t-1", MAX_THEME_PAGE_SIZE, 0, []);
     await GET(...get("t-1", "?limit=abc&offset=-40"));
-    expect(st.list).toHaveBeenLastCalledWith("t-1", THEME_PAGE_SIZE, 0);
+    expect(st.list).toHaveBeenLastCalledWith("t-1", THEME_PAGE_SIZE, 0, []);
   });
 
   it("uma pasta ilegível sai como ok:false — nunca como um tema sem fotos", async () => {
@@ -277,5 +277,17 @@ describe("POST /api/temas/[id]/imagens", () => {
     const res = await POST(...post([jpg()], "t-1", [gif]));
     expect(res.status).toBe(200);
     expect(st.upload).toHaveBeenCalledWith("t-1", expect.any(Buffer), "image/jpeg", undefined);
+  });
+});
+
+// A ordem que a equipa arrumou tem de CHEGAR à listagem — senão arrastava-se
+// uma foto para a frente e, ao recarregar, ela voltava para trás.
+describe("GET /api/temas/[id]/imagens — ordem arrumada à mão", () => {
+  it("entrega a ordem do tema à listagem", async () => {
+    st.themes = st.themes.map((t) =>
+      t.id === "t-1" ? { ...t, photoOrder: ["t-1/b.jpg", "t-1/a.jpg"] } : t,
+    );
+    await GET(...get("t-1", "?offset=0&limit=60"));
+    expect(st.list).toHaveBeenCalledWith("t-1", 60, 0, ["t-1/b.jpg", "t-1/a.jpg"]);
   });
 });

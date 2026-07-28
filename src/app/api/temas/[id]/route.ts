@@ -5,6 +5,7 @@ import { deleteThemeFolder, isThemePath, themeIdOfPath, themeFolder } from "@/li
 import { isUniqueViolation } from "@/lib/invoices-store";
 import { isMissingTable, isPersistenceUnavailable } from "@/lib/repository";
 import {
+  MAX_PHOTO_ORDER,
   MAX_THEME_NAME,
   MAX_THEME_NOTES,
   normalizedThemeName,
@@ -48,7 +49,37 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   let name = "";
   try {
     const body = await request.json().catch(() => null);
-    const patch: { name?: string; notes?: string; coverPath?: string } = {};
+    const patch: {
+      name?: string;
+      notes?: string;
+      coverPath?: string;
+      photoOrder?: string[];
+    } = {};
+
+    // A ordem arrumada à mão. Guarda-se SÓ o que ela moveu: caminhos deste
+    // tema, sem repetições e limitados a MAX_PHOTO_ORDER. Uma lista vazia
+    // limpa a arrumação e o tema volta às mais recentes primeiro.
+    if (body?.photoOrder !== undefined) {
+      if (!Array.isArray(body.photoOrder)) {
+        return NextResponse.json({ error: "Ordem inválida." }, { status: 400 });
+      }
+      const seen = new Set<string>();
+      const order: string[] = [];
+      for (const raw of body.photoOrder) {
+        if (typeof raw !== "string") continue;
+        const path = raw.trim();
+        // Um caminho de OUTRO tema aqui reordenaria fotos que não são deste —
+        // é o mesmo guarda da capa e da remoção, pela mesma razão.
+        if (!isThemePath(path) || themeIdOfPath(path) !== themeFolder(id)) {
+          return NextResponse.json({ error: "Ordem inválida." }, { status: 400 });
+        }
+        if (seen.has(path)) continue;
+        seen.add(path);
+        order.push(path);
+        if (order.length >= MAX_PHOTO_ORDER) break;
+      }
+      patch.photoOrder = order;
+    }
 
     if (body?.coverPath !== undefined) {
       const cover = typeof body.coverPath === "string" ? body.coverPath.trim() : "";

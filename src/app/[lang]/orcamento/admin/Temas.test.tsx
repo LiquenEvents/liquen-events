@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import { THEME_PAGE_SIZE } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
-import Temas, { mergePage, reinsertAt } from "./Temas";
+import Temas, { mergePage, moveItem, reinsertAt } from "./Temas";
 
 /**
  * Rede de segurança da Biblioteca de Temas.
@@ -643,6 +643,31 @@ describe("Biblioteca de Temas — seleção e ações em bloco", () => {
     expect(screen.getByText("Capa")).toBeInTheDocument();
     // A ação de capa só faz sentido para UMA foto.
     expect(screen.queryByRole("button", { name: "Definir como capa" })).not.toBeInTheDocument();
+  });
+});
+
+describe("reordenar fotos à mão", () => {
+  it("tira a foto de onde está e põe-na onde deve ficar", () => {
+    expect(moveItem(["a", "b", "c", "d"], 2, 0)).toEqual(["c", "a", "b", "d"]);
+    expect(moveItem(["a", "b", "c", "d"], 0, 3)).toEqual(["b", "c", "d", "a"]);
+    expect(moveItem(["a", "b", "c"], 1, 1)).toEqual(["a", "b", "c"]);
+  });
+
+  it("nunca perde nem duplica uma foto", () => {
+    const list = ["a", "b", "c", "d", "e"];
+    for (let from = 0; from < list.length; from++) {
+      for (let to = 0; to < list.length; to++) {
+        const moved = moveItem(list, from, to);
+        expect([...moved].sort()).toEqual([...list].sort());
+        expect(moved).toHaveLength(list.length);
+      }
+    }
+  });
+
+  it("devolve a lista intacta para índices fora dela", () => {
+    const list = ["a", "b"];
+    expect(moveItem(list, -1, 0)).toBe(list);
+    expect(moveItem(list, 0, 5)).toBe(list);
   });
 });
 

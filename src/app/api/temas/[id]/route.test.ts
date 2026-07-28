@@ -201,3 +201,44 @@ describe("DELETE /api/temas/[id]", () => {
     expect(st.remove).not.toHaveBeenCalled();
   });
 });
+
+// ── Ordem manual das fotos ─────────────────────────────────────────────────
+// O mesmo guarda da capa e da remoção: um caminho de OUTRO tema aqui
+// reordenaria fotos que não são deste.
+describe("PATCH /api/temas/[id] — ordem das fotos", () => {
+  it("guarda a ordem escolhida, sem repetições", async () => {
+    st.authed = true;
+    const res = await PATCH(
+      ...patchReq({ photoOrder: ["t-1/b.jpg", "t-1/a.jpg", "t-1/b.jpg"] }, "t-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(st.update).toHaveBeenCalledWith(
+      "t-1",
+      expect.objectContaining({ photoOrder: ["t-1/b.jpg", "t-1/a.jpg"] }),
+    );
+  });
+
+  it("recusa um caminho de outro tema", async () => {
+    st.authed = true;
+    const res = await PATCH(...patchReq({ photoOrder: ["t-2/a.jpg"] }, "t-1"));
+    expect(res.status).toBe(400);
+    expect(st.update).not.toHaveBeenCalled();
+  });
+
+  it("recusa travessia de diretórios", async () => {
+    st.authed = true;
+    expect((await PATCH(...patchReq({ photoOrder: ["../fora.jpg"] }, "t-1"))).status).toBe(400);
+    expect(st.update).not.toHaveBeenCalled();
+  });
+
+  it("recusa o que não é uma lista", async () => {
+    st.authed = true;
+    expect((await PATCH(...patchReq({ photoOrder: "t-1/a.jpg" }, "t-1"))).status).toBe(400);
+  });
+
+  it("uma lista vazia limpa a arrumação", async () => {
+    st.authed = true;
+    await PATCH(...patchReq({ photoOrder: [] }, "t-1"));
+    expect(st.update).toHaveBeenCalledWith("t-1", expect.objectContaining({ photoOrder: [] }));
+  });
+});
