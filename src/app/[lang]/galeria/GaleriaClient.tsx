@@ -9,6 +9,7 @@ import { collectionFor } from "./collections";
 import { type Photo, interleaveByCollection } from "./interleave";
 import type { Dict } from "@/lib/i18n";
 import { ViewTransition } from "@/components/vt";
+import GalleryImage from "./GalleryImage";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -87,6 +88,12 @@ function collectionFromSlug(slug: string, names: string[]): string | null {
 }
 const STRIP = 7;
 const SLIDE_MS = 5000; // ritmo do slideshow cinematográfico
+// Com prefers-reduced-motion o indicador de progresso do slideshow deixa de ser
+// pintado (`.lb-progress { animation: none }` em globals.css), portanto a foto
+// mudava sozinha de 5 em 5 segundos sem qualquer pista visual de que ia mudar
+// — medido: aria-label passou de "foto 3 de 427" para "foto 4 de 427" em 6,2s.
+// 15s dá tempo de ler a foto antes de ela saltar. Continua pausável (WCAG 2.2.2).
+const SLIDE_MS_REDUCED = 15000;
 
 // Corre trabalho NÃO crítico quando a main thread está livre, para que a
 // hidratação e a primeira interação não fiquem bloqueadas por observers /
@@ -124,16 +131,42 @@ function shouldPreloadNeighbours(): boolean {
   return !(c.effectiveType && SLOW_ET.has(c.effectiveType));
 }
 
-// Keyboard focus ring that survives `overflow-hidden`. The global :focus-visible
-// outline is a box-shadow, which these image cells clip; an *inset* ring renders
-// inside the box, so it stays visible for keyboard users tabbing the grid.
-const FOCUS_RING =
-  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80";
+// Anel de foco de teclado, DENTRO da caixa (os mosaicos têm overflow-hidden).
+//
+// A versão anterior (`focus-visible:ring-2 ring-inset`) nunca chegou a ser
+// pintada: a regra global `:focus-visible { box-shadow: ... }` (globals.css)
+// declara o MESMO box-shadow no MESMO elemento e ganha, por isso o anel real
+// era o global — sem `inset`, cortado pelo overflow, e com um contraste medido
+// de 1.01:1 sobre a foto (pior de 8 mosaicos). Aqui o anel é um ELEMENTO
+// próprio: o box-shadow é dele, não do elemento focado, logo a regra global não
+// lhe toca. Par branco/preto para se ver tanto sobre fotos claras como escuras.
+const FOCUS_RING = "focus:outline-none";
+const FOCUS_RING_SHADOW = "inset 0 0 0 3px #fff, inset 0 0 0 6px rgba(0,0,0,0.85)";
+function FocusRing() {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-20 opacity-0 group-focus-visible:opacity-100"
+      style={{ boxShadow: FOCUS_RING_SHADOW }}
+    />
+  );
+}
 
-// Hover overlay — reused in hero cells and masonry cells
+// Zoom de hover. Sob prefers-reduced-motion não há transição nenhuma: as três
+// ocorrências (masonry, herói 2x2, satélites) escapavam ao bloco reduced-motion
+// do globals.css e continuavam a animar 900ms (medido: transitionDuration 0.9s
+// com reducedMotion "reduce").
+const ZOOM_CLASS =
+  "transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]";
+
+// Hover overlay — reused in hero cells and masonry cells.
+// `aria-hidden`: é decoração visual que repete o que o botão já diz. Sem isto o
+// nome acessível de cada mosaico saía com a informação colada 2-3 vezes
+// ("Casamento … : Sophia & Artur Sophia & Artur CASAMENTO", lido da árvore de
+// acessibilidade); o nome vem agora só do aria-label do botão.
 function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   return (
-    <>
+    <span aria-hidden>
       {/* Reveal on keyboard focus too (not just hover) so tabbing the grid
           surfaces the same caption sighted mouse users get (WCAG 1.4.13). */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-500 pointer-events-none" />
@@ -145,8 +178,10 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
           >
             {caption}
           </span>
+          {/* /70 (era /55): sobre a foto mais clara medida (luminância 0.535) a
+              sub-legenda de 9px dava 4.25:1, abaixo do mínimo de 4.5:1. */}
           {sub && (
-            <span className="block text-white/55 text-[9px] tracking-[0.2em] uppercase mt-0.5">
+            <span className="block text-white/70 text-[9px] tracking-[0.2em] uppercase mt-0.5">
               {sub}
             </span>
           )}
@@ -167,7 +202,7 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
           </svg>
         </span>
       </div>
-    </>
+    </span>
   );
 }
 
@@ -183,25 +218,39 @@ const Tile = memo(function Tile({
   photo,
   idx,
   alt,
+  label,
   caption,
   sub,
   hiddenSm,
   eager,
   revealDelay,
+  tabbable,
+  unavailableLabel,
+  zoomClass,
   onOpen,
+  onKeyNav,
+  onTileFocus,
   registerTile,
 }: {
   photo: Photo;
   idx: number;
   alt: string;
+  /** Nome acessível completo do botão (legenda + posição no pool). */
+  label: string;
   caption: string;
   sub?: string;
   hiddenSm: boolean;
   eager: boolean;
   revealDelay: number;
+  tabbable: boolean;
+  unavailableLabel: string;
+  zoomClass: string;
   onOpen: (idx: number) => void;
+  onKeyNav: (e: React.KeyboardEvent, idx: number) => void;
+  onTileFocus: (idx: number) => void;
   registerTile: (el: HTMLDivElement | null) => void;
 }) {
+  const btnRef = useRef<HTMLButtonElement>(null);
   return (
     <div
       ref={registerTile}
@@ -209,31 +258,125 @@ const Tile = memo(function Tile({
       style={{ "--reveal-delay": `${revealDelay}ms` } as React.CSSProperties}
     >
       <button
+        ref={btnRef}
         onClick={() => onOpen(idx)}
+        onKeyDown={(e) => onKeyNav(e, idx)}
+        onFocus={() => onTileFocus(idx)}
         data-ripple
+        data-tile-idx={idx}
         data-cap={caption}
         data-sub={sub}
+        // Tabulação rotativa (roving tabindex): a grelha é UM ponto de
+        // tabulação e as setas percorrem as fotos. Antes eram 427 pontos numa
+        // ordem que saltava até 3625px para trás (o masonry é empacotado
+        // coluna-a-coluna) e a tabulação era EXPULSA da grelha ao fim de cada
+        // lote de 24, deixando 403 das 427 fotos inalcançáveis sem rato.
+        tabIndex={tabbable ? 0 : -1}
+        aria-label={label}
         className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
         style={{ aspectRatio: photo.aspectRatio }}
       >
-        <Image
+        <GalleryImage
           src={photo.src}
           alt={alt}
-          fill
-          sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
+          // 60vw no ramo mobile (era 100vw). Medido a 390x844 DPR3 com a cache
+          // do optimizador vazia: 38 de 40 pedidos vinham a w=1280 (170KB cada)
+          // para uma caixa de 390px. Com 60vw o candidato passa a w=768 e a
+          // sessão de scroll caiu de 6,19MB para 2,56MB (-59%), o primeiro ecrã
+          // de 1277KB para 772KB (-40%) e o p50 por imagem de 918ms para 317ms
+          // (-65%). Ainda ~2,0x de densidade numa miniatura que abre em
+          // full-res no lightbox. O ramo >=768px não muda: desktop fica igual.
+          sizes="(max-width: 639px) 60vw, (max-width: 767px) 50vw, 33vw"
           // 65 (was 72): thumbnails, so a lean file that loads fast on the grid
           // burst matters more than the last few % of sharpness — the full-res
           // photo opens in the lightbox. Smaller download + faster cold encode.
           quality={65}
-          className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-          loading={eager ? "eager" : "lazy"}
-          {...blurProps(photo)}
+          className={`object-cover ${zoomClass}`}
+          priority={eager}
+          anchorRef={btnRef}
+          unavailableLabel={unavailableLabel}
+          blurDataURL={photo.blurDataURL}
         />
         <HoverOverlay caption={caption} sub={sub} />
+        <FocusRing />
       </button>
     </div>
   );
 });
+
+/**
+ * Um dos 4 satélites do mosaico-herói. Componente próprio só por causa do ref:
+ * o `anchorRef` de cada satélite tem de ser o SEU botão (é ele que o observer
+ * vigia e é ele que o `<ViewTransition>` do morph nomeia).
+ */
+function SatelliteTile({
+  photo,
+  idx,
+  alt,
+  label,
+  cap,
+  hidden,
+  vtName,
+  tabbable,
+  zoomClass,
+  unavailableLabel,
+  onOpen,
+  onKeyNav,
+  onTileFocus,
+}: {
+  photo: Photo;
+  idx: number;
+  alt: string;
+  label: string;
+  cap: { caption: string; sub?: string };
+  hidden: boolean;
+  vtName?: string;
+  tabbable: boolean;
+  zoomClass: string;
+  unavailableLabel: string;
+  onOpen: (idx: number) => void;
+  onKeyNav: (e: React.KeyboardEvent, idx: number) => void;
+  onTileFocus: (idx: number) => void;
+}) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  return (
+    <button
+      ref={btnRef}
+      onClick={() => onOpen(idx)}
+      onKeyDown={(e) => onKeyNav(e, idx)}
+      onFocus={() => onTileFocus(idx)}
+      data-ripple
+      data-tile-idx={idx}
+      tabIndex={tabbable ? 0 : -1}
+      aria-label={label}
+      data-cap={cap.caption}
+      data-sub={cap.sub}
+      className={`g-hero g-tile relative hidden sm:block h-full w-full overflow-hidden group ${FOCUS_RING}`}
+      style={{ "--hero-delay": `${idx * 70}ms` } as React.CSSProperties}
+    >
+      {!hidden && (
+        <VTWrap name={vtName}>
+          <GalleryImage
+            src={photo.src}
+            alt={alt}
+            sizes="25vw"
+            // 65 (era 75): alinhado com o resto da grelha. Medido nas mesmas 10
+            // fotos, no candidato que estes satélites usam (w=360), q75 dá 20KB
+            // contra 16KB a q65 (+25% de bytes por nada de visível numa
+            // miniatura de 359px).
+            quality={65}
+            className={`object-cover ${zoomClass}`}
+            anchorRef={btnRef}
+            unavailableLabel={unavailableLabel}
+            blurDataURL={photo.blurDataURL}
+          />
+        </VTWrap>
+      )}
+      <HoverOverlay {...cap} />
+      <FocusRing />
+    </button>
+  );
+}
 
 export default function GaleriaClient({
   photos,
@@ -326,6 +469,19 @@ export default function GaleriaClient({
   // morph (`morphSrc`) e só na sua instância visível (gate `isSm`). Em repouso
   // — a navegar, filtrar, redimensionar — não há nomes nenhuns, portanto a
   // colisão é impossível; no morph existe exatamente um par miniatura↔lightbox.
+  // prefers-reduced-motion, lido no cliente (false no SSR e na hidratação, por
+  // isso não há mismatch). Serve para desligar o zoom de hover das fotos, que
+  // escapava ao bloco reduced-motion do globals.css.
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReduceMotion(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  const zoomClass = reduceMotion ? "" : ZOOM_CLASS;
+
   const [morphSrc, setMorphSrc] = useState<string | null>(null);
   /** Nome VT de uma tile: só quando é a foto em morph E é a sua instância
       visível (mosaico em sm+, masonry em mobile — codificado em `active`). */
@@ -440,7 +596,13 @@ export default function GaleriaClient({
         setCollectionFilter(null);
         const c = catFromSlug(hash);
         setCat((prev) => (prev === c ? prev : c));
-        setShown(PAGE);
+        // Sem hash e ainda no estado inicial, NÃO repor `shown`. Este efeito
+        // corre no mount (via onIdle) mesmo quando não há hash nenhum, e o
+        // `setShown(PAGE)` anulava o INITIAL_PAGE=12 ~1,3s depois do arranque:
+        // medido, o contador saltava de "12 de 427" para "24 de 427" aos 2,0s e
+        // os pedidos do primeiro ecrã partiam em duas vagas com 964ms parados
+        // no meio (…354, 354, 1318, 1318…). Com esta guarda a rampa é contínua.
+        setShown((prev) => (prev === INITIAL_PAGE && !hash ? prev : PAGE));
       };
       apply();
       window.addEventListener("hashchange", apply);
@@ -455,6 +617,30 @@ export default function GaleriaClient({
   // Localized display helpers — internal label keys stay PT (used for
   // filtering); only what the user reads is translated.
   const labelText = (l: Label) => dict.labels[l];
+
+  // Posição de cada foto dentro do seu grupo (a coleção quando existe, senão a
+  // categoria). É isto que torna o alt ÚNICO: o comentário antigo dizia que
+  // juntar a coleção fazia cada foto "ler unicamente", mas a medição sobre o
+  // dataset inteiro deu 427 fotos para 17 strings distintas — as 3 mais
+  // repetidas cobriam 188 fotos e a pior repetia-se 86 vezes. Com a posição, as
+  // 427 passam a 427 strings distintas.
+  const ordinals = useMemo(() => {
+    const seen = new Map<string, number>();
+    const total = new Map<string, number>();
+    const out = new Map<string, { n: number; of: number }>();
+    for (const p of photos) {
+      const key = collectionFor(p.src) ?? p.label;
+      total.set(key, (total.get(key) ?? 0) + 1);
+    }
+    for (const p of photos) {
+      const key = collectionFor(p.src) ?? p.label;
+      const n = (seen.get(key) ?? 0) + 1;
+      seen.set(key, n);
+      out.set(p.src, { n, of: total.get(key) ?? 1 });
+    }
+    return out;
+  }, [photos]);
+
   // Per-photo alt text. The category template (dict.alt) alone would make
   // hundreds of photos share one identical string (bad for image SEO + a11y),
   // so when the shoot/couple is known we append it — every photo then reads
@@ -463,7 +649,9 @@ export default function GaleriaClient({
   const altText = (src: string, l: Label) => {
     const base = dict.alt[l];
     const c = collectionFor(src);
-    return c ? `${base}: ${c}` : base;
+    const o = ordinals.get(src);
+    const pos = o ? ` (${dict.lbPhoto} ${o.n} ${dict.lbOf} ${o.of})` : "";
+    return (c ? `${base}: ${c}` : base) + pos;
   };
   const caption = (src: string, label: Label): { caption: string; sub?: string } => {
     const c = collectionFor(src);
@@ -518,6 +706,72 @@ export default function GaleriaClient({
     return cells;
   }, [visible, cols, collectionFilter]);
 
+  // ── Tabulação rotativa da grelha ────────────────────────────────────────
+  // A grelha é um único ponto de tabulação e as setas ←/→ (mais Home/End)
+  // percorrem as fotos por ordem de leitura lógica. Corrige duas medições: a
+  // ordem de foco saltava até 3625px para trás (o DOM é coluna-a-coluna) e ao
+  // 24.º Tab o foco era expulso da grelha para o link "Pedir orçamento",
+  // porque o lote seguinte só montava 3s depois — 403 das 427 fotos eram
+  // inalcançáveis sem rato.
+  const [rovingIdx, setRovingIdx] = useState(0);
+  const pendingFocusRef = useRef<number | null>(null);
+  const heroRef = useRef<HTMLButtonElement>(null);
+  // Ao trocar de filtro/coleção o pool encolhe; o índice tabulável é sempre
+  // encostado ao que existe, para a grelha nunca ficar sem porta de entrada.
+  const roving = Math.min(rovingIdx, Math.max(0, visible.length - 1));
+  /** Foca o mosaico `idx` na sua instância VISÍVEL (as fotos 1-4 existem duas
+      vezes: no mosaico-herói em sm+ e no masonry em mobile). */
+  const focusTile = useCallback((idx: number) => {
+    if (typeof document === "undefined") return false;
+    const els = document.querySelectorAll<HTMLElement>(`[data-tile-idx="${idx}"]`);
+    for (const el of els) {
+      if (el.offsetParent !== null) {
+        el.focus();
+        return true;
+      }
+    }
+    return false;
+  }, []);
+  const onTileFocus = useCallback((idx: number) => setRovingIdx(idx), []);
+  /**
+   * Nome acessível do botão de um mosaico. Antes não havia nenhum: o nome vinha
+   * do conteúdo (alt da imagem + texto do overlay), o que dava a informação
+   * colada 2-3 vezes e sem qualquer posição — 24 mosaicos visíveis partilhavam
+   * 11 nomes, o mais repetido 6 vezes seguidas. Também é isto que devolve os
+   * mosaicos à árvore de acessibilidade: com o nome no BOTÃO em vez de no
+   * conteúdo, o `content-visibility: auto` (que salta o conteúdo dos mosaicos
+   * fora do ecrã) deixa de os apagar.
+   */
+  const tileLabel = (src: string, l: Label, idx: number) => {
+    const c = caption(src, l);
+    const head = c.sub ? `${c.caption}, ${c.sub}` : c.caption;
+    return `${head}. ${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`;
+  };
+  const onKeyNav = useCallback(
+    (e: React.KeyboardEvent, idx: number) => {
+      let target: number | null = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") target = idx + 1;
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") target = idx - 1;
+      else if (e.key === "Home") target = 0;
+      else if (e.key === "End") target = pool.length - 1;
+      if (target === null) return;
+      e.preventDefault();
+      const to = Math.max(0, Math.min(target, pool.length - 1));
+      setRovingIdx(to);
+      if (!focusTile(to)) {
+        // Ainda não está montado: carrega até lá e foca quando aparecer.
+        pendingFocusRef.current = to;
+        startTransition(() => setShown((s) => Math.max(s, Math.min(to + 1, pool.length))));
+      }
+    },
+    [pool.length, focusTile],
+  );
+  useIsomorphicLayoutEffect(() => {
+    const want = pendingFocusRef.current;
+    if (want === null) return;
+    if (focusTile(want)) pendingFocusRef.current = null;
+  }, [shown, cols, focusTile]);
+
   // Infinite scroll — a sentinel below the grid loads the next page as it nears
   // the viewport (no "Ver mais" click). Recreated whenever `shown`/`pool.length`
   // change: re-observing reports the current intersection immediately, so if the
@@ -537,7 +791,12 @@ export default function GaleriaClient({
         if (entries[0]?.isIntersecting)
           startTransition(() => setShown((s) => Math.min(s + PAGE, pool.length)));
       },
-      { rootMargin: "800px 0px" },
+      // 400px (era 800px, ~um ecrã inteiro de fotos à frente). O que empilha a
+      // rajada é a antecipação: com 800px chegavam a estar 116-169 pedidos ao
+      // optimizador em voo ao mesmo tempo sobre HTTP/2. Metade da antecipação
+      // continua a montar os mosaicos antes de entrarem no ecrã, e quem trava
+      // o pedido em si é agora a fila (load-queue.ts).
+      { rootMargin: "400px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -687,7 +946,20 @@ export default function GaleriaClient({
       )}
 
       {/* ── Grid ── */}
-      <div style={{ opacity: fading ? 0 : 1, transition: "opacity 0.16s" }}>
+      {/* O contentor do masonry era um `DIV role=none label=none`: 427 botões
+          soltos, sem região, sem nome e sem posição. Agora é um grupo com nome
+          e com uma instrução (as setas) que o leitor de ecrã anuncia à entrada.
+          Isto e o `aria-label` de cada mosaico são o que dá contexto a quem
+          navega sem ver. */}
+      <div
+        role="group"
+        aria-label={dict.gridLabel}
+        aria-describedby="galeria-grid-hint"
+        style={{ opacity: fading ? 0 : 1, transition: "opacity 0.16s" }}
+      >
+        <p id="galeria-grid-hint" className="sr-only">
+          {dict.gridHint}
+        </p>
         {/* Hero — mosaico editorial de 5 fotos. Skipped in collection view:
             the mosaic/masonry dual-mount for slots 1-4, combined with a full
             pool swap, is exactly the combination that confuses React's
@@ -697,8 +969,14 @@ export default function GaleriaClient({
           <div className="grid grid-cols-2 sm:grid-cols-4 grid-rows-2 gap-0.5 mb-0.5 h-[320px] sm:h-[480px] lg:h-[600px]">
             {/* Foto grande — 2×2 */}
             <button
+              ref={heroRef}
               onClick={() => openAt(0)}
+              onKeyDown={(e) => onKeyNav(e, 0)}
+              onFocus={() => onTileFocus(0)}
               data-ripple
+              data-tile-idx={0}
+              tabIndex={roving === 0 ? 0 : -1}
+              aria-label={tileLabel(visible[0].src, visible[0].label, 0)}
               data-cap={caption(visible[0].src, visible[0].label).caption}
               data-sub={caption(visible[0].src, visible[0].label).sub}
               className={`g-hero g-tile relative col-span-2 row-span-2 h-full w-full overflow-hidden group ${FOCUS_RING}`}
@@ -710,52 +988,53 @@ export default function GaleriaClient({
                   overlay opaco, por isso nada se vê. */}
               {lb !== 0 && (
                 <VTWrap name={mosaicName(0)}>
-                  <Image
+                  <GalleryImage
                     src={visible[0].src}
                     alt={altText(visible[0].src, visible[0].label)}
-                    fill
                     sizes="(max-width: 640px) 100vw, 50vw"
                     quality={75}
-                    className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+                    className={`object-cover ${zoomClass}`}
                     // The 2×2 flagship tile is the largest grid image, the LCP
                     // candidate on this route, and the lightbox morph source —
                     // eager so it resolves without a lazy delay / pop-in.
-                    loading="eager"
-                    {...blurProps(visible[0])}
+                    // `priority` aqui também significa: salta a fila e leva
+                    // fetchPriority="high" (era null em TODAS as <img> da
+                    // página, mesmo nesta, que compete com o herói e o logo).
+                    priority
+                    anchorRef={heroRef}
+                    unavailableLabel={dict.photoUnavailable}
+                    blurDataURL={visible[0].blurDataURL}
                   />
                 </VTWrap>
               )}
               <HoverOverlay {...caption(visible[0].src, visible[0].label)} />
+              <FocusRing />
             </button>
 
-            {/* 4 fotos satélite — só em sm+ (lazy: não descarrega no telemóvel) */}
+            {/* 4 fotos satélite — só em sm+. Não levam `priority`: em mobile
+                estão em `display:none`, portanto o observer nunca dispara e o
+                telemóvel continua a não as descarregar (era o que o
+                loading="lazy" garantia). Em sm+ estão sempre visíveis, por
+                isso entram na fila logo a seguir ao 2x2 e deixam de esperar os
+                250ms de descoberta lazy que se mediram. */}
             {[1, 2, 3, 4].map((idx) =>
               visible.length > idx ? (
-                <button
+                <SatelliteTile
                   key={idx}
-                  onClick={() => openAt(idx)}
-                  data-ripple
-                  data-cap={caption(visible[idx].src, visible[idx].label).caption}
-                  data-sub={caption(visible[idx].src, visible[idx].label).sub}
-                  className={`g-hero g-tile relative hidden sm:block h-full w-full overflow-hidden group ${FOCUS_RING}`}
-                  style={{ "--hero-delay": `${idx * 70}ms` } as React.CSSProperties}
-                >
-                  {lb !== idx && (
-                    <VTWrap name={mosaicName(idx)}>
-                      <Image
-                        src={visible[idx].src}
-                        alt={altText(visible[idx].src, visible[idx].label)}
-                        fill
-                        sizes="25vw"
-                        quality={75}
-                        className="object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
-                        loading="lazy"
-                        {...blurProps(visible[idx])}
-                      />
-                    </VTWrap>
-                  )}
-                  <HoverOverlay {...caption(visible[idx].src, visible[idx].label)} />
-                </button>
+                  photo={visible[idx]}
+                  idx={idx}
+                  alt={altText(visible[idx].src, visible[idx].label)}
+                  label={tileLabel(visible[idx].src, visible[idx].label, idx)}
+                  cap={caption(visible[idx].src, visible[idx].label)}
+                  hidden={lb === idx}
+                  vtName={mosaicName(idx)}
+                  tabbable={roving === idx}
+                  zoomClass={zoomClass}
+                  unavailableLabel={dict.photoUnavailable}
+                  onOpen={openAt}
+                  onKeyNav={onKeyNav}
+                  onTileFocus={onTileFocus}
+                />
               ) : null,
             )}
           </div>
@@ -783,12 +1062,18 @@ export default function GaleriaClient({
                       photo={p}
                       idx={idx}
                       alt={altText(p.src, p.label)}
+                      label={tileLabel(p.src, p.label, idx)}
                       caption={cap.caption}
                       sub={cap.sub}
                       hiddenSm={!collectionFilter && idx < 5}
                       eager={!!collectionFilter && idx === 0}
                       revealDelay={(j % 3) * 60}
+                      tabbable={roving === idx}
+                      unavailableLabel={dict.photoUnavailable}
+                      zoomClass={zoomClass}
                       onOpen={openAt}
+                      onKeyNav={onKeyNav}
+                      onTileFocus={onTileFocus}
                       registerTile={registerTile}
                     />
                   );
@@ -800,41 +1085,50 @@ export default function GaleriaClient({
       </div>
 
       {/* ── Scroll infinito ── */}
-      {shown < pool.length && (
-        <div className="mt-14 flex flex-col items-center gap-4">
-          {/* Sentinela invisível — o IntersectionObserver carrega a próxima
-              página quando ela se aproxima do ecrã. */}
-          <div ref={sentinelRef} aria-hidden className="h-px w-full" />
-          {ioSupported ? (
-            <div className="g-loading flex items-center gap-2" aria-hidden>
-              <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
-              <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
-              <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
-            </div>
-          ) : (
-            // Fallback sem IntersectionObserver — botão manual (ghost quadrado,
-            // preenche a branco no hover como os CTA do idioma SpaceX).
+      <div className="mt-14 flex flex-col items-center gap-4">
+        {shown < pool.length && (
+          <>
+            {/* Sentinela invisível — o IntersectionObserver carrega a próxima
+                página quando ela se aproxima do ecrã. */}
+            <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+            {ioSupported && (
+              <div className="g-loading flex items-center gap-2" aria-hidden>
+                <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
+                <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
+                <span className="g-loading-dot h-1.5 w-1.5 rounded-full bg-moss-light" />
+              </div>
+            )}
+            {/* Botão "Ver mais" REAL, sempre montado, não só quando falta o
+                IntersectionObserver. Com o scroll infinito ele fica invisível
+                (sr-only) até receber foco: é a saída de teclado que faltava —
+                quem sai da grelha com Tab encontra sempre algo focável que
+                carrega o lote seguinte, em vez de ser expulso para o CTA. */}
             <button
               onClick={() => setShown((s) => Math.min(s + PAGE, pool.length))}
-              className="group flex min-h-[44px] items-center gap-3 border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.3em] text-white transition-colors duration-300 hover:border-white hover:bg-white hover:text-[#0c0e0b]"
+              className={`group flex min-h-[44px] items-center gap-3 border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.3em] text-white transition-colors duration-300 hover:border-white hover:bg-white hover:text-[#0c0e0b] ${
+                ioSupported ? "sr-only focus:not-sr-only focus:relative" : ""
+              }`}
             >
               {dict.verMais}
               <span className="text-white/55 transition-colors group-hover:text-[#0c0e0b]/70">
                 +{Math.min(PAGE, pool.length - shown)}
               </span>
             </button>
-          )}
-          <div className="relative h-px w-40 overflow-hidden bg-white/10">
-            <div
-              className="absolute left-0 top-0 h-full bg-moss/60 transition-all duration-500"
-              style={{ width: `${(shown / pool.length) * 100}%` }}
-            />
-          </div>
-          <p role="status" className="text-[10px] tracking-widest text-white/55">
-            {shown} {dict.de} {pool.length}
-          </p>
-        </div>
-      )}
+            <div className="relative h-px w-40 overflow-hidden bg-white/10">
+              <div
+                className="absolute left-0 top-0 h-full bg-moss/60 transition-all duration-500"
+                style={{ width: `${(shown / pool.length) * 100}%` }}
+              />
+            </div>
+          </>
+        )}
+        {/* Contador SEMPRE montado. O bloco inteiro desmontava assim que
+            `shown >= pool.length`, por isso o estado final ("427 de 427") era o
+            único que nunca chegava a ser anunciado. */}
+        <p role="status" className="text-[10px] tracking-widest text-white/55">
+          {shown} {dict.de} {pool.length}
+        </p>
+      </div>
 
       {/* ── Lightbox ── LAZY-MOUNT: só existe quando aberto. Todo o seu JS de
           runtime — portal, listeners de teclado/gesto, trap de foco, slideshow,
@@ -962,6 +1256,14 @@ function Lightbox({
       else if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
       else if (e.key === " " || e.code === "Space") {
+        // NÃO sequestrar a barra de espaço quando o foco está num controlo: ela
+        // é o gesto padrão para activar um botão. Medido, com o foco em
+        // "Fechar", Space deixava o diálogo aberto E arrancava o slideshow
+        // (dialogStillOpen: true, slideshowPlayingAfter: true) — o oposto do
+        // que o utilizador pediu. Falha WCAG 2.1.1.
+        const el = document.activeElement;
+        const tag = el?.tagName;
+        if (tag === "BUTTON" || tag === "A" || el?.getAttribute("role") === "button") return;
         e.preventDefault();
         setPlaying((p) => !p);
       } else if (e.key === "Tab" && dialogRef.current) {
@@ -991,23 +1293,46 @@ function Lightbox({
 
   // Move focus into the dialog on open; restore it to the trigger on close
   // (mount = abrir, unmount = fechar, já que este componente só vive aberto).
+  // Índice actual num ref, para a limpeza do efeito de foco (que corre uma só
+  // vez, no unmount) saber qual era a foto aberta.
+  const indexRef = useRef(index);
+  useEffect(() => {
+    indexRef.current = index;
+  }, [index]);
   useEffect(() => {
     restoreFocusRef.current = document.activeElement as HTMLElement | null;
     const id = requestAnimationFrame(() => dialogRef.current?.focus());
     return () => {
       cancelAnimationFrame(id);
-      restoreFocusRef.current?.focus?.();
+      const origin = restoreFocusRef.current;
+      // `viewCollection` ("Ver este casamento") troca o pool inteiro: o mosaico
+      // de origem já foi desmontado e focá-lo mandava o foco para o <body>
+      // (medido: focusOnBody true, activeElement BODY). Confirmar `isConnected`
+      // e, se falhar, cair no mosaico da foto que estava aberta.
+      if (origin?.isConnected) {
+        origin.focus?.();
+        return;
+      }
+      const tile = document.querySelector<HTMLElement>(`[data-tile-idx="${indexRef.current}"]`);
+      (tile ?? document.querySelector<HTMLElement>("[data-tile-idx]"))?.focus();
     };
   }, []);
 
   // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
   // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
+  // Lido uma vez na montagem do lightbox (que só existe no cliente, depois de
+  // uma interacção), por isso não há hidratação a acertar.
+  const [slideMs] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+      ? SLIDE_MS_REDUCED
+      : SLIDE_MS,
+  );
   useEffect(() => {
     if (!playing) return;
     if (typeof document !== "undefined" && document.hidden) return;
-    const id = window.setTimeout(next, SLIDE_MS);
+    const id = window.setTimeout(next, slideMs);
     return () => window.clearTimeout(id);
-  }, [playing, next]);
+  }, [playing, next, slideMs]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -1108,6 +1433,17 @@ function Lightbox({
           É também o que o gesto de arrastar-para-baixo desvanece. */}
       <div ref={backdropRef} className="lb-backdrop absolute inset-0 bg-black" />
 
+      {/* Região viva. Medido: `liveRegionsInDialog: 0` — navegar com ←/→ (ou
+          pelas miniaturas, ou pelo slideshow) era completamente silencioso.
+          Mudar o `aria-label` de um elemento JÁ focado não anuncia nada; esta
+          região reescreve-se a cada foto e é isso que o leitor lê. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {`${dict.lbPhoto} ${index + 1} ${dict.lbOf} ${pool.length}. ${altText(
+          pool[index].src,
+          pool[index].label,
+        )}`}
+      </p>
+
       {/* Barra superior */}
       <div
         className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 pb-3.5 flex-shrink-0"
@@ -1118,7 +1454,8 @@ function Lightbox({
       >
         <div className="flex items-center gap-3">
           <span className="text-white/70 text-xs font-light tabular-nums">{index + 1}</span>
-          <span className="text-white/40 text-xs">/</span>
+          {/* /60 (era /40): o separador media 3.66:1 a 12px, abaixo do minimo de 4.5:1. */}
+          <span className="text-white/60 text-xs">/</span>
           <span className="text-white/55 text-xs tabular-nums">{pool.length}</span>
           <span className="w-px h-3 bg-white/10 mx-1" />
           {collectionFor(pool[index].src) && (
@@ -1130,7 +1467,9 @@ function Lightbox({
                 }}
                 aria-label={`${dict.viewWedding}: ${collectionFor(pool[index].src)}`}
                 title={dict.viewWedding}
-                className="text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
+                // min-h + inline-flex: media 27x16px em telemovel, abaixo dos 24x24 CSS
+                // px minimos da WCAG 2.5.8. So cresce a caixa, o sublinhado fica igual.
+                className="inline-flex min-h-[24px] items-center text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
                 {collectionFor(pool[index].src)}
@@ -1147,7 +1486,7 @@ function Lightbox({
             onClick={() => setPlaying((p) => !p)}
             aria-label={playing ? dict.lbPause : dict.lbPlay}
             aria-pressed={playing}
-            className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/40 hover:text-white"}`}
+            className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/60 hover:text-white"}`}
           >
             {playing ? (
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1163,7 +1502,8 @@ function Lightbox({
           <button
             onClick={close}
             aria-label={dict.lbClose}
-            className="p-3 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/8"
+            // /60 (era /40): icone em repouso media 3.66:1, no limite de WCAG 1.4.11.
+            className="p-3 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/8"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -1230,7 +1570,10 @@ function Lightbox({
               // candidate than the tile thumbnail, so opening starts a cold fetch.
               // Fetching it high-priority (instead of default) shortens the
               // "black → pop" gap so the photo is ready as the open animation runs.
-              priority
+              // Next 16 deprecou `priority` a favor de `preload`; para uma
+              // foto que ja esta no DOM a propria doc recomenda antes
+              // fetchPriority="high", que e exactamente o efeito que se quer.
+              fetchPriority="high"
               onLoad={() => setHeroLoaded(true)}
               className={`object-contain ${
                 playing ? "lb-kenburns" : justOpened ? "lb-open-in" : "lb-photo-in"
@@ -1295,19 +1638,20 @@ function Lightbox({
               }}
               aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
               aria-current={idx === index ? "true" : undefined}
-              className={`relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
+              className={`group relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
                 idx === index
                   ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
-                  : "w-[60px] h-[44px] opacity-30 hover:opacity-60 hover:scale-105"
+                  : "w-[60px] h-[44px] opacity-50 hover:opacity-80 hover:scale-105"
               }`}
             >
               <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+              <FocusRing />
             </button>
           ))}
       </div>
 
       {/* Dicas teclado */}
-      <p className="text-center text-white/45 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
+      <p className="text-center text-white/60 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
         {dict.keyboardHint}
       </p>
     </div>,

@@ -233,6 +233,9 @@ export const pt = {
     photosLabel: "fotos",
     keyboardHint: "← → navegar · esc fechar · deslize no telemóvel",
     backToTop: "Voltar ao topo",
+    gridLabel: "Galeria de fotografias",
+    gridHint: "Use as setas para percorrer as fotos e Enter para abrir.",
+    photoUnavailable: "Foto indisponível",
   },
 
   clientes: {

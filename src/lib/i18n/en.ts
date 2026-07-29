@@ -231,6 +231,9 @@ export const en: Dict = {
     photosLabel: "photos",
     keyboardHint: "← → navigate · esc to close · swipe on mobile",
     backToTop: "Back to top",
+    gridLabel: "Photo gallery",
+    gridHint: "Use the arrow keys to move through the photos and Enter to open.",
+    photoUnavailable: "Photo unavailable",
   },
 
   clientes: {
