@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listCalendarEvents, createCalendarEvent } from "@/lib/calendar-store";
+import { jsonWithEtag } from "@/lib/api-cache";
 import type { CalendarEventKind } from "@/lib/orcamento/types";
 import { log } from "@/lib/logger";
 
@@ -12,7 +13,7 @@ const KINDS: CalendarEventKind[] = ["reuniao", "evento", "bloqueio", "nota"];
 export async function GET(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
-    return NextResponse.json(await listCalendarEvents());
+    return jsonWithEtag(request, await listCalendarEvents());
   } catch (err) {
     log.error("calendario GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

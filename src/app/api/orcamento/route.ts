@@ -14,6 +14,7 @@ import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
 import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
+import { jsonWithEtag } from "@/lib/api-cache";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quotePayloadSchema, firstError } from "@/lib/validation";
@@ -527,7 +528,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const quotes = await listQuotes();
-    return NextResponse.json(quotes);
+    return jsonWithEtag(request, quotes);
   } catch (err) {
     log.error("orcamento GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

@@ -10,6 +10,7 @@ import {
   isUniqueViolation,
   type Invoice,
 } from "@/lib/invoices-store";
+import { jsonWithEtag } from "@/lib/api-cache";
 import { log } from "@/lib/logger";
 import { invoiceCreateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   try {
     const quoteId = request.nextUrl.searchParams.get("quoteId");
     const invoices = quoteId ? await listInvoicesForQuote(quoteId) : await listInvoices();
-    return NextResponse.json(invoices);
+    return jsonWithEtag(request, invoices);
   } catch (err) {
     log.error("faturas GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

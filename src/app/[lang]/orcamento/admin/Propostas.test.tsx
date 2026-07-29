@@ -52,15 +52,22 @@ const proposals = [
   },
 ];
 
+/** Resposta mínima que o `useCachedList` sabe ler: além do corpo, ele consulta
+ *  o estado (304 = nada mudou) e o cabeçalho ETag. Sem `headers` o carregamento
+ *  rebentava e a lista nunca chegava a desenhar-se. */
+const response = (body: unknown) => ({
+  ok: true,
+  status: 200,
+  headers: new Headers({ ETag: 'W/"teste"' }),
+  json: async () => body,
+});
+
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => {
-      if (String(url).startsWith("/api/propostas")) {
-        return { ok: true, status: 200, json: async () => proposals };
-      }
-      return { ok: true, status: 200, json: async () => [] };
-    }),
+    vi.fn(async (url: string) =>
+      String(url).startsWith("/api/propostas") ? response(proposals) : response([]),
+    ),
   );
 });
 

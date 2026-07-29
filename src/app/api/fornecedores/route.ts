@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listSuppliers, createSupplier } from "@/lib/suppliers-store";
+import { jsonWithEtag } from "@/lib/api-cache";
 import { supplierUpdateSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
-    return NextResponse.json(await listSuppliers());
+    return jsonWithEtag(request, await listSuppliers());
   } catch (err) {
     log.error("fornecedores GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

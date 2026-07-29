@@ -219,7 +219,22 @@ const nextConfig: NextConfig = {
   },
 };
 
-// Wrap with the bundle analyzer (run `npm run analyze` to open the report).
+// Bundle analyzer.
+//
+// ATENÇÃO: `npm run analyze` NÃO produz relatório nenhum neste projecto. O
+// @next/bundle-analyzer é um plugin de webpack e o `next build` do Next 16 usa
+// Turbopack; o próprio build avisa "The Next Bundle Analyzer is not compatible
+// with Turbopack builds, no report will be generated" — mas sai com código 0, o
+// que faz o comando parecer bem-sucedido.
+//
+// Para ver o peso dos chunks a sério, uma destas duas:
+//   • `npx next experimental-analyze` — o analisador do Turbopack (verificado:
+//     corre e serve o relatório em http://127.0.0.1:4000);
+//   • `next build --webpack`, que reactiva este plugin (build mais lento e não
+//     é o que a produção usa, por isso os números afastam-se um pouco).
+//
+// O wrapper fica: é inerte quando ANALYZE não está definido e volta a funcionar
+// se algum dia se voltar ao webpack.
 const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
 
 export default withBundleAnalyzer(nextConfig);

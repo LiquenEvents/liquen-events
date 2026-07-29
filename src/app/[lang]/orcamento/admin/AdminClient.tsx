@@ -453,6 +453,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const gestaoRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // ETag da última lista de pedidos vinda de `/api/orcamento`, para que o botão
+  // "Atualizar" possa perguntar "mudou alguma coisa?" em vez de mandar vir tudo
+  // outra vez. Começa vazio: a primeira lista veio no HTML, sem carimbo.
+  const quotesEtag = useRef<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
   // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
@@ -857,9 +861,26 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   async function refresh() {
     setRefreshing(true);
     try {
-      const res = await fetch("/api/orcamento", { headers: { "x-admin-refresh": "1" } });
+      const res = await fetch("/api/orcamento", {
+        cache: "no-store",
+        headers: {
+          "x-admin-refresh": "1",
+          // Pedido condicional: se a lista no servidor for a mesma que
+          // recebemos da última vez, ele responde 304 sem corpo.
+          ...(quotesEtag.current ? { "If-None-Match": quotesEtag.current } : {}),
+        },
+      });
+      // 304 = o servidor leu a tabela e nada mudou. É uma resposta tão fresca
+      // como um 200 — poupa a transferência (com 300 pedidos, ~440 KB) e, o
+      // que se nota mais, evita substituir a lista inteira por uma cópia
+      // idêntica, o que faria a página redesenhar-se toda sem motivo.
+      if (res.status === 304) {
+        toast(`Atualizado — ${quotes.length} pedido${quotes.length !== 1 ? "s" : ""}`, "success");
+        return;
+      }
       const data = await res.json();
       if (Array.isArray(data)) {
+        quotesEtag.current = res.headers.get("etag");
         setQuotes(data);
         toast(`Atualizado — ${data.length} pedido${data.length !== 1 ? "s" : ""}`, "success");
       }

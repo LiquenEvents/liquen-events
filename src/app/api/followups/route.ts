@@ -4,6 +4,7 @@ import { listQuotes } from "@/lib/quotes-store";
 import { listAllProposals } from "@/lib/proposals-store";
 import { listInvoices } from "@/lib/invoices-store";
 import { computeFollowUps, withInvoiceFollowUps } from "@/lib/followups";
+import { jsonWithEtag } from "@/lib/api-cache";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Junta os atrasos do livro de faturas (deduplicando contra os informais do
     // mesmo evento — prevalece o livro) e reordena.
     const followUps = withInvoiceFollowUps({ base, invoices, quotes, now });
-    return NextResponse.json(followUps);
+    return jsonWithEtag(request, followUps);
   } catch (err) {
     log.error("followups GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
