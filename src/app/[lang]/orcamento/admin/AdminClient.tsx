@@ -1348,19 +1348,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </svg>
           </button>
 
-          {/* Brand — small, quiet Líquen lockup for the light rail. */}
-          <div className="px-5 pt-6 pb-4 flex flex-col items-center text-center">
+          {/* Marca — o logótipo sozinho, em maior. A legenda "Back Office" saiu:
+              quem está aqui dentro já sabe onde está, e o rótulo só roubava
+              espaço ao único elemento que identifica a casa. O nome continua a
+              ser anunciado por leitores de ecrã através do `alt` da imagem. */}
+          <div className="px-5 pt-6 pb-5 flex flex-col items-center text-center">
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
               width={300}
               height={179}
               priority
-              className="h-12 w-auto object-contain"
+              className="h-20 w-auto object-contain"
             />
-            <span className="text-[var(--bo-text-faint)] text-[9px] tracking-[0.3em] uppercase mt-2">
-              Back Office
-            </span>
           </div>
 
           {/* Nav — quiet, ChatGPT-like rail: a short core list always visible,
