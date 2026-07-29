@@ -10,7 +10,7 @@ import {
 import { isAuthed } from "@/lib/admin-auth";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal } from "@/lib/proposals-store";
-import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
+import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
@@ -45,13 +45,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Shared pipeline (resolve Storage images → render) — the exact same helper
     // the public portal PDF route uses, so both emit an identical document.
-    const pdfBuffer = await renderStoredProposalDocPdf(doc);
+    const { pdf: pdfBuffer, missingImages } = await renderStoredProposalDocPdfWithReport(doc);
 
     if (mode === "preview") {
       return new NextResponse(pdfBuffer, {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": 'inline; filename="proposta-preview.pdf"',
+          // Quantas fotos não entraram. O gerador salta a que não resolve, por
+          // isso sem este cabeçalho o PDF sai com fotos a menos e o estúdio não
+          // tem como saber. É lido em ProposalStudio para avisar antes de enviar.
+          "X-Fotos-Em-Falta": String(missingImages),
         },
       });
     }

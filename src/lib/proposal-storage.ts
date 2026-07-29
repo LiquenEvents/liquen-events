@@ -401,6 +401,33 @@ function allowedRemoteHost(): string | null {
  * string — so the generator input can mix stored images and inline uploads.
  */
 export async function fetchProposalImageBytes(ref: string): Promise<Buffer | null> {
+  const bytes = await fetchProposalImageBytesInner(ref);
+  if (!bytes) {
+    // PORQUÊ REGISTAR ISTO.
+    //
+    // Todos os caminhos de falha aqui devolviam `null` em silêncio, e quem
+    // desenha o PDF salta a foto que não resolve. O resultado é uma proposta a
+    // seguir para o cliente com fotografias a menos e NINGUÉM a saber: nem a
+    // Catarina, nem os registos do servidor. Foi assim que isto apareceu, com
+    // ela a abrir o PDF e a dar pela falta.
+    //
+    // O `kind` diz onde procurar sem expor o caminho todo: um caminho de bucket
+    // que falha é outro problema (permissões, ficheiro apagado) de um URL que
+    // falha (assinatura expirada, anfitrião errado).
+    const kind = ref.startsWith("data:")
+      ? "data-uri"
+      : /^https?:\/\//i.test(ref)
+        ? "url"
+        : "caminho-do-bucket";
+    log.warn("proposal-storage: imagem não resolveu, vai FALTAR no PDF", {
+      kind,
+      ref: ref.slice(0, 120),
+    });
+  }
+  return bytes;
+}
+
+async function fetchProposalImageBytesInner(ref: string): Promise<Buffer | null> {
   if (!ref) return null;
   // Inline base64 / data URI.
   if (ref.startsWith("data:") || (!ref.includes("/") && ref.length > 128)) {

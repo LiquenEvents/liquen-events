@@ -2,6 +2,7 @@ import "server-only";
 import { type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
 import { renderProposalDocPdf } from "@/lib/proposal-doc-pdf";
 import { fetchProposalImageBytes } from "@/lib/proposal-storage";
+import { log } from "@/lib/logger";
 
 // Bounds on image resolution, so a doc with a huge number of image refs can't
 // fan out unbounded concurrent fetches (memory/CPU DoS during render) or embed
@@ -35,12 +36,22 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
  *  dropped (the collage has no fixed slots); a missing COVER image keeps its
  *  position, because the two cover slots are left and right. Resolution is
  *  concurrency-bounded and capped at MAX_IMAGES_PER_DOC total. */
-async function resolveImages(doc: ProposalDoc): Promise<ProposalDoc> {
+async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; missing: number }> {
   let remaining = MAX_IMAGES_PER_DOC;
+  // Quantas fotos foram PEDIDAS e não entraram. Uma proposta com fotos a menos
+  // seguia para o cliente sem ninguém dar por isso; agora quem chama fica a
+  // saber e pode dizê-lo. Ver o cabeçalho `X-Fotos-Em-Falta` na rota.
+  let missing = 0;
   const toB64 = async (ref: string): Promise<string | null> => {
-    if (remaining <= 0) return null;
+    if (remaining <= 0) {
+      // O tecto também é uma perda silenciosa: uma proposta com mais de
+      // MAX_IMAGES_PER_DOC fotos perdia as últimas sem aviso.
+      missing++;
+      return null;
+    }
     remaining--;
     const bytes = await fetchProposalImageBytes(ref);
+    if (!bytes) missing++;
     return bytes ? bytes.toString("base64") : null;
   };
   // A capa tem 2 POSIÇÕES fixas. Uma referência vazia — ou que não resolve —
@@ -61,7 +72,7 @@ async function resolveImages(doc: ProposalDoc): Promise<ProposalDoc> {
     );
     moodBoards.push({ ...mb, images });
   }
-  return { ...doc, coverImages: cover, moodBoards };
+  return { doc: { ...doc, coverImages: cover, moodBoards }, missing };
 }
 
 /**
@@ -73,11 +84,29 @@ async function resolveImages(doc: ProposalDoc): Promise<ProposalDoc> {
  * both produce byte-for-byte the same document from the same stored doc.
  */
 export async function renderStoredProposalDocPdf(doc: ProposalDoc): Promise<Buffer<ArrayBuffer>> {
+  return (await renderStoredProposalDocPdfWithReport(doc)).pdf;
+}
+
+/**
+ * Como `renderStoredProposalDocPdf`, mas diz também quantas fotos ficaram por
+ * resolver. Existe porque o gerador SALTA a foto que não resolve: sem esta
+ * contagem, uma proposta seguia para o cliente com fotografias a menos e o
+ * único a dar por isso era quem abrisse o PDF.
+ */
+export async function renderStoredProposalDocPdfWithReport(
+  doc: ProposalDoc,
+): Promise<{ pdf: Buffer<ArrayBuffer>; missingImages: number }> {
   // Fill the studio's fixed boilerplate (condições, observações, faseamento,
   // cancelamento) + event-token substitution so the caller only supplies what
   // varies per event.
   const withDefaults = withProposalDefaults(doc);
-  const resolved = await resolveImages(withDefaults);
+  const { doc: resolved, missing } = await resolveImages(withDefaults);
   const pdfBytes = await renderProposalDocPdf(resolved);
-  return Buffer.from(pdfBytes);
+  if (missing > 0) {
+    log.error("proposal-doc-render: PDF gerado com fotos EM FALTA", null, {
+      emFalta: missing,
+      ref: doc.ref,
+    });
+  }
+  return { pdf: Buffer.from(pdfBytes), missingImages: missing };
 }

@@ -797,7 +797,21 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast("Pré-visualização gerada (PDF descarregado)", "success");
+      // O gerador SALTA a foto que não consegue ir buscar, por isso um PDF com
+      // fotos a menos sai na mesma, com ar de estar bem. Sem este aviso, a
+      // primeira pessoa a dar pela falta era o cliente. O servidor conta-as e
+      // devolve o número neste cabeçalho.
+      const emFalta = Number(res.headers.get("X-Fotos-Em-Falta") ?? "0");
+      if (emFalta > 0) {
+        toast(
+          emFalta === 1
+            ? "PDF gerado, mas 1 foto não entrou. Verifique antes de enviar."
+            : `PDF gerado, mas ${emFalta} fotos não entraram. Verifique antes de enviar.`,
+          "error",
+        );
+      } else {
+        toast("Pré-visualização gerada (PDF descarregado)", "success");
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro na pré-visualização.", "error");
     } finally {
