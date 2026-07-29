@@ -84,9 +84,8 @@ const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
   { nav: /^Propostas$/, heading: /^Propostas$/ },
-  { nav: /^Faturas$/, heading: /^Faturas$/ },
-  { nav: /^Contratos$/, heading: /^Contratos$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
+  { nav: /^Tarefas$/, heading: /^Tarefas$/ },
 ];
 
 test.describe("Back office — smoke", () => {

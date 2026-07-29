@@ -5,9 +5,8 @@ import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
  *
  * A companion to admin-smoke: that spec covers the always-visible CORE sidebar
  * items, this one opens the collapsed "Mais" disclosure and walks the SECONDARY
- * destinations tucked behind it (Pipeline, Clientes, Tarefas, Temas,
- * Fornecedores, Inventário, Seguimentos, Estatísticas, Modelos de email —
- * labels from nav.tsx).
+ * destinations tucked behind it (Faturas, Contratos, Temas, Pipeline,
+ * Seguimentos, Estatísticas — labels from nav.tsx's MORE_NAV).
  * For each it asserts:
  *   1. its page heading (H1) renders, so the lazy chunk mounted (not a skeleton),
  *   2. no error boundary ("Ocorreu um erro inesperado") tripped, and
@@ -83,15 +82,12 @@ async function login(page: Page): Promise<boolean> {
 // the H1 the sticky header shows for that view (AdminClient's VIEW_TITLES).
 // admin-smoke already covers every CORE item, so this walk complements it.
 const SECONDARY_VIEWS: { nav: RegExp; heading: RegExp }[] = [
-  { nav: /^Pipeline$/, heading: /^Pipeline$/ },
-  { nav: /^Clientes$/, heading: /^Clientes$/ },
-  { nav: /^Tarefas$/, heading: /^Tarefas$/ },
+  { nav: /^Faturas$/, heading: /^Faturas$/ },
+  { nav: /^Contratos$/, heading: /^Contratos$/ },
   { nav: /^Temas$/, heading: /^Temas$/ },
-  { nav: /^Fornecedores$/, heading: /^Fornecedores$/ },
-  { nav: /^Inventário$/, heading: /^Inventário$/ },
+  { nav: /^Pipeline$/, heading: /^Pipeline$/ },
   { nav: /^Seguimentos$/, heading: /^Seguimentos$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
-  { nav: /^Modelos de email$/, heading: /^Modelos de email$/ },
 ];
 
 test.describe("Back office — secondary views", () => {
