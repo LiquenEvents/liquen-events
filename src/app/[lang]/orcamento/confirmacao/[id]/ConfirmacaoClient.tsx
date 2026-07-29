@@ -197,7 +197,7 @@ export default function ConfirmacaoClient({
     const end = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(
       next.getDate(),
     ).padStart(2, "0")}`;
-    const title = `${typeLabel || cat?.label || "Evento"} — Líquen Events`;
+    const title = `${typeLabel || cat?.label || "Evento"} | Líquen Events`;
     // Escape per RFC 5545 §3.3.11 — a stray comma/semicolon in the copy would
     // otherwise split the value and corrupt the event.
     const esc = (s: string) =>

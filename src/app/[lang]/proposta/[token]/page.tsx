@@ -15,7 +15,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const locale = normalizeLocale((await params).lang);
   return {
-    title: locale === "en" ? "Your proposal — Líquen Events" : "A sua proposta — Líquen Events",
+    title: locale === "en" ? "Your proposal | Líquen Events" : "A sua proposta | Líquen Events",
     robots: { index: false, follow: false },
   };
 }

@@ -463,7 +463,7 @@ export default function GaleriaClient({
   const altText = (src: string, l: Label) => {
     const base = dict.alt[l];
     const c = collectionFor(src);
-    return c ? `${base} — ${c}` : base;
+    return c ? `${base}: ${c}` : base;
   };
   const caption = (src: string, label: Label): { caption: string; sub?: string } => {
     const c = collectionFor(src);
@@ -953,7 +953,7 @@ function Lightbox({
   const altText = (src: string, l: Label) => {
     const base = dict.alt[l];
     const c = collectionFor(src);
-    return c ? `${base} — ${c}` : base;
+    return c ? `${base}: ${c}` : base;
   };
 
   useEffect(() => {
@@ -1098,7 +1098,7 @@ function Lightbox({
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`${dict.lbGallery} — ${labelText(pool[index].label)}, ${dict.lbPhoto} ${index + 1} ${dict.lbOf} ${pool.length}`}
+      aria-label={`${dict.lbGallery}: ${labelText(pool[index].label)}, ${dict.lbPhoto} ${index + 1} ${dict.lbOf} ${pool.length}`}
       tabIndex={-1}
       className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
       onClick={close}
@@ -1128,7 +1128,7 @@ function Lightbox({
                   e.stopPropagation();
                   viewCollection(collectionFor(pool[index].src)!);
                 }}
-                aria-label={`${dict.viewWedding} — ${collectionFor(pool[index].src)}`}
+                aria-label={`${dict.viewWedding}: ${collectionFor(pool[index].src)}`}
                 title={dict.viewWedding}
                 className="text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
                 style={{ fontFamily: "var(--font-playfair)" }}
