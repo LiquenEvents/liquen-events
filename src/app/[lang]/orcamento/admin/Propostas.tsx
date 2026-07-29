@@ -23,6 +23,26 @@ const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
   rejeitada: { label: "Recusada", color: "#5a5a55" },
 };
 
+/**
+ * O estado de UMA proposta não pode derrubar a lista toda.
+ *
+ * `STATUS_META[p.status].color` rebentava com `undefined` assim que uma linha
+ * trazia um estado fora do mapa — e como isto é um componente de cliente, o erro
+ * subia até ao limite de erro e substituía o back office INTEIRO pelo ecrã
+ * "Ocorreu um erro inesperado". Não era hipotético: apanhámos-lo com uma linha
+ * gravada como `recusada` em vez de `rejeitada` (o mapa usa a segunda, e mostra
+ * "Recusada" como etiqueta — é fácil trocar).
+ *
+ * A API valida os estados, portanto pelo uso normal não acontece; acontece com
+ * uma linha antiga, uma migração, ou uma correcção feita à mão na base de dados.
+ * Nesse caso mostramos o valor cru em cinzento em vez de perder o ecrã: ela vê
+ * que aquela linha tem algo estranho e continua a trabalhar. O `AdminClient` já
+ * se protegia assim (`statusBadge`); esta lista não.
+ */
+function statusMeta(status: string): { label: string; color: string } {
+  return STATUS_META[status as ProposalStatus] ?? { label: status || "—", color: "#8a8a82" };
+}
+
 function expiryInfo(
   validUntil?: string,
 ): { label: string; tone: "ok" | "soon" | "expired" } | null {
@@ -370,11 +390,11 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                       <span
                         className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
                         style={{
-                          background: `${STATUS_META[p.status].color}1f`,
-                          color: STATUS_META[p.status].color,
+                          background: `${statusMeta(p.status).color}1f`,
+                          color: statusMeta(p.status).color,
                         }}
                       >
-                        {STATUS_META[p.status].label}
+                        {statusMeta(p.status).label}
                       </span>
                       {exp && (
                         <span

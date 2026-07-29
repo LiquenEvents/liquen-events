@@ -10,17 +10,23 @@
  * embutidas quatro vezes — não por serem fotos grandes). A regra passou a ser:
  * medir primeiro, mexer depois, e voltar a medir. Este script é a medição.
  *
- * Só LÊ o produto. Não altera código nenhum. A única coisa que escreve são os
- * ficheiros `data/*.json` durante o teste de volume — e faz cópia de segurança
- * antes e repõe-a no fim, mesmo que algo corra mal (ver `withVolume`).
+ * Só LÊ o produto. Não altera código nenhum. Sem opções NÃO ESCREVE NADA.
+ * A única coisa que escreve são os ficheiros `data/*.json`, e só quando se pede
+ * `--volume=N` de propósito: faz cópia de segurança antes, repõe-a no fim, e
+ * repõe-a também no arranque seguinte se uma execução tiver sido interrompida
+ * a meio (ver `withVolume` e `recoverAbandonedBackup`). Use sempre `--volume`
+ * em conjunto com `--root=<cópia do projeto>`, para não mexer nos dados reais.
  *
  * O QUE MEDE
  * ----------
  *   1. Primeiro carregamento de /orcamento/admin — bytes de JS, tempo até o
  *      ecrã responder a um clique, e a cascata de pedidos (waterfall).
- *   2. Mudança de vista — Pedidos → Propostas → Faturas → Calendário →
- *      Comunicação, e para cada uma o que domina: descarregar o chunk, ir
- *      buscar dados, ou desenhar.
+ *   2. Mudança de vista — Pedidos → Propostas → Faturas → Calendário → Temas →
+ *      Estatísticas, mais abrir um pedido e o separador das mensagens, com o
+ *      tempo repartido pelas fases em série (reagir, descarregar o ficheiro,
+ *      montar, ir buscar dados, desenhar) para se ver o que domina.
+ *      "Mensagens" não é uma vista de topo: vive dentro de um pedido, no
+ *      separador "Fazer proposta".
  *   3. Tarefas longas — onde a thread principal bloqueia mais de 50 ms.
  *   4. Com volume a sério — centenas de pedidos/propostas/faturas, porque um
  *      back office rápido com 3 linhas e lento com 300 é a queixa verdadeira.
@@ -38,8 +44,14 @@
  *
  * Opções:
  *   --url=http://localhost:3000   usar um servidor já a correr (não arranca nenhum)
+ *   --root=/caminho/para/copia    medir OUTRA árvore (o .next e o data/ dela).
+ *                                 Indispensável quando várias pessoas estão a
+ *                                 compilar a mesma pasta ao mesmo tempo — senão
+ *                                 o .next muda debaixo dos pés a meio da medição.
  *   --runs=3                      repetições por medição (mediana; por omissão 3)
- *   --volume=300                  quantos pedidos/propostas/faturas gerar
+ *   --volume=300                  gerar N pedidos/propostas/faturas e medir com eles.
+ *                                 OPT-IN: sem esta opção nada é escrito em data/.
+ *                                 Use-a sempre com --root=<cópia> (ver abaixo).
  *   --skip=publico,pdf,volume     saltar secções (admin,vistas,volume,publico,pdf)
  *   --cpu=4                       abrandar o CPU N× (emula um portátil modesto)
  *   --json=caminho.json           gravar os números em bruto para comparar depois
@@ -93,7 +105,11 @@ const args = Object.fromEntries(
   }),
 );
 const RUNS = Number(args.runs ?? 3);
-const VOLUME = Number(args.volume ?? 300);
+// A secção de volume SUBSTITUI os ficheiros em data/. É por isso OPT-IN: só
+// corre se `--volume=N` for escrito à mão. Antes era o comportamento por
+// omissão e uma execução distraída chegou a reescrever os dados do projeto —
+// nunca mais. Sem `--volume`, a medição é 100% de leitura.
+const VOLUME = args.volume === undefined ? 0 : Number(args.volume);
 const CPU_THROTTLE = Number(args.cpu ?? 1);
 const SKIP = new Set(
   String(args.skip ?? "")
@@ -1428,7 +1444,9 @@ async function runDiff(spec) {
   const a = JSON.parse(await fs.readFile(aPath, "utf8"));
   const b = JSON.parse(await fs.readFile(bPath, "utf8"));
   const line = (name, x, y, unit = "ms") => {
-    if (x == null || y == null) return;
+    // Uma secção que não foi corrida numa das medições simplesmente não aparece
+    // (em vez de imprimir "NaN%", que não diz nada a ninguém).
+    if (x == null || y == null || Number.isNaN(x) || Number.isNaN(y)) return;
     const delta = y - x;
     const pct = x ? ((delta / x) * 100).toFixed(1) : "—";
     const arrow = delta < 0 ? "▼" : delta > 0 ? "▲" : "=";
@@ -1499,11 +1517,13 @@ async function main() {
       report.longTasks = reportLongTasks(report.firstLoad, report.views, "dados de origem");
     }
 
-    if (!SKIP.has("volume")) {
+    if (!SKIP.has("volume") && VOLUME > 0) {
       heading(`4. COM VOLUME REAL — ${VOLUME} pedidos, propostas e faturas`);
       console.log(
-        "   Nota: os ficheiros data/*.json são substituídos durante esta secção e\n" +
-          "   repostos no fim. Nada disto deve ser commitado.",
+        `   ATENÇÃO: esta secção substitui os ficheiros em\n` +
+          `   ${DATA_DIR}\n` +
+          `   e repõe-nos no fim (incluindo depois de uma interrupção). Confirme que\n` +
+          `   é a pasta que espera — use --root=<cópia> para medir fora do projeto.`,
       );
       report.volume = await withVolume(VOLUME, async () => {
         const v = {};
@@ -1513,6 +1533,15 @@ async function main() {
         v.longTasks = reportLongTasks(v.firstLoad, v.views, `${VOLUME} pedidos`);
         return v;
       });
+    }
+
+    if (!SKIP.has("volume") && VOLUME === 0) {
+      heading("4. COM VOLUME REAL — não corrida");
+      console.log(
+        "   Esta secção escreve em data/*.json, por isso é preciso pedi-la:\n" +
+          "     node scripts/bench-back-office.mjs --volume=300 --root=<cópia do projeto>\n" +
+          "   Sem --volume, a medição não escreve nada em lado nenhum.",
+      );
     }
 
     if (!SKIP.has("publico")) {
