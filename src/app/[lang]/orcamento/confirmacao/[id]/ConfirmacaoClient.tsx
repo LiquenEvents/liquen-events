@@ -176,15 +176,16 @@ export default function ConfirmacaoClient({
   const countdown = eventDate ? daysUntil(eventDate, now) : null;
   const highSeason = isHighSeason(eventDate);
 
-  // The form folds a "(Data ainda a definir)" marker into `notes` so the team
-  // can segment early-stage leads. That's an internal signal — echoing it back
-  // inside the client's own message made it look like we'd mangled their text.
-  // Strip it here and let the Data row carry the meaning instead.
+  // The form folds "(Data ainda a definir)" / "(Nº de pessoas: Ainda a definir)"
+  // markers into `notes` so the team can segment early-stage leads. Those are
+  // internal signals — echoing them back inside the client's own message made
+  // it look like we'd mangled their text. Strip any leading run of them and let
+  // the Data / Convidados rows carry the meaning instead.
   const rawNotes = quote?.notes?.trim() ?? "";
   const openDate = !!quote && !eventDate;
-  const clientMessage = openDate
-    ? rawNotes.replace(/^\([^)\n]{1,60}\)(\n\n|$)/, "").trim()
-    : rawNotes;
+  const openGuests = !!quote && !quote.guests;
+  const clientMessage =
+    openDate || openGuests ? rawNotes.replace(/^(\([^)\n]{1,60}\)(\n\n|$))+/, "").trim() : rawNotes;
 
   // "Add to calendar" — an all-day event on the client's chosen date, offered
   // as a downloadable .ics (works with Apple/Google/Outlook calendars).
@@ -299,7 +300,12 @@ export default function ConfirmacaoClient({
   const details: { label: string; value: string; note?: string }[] = quote
     ? [
         { label: tc.tipo, value: typeLabel },
-        { label: tc.convidados, value: quote.guests ? String(quote.guests) : "" },
+        {
+          label: tc.convidados,
+          // Same treatment as the date: an open headcount is an answer, not a
+          // blank, and the client explicitly told us so.
+          value: quote.guests ? String(quote.guests) : openGuests ? tc.openDate : "",
+        },
         {
           label: tc.data,
           // An open date is information, not a blank — say so, and turn it into
