@@ -108,7 +108,7 @@ export const en: Dict = {
     ogLocale: "en_GB",
     homeTitle: "Event & Wedding Decoration in Évora | Líquen Events",
     homeDescription:
-      "Líquen Events is a company specialising in planning and delivering one-of-a-kind events, turning your ideas into unforgettable experiences.",
+      "Líquen Events decorates and coordinates weddings, company events and private celebrations. Based in Évora, over 100 events since 2018.",
     sobreTitle: "Event Decoration Company in the Alentejo",
     sobreDescription:
       "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
@@ -170,7 +170,7 @@ export const en: Dict = {
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
     manifestoTitleLine2: "We make memories last.",
-    manifestoText: "Since 2018 we've turned spaces into experiences, across the country.",
+    manifestoText: "Over 100 events since 2018, from Évora to the whole country.",
     // Corner caption (chapter idiom) over the manifesto photograph.
     manifestoImageCaption: "Évora · Alentejo",
     statementLead: "We don't just decorate spaces.",
@@ -183,7 +183,7 @@ export const en: Dict = {
     ctaEyebrow: "Let's create together",
     ctaTitleLine1: "Shall we work",
     ctaTitleMoss: "together?",
-    ctaText: "From the first conversation to the last toast, we handle every detail of your event.",
+    ctaText: "From the first conversation to the last toast, the event is ours to run.",
     galleryAlt: [
       "Outdoor wedding ceremony on an Alentejo estate",
       "Wedding party under hanging lights at dusk",
@@ -281,7 +281,7 @@ export const en: Dict = {
     ctaEyebrow: "Next event",
     ctaTitleLine1: "Join our",
     ctaTitleLine2: "clients",
-    ctaText: "Tell us your idea and we'll show you how we can turn it into a memorable event.",
+    ctaText: "Tell us your idea and we will tell you what it takes to put it together.",
     galleryAlt: [
       "Corporate event reception in a courtyard in Évora",
       "Wedding with floral decoration on an Alentejo estate",
@@ -476,7 +476,7 @@ export const en: Dict = {
     heroEyebrow: "What we offer",
     heroTitle: ["Every event,", "a story", "to tell"],
     heroLead:
-      "Specialised in weddings, corporate events and private celebrations, with bespoke solutions adapted to your style, taste and budget.",
+      "Weddings, company events and private celebrations. We design the decoration around what you have in mind and the budget you are working with.",
     nav: ["Celebrations", "Companies"],
     interludeEyebrow: "Líquen Events",
     interludeTitle: "From Évora to the whole country: over 100 events since 2018.",

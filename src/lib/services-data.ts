@@ -38,8 +38,8 @@ export const SERVICES: ServiceDetail[] = [
     ],
     hero: "/imagens/EW1_1100.jpg",
     intro: [
-      "Transformamos o seu casamento num dia verdadeiramente inesquecível. Cuidamos de cada detalhe, da escolha do local perfeito à decoração elegante, até à organização completa da cerimónia e receção, garantindo que tudo reflete a sua personalidade e o seu estilo.",
-      "Com uma equipa experiente e dedicada, proporcionamos um planeamento personalizado, assessoria e coordenação no dia, em herdades e quintas em todo o País, para que possa viver plenamente o seu momento especial, sem preocupações.",
+      "Desenhamos a decoração do seu casamento e coordenamos o dia, do primeiro esboço até à desmontagem. Trabalhamos a partir de Évora, sobretudo em herdades e quintas do Alentejo, e deslocamo-nos a todo o país.",
+      "Na prática: o conceito visual, as flores e a cenografia, o styling das mesas, a luz, e a articulação com o catering, a fotografia e o vídeo. No dia está lá alguém da nossa equipa a segurar os tempos, para que não seja a noiva a atender o fornecedor que chegou atrasado.",
     ],
     includes: [
       "Conceito e design de decoração",
@@ -84,8 +84,8 @@ export const SERVICES: ServiceDetail[] = [
     ],
     hero: "/imagens/viaturas-classicas.jpg",
     intro: [
-      "Na Líquen Events disponibilizamos um serviço exclusivo de aluguer de viaturas para casamentos, com uma seleção de carros clássicos que trazem elegância e sofisticação ao seu dia especial. Seja para a chegada triunfante da noiva, seja para o transporte dos noivos e dos convidados, cada detalhe é cuidadosamente planeado para proporcionar uma experiência confortável e memorável.",
-      "Com motoristas experientes e um serviço de alta qualidade, asseguramos um transporte pontual e sem preocupações, acrescentando um toque de glamour ao seu casamento.",
+      "Alugamos carros clássicos com motorista para casamentos. A viatura vai decorada a condizer com o resto do casamento, e o percurso é combinado antes: onde para, a que horas sai, quanto tempo leva até à igreja num sábado de manhã.",
+      "Serve para a chegada da noiva e, se quiserem, para levar os noivos e os convidados depois da cerimónia. O motorista é sempre experiente, para que ninguém do vosso lado tenha de conduzir naquele dia.",
     ],
     includes: [
       "Viatura clássica com motorista",
@@ -134,8 +134,8 @@ export const SERVICES: ServiceDetail[] = [
     hero: "/imagens/EW1_1332.jpg",
     ogImage: "/imagens/EW1_1404.jpg",
     intro: [
-      "Na Líquen Events, combinamos profissionalismo e criatividade para proporcionar experiências que fortalecem a identidade da sua empresa. De conferências e lançamentos de produto a reuniões e formações, oferecemos soluções personalizadas que refletem os seus objetivos e valores.",
-      "Garantimos uma organização impecável, com atenção ao detalhe em cada fase do planeamento, da escolha do local à logística, ao catering e ao suporte técnico. A nossa equipa assegura que cada evento é executado com excelência, num ambiente propício ao networking, à inovação e ao sucesso da sua empresa.",
+      "Produzimos congressos, seminários, retiros de empresa, cerimónias de entrega de prémios e jantares corporativos, em Lisboa, em Évora e no resto do país. Já trabalhámos com a Universidade de Évora, a Câmara Municipal de Évora, a José de Mello, a Aernnova e a Mainova.",
+      "Tratamos do espaço, da cenografia, da logística, do catering e do apoio técnico, e ficamos com a coordenação no próprio dia. Quando há convidados de fora, tratamos também da tradução simultânea, do alojamento e dos transfers.",
     ],
     includes: [
       "Congressos",
@@ -179,8 +179,8 @@ export const SERVICES: ServiceDetail[] = [
     ],
     hero: "/imagens/DaniGui_JantarFesta_130.jpg",
     intro: [
-      "Garantimos que cada celebração seja única e memorável. De festas de aniversário a celebrações íntimas, criamos experiências personalizadas, com atenção ao ambiente, à decoração e ao entretenimento, sempre adaptadas ao seu estilo e às suas preferências.",
-      "Com uma abordagem criativa e uma equipa dedicada, tratamos de todos os detalhes, da escolha do local ao catering, até à coordenação do evento, permitindo-lhe desfrutar do momento sem preocupações. Transformamos a sua visão numa festa exclusiva e inesquecível.",
+      "Aniversários, festas temáticas e celebrações privadas, de festas de criança a jantares de adultos. O conceito é desenhado à volta do tema que tiver em mente, e não escolhido de um catálogo.",
+      "Tratamos do espaço, da decoração, do catering e da coordenação no dia da festa. Quanto mais cedo falarmos, mais fácil é garantir a data, mas conseguimos entrar perto do dia consoante a dimensão da festa.",
     ],
     includes: [
       "Conceito e tema da festa",
@@ -226,7 +226,7 @@ export const SERVICES: ServiceDetail[] = [
     hero: "/imagens/DaniGui_JantarFesta_26.jpg",
     intro: [
       "Os batizados e as comunhões são momentos de família que ficam para a vida. A Líquen Events cria a decoração destas celebrações no Alentejo e em todo o País, íntimas ou de maior escala, sempre com o mesmo cuidado.",
-      "Do conceito à mesa, das flores ao ambiente, tratamos de cada detalhe para que só tenham de estar com quem é importante.",
+      "Decoramos a cerimónia e depois o almoço ou o jantar, com o mesmo conceito nos dois espaços, para que não pareçam duas festas diferentes. O resto do dia fica para a família.",
     ],
     includes: [
       "Conceito e cenografia da celebração",
@@ -277,8 +277,8 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     metaDescription:
       "Wedding decoration in the Alentejo: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues across Portugal.",
     intro: [
-      "We turn your wedding into a truly unforgettable day. We take care of every detail, from choosing the perfect venue to elegant decoration and the complete organisation of the ceremony and reception, making sure everything reflects your personality and style.",
-      "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the Alentejo and all of Portugal, so you can fully live your special moment, worry-free.",
+      "We design your wedding decoration and coordinate the day itself, from the first sketch through to the take-down. We work out of Évora, mostly at estates and quintas in the Alentejo, and we travel anywhere in the country.",
+      "In practice: the visual concept, the flowers and scenography, the table styling, the lighting, and the liaison with catering, photography and video. On the day someone from our team is there holding the timings, so the bride is not the one taking calls from a supplier who is running late.",
     ],
     includes: [
       "Decoration concept and design",
@@ -306,8 +306,8 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     metaDescription:
       "Classic car hire for weddings in the Alentejo and across Portugal: vintage cars with a driver for the bride's arrival and transport for the couple and guests.",
     intro: [
-      "At Líquen Events we offer an exclusive wedding car hire service, with a selection of classic cars that bring elegance and sophistication to your special day. Whether for the bride's grand arrival or transport for the couple and guests, every detail is carefully planned for a comfortable, memorable experience.",
-      "With experienced drivers and a high-quality service, we ensure punctual, worry-free transport, adding a touch of glamour to your wedding.",
+      "We hire out classic cars with a driver for weddings. The car is decorated to match the rest of the wedding, and the route is agreed beforehand: where it waits, what time it leaves, how long it takes to reach the church on a Saturday morning.",
+      "It covers the bride's arrival and, if you want, the couple and guests after the ceremony. The driver is always an experienced one, so nobody on your side has to drive that day.",
     ],
     includes: [
       "Classic car with driver",
@@ -334,8 +334,8 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     metaDescription:
       "Decoration and scenography for corporate events in Lisbon and Portugal: conferences, congresses, team-building, product launches and company dinners.",
     intro: [
-      "At Líquen Events, we combine professionalism and creativity to deliver experiences that strengthen your company's identity. From conferences and product launches to meetings and training, we offer tailored solutions that reflect your goals and values.",
-      "We ensure flawless organisation, with attention to detail at every stage of planning, from venue selection to logistics, catering and technical support. Our team makes sure each event is executed with excellence, in an environment that fosters networking, innovation and your company's success.",
+      "We produce congresses, seminars, company retreats, award ceremonies and corporate dinners, in Lisbon, in Évora and across the country. We have worked with the University of Évora, Évora City Council, José de Mello, Aernnova and Mainova.",
+      "We handle the venue, the scenography, the logistics, the catering and the technical support, and we take the coordination on the day. When guests come from abroad, we also arrange simultaneous translation, accommodation and transfers.",
     ],
     includes: [
       "Congresses",
@@ -362,8 +362,8 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     metaDescription:
       "Decoration for birthday parties, christenings, communions and private celebrations in the Alentejo. Concept, scenography, atmosphere and bespoke coordination.",
     intro: [
-      "We make sure every celebration is unique and memorable. From birthday parties to intimate gatherings, we create personalised experiences with care for atmosphere, decoration and entertainment, always tailored to your style and preferences.",
-      "With a creative approach and a dedicated team, we handle every detail, from choosing the venue to catering and coordinating the event, so you can simply enjoy the moment. We turn your vision into an exclusive, unforgettable celebration.",
+      "Birthdays, themed parties and private celebrations, from children's parties to grown-up dinners. The concept is designed around whatever theme you have in mind, rather than picked from a catalogue.",
+      "We handle the venue, the decoration, the catering and the coordination on the day of the party. The earlier we talk, the easier it is to secure the date, though we can come on board close to the day depending on the size of the party.",
     ],
     includes: [
       "Party concept and theme",
@@ -392,7 +392,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Decoration for christenings and communions in the Alentejo and across Portugal: intimate family celebrations, with bespoke concept, flowers and table styling.",
     intro: [
       "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations in the Alentejo and across Portugal, intimate or larger in scale, always with the same care.",
-      "From concept to the table, from flowers to the atmosphere, we handle every detail so all you have to do is be with the people who matter.",
+      "We decorate the ceremony and then the lunch or dinner, with the same concept in both spaces so they do not read as two different parties. The rest of the day belongs to the family.",
     ],
     includes: [
       "Concept and scenography",

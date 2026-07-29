@@ -108,7 +108,7 @@ export const pt = {
     ogLocale: "pt_PT",
     homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
     homeDescription:
-      "A Líquen Events é uma empresa especializada em planear e executar eventos únicos, transformando as suas ideias em experiências memoráveis.",
+      "A Líquen Events decora e coordena casamentos, eventos de empresa e celebrações privadas. Com base em Évora, mais de 100 eventos desde 2018.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
       "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
@@ -173,7 +173,7 @@ export const pt = {
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
-    manifestoText: "Desde 2018 que transformamos espaços em experiências, em todo o País.",
+    manifestoText: "Mais de 100 eventos desde 2018, de Évora a todo o País.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
     manifestoImageCaption: "Évora · Alentejo",
     statementLead: "Não decoramos apenas espaços.",
@@ -185,7 +185,7 @@ export const pt = {
     ctaEyebrow: "Vamos criar juntos",
     ctaTitleLine1: "Vamos trabalhar",
     ctaTitleMoss: "juntos?",
-    ctaText: "Da primeira conversa ao último brinde, tratamos de cada detalhe do seu evento.",
+    ctaText: "Da primeira conversa ao último brinde, o evento fica connosco.",
     galleryAlt: [
       "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
       "Festa de casamento sob luzes suspensas ao anoitecer",
@@ -291,8 +291,7 @@ export const pt = {
     ctaEyebrow: "Próximo evento",
     ctaTitleLine1: "Junte-se aos",
     ctaTitleLine2: "nossos clientes",
-    ctaText:
-      "Conte-nos a sua ideia e mostramos-lhe como a podemos transformar num evento memorável.",
+    ctaText: "Conte-nos a sua ideia e dizemos-lhe o que é preciso para a pôr de pé.",
     galleryAlt: [
       "Receção de evento corporativo num pátio em Évora",
       "Casamento com decoração floral numa herdade do Alentejo",
@@ -489,7 +488,7 @@ export const pt = {
     heroEyebrow: "O que oferecemos",
     heroTitle: ["Cada evento,", "uma história", "por contar"],
     heroLead:
-      "Especializados em casamentos, eventos corporativos e celebrações privadas, com soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
+      "Casamentos, eventos de empresa e celebrações privadas. Desenhamos a decoração à volta do que tem em mente e do orçamento com que conta.",
     nav: ["Celebrações", "Empresas"],
     interludeEyebrow: "Líquen Events",
     interludeTitle: "De Évora para todo o País: mais de 100 eventos desde 2018.",
