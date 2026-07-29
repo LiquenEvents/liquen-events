@@ -56,7 +56,30 @@ const st = vi.hoisted(() => ({
   thumbSigned: vi.fn(),
   thumbSignOne: vi.fn(),
   thumbUpload: vi.fn(),
+  // ── Carregamento DIRETO ──────────────────────────────────────────────
+  /** Esta instalação sabe emitir URLs de carregamento? Um Supabase antigo
+   *  não sabe, e é isso que faz o cliente cair para o multipart. */
+  hasUploadUrlApi: true,
+  uploadUrl: vi.fn(),
+  thumbUploadUrl: vi.fn(),
+  updateBucket: vi.fn(),
 }));
+
+/** Veredicto que a verificação de dimensões devolve — encenado por teste. */
+const insp = vi.hoisted(() => ({ verdict: { ok: true, reason: "" } }));
+
+// A verificação real lê o cabeçalho da imagem por HTTP e chama o `sharp`;
+// aqui o que se está a provar é OUTRA coisa (o que a confirmação faz com o
+// veredicto), por isso o veredicto é encenado e o resto de `proposal-storage`
+// fica real — `copyThemeImageToProposal` depende dele.
+vi.mock("./proposal-storage", async () => {
+  const real = await vi.importActual<typeof import("./proposal-storage")>("./proposal-storage");
+  return {
+    ...real,
+    inspectStoredImage: vi.fn(async () => insp.verdict),
+    removeStoredObject: vi.fn(async () => {}),
+  };
+});
 
 vi.mock("./supabase", () => {
   const from = (bucket: string) => {
@@ -70,6 +93,9 @@ vi.mock("./supabase", () => {
       copy: st.copy,
       download: st.download,
       upload: thumbs ? st.thumbUpload : st.upload,
+      ...(st.hasUploadUrlApi
+        ? { createSignedUploadUrl: thumbs ? st.thumbUploadUrl : st.uploadUrl }
+        : {}),
     };
   };
   const stateOf = (name: string) => (name === "theme-thumbs" ? st.thumbBucket : st.bucket);
@@ -89,6 +115,7 @@ vi.mock("./supabase", () => {
                 b.creates++;
                 return { data: null, error: b.createError };
               },
+              updateBucket: st.updateBucket,
             },
           }
         : null,
@@ -151,6 +178,17 @@ beforeEach(() => {
     error: null,
   });
   st.upload.mockResolvedValue({ data: { path: "ok" }, error: null });
+  st.hasUploadUrlApi = true;
+  insp.verdict = { ok: true, reason: "" };
+  st.updateBucket.mockResolvedValue({ data: null, error: null });
+  st.uploadUrl.mockImplementation(async (path: string) => ({
+    data: { signedUrl: `https://upload/theme-assets/${path}?token=tok`, token: "tok", path },
+    error: null,
+  }));
+  st.thumbUploadUrl.mockImplementation(async (path: string) => ({
+    data: { signedUrl: `https://upload/theme-thumbs/${path}?token=tuk`, token: "tuk", path },
+    error: null,
+  }));
 });
 
 /**
@@ -651,6 +689,167 @@ describe("copyThemeImageToProposal", () => {
 });
 
 // ── A ordem arrumada à mão manda no início da lista ────────────────────────
+describe("bilhetes de carregamento direto", () => {
+  it("constrói o caminho NO SERVIDOR, dentro da pasta do tema", async () => {
+    const { createThemeUploadTickets } = await load();
+    const tickets = await createThemeUploadTickets("tema-1", ["image/jpeg", "image/png"]);
+
+    expect(tickets).toHaveLength(2);
+    // O que o cliente pediu foi só o TIPO; a pasta e o nome saem daqui.
+    expect(tickets![0].path).toMatch(/^tema-1\/[0-9a-f-]{36}\.jpg$/);
+    expect(tickets![1].path).toMatch(/^tema-1\/[0-9a-f-]{36}\.png$/);
+    // Dois bilhetes nunca apontam ao mesmo sítio.
+    expect(tickets![0].path).not.toBe(tickets![1].path);
+    // A miniatura vai na MESMA chave, no bucket das miniaturas.
+    expect(tickets![0].thumb?.path).toBe(tickets![0].path);
+  });
+
+  it("um id de tema com travessia é limpo antes de virar pasta", async () => {
+    const { createThemeUploadTickets } = await load();
+    const tickets = await createThemeUploadTickets("../../etc", ["image/jpeg"]);
+
+    // `themeFolder` come os caracteres perigosos: sobra "etc", nunca um
+    // caminho que saia do bucket.
+    expect(tickets![0].path).toMatch(/^etc\//);
+    expect(tickets![0].path).not.toContain("..");
+  });
+
+  it("emite sempre com upsert desligado — um bilhete não substitui nada", async () => {
+    const { createThemeUploadTickets } = await load();
+    await createThemeUploadTickets("tema-1", ["image/jpeg"]);
+
+    expect(st.uploadUrl).toHaveBeenCalledWith(expect.any(String), { upsert: false });
+  });
+
+  it("corta o pedido no teto de bilhetes", async () => {
+    const { createThemeUploadTickets } = await load();
+    const tickets = await createThemeUploadTickets(
+      "tema-1",
+      Array.from({ length: 100 }, () => "image/jpeg"),
+    );
+
+    expect(tickets!.length).toBeLessThanOrEqual(24);
+  });
+
+  it("um Storage que não sabe emitir URLs devolve null — o cliente cai para o multipart", async () => {
+    st.hasUploadUrlApi = false;
+    const { createThemeUploadTickets } = await load();
+
+    expect(await createThemeUploadTickets("tema-1", ["image/jpeg"])).toBeNull();
+  });
+
+  it("se UM bilhete falhar, não sai nenhum (nada de lotes com buracos)", async () => {
+    st.uploadUrl.mockResolvedValueOnce({ data: null, error: { message: "não" } });
+    const { createThemeUploadTickets } = await load();
+
+    expect(await createThemeUploadTickets("tema-1", ["image/jpeg", "image/jpeg"])).toBeNull();
+  });
+
+  it("sem bucket de miniaturas, a foto sobe na mesma e fica sem miniatura", async () => {
+    st.thumbBucket.exists = false;
+    st.thumbBucket.createError = { message: "recusado" };
+    const { createThemeUploadTickets } = await load();
+    const tickets = await createThemeUploadTickets("tema-1", ["image/jpeg"]);
+
+    expect(tickets).toHaveLength(1);
+    expect(tickets![0].thumb).toBeNull();
+  });
+});
+
+describe("confirmação de carregamentos diretos", () => {
+  it("assina as boas e devolve-as com miniatura", async () => {
+    const { confirmThemeUploads } = await load();
+    const res = await confirmThemeUploads("tema-1", ["tema-1/foto.jpg"]);
+
+    expect(res.rejected).toEqual([]);
+    expect(res.images).toEqual([
+      {
+        path: "tema-1/foto.jpg",
+        url: "https://signed/tema-1/foto.jpg",
+        thumbUrl: "https://thumb/tema-1/foto.jpg",
+      },
+    ]);
+  });
+
+  it("RECUSA um caminho da pasta de outro tema, sem lhe tocar", async () => {
+    const { confirmThemeUploads } = await load();
+    const res = await confirmThemeUploads("tema-1", [
+      "tema-2/roubada.jpg",
+      "../proposal-assets/q-1/segredo.jpg",
+      "tema-1/minha.jpg",
+    ]);
+
+    // Só a que é mesmo desta pasta é assinada. As outras nem chegam ao Storage.
+    expect(res.images.map((i) => i.path)).toEqual(["tema-1/minha.jpg"]);
+    expect(res.rejected).toContain("tema-2/roubada.jpg");
+    expect(res.rejected).toContain("../proposal-assets/q-1/segredo.jpg");
+  });
+
+  it("uma imagem que não passa na verificação é APAGADA e reportada", async () => {
+    insp.verdict = { ok: false, reason: "dimensoes-excessivas" };
+    const { confirmThemeUploads } = await load();
+    const proposal = await import("./proposal-storage");
+    const res = await confirmThemeUploads("tema-1", ["tema-1/bomba.png"]);
+
+    expect(res.images).toEqual([]);
+    expect(res.rejected).toEqual(["tema-1/bomba.png"]);
+    // Sai o original E a miniatura — nada de lixo órfão no bucket.
+    expect(proposal.removeStoredObject).toHaveBeenCalledWith("theme-assets", "tema-1/bomba.png");
+    expect(proposal.removeStoredObject).toHaveBeenCalledWith("theme-thumbs", "tema-1/bomba.png");
+  });
+});
+
+describe("memória curta da contagem", () => {
+  it("a segunda contagem não volta a ler a pasta", async () => {
+    st.list.mockResolvedValue(page(NAMES_500));
+    const { countThemeFiles } = await load();
+
+    const first = await countThemeFiles("tema-1");
+    const calls = st.list.mock.calls.length;
+    const second = await countThemeFiles("tema-1");
+
+    expect(second).toEqual(first);
+    expect(st.list.mock.calls.length).toBe(calls);
+  });
+
+  it("carregar uma foto deita a contagem fora", async () => {
+    st.list.mockResolvedValue(page(NAMES_500));
+    const { countThemeFiles, uploadThemeImage } = await load();
+
+    await countThemeFiles("tema-1");
+    const calls = st.list.mock.calls.length;
+    await uploadThemeImage("tema-1", Buffer.from("foto"), "image/jpeg");
+    await countThemeFiles("tema-1");
+
+    // Contou outra vez: o número que a Catarina vê muda quando ela mexe.
+    expect(st.list.mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it("uma contagem TRUNCADA nunca fica guardada — é um mínimo, não um total", async () => {
+    st.list.mockResolvedValue(page(NAMES_500));
+    const { countThemeFiles } = await load();
+
+    // Teto de 1 página com páginas cheias: o resultado sai truncado.
+    const first = await countThemeFiles("tema-1", 1, 500);
+    expect(first.truncated).toBe(true);
+    const calls = st.list.mock.calls.length;
+    await countThemeFiles("tema-1", 1, 500);
+
+    expect(st.list.mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it("cada tema tem a sua contagem", async () => {
+    st.list.mockResolvedValue(page(NAMES_500));
+    const { countThemeFiles } = await load();
+
+    await countThemeFiles("tema-1");
+    const calls = st.list.mock.calls.length;
+    await countThemeFiles("tema-2");
+
+    expect(st.list.mock.calls.length).toBeGreaterThan(calls);
+  });
+});
+
 describe("planOrderedPage", () => {
   const order = ["t/a.jpg", "t/b.jpg", "t/c.jpg"];
 

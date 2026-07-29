@@ -5,6 +5,12 @@ import {
   PROPOSAL_BUCKET,
   uploadProposalImage,
   ensureBucket as ensureProposalBucket,
+  inspectStoredImage,
+  removeStoredObject,
+  UPLOAD_MIME_TYPES,
+  BUCKET_FILE_SIZE_LIMIT,
+  MAX_UPLOAD_TICKETS,
+  type UploadTicket,
 } from "./proposal-storage";
 import { log } from "./logger";
 import type { ThemeImage, ThemeImagePage } from "./theme-types";
@@ -101,6 +107,32 @@ function isNotFound(err: unknown): boolean {
 }
 
 /**
+ * Aplica a um bucket já existente os limites que travam um URL de
+ * carregamento roubado (formatos aceites + tamanho máximo). Melhor esforço
+ * declarado: um Storage sem `updateBucket` deixa o bucket como está — que é
+ * exatamente como está hoje —, nunca faz falhar um carregamento.
+ */
+async function hardenBucket(bucket: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || typeof sb.storage.updateBucket !== "function") return;
+  try {
+    const { error } = await sb.storage.updateBucket(bucket, {
+      public: false,
+      fileSizeLimit: BUCKET_FILE_SIZE_LIMIT,
+      allowedMimeTypes: UPLOAD_MIME_TYPES,
+    });
+    if (error) {
+      log.warn("theme-storage: limites do bucket não aplicados", {
+        bucket,
+        erro: error.message,
+      });
+    }
+  } catch (e) {
+    log.warn("theme-storage: limites do bucket não aplicados", { bucket, erro: String(e) });
+  }
+}
+
+/**
  * Garante um bucket, uma vez por processo e por bucket. Memoiza a PROMESSA (e
  * não um booleano): vários pedidos em paralelo — a lista de temas faz um por
  * tema — partilham a mesma verificação em vez de dispararem
@@ -119,12 +151,22 @@ async function ensureBucket(bucket: string): Promise<boolean> {
   if (!pending) {
     const attempt = (async () => {
       const { data, error } = await sb.storage.getBucket(bucket);
-      if (data) return true;
+      if (data) {
+        // Já existia: aperta os limites (formato + tamanho) uma vez por
+        // processo. Com carregamento DIRETO é aqui, e só aqui, que uma regra
+        // ainda se aplica — a rota deixou de ver os bytes.
+        await hardenBucket(bucket);
+        return true;
+      }
       if (error && !isNotFound(error)) {
         log.error("theme-storage: getBucket falhou", error, { bucket });
         return false;
       }
-      const { error: createError } = await sb.storage.createBucket(bucket, { public: false });
+      const { error: createError } = await sb.storage.createBucket(bucket, {
+        public: false,
+        fileSizeLimit: BUCKET_FILE_SIZE_LIMIT,
+        allowedMimeTypes: UPLOAD_MIME_TYPES,
+      });
       // Ignora corridas "already exists"; qualquer outro erro é reportado.
       if (createError && !/exist/i.test(createError.message)) {
         log.error("theme-storage: createBucket falhou", createError, { bucket });
@@ -242,11 +284,171 @@ export async function uploadThemeImage(
     log.error("theme-storage: upload falhou", error, { themeId });
     return null;
   }
+  invalidateThemeCount(themeId);
   const [{ data }, thumbUrl] = await Promise.all([
     sb.storage.from(THEME_BUCKET).createSignedUrl(path, SIGNED_TTL),
     thumb ? uploadThemeThumb(path, thumb) : Promise.resolve(""),
   ]);
   return { path, url: data?.signedUrl ?? "", ...(thumbUrl ? { thumbUrl } : {}) };
+}
+
+/**
+ * CARREGAMENTO DIRETO — um bilhete por foto.
+ *
+ * Hoje cada foto atravessa a rede DUAS vezes: navegador → função → Storage. A
+ * função tem de receber o multipart inteiro em memória antes de poder reenviar
+ * um único byte, e é por isso que existe o teto de ~4,5 MB por pedido. Um
+ * bilhete troca isso por um URL que o navegador usa para escrever DIRETAMENTE
+ * no bucket.
+ *
+ * O que o bilhete NÃO é: uma autorização geral. O caminho é construído aqui —
+ * `<pasta do tema>/<uuid>.<ext>` — e nunca aceite do cliente. Cada bilhete
+ * abre exatamente UM caminho, `upsert: false` impede-o de substituir seja o
+ * que for, e os limites do bucket (`hardenBucket`) travam o formato e o
+ * tamanho do que lá pode entrar.
+ *
+ * A miniatura leva bilhete próprio, com a MESMA chave no bucket das
+ * miniaturas — a regra "o caminho do original é o caminho da miniatura"
+ * mantém-se, e continua a não haver índice nenhum a manter.
+ */
+export interface ThemeUploadTicket {
+  /** O caminho no bucket dos temas. É por aqui que a confirmação identifica a foto. */
+  path: string;
+  /** Bilhete para o ORIGINAL (bucket `theme-assets`). */
+  original: UploadTicket;
+  /** Bilhete para a MINIATURA (bucket `theme-thumbs`), ou `null` quando não foi
+   *  possível emitir — a foto sobe na mesma e a grelha cai para o original,
+   *  exatamente como faz com as fotos anteriores às miniaturas. */
+  thumb: UploadTicket | null;
+}
+
+/** O Storage desta instalação sabe emitir URLs de carregamento? Um Supabase
+ *  mais antigo não sabe — e aí a rota manda o cliente pelo multipart. */
+function canMintUploadUrls(sb: NonNullable<ReturnType<typeof getSupabase>>): boolean {
+  return typeof sb.storage.from(THEME_BUCKET).createSignedUploadUrl === "function";
+}
+
+async function mintOne(bucket: string, path: string): Promise<UploadTicket | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.storage
+      .from(bucket)
+      .createSignedUploadUrl(path, { upsert: false });
+    if (error || !data) return null;
+    return { path, uploadUrl: data.signedUrl, token: data.token };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Emite bilhetes para carregar fotos DIRETAMENTE na pasta de um tema.
+ *
+ * `contentTypes` só decide a EXTENSÃO do caminho — nunca o destino. Um tipo
+ * que não reconheçamos vira `.jpg`, e o que o bucket aceita de facto é
+ * decidido pelos limites do bucket, não por esta lista.
+ *
+ * Devolve `null` quando esta instalação não sabe emitir URLs de carregamento:
+ * a rota traduz isso em "usa o multipart de sempre", e nada quebra.
+ */
+export async function createThemeUploadTickets(
+  themeId: string,
+  contentTypes: readonly string[],
+): Promise<ThemeUploadTicket[] | null> {
+  const sb = getSupabase();
+  if (!sb || !(await ensureBucket(THEME_BUCKET))) return null;
+  if (!canMintUploadUrls(sb)) return null;
+  const folder = themeFolder(themeId);
+  if (!folder) return null;
+  const wanted = contentTypes.slice(0, MAX_UPLOAD_TICKETS);
+  if (wanted.length === 0) return [];
+
+  // O bucket das miniaturas pode ainda não existir (instalação antiga). Só se
+  // pedem bilhetes de miniatura se ele estiver mesmo lá — falhar a criá-lo
+  // deixa as fotos sem miniatura, nunca impede o carregamento.
+  const thumbsReady = await ensureBucket(THEME_THUMB_BUCKET);
+
+  const tickets = await Promise.all(
+    wanted.map(async (type) => {
+      const path = `${folder}/${randomUUID()}.${extFor(type)}`;
+      const [original, thumb] = await Promise.all([
+        mintOne(THEME_BUCKET, path),
+        thumbsReady ? mintOne(THEME_THUMB_BUCKET, path) : Promise.resolve(null),
+      ]);
+      return original ? { path, original, thumb } : null;
+    }),
+  );
+  // Ou saem todos, ou nenhum: bilhetes com buracos punham o cliente a
+  // adivinhar quais podia usar, e é mais barato cair para o multipart.
+  if (tickets.some((t) => t === null)) {
+    log.warn("theme-storage: emissão de bilhetes incompleta", { themeId });
+    return null;
+  }
+  return tickets as ThemeUploadTicket[];
+}
+
+/**
+ * Confirma as fotos que o navegador escreveu no bucket.
+ *
+ * Porquê uma confirmação e não só relistar: a pasta CONTINUA a ser a fonte de
+ * verdade — nada aqui é gravado, e um carregamento que nunca seja confirmado
+ * aparece na mesma na listagem seguinte. O que a confirmação faz, e a
+ * listagem não pode fazer, é OLHAR PARA A IMAGEM. Enquanto os bytes passavam
+ * pela função, era ela que recusava um ficheiro com dimensões absurdas antes
+ * de o guardar; com escrita direta ninguém o vê. A verificação mudou de
+ * lugar, não desapareceu — e lê só o cabeçalho, uns KB, para não trazer de
+ * volta a travessia que este desenho veio eliminar.
+ *
+ * O que não passa é APAGADO e devolvido em `rejected`, para o estúdio poder
+ * dizer quais falharam. Nunca lança.
+ */
+export async function confirmThemeUploads(
+  themeId: string,
+  paths: readonly string[],
+): Promise<{ images: ThemeImage[]; rejected: string[] }> {
+  const folder = themeFolder(themeId);
+  const rejected: string[] = [];
+  if (!getSupabase() || !folder) return { images: [], rejected: [...paths] };
+
+  // O caminho vem do cliente: só se aceita um ficheiro DENTRO da pasta deste
+  // tema — nunca de outro tema, nunca com travessia de diretórios.
+  const mine: string[] = [];
+  for (const p of paths) {
+    if (isThemePath(p) && themeIdOfPath(p) === folder) mine.push(p);
+    else rejected.push(p);
+  }
+
+  const checked = await Promise.all(
+    mine.map(async (path) => ({ path, verdict: await inspectStoredImage(THEME_BUCKET, path) })),
+  );
+  const good: string[] = [];
+  for (const { path, verdict } of checked) {
+    if (verdict.ok) {
+      good.push(path);
+      continue;
+    }
+    log.warn("theme-storage: foto recusada na confirmação", { path, motivo: verdict.reason });
+    rejected.push(path);
+    // Sai o original E a miniatura: uma miniatura órfã de uma foto recusada é
+    // lixo que a grelha nunca mostraria e que ninguém voltaria a limpar.
+    await Promise.all([
+      removeStoredObject(THEME_BUCKET, path),
+      removeStoredObject(THEME_THUMB_BUCKET, path),
+    ]);
+  }
+  // A pasta mudou: a contagem guardada deixou de valer.
+  invalidateThemeCount(themeId);
+  if (good.length === 0) return { images: [], rejected };
+
+  const [urls, thumbs] = await Promise.all([signThemePaths(good), signThemeThumbs(good)]);
+  const images: ThemeImage[] = good
+    .map((path) => {
+      const thumbUrl = thumbs.get(path);
+      return { path, url: urls.get(path) ?? "", ...(thumbUrl ? { thumbUrl } : {}) };
+    })
+    .filter((im) => im.url);
+  return { images, rejected };
 }
 
 /** O conteúdo (cru) da pasta de um tema — ver `listThemeFiles`. */
@@ -328,14 +530,83 @@ export async function countThemeFiles(
   maxPages = MAX_COUNT_PAGES,
   pageSize = COUNT_PAGE,
 ): Promise<ThemeFileCount> {
+  const cached = readCount(themeId, maxPages, pageSize);
+  if (cached) return cached;
   let total = 0;
   for (let page = 0; page < maxPages; page++) {
     const listed = await listThemeFiles(themeId, pageSize, page * pageSize);
     if (!listed.ok) return { total, ok: false, truncated: false };
     total += listed.names.length;
-    if (!listed.truncated) return { total, ok: true, truncated: false };
+    if (!listed.truncated) {
+      return writeCount(themeId, maxPages, pageSize, { total, ok: true, truncated: false });
+    }
   }
-  return { total, ok: true, truncated: true };
+  return writeCount(themeId, maxPages, pageSize, { total, ok: true, truncated: true });
+}
+
+/**
+ * MEMÓRIA CURTA DA CONTAGEM — medido, não suposto.
+ *
+ * Contar é listar: uma ida ao Storage por cada `COUNT_PAGE` fotos. Numa pasta
+ * de 5000 são 6, SEQUENCIAIS, e a `listThemeImagePage` recontava-as em CADA
+ * página da grelha. Medido com latências de Storage realistas (list 120 ms,
+ * assinatura 90 ms): abrir uma página de um tema de 5000 fotos custava 936 ms,
+ * de 12 000 custava 1778 ms, e percorrer cinco páginas pagava isso cinco
+ * vezes. O custo crescia com a BIBLIOTECA, não com o que se mostra — que é o
+ * oposto da promessa deste módulo.
+ *
+ * Isto não é um índice, e não é uma segunda fonte de verdade: é o resultado da
+ * mesma contagem, guardado por 60 segundos DENTRO do processo. Expira sozinho,
+ * é deitado fora a cada escrita (`invalidateThemeCount`) e, se o processo
+ * morrer, conta-se outra vez. A pasta continua a mandar em tudo.
+ *
+ * Só se guardam contagens COMPLETAS e com os parâmetros por omissão: uma
+ * contagem que falhou a meio, ou que bateu no teto, ou que alguém pediu com
+ * um orçamento próprio, não tem nada que ficar em cache a mentir a outra
+ * chamada.
+ */
+const COUNT_TTL_MS = 60_000;
+const countMemo = new Map<string, { at: number; value: ThemeFileCount }>();
+
+function countMemoKey(themeId: string, maxPages: number, pageSize: number): string | null {
+  if (maxPages !== MAX_COUNT_PAGES || pageSize !== COUNT_PAGE) return null;
+  const folder = themeFolder(themeId);
+  return folder ? folder : null;
+}
+
+function readCount(themeId: string, maxPages: number, pageSize: number): ThemeFileCount | null {
+  const key = countMemoKey(themeId, maxPages, pageSize);
+  if (!key) return null;
+  const hit = countMemo.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > COUNT_TTL_MS) {
+    countMemo.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function writeCount(
+  themeId: string,
+  maxPages: number,
+  pageSize: number,
+  value: ThemeFileCount,
+): ThemeFileCount {
+  const key = countMemoKey(themeId, maxPages, pageSize);
+  // Uma contagem truncada é um MÍNIMO: guardá-la fixaria esse mínimo durante
+  // um minuto inteiro, em vez de ele melhorar quando a pasta encolhe.
+  if (key && !value.truncated) countMemo.set(key, { at: Date.now(), value });
+  return value;
+}
+
+/**
+ * Esquece a contagem de um tema. Chamada por tudo o que ESCREVE na pasta —
+ * carregar, confirmar, apagar —, para que o número que a Catarina vê mude no
+ * momento em que ela mexe nas fotos, e não daqui a um minuto.
+ */
+export function invalidateThemeCount(themeId: string): void {
+  const folder = themeFolder(themeId);
+  if (folder) countMemo.delete(folder);
 }
 
 /**
@@ -534,6 +805,7 @@ export async function deleteThemeImage(path: string): Promise<boolean> {
     log.error("theme-storage: remove falhou", error, { path });
     return false;
   }
+  invalidateThemeCount(themeIdOfPath(path));
   await removeThumbs([path]);
   return true;
 }
@@ -596,6 +868,8 @@ export async function deleteThemeFolder(
       return { ok: false, removed };
     }
   }
+
+  invalidateThemeCount(themeId);
 
   // 3) E só então as miniaturas: são derivadas, e o seu destino não pode
   //    influenciar o resultado. Se a limpeza das fotos tivesse falhado
