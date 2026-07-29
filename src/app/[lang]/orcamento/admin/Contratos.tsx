@@ -39,8 +39,28 @@ const fmtDate = (iso?: string) =>
     ? new Date(iso).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" })
     : "—";
 
+/**
+ * O estado de UM contrato não pode derrubar a lista toda.
+ *
+ * `STATUS_META[status]` dá `undefined` para um valor fora do mapa, e num
+ * componente de cliente esse erro sobe ao limite de erro e substitui o BACK
+ * OFFICE INTEIRO pelo ecrã "Ocorreu um erro inesperado". Este mapa só conhece
+ * `aceite` e `pendente`, portanto qualquer estado acrescentado ao contrato sem
+ * passar por aqui — ou uma linha corrigida à mão — bastava. Mostramos o valor
+ * cru em cinzento e a lista continua de pé.
+ */
+function statusMeta(status: string): { label: string; bg: string; text: string } {
+  return (
+    STATUS_META[status as ContractStatus] ?? {
+      label: status || "—",
+      bg: "#00000008",
+      text: "#8a8378",
+    }
+  );
+}
+
 function StatusChip({ status }: { status: ContractStatus }) {
-  const s = STATUS_META[status];
+  const s = statusMeta(status);
   return (
     <span
       className="inline-block px-2 py-0.5 rounded-md text-[10px] tracking-[0.08em] uppercase font-medium"
@@ -97,7 +117,7 @@ export default function Contratos() {
         c.clientEmail,
         c.quoteId,
         c.proposalId,
-        STATUS_META[c.status].label,
+        statusMeta(c.status).label,
         fmtDate(c.createdAt),
         c.acceptedAt ? fmtDateTime(c.acceptedAt) : "",
         c.acceptedName ?? "",

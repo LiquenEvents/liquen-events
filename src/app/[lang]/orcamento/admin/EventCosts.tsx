@@ -7,6 +7,7 @@ import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
 import { Button, Field, EmptyState } from "./ui";
+import { metaFor } from "./status-meta";
 
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
   contactado: { label: "Contactado", color: "#8a8a82" },
@@ -217,12 +218,12 @@ export default function EventCosts({ quote, onChange }: Props) {
                   onClick={() => cycleStatus(it)}
                   className="shrink-0 rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] motion-safe:transition-opacity hover:opacity-80"
                   style={{
-                    background: `${STATUS_META[it.status].color}18`,
-                    color: STATUS_META[it.status].color,
+                    background: `${metaFor(STATUS_META, it.status).color}18`,
+                    color: metaFor(STATUS_META, it.status).color,
                   }}
                   title="Clique para mudar o estado"
                 >
-                  {STATUS_META[it.status].label}
+                  {metaFor(STATUS_META, it.status).label}
                 </button>
                 <button
                   onClick={() => remove(it.id)}

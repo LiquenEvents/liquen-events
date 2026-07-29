@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
@@ -8,6 +8,7 @@ import { Button, Card, EmptyState, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { randomId } from "./util";
 import { useCachedList } from "./useCachedList";
+import { metaFor } from "./status-meta";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -23,26 +24,6 @@ const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
   rejeitada: { label: "Recusada", color: "#5a5a55" },
 };
 
-/**
- * O estado de UMA proposta não pode derrubar a lista toda.
- *
- * `STATUS_META[p.status].color` rebentava com `undefined` assim que uma linha
- * trazia um estado fora do mapa — e como isto é um componente de cliente, o erro
- * subia até ao limite de erro e substituía o back office INTEIRO pelo ecrã
- * "Ocorreu um erro inesperado". Não era hipotético: apanhámos-lo com uma linha
- * gravada como `recusada` em vez de `rejeitada` (o mapa usa a segunda, e mostra
- * "Recusada" como etiqueta — é fácil trocar).
- *
- * A API valida os estados, portanto pelo uso normal não acontece; acontece com
- * uma linha antiga, uma migração, ou uma correcção feita à mão na base de dados.
- * Nesse caso mostramos o valor cru em cinzento em vez de perder o ecrã: ela vê
- * que aquela linha tem algo estranho e continua a trabalhar. O `AdminClient` já
- * se protegia assim (`statusBadge`); esta lista não.
- */
-function statusMeta(status: string): { label: string; color: string } {
-  return STATUS_META[status as ProposalStatus] ?? { label: status || "—", color: "#8a8a82" };
-}
-
 function expiryInfo(
   validUntil?: string,
 ): { label: string; tone: "ok" | "soon" | "expired" } | null {
@@ -54,6 +35,155 @@ function expiryInfo(
   if (days <= 5) return { label: `Termina em ${days} dias`, tone: "soon" };
   return { label: `Válida mais ${days} dias`, tone: "ok" };
 }
+
+interface RowProps {
+  p: Proposal;
+  linkedQuote?: Quote;
+  busy: boolean;
+  canOpenQuote: boolean;
+  onOpenQuote: (q: Quote) => void;
+  onUpdate: (id: string, status: ProposalStatus) => void;
+  onDelete: (id: string) => void;
+}
+
+/**
+ * Uma linha da lista, memoizada.
+ *
+ * Sem isto, marcar UMA proposta como aceite (que muda `actionBusy`) voltava a
+ * desenhar as 202 linhas — e mudar de filtro custava, medido, um evento de
+ * 104 ms (uma tarefa longa de 89 ms). A linha só depende da proposta, do pedido
+ * ligado e de estar ocupada.
+ */
+const ProposalRow = memo(function ProposalRow({
+  p,
+  linkedQuote,
+  busy,
+  canOpenQuote,
+  onOpenQuote,
+  onUpdate,
+  onDelete,
+}: RowProps) {
+  const exp = expiryInfo(p.validUntil);
+  const meta = metaFor(STATUS_META, p.status);
+  return (
+    <div
+      className={`px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 motion-safe:transition-colors hover:bg-foreground/[0.02] ${p.status === "enviada" && exp?.tone === "expired" ? "opacity-60" : ""}`}
+    >
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <p className="text-foreground/90 text-sm font-medium truncate">{p.clientName}</p>
+          <span
+            className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
+            style={{ background: `${meta.color}1f`, color: meta.color }}
+          >
+            {meta.label}
+          </span>
+          {exp && (
+            <span
+              className={`text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium ${
+                exp.tone === "expired"
+                  ? "bg-[#8a2a22]/10 text-[#8a2a22]"
+                  : exp.tone === "soon"
+                    ? "bg-[#b5894a]/12 text-[#a9781f]"
+                    : "bg-foreground/[0.05] text-foreground/45"
+              }`}
+            >
+              {exp.label}
+            </span>
+          )}
+        </div>
+        <p className="text-foreground/45 text-xs">
+          {p.clientEmail} · {p.lineItems.length} {p.lineItems.length !== 1 ? "itens" : "item"}
+          {p.sentAt &&
+            ` · enviada a ${new Date(p.sentAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`}
+        </p>
+      </div>
+
+      {/* Value + actions — share one row on phones, split out on desktop */}
+      <div className="flex items-center justify-between gap-3 sm:contents">
+        <p className="text-foreground/90 text-sm font-semibold shrink-0 tabular-nums">
+          {eur(p.total)}
+        </p>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {p.status === "enviada" && (
+            <>
+              <Button
+                variant="subtle"
+                size="sm"
+                disabled={busy}
+                onClick={() => onUpdate(p.id, "aceite")}
+                title="O cliente aceitou: fecha o negócio e marca o pedido como ganho"
+                iconLeft={
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path
+                      d="M2 6l2.5 2.5L10 3"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                }
+              >
+                Aceitar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() => onUpdate(p.id, "rejeitada")}
+                title="O cliente não avançou com esta proposta"
+              >
+                Recusar
+              </Button>
+            </>
+          )}
+          {linkedQuote && canOpenQuote && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenQuote(linkedQuote)}
+              title="Abrir o pedido deste cliente"
+              iconRight={<span aria-hidden="true">→</span>}
+            >
+              Ver pedido
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onClick={() => onDelete(p.id)}
+            aria-label={`Apagar a proposta de ${p.clientName}`}
+            title="Apagar esta proposta"
+            className="text-foreground/40 hover:text-[#8a2a22]"
+            iconLeft={
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+            }
+          >
+            Apagar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 interface Props {
   quotes?: Quote[];
@@ -72,6 +202,10 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
     refresh: retryLoad,
   } = useCachedList<Proposal[]>("propostas", "/api/propostas");
   const [filter, setFilter] = useState<ProposalStatus | "all">("all");
+  // O chip acende-se já; a lista (202 linhas) é reconstruída a seguir, em
+  // prioridade baixa. Medido: sem isto, um clique no filtro era um evento de
+  // 104 ms — acima do limiar em que um clique deixa de parecer instantâneo.
+  const deferredFilter = useDeferredValue(filter);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
 
   // Índice id→pedido: evita um varrimento linear de todos os pedidos por cada
@@ -135,11 +269,21 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
     }
   }
 
+  // A lista actual e o `onOpenQuote` do pai, numa ref: os manipuladores que
+  // vão parar às 202 linhas memoizadas têm de manter a mesma identidade, senão
+  // o `memo()` falha sempre e não poupa nada.
+  const latest = useRef({ proposals, onOpenQuote });
+  useEffect(() => {
+    latest.current = { proposals, onOpenQuote };
+  });
+
+  const handleOpenQuote = useCallback((q: Quote) => latest.current.onOpenQuote?.(q), []);
+
   // Aceitar/recusar é uma ação de negócio consequente (aceitar é irreversível e
   // move o pedido). Pedimos confirmação antes de avançar.
   const confirmAndUpdate = useCallback(
     (id: string, status: ProposalStatus) => {
-      const p = proposals.find((x) => x.id === id);
+      const p = latest.current.proposals.find((x) => x.id === id);
       const name = p?.clientName ?? "este cliente";
       const message =
         status === "aceite"
@@ -148,41 +292,44 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
       if (typeof window !== "undefined" && !window.confirm(message)) return;
       void updateStatus(id, status);
     },
-    // updateStatus é estável o suficiente (fecha sobre estado atual via setters);
-    // dependemos apenas da lista para resolver o nome do cliente.
+    // updateStatus fecha sobre o estado actual via setters; a lista chega pela
+    // ref, por isso este callback nunca muda de identidade.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [proposals],
+    [],
   );
 
   // Apagar uma proposta da lista. Pede confirmação (é irreversível) e repõe a
   // proposta se o servidor recusar, para nunca desaparecer sem ter sido guardado.
-  async function deleteProposal(id: string) {
-    const p = proposals.find((x) => x.id === id);
-    const name = p?.clientName ?? "esta proposta";
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Apagar a proposta de ${name}?\n\nEsta ação não pode ser anulada.`)
-    ) {
-      return;
-    }
-    setActionBusy(id);
-    const snapshot = proposals;
-    setProposals((prev) => prev.filter((x) => x.id !== id));
-    try {
-      const res = await fetch(`/api/propostas/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      toast("Proposta apagada.", "success");
-    } catch {
-      setProposals(snapshot);
-      toast("Não foi possível apagar a proposta. Tente novamente.", "error");
-    } finally {
-      setActionBusy(null);
-    }
-  }
+  const deleteProposal = useCallback(
+    async (id: string) => {
+      const snapshot = latest.current.proposals;
+      const p = snapshot.find((x) => x.id === id);
+      const name = p?.clientName ?? "esta proposta";
+      if (
+        typeof window !== "undefined" &&
+        !window.confirm(`Apagar a proposta de ${name}?\n\nEsta ação não pode ser anulada.`)
+      ) {
+        return;
+      }
+      setActionBusy(id);
+      setProposals((prev) => prev.filter((x) => x.id !== id));
+      try {
+        const res = await fetch(`/api/propostas/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error();
+        toast("Proposta apagada.", "success");
+      } catch {
+        setProposals(snapshot);
+        toast("Não foi possível apagar a proposta. Tente novamente.", "error");
+      } finally {
+        setActionBusy(null);
+      }
+    },
+    [setProposals, toast],
+  );
 
   const filtered = useMemo(
     () =>
-      (filter === "all" ? proposals : proposals.filter((p) => p.status === filter))
+      (deferredFilter === "all" ? proposals : proposals.filter((p) => p.status === deferredFilter))
         .slice()
         .sort((a, b) => {
           // Enviadas com expiração iminente first
@@ -193,7 +340,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
           if (a.status === "enviada" && b.status === "enviada") return aExp - bExp;
           return +new Date(b.createdAt) - +new Date(a.createdAt);
         }),
-    [proposals, filter],
+    [proposals, deferredFilter],
   );
 
   const stats = useMemo(() => {
@@ -362,152 +509,29 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
                 <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             }
-            title={filter !== "all" ? "Nenhuma proposta neste estado" : "Sem propostas ainda"}
+            title={
+              deferredFilter !== "all" ? "Nenhuma proposta neste estado" : "Sem propostas ainda"
+            }
             description={
-              filter !== "all"
+              deferredFilter !== "all"
                 ? "Mude de filtro para ver as restantes."
                 : "As propostas enviadas a partir de um pedido aparecem aqui."
             }
           />
         ) : (
           <div className="divide-y divide-foreground/[0.06]">
-            {filtered.map((p) => {
-              const exp = expiryInfo(p.validUntil);
-              const linkedQuote = quotesById.get(p.quoteId);
-              const busy = actionBusy === p.id;
-
-              return (
-                <div
-                  key={p.id}
-                  className={`px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 motion-safe:transition-colors hover:bg-foreground/[0.02] ${p.status === "enviada" && exp?.tone === "expired" ? "opacity-60" : ""}`}
-                >
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <p className="text-foreground/90 text-sm font-medium truncate">
-                        {p.clientName}
-                      </p>
-                      <span
-                        className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
-                        style={{
-                          background: `${statusMeta(p.status).color}1f`,
-                          color: statusMeta(p.status).color,
-                        }}
-                      >
-                        {statusMeta(p.status).label}
-                      </span>
-                      {exp && (
-                        <span
-                          className={`text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium ${
-                            exp.tone === "expired"
-                              ? "bg-[#8a2a22]/10 text-[#8a2a22]"
-                              : exp.tone === "soon"
-                                ? "bg-[#b5894a]/12 text-[#a9781f]"
-                                : "bg-foreground/[0.05] text-foreground/45"
-                          }`}
-                        >
-                          {exp.label}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-foreground/45 text-xs">
-                      {p.clientEmail} · {p.lineItems.length}{" "}
-                      {p.lineItems.length !== 1 ? "itens" : "item"}
-                      {p.sentAt &&
-                        ` · enviada a ${new Date(p.sentAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`}
-                    </p>
-                  </div>
-
-                  {/* Value + actions — share one row on phones, split out on desktop */}
-                  <div className="flex items-center justify-between gap-3 sm:contents">
-                    <p className="text-foreground/90 text-sm font-semibold shrink-0 tabular-nums">
-                      {eur(p.total)}
-                    </p>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      {p.status === "enviada" && (
-                        <>
-                          <Button
-                            variant="subtle"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => confirmAndUpdate(p.id, "aceite")}
-                            title="O cliente aceitou: fecha o negócio e marca o pedido como ganho"
-                            iconLeft={
-                              <svg
-                                width="13"
-                                height="13"
-                                viewBox="0 0 12 12"
-                                fill="none"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  d="M2 6l2.5 2.5L10 3"
-                                  stroke="currentColor"
-                                  strokeWidth="1.8"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            }
-                          >
-                            Aceitar
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => confirmAndUpdate(p.id, "rejeitada")}
-                            title="O cliente não avançou com esta proposta"
-                          >
-                            Recusar
-                          </Button>
-                        </>
-                      )}
-                      {linkedQuote && onOpenQuote && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onOpenQuote(linkedQuote)}
-                          title="Abrir o pedido deste cliente"
-                          iconRight={<span aria-hidden="true">→</span>}
-                        >
-                          Ver pedido
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => deleteProposal(p.id)}
-                        aria-label={`Apagar a proposta de ${p.clientName}`}
-                        title="Apagar esta proposta"
-                        className="text-foreground/40 hover:text-[#8a2a22]"
-                        iconLeft={
-                          <svg
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                            <path d="M10 11v6M14 11v6" />
-                          </svg>
-                        }
-                      >
-                        Apagar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {filtered.map((p) => (
+              <ProposalRow
+                key={p.id}
+                p={p}
+                linkedQuote={quotesById.get(p.quoteId)}
+                busy={actionBusy === p.id}
+                canOpenQuote={!!onOpenQuote}
+                onOpenQuote={handleOpenQuote}
+                onUpdate={confirmAndUpdate}
+                onDelete={deleteProposal}
+              />
+            ))}
           </div>
         )}
       </Card>

@@ -6,6 +6,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
+import { metaFor } from "./status-meta";
 
 // Memoised so editing the revenue goal or the team notes (local Overview state)
 // doesn't re-render these two heavier panels every keystroke — their props
@@ -92,6 +93,215 @@ function Delta({ now, prev }: { now: number; prev: number }) {
     </span>
   );
 }
+
+/**
+ * ── Meta de receita e Notas da equipa, com estado LOCAL ───────────────────
+ *
+ * Estavam as duas dentro do `Overview`. Como o valor escrito é estado deste
+ * ecrã, cada tecla voltava a desenhar o painel INTEIRO — os cinco KPI, o
+ * funil, o pulso financeiro, "Precisam de atenção", "Atividade recente". Nada
+ * disso muda enquanto se escreve uma nota.
+ *
+ * O padrão é o mesmo que o `Calendario` já usa no seu `AddEventModal`: quem
+ * escreve fica dono do que escreve. `Reminders` e `Agenda` já estavam
+ * protegidos por `memo()`; faltavam estes dois.
+ */
+const MetaReceita = memo(function MetaReceita({ wonThisMonth }: { wonThisMonth: number }) {
+  const [goal, setGoal] = useState(0);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("liquen-meta-receita");
+      if (v) setGoal(Number(v));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function saveGoal() {
+    const v = parseFloat(goalInput.replace(/[^\d.]/g, "")) || 0;
+    setGoal(v);
+    setEditingGoal(false);
+    try {
+      localStorage.setItem("liquen-meta-receita", String(v));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="bo-card p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="bo-eyebrow">Meta de receita — este mês</h3>
+        {!editingGoal && (
+          <button
+            onClick={() => {
+              setGoalInput(goal > 0 ? String(goal) : "");
+              setEditingGoal(true);
+            }}
+            className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+          >
+            {goal > 0 ? "Editar meta" : "Definir meta"}
+          </button>
+        )}
+      </div>
+
+      {editingGoal ? (
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            type="number"
+            value={goalInput}
+            onChange={(e) => setGoalInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveGoal();
+              if (e.key === "Escape") setEditingGoal(false);
+            }}
+            placeholder="Ex: 15000"
+            className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
+          />
+          <button
+            onClick={saveGoal}
+            className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors whitespace-nowrap"
+          >
+            Guardar
+          </button>
+          <button
+            onClick={() => setEditingGoal(false)}
+            className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
+          >
+            ×
+          </button>
+        </div>
+      ) : goal > 0 ? (
+        <>
+          <div className="flex items-end justify-between mb-2">
+            <div>
+              <span
+                className="font-bold"
+                style={{
+                  fontFamily: "var(--font-playfair)",
+                  fontSize: "clamp(18px, 2vw, 24px)",
+                  color: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
+                }}
+              >
+                {eur(wonThisMonth)}
+              </span>
+              <span className="text-foreground/30 text-xs ml-2">de {eur(goal)}</span>
+            </div>
+            <span
+              className="text-sm font-semibold tabular-nums"
+              style={{ color: wonThisMonth >= goal ? "#3a5c39" : "#4d6350" }}
+            >
+              {Math.min(100, Math.round((wonThisMonth / goal) * 100))}%
+            </span>
+          </div>
+          <div className="h-2.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.min(100, (wonThisMonth / goal) * 100)}%`,
+                background: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
+              }}
+            />
+          </div>
+          {wonThisMonth >= goal && (
+            <p className="text-[#3a5c39] text-[10px] tracking-[0.12em] uppercase font-semibold mt-2">
+              Meta atingida ✓
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="text-foreground/40 text-xs py-1">Sem meta definida.</p>
+      )}
+    </div>
+  );
+});
+
+const NotasEquipa = memo(function NotasEquipa() {
+  const [teamNotes, setTeamNotes] = useState("");
+  const [editingNotes, setEditingNotes] = useState(false);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("liquen-team-notes");
+      if (v !== null) setTeamNotes(v);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Keep the textarea instant (setTeamNotes now), but DEBOUNCE the localStorage
+  // write: a synchronous setItem on every keystroke serialises + commits to
+  // storage on the main thread per character, which hitches typing under storage
+  // pressure. Persist ~500ms after the last keystroke instead.
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function persistNotes(v: string) {
+    setTeamNotes(v);
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem("liquen-team-notes", v);
+      } catch {
+        /* ignore */
+      }
+    }, 500);
+  }
+  useEffect(() => () => void (notesTimer.current && clearTimeout(notesTimer.current)), []);
+
+  return (
+    <div className="bo-card p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="bo-eyebrow">Notas da equipa</h3>
+        {!editingNotes && (
+          <button
+            onClick={() => setEditingNotes(true)}
+            className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+          >
+            {teamNotes ? "Editar" : "Adicionar nota"}
+          </button>
+        )}
+      </div>
+      {editingNotes ? (
+        <div>
+          <textarea
+            autoFocus
+            rows={4}
+            value={teamNotes}
+            onChange={(e) => persistNotes(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditingNotes(false);
+            }}
+            placeholder="Notas partilhadas com a equipa — lembretes, contexto, próximos passos…"
+            className="bo-input w-full px-3 py-2 text-sm text-foreground/70 resize-none"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-foreground/22 text-[10px]">
+              Guardado automaticamente · Esc para fechar
+            </span>
+            <button
+              onClick={() => setEditingNotes(false)}
+              className="text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 transition-opacity"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      ) : teamNotes ? (
+        <p
+          className="text-foreground/55 text-sm leading-relaxed whitespace-pre-wrap cursor-text"
+          onClick={() => setEditingNotes(true)}
+        >
+          {teamNotes}
+        </p>
+      ) : (
+        <p className="text-foreground/40 text-xs">Sem notas.</p>
+      )}
+    </div>
+  );
+});
 
 interface Props {
   quotes: Quote[];
@@ -228,59 +438,6 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       funnelMax: Math.max(1, ...FUNNEL.map((f) => byStatus[f.id] ?? 0)),
     };
   }, [quotes]);
-
-  const [goal, setGoal] = useState(0);
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [goalInput, setGoalInput] = useState("");
-  const [teamNotes, setTeamNotes] = useState("");
-  const [editingNotes, setEditingNotes] = useState(false);
-
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem("liquen-team-notes");
-      if (v !== null) setTeamNotes(v);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // Keep the textarea instant (setTeamNotes now), but DEBOUNCE the localStorage
-  // write: a synchronous setItem on every keystroke serialises + commits to
-  // storage on the main thread per character, which hitches typing under storage
-  // pressure. Persist ~500ms after the last keystroke instead.
-  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function persistNotes(v: string) {
-    setTeamNotes(v);
-    if (notesTimer.current) clearTimeout(notesTimer.current);
-    notesTimer.current = setTimeout(() => {
-      try {
-        localStorage.setItem("liquen-team-notes", v);
-      } catch {
-        /* ignore */
-      }
-    }, 500);
-  }
-  useEffect(() => () => void (notesTimer.current && clearTimeout(notesTimer.current)), []);
-
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem("liquen-meta-receita");
-      if (v) setGoal(Number(v));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  function saveGoal() {
-    const v = parseFloat(goalInput.replace(/[^\d.]/g, "")) || 0;
-    setGoal(v);
-    setEditingGoal(false);
-    try {
-      localStorage.setItem("liquen-meta-receita", String(v));
-    } catch {
-      /* ignore */
-    }
-  }
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 20 ? "Boa tarde" : "Boa noite";
@@ -518,7 +675,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 {data.nextEventDays === 0 ? "hoje" : `${data.nextEventDays}d`}
               </p>
               <p className="text-foreground/25 text-[10px] tracking-[0.15em] uppercase mt-0.5">
-                {STATUS_META[data.nextEvent.status].label}
+                {metaFor(STATUS_META, data.nextEvent.status).label}
               </p>
             </div>
           </div>
@@ -586,142 +743,9 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         ))}
       </div>
 
-      {/* Meta mensal de receita */}
-      <div className="bo-card p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="bo-eyebrow">Meta de receita — este mês</h3>
-          {!editingGoal && (
-            <button
-              onClick={() => {
-                setGoalInput(goal > 0 ? String(goal) : "");
-                setEditingGoal(true);
-              }}
-              className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
-            >
-              {goal > 0 ? "Editar meta" : "Definir meta"}
-            </button>
-          )}
-        </div>
+      <MetaReceita wonThisMonth={data.wonThisMonth} />
 
-        {editingGoal ? (
-          <div className="flex items-center gap-2">
-            <input
-              autoFocus
-              type="number"
-              value={goalInput}
-              onChange={(e) => setGoalInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveGoal();
-                if (e.key === "Escape") setEditingGoal(false);
-              }}
-              placeholder="Ex: 15000"
-              className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
-            />
-            <button
-              onClick={saveGoal}
-              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors whitespace-nowrap"
-            >
-              Guardar
-            </button>
-            <button
-              onClick={() => setEditingGoal(false)}
-              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
-            >
-              ×
-            </button>
-          </div>
-        ) : goal > 0 ? (
-          <>
-            <div className="flex items-end justify-between mb-2">
-              <div>
-                <span
-                  className="font-bold"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(18px, 2vw, 24px)",
-                    color: data.wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
-                  }}
-                >
-                  {eur(data.wonThisMonth)}
-                </span>
-                <span className="text-foreground/30 text-xs ml-2">de {eur(goal)}</span>
-              </div>
-              <span
-                className="text-sm font-semibold tabular-nums"
-                style={{ color: data.wonThisMonth >= goal ? "#3a5c39" : "#4d6350" }}
-              >
-                {Math.min(100, Math.round((data.wonThisMonth / goal) * 100))}%
-              </span>
-            </div>
-            <div className="h-2.5 bg-foreground/[0.06] rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${Math.min(100, (data.wonThisMonth / goal) * 100)}%`,
-                  background: data.wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
-                }}
-              />
-            </div>
-            {data.wonThisMonth >= goal && (
-              <p className="text-[#3a5c39] text-[10px] tracking-[0.12em] uppercase font-semibold mt-2">
-                Meta atingida ✓
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-foreground/40 text-xs py-1">Sem meta definida.</p>
-        )}
-      </div>
-
-      {/* Notas da equipa */}
-      <div className="bo-card p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="bo-eyebrow">Notas da equipa</h3>
-          {!editingNotes && (
-            <button
-              onClick={() => setEditingNotes(true)}
-              className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
-            >
-              {teamNotes ? "Editar" : "Adicionar nota"}
-            </button>
-          )}
-        </div>
-        {editingNotes ? (
-          <div>
-            <textarea
-              autoFocus
-              rows={4}
-              value={teamNotes}
-              onChange={(e) => persistNotes(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setEditingNotes(false);
-              }}
-              placeholder="Notas partilhadas com a equipa — lembretes, contexto, próximos passos…"
-              className="bo-input w-full px-3 py-2 text-sm text-foreground/70 resize-none"
-            />
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-foreground/22 text-[10px]">
-                Guardado automaticamente · Esc para fechar
-              </span>
-              <button
-                onClick={() => setEditingNotes(false)}
-                className="text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 transition-opacity"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        ) : teamNotes ? (
-          <p
-            className="text-foreground/55 text-sm leading-relaxed whitespace-pre-wrap cursor-text"
-            onClick={() => setEditingNotes(true)}
-          >
-            {teamNotes}
-          </p>
-        ) : (
-          <p className="text-foreground/40 text-xs">Sem notas.</p>
-        )}
-      </div>
+      <NotasEquipa />
 
       {/* Reminders — derived urgent items */}
       <MemoReminders quotes={quotes} onOpen={onOpen} />
@@ -904,11 +928,11 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                     <span
                       className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
                       style={{
-                        background: `${STATUS_META[q.status].color}18`,
-                        color: STATUS_META[q.status].color,
+                        background: `${metaFor(STATUS_META, q.status).color}18`,
+                        color: metaFor(STATUS_META, q.status).color,
                       }}
                     >
-                      {STATUS_META[q.status].label}
+                      {metaFor(STATUS_META, q.status).label}
                     </span>
                   )}
                   <p className="text-foreground/22 text-[10px] mt-1">{timeAgo(q.submittedAt)}</p>

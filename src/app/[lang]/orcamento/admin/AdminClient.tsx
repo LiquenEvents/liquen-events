@@ -1373,16 +1373,22 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               quem está aqui dentro já sabe onde está, e o rótulo só roubava
               espaço ao único elemento que identifica a casa. O nome continua a
               ser anunciado por leitores de ecrã através do `alt` da imagem. */}
-          <div className="w-full px-4 pt-6 pb-6 flex justify-center">
+          <div className="w-full px-3 pt-5 pb-6 flex justify-center">
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
               width={300}
               height={179}
               priority
-              // Centrado na largura da barra e o maior que cabe sem tocar nas
-              // margens — é a marca que abre o dia de trabalho, não um ícone.
-              className="h-28 w-auto max-w-full object-contain"
+              /* Centrado e a ocupar a largura toda da barra.
+               *
+               * Antes limitava-se a altura (`h-28`), e com isso o logótipo
+               * parava nos ~188 px de largura numa barra de 256: sobrava
+               * margem dos dois lados e ele ficava pequeno no meio do vazio.
+               * Amarrando à LARGURA (`w-full`) e deixando a altura seguir o
+               * rácio, passa a encher a barra de margem a margem — é a marca
+               * que abre o dia de trabalho, não um ícone. */
+              className="w-full h-auto object-contain"
             />
           </div>
 

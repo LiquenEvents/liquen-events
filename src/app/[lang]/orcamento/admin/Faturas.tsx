@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 // `import type` is fully erased at build time, so pulling the shape from the
 // server-only store never drags its runtime `server-only` guard into this
@@ -12,6 +12,7 @@ import { splitThirtySeventy } from "@/lib/money";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Field, Segmented } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { metaFor } from "./status-meta";
 
 type Status = Invoice["status"];
 type Kind = Invoice["kind"];
@@ -49,6 +50,188 @@ const fmtDate = (d?: string) =>
   d
     ? new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short" })
     : "—";
+
+/**
+ * ── Porque é que estas duas peças estão memoizadas ────────────────────────
+ *
+ * Medido numa compilação de produção com 167 faturas e 300 pedidos: escrever o
+ * nome do cliente no formulário "Nova fatura" custava **68 ms por tecla** até o
+ * ecrã voltar a pintar (22 teclas → 1473 ms de JavaScript, 22 tarefas longas).
+ * Escrever ficava a arrastar visivelmente.
+ *
+ * A causa não era o formulário — era tudo o que estava POR BAIXO dele. O estado
+ * do formulário vive neste componente, por isso cada tecla voltava a desenhar:
+ *   · o `<select>` de eventos, com **300 `<option>`**;
+ *   · o livro de faturas INTEIRO, e duas vezes — a lista de telemóvel
+ *     (`md:hidden`) e a tabela de secretária (`hidden md:block`) estão as duas
+ *     sempre no DOM, só escondidas por CSS. São ~2700 elementos por tecla.
+ *
+ * Nada disto muda enquanto se escreve. Isolar as duas peças em componentes
+ * `memo()` deixa o React saltá-las: o formulário continua a redesenhar-se (é o
+ * que tem de acontecer), o livro e as opções não. Sem alterar comportamento
+ * nenhum — mesmas linhas, mesmas ações, mesmo HTML.
+ */
+
+/** As 300 `<option>` do seletor de evento. */
+const QuoteOptions = memo(function QuoteOptions({ quotes }: { quotes: Quote[] }) {
+  return (
+    <>
+      {quotes.map((q) => (
+        <option key={q.id} value={q.id}>
+          {q.name} · {q.eventName || q.eventType || "evento"}
+        </option>
+      ))}
+    </>
+  );
+});
+
+const statusBadge = (i: Invoice) => (
+  <span
+    className="inline-block rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
+    style={{
+      background: `${metaFor(STATUS_META, i.status).color}18`,
+      color: metaFor(STATUS_META, i.status).color,
+    }}
+  >
+    {metaFor(STATUS_META, i.status).label}
+  </span>
+);
+
+interface LedgerProps {
+  rows: Invoice[];
+  busyId: string | null;
+  onSetStatus: (inv: Invoice, status: Status) => void;
+  onRemove: (inv: Invoice) => void;
+}
+
+/** O livro de faturas: cartões no telemóvel, tabela na secretária. */
+const Ledger = memo(function Ledger({ rows, busyId, onSetStatus, onRemove }: LedgerProps) {
+  // Partilhado pelos dois layouts, para nunca divergirem.
+  const rowActions = (i: Invoice) => (
+    <>
+      {i.status === "emitida" && (
+        <>
+          <Button
+            size="sm"
+            variant="subtle"
+            onClick={() => onSetStatus(i, "paga")}
+            disabled={busyId === i.id}
+            title="Já recebeu o pagamento desta fatura"
+          >
+            Marcar como paga
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (window.confirm(`Anular a fatura ${i.number}? Deixa de contar para o total.`))
+                onSetStatus(i, "anulada");
+            }}
+            disabled={busyId === i.id}
+            title="Cancelar esta fatura (deixa de contar para os totais)"
+          >
+            Anular
+          </Button>
+        </>
+      )}
+      {i.status === "paga" && (
+        <span className="text-xs text-foreground/40">Pago {fmtDate(i.paidAt)}</span>
+      )}
+      {/* Apagar — só para faturas já anuladas (segurança fiscal:
+          anula-se primeiro, depois apaga-se). */}
+      {i.status === "anulada" && (
+        <Button size="sm" variant="ghost" onClick={() => onRemove(i)} disabled={busyId === i.id}>
+          Apagar
+        </Button>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile: one calm card per invoice (no horizontal scroll) */}
+      <ul className="divide-y divide-foreground/[0.06] md:hidden">
+        {rows.map((i) => (
+          <li key={i.id} className={`p-4 ${i.status === "anulada" ? "opacity-55" : ""}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-foreground/80" title={i.clientName}>
+                  {i.clientName || "—"}
+                </p>
+                <p className="mt-0.5 text-xs tabular-nums text-foreground/45">
+                  {i.number} · {KIND_LABEL[i.kind]}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-base font-semibold tabular-nums text-foreground/80">
+                  {eur2(i.amount)}
+                </p>
+                <div className="mt-1">{statusBadge(i)}</div>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-foreground/45">
+              Emitida {fmtDate(i.issuedAt)}
+              {i.dueAt && <> · vence {fmtDate(i.dueAt)}</>}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">{rowActions(i)}</div>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop: the full ledger table */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-foreground/[0.08] text-foreground/40">
+              <th className="bo-eyebrow px-4 py-3.5 text-left">Nº</th>
+              <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
+              <th className="bo-eyebrow px-4 py-3.5 text-left">Tipo</th>
+              <th className="bo-eyebrow px-4 py-3.5 text-right">Valor</th>
+              <th className="bo-eyebrow px-4 py-3.5 text-left">Emitida</th>
+              <th className="bo-eyebrow px-4 py-3.5 text-left">Vencimento</th>
+              <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
+              <th className="bo-eyebrow px-4 py-3.5 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-foreground/[0.06]">
+            {rows.map((i) => (
+              <tr
+                key={i.id}
+                className={`transition-colors hover:bg-foreground/[0.02] ${i.status === "anulada" ? "opacity-55" : ""}`}
+              >
+                <td className="whitespace-nowrap px-4 py-3.5 font-medium tabular-nums text-foreground/70">
+                  {i.number}
+                </td>
+                <td
+                  className="max-w-[180px] truncate px-4 py-3.5 text-foreground/70"
+                  title={i.clientName}
+                >
+                  {i.clientName || "—"}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
+                  {KIND_LABEL[i.kind]}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-foreground/80">
+                  {eur2(i.amount)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
+                  {fmtDate(i.issuedAt)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
+                  {fmtDate(i.dueAt)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3.5">{statusBadge(i)}</td>
+                <td className="px-4 py-3.5">
+                  <div className="flex items-center justify-end gap-1.5">{rowActions(i)}</div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+});
 
 interface Props {
   /** Optional events to prefill the "Nova fatura" client + total from. */
@@ -196,118 +379,73 @@ export default function Faturas({ quotes }: Props) {
     }
   }
 
-  async function setStatus(inv: Invoice, status: Status) {
-    setBusy(inv.id);
-    try {
-      const res = await fetch(`/api/faturas/${inv.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast(data.error || "Não foi possível atualizar", "error");
-        return;
+  // `useCallback` não é decoração: são estes dois que o `Ledger` memoizado
+  // recebe. Se mudassem de identidade a cada tecla escrita no formulário, o
+  // `memo()` nunca acertava e o livro voltava a desenhar-se na mesma.
+  const setStatus = useCallback(
+    async function setStatus(inv: Invoice, status: Status) {
+      setBusy(inv.id);
+      try {
+        const res = await fetch(`/api/faturas/${inv.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast(data.error || "Não foi possível atualizar", "error");
+          return;
+        }
+        // O PATCH pode devolver um saldo emitido automaticamente (quando se marca
+        // um sinal como pago). Separamo-lo do próprio registo atualizado.
+        const { saldoAutoIssued, ...updated } = data as Invoice & { saldoAutoIssued?: Invoice };
+        setInvoices((prev) => {
+          const next = prev.map((i) => (i.id === inv.id ? (updated as Invoice) : i));
+          return saldoAutoIssued ? [saldoAutoIssued, ...next] : next;
+        });
+        if (saldoAutoIssued) {
+          toast(`Sinal pago · saldo ${saldoAutoIssued.number} emitido automaticamente`, "success");
+        } else {
+          toast(status === "paga" ? "Fatura marcada como paga" : "Fatura anulada", "success");
+        }
+      } catch {
+        toast("Erro de rede ao atualizar", "error");
+      } finally {
+        setBusy(null);
       }
-      // O PATCH pode devolver um saldo emitido automaticamente (quando se marca
-      // um sinal como pago). Separamo-lo do próprio registo atualizado.
-      const { saldoAutoIssued, ...updated } = data as Invoice & { saldoAutoIssued?: Invoice };
-      setInvoices((prev) => {
-        const next = prev.map((i) => (i.id === inv.id ? (updated as Invoice) : i));
-        return saldoAutoIssued ? [saldoAutoIssued, ...next] : next;
-      });
-      if (saldoAutoIssued) {
-        toast(`Sinal pago · saldo ${saldoAutoIssued.number} emitido automaticamente`, "success");
-      } else {
-        toast(status === "paga" ? "Fatura marcada como paga" : "Fatura anulada", "success");
-      }
-    } catch {
-      toast("Erro de rede ao atualizar", "error");
-    } finally {
-      setBusy(null);
-    }
-  }
+    },
+    [setInvoices, toast],
+  );
 
   // Apagar definitivamente uma fatura — só permitido quando já está anulada
   // (a guarda fiscal vive também no servidor, que devolve 409 caso contrário).
   // Anula-se primeiro, depois apaga-se: uma fatura viva nunca se apaga por engano.
-  async function remove(inv: Invoice) {
-    if (
-      !window.confirm(
-        `Apagar definitivamente a fatura ${inv.number}? Esta ação não pode ser anulada.`,
-      )
-    ) {
-      return;
-    }
-    setBusy(inv.id);
-    try {
-      const res = await fetch(`/api/faturas/${inv.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast(data.error || "Não foi possível apagar", "error");
+  const remove = useCallback(
+    async function remove(inv: Invoice) {
+      if (
+        !window.confirm(
+          `Apagar definitivamente a fatura ${inv.number}? Esta ação não pode ser anulada.`,
+        )
+      ) {
         return;
       }
-      setInvoices((prev) => prev.filter((i) => i.id !== inv.id));
-      toast("Fatura apagada", "success");
-    } catch {
-      toast("Erro de rede ao apagar", "error");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  // Shared bits used by both the desktop table and the mobile card list, so the
-  // two layouts can never drift apart.
-  const statusBadge = (i: Invoice) => (
-    <span
-      className="inline-block rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
-      style={{
-        background: `${STATUS_META[i.status].color}18`,
-        color: STATUS_META[i.status].color,
-      }}
-    >
-      {STATUS_META[i.status].label}
-    </span>
-  );
-
-  const rowActions = (i: Invoice) => (
-    <>
-      {i.status === "emitida" && (
-        <>
-          <Button
-            size="sm"
-            variant="subtle"
-            onClick={() => setStatus(i, "paga")}
-            disabled={busy === i.id}
-            title="Já recebeu o pagamento desta fatura"
-          >
-            Marcar como paga
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              if (window.confirm(`Anular a fatura ${i.number}? Deixa de contar para o total.`))
-                setStatus(i, "anulada");
-            }}
-            disabled={busy === i.id}
-            title="Cancelar esta fatura (deixa de contar para os totais)"
-          >
-            Anular
-          </Button>
-        </>
-      )}
-      {i.status === "paga" && (
-        <span className="text-xs text-foreground/40">Pago {fmtDate(i.paidAt)}</span>
-      )}
-      {/* Apagar — só para faturas já anuladas (segurança fiscal:
-          anula-se primeiro, depois apaga-se). */}
-      {i.status === "anulada" && (
-        <Button size="sm" variant="ghost" onClick={() => remove(i)} disabled={busy === i.id}>
-          Apagar
-        </Button>
-      )}
-    </>
+      setBusy(inv.id);
+      try {
+        const res = await fetch(`/api/faturas/${inv.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast(data.error || "Não foi possível apagar", "error");
+          return;
+        }
+        setInvoices((prev) => prev.filter((i) => i.id !== inv.id));
+        toast("Fatura apagada", "success");
+      } catch {
+        toast("Erro de rede ao apagar", "error");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [setInvoices, toast],
   );
 
   const filtered = useMemo(
@@ -317,15 +455,20 @@ export default function Faturas({ quotes }: Props) {
 
   // Totals: emitido = tudo o que não está anulado; pago = faturas pagas;
   // em dívida = emitido − pago (o que falta receber).
+  // A mesma passagem conta as faturas por estado, para os chips do filtro: antes
+  // eram três `invoices.filter()` completos por cada render (e havia um render
+  // por tecla escrita no formulário).
   const totals = useMemo(() => {
     let emitido = 0;
     let pago = 0;
+    const counts: Record<string, number> = {};
     for (const i of invoices) {
+      counts[i.status] = (counts[i.status] ?? 0) + 1;
       if (i.status === "anulada") continue;
       emitido += i.amount;
       if (i.status === "paga") pago += i.amount;
     }
-    return { emitido, pago, divida: Math.max(0, emitido - pago) };
+    return { emitido, pago, divida: Math.max(0, emitido - pago), counts };
   }, [invoices]);
 
   if (loading) return <SkeletonList rows={5} />;
@@ -391,11 +534,7 @@ export default function Faturas({ quotes }: Props) {
                 containerClassName="sm:col-span-2"
               >
                 <option value="">— Escolher para preencher —</option>
-                {quotes.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.name} · {q.eventName || q.eventType || "evento"}
-                  </option>
-                ))}
+                <QuoteOptions quotes={quotes} />
               </Field>
             )}
 
@@ -537,20 +676,17 @@ export default function Faturas({ quotes }: Props) {
         >
           Todas · {invoices.length}
         </Button>
-        {STATUSES.map((s) => {
-          const count = invoices.filter((i) => i.status === s).length;
-          return (
-            <Button
-              key={s}
-              size="sm"
-              variant={filter === s ? "subtle" : "ghost"}
-              aria-pressed={filter === s}
-              onClick={() => setFilter(s)}
-            >
-              {STATUS_META[s].label} · {count}
-            </Button>
-          );
-        })}
+        {STATUSES.map((s) => (
+          <Button
+            key={s}
+            size="sm"
+            variant={filter === s ? "subtle" : "ghost"}
+            aria-pressed={filter === s}
+            onClick={() => setFilter(s)}
+          >
+            {STATUS_META[s].label} · {totals.counts[s] ?? 0}
+          </Button>
+        ))}
       </div>
 
       {/* Ledger table */}
@@ -584,88 +720,7 @@ export default function Faturas({ quotes }: Props) {
             }
           />
         ) : (
-          <>
-            {/* Mobile: one calm card per invoice (no horizontal scroll) */}
-            <ul className="divide-y divide-foreground/[0.06] md:hidden">
-              {filtered.map((i) => (
-                <li key={i.id} className={`p-4 ${i.status === "anulada" ? "opacity-55" : ""}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground/80" title={i.clientName}>
-                        {i.clientName || "—"}
-                      </p>
-                      <p className="mt-0.5 text-xs tabular-nums text-foreground/45">
-                        {i.number} · {KIND_LABEL[i.kind]}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-base font-semibold tabular-nums text-foreground/80">
-                        {eur2(i.amount)}
-                      </p>
-                      <div className="mt-1">{statusBadge(i)}</div>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs text-foreground/45">
-                    Emitida {fmtDate(i.issuedAt)}
-                    {i.dueAt && <> · vence {fmtDate(i.dueAt)}</>}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">{rowActions(i)}</div>
-                </li>
-              ))}
-            </ul>
-
-            {/* Desktop: the full ledger table */}
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-foreground/[0.08] text-foreground/40">
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Nº</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Tipo</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-right">Valor</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Emitida</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Vencimento</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-foreground/[0.06]">
-                  {filtered.map((i) => (
-                    <tr
-                      key={i.id}
-                      className={`transition-colors hover:bg-foreground/[0.02] ${i.status === "anulada" ? "opacity-55" : ""}`}
-                    >
-                      <td className="whitespace-nowrap px-4 py-3.5 font-medium tabular-nums text-foreground/70">
-                        {i.number}
-                      </td>
-                      <td
-                        className="max-w-[180px] truncate px-4 py-3.5 text-foreground/70"
-                        title={i.clientName}
-                      >
-                        {i.clientName || "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
-                        {KIND_LABEL[i.kind]}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-foreground/80">
-                        {eur2(i.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
-                        {fmtDate(i.issuedAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 text-foreground/45">
-                        {fmtDate(i.dueAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5">{statusBadge(i)}</td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center justify-end gap-1.5">{rowActions(i)}</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <Ledger rows={filtered} busyId={busy} onSetStatus={setStatus} onRemove={remove} />
         )}
       </Card>
     </div>

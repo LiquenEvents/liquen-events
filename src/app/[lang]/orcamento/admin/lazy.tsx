@@ -163,6 +163,17 @@ export const EventTasks = dynamic(() => import("./EventTasks"), { loading: Panel
  * vistas obrigaria o servidor a compilá-las todas, tornando o trabalho do dia-a-
  * dia MAIS lento, não mais rápido. Tudo junto são ~250 KB, menos do que o
  * runtime do React, e ficam em cache imutável durante um ano.
+ *
+ * O QUE ISTO NÃO FAZ — medido, para ninguém voltar a assumir o contrário:
+ * aquecer os módulos **não** encurta o tempo de mudar de vista. Com tudo
+ * aquecido (zero pedidos à rede ao clicar), o marcador de posição continuava no
+ * ecrã os mesmos ~300 ms. O que esses 300 ms são não é descarregamento nem
+ * dados (8–21 ms e 9–31 ms): é o custo de MONTAR a vista dividida em chunk —
+ * importar a mesma vista normalmente baixou a mudança de 370 para 258 ms.
+ *
+ * Isto continua a valer a pena pela razão certa: numa ligação lenta ou instável
+ * não há ida à rede no momento do clique. Mas é robustez, não velocidade — e a
+ * decisão de desdobrar (ou não) as vistas diárias é que mexe no tempo.
  */
 const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   kanban: kanban.warm,

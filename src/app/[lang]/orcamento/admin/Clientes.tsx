@@ -6,6 +6,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Segmented, Toolbar } from "./ui";
 import { eur0 as eur } from "@/lib/money";
+import { metaFor } from "./status-meta";
 
 // Unified status vocabulary (Novo / Em revisão / Proposta enviada / Ganho / Perdido).
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
@@ -44,6 +45,11 @@ interface Client {
   wonCount: number;
   rejectedCount: number;
   lastAt: string;
+  /** `lastAt` em milissegundos — para ordenar sem construir um `Date` por comparação. */
+  lastMs: number;
+  /** Nome + email + telefone + empresa, em minúsculas, para a procura. */
+  haystack: string;
+  vip: boolean;
 }
 
 interface Props {
@@ -62,7 +68,16 @@ export default function Clientes({ quotes, onOpen }: Props) {
   const [vipOnly, setVipOnly] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
 
-  const clients = useMemo(() => {
+  // A AGREGAÇÃO (varrer todos os pedidos e juntá-los por cliente) só depende dos
+  // pedidos. Estava no mesmo `useMemo` do filtro e da ordenação, por isso mudar
+  // de ordenação, ligar o VIP ou escrever mais uma letra na procura obrigava a
+  // refazer o varrimento inteiro — trabalho O(n) sobre centenas de pedidos para
+  // chegar exactamente ao mesmo resultado. Agora são dois passos: este é caro e
+  // raro; o de baixo é barato e frequente.
+  //
+  // De passagem, guarda-se o texto de procura já em minúsculas por cliente: era
+  // um `toLowerCase()` por campo, por cliente, POR TECLA.
+  const aggregated = useMemo(() => {
     const map = new Map<string, Client>();
     for (const q of quotes) {
       const key = (q.email || q.phone || q.name).toLowerCase();
@@ -78,6 +93,9 @@ export default function Clientes({ quotes, onOpen }: Props) {
           wonCount: 0,
           rejectedCount: 0,
           lastAt: q.submittedAt,
+          lastMs: 0,
+          haystack: "",
+          vip: false,
         });
       }
       const c = map.get(key)!;
@@ -96,29 +114,29 @@ export default function Clientes({ quotes, onOpen }: Props) {
         c.company = q.company;
       }
     }
-    let list = Array.from(map.values());
-
-    if (vipOnly) list = list.filter((c) => c.totalWon >= 10000 || c.wonCount >= 2);
-
-    const s = dSearch.trim().toLowerCase();
-    if (s)
-      list = list.filter((c) =>
-        [c.name, c.email, c.phone, c.company]
-          .filter(Boolean)
-          .some((v) => v.toLowerCase().includes(s)),
-      );
-
-    list.sort(
-      sort === "value"
-        ? (a, b) => b.totalWon - a.totalWon || +new Date(b.lastAt) - +new Date(a.lastAt)
-        : sort === "pipeline"
-          ? (a, b) => b.totalPipeline - a.totalPipeline || +new Date(b.lastAt) - +new Date(a.lastAt)
-          : (a, b) => +new Date(b.lastAt) - +new Date(a.lastAt),
-    );
+    const list = Array.from(map.values());
+    for (const c of list) {
+      c.lastMs = +new Date(c.lastAt);
+      c.vip = c.totalWon >= 10000 || c.wonCount >= 2;
+      c.haystack = [c.name, c.email, c.phone, c.company].filter(Boolean).join(" ").toLowerCase();
+    }
     return list;
-  }, [quotes, dSearch, sort, vipOnly]);
+  }, [quotes]);
 
-  const isVip = (c: Client) => c.totalWon >= 10000 || c.wonCount >= 2;
+  const clients = useMemo(() => {
+    let list = aggregated;
+    if (vipOnly) list = list.filter((c) => c.vip);
+    const s = dSearch.trim().toLowerCase();
+    if (s) list = list.filter((c) => c.haystack.includes(s));
+    // `sort` muta em sítio, por isso copiamos antes — `aggregated` é partilhado.
+    return [...list].sort(
+      sort === "value"
+        ? (a, b) => b.totalWon - a.totalWon || b.lastMs - a.lastMs
+        : sort === "pipeline"
+          ? (a, b) => b.totalPipeline - a.totalPipeline || b.lastMs - a.lastMs
+          : (a, b) => b.lastMs - a.lastMs,
+    );
+  }, [aggregated, dSearch, sort, vipOnly]);
 
   function exportCsv() {
     const rows: (string | number)[][] = [
@@ -257,7 +275,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
               >
                 {/* Avatar */}
                 <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${isVip(c) ? "bg-[#d6ab3a]/20 text-[#b88f28] ring-[#d6ab3a]/20" : "bg-[#4d6350] text-white ring-[#4d6350]/10"}`}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${c.vip ? "bg-[#d6ab3a]/20 text-[#b88f28] ring-[#d6ab3a]/20" : "bg-[#4d6350] text-white ring-[#4d6350]/10"}`}
                 >
                   {c.name.slice(0, 1).toUpperCase()}
                 </div>
@@ -266,7 +284,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="text-foreground/78 text-sm font-semibold truncate flex items-center gap-2">
                     <span className="truncate">{c.name}</span>
-                    {isVip(c) && (
+                    {c.vip && (
                       <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#d6ab3a]/15 text-[#b88f28] text-[8px] tracking-[0.12em] uppercase font-bold">
                         ★ VIP
                       </span>
@@ -419,11 +437,11 @@ export default function Clientes({ quotes, onOpen }: Props) {
                               <span
                                 className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-md font-medium"
                                 style={{
-                                  background: `${STATUS_META[q.status].color}18`,
-                                  color: STATUS_META[q.status].color,
+                                  background: `${metaFor(STATUS_META, q.status).color}18`,
+                                  color: metaFor(STATUS_META, q.status).color,
                                 }}
                               >
-                                {STATUS_META[q.status].label}
+                                {metaFor(STATUS_META, q.status).label}
                               </span>
                               {q.assignedTo && (
                                 <span className="text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded-md bg-[#4d6350]/10 text-[#4d6350] font-medium">

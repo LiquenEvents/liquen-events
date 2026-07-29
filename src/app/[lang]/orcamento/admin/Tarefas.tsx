@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { metaFor } from "./status-meta";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#b5654a" },
@@ -15,6 +16,138 @@ const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
 };
 
 const AREAS = ["Comercial", "Produção", "Decoração", "Financeiro", "Logística", "Geral"];
+
+const PRIORITY_ORDER: Record<TaskPriority, number> = { alta: 0, normal: 1, baixa: 2 };
+
+/**
+ * Uma linha da lista, memoizada.
+ *
+ * O título da tarefa nova é estado DESTE ecrã, por isso cada tecla escrita em
+ * "O que há para fazer?" voltava a desenhar a lista inteira — e, de caminho, a
+ * refazer o `filter`/`sort` das tarefas (que também estavam fora de qualquer
+ * `useMemo`). Com a linha atrás de `memo()` e os derivados memoizados, escrever
+ * deixa de tocar na lista: nenhuma linha muda enquanto se escreve um título.
+ */
+const TaskRow = memo(function TaskRow({
+  t,
+  overdue,
+  onToggle,
+  onEdit,
+  onRemove,
+}: {
+  t: Task;
+  overdue: boolean;
+  onToggle: (t: Task) => void;
+  onEdit: (t: Task) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="group flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.02] transition-colors">
+      <button
+        onClick={() => onToggle(t)}
+        className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
+      >
+        {t.done && (
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path
+              d="M2 6l2.5 2.5L10 3"
+              stroke="white"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </button>
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-sm truncate ${t.done ? "text-foreground/30 line-through" : "text-foreground/70"}`}
+        >
+          {t.title}
+        </p>
+        <div className="text-[10px] mt-0.5 flex items-center gap-2 flex-wrap">
+          {t.dueDate && (
+            <span className={overdue ? "text-[#b5654a]" : "text-foreground/30"}>
+              {overdue ? "Atrasada · " : ""}
+              {new Date(t.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
+                day: "numeric",
+                month: "short",
+              })}
+            </span>
+          )}
+          {t.area && (
+            <span className="text-foreground/30 border border-foreground/12 rounded px-1.5 py-0.5">
+              {t.area}
+            </span>
+          )}
+          {t.clientName && <span className="text-foreground/25">{t.clientName}</span>}
+        </div>
+      </div>
+      {t.assignee && (
+        <span
+          className="hidden sm:flex items-center gap-1.5 shrink-0"
+          title={`Responsável: ${t.assignee}`}
+        >
+          <span className="w-5 h-5 rounded-full bg-[#4d6350] text-white flex items-center justify-center text-[9px] font-bold">
+            {t.assignee.slice(0, 1).toUpperCase()}
+          </span>
+          <span className="text-foreground/35 text-[10px]">{t.assignee}</span>
+        </span>
+      )}
+      {!t.done && (
+        <span
+          className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-sm shrink-0"
+          style={{
+            background: `${metaFor(PRIORITY_META, t.priority).color}22`,
+            color: metaFor(PRIORITY_META, t.priority).color,
+          }}
+        >
+          {metaFor(PRIORITY_META, t.priority).label}
+        </span>
+      )}
+      {!t.done && (
+        <button
+          onClick={() => onEdit(t)}
+          className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+          aria-label="Editar tarefa"
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+          </svg>
+        </button>
+      )}
+      <button
+        onClick={() => onRemove(t.id)}
+        className="text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+        aria-label="Eliminar"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        >
+          <path
+            d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+});
 
 export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: string }) {
   const { toast } = useToast();
@@ -48,7 +181,15 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     area: "",
   });
 
-  function startEditTask(t: Task) {
+  // A lista actual, sempre à mão para os manipuladores optimistas, sem os
+  // obrigar a mudar de identidade a cada alteração (o que desfaria o `memo()`
+  // das linhas).
+  const tasksRef = useRef(tasks);
+  useEffect(() => {
+    tasksRef.current = tasks;
+  });
+
+  const startEditTask = useCallback((t: Task) => {
     setEditingTaskId(t.id);
     setEditTaskFields({
       title: t.title,
@@ -57,11 +198,11 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       assignee: t.assignee ?? "",
       area: t.area ?? "",
     });
-  }
+  }, []);
 
   async function saveEditTask(id: string) {
     // Keep the pre-edit list so we can undo if the save doesn't stick.
-    const snapshot = tasks;
+    const snapshot = tasksRef.current;
     setTasks((prev) =>
       prev.map((t) =>
         t.id === id
@@ -120,64 +261,81 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     }
   }
 
-  async function toggle(task: Task) {
-    // Optimistic tick, but undo it if the server rejects — otherwise the box
-    // stays flipped while the task is unchanged, and desyncs on next reload.
-    const snapshot = tasks;
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
-    try {
-      const res = await fetch(`/api/tarefas/${task.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ done: !task.done }),
-      });
-      if (!res.ok) throw new Error();
-    } catch {
-      setTasks(snapshot);
-      toast("Não foi possível atualizar a tarefa. Tente novamente.", "error");
-    }
-  }
-
-  async function remove(id: string) {
-    const t = tasks.find((x) => x.id === id);
-    // Only confirm when there's real content to lose (skip trivial empties).
-    if (t && !confirm(`Eliminar a tarefa "${t.title}"?`)) return;
-    const snapshot = tasks;
-    setTasks((prev) => prev.filter((x) => x.id !== id));
-    try {
-      const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-    } catch {
-      setTasks(snapshot);
-      toast("Não foi possível eliminar a tarefa. Tente novamente.", "error");
-    }
-  }
-
-  const people = useMemo(
-    () => [
-      "Todos",
-      ...Array.from(new Set(tasks.map((t) => t.assignee).filter(Boolean) as string[])),
-    ],
-    [tasks],
+  const toggle = useCallback(
+    async (task: Task) => {
+      // Optimistic tick, but undo it if the server rejects — otherwise the box
+      // stays flipped while the task is unchanged, and desyncs on next reload.
+      const snapshot = tasksRef.current;
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
+      try {
+        const res = await fetch(`/api/tarefas/${task.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ done: !task.done }),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        setTasks(snapshot);
+        toast("Não foi possível atualizar a tarefa. Tente novamente.", "error");
+      }
+    },
+    [setTasks, toast],
   );
 
-  const visible = who === "Todos" ? tasks : tasks.filter((t) => t.assignee === who);
-  const open = visible.filter((t) => !t.done);
-  const done = visible.filter((t) => t.done);
-  const order: Record<TaskPriority, number> = { alta: 0, normal: 1, baixa: 2 };
-  open.sort((a, b) => {
-    if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate)
-      return a.dueDate.localeCompare(b.dueDate);
-    if (a.dueDate && !b.dueDate) return -1;
-    if (!a.dueDate && b.dueDate) return 1;
-    return order[a.priority] - order[b.priority];
-  });
+  const remove = useCallback(
+    async (id: string) => {
+      const t = tasksRef.current.find((x) => x.id === id);
+      // Only confirm when there's real content to lose (skip trivial empties).
+      if (t && !confirm(`Eliminar a tarefa "${t.title}"?`)) return;
+      const snapshot = tasksRef.current;
+      setTasks((prev) => prev.filter((x) => x.id !== id));
+      try {
+        const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error();
+      } catch {
+        setTasks(snapshot);
+        toast("Não foi possível eliminar a tarefa. Tente novamente.", "error");
+      }
+    },
+    [setTasks, toast],
+  );
+
+  // Uma passagem só: as pessoas, e quantas tarefas por fazer tem cada uma. Antes
+  // cada botão de pessoa varria a lista toda (`tasks.filter`) a cada render.
+  const { people, openByPerson } = useMemo(() => {
+    const counts = new Map<string, number>();
+    const seen: string[] = [];
+    for (const t of tasks) {
+      if (!t.assignee) continue;
+      if (!counts.has(t.assignee)) {
+        counts.set(t.assignee, 0);
+        seen.push(t.assignee);
+      }
+      if (!t.done) counts.set(t.assignee, counts.get(t.assignee)! + 1);
+    }
+    return { people: ["Todos", ...seen], openByPerson: counts };
+  }, [tasks]);
+
+  // Filtrar e ordenar acontecia em CADA render — inclusive a cada tecla escrita
+  // no campo "Nova tarefa", que é estado deste componente. Só depende da lista
+  // e do filtro de pessoa.
+  const { open, done } = useMemo(() => {
+    const visible = who === "Todos" ? tasks : tasks.filter((t) => t.assignee === who);
+    const openTasks = visible.filter((t) => !t.done);
+    const doneTasks = visible.filter((t) => t.done);
+    openTasks.sort((a, b) => {
+      if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate)
+        return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate && !b.dueDate) return -1;
+      if (!a.dueDate && b.dueDate) return 1;
+      return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    });
+    return { open: openTasks, done: doneTasks };
+  }, [tasks, who]);
 
   const todayStr = todayKey();
 
   function row(t: Task) {
-    const overdue = t.dueDate && !t.done && t.dueDate < todayStr;
-
     if (editingTaskId === t.id) {
       return (
         <div
@@ -246,113 +404,14 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     }
 
     return (
-      <div
+      <TaskRow
         key={t.id}
-        className="group flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.02] transition-colors"
-      >
-        <button
-          onClick={() => toggle(t)}
-          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
-        >
-          {t.done && (
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M2 6l2.5 2.5L10 3"
-                stroke="white"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
-        </button>
-        <div className="min-w-0 flex-1">
-          <p
-            className={`text-sm truncate ${t.done ? "text-foreground/30 line-through" : "text-foreground/70"}`}
-          >
-            {t.title}
-          </p>
-          <div className="text-[10px] mt-0.5 flex items-center gap-2 flex-wrap">
-            {t.dueDate && (
-              <span className={overdue ? "text-[#b5654a]" : "text-foreground/30"}>
-                {overdue ? "Atrasada · " : ""}
-                {new Date(t.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </span>
-            )}
-            {t.area && (
-              <span className="text-foreground/30 border border-foreground/12 rounded px-1.5 py-0.5">
-                {t.area}
-              </span>
-            )}
-            {t.clientName && <span className="text-foreground/25">{t.clientName}</span>}
-          </div>
-        </div>
-        {t.assignee && (
-          <span
-            className="hidden sm:flex items-center gap-1.5 shrink-0"
-            title={`Responsável: ${t.assignee}`}
-          >
-            <span className="w-5 h-5 rounded-full bg-[#4d6350] text-white flex items-center justify-center text-[9px] font-bold">
-              {t.assignee.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="text-foreground/35 text-[10px]">{t.assignee}</span>
-          </span>
-        )}
-        {!t.done && (
-          <span
-            className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-sm shrink-0"
-            style={{
-              background: `${PRIORITY_META[t.priority].color}22`,
-              color: PRIORITY_META[t.priority].color,
-            }}
-          >
-            {PRIORITY_META[t.priority].label}
-          </span>
-        )}
-        {!t.done && (
-          <button
-            onClick={() => startEditTask(t)}
-            className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
-            aria-label="Editar tarefa"
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
-            </svg>
-          </button>
-        )}
-        <button
-          onClick={() => remove(t.id)}
-          className="text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
-          aria-label="Eliminar"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          >
-            <path
-              d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
+        t={t}
+        overdue={!!t.dueDate && !t.done && t.dueDate < todayStr}
+        onToggle={toggle}
+        onEdit={startEditTask}
+        onRemove={remove}
+      />
     );
   }
 
@@ -471,7 +530,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               {p}
               {p !== "Todos" && (
                 <span className="ml-1 text-[11px] tabular-nums opacity-60">
-                  {tasks.filter((t) => t.assignee === p && !t.done).length}
+                  {openByPerson.get(p) ?? 0}
                 </span>
               )}
             </Button>

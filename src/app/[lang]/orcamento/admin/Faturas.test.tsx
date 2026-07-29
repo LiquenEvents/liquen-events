@@ -1,0 +1,167 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { ToastProvider } from "./Toast";
+import { __resetListCache } from "./useCachedList";
+import Faturas from "./Faturas";
+
+/**
+ * ESCREVER NO FORMULÁRIO NÃO PODE VOLTAR A DESENHAR O LIVRO DE FATURAS.
+ *
+ * Medido numa compilação de produção com 167 faturas e 300 pedidos: escrever o
+ * nome do cliente em "Nova fatura" custava 68–71 ms por tecla até o ecrã pintar,
+ * com 22 tarefas longas em 22 teclas. A causa era estrutural, não cosmética: o
+ * estado do formulário vive no mesmo componente que o livro, por isso cada tecla
+ * voltava a desenhar as 167 linhas — DUAS vezes, porque o layout de telemóvel e
+ * o de secretária estão os dois no DOM (só escondidos por CSS) — mais as 300
+ * `<option>` do seletor de evento.
+ *
+ * Estes testes fixam a correcção pelo lado do comportamento (o livro continua
+ * completo e as ações funcionam) e pelo lado do custo: contamos quantas vezes o
+ * formatador de euros é chamado, que é uma vez por linha por desenho do livro.
+ * Se alguém desfizer os `memo()`, a contagem dispara e o teste falha.
+ */
+
+const { moneyCalls } = vi.hoisted(() => ({ moneyCalls: { eur: 0 } }));
+
+vi.mock("@/lib/money", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/money")>();
+  return {
+    ...actual,
+    eur: (n: number) => {
+      moneyCalls.eur += 1;
+      return actual.eur(n);
+    },
+  };
+});
+
+type Row = {
+  id: string;
+  number: string;
+  quoteId: string;
+  clientName: string;
+  clientEmail: string;
+  kind: "sinal" | "saldo" | "total";
+  amount: number;
+  vatRate: number;
+  issuedAt: string;
+  status: "emitida" | "paga" | "anulada";
+};
+
+const ROWS = 40;
+const invoices: Row[] = Array.from({ length: ROWS }, (_, i) => ({
+  id: `inv-${i}`,
+  number: `FT 2026/${String(i + 1).padStart(4, "0")}`,
+  quoteId: `q-${i}`,
+  clientName: `Cliente ${i}`,
+  clientEmail: `c${i}@exemplo.pt`,
+  kind: i % 3 === 0 ? "sinal" : i % 3 === 1 ? "saldo" : "total",
+  amount: 1000 + i,
+  vatRate: 0.23,
+  issuedAt: "2026-05-01",
+  // 0,3,6… anuladas · 1,4,7… pagas · o resto emitidas
+  status: i % 3 === 0 ? "anulada" : i % 3 === 1 ? "paga" : "emitida",
+}));
+
+const quotes = Array.from({ length: 120 }, (_, i) => ({
+  id: `q-${i}`,
+  name: `Par ${i}`,
+  eventName: "Casamento",
+  email: `c${i}@exemplo.pt`,
+})) as never[];
+
+const ok = (body: unknown) => ({
+  ok: true,
+  status: 200,
+  headers: new Headers({ ETag: 'W/"faturas"' }),
+  json: async () => body,
+});
+
+beforeEach(() => {
+  __resetListCache();
+  moneyCalls.eur = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => (String(url).startsWith("/api/faturas") ? ok(invoices) : ok([]))),
+  );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+function renderFaturas() {
+  return render(
+    <ToastProvider>
+      <Faturas quotes={quotes} />
+    </ToastProvider>,
+  );
+}
+
+describe("Faturas — o livro", () => {
+  it("desenha todas as faturas e os totais por estado nos filtros", async () => {
+    renderFaturas();
+    await waitFor(() => expect(screen.getAllByText("Cliente 0").length).toBeGreaterThan(0));
+
+    // Os dois layouts (cartões + tabela) estão ambos no DOM, por isso cada
+    // cliente aparece duas vezes. O que interessa é que nenhuma linha falta.
+    expect(screen.getAllByText(`Cliente ${ROWS - 1}`).length).toBeGreaterThan(0);
+
+    // Contagens dos chips, agora vindas de uma única passagem sobre a lista.
+    const anuladas = invoices.filter((i) => i.status === "anulada").length;
+    const pagas = invoices.filter((i) => i.status === "paga").length;
+    const emitidas = invoices.filter((i) => i.status === "emitida").length;
+    expect(screen.getByRole("button", { name: `Todas · ${ROWS}` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `Emitida · ${emitidas}` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `Paga · ${pagas}` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `Anulada · ${anuladas}` })).toBeTruthy();
+  });
+
+  it("filtra por estado", async () => {
+    const user = userEvent.setup();
+    renderFaturas();
+    await waitFor(() => expect(screen.getAllByText("Cliente 0").length).toBeGreaterThan(0));
+
+    const pagas = invoices.filter((i) => i.status === "paga").length;
+    await user.click(screen.getByRole("button", { name: `Paga · ${pagas}` }));
+
+    // "Cliente 0" está anulada, portanto sai; "Cliente 1" está paga e fica.
+    await waitFor(() => expect(screen.queryByText("Cliente 0")).toBeNull());
+    expect(screen.getAllByText("Cliente 1").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Faturas — escrever no formulário não redesenha o livro", () => {
+  it("não volta a formatar um único valor do livro por cada tecla", async () => {
+    const user = userEvent.setup();
+    renderFaturas();
+    await waitFor(() => expect(screen.getAllByText("Cliente 0").length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: /Nova fatura/ }));
+    const campo = await screen.findByLabelText("Cliente");
+
+    // A partir daqui, contamos.
+    moneyCalls.eur = 0;
+    await user.type(campo, "Maria e Tomás");
+
+    // Se o livro voltasse a desenhar-se, seriam ~2 × 40 formatações POR TECLA
+    // (mais de mil no total). Com os `memo()` no sítio, o livro não é tocado —
+    // toleramos uma margem folgada para não prender o teste a um número exacto.
+    expect(moneyCalls.eur).toBeLessThan(ROWS);
+    expect((campo as HTMLInputElement).value).toBe("Maria e Tomás");
+  });
+
+  it("mantém o livro intacto enquanto se escreve", async () => {
+    const user = userEvent.setup();
+    renderFaturas();
+    await waitFor(() => expect(screen.getAllByText("Cliente 0").length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: /Nova fatura/ }));
+    const campo = await screen.findByLabelText("Cliente");
+    await user.type(campo, "Ana");
+
+    expect(screen.getAllByText(`Cliente ${ROWS - 1}`).length).toBeGreaterThan(0);
+  });
+});

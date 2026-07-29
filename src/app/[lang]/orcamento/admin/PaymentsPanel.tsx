@@ -15,6 +15,7 @@ import {
   type DossierData,
   type DossierInvoice,
 } from "@/lib/orcamento/dossier";
+import { metaFor } from "./status-meta";
 
 const KIND_LABEL: Record<PaymentKind, string> = {
   sinal: "Sinal",
@@ -751,11 +752,11 @@ export default function PaymentsPanel({
                           <span
                             className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md"
                             style={{
-                              background: `${INV_STATUS_META[i.status].color}18`,
-                              color: INV_STATUS_META[i.status].color,
+                              background: `${metaFor(INV_STATUS_META, i.status).color}18`,
+                              color: metaFor(INV_STATUS_META, i.status).color,
                             }}
                           >
-                            {INV_STATUS_META[i.status].label}
+                            {metaFor(INV_STATUS_META, i.status).label}
                           </span>
                         </td>
                       </tr>
