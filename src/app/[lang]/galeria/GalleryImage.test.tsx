@@ -156,12 +156,25 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     expect(img()).not.toBeNull();
   });
 
-  it("sem `priority`, o pedido só sai quando o mosaico se aproxima do ecrã", () => {
+  it("a foto existe no HTML desde o início, mesmo sem `priority`", () => {
+    // Este teste já exigiu o CONTRÁRIO: que a foto só aparecesse quando o
+    // mosaico se aproximasse do ecrã. Isso escondia o `src` até alguém correr
+    // JavaScript e deixava o HTML do servidor sem fotografia nenhuma (medido:
+    // 21 `<img>` caíram para 6). Numa galeria, isso é não ter conteúdo para
+    // quem tem a ligação lenta, para quem navega sem JavaScript e para os
+    // motores de busca.
+    //
+    // Quem adia o pedido do que está longe do ecrã é o `loading="lazy"` do
+    // próprio browser, que não precisa de hidratação para funcionar.
     renderTile({ priority: false });
-    expect(img()).toBeNull(); // nada pedido ainda
-    const io = FakeIO.instances[FakeIO.instances.length - 1];
-    act(() => io.fire(true));
-    expect(img()).not.toBeNull();
+    const el = img();
+    expect(el).not.toBeNull();
+    expect(el).toHaveAttribute("loading", "lazy");
+  });
+
+  it("uma foto `priority` não é adiada pelo browser", () => {
+    renderTile({ priority: true });
+    expect(img()).not.toHaveAttribute("loading", "lazy");
   });
 
   it("a foto com prioridade não espera pelo viewport e pede fetchpriority alto", () => {

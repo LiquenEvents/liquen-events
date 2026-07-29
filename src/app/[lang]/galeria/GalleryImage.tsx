@@ -80,8 +80,23 @@ export default function GalleryImage({
   const releaseRef = useRef<(() => void) | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptsRef = useRef(0);
-  // `armed` = o <Image> está montado com src (o pedido está a ser feito).
-  const [armed, setArmed] = useState(priority);
+  /**
+   * `armed` = o <Image> está montado com src (o pedido está a ser feito).
+   *
+   * ARRANCA LIGADO. Antes só arrancava ligado nas fotos `priority`, e o resto
+   * esperava por um IntersectionObserver — que só corre DEPOIS da hidratação.
+   * O efeito medido: o HTML vindo do servidor passou a trazer ZERO fotografias
+   * (contadas com `curl … | grep -c "<img"`). Numa galeria isso é grave em três
+   * frentes: quem tem a ligação lenta não vê nada até o JavaScript chegar, quem
+   * navega sem JavaScript não vê nada de todo, e os motores de busca deixam de
+   * encontrar as imagens da página cujo conteúdo SÃO as imagens.
+   *
+   * A fila continua a proteger da rajada: a limitação de pedidos em voo é feita
+   * pelo browser e pela fila nas RE-TENTATIVAS, não por esconder o `src` até
+   * alguém correr JavaScript. O `loading="lazy"` do próprio browser já adia o
+   * que está longe do ecrã, e esse não precisa de hidratação nenhuma.
+   */
+  const [armed, setArmed] = useState(true);
   // Nº do cache-buster: 0 = URL original, N = `?r=N` na re-tentativa N.
   const [bust, setBust] = useState(0);
   // Esgotou o tecto de tentativas: mostra-se o fallback digno.
@@ -225,10 +240,22 @@ export default function GalleryImage({
           sizes={sizes}
           quality={quality}
           className={className}
-          // Já decidimos nós que está perto do ecrã (ou é prioritária), por isso
-          // não voltamos a passar pelo lazy nativo: o pedido tem de sair no
-          // instante em que a fila lhe dá a vez.
-          loading="eager"
+          /**
+           * O adiamento é do BROWSER, não nosso.
+           *
+           * Isto esteve "eager" para todos, o que fazia sentido quando o `src`
+           * só era montado depois de um IntersectionObserver decidir que o
+           * mosaico estava perto. Agora que a foto vem no HTML do servidor (para
+           * existir sem JavaScript), "eager" em todos os mosaicos mandaria os
+           * doze primeiros pedidos de uma vez — a mesma rajada que estamos a
+           * tentar evitar.
+           *
+           * `lazy` devolve essa decisão ao browser, que a toma com informação
+           * que nós não temos (velocidade da ligação, direcção do scroll) e sem
+           * esperar por hidratação nenhuma. As re-tentativas continuam a passar
+           * pela fila, que é onde o limite importa.
+           */
+          loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           onLoad={handleLoad}
           onError={handleError}

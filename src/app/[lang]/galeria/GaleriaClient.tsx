@@ -280,14 +280,14 @@ const Tile = memo(function Tile({
         <GalleryImage
           src={photo.src}
           alt={alt}
-          // 60vw no ramo mobile (era 100vw). Medido a 390x844 DPR3 com a cache
-          // do optimizador vazia: 38 de 40 pedidos vinham a w=1280 (170KB cada)
-          // para uma caixa de 390px. Com 60vw o candidato passa a w=768 e a
-          // sessão de scroll caiu de 6,19MB para 2,56MB (-59%), o primeiro ecrã
-          // de 1277KB para 772KB (-40%) e o p50 por imagem de 918ms para 317ms
-          // (-65%). Ainda ~2,0x de densidade numa miniatura que abre em
-          // full-res no lightbox. O ramo >=768px não muda: desktop fica igual.
-          sizes="(max-width: 639px) 60vw, (max-width: 767px) 50vw, 33vw"
+          // 100vw no ramo mobile. Esteve a 60vw por causa de uma poupança de
+          // bytes que era, na verdade, um corte de resolução: em telemóvel o
+          // mosaico do masonry ocupa a LARGURA TODA. Medido a 390px, a caixa
+          // mede 390 CSS px, e com 60vw o browser pedia candidatos de 256px
+          // para a encher — suave já a DPR1, e a 3x nem se discute. Os "-56% de
+          // bytes" que isso mostrava eram fotografias mais pequenas do que o
+          // sítio onde são desenhadas, não compressão melhor.
+          sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
           // 65 (was 72): thumbnails, so a lean file that loads fast on the grid
           // burst matters more than the last few % of sharpness — the full-res
           // photo opens in the lightbox. Smaller download + faster cold encode.
