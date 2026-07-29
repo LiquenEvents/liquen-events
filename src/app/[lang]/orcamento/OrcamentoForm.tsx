@@ -137,12 +137,18 @@ export default function OrcamentoForm({
   const [data, setData] = useState("");
   const [dateFlexible, setDateFlexible] = useState(false);
   const [pessoas, setPessoas] = useState("");
+  const [guestsFlexible, setGuestsFlexible] = useState(false);
   const [local, setLocal] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [touched, setTouched] = useState<{ nome?: boolean; email?: boolean }>({});
+  // Every field is required, so every field needs its own "has the visitor
+  // been here yet" flag — errors must appear after leaving a field, never while
+  // it's still being typed into for the first time.
+  type Field = "nome" | "email" | "telefone" | "data" | "pessoas" | "local" | "mensagem";
+  const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
+  const markTouched = (f: Field) => setTouched((prev) => (prev[f] ? prev : { ...prev, [f]: true }));
   // Set once the user tries to submit an incomplete form — drives the visible,
   // announced error identification (WCAG 3.3.1) instead of a silent disabled button.
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
@@ -159,6 +165,11 @@ export default function OrcamentoForm({
   const nomeRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const dataRef = useRef<HTMLInputElement>(null);
+  const pessoasRef = useRef<HTMLInputElement>(null);
+  const localRef = useRef<HTMLInputElement>(null);
+  const telefoneRef = useRef<HTMLInputElement>(null);
+  const mensagemRef = useRef<HTMLTextAreaElement>(null);
   // Data mínima = hoje (não faz sentido pedir orçamento para uma data passada).
   const [minDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -184,6 +195,7 @@ export default function OrcamentoForm({
       if (d.telefone) setTelefone(d.telefone);
       if (d.data) setData(d.data);
       if (d.dateFlexible) setDateFlexible(d.dateFlexible === "1");
+      if (d.guestsFlexible) setGuestsFlexible(d.guestsFlexible === "1");
       if (d.pessoas) setPessoas(d.pessoas);
       if (d.local) setLocal(d.local);
       if (d.mensagem) setMensagem(d.mensagem);
@@ -228,11 +240,23 @@ export default function OrcamentoForm({
       telefone,
       data,
       dateFlexible: dateFlexible ? "1" : "",
+      guestsFlexible: guestsFlexible ? "1" : "",
       pessoas,
       local,
       mensagem,
     };
-  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem]);
+  }, [
+    eventType,
+    nome,
+    email,
+    telefone,
+    data,
+    dateFlexible,
+    pessoas,
+    guestsFlexible,
+    local,
+    mensagem,
+  ]);
   // Once the quote is submitted the draft is intentionally cleared; block any
   // later lifecycle flush (the router.push unmount below) from resurrecting it.
   const submittedRef = useRef(false);
@@ -254,7 +278,19 @@ export default function OrcamentoForm({
     }
     const timer = setTimeout(flushDraft, 500);
     return () => clearTimeout(timer);
-  }, [eventType, nome, email, telefone, data, dateFlexible, pessoas, local, mensagem, flushDraft]);
+  }, [
+    eventType,
+    nome,
+    email,
+    telefone,
+    data,
+    dateFlexible,
+    pessoas,
+    guestsFlexible,
+    local,
+    mensagem,
+    flushDraft,
+  ]);
 
   // Persist immediately when the page is hidden or torn down (navigation, tab
   // close, bfcache). `visibilitychange → hidden` and `pagehide` are the only
@@ -273,10 +309,31 @@ export default function OrcamentoForm({
     };
   }, [flushDraft]);
 
-  const nomeErr = touched.nome && nome.trim().length < 2 ? to.errNome : "";
-  const emailErr = touched.email && !/\S+@\S+\.\S+/.test(email) ? to.errEmail : "";
-  const tipoErr = attemptedSubmit && eventType === "" ? to.errTipo : "";
-  const ready = nome.trim().length >= 2 && /\S+@\S+\.\S+/.test(email) && eventType !== "";
+  // One predicate per field, so the error text, the focus target and the
+  // submit gate can never disagree about what "valid" means.
+  const okTipo = eventType !== "";
+  const okNome = nome.trim().length >= 2;
+  const okEmail = /\S+@\S+\.\S+/.test(email);
+  // 9 digits is the Portuguese national number; an international one arrives
+  // longer, so accept anything from 9 digits up.
+  const okTelefone = telefone.replace(/\D/g, "").length >= 9;
+  // "Ainda a definir" IS an answer — the field is satisfied either way.
+  const okData = dateFlexible || data !== "";
+  const okPessoas = guestsFlexible || Number(pessoas) > 0;
+  const okLocal = local.trim().length >= 2;
+  const okMensagem = mensagem.trim().length > 0;
+
+  const show = (t: boolean | undefined) => Boolean(t) || attemptedSubmit;
+  const nomeErr = show(touched.nome) && !okNome ? to.errNome : "";
+  const emailErr = show(touched.email) && !okEmail ? to.errEmail : "";
+  const telefoneErr = show(touched.telefone) && !okTelefone ? to.errTelefone : "";
+  const dataErr = show(touched.data) && !okData ? to.errData : "";
+  const pessoasErr = show(touched.pessoas) && !okPessoas ? to.errPessoas : "";
+  const localErr = show(touched.local) && !okLocal ? to.errLocal : "";
+  const mensagemErr = show(touched.mensagem) && !okMensagem ? to.errMensagem : "";
+  const tipoErr = attemptedSubmit && !okTipo ? to.errTipo : "";
+  const ready =
+    okTipo && okNome && okEmail && okTelefone && okData && okPessoas && okLocal && okMensagem;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -288,13 +345,30 @@ export default function OrcamentoForm({
     // Incomplete: reveal + announce what's missing (the submit stays operable so
     // keyboard/AT users get a reason, not a silently disabled control).
     if (!ready) {
-      setTouched({ nome: true, email: true });
+      setTouched({
+        nome: true,
+        email: true,
+        telefone: true,
+        data: true,
+        pessoas: true,
+        local: true,
+        mensagem: true,
+      });
       setAttemptedSubmit(true);
-      // Move focus to the first invalid control so the reason is discoverable
-      // (WCAG 3.3.1 error identification + 2.4.3 focus order).
-      if (eventType === "") radioRefs.current[0]?.focus();
-      else if (nome.trim().length < 2) nomeRef.current?.focus();
-      else emailRef.current?.focus();
+      // Move focus to the first invalid control, in the order the fields are
+      // laid out, so the reason is discoverable rather than somewhere off
+      // screen (WCAG 3.3.1 error identification + 2.4.3 focus order).
+      const first: [boolean, { focus: () => void } | null][] = [
+        [okTipo, radioRefs.current[0]],
+        [okData, dataRef.current],
+        [okPessoas, pessoasRef.current],
+        [okLocal, localRef.current],
+        [okNome, nomeRef.current],
+        [okEmail, emailRef.current],
+        [okTelefone, telefoneRef.current],
+        [okMensagem, mensagemRef.current],
+      ];
+      first.find(([ok]) => !ok)?.[1]?.focus();
       return;
     }
     setSending(true);
@@ -309,11 +383,15 @@ export default function OrcamentoForm({
       eventType: opt?.eventType ?? null,
       eventName: eventType,
       date: dateFlexible ? "" : data,
-      guests: Number(pessoas) || 0,
+      guests: guestsFlexible ? 0 : Number(pessoas) || 0,
       location: local.trim(),
       // Capture the "no fixed date yet" signal for the team (a high-value
       // early-stage lead segment) by folding it into the notes.
-      notes: [dateFlexible ? `(${to.dateFlexibleLabel})` : "", mensagem.trim()]
+      notes: [
+        dateFlexible ? `(${to.dateFlexibleLabel})` : "",
+        guestsFlexible ? `(${to.labelPessoas}: ${to.guestsFlexibleLabel})` : "",
+        mensagem.trim(),
+      ]
         .filter(Boolean)
         .join("\n\n"),
       // First-touch acquisition source (UTM/referrer), captured on entry by
@@ -397,7 +475,8 @@ export default function OrcamentoForm({
     if (tipoLabel) lines.push(`${to.labelTipo}: ${tipoLabel}`);
     if (dateFlexible) lines.push(to.dateFlexibleLabel);
     else if (data) lines.push(`${to.labelData}: ${data}`);
-    if (pessoas) lines.push(`${to.labelPessoas}: ${pessoas}`);
+    if (guestsFlexible) lines.push(`${to.labelPessoas}: ${to.guestsFlexibleLabel}`);
+    else if (pessoas) lines.push(`${to.labelPessoas}: ${pessoas}`);
     if (local.trim()) lines.push(`${to.labelLocal}: ${local.trim()}`);
     if (nome.trim()) lines.push(`${to.labelNome}: ${nome.trim()}`);
     return lines.join("\n");
@@ -408,7 +487,7 @@ export default function OrcamentoForm({
   const waLink = useMemo(
     () => waHref(waMessage()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [eventType, dateFlexible, data, pessoas, local, nome, to, t],
+    [eventType, dateFlexible, data, pessoas, guestsFlexible, local, nome, to, t],
   );
 
   // Arrow-key navigation for the event-type radiogroup (WAI-ARIA radio pattern).
@@ -542,11 +621,10 @@ export default function OrcamentoForm({
 
             {/* Tipo de evento */}
             <fieldset className="group">
+              {/* No per-field asterisk: with every field required it marked
+                  nothing, and the note above the form says it once. */}
               <legend id="of-tipo-legend" className={labelCls}>
                 {to.labelTipo}
-                <span aria-hidden className="text-gold-text">
-                  &nbsp;*
-                </span>
               </legend>
               {/* A single-select toggle group is semantically a radiogroup —
                   aria-required/invalid on a <fieldset> aren't exposed by AT, so
@@ -595,13 +673,23 @@ export default function OrcamentoForm({
             {/* Data + Nº de pessoas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
               <div>
-                <FloatingField htmlFor="of-data" label={to.labelData} floatAlways>
+                <FloatingField
+                  htmlFor="of-data"
+                  label={to.labelData}
+                  floatAlways
+                  error={dataErr}
+                  errorId="of-data-err"
+                >
                   <input
                     id="of-data"
+                    ref={dataRef}
                     type="date"
                     min={minDate}
                     value={data}
                     disabled={dateFlexible}
+                    onBlur={() => markTouched("data")}
+                    aria-invalid={dataErr ? true : undefined}
+                    aria-describedby={dataErr ? "of-data-err" : undefined}
                     onChange={(e) => setData(e.target.value)}
                     className={`${ffInputCls} [color-scheme:light] ${dateFlexible ? "opacity-40" : ""}`}
                   />
@@ -610,34 +698,74 @@ export default function OrcamentoForm({
                   <input
                     type="checkbox"
                     checked={dateFlexible}
-                    onChange={(e) => setDateFlexible(e.target.checked)}
+                    onChange={(e) => {
+                      setDateFlexible(e.target.checked);
+                      markTouched("data");
+                    }}
                     className="w-4 h-4 accent-moss cursor-pointer"
                   />
                   <span className="text-[11px] tracking-wide">{to.dateFlexibleLabel}</span>
                 </label>
               </div>
-              <FloatingField htmlFor="of-pessoas" label={to.labelPessoas}>
-                <input
-                  id="of-pessoas"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                  value={pessoas}
-                  onChange={(e) => setPessoas(e.target.value.replace(/[^0-9]/g, ""))}
-                  className={ffInputCls}
-                  placeholder={to.phPessoas}
-                />
-              </FloatingField>
+              {/* Same escape hatch as the date: "how many" is often the last
+                  thing a couple settles, and forcing a number would either lose
+                  the lead or invite a made-up one — which is worse, because the
+                  proposal would then be built on it. */}
+              <div>
+                <FloatingField
+                  htmlFor="of-pessoas"
+                  label={to.labelPessoas}
+                  error={pessoasErr}
+                  errorId="of-pessoas-err"
+                >
+                  <input
+                    id="of-pessoas"
+                    ref={pessoasRef}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={pessoas}
+                    disabled={guestsFlexible}
+                    onBlur={() => markTouched("pessoas")}
+                    aria-invalid={pessoasErr ? true : undefined}
+                    aria-describedby={pessoasErr ? "of-pessoas-err" : undefined}
+                    onChange={(e) => setPessoas(e.target.value.replace(/[^0-9]/g, ""))}
+                    className={`${ffInputCls} ${guestsFlexible ? "opacity-40" : ""}`}
+                    placeholder={to.phPessoas}
+                  />
+                </FloatingField>
+                <label className="mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={guestsFlexible}
+                    onChange={(e) => {
+                      setGuestsFlexible(e.target.checked);
+                      markTouched("pessoas");
+                    }}
+                    className="w-4 h-4 accent-moss cursor-pointer"
+                  />
+                  <span className="text-[11px] tracking-wide">{to.guestsFlexibleLabel}</span>
+                </label>
+              </div>
             </div>
 
-            {/* Local / região (opcional) */}
-            <FloatingField htmlFor="of-local" label={to.labelLocal}>
+            {/* Local / região */}
+            <FloatingField
+              htmlFor="of-local"
+              label={to.labelLocal}
+              error={localErr}
+              errorId="of-local-err"
+            >
               <input
                 id="of-local"
+                ref={localRef}
                 type="text"
                 autoComplete="address-level2"
                 value={local}
+                onBlur={() => markTouched("local")}
+                aria-invalid={localErr ? true : undefined}
+                aria-describedby={localErr ? "of-local-err" : undefined}
                 onChange={(e) => setLocal(e.target.value)}
                 className={ffInputCls}
                 placeholder={to.phLocal}
@@ -649,7 +777,6 @@ export default function OrcamentoForm({
               <FloatingField
                 htmlFor="of-nome"
                 label={to.labelNome}
-                required
                 error={nomeErr}
                 errorId="of-nome-err"
               >
@@ -661,7 +788,7 @@ export default function OrcamentoForm({
                   aria-required="true"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  onBlur={() => setTouched((prev) => ({ ...prev, nome: true }))}
+                  onBlur={() => markTouched("nome")}
                   aria-invalid={!!nomeErr}
                   aria-describedby={nomeErr ? "of-nome-err" : undefined}
                   className={`${ffInputCls} ${
@@ -673,7 +800,6 @@ export default function OrcamentoForm({
               <FloatingField
                 htmlFor="of-email"
                 label={to.labelEmail}
-                required
                 error={emailErr}
                 errorId="of-email-err"
               >
@@ -685,7 +811,7 @@ export default function OrcamentoForm({
                   aria-required="true"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+                  onBlur={() => markTouched("email")}
                   aria-invalid={!!emailErr}
                   aria-describedby={emailErr ? "of-email-err" : undefined}
                   className={`${ffInputCls} ${
@@ -697,13 +823,22 @@ export default function OrcamentoForm({
             </div>
 
             {/* Telefone */}
-            <FloatingField htmlFor="of-telefone" label={to.labelTelefone}>
+            <FloatingField
+              htmlFor="of-telefone"
+              label={to.labelTelefone}
+              error={telefoneErr}
+              errorId="of-telefone-err"
+            >
               <input
                 id="of-telefone"
+                ref={telefoneRef}
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel"
                 value={telefone}
+                onBlur={() => markTouched("telefone")}
+                aria-invalid={telefoneErr ? true : undefined}
+                aria-describedby={telefoneErr ? "of-telefone-err" : undefined}
                 onChange={(e) => setTelefone(e.target.value)}
                 className={ffInputCls}
                 placeholder={to.phTelefone}
@@ -716,17 +851,26 @@ export default function OrcamentoForm({
                 labelled "Mensagem" with no reason to fill it, so most arrived
                 empty and every proposal started from a blank page. It now asks
                 a question, says plainly what the answer buys, and is tall
-                enough to look like somewhere to write. Deliberately still
-                optional: making it required would cost leads at the last step,
-                which is a worse trade than a short answer. */}
+                enough to look like somewhere to write — and required, like
+                every other field, so no proposal ever starts from nothing. */}
             <div>
-              <FloatingField htmlFor="of-mensagem" label={to.labelMensagem}>
+              <FloatingField
+                htmlFor="of-mensagem"
+                label={to.labelMensagem}
+                error={mensagemErr}
+                errorId="of-mensagem-err"
+              >
                 <textarea
                   id="of-mensagem"
+                  ref={mensagemRef}
                   value={mensagem}
                   onChange={(e) => setMensagem(e.target.value)}
+                  onBlur={() => markTouched("mensagem")}
                   rows={6}
-                  aria-describedby="of-mensagem-hint"
+                  aria-invalid={mensagemErr ? true : undefined}
+                  aria-describedby={
+                    mensagemErr ? "of-mensagem-err of-mensagem-hint" : "of-mensagem-hint"
+                  }
                   className={`${ffInputCls} resize-y min-h-[132px]`}
                   placeholder={to.phMensagem}
                 />

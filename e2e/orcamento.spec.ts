@@ -1,10 +1,25 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 /**
  * Drives the quote request form (the site's main conversion path) end to end.
  * The POST to /api/orcamento is intercepted so the test is deterministic and
  * sends no real email/push — same approach as the contacto spec.
  */
+
+/** Fills every field the form now requires. */
+async function fillAll(page: Page, name = "Ana Teste") {
+  await page.getByRole("radio", { name: "Casamento", exact: true }).click();
+  await page.getByLabel("Data ainda a definir").check();
+  await page.getByLabel("Ainda a definir", { exact: true }).check();
+  await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
+  await page.getByPlaceholder("O seu nome").fill(name);
+  await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
+  await page.getByPlaceholder("+351 9XX XXX XXX").fill("912345678");
+  await page
+    .getByPlaceholder("Estilo, cores, ambiente, inspirações que guardou…")
+    .fill("Algo natural, com flores do campo e tons de branco e verde.");
+}
+
 test.describe("Pedido de orçamento", () => {
   test("submete o formulário e chega à confirmação com a referência", async ({ page }) => {
     await page.route("**/api/orcamento", (route) =>
@@ -16,12 +31,7 @@ test.describe("Pedido de orçamento", () => {
     );
 
     await page.goto("/orcamento");
-
-    // Required: event type + name + email.
-    await page.getByRole("radio", { name: "Casamento", exact: true }).click();
-    await page.getByPlaceholder("O seu nome").fill("Ana Teste");
-    await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
-
+    await fillAll(page);
     await page.getByRole("button", { name: /Enviar pedido/ }).click();
 
     // Hand-off lands on the confirmation page showing the reference id.
@@ -33,7 +43,7 @@ test.describe("Pedido de orçamento", () => {
     await page.goto("/orcamento");
 
     // The submit stays operable (accessible pattern) — submitting an incomplete
-    // form surfaces an announced error instead of a silently disabled button.
+    // form surfaces announced errors instead of a silently disabled button.
     const enviar = page.getByRole("button", { name: /Enviar pedido/ });
     await expect(enviar).toBeEnabled();
 
@@ -41,11 +51,31 @@ test.describe("Pedido de orçamento", () => {
     await expect(page.getByText("Selecione o tipo de evento.")).toBeVisible();
     await expect(page).toHaveURL(/\/orcamento$/);
 
-    // Fill the required fields — type, name and a valid email.
+    // Every field is required now, so filling only the contact details must
+    // still be refused — with the reason named, on the field that's missing.
     await page.getByRole("radio", { name: "Corporativo", exact: true }).click();
     await page.getByPlaceholder("O seu nome").fill("Ana");
     await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
-    await expect(enviar).toBeEnabled();
+    await enviar.click();
+    await expect(page).toHaveURL(/\/orcamento$/);
+    await expect(page.getByText("Indique o local ou a região.")).toBeVisible();
+  });
+
+  test("aceita “ainda a definir” como resposta à data e ao nº de pessoas", async ({ page }) => {
+    await page.route("**/api/orcamento", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "LIQ-E2E-OPEN", status: "ok" }),
+      }),
+    );
+
+    await page.goto("/orcamento");
+    await fillAll(page, "Rita Aberta");
+    // Neither a date nor a headcount was typed — both checkboxes carry them.
+    await expect(page.getByLabel("Data ainda a definir")).toBeChecked();
+    await page.getByRole("button", { name: /Enviar pedido/ }).click();
+    await expect(page).toHaveURL(/\/orcamento\/confirmacao\/LIQ-E2E-OPEN$/);
   });
 
   test("o rascunho sobrevive a sair e voltar à página", async ({ page }) => {
