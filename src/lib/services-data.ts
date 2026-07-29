@@ -24,7 +24,7 @@ export const SERVICES: ServiceDetail[] = [
   {
     slug: "casamentos",
     eyebrow: "Decoração e Coordenação de Casamentos",
-    title: "Decoração de Casamentos no Alentejo e em Portugal",
+    title: "Decoração de Casamentos",
     metaTitle: "Decoração de Casamentos no Alentejo",
     metaDescription:
       "Decoração de casamentos no Alentejo: design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos de todo o Portugal.",
@@ -36,10 +36,10 @@ export const SERVICES: ServiceDetail[] = [
       "casamento herdade Alentejo",
       "wedding decoration Alentejo",
     ],
-    hero: "/imagens/EW1_1100.jpg",
+    hero: "/imagens/stephanie-mizio-715.jpg",
     intro: [
-      "Desenhamos a decoração do seu casamento e coordenamos o dia, do primeiro esboço até à desmontagem. Trabalhamos a partir de Évora, sobretudo em herdades e quintas do Alentejo, e deslocamo-nos a todo o país.",
-      "Na prática: o conceito visual, as flores e a cenografia, o styling das mesas, a luz, e a articulação com o catering, a fotografia e o vídeo. No dia está lá alguém da nossa equipa a segurar os tempos, para que não seja a noiva a atender o fornecedor que chegou atrasado.",
+      "Transformamos o seu casamento num dia verdadeiramente inesquecível. Cuidamos de cada detalhe, da escolha do local perfeito à decoração elegante, até à organização completa da cerimónia e receção, garantindo que tudo reflete a sua personalidade e o seu estilo.",
+      "Com uma equipa experiente e dedicada, proporcionamos um planeamento personalizado, assessoria e coordenação no dia, em herdades e quintas em todo o País, para que possa viver plenamente o seu momento especial, sem preocupações.",
     ],
     includes: [
       "Conceito e design de decoração",
@@ -117,7 +117,7 @@ export const SERVICES: ServiceDetail[] = [
   {
     slug: "eventos-corporativos",
     eyebrow: "Para Empresas",
-    title: "Decoração de Eventos Corporativos em Lisboa",
+    title: "Decoração de Eventos Corporativos",
     metaTitle: "Decoração de Eventos Corporativos em Lisboa",
     metaDescription:
       "Decoração e cenografia de eventos corporativos em Lisboa e Portugal: conferências, congressos, teambuilding, lançamentos e jantares de empresa à medida.",
@@ -272,13 +272,13 @@ type ServiceCopy = Pick<
 const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
     eyebrow: "Wedding Decoration & Coordination",
-    title: "Wedding Decoration in the Alentejo and across Portugal",
+    title: "Wedding Decoration",
     metaTitle: "Wedding Decoration in the Alentejo",
     metaDescription:
       "Wedding decoration in the Alentejo: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues across Portugal.",
     intro: [
-      "We design your wedding decoration and coordinate the day itself, from the first sketch through to the take-down. We work out of Évora, mostly at estates and quintas in the Alentejo, and we travel anywhere in the country.",
-      "In practice: the visual concept, the flowers and scenography, the table styling, the lighting, and the liaison with catering, photography and video. On the day someone from our team is there holding the timings, so the bride is not the one taking calls from a supplier who is running late.",
+      "We turn your wedding into a truly unforgettable day. We take care of every detail, from choosing the perfect venue to elegant decoration and the complete organisation of the ceremony and reception, making sure everything reflects your personality and style.",
+      "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the Alentejo and all of Portugal, so you can fully live your special moment, worry-free.",
     ],
     includes: [
       "Decoration concept and design",
@@ -329,7 +329,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   },
   "eventos-corporativos": {
     eyebrow: "For Companies",
-    title: "Corporate Event Decoration in Lisbon",
+    title: "Corporate Event Decoration",
     metaTitle: "Corporate Event Decoration in Lisbon",
     metaDescription:
       "Decoration and scenography for corporate events in Lisbon and Portugal: conferences, congresses, team-building, product launches and company dinners.",

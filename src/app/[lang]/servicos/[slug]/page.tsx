@@ -11,8 +11,18 @@ import Reveal from "@/components/motion/Reveal";
 import { BreadcrumbJsonLd, ServiceJsonLd, FaqJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { SERVICES, getService, quoteTipoForSlug } from "@/lib/services-data";
+import { pickServiceGallery } from "@/lib/service-gallery";
 import { getDictionary, localizeHref, normalizeLocale } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS, OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
+
+/**
+ * A secção de portefólio sorteia as fotos a cada desenho, por isso a página é
+ * regenerada de tempos a tempos em vez de ficar congelada na compilação: quem
+ * volta encontra fotografias diferentes. Trinta segundos mantém o HTML em cache
+ * (o site continua a servir-se da borda, sem render por visita) e ainda assim
+ * troca as fotos entre visitas com minutos de intervalo.
+ */
+export const revalidate = 30;
 
 export function generateStaticParams() {
   return SERVICES.map((s) => ({ slug: s.slug }));
@@ -85,6 +95,10 @@ export default async function ServiceDetailPage({
   // Closing CTA backdrop — a frame from this service's own gallery (falls back
   // to the hero) so the final call-to-action stays on-topic and cinematic.
   const ctaImg = svc.gallery.at(-1) ?? svc.hero;
+
+  // Seis do conjunto deste serviço, sorteadas agora; a lista escolhida à mão
+  // fica como recurso para os serviços que ainda não têm conjunto próprio.
+  const gallery = pickServiceGallery(svc.slug) ?? svc.gallery;
 
   // Deep-link the quote CTAs with the matching event type so a visitor arriving
   // from this service page lands with it pre-selected (see OrcamentoForm).
@@ -315,7 +329,7 @@ export default async function ServiceDetailPage({
           stagger={0.08}
           className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
         >
-          {svc.gallery.map((src, i) => {
+          {gallery.map((src, i) => {
             // Match the real column span (grid is 6-col at lg) so the wide
             // feature tiles aren't served a 33vw candidate and upscaled.
             const span = GALLERY_SPANS[i % GALLERY_SPANS.length];
