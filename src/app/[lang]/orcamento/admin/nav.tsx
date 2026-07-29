@@ -33,26 +33,19 @@ export type View =
  * other consumer (command palette, mobile bar); these arrays only decide what
  * the rail shows up-front vs. behind the disclosure.
  *
- * Note: a couple of `View` ids (e.g. `inventario`, `modelos-email`) exist in the
- * type and still render if reached, but are intentionally left out of `NAV` so
- * they don't clutter the menu — the owner asked to hide them. Add an id back to
- * `NAV` (and one of the arrays below) to surface it again.
+ * Note: several `View` ids (`clientes`, `fornecedores`, `inventario`,
+ * `modelos-email`) exist in the type and still render if reached by a direct
+ * link, but are intentionally left out of `NAV` so they don't clutter the menu
+ * — the owner asked to hide them. Nothing about them was deleted: add an id
+ * back to `NAV` (and to one of the arrays above) to surface it again.
  */
-export const CORE_NAV: View[] = [
-  "overview",
-  "pedidos",
-  "propostas",
-  "faturas",
-  "contratos",
-  "calendario",
-];
+export const CORE_NAV: View[] = ["overview", "pedidos", "propostas", "calendario", "tarefas"];
 
 export const MORE_NAV: View[] = [
-  "kanban",
-  "clientes",
-  "tarefas",
+  "faturas",
+  "contratos",
   "temas",
-  "fornecedores",
+  "kanban",
   "seguimentos",
   "estatisticas",
 ];
@@ -110,24 +103,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
         <rect x="3" y="4" width="4" height="16" rx="1" />
         <rect x="10" y="4" width="4" height="11" rx="1" />
         <rect x="17" y="4" width="4" height="7" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    id: "clientes",
-    label: "Clientes",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <circle cx="9" cy="8" r="3" />
-        <path d="M3 20c0-3 2.7-5 6-5s6 2 6 5" />
-        <path d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.5-1.8-4.3-4-4.8" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -200,26 +175,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
         />
         <circle cx="9.5" cy="12" r="1.2" />
         <path d="m6 17 3.5-3 3 2.5L16 13l3 4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "fornecedores",
-    label: "Fornecedores",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path
-          d="M3 9l1-5h16l1 5M4 9h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9z"
-          strokeLinejoin="round"
-        />
-        <path d="M9 13h6" strokeLinecap="round" />
       </svg>
     ),
   },

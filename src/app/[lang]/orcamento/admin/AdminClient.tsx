@@ -1352,14 +1352,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               quem está aqui dentro já sabe onde está, e o rótulo só roubava
               espaço ao único elemento que identifica a casa. O nome continua a
               ser anunciado por leitores de ecrã através do `alt` da imagem. */}
-          <div className="px-5 pt-6 pb-5 flex flex-col items-center text-center">
+          <div className="w-full px-4 pt-6 pb-6 flex justify-center">
             <Image
               src="/logo-liquen.png"
               alt="Líquen Events"
               width={300}
               height={179}
               priority
-              className="h-20 w-auto object-contain"
+              // Centrado na largura da barra e o maior que cabe sem tocar nas
+              // margens — é a marca que abre o dia de trabalho, não um ícone.
+              className="h-28 w-auto max-w-full object-contain"
             />
           </div>
 
