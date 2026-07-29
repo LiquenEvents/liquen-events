@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import GalleryImage from "./GalleryImage";
+
+/** O mesmo caminho que `renderTile` usa. */
+const SRC = "/imagens/DaniGui_Preview20.jpg";
+/** Tentativas pelo optimizador antes de se passar ao ficheiro original. */
+const MAX_ATTEMPTS = 4;
 
 /**
  * A PROVA de que a queixa da dona ("nem todas as fotos carregam") deixou de ser
@@ -123,9 +128,18 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     expect(urls).toHaveLength(4);
     expect(new Set(urls).size).toBe(4); // cada tentativa é um URL novo
 
-    // 4.ª falha: tecto atingido.
+    // 4.ª falha: acabou o optimizador, mas ainda falta o ficheiro original.
     act(() => {
       img()!.dispatchEvent(new Event("error"));
+    });
+    act(() => vi.advanceTimersByTime(60_000));
+    const cru = img();
+    expect(cru, "ainda faltava tentar o ficheiro original").not.toBeNull();
+    expect(cru!.getAttribute("src")).not.toContain("_next/image");
+
+    // Só quando ESSE também falha é que se mostra o fallback.
+    act(() => {
+      cru!.dispatchEvent(new Event("error"));
     });
     act(() => vi.advanceTimersByTime(60_000));
     expect(img()).toBeNull();
@@ -139,7 +153,8 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     // É a recuperação que faltava: medido, o utilizador podia subir e voltar a
     // descer por cima da foto falhada e o browser nunca a voltava a pedir.
     renderTile();
-    for (let i = 0; i < 4; i++) {
+    // 4 pelo optimizador + 1 pelo ficheiro original.
+    for (let i = 0; i < 5; i++) {
       act(() => {
         img()!.dispatchEvent(new Event("error"));
       });
@@ -181,5 +196,40 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     renderTile({ priority: true });
     expect(img()).not.toBeNull();
     expect(img()!.getAttribute("fetchpriority")).toBe("high");
+  });
+
+  it("esgotado o optimizador, tenta o ficheiro original antes de desistir", async () => {
+    // O caso que a Catarina viu no site: "Foto indisponível" só aparecia depois
+    // de quatro falhas, mas as quatro iam todas por /_next/image. Se é o
+    // optimizador que está em baixo, insistir com ele não serve de nada. O
+    // ficheiro em /public é servido pelo CDN e não lhe toca.
+    renderTile({ priority: true });
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      const el = img();
+      expect(el, `tentativa ${i + 1} devia ter um <img>`).not.toBeNull();
+      await act(async () => {
+        fireEvent.error(el!);
+        await vi.runAllTimersAsync();
+      });
+    }
+    const el = img();
+    expect(el, "devia haver um <img> a apontar ao ficheiro original").not.toBeNull();
+    // Sem optimizador: o src é o caminho tal e qual, sem /_next/image.
+    expect(el!.getAttribute("src")).toContain(SRC);
+    expect(el!.getAttribute("src")).not.toContain("_next/image");
+  });
+
+  it("só desiste depois de o ficheiro original também falhar", async () => {
+    renderTile({ priority: true });
+    for (let i = 0; i < MAX_ATTEMPTS + 1; i++) {
+      const el = img();
+      if (!el) break;
+      await act(async () => {
+        fireEvent.error(el);
+        await vi.runAllTimersAsync();
+      });
+    }
+    expect(img()).toBeNull();
+    expect(screen.getByText(/indispon/i)).toBeTruthy();
   });
 });

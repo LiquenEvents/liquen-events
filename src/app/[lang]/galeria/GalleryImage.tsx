@@ -101,6 +101,19 @@ export default function GalleryImage({
   const [bust, setBust] = useState(0);
   // Esgotou o tecto de tentativas: mostra-se o fallback digno.
   const [exhausted, setExhausted] = useState(false);
+  /**
+   * ÚLTIMO RECURSO: o ficheiro original, sem passar pelo optimizador.
+   *
+   * As re-tentativas iam TODAS por `/_next/image`. Se é o optimizador que está
+   * a falhar, insistir com ele quatro vezes não resolve nada: foi o que a
+   * Catarina viu no site, com mosaicos a mostrar "Foto indisponível", que só
+   * aparece depois de quatro falhas seguidas.
+   *
+   * `/imagens/x.jpg` é um ficheiro estático servido pelo CDN e não toca no
+   * optimizador. Custa mais bytes do que a miniatura, mas a escolha aqui é
+   * entre uma fotografia pesada e nenhuma fotografia.
+   */
+  const [raw, setRaw] = useState(false);
 
   const releaseSlot = useCallback(() => {
     releaseRef.current?.();
@@ -152,6 +165,7 @@ export default function GalleryImage({
     if (!exhausted) return;
     const reset = () => {
       attemptsRef.current = 0;
+      setRaw(false);
       setExhausted(false);
       setBust((b) => b + 1);
       // Re-armar SEMPRE pela fila (mesmo a foto com prioridade): já não estamos
@@ -188,6 +202,15 @@ export default function GalleryImage({
     releaseSlot();
     attemptsRef.current += 1;
     if (attemptsRef.current >= MAX_ATTEMPTS) {
+      if (!raw) {
+        // Ainda não tentámos sem o optimizador: é a tentativa que falta.
+        setArmed(false);
+        setRaw(true);
+        setBust((b) => b + 1);
+        enqueue();
+        return;
+      }
+      // Falhou até o ficheiro original: aí sim, não há foto para mostrar.
       setArmed(false);
       setExhausted(true);
       return;
@@ -202,7 +225,10 @@ export default function GalleryImage({
       setBust(attemptsRef.current);
       enqueue();
     }, delay);
-  }, [releaseSlot, enqueue]);
+    // `raw` TEM de estar nas dependências: sem ele o fecho via sempre o valor
+    // inicial (false) e a passagem pelo ficheiro original repetia-se para
+    // sempre, em vez de ser a última tentativa.
+  }, [releaseSlot, enqueue, raw]);
 
   // Cache-buster da re-tentativa. NÃO pode ir no `src`: o `localPatterns` por
   // defeito do Next 16 é [{ pathname:"**", search:"" }], por isso um
@@ -214,6 +240,9 @@ export default function GalleryImage({
   // 1ª re-tentativa: o caminho normal continua a usar o loader do Next,
   // intocado (incluindo o `dpl` de deploy).
   const retryLoader = useMemo(() => {
+    // Sem optimizador: devolve-se o caminho tal e qual, e o `<Image>` passa a
+    // apontar directamente ao ficheiro em /public.
+    if (raw) return ({ src: s }: ImageLoaderProps) => s;
     if (bust === 0) return undefined;
     return ({ src: s, width, quality: q }: ImageLoaderProps) => {
       const dpl = typeof document !== "undefined" ? document.documentElement.dataset.dplId : "";
@@ -221,7 +250,7 @@ export default function GalleryImage({
         dpl ? `&dpl=${dpl}` : ""
       }&r=${bust}`;
     };
-  }, [bust, quality]);
+  }, [raw, bust, quality]);
 
   // Fragmento com no máximo UM elemento montado de cada vez (a foto OU o
   // fallback): é o que o `<ViewTransition>` do mosaico-herói precisa para
