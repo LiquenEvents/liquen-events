@@ -264,6 +264,7 @@ const Tile = memo(function Tile({
         onFocus={() => onTileFocus(idx)}
         data-ripple
         data-tile-idx={idx}
+        data-tile-variant="grid"
         data-cap={caption}
         data-sub={sub}
         // Tabulação rotativa (roving tabindex): a grelha é UM ponto de
@@ -347,6 +348,7 @@ function SatelliteTile({
       onFocus={() => onTileFocus(idx)}
       data-ripple
       data-tile-idx={idx}
+      data-tile-variant="hero"
       tabIndex={tabbable ? 0 : -1}
       aria-label={label}
       data-cap={cap.caption}
@@ -646,12 +648,17 @@ export default function GaleriaClient({
   // so when the shoot/couple is known we append it — every photo then reads
   // uniquely and descriptively (e.g. "Casamento … no Alentejo — Daniela &
   // Guilherme") while keeping the localized, keyword-rich base.
-  const altText = (src: string, l: Label) => {
+  /** Descrição da foto sem posição nenhuma (o tronco comum ao alt e ao nome
+      acessível do botão). */
+  const altBase = (src: string, l: Label) => {
     const base = dict.alt[l];
     const c = collectionFor(src);
+    return c ? `${base}: ${c}` : base;
+  };
+  const altText = (src: string, l: Label) => {
     const o = ordinals.get(src);
     const pos = o ? ` (${dict.lbPhoto} ${o.n} ${dict.lbOf} ${o.of})` : "";
-    return (c ? `${base}: ${c}` : base) + pos;
+    return altBase(src, l) + pos;
   };
   const caption = (src: string, label: Label): { caption: string; sub?: string } => {
     const c = collectionFor(src);
@@ -721,17 +728,23 @@ export default function GaleriaClient({
   const roving = Math.min(rovingIdx, Math.max(0, visible.length - 1));
   /** Foca o mosaico `idx` na sua instância VISÍVEL (as fotos 1-4 existem duas
       vezes: no mosaico-herói em sm+ e no masonry em mobile). */
-  const focusTile = useCallback((idx: number) => {
-    if (typeof document === "undefined") return false;
-    const els = document.querySelectorAll<HTMLElement>(`[data-tile-idx="${idx}"]`);
-    for (const el of els) {
-      if (el.offsetParent !== null) {
-        el.focus();
-        return true;
-      }
-    }
-    return false;
-  }, []);
+  const focusTile = useCallback(
+    (idx: number) => {
+      if (typeof document === "undefined") return false;
+      // Qual das duas instâncias está visível é decidido pelo breakpoint, não
+      // por medição de layout: as fotos 1-4 vivem no mosaico-herói em sm+ e no
+      // masonry em mobile, e o CSS esconde a outra.
+      const want = isSm ? "hero" : "grid";
+      const el =
+        document.querySelector<HTMLElement>(
+          `[data-tile-idx="${idx}"][data-tile-variant="${want}"]`,
+        ) ?? document.querySelector<HTMLElement>(`[data-tile-idx="${idx}"]`);
+      if (!el) return false;
+      el.focus();
+      return true;
+    },
+    [isSm],
+  );
   const onTileFocus = useCallback((idx: number) => setRovingIdx(idx), []);
   /**
    * Nome acessível do botão de um mosaico. Antes não havia nenhum: o nome vinha
@@ -742,11 +755,8 @@ export default function GaleriaClient({
    * conteúdo, o `content-visibility: auto` (que salta o conteúdo dos mosaicos
    * fora do ecrã) deixa de os apagar.
    */
-  const tileLabel = (src: string, l: Label, idx: number) => {
-    const c = caption(src, l);
-    const head = c.sub ? `${c.caption}, ${c.sub}` : c.caption;
-    return `${head}. ${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`;
-  };
+  const tileLabel = (src: string, l: Label, idx: number) =>
+    `${altBase(src, l)}. ${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`;
   const onKeyNav = useCallback(
     (e: React.KeyboardEvent, idx: number) => {
       let target: number | null = null;
@@ -791,12 +801,14 @@ export default function GaleriaClient({
         if (entries[0]?.isIntersecting)
           startTransition(() => setShown((s) => Math.min(s + PAGE, pool.length)));
       },
-      // 400px (era 800px, ~um ecrã inteiro de fotos à frente). O que empilha a
-      // rajada é a antecipação: com 800px chegavam a estar 116-169 pedidos ao
-      // optimizador em voo ao mesmo tempo sobre HTTP/2. Metade da antecipação
-      // continua a montar os mosaicos antes de entrarem no ecrã, e quem trava
-      // o pedido em si é agora a fila (load-queue.ts).
-      { rootMargin: "400px 0px" },
+      // 800px, NÃO menos. Tentou-se 400px (para encurtar a rajada) e partiu o
+      // scroll infinito: no fundo da página a sentinela fica ~707px ACIMA do
+      // viewport, porque debaixo dela ainda vem a secção do Instagram; com uma
+      // margem de 400px deixava de intersectar e a galeria congelava em 252 de
+      // 427 no telemóvel (medido). Quem limita a rajada agora é a fila de
+      // pedidos (load-queue.ts), não esta margem, por isso ela pode ficar
+      // folgada.
+      { rootMargin: "800px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -975,6 +987,7 @@ export default function GaleriaClient({
               onFocus={() => onTileFocus(0)}
               data-ripple
               data-tile-idx={0}
+              data-tile-variant="hero"
               tabIndex={roving === 0 ? 0 : -1}
               aria-label={tileLabel(visible[0].src, visible[0].label, 0)}
               data-cap={caption(visible[0].src, visible[0].label).caption}
@@ -1125,8 +1138,11 @@ export default function GaleriaClient({
         {/* Contador SEMPRE montado. O bloco inteiro desmontava assim que
             `shown >= pool.length`, por isso o estado final ("427 de 427") era o
             único que nunca chegava a ser anunciado. */}
+        {/* `shown` arranca em INITIAL_PAGE=12 mesmo quando o pool é menor, por
+            isso encosta-se ao total: agora que o contador está sempre montado,
+            sem isto lia-se "12 de 8". */}
         <p role="status" className="text-[10px] tracking-widest text-white/55">
-          {shown} {dict.de} {pool.length}
+          {Math.min(shown, pool.length)} {dict.de} {pool.length}
         </p>
       </div>
 
