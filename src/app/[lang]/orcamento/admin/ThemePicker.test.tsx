@@ -184,9 +184,10 @@ describe("ThemePicker", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(photo(TOTAL));
     expect(photo(TOTAL)).toHaveAttribute("aria-pressed", "true");
-  }, // diálogo. Não é lento por acidente, é o que este teste faz — e os 5 s por // 41 cliques numa grelha de 41 células = 41 renderizações completas do
-  // omissão não chegam num runner de CI partilhado.
-  20_000);
+    // 41 cliques numa grelha de 41 células = 41 renderizações completas do
+    // diálogo. Não é lento por acidente, é o que este teste faz — e os 5 s por
+    // omissão não chegam num runner de CI partilhado.
+  }, 20_000);
 
   it("nas capas (uma só foto) a segunda escolha substitui a primeira", async () => {
     await openPicker(false);
@@ -245,8 +246,12 @@ describe("ThemePicker", () => {
     photos = folder(4, (i) => i === 0); // só a primeira tem miniatura
     await openPicker(true);
 
+    // A miniatura aparece já; a que não tem uma espera pela vez na fila dos
+    // originais (aqui há vagas de sobra, por isso é o tempo de uma renderização).
     expect(photo(1).querySelector("img")).toHaveAttribute("src", "https://cdn.test/thumb-1.jpg");
-    expect(photo(2).querySelector("img")).toHaveAttribute("src", "https://cdn.test/foto-2.jpg");
+    await waitFor(() =>
+      expect(photo(2).querySelector("img")).toHaveAttribute("src", "https://cdn.test/foto-2.jpg"),
+    );
   });
 
   it("as fotos sem miniatura entram numa fila — a que está à vista não espera pelas outras", async () => {
@@ -261,8 +266,7 @@ describe("ThemePicker", () => {
     const started = () => imgs().filter((i) => i.getAttribute("src")).length;
 
     expect(cells()).toHaveLength(THEME_PAGE_SIZE);
-    console.log("HTML", cells()[0].outerHTML, cells()[1].outerHTML);
-    expect(started()).toBe(3);
+    await waitFor(() => expect(started()).toBe(3));
     expect(imgs()[0].getAttribute("src")).toBe("https://cdn.test/foto-1.jpg");
 
     // Cada uma que acaba liberta a vez seguinte.
@@ -275,7 +279,9 @@ describe("ThemePicker", () => {
     await openPicker(true);
 
     const imgs = () => cells().map((c) => c.querySelector("img") as HTMLImageElement);
-    expect(imgs().filter((i) => i.getAttribute("src"))).toHaveLength(THEME_PAGE_SIZE);
+    await waitFor(() =>
+      expect(imgs().filter((i) => i.getAttribute("src"))).toHaveLength(THEME_PAGE_SIZE),
+    );
     // A primeira dobra não espera pelo `lazy`; o resto do rolo espera.
     expect(imgs()[0]).toHaveAttribute("loading", "eager");
     expect(imgs()[0]).toHaveAttribute("fetchpriority", "high");

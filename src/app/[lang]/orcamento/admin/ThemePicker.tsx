@@ -95,7 +95,6 @@ function pumpHeavy() {
     if (!slot || slot.released) continue;
     slot.started = true;
     heavyLive += 1;
-    if (process.env.NODE_ENV === "test") console.log("START", heavyLive, heavyWaiting.length);
     slot.start();
   }
 }
@@ -110,7 +109,6 @@ function queueHeavyImage(start: () => void): () => void {
     if (slot.released) return;
     slot.released = true;
     if (slot.started) {
-      if (process.env.NODE_ENV === "test") console.log("RELEASE", heavyLive);
       heavyLive = Math.max(0, heavyLive - 1);
       pumpHeavy();
       return;
@@ -359,12 +357,12 @@ export default function ThemePicker({
    * com que foi pedida: mudar de tema (ou a grelha crescer) invalida-a, senão
    * o "Mostrar mais" colava fotos do tema errado.
    */
+  // Uma página guardada só serve no tema e no sítio para onde foi pedida —
+  // lê-se aqui em vez de se apagar dentro do efeito (seria uma renderização a
+  // mais para dizer o que já se sabe daqui).
+  const aheadFits = ahead !== null && ahead.themeId === themeId && ahead.offset === images.length;
   useEffect(() => {
-    if (!themeId || loadingImages || loadingMore || !hasMore) return;
-    if (ahead) {
-      if (ahead.themeId !== themeId || ahead.offset !== images.length) setAhead(null);
-      return;
-    }
+    if (!themeId || loadingImages || loadingMore || !hasMore || aheadFits) return;
     let cancelled = false;
     const offset = images.length;
     const timer = window.setTimeout(() => {
@@ -397,7 +395,7 @@ export default function ThemePicker({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [themeId, loadingImages, loadingMore, hasMore, ahead, images.length]);
+  }, [themeId, loadingImages, loadingMore, hasMore, aheadFits, images.length]);
 
   // `dismiss`/`importSelected` e não `close`/`confirm`: os nomes curtos
   // escondiam o `window.close`/`window.confirm` — e o `window.confirm()` é o
@@ -1097,9 +1095,8 @@ function Photo({ image, priority }: { image: ThemeImage; priority?: boolean }) {
       loading={heavy || priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : undefined}
       decoding="async"
-      onLoad={() => { if (process.env.NODE_ENV === "test") console.log("LOAD"); finished(); }}
+      onLoad={finished}
       onError={() => {
-        if (process.env.NODE_ENV === "test") console.log("ERROR-EVT");
         finished();
         if (!heavy) setThumbBroken(true);
       }}

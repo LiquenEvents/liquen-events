@@ -67,17 +67,26 @@ const THUMB_QUALITY = 72;
 const SCAN_WINDOW = 200;
 
 /**
- * Quantas miniaturas se GERAM por pedido. Medido nesta máquina: descodificar +
- * reduzir + codificar uma foto de 3000 px custa ~90 ms de CPU com o `sharp`, e
- * a estes 8 juntam-se 8 descarregamentos de ~2,6 MB. Oito por pedido mantém-se
- * folgadamente dentro do `maxDuration` de 60 s mesmo com o Storage lento, e é
- * o suficiente para a barra de progresso andar a olhos vistos.
+ * Quantas miniaturas se GERAM por pedido.
+ *
+ * MEDIDO, não estimado: uma foto real de 3000 px (2,6 MB) reduzida a 400 px
+ * q72 custa 37 ms de CPU (mediana de 12; o `sharp` desce a resolução ainda
+ * dentro do descodificador de JPEG, por isso nem chega a montar a imagem
+ * grande em memória) e sai com ~29 KB — o mesmo tamanho da miniatura que o
+ * navegador faz. Um lote de 8 com três em voo são 127 ms de CPU.
+ *
+ * Ou seja: o custo de um lote NÃO é o `sharp`, são os 8 descarregamentos de
+ * 2,6 MB entre o Storage e a função. Oito é o número que mantém cada pedido
+ * curto — segundos, não dezenas — para caber no `maxDuration` mesmo num dia
+ * mau do Storage, e para a barra de progresso andar a olhos vistos. Subir este
+ * número acelera pouco (o gargalo é a rede) e arrisca perder o lote todo num
+ * tempo-limite.
  */
 const MAX_PER_BATCH = 8;
 
-/** Quantas fotos em voo dentro de um lote. Cada uma tem a sua bitmap
- *  descodificada em memória (uma foto de 12 MP são ~36 MB em cru): três é o
- *  que enche a rede sem pôr a função a arriscar a memória. */
+/** Quantas fotos em voo dentro de um lote. Três chega para tapar a latência do
+ *  Storage sem abrir uma dúzia de ligações nem empilhar bytes na memória da
+ *  função — e, a 37 ms de CPU cada, o processador nunca é o problema. */
 const BATCH_CONCURRENCY = 3;
 
 /** Uma miniatura maior do que isto não é uma miniatura — é um erro nosso. */

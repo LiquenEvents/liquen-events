@@ -920,7 +920,26 @@ function seededRandom(seed) {
   return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
 }
 
-function generateVolume(n) {
+/**
+ * Lê um pedido REAL de data/quotes.json para servir de molde.
+ *
+ * Sem isto, os pedidos gerados tinham menos campos do que os verdadeiros
+ * (`priceBreakdown`, `addons`, `packageTier`, …) e qualquer ecrã que rebentasse
+ * seria culpa dos dados de teste, não do produto. Partindo de um pedido real e
+ * variando só o que distingue um cliente de outro, o que a medição encontra é
+ * mesmo do produto.
+ */
+async function quoteTemplate() {
+  try {
+    const rows = JSON.parse(await fs.readFile(path.join(DATA_DIR, "quotes.json"), "utf8"));
+    if (Array.isArray(rows) && rows.length) return rows[0];
+  } catch {
+    /* sem molde — seguimos com o mínimo */
+  }
+  return null;
+}
+
+function generateVolume(n, template = null) {
   const rnd = seededRandom(42);
   const pick = (a) => a[Math.floor(rnd() * a.length)];
   const quotes = [];
@@ -943,6 +962,9 @@ function generateVolume(n) {
     const guests = 40 + Math.floor(rnd() * 260);
 
     quotes.push({
+      // Começa por um pedido real (todos os campos que a interface espera) e
+      // sobrepõe-se só o que varia de cliente para cliente.
+      ...(template ?? {}),
       id,
       name: nome,
       email: `cliente${i}@exemplo.pt`,
@@ -989,7 +1011,7 @@ function generateVolume(n) {
         subtotal: base,
         vat: base * 0.23,
         total: base * 1.23,
-        status: pick(["rascunho", "enviada", "aceite", "recusada"]),
+        status: pick(["rascunho", "enviada", "aceite", "rejeitada"]),
         createdAt: submitted,
         sentAt: submitted,
       });
@@ -1019,9 +1041,12 @@ function generateVolume(n) {
         id: `task-bench-${i}`,
         title: `Confirmar fornecedor para ${nome}`,
         done: rnd() > 0.5,
+        priority: pick(["baixa", "normal", "alta"]),
         dueDate: date,
         quoteId: id,
-        owner: "Catarina",
+        clientName: nome,
+        assignee: "Catarina",
+        area: pick(["Comercial", "Produção", "Decoração", "Financeiro"]),
         createdAt: submitted,
       });
     }
@@ -1039,11 +1064,15 @@ function generateVolume(n) {
       contracts.push({
         id: `ct-bench-${i}`,
         quoteId: id,
+        proposalId: `prop-bench-${i}`,
         clientName: nome,
         clientEmail: `cliente${i}@exemplo.pt`,
-        status: pick(["rascunho", "enviado", "assinado"]),
+        termsVersion: "2026-01",
+        termsSnapshot: "Condições gerais aceites pelo cliente (amostra de medição).",
+        status: pick(["pendente", "aceite"]),
         createdAt: submitted,
-        total: 5000,
+        acceptedAt: submitted,
+        acceptedName: nome,
       });
     }
   }
@@ -1089,7 +1118,7 @@ async function withVolume(n, fn) {
   await recoverAbandonedBackup();
   const backup = path.join(ROOT, `.bench-data-backup-${Date.now()}`);
   await fs.mkdir(backup, { recursive: true });
-  const files = generateVolume(n);
+  const files = generateVolume(n, await quoteTemplate());
   const existing = await fs.readdir(DATA_DIR).catch(() => []);
   for (const f of existing) await fs.copyFile(path.join(DATA_DIR, f), path.join(backup, f));
 
@@ -1265,7 +1294,15 @@ async function loadSamplePhotos(count) {
   const out = [];
   for (let i = 0; i < count; i++) {
     const buf = await fs.readFile(path.join(dir, all[i % all.length]));
-    out.push({ b64: buf.toString("base64"), bytes: buf.length, name: all[i % all.length] });
+    // Prefixo `data:` obrigatório. Sem ele, `fetchProposalImageBytes` só aceita
+    // base64 solto se a string NÃO tiver "/" — e o alfabeto base64 tem "/", por
+    // isso uma foto qualquer era confundida com um caminho de Storage e caía
+    // fora do PDF sem dizer nada. Ver src/lib/proposal-storage.ts:406.
+    out.push({
+      b64: `data:image/jpeg;base64,${buf.toString("base64")}`,
+      bytes: buf.length,
+      name: all[i % all.length],
+    });
   }
   return out;
 }
@@ -1320,7 +1357,10 @@ function buildDoc(photos, coverCount = 2) {
 }
 
 async function measurePdf(base, cookieHeader, quoteId) {
-  const cases = [0, 2, 8, 20];
+  // O corpo do POST leva as fotos em base64: 12 fotos já são ~5 MB de JSON e o
+  // Next recusa acima disso. Com 12 chega para separar o custo fixo do custo
+  // por foto, que é o que interessa.
+  const cases = [0, 2, 6, 12];
   const rows = [];
   const maxPhotos = Math.max(...cases);
   const pool = await loadSamplePhotos(maxPhotos);
@@ -1378,23 +1418,6 @@ async function measurePdf(base, cookieHeader, quoteId) {
     );
   }
   return rows;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Ranking final
-// ═══════════════════════════════════════════════════════════════════════════
-function rank(findings) {
-  heading("RANKING — (tempo poupado) ÷ (risco da alteração)");
-  const scored = findings
-    .map((f) => ({ ...f, score: f.saves / Math.max(0.25, f.risk) }))
-    .sort((a, b) => b.score - a.score);
-  console.log("   #  poupa    risco  índice  o quê");
-  scored.forEach((f, i) => {
-    console.log(
-      `   ${String(i + 1).padStart(2)}  ${ms(f.saves).padStart(7)}  ${String(f.risk).padStart(5)}  ${f.score.toFixed(0).padStart(6)}  ${f.what}`,
-    );
-  });
-  return scored;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

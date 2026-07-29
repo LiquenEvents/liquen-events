@@ -907,6 +907,34 @@ describe("Biblioteca de Temas — miniaturas em falta", () => {
     expect(callsTo("POST /api/temas/t1/miniaturas")).toBe(2);
   });
 
+  it("desiste quando nada é gerado — não percorre 4000 fotos a falhar em silêncio", async () => {
+    // O servidor responde 200 a dizer "vi 8, gerei 0, falharam 8": não é a
+    // foto, é o Storage. Insistir seria a barra a andar sem nada acontecer.
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 4000 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 20), total: 4000 }));
+    let cursor = 0;
+    route("POST /api/temas/t1/miniaturas", () => {
+      cursor += 8;
+      return ok({
+        scanned: 8,
+        generated: 0,
+        skipped: 0,
+        failed: 8,
+        nextCursor: cursor,
+        total: 4000,
+      });
+    });
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Gerar miniaturas em falta" }));
+    });
+
+    expect(callsTo("POST /api/temas/t1/miniaturas")).toBe(3);
+    expect(screen.getByText(/8 fotos sem miniatura|24 fotos sem miniatura/)).toBeInTheDocument();
+  });
+
   it("uma falha do servidor não apaga o que já tinha sido gerado", async () => {
     route("GET /api/temas", () => ok([{ ...THEME, imageCount: 100 }]));
     route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 20), total: 100 }));

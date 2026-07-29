@@ -709,6 +709,10 @@ const PREVIEW_EAGER = 12;
  *  ciclo infinito se o servidor devolver sempre o mesmo cursor. */
 const MAX_THUMB_BATCHES = 2000;
 
+/** Lotes seguidos sem gerar nada (e com falhas) antes de desistir: a esta
+ *  altura o problema é o Storage, não as fotos. */
+const MAX_BAD_BATCHES = 3;
+
 /** Quantas páginas já mostradas se voltam a pedir no fim da geração de
  *  miniaturas, para a grelha passar a mostrar as novas. */
 const MAX_REFRESH_PAGES = 5;
@@ -1231,6 +1235,7 @@ function ThemeFolder({
     let scanned = 0;
     let generated = 0;
     let failedCount = 0;
+    let badBatches = 0;
     let complete = false;
     setThumbJob({
       running: true,
@@ -1274,6 +1279,17 @@ function ThemeFolder({
         scanned += data?.scanned ?? 0;
         generated += data?.generated ?? 0;
         failedCount += data?.failed ?? 0;
+        // Lotes seguidos em que NADA se gerou e tudo falhou = o problema não é
+        // a foto, é o Storage. Continuar seria percorrer 4000 fotos a falhar
+        // em silêncio, com a barra a andar como se estivesse a fazer algo.
+        badBatches = (data?.generated ?? 0) === 0 && (data?.failed ?? 0) > 0 ? badBatches + 1 : 0;
+        if (badBatches >= MAX_BAD_BATCHES) {
+          toast(
+            "As miniaturas não estão a ser criadas. Pare por agora e tente mais tarde — as fotos não foram tocadas.",
+            "error",
+          );
+          break;
+        }
         const next = data?.nextCursor;
         cursor = typeof next === "number" ? next : cursor;
         if (!alive.current) return;
@@ -1412,12 +1428,13 @@ function ThemeFolder({
    * ou sair uma foto, deixa de encaixar e é deitada fora (o efeito volta a
    * correr e pede a certa).
    */
+  // Uma página guardada só serve no sítio para onde foi pedida: se entretanto
+  // entrou (ou saiu) uma foto, ela deixa de encaixar e volta a pedir-se a
+  // certa. Isto lê-se, não se apaga — deitar fora o estado dentro do efeito
+  // seria uma renderização a mais para dizer o que já se sabe daqui.
+  const aheadFits = ahead !== null && ahead.offset === images.length;
   useEffect(() => {
-    if (loading || loadingMore || !hasMore) return;
-    if (ahead) {
-      if (ahead.offset !== images.length) setAhead(null);
-      return;
-    }
+    if (loading || loadingMore || !hasMore || aheadFits) return;
     let cancelled = false;
     const offset = images.length;
     const timer = window.setTimeout(() => {
@@ -1449,7 +1466,7 @@ function ThemeFolder({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [theme.id, loading, loadingMore, hasMore, ahead, images.length]);
+  }, [theme.id, loading, loadingMore, hasMore, aheadFits, images.length]);
 
   function toggleAt(index: number, extend: boolean) {
     // A âncora é lida AGORA e só depois movida: o React corre o `setSelected`
