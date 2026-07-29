@@ -21,6 +21,10 @@ const IGNORED_CONSOLE = [
   /favicon/i,
   /Failed to load resource: the server responded with a status of 404/i,
   /is using quality/i, // next/image quality hint — not a runtime defect
+  // Recursos de terceiros (analytics) inalcançáveis na rede onde o teste corre
+  // — condição do ambiente, não defeito da aplicação. Um erro lançado pelo
+  // nosso próprio código continua a falhar o passeio. (Igual aos outros passeios.)
+  /net::ERR_(TUNNEL_CONNECTION_FAILED|CONNECTION_|NAME_NOT_RESOLVED|PROXY_)/i,
 ];
 const isIgnored = (t: string) => IGNORED_CONSOLE.some((re) => re.test(t));
 
@@ -62,8 +66,10 @@ async function expectNoHorizontalOverflow(page: Page, label: string) {
   );
 }
 
-// nav label → H1 heading. Core items plus the table-heavy "Mais" destinations the
-// mobile audit called out (Pipeline/Inventário/Contratos).
+// nav label → H1 heading. The five core items plus the "Mais" destinations whose
+// wide tables and image grids are the likeliest to push the page sideways on a
+// phone (Faturas/Contratos/Pipeline/Temas/Estatísticas). Every label here must
+// exist in nav.tsx — a destination that isn't in the sidebar can't be walked.
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
@@ -72,7 +78,7 @@ const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Contratos$/, heading: /^Contratos$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
   { nav: /^Pipeline$/, heading: /^Pipeline$/ },
-  { nav: /^Clientes$/, heading: /^Clientes$/ },
+  { nav: /^Temas$/, heading: /^Temas$/ },
   { nav: /^Tarefas$/, heading: /^Tarefas$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
 ];
@@ -98,6 +104,12 @@ test.describe("Back office — mobile", () => {
       if ((await item.count()) === 0) {
         await sidebar.getByRole("button", { name: /^Mais$/ }).click();
       }
+      // Say which label is missing instead of waiting out the 30s click timeout:
+      // when a destination leaves the sidebar, that diagnosis should be free.
+      await expect(
+        item,
+        `Sidebar has no "${view.nav.source}" button — is it still in nav.tsx?`,
+      ).toHaveCount(1);
       await item.first().click();
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
