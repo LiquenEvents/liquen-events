@@ -189,17 +189,11 @@ export default async function ServiceDetailPage({
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-16">
           <AnimateIn>
             <div className="flex flex-col gap-6 text-foreground/72 text-[16px] leading-[1.8]">
+              {/* Todos os parágrafos com o mesmo corpo e a mesma cor: o primeiro
+                  vinha maior e mais escuro, e a mudança de tamanho a meio do
+                  texto lia-se como se fossem duas coisas diferentes. */}
               {svc.intro.map((p, i) => (
-                <p
-                  key={i}
-                  className={
-                    i === 0
-                      ? "text-[19px] lg:text-[22px] leading-[1.6] text-foreground/85"
-                      : undefined
-                  }
-                >
-                  {emphasize(p)}
-                </p>
+                <p key={i}>{emphasize(p)}</p>
               ))}
               <TrackedLink
                 href={orcamentoHref}

@@ -179,7 +179,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
         <div className="border-t border-white/12 py-5">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-center gap-3 text-center">
             <p className="text-[11px] text-white/55 tracking-wide">
-              © {new Date().getFullYear()} Líquen Events — {t.footer.rights}
+              © {new Date().getFullYear()} Líquen Events. {t.footer.rights}
             </p>
             <div className="flex items-center gap-5 text-[11px] text-white/55 tracking-wide">
               <Link

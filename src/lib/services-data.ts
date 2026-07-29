@@ -27,7 +27,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Decoração de Casamentos no Alentejo e em Portugal",
     metaTitle: "Decoração de Casamentos no Alentejo",
     metaDescription:
-      "Decoração de casamentos no Alentejo — design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos de todo o Portugal.",
+      "Decoração de casamentos no Alentejo: design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos de todo o Portugal.",
     keywords: [
       "decoração de casamentos Alentejo",
       "decoração de casamentos",
@@ -38,8 +38,8 @@ export const SERVICES: ServiceDetail[] = [
     ],
     hero: "/imagens/EW1_1100.jpg",
     intro: [
-      "Transformamos o seu casamento num dia verdadeiramente inesquecível. Cuidamos de cada detalhe — da escolha do local perfeito à decoração elegante, até à organização completa da cerimónia e receção —, garantindo que tudo reflete a sua personalidade e o seu estilo.",
-      "Com uma equipa experiente e dedicada, proporcionamos um planeamento personalizado, assessoria e coordenação no dia, em herdades e quintas do Alentejo e em todo o Portugal, para que possa viver plenamente o seu momento especial, sem preocupações.",
+      "Transformamos o seu casamento num dia verdadeiramente inesquecível. Cuidamos de cada detalhe, da escolha do local perfeito à decoração elegante, até à organização completa da cerimónia e receção, garantindo que tudo reflete a sua personalidade e o seu estilo.",
+      "Com uma equipa experiente e dedicada, proporcionamos um planeamento personalizado, assessoria e coordenação no dia, em herdades e quintas em todo o País, para que possa viver plenamente o seu momento especial, sem preocupações.",
     ],
     includes: [
       "Conceito e design de decoração",
@@ -75,7 +75,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Aluguer de Viaturas Clássicas para Casamentos",
     metaTitle: "Aluguer de Viaturas Clássicas para Casamentos",
     metaDescription:
-      "Aluguer de viaturas clássicas para casamentos no Alentejo e em Portugal — carros de época com motorista para a chegada da noiva e o transporte dos noivos e convidados.",
+      "Aluguer de viaturas clássicas para casamentos no Alentejo e em Portugal: carros de época com motorista para a chegada da noiva e o transporte dos noivos e convidados.",
     keywords: [
       "aluguer de viaturas clássicas casamento",
       "carros clássicos casamento",
@@ -135,7 +135,7 @@ export const SERVICES: ServiceDetail[] = [
     ogImage: "/imagens/EW1_1404.jpg",
     intro: [
       "Na Líquen Events, combinamos profissionalismo e criatividade para proporcionar experiências que fortalecem a identidade da sua empresa. De conferências e lançamentos de produto a reuniões e formações, oferecemos soluções personalizadas que refletem os seus objetivos e valores.",
-      "Garantimos uma organização impecável, com atenção ao detalhe em cada fase do planeamento — da escolha do local à logística, ao catering e ao suporte técnico. A nossa equipa assegura que cada evento é executado com excelência, num ambiente propício ao networking, à inovação e ao sucesso da sua empresa.",
+      "Garantimos uma organização impecável, com atenção ao detalhe em cada fase do planeamento, da escolha do local à logística, ao catering e ao suporte técnico. A nossa equipa assegura que cada evento é executado com excelência, num ambiente propício ao networking, à inovação e ao sucesso da sua empresa.",
     ],
     includes: [
       "Congressos",
@@ -180,7 +180,7 @@ export const SERVICES: ServiceDetail[] = [
     hero: "/imagens/DaniGui_JantarFesta_130.jpg",
     intro: [
       "Garantimos que cada celebração seja única e memorável. De festas de aniversário a celebrações íntimas, criamos experiências personalizadas, com atenção ao ambiente, à decoração e ao entretenimento, sempre adaptadas ao seu estilo e às suas preferências.",
-      "Com uma abordagem criativa e uma equipa dedicada, tratamos de todos os detalhes — da escolha do local ao catering, até à coordenação do evento —, permitindo-lhe desfrutar do momento sem preocupações. Transformamos a sua visão numa festa exclusiva e inesquecível.",
+      "Com uma abordagem criativa e uma equipa dedicada, tratamos de todos os detalhes, da escolha do local ao catering, até à coordenação do evento, permitindo-lhe desfrutar do momento sem preocupações. Transformamos a sua visão numa festa exclusiva e inesquecível.",
     ],
     includes: [
       "Conceito e tema da festa",
@@ -201,7 +201,7 @@ export const SERVICES: ServiceDetail[] = [
     faqs: [
       {
         q: "Fazem festas de aniversário temáticas?",
-        a: "Sim. Desenhamos o conceito e a decoração à volta do tema que imaginar — de aniversários infantis a festas de adulto —, sempre à medida.",
+        a: "Sim. Desenhamos o conceito e a decoração à volta do tema que imaginar, de aniversários infantis a festas de adulto, sempre à medida.",
       },
       {
         q: "Com quanto tempo devo reservar a decoração da festa?",
@@ -216,7 +216,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Decoração de Batizados e Comunhões no Alentejo",
     metaTitle: "Decoração de Batizados e Comunhões",
     metaDescription:
-      "Decoração de batizados e comunhões no Alentejo e em Portugal — celebrações familiares íntimas, com conceito, flores e mesa à medida, organizadas com carinho.",
+      "Decoração de batizados e comunhões no Alentejo e em Portugal: celebrações familiares íntimas, com conceito, flores e mesa à medida, organizadas com carinho.",
     keywords: [
       "decoração de batizados",
       "decoração de comunhões",
@@ -225,7 +225,7 @@ export const SERVICES: ServiceDetail[] = [
     ],
     hero: "/imagens/DaniGui_JantarFesta_26.jpg",
     intro: [
-      "Os batizados e as comunhões são momentos de família que ficam para a vida. A Líquen Events cria a decoração destas celebrações no Alentejo e em todo o Portugal — íntimas ou de maior escala, sempre com o mesmo cuidado.",
+      "Os batizados e as comunhões são momentos de família que ficam para a vida. A Líquen Events cria a decoração destas celebrações no Alentejo e em todo o País, íntimas ou de maior escala, sempre com o mesmo cuidado.",
       "Do conceito à mesa, das flores ao ambiente, tratamos de cada detalhe para que só tenham de estar com quem é importante.",
     ],
     includes: [
@@ -275,9 +275,9 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Wedding Decoration in the Alentejo and across Portugal",
     metaTitle: "Wedding Decoration in the Alentejo",
     metaDescription:
-      "Wedding decoration in the Alentejo — bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues across Portugal.",
+      "Wedding decoration in the Alentejo: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues across Portugal.",
     intro: [
-      "We turn your wedding into a truly unforgettable day. We take care of every detail — from choosing the perfect venue to elegant decoration and the complete organisation of the ceremony and reception — making sure everything reflects your personality and style.",
+      "We turn your wedding into a truly unforgettable day. We take care of every detail, from choosing the perfect venue to elegant decoration and the complete organisation of the ceremony and reception, making sure everything reflects your personality and style.",
       "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the Alentejo and all of Portugal, so you can fully live your special moment, worry-free.",
     ],
     includes: [
@@ -304,7 +304,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Classic Car Hire for Weddings",
     metaTitle: "Classic Car Hire for Weddings",
     metaDescription:
-      "Classic car hire for weddings in the Alentejo and across Portugal — vintage cars with a driver for the bride's arrival and transport for the couple and guests.",
+      "Classic car hire for weddings in the Alentejo and across Portugal: vintage cars with a driver for the bride's arrival and transport for the couple and guests.",
     intro: [
       "At Líquen Events we offer an exclusive wedding car hire service, with a selection of classic cars that bring elegance and sophistication to your special day. Whether for the bride's grand arrival or transport for the couple and guests, every detail is carefully planned for a comfortable, memorable experience.",
       "With experienced drivers and a high-quality service, we ensure punctual, worry-free transport, adding a touch of glamour to your wedding.",
@@ -335,7 +335,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Decoration and scenography for corporate events in Lisbon and Portugal: conferences, congresses, team-building, product launches and company dinners.",
     intro: [
       "At Líquen Events, we combine professionalism and creativity to deliver experiences that strengthen your company's identity. From conferences and product launches to meetings and training, we offer tailored solutions that reflect your goals and values.",
-      "We ensure flawless organisation, with attention to detail at every stage of planning — from venue selection to logistics, catering and technical support. Our team makes sure each event is executed with excellence, in an environment that fosters networking, innovation and your company's success.",
+      "We ensure flawless organisation, with attention to detail at every stage of planning, from venue selection to logistics, catering and technical support. Our team makes sure each event is executed with excellence, in an environment that fosters networking, innovation and your company's success.",
     ],
     includes: [
       "Congresses",
@@ -363,7 +363,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Decoration for birthday parties, christenings, communions and private celebrations in the Alentejo. Concept, scenography, atmosphere and bespoke coordination.",
     intro: [
       "We make sure every celebration is unique and memorable. From birthday parties to intimate gatherings, we create personalised experiences with care for atmosphere, decoration and entertainment, always tailored to your style and preferences.",
-      "With a creative approach and a dedicated team, we handle every detail — from choosing the venue to catering and coordinating the event — so you can simply enjoy the moment. We turn your vision into an exclusive, unforgettable celebration.",
+      "With a creative approach and a dedicated team, we handle every detail, from choosing the venue to catering and coordinating the event, so you can simply enjoy the moment. We turn your vision into an exclusive, unforgettable celebration.",
     ],
     includes: [
       "Party concept and theme",
@@ -376,7 +376,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     faqs: [
       {
         q: "Do you do themed birthday parties?",
-        a: "Yes. We design the concept and decoration around whatever theme you imagine — from children's birthdays to grown-up parties — always bespoke.",
+        a: "Yes. We design the concept and decoration around whatever theme you imagine, from children's birthdays to grown-up parties, always bespoke.",
       },
       {
         q: "How far in advance should I book the party decoration?",
@@ -389,9 +389,9 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Christening & Communion Decoration in the Alentejo",
     metaTitle: "Christening & Communion Decoration",
     metaDescription:
-      "Decoration for christenings and communions in the Alentejo and across Portugal — intimate family celebrations, with bespoke concept, flowers and table styling.",
+      "Decoration for christenings and communions in the Alentejo and across Portugal: intimate family celebrations, with bespoke concept, flowers and table styling.",
     intro: [
-      "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations in the Alentejo and across Portugal — intimate or larger in scale, always with the same care.",
+      "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations in the Alentejo and across Portugal, intimate or larger in scale, always with the same care.",
       "From concept to the table, from flowers to the atmosphere, we handle every detail so all you have to do is be with the people who matter.",
     ],
     includes: [

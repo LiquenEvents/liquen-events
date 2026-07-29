@@ -39,23 +39,23 @@ function privacyPt(): LegalDoc {
       {
         heading: "2. Que dados recolhemos",
         body: [
-          "Dados que nos fornece diretamente ao preencher o formulário de pedido de orçamento: nome, e-mail, telefone, tipo e data do evento, localidade ou região do evento, número de convidados e a mensagem que nos enviar. O fornecimento destes dados é facultativo, mas necessário para lhe respondermos e elaborarmos um orçamento — sem eles não conseguimos dar seguimento ao pedido.",
+          "Dados que nos fornece diretamente ao preencher o formulário de pedido de orçamento: nome, e-mail, telefone, tipo e data do evento, localidade ou região do evento, número de convidados e a mensagem que nos enviar. O fornecimento destes dados é facultativo, mas necessário para lhe respondermos e elaborarmos um orçamento: sem eles não conseguimos dar seguimento ao pedido.",
           "Dados de aceitação de propostas e contratação: se aceitar uma proposta através da ligação que lhe enviamos, registamos o nome indicado por quem aceita, a data e hora e o endereço IP, como prova da aceitação da proposta de prestação de serviços.",
           "Dados de faturação e pagamentos do seu evento (valores, faturas de sinal e de saldo e o estado dos pagamentos), acessíveis na sua área de cliente e conservados para cumprimento das obrigações fiscais.",
           "Origem da visita: se chegar ao site através de uma ligação com parâmetros de campanha (UTM) ou a partir de outro site, podemos registar essa proveniência, associada ao pedido, para percebermos como nos encontrou.",
           "Dados técnicos recolhidos automaticamente para segurança e estatística: endereço IP (de forma efémera, para limitação de abusos) e informação básica do pedido.",
           "Dados de análise e de publicidade (apenas com o seu consentimento): se aceitar os cookies no aviso apresentado, utilizamos o Google Analytics e o Google Ads. Estes serviços recolhem identificadores associados a cookies, informação do dispositivo e do navegador e as páginas e interações no site, para medirmos a audiência e a eficácia da nossa publicidade. Se recusar, não são colocados cookies nem recolhida informação associada a cookies; o Google poderá ainda receber sinais técnicos agregados e sem cookies (por exemplo, país e tipo de página), que utiliza para modelação estatística e que não permitem identificá-lo individualmente.",
-          "Rascunho do formulário: para não perder o que escreve, o formulário de pedido de orçamento guarda temporariamente as suas respostas no armazenamento de sessão do navegador (sessionStorage), apenas no seu dispositivo e apenas durante a sessão — são apagadas ao fechar o separador. Pode também limpá-lo a qualquer momento nas definições do navegador; nada é enviado enquanto não submeter o pedido.",
+          "Rascunho do formulário: para não perder o que escreve, o formulário de pedido de orçamento guarda temporariamente as suas respostas no armazenamento de sessão do navegador (sessionStorage), apenas no seu dispositivo e apenas durante a sessão, e são apagadas ao fechar o separador. Pode também limpá-lo a qualquer momento nas definições do navegador; nada é enviado enquanto não submeter o pedido.",
         ],
       },
       {
         heading: "3. Finalidades e fundamento legal",
         body: [
-          "Responder a pedidos e elaborar orçamentos — diligências pré-contratuais que solicita (art. 6.º, n.º 1, al. b) do RGPD) e, quanto a mensagens que não visem a contratação, o nosso interesse legítimo em responder-lhe (al. f)).",
-          "Gerir a relação com clientes e a prestação dos nossos serviços de organização de eventos — execução do contrato (al. b).",
-          "Medir a audiência do site e a eficácia da nossa publicidade (Google Analytics e Google Ads) — com base no seu consentimento (al. a)), quando aceita os cookies.",
-          "Garantir a segurança do site e prevenir abusos — interesse legítimo (al. f).",
-          "Cumprir obrigações legais, nomeadamente fiscais e contabilísticas — obrigação legal (al. c).",
+          "Responder a pedidos e elaborar orçamentos: diligências pré-contratuais que solicita (art. 6.º, n.º 1, al. b) do RGPD) e, quanto a mensagens que não visem a contratação, o nosso interesse legítimo em responder-lhe (al. f)).",
+          "Gerir a relação com clientes e a prestação dos nossos serviços de organização de eventos: execução do contrato (al. b).",
+          "Medir a audiência do site e a eficácia da nossa publicidade (Google Analytics e Google Ads): com base no seu consentimento (al. a)), quando aceita os cookies.",
+          "Garantir a segurança do site e prevenir abusos: interesse legítimo (al. f).",
+          "Cumprir obrigações legais, nomeadamente fiscais e contabilísticas: obrigação legal (al. c).",
         ],
       },
       {
@@ -69,8 +69,8 @@ function privacyPt(): LegalDoc {
         heading: "5. Subcontratantes e partilha de dados",
         body: [
           "Não vendemos os seus dados. Podemos recorrer a prestadores de serviços que os tratam em nosso nome e sob instruções, com garantias de segurança adequadas: alojamento e infraestrutura do site, envio e receção de e-mail, e base de dados. Sempre que aplicável, celebramos contratos de subcontratação nos termos do art. 28.º do RGPD.",
-          "Recorremos ainda ao Google (Google Ireland Limited) para estatísticas de utilização (Google Analytics) e para medição e otimização de publicidade (Google Ads) — mas apenas quando aceita os cookies respetivos no aviso de cookies. Se recusar, não são colocados cookies nem partilhados identificadores; o Google poderá ainda receber sinais agregados e sem cookies para modelação estatística, que não o identificam individualmente.",
-          "Conversões Melhoradas: se aceitar os cookies e submeter um pedido de orçamento, o seu e-mail e/ou telefone podem ser partilhados com o Google apenas para medir a eficácia dos anúncios. Estes dados são encriptados (com hash) no seu navegador antes de serem enviados — o Google usa-os apenas para associar a conversão ao anúncio, nunca para o identificar publicamente. Se recusar os cookies, nada disto acontece.",
+          "Recorremos ainda ao Google (Google Ireland Limited) para estatísticas de utilização (Google Analytics) e para medição e otimização de publicidade (Google Ads), mas apenas quando aceita os cookies respetivos no aviso de cookies. Se recusar, não são colocados cookies nem partilhados identificadores; o Google poderá ainda receber sinais agregados e sem cookies para modelação estatística, que não o identificam individualmente.",
+          "Conversões Melhoradas: se aceitar os cookies e submeter um pedido de orçamento, o seu e-mail e/ou telefone podem ser partilhados com o Google apenas para medir a eficácia dos anúncios. Estes dados são encriptados (com hash) no seu navegador antes de serem enviados, e o Google usa-os apenas para associar a conversão ao anúncio, nunca para o identificar publicamente. Se recusar os cookies, nada disto acontece.",
           "Poderemos divulgar dados quando exigido por lei ou por autoridade competente.",
         ],
       },
@@ -84,7 +84,7 @@ function privacyPt(): LegalDoc {
       {
         heading: "7. Segurança dos dados",
         body: [
-          "Adotamos medidas técnicas e organizativas adequadas para proteger os seus dados contra o acesso não autorizado, a perda, a alteração ou a divulgação indevida — por exemplo, o acesso restrito à informação e a utilização de ligações encriptadas (HTTPS).",
+          "Adotamos medidas técnicas e organizativas adequadas para proteger os seus dados contra o acesso não autorizado, a perda, a alteração ou a divulgação indevida, por exemplo o acesso restrito à informação e a utilização de ligações encriptadas (HTTPS).",
           "Nenhum sistema é totalmente inviolável; caso ocorra uma violação de dados que implique risco elevado para os seus direitos, cumpriremos os deveres de comunicação previstos no RGPD.",
         ],
       },
@@ -99,19 +99,19 @@ function privacyPt(): LegalDoc {
       {
         heading: "9. Direitos de imagem",
         body: [
-          "Nos eventos que organizamos podem ser captadas fotografias e vídeos. Algumas destas imagens poderão ser publicadas no nosso portefólio — neste site e nas nossas redes sociais — para divulgar o nosso trabalho.",
+          "Nos eventos que organizamos podem ser captadas fotografias e vídeos. Algumas destas imagens poderão ser publicadas no nosso portefólio, neste site e nas nossas redes sociais, para divulgar o nosso trabalho.",
           "A publicação de imagens em que seja identificável assenta no seu consentimento, recolhido de forma específica (por exemplo, no contrato de prestação de serviços ou em autorização própria). Pode não autorizar essa utilização, sem que isso afete a prestação dos nossos serviços.",
-          `Pode, a qualquer momento, retirar o consentimento e pedir a remoção de imagens em que seja identificável, através de ${SITE.email}. Removê-las-emos, num prazo razoável, dos canais que controlamos — note-se que imagens eventualmente já partilhadas ou reproduzidas por terceiros podem não estar sob o nosso controlo.`,
+          `Pode, a qualquer momento, retirar o consentimento e pedir a remoção de imagens em que seja identificável, através de ${SITE.email}. Removê-las-emos, num prazo razoável, dos canais que controlamos. Note-se que imagens eventualmente já partilhadas ou reproduzidas por terceiros podem não estar sob o nosso controlo.`,
           "As imagens são utilizadas exclusivamente para divulgar o nosso trabalho, no nosso site e nas nossas redes sociais, não sendo cedidas a terceiros para fins promocionais próprios destes. Nos eventos podem estar presentes menores: a captação e a publicação de imagens de menores identificáveis dependem do consentimento prévio dos respetivos representantes legais (pais ou tutores), que pode ser retirado a qualquer momento.",
         ],
       },
       {
         heading: "10. Cookies",
         body: [
-          "Cookies estritamente necessários ao funcionamento — por exemplo «liquen-lang», que guarda o idioma escolhido — não requerem consentimento. A sua preferência de cookies é guardada no armazenamento local do navegador (localStorage), na chave «liquen-consent», e não num cookie.",
-          "Cookies de análise e de publicidade (Google Analytics e Google Ads) — só são ativados se os aceitar no aviso de cookies apresentado na primeira visita. Servem para medir as visitas e a eficácia da nossa publicidade e podem implicar a partilha de dados com o Google (ver secções 5 e 6). Utilizamos o Modo de Consentimento da Google: enquanto não aceitar, não são colocados cookies de análise nem de publicidade.",
+          "Cookies estritamente necessários ao funcionamento, por exemplo «liquen-lang», que guarda o idioma escolhido, não requerem consentimento. A sua preferência de cookies é guardada no armazenamento local do navegador (localStorage), na chave «liquen-consent», e não num cookie.",
+          "Cookies de análise e de publicidade (Google Analytics e Google Ads): só são ativados se os aceitar no aviso de cookies apresentado na primeira visita. Servem para medir as visitas e a eficácia da nossa publicidade e podem implicar a partilha de dados com o Google (ver secções 5 e 6). Utilizamos o Modo de Consentimento da Google: enquanto não aceitar, não são colocados cookies de análise nem de publicidade.",
           "Pode recusar, ou alterar a sua escolha a qualquer momento, através da ligação «Gerir cookies» no rodapé do site. Recusar os cookies não essenciais não afeta o funcionamento do site.",
-          "Principais cookies e armazenamento utilizados: «liquen-lang» (cookie de idioma, cerca de 1 ano); «liquen-consent» (a sua escolha de cookies, guardada no localStorage do navegador); «_ga» e «_ga_*» (Google Analytics — distinguem visitantes e sessões, até 2 anos); «_gcl_au» (Google Ads — medição de conversões, cerca de 90 dias). Os cookies de análise e de publicidade só existem se os tiver aceitado.",
+          "Principais cookies e armazenamento utilizados: «liquen-lang» (cookie de idioma, cerca de 1 ano); «liquen-consent» (a sua escolha de cookies, guardada no localStorage do navegador); «_ga» e «_ga_*» (Google Analytics: distinguem visitantes e sessões, até 2 anos); «_gcl_au» (Google Ads: medição de conversões, cerca de 90 dias). Os cookies de análise e de publicidade só existem se os tiver aceitado.",
           "Para funcionamento offline, o site pode guardar no seu dispositivo uma cópia de páginas e recursos (cache do navegador), que não contém dados pessoais. A área reservada da equipa utiliza ainda cookies de sessão estritamente necessários, que não são colocados aos visitantes do site.",
         ],
       },
@@ -134,7 +134,7 @@ function termsPt(): LegalDoc {
       {
         heading: "1. Objeto",
         body: [
-          `Este site apresenta os serviços de organização e planeamento de eventos da ${SITE.legalName} e permite o envio de pedidos de orçamento. O envio de um pedido não constitui, por si só, um contrato — a prestação de serviços é formalizada em documento próprio.`,
+          `Este site apresenta os serviços de organização e planeamento de eventos da ${SITE.legalName} e permite o envio de pedidos de orçamento. O envio de um pedido não constitui, por si só, um contrato: a prestação de serviços é formalizada em documento próprio.`,
           "Quando aceita uma proposta através da ligação que lhe enviamos, registamos o nome indicado por quem aceita, a data e a hora e o endereço IP, como prova dessa aceitação. Esse registo respeita à aceitação da proposta de prestação de serviços, cujas condições se regem pelo contrato referido na secção 5, e não por estes termos de utilização do site.",
         ],
       },
@@ -147,7 +147,7 @@ function termsPt(): LegalDoc {
       {
         heading: "3. Propriedade intelectual",
         body: [
-          `Os conteúdos deste site — textos, imagens, fotografias, marca e identidade visual — são propriedade da ${SITE.legalName} ou usados com autorização, e estão protegidos por direitos de autor. Não é permitida a sua reprodução sem autorização prévia e escrita.`,
+          `Os conteúdos deste site, incluindo textos, imagens, fotografias, marca e identidade visual, são propriedade da ${SITE.legalName} ou usados com autorização, e estão protegidos por direitos de autor. Não é permitida a sua reprodução sem autorização prévia e escrita.`,
         ],
       },
       {
@@ -174,7 +174,7 @@ function termsPt(): LegalDoc {
       {
         heading: "7. Resolução alternativa de litígios de consumo",
         body: [
-          "Em caso de litígio de consumo, pode recorrer a uma entidade de resolução alternativa de litígios de consumo (RAL). A entidade de competência genérica a nível nacional é o CNIACC — Centro Nacional de Informação e Arbitragem de Conflitos de Consumo (www.cniacc.pt).",
+          "Em caso de litígio de consumo, pode recorrer a uma entidade de resolução alternativa de litígios de consumo (RAL). A entidade de competência genérica a nível nacional é o CNIACC, Centro Nacional de Informação e Arbitragem de Conflitos de Consumo (www.cniacc.pt).",
           "A lista atualizada das entidades de RAL competentes está disponível no Portal do Consumidor, em www.consumidor.gov.pt.",
         ],
       },
@@ -204,23 +204,23 @@ function privacyEn(): LegalDoc {
       {
         heading: "2. What data we collect",
         body: [
-          "Data you provide directly when filling in the quote-request form: name, e-mail, phone, event type and date, event location or region, number of guests and the message you send us. Providing this data is optional but necessary for us to reply and prepare a quote — without it we cannot act on your request.",
+          "Data you provide directly when filling in the quote-request form: name, e-mail, phone, event type and date, event location or region, number of guests and the message you send us. Providing this data is optional but necessary for us to reply and prepare a quote: without it we cannot act on your request.",
           "Proposal-acceptance and contracting data: if you accept a proposal through the link we send you, we record the name given by whoever accepts, the date and time and the IP address, as proof of acceptance of the service proposal.",
           "Billing and payment data for your event (amounts, deposit and balance invoices and payment status), available in your client area and retained to meet tax obligations.",
           "Visit source: if you reach the site via a link carrying campaign parameters (UTM) or from another website, we may record that origin, linked to your request, to understand how you found us.",
           "Technical data collected automatically for security and statistics: IP address (ephemerally, for abuse limiting) and basic request information.",
           "Analytics and advertising data (only with your consent): if you accept cookies in the notice shown, we use Google Analytics and Google Ads. These services collect cookie-based identifiers, device and browser information and the pages and interactions on the site, so we can measure our audience and the effectiveness of our advertising. If you decline, no cookies are set and no cookie-based information is collected; Google may still receive aggregated, cookieless signals (for example, country and page type) that it uses for statistical modelling and that do not identify you individually.",
-          "Form draft: so you don't lose what you type, the quote-request form temporarily saves your answers in the browser's session storage (sessionStorage), on your device only and only for the session — they are cleared when you close the tab. You can also clear it at any time in your browser settings; nothing is sent until you submit the request.",
+          "Form draft: so you don't lose what you type, the quote-request form temporarily saves your answers in the browser's session storage (sessionStorage), on your device only and only for the session, and they are cleared when you close the tab. You can also clear it at any time in your browser settings; nothing is sent until you submit the request.",
         ],
       },
       {
         heading: "3. Purposes and legal basis",
         body: [
-          "Responding to requests and preparing quotes — pre-contractual steps you request (Art. 6(1)(b) GDPR) and, for messages not aimed at contracting, our legitimate interest in replying to you (f).",
-          "Managing the client relationship and delivering our event-planning services — performance of a contract (b).",
-          "Measuring the site's audience and the effectiveness of our advertising (Google Analytics and Google Ads) — based on your consent (a), when you accept cookies.",
-          "Ensuring the security of the site and preventing abuse — legitimate interest (f).",
-          "Complying with legal obligations, notably tax and accounting — legal obligation (c).",
+          "Responding to requests and preparing quotes: pre-contractual steps you request (Art. 6(1)(b) GDPR) and, for messages not aimed at contracting, our legitimate interest in replying to you (f).",
+          "Managing the client relationship and delivering our event-planning services: performance of a contract (b).",
+          "Measuring the site's audience and the effectiveness of our advertising (Google Analytics and Google Ads): based on your consent (a), when you accept cookies.",
+          "Ensuring the security of the site and preventing abuse: legitimate interest (f).",
+          "Complying with legal obligations, notably tax and accounting: legal obligation (c).",
         ],
       },
       {
@@ -234,8 +234,8 @@ function privacyEn(): LegalDoc {
         heading: "5. Processors and data sharing",
         body: [
           "We do not sell your data. We may use service providers who process it on our behalf and under our instructions, with appropriate security safeguards: website hosting and infrastructure, sending and receiving e-mail, and database. Where applicable, we enter into processing agreements under Art. 28 GDPR.",
-          "We also use Google (Google Ireland Limited) for usage statistics (Google Analytics) and for advertising measurement and optimisation (Google Ads) — but only when you accept the relevant cookies in the cookie notice. If you decline, no cookies are set and no identifiers are shared; Google may still receive aggregated, cookieless signals for statistical modelling that do not identify you individually.",
-          "Enhanced Conversions: if you accept cookies and submit a quote request, your e-mail and/or phone may be shared with Google solely to measure ad effectiveness. This data is hashed in your browser before it is sent — Google uses it only to match the conversion to the ad, never to identify you publicly. If you decline cookies, none of this happens.",
+          "We also use Google (Google Ireland Limited) for usage statistics (Google Analytics) and for advertising measurement and optimisation (Google Ads), but only when you accept the relevant cookies in the cookie notice. If you decline, no cookies are set and no identifiers are shared; Google may still receive aggregated, cookieless signals for statistical modelling that do not identify you individually.",
+          "Enhanced Conversions: if you accept cookies and submit a quote request, your e-mail and/or phone may be shared with Google solely to measure ad effectiveness. This data is hashed in your browser before it is sent, and Google uses it only to match the conversion to the ad, never to identify you publicly. If you decline cookies, none of this happens.",
           "We may disclose data where required by law or by a competent authority.",
         ],
       },
@@ -249,7 +249,7 @@ function privacyEn(): LegalDoc {
       {
         heading: "7. Data security",
         body: [
-          "We put in place appropriate technical and organisational measures to protect your data against unauthorised access, loss, alteration or improper disclosure — for example, restricted access to information and the use of encrypted connections (HTTPS).",
+          "We put in place appropriate technical and organisational measures to protect your data against unauthorised access, loss, alteration or improper disclosure, for example restricted access to information and the use of encrypted connections (HTTPS).",
           "No system is entirely secure; should a data breach occur that is likely to result in a high risk to your rights, we will comply with the notification duties set out in the GDPR.",
         ],
       },
@@ -264,19 +264,19 @@ function privacyEn(): LegalDoc {
       {
         heading: "9. Image rights",
         body: [
-          "At the events we organise, photographs and video may be taken. Some of these images may be published in our portfolio — on this website and on our social media — to showcase our work.",
+          "At the events we organise, photographs and video may be taken. Some of these images may be published in our portfolio, on this website and on our social media, to showcase our work.",
           "Publishing images in which you are identifiable is based on your consent, obtained specifically (for example, in the service contract or in a separate authorisation). You may decline this use without it affecting the delivery of our services.",
-          `You may, at any time, withdraw your consent and ask us to remove images in which you are identifiable, by contacting ${SITE.email}. We will remove them, within a reasonable period, from the channels we control — note that images already shared or reproduced by third parties may be outside our control.`,
+          `You may, at any time, withdraw your consent and ask us to remove images in which you are identifiable, by contacting ${SITE.email}. We will remove them, within a reasonable period, from the channels we control. Note that images already shared or reproduced by third parties may be outside our control.`,
           "Images are used solely to showcase our work, on our website and social media, and are not transferred to third parties for their own promotional purposes. Minors may be present at events: capturing and publishing identifiable images of minors depends on the prior consent of their legal representatives (parents or guardians), which may be withdrawn at any time.",
         ],
       },
       {
         heading: "10. Cookies",
         body: [
-          "Strictly necessary cookies for the site to work — for example “liquen-lang”, which remembers your chosen language — do not require consent. Your cookie preference is stored in the browser's local storage (localStorage), under the key “liquen-consent”, not in a cookie.",
-          "Analytics and advertising cookies (Google Analytics and Google Ads) — these are only activated if you accept them in the cookie notice shown on your first visit. They are used to measure visits and the effectiveness of our advertising and may involve sharing data with Google (see sections 5 and 6). We use Google Consent Mode: until you accept, no analytics or advertising cookies are set.",
+          "Strictly necessary cookies for the site to work, for example “liquen-lang”, which remembers your chosen language, do not require consent. Your cookie preference is stored in the browser's local storage (localStorage), under the key “liquen-consent”, not in a cookie.",
+          "Analytics and advertising cookies (Google Analytics and Google Ads): these are only activated if you accept them in the cookie notice shown on your first visit. They are used to measure visits and the effectiveness of our advertising and may involve sharing data with Google (see sections 5 and 6). We use Google Consent Mode: until you accept, no analytics or advertising cookies are set.",
           "You can decline, or change your choice at any time, via the “Manage cookies” link in the site footer. Declining non-essential cookies does not affect how the site works.",
-          "Main cookies and storage used: “liquen-lang” (language cookie, about 1 year); “liquen-consent” (your cookie choice, stored in the browser's localStorage); “_ga” and “_ga_*” (Google Analytics — distinguish visitors and sessions, up to 2 years); “_gcl_au” (Google Ads — conversion measurement, about 90 days). Analytics and advertising cookies only exist if you have accepted them.",
+          "Main cookies and storage used: “liquen-lang” (language cookie, about 1 year); “liquen-consent” (your cookie choice, stored in the browser's localStorage); “_ga” and “_ga_*” (Google Analytics: distinguish visitors and sessions, up to 2 years); “_gcl_au” (Google Ads: conversion measurement, about 90 days). Analytics and advertising cookies only exist if you have accepted them.",
           "For offline use, the site may store a copy of pages and resources on your device (browser cache), which contains no personal data. The team's restricted area also uses strictly necessary session cookies, which are not set for site visitors.",
         ],
       },
@@ -299,7 +299,7 @@ function termsEn(): LegalDoc {
       {
         heading: "1. Purpose",
         body: [
-          `This site presents the event organisation and planning services of ${SITE.legalName} and allows quote requests to be sent. Sending a request does not, in itself, constitute a contract — the provision of services is formalised in a separate document.`,
+          `This site presents the event organisation and planning services of ${SITE.legalName} and allows quote requests to be sent. Sending a request does not, in itself, constitute a contract: the provision of services is formalised in a separate document.`,
           "When you accept a proposal through the link we send you, we record the name given by whoever accepts, the date and time and the IP address, as proof of that acceptance. This record concerns acceptance of the service proposal, whose conditions are governed by the contract referred to in section 5, and not by these website terms of use.",
         ],
       },
@@ -312,7 +312,7 @@ function termsEn(): LegalDoc {
       {
         heading: "3. Intellectual property",
         body: [
-          `The contents of this site — text, images, photographs, brand and visual identity — are the property of ${SITE.legalName} or used with permission, and are protected by copyright. Reproduction without prior written authorisation is not permitted.`,
+          `The contents of this site, including text, images, photographs, brand and visual identity, are the property of ${SITE.legalName} or used with permission, and are protected by copyright. Reproduction without prior written authorisation is not permitted.`,
         ],
       },
       {
@@ -339,7 +339,7 @@ function termsEn(): LegalDoc {
       {
         heading: "7. Alternative consumer dispute resolution",
         body: [
-          "In the event of a consumer dispute, you may turn to an alternative consumer dispute resolution (ADR) body. The nationally competent body of general jurisdiction is CNIACC — Centro Nacional de Informação e Arbitragem de Conflitos de Consumo (www.cniacc.pt).",
+          "In the event of a consumer dispute, you may turn to an alternative consumer dispute resolution (ADR) body. The nationally competent body of general jurisdiction is CNIACC, Centro Nacional de Informação e Arbitragem de Conflitos de Consumo (www.cniacc.pt).",
           "The up-to-date list of competent ADR bodies is available on the Portuguese Consumer Portal, at www.consumidor.gov.pt.",
         ],
       },

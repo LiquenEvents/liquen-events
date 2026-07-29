@@ -23,7 +23,7 @@ export const pt = {
       name: "Stephanie & Mizio",
       role: "Evento Privado",
       quote:
-        "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
+        "Estava tudo exatamente como tínhamos imaginado, criaram um espaço lindíssimo para nós!",
     },
     {
       name: "Teresinha Malta",
@@ -79,7 +79,7 @@ export const pt = {
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
-      homeHero: "Líquen Events — evento aéreo no Alentejo",
+      homeHero: "Líquen Events: evento aéreo no Alentejo",
       homeWedding: "Casamento ao pôr do sol numa herdade no Alentejo",
       contactoHero: "Vista aérea de uma herdade preparada para um evento no Alentejo",
       sobrePortrait: "Momento de casamento decorado pela Líquen Events no Alentejo",
@@ -92,7 +92,7 @@ export const pt = {
       galeriaHeader: "Galeria de casamentos e eventos decorados pela Líquen Events no Alentejo",
       galeriaInstagram: "Eventos decorados pela Líquen Events no Instagram",
       sobreCelebration: "Celebração de casamento decorada pela Líquen Events no Alentejo",
-      sobreFounder: "Catarina Gaspar — Fundadora & CEO da Líquen Events",
+      sobreFounder: "Catarina Gaspar, Fundadora & CEO da Líquen Events",
       clientesCorporate: "Evento corporativo decorado pela Líquen Events em Évora",
       clientesDinner: "Jantar de evento decorado pela Líquen Events",
       servicosEndOfDay: "Evento decorado pela Líquen Events ao final do dia",
@@ -115,18 +115,18 @@ export const pt = {
     servicosTitle: "Decoração de Casamentos e Eventos no Alentejo",
     servicosDescription:
       "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em Évora, no Alentejo e em Portugal.",
-    galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
+    galeriaTitle: "Galeria de Casamentos e Eventos no Alentejo",
     galeriaDescription:
-      "Galeria de fotografias de eventos decorados pela Líquen Events no Alentejo e em Portugal — casamentos, eventos corporativos, conferências e celebrações.",
+      "Galeria de fotografias de eventos decorados pela Líquen Events no Alentejo e em Portugal: casamentos, eventos corporativos, conferências e celebrações.",
     clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
-    contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
+    contactoTitle: "Contacto: Peça o Seu Orçamento de Evento",
     contactoDescription:
       "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Receba uma proposta à medida para o seu evento.",
-    orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
+    orcamentoTitle: "Pedir Orçamento: Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — e receba uma proposta à medida.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas, e receba uma proposta à medida.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -173,7 +173,7 @@ export const pt = {
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
-    manifestoText: "Desde 2018 que transformamos espaços em experiências — em todo o Portugal.",
+    manifestoText: "Desde 2018 que transformamos espaços em experiências, em todo o País.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
     manifestoImageCaption: "Évora · Alentejo",
     statementLead: "Não decoramos apenas espaços.",
@@ -199,7 +199,7 @@ export const pt = {
   galeria: {
     headerLabel: "Os nossos momentos",
     headerTitle: "Galeria",
-    headerDesc: "Casamentos, eventos corporativos e celebrações — capturados ao pormenor.",
+    headerDesc: "Casamentos, eventos corporativos e celebrações, capturados ao pormenor.",
     instaEyebrow: "Redes sociais",
     instaTitle: "Siga-nos no Instagram",
     instaText: "Partilhamos os bastidores dos nossos eventos e inspirações diárias.",
@@ -240,10 +240,10 @@ export const pt = {
     heroTitleLine1: "Os Nossos",
     heroTitleMoss: "Clientes",
     heroLead:
-      "Empresas, instituições e famílias que nos escolheram para os seus momentos mais especiais — e que nos honram com a sua confiança.",
+      "Empresas, instituições e famílias que nos escolheram para os seus momentos mais especiais, e que nos honram com a sua confiança.",
     scroll: "Scroll",
     leadPre:
-      "De grandes empresas a celebrações de família, são dezenas os que confiam à Líquen Events os seus momentos mais importantes — e a essa confiança respondemos com ",
+      "De grandes empresas a celebrações de família, são dezenas os que confiam à Líquen Events os seus momentos mais importantes, e a essa confiança respondemos com ",
     leadMoss: "rigor, criatividade e dedicação",
     leadPost: " em cada detalhe.",
     desde: "Desde",
@@ -264,7 +264,7 @@ export const pt = {
       },
       {
         name: "Stephanie & Mizio",
-        text: "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
+        text: "Estava tudo exatamente como tínhamos imaginado, criaram um espaço lindíssimo para nós!",
         event: "Evento Privado",
       },
       {
@@ -310,7 +310,7 @@ export const pt = {
       ctaTitleLine1: "Peça o seu",
       ctaTitleMoss: "orçamento.",
       ctaText:
-        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida. Para uma pergunta rápida, use um dos canais diretos.",
+        "Conte-nos sobre o seu evento e respondemos com uma proposta à medida. Para uma pergunta rápida, use um dos canais diretos.",
       ctaButton: "Pedir orçamento",
     },
     testimonialsEyebrow: "O que dizem os nossos clientes",
@@ -342,13 +342,13 @@ export const pt = {
       phoneLabel: "Telefone",
       phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
-      locationValue: "Évora, Alentejo — em todo o Portugal",
+      locationValue: "Évora, Alentejo, em todo o País",
       locationSub: "Reuniões presenciais disponíveis",
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
       googleLink: "Ver no Google · Deixar avaliação",
       promise: "Respondemos a todos os pedidos com uma proposta personalizada.",
-      promiseSign: "— Equipa Líquen Events",
+      promiseSign: "Equipa Líquen Events",
       stepLabels: ["Evento", "Dados", "Detalhes", "Mensagem"],
       eventCards: [
         { value: "Corporativo", desc: "Conferências, teambuildings, jantares" },
@@ -414,7 +414,7 @@ export const pt = {
       },
       {
         q: "Podem assumir apenas parte da organização?",
-        a: "Absolutamente. Podemos tratar de tudo — da conceção à execução — ou assumir apenas áreas específicas como decoração, coordenação do dia, catering ou audiovisual. Adaptamos o serviço ao que precisa.",
+        a: "Absolutamente. Podemos tratar de tudo, da conceção à execução, ou assumir apenas áreas específicas como decoração, coordenação do dia, catering ou audiovisual. Adaptamos o serviço ao que precisa.",
       },
       {
         q: "Como funciona o processo de orçamentação?",
@@ -464,7 +464,7 @@ export const pt = {
     phTelefone: "+351 9XX XXX XXX",
     phMensagem: "Estilo, cores, ambiente, inspirações que guardou…",
     hintMensagem:
-      "Quanto mais nos contar sobre o estilo que tem em mente — as cores, o ambiente, referências que guardou — mais à medida sai a proposta. É por aqui que a começamos a desenhar.",
+      "Quanto mais nos contar sobre o estilo que tem em mente, as cores, o ambiente, referências que guardou, mais à medida sai a proposta. É por aqui que a começamos a desenhar.",
     errNome: "Indique o seu nome",
     errEmail: "E-mail inválido",
     errTipo: "Selecione o tipo de evento.",
@@ -483,10 +483,10 @@ export const pt = {
     heroEyebrow: "O que oferecemos",
     heroTitle: ["Cada evento,", "uma história", "por contar"],
     heroLead:
-      "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
+      "Especializados em casamentos, eventos corporativos e celebrações privadas, com soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
     nav: ["Celebrações", "Empresas"],
     interludeEyebrow: "Líquen Events",
-    interludeTitle: "De Évora para todo o Portugal — mais de 100 eventos desde 2018.",
+    interludeTitle: "De Évora para todo o País: mais de 100 eventos desde 2018.",
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
     philoEyebrow: "A nossa assinatura",
@@ -494,7 +494,7 @@ export const pt = {
     philoPillars: [
       {
         title: "Decoração",
-        text: "Conceito, flores e cenografia à medida — cada evento com uma identidade própria.",
+        text: "Conceito, flores e cenografia à medida, cada evento com uma identidade própria.",
       },
       {
         title: "Coordenação",
@@ -513,7 +513,7 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial — coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
+            desc: "O vosso dia mais especial: coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
           },
           {
             title: "Batizados & Comunhões",
@@ -525,7 +525,7 @@ export const pt = {
           },
           {
             title: "Aluguer de Viaturas Clássicas",
-            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
+            desc: "Carros clássicos com motorista para uma chegada de sonho, da entrada da noiva ao transporte dos convidados.",
           },
         ],
       },
@@ -536,7 +536,7 @@ export const pt = {
         services: [
           {
             title: "Eventos Corporativos",
-            desc: "Decoração e cenografia à medida da sua marca — de conferências e lançamentos a jantares de empresa.",
+            desc: "Decoração e cenografia à medida da sua marca, de conferências e lançamentos a jantares de empresa.",
           },
         ],
       },
@@ -544,7 +544,7 @@ export const pt = {
     seoEyebrow: "Onde atuamos",
     seoTitle: "De Évora para Portugal",
     seoText:
-      "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
+      "Casamentos, eventos corporativos e celebrações, do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Vamos dar vida",
     ctaTitleMoss: "à sua ideia?",
@@ -575,10 +575,10 @@ export const pt = {
     // batizados), singular formal otherwise — the same rule as the email.
     titleMoss: "seu pedido.",
     titleMossPlural: "vosso pedido.",
-    lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento — antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
+    lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento, antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
     countdown: "Faltam {days} dias para a data do evento.",
     highSeasonNote:
-      "De maio a outubro o Alentejo enche — as melhores quintas fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
+      "De maio a outubro o Alentejo enche e as melhores quintas fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
     recapTitle: "O que nos contou",
     recapTitlePlural: "O que nos contaram",
     refLabel: "Referência do Pedido",
@@ -592,7 +592,7 @@ export const pt = {
     adicionais: "Serviços Adicionais",
     openDate: "Ainda a definir",
     openDateNote:
-      "Sem data fechada temos margem para sugerir fins de semana com melhor disponibilidade — e, muitas vezes, melhor preço.",
+      "Sem data fechada temos margem para sugerir fins de semana com melhor disponibilidade e, muitas vezes, melhor preço.",
     noDataNote:
       "Guarde a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto consigo brevemente.",
     noDataNotePlural:
@@ -613,7 +613,7 @@ export const pt = {
     // No quote here, so the register is unknown — singular formal is the safe
     // form for an anonymous visitor.
     notFoundBody:
-      "A ligação pode estar incompleta ou já não ser válida. Se enviou um pedido e não recebeu a nossa confirmação por email, fale connosco — resolvemos no próprio dia.",
+      "A ligação pode estar incompleta ou já não ser válida. Se enviou um pedido e não recebeu a nossa confirmação por email, fale connosco e resolvemos no próprio dia.",
     voltarInicio: "Voltar ao Início",
     novoPedido: "Novo Pedido",
     dateLocale: "pt-PT",
@@ -644,7 +644,7 @@ export const pt = {
     viaturasEyebrow: "Serviço exclusivo",
     viaturasTitle: "Aluguer de Viaturas Clássicas",
     viaturasText:
-      "Para uma chegada de sonho — da entrada da noiva ao transporte dos noivos e convidados. Carros clássicos com motorista e todo o cuidado.",
+      "Para uma chegada de sonho, da entrada da noiva ao transporte dos noivos e convidados. Carros clássicos com motorista e todo o cuidado.",
   },
 
   proposta: {
@@ -657,7 +657,7 @@ export const pt = {
     eyebrow: "Proposta para o seu evento",
     greeting: "Olá",
     intro:
-      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo — será um prazer avançar consigo.",
+      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo, será um prazer avançar consigo.",
     tableDescricao: "Descrição",
     tableQt: "Qt",
     tableValor: "Valor",
@@ -665,12 +665,12 @@ export const pt = {
     iva: "IVA",
     total: "Total",
     validoAte: "Válida até",
-    footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos —",
+    footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos:",
     dateLocale: "pt-PT",
     response: {
       confirmRecusar: "Tem a certeza que pretende recusar a proposta?",
       confirmAceitar: "Confirma que pretende aceitar esta proposta?",
-      aceiteTitle: "Proposta aceite — obrigado!",
+      aceiteTitle: "Proposta aceite. Obrigado!",
       aceiteBody:
         "Que alegria avançar consigo. A nossa equipa entra em contacto em breve com os próximos passos.",
       rejeitadaTitle: "Resposta registada.",
@@ -699,7 +699,7 @@ export const pt = {
   },
 
   portal: {
-    title: "Portal do Cliente — Líquen Events",
+    title: "Portal do Cliente da Líquen Events",
     eyebrow: "Portal do Cliente",
     greeting: "Olá",
     intro:
@@ -726,7 +726,7 @@ export const pt = {
       statusLabel: "Estado",
       status: {
         rascunho: "Em preparação",
-        enviada: "Enviada — a aguardar a sua resposta",
+        enviada: "Enviada, a aguardar a sua resposta",
         aceite: "Aceite",
         rejeitada: "Recusada",
       },
@@ -786,7 +786,7 @@ export const pt = {
     errorEyebrow: "Algo correu mal",
     errorTitle: "Ocorreu um erro inesperado.",
     errorText:
-      "Pedimos desculpa pelo incómodo. Tente novamente — se o problema persistir, contacte-nos diretamente e teremos todo o gosto em ajudar.",
+      "Pedimos desculpa pelo incómodo. Tente novamente. Se o problema persistir, contacte-nos diretamente e teremos todo o gosto em ajudar.",
     retry: "Tentar novamente",
     loading: "A carregar",
   },

@@ -52,7 +52,7 @@ export default function LanguageToggle({ light = false }: { light?: boolean }) {
         // Accessible name must contain the visible text ("PT") — WCAG 2.5.3
         // Label in Name — so speech-input users can target it and the two names
         // don't conflict. Visible text first, then the action for context.
-        aria-label={`${t.langToggle.pt} — ${t.langToggle.switchToPt}`}
+        aria-label={`${t.langToggle.pt}: ${t.langToggle.switchToPt}`}
         className={`${base} ${locale === "pt" ? activeCls : idleCls}`}
       >
         {t.langToggle.pt}
@@ -64,7 +64,7 @@ export default function LanguageToggle({ light = false }: { light?: boolean }) {
         type="button"
         onClick={() => choose("en")}
         aria-pressed={locale === "en"}
-        aria-label={`${t.langToggle.en} — ${t.langToggle.switchToEn}`}
+        aria-label={`${t.langToggle.en}: ${t.langToggle.switchToEn}`}
         className={`${base} ${locale === "en" ? activeCls : idleCls}`}
       >
         {t.langToggle.en}

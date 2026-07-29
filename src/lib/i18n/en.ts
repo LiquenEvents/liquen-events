@@ -79,7 +79,7 @@ export const en: Dict = {
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
-      homeHero: "Líquen Events — aerial view of an event in the Alentejo",
+      homeHero: "Líquen Events: aerial view of an event in the Alentejo",
       homeWedding: "Wedding at sunset on an estate in the Alentejo",
       contactoHero: "Aerial view of an estate set up for an event in the Alentejo",
       sobrePortrait: "A wedding moment decorated by Líquen Events in the Alentejo",
@@ -92,7 +92,7 @@ export const en: Dict = {
       galeriaHeader: "Gallery of weddings and events decorated by Líquen Events in the Alentejo",
       galeriaInstagram: "Events decorated by Líquen Events on Instagram",
       sobreCelebration: "Wedding celebration decorated by Líquen Events in the Alentejo",
-      sobreFounder: "Catarina Gaspar — Founder & CEO of Líquen Events",
+      sobreFounder: "Catarina Gaspar, Founder & CEO of Líquen Events",
       clientesCorporate: "Corporate event decorated by Líquen Events in Évora",
       clientesDinner: "Event dinner decorated by Líquen Events",
       servicosEndOfDay: "Event decorated by Líquen Events at the end of the day",
@@ -115,18 +115,18 @@ export const en: Dict = {
     servicosTitle: "Wedding & Event Decoration in the Alentejo",
     servicosDescription:
       "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties in Évora, the Alentejo and Portugal.",
-    galeriaTitle: "Wedding & Event Gallery — Alentejo",
+    galeriaTitle: "Wedding & Event Gallery in the Alentejo",
     galeriaDescription:
-      "Photo gallery of events decorated by Líquen Events in the Alentejo and Portugal — weddings, corporate events, conferences and celebrations.",
+      "Photo gallery of events decorated by Líquen Events in the Alentejo and Portugal: weddings, corporate events, conferences and celebrations.",
     clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
       "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
-    contactoTitle: "Contact — Request Your Event Quote",
+    contactoTitle: "Contact: Request Your Event Quote",
     contactoDescription:
       "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. Receive a tailored proposal for your event.",
-    orcamentoTitle: "Request a Quote — Weddings & Events",
+    orcamentoTitle: "Request a Quote: Weddings & Events",
     orcamentoDescription:
-      "Request your quote from Líquen Events. Tell us the event type, date and number of guests — and receive a tailored proposal.",
+      "Request your quote from Líquen Events. Tell us the event type, date and number of guests, and receive a tailored proposal.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -170,7 +170,7 @@ export const en: Dict = {
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
     manifestoTitleLine2: "We make memories last.",
-    manifestoText: "Since 2018 we've turned spaces into experiences — across Portugal.",
+    manifestoText: "Since 2018 we've turned spaces into experiences, across the country.",
     // Corner caption (chapter idiom) over the manifesto photograph.
     manifestoImageCaption: "Évora · Alentejo",
     statementLead: "We don't just decorate spaces.",
@@ -197,7 +197,7 @@ export const en: Dict = {
   galeria: {
     headerLabel: "Our moments",
     headerTitle: "Gallery",
-    headerDesc: "Weddings, corporate events and celebrations — captured in detail.",
+    headerDesc: "Weddings, corporate events and celebrations, captured in detail.",
     instaEyebrow: "Social media",
     instaTitle: "Follow us on Instagram",
     instaText: "We share behind-the-scenes from our events and daily inspiration.",
@@ -238,10 +238,10 @@ export const en: Dict = {
     heroTitleLine1: "Our",
     heroTitleMoss: "Clients",
     heroLead:
-      "Companies, institutions and families who chose us for their most special moments — and who honour us with their trust.",
+      "Companies, institutions and families who chose us for their most special moments, and who honour us with their trust.",
     scroll: "Scroll",
     leadPre:
-      "From large companies to family celebrations, dozens entrust Líquen Events with their most important moments — and we answer that trust with ",
+      "From large companies to family celebrations, dozens entrust Líquen Events with their most important moments, and we answer that trust with ",
     leadMoss: "rigour, creativity and dedication",
     leadPost: " in every detail.",
     desde: "Since",
@@ -272,7 +272,7 @@ export const en: Dict = {
       },
       {
         name: "Ana Pinho",
-        text: "Excellent — I recommend them without reservation. A team you can trust from start to finish.",
+        text: "Excellent. I recommend them without reservation. A team you can trust from start to finish.",
         event: "Private Event",
       },
     ],
@@ -299,7 +299,7 @@ export const en: Dict = {
       ctaTitleLine1: "Request your",
       ctaTitleMoss: "quote.",
       ctaText:
-        "Tell us about your event — we reply with a tailored proposal. For a quick question, use one of the direct channels.",
+        "Tell us about your event and we reply with a tailored proposal. For a quick question, use one of the direct channels.",
       ctaButton: "Request a quote",
     },
     testimonialsEyebrow: "What our clients say",
@@ -331,13 +331,13 @@ export const en: Dict = {
       phoneLabel: "Phone",
       phoneSub: "Call or message us",
       locationLabel: "Location",
-      locationValue: "Évora, Alentejo — across Portugal",
+      locationValue: "Évora, Alentejo, across the country",
       locationSub: "In-person meetings available",
       quoteLink: "Request a quote for your event",
       whatsappLink: "Chat on WhatsApp",
       googleLink: "See on Google · Leave a review",
       promise: "We reply to every request with a personalised proposal.",
-      promiseSign: "— The Líquen Events team",
+      promiseSign: "The Líquen Events team",
       stepLabels: ["Event", "Details", "Specifics", "Message"],
       eventCards: [
         { value: "Corporate", desc: "Conferences, team-building, dinners" },
@@ -403,7 +403,7 @@ export const en: Dict = {
       },
       {
         q: "Can you handle only part of the organisation?",
-        a: "Absolutely. We can take care of everything — from concept to execution — or just specific areas such as décor, day-of coordination, catering or audiovisual. We tailor the service to what you need.",
+        a: "Absolutely. We can take care of everything, from concept to execution, or just specific areas such as décor, day-of coordination, catering or audiovisual. We tailor the service to what you need.",
       },
       {
         q: "How does the quoting process work?",
@@ -451,7 +451,7 @@ export const en: Dict = {
     phTelefone: "+351 9XX XXX XXX",
     phMensagem: "Style, colours, atmosphere, inspiration you've saved…",
     hintMensagem:
-      "The more you tell us about the style you have in mind — the colours, the mood, references you've saved — the more tailored the proposal. This is where we start designing it.",
+      "The more you tell us about the style you have in mind, the colours, the mood, references you've saved, the more tailored the proposal. This is where we start designing it.",
     errNome: "Please enter your name",
     errEmail: "Invalid email",
     errTipo: "Please select the event type.",
@@ -470,10 +470,10 @@ export const en: Dict = {
     heroEyebrow: "What we offer",
     heroTitle: ["Every event,", "a story", "to tell"],
     heroLead:
-      "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
+      "Specialised in weddings, corporate events and private celebrations, with bespoke solutions adapted to your style, taste and budget.",
     nav: ["Celebrations", "Companies"],
     interludeEyebrow: "Líquen Events",
-    interludeTitle: "From Évora to all of Portugal — over 100 events since 2018.",
+    interludeTitle: "From Évora to the whole country: over 100 events since 2018.",
     verMais: "View more",
     verDetalhes: "View details",
     philoEyebrow: "Our signature",
@@ -481,7 +481,7 @@ export const en: Dict = {
     philoPillars: [
       {
         title: "Decoration",
-        text: "Bespoke concept, flowers and scenography — every event with an identity of its own.",
+        text: "Bespoke concept, flowers and scenography, every event with an identity of its own.",
       },
       {
         title: "Coordination",
@@ -500,7 +500,7 @@ export const en: Dict = {
         services: [
           {
             title: "Weddings",
-            desc: "Your most special day — coordination, decoration, photography and catering. We handle it all so you can simply live it.",
+            desc: "Your most special day: coordination, decoration, photography and catering. We handle it all so you can simply live it.",
           },
           {
             title: "Christenings & Communions",
@@ -512,7 +512,7 @@ export const en: Dict = {
           },
           {
             title: "Classic Car Rental",
-            desc: "Classic cars with a driver for a dream arrival — from the bride's entrance to guest transport.",
+            desc: "Classic cars with a driver for a dream arrival, from the bride's entrance to guest transport.",
           },
         ],
       },
@@ -523,7 +523,7 @@ export const en: Dict = {
         services: [
           {
             title: "Corporate Events",
-            desc: "Decoration and scenography tailored to your brand — from conferences and launches to company dinners.",
+            desc: "Decoration and scenography tailored to your brand, from conferences and launches to company dinners.",
           },
         ],
       },
@@ -531,7 +531,7 @@ export const en: Dict = {
     seoEyebrow: "Where we work",
     seoTitle: "From Évora to Portugal",
     seoText:
-      "Weddings, corporate events and celebrations — from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
+      "Weddings, corporate events and celebrations, from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Shall we bring",
     ctaTitleMoss: "your idea to life?",
@@ -562,10 +562,10 @@ export const en: Dict = {
     // kept for key parity with pt, where the register genuinely changes.
     titleMoss: "your request.",
     titleMossPlural: "your request.",
-    lead: "We'll read everything carefully, check availability for the date and think about what makes sense for this event — before we reply. What follows isn't an automatic price, it's the beginning of a proposal built for you.",
+    lead: "We'll read everything carefully, check availability for the date and think about what makes sense for this event, before we reply. What follows isn't an automatic price, it's the beginning of a proposal built for you.",
     countdown: "{days} days to go until the event.",
     highSeasonNote:
-      "May to October is the busy season in the Alentejo — the best estates close their calendars far in advance. It's worth not leaving it too long.",
+      "May to October is the busy season in the Alentejo and the best estates close their calendars far in advance. It's worth not leaving it too long.",
     recapTitle: "What you told us",
     recapTitlePlural: "What you told us",
     refLabel: "Request Reference",
@@ -579,7 +579,7 @@ export const en: Dict = {
     adicionais: "Additional Services",
     openDate: "Still to be decided",
     openDateNote:
-      "With no fixed date we have room to suggest weekends with better availability — and often a better price.",
+      "With no fixed date we have room to suggest weekends with better availability and often a better price.",
     noDataNote:
       "Save the reference above. We've sent the details to our team and will be in touch shortly.",
     noDataNotePlural:
@@ -598,7 +598,7 @@ export const en: Dict = {
     contactWhatsappSub: "The fastest way to reach us.",
     notFoundTitle: "We couldn't find this request",
     notFoundBody:
-      "The link may be incomplete or no longer valid. If you sent a request and didn't receive our confirmation email, get in touch — we'll sort it out the same day.",
+      "The link may be incomplete or no longer valid. If you sent a request and didn't receive our confirmation email, get in touch and we'll sort it out the same day.",
     voltarInicio: "Back to Home",
     novoPedido: "New Request",
     dateLocale: "en-GB",
@@ -629,7 +629,7 @@ export const en: Dict = {
     viaturasEyebrow: "Exclusive service",
     viaturasTitle: "Classic Car Rental",
     viaturasText:
-      "For a dream arrival — from the bride's entrance to transport for the newlyweds and guests. Classic cars with a driver and every care taken.",
+      "For a dream arrival, from the bride's entrance to transport for the newlyweds and guests. Classic cars with a driver and every care taken.",
   },
 
   proposta: {
@@ -641,7 +641,7 @@ export const en: Dict = {
     eyebrow: "Proposal for your event",
     greeting: "Hello",
     intro:
-      "We've carefully prepared this proposal for your event. Review the details and respond right here — we'd be delighted to move forward with you.",
+      "We've carefully prepared this proposal for your event. Review the details and respond right here, we'd be delighted to move forward with you.",
     tableDescricao: "Description",
     tableQt: "Qty",
     tableValor: "Amount",
@@ -649,12 +649,12 @@ export const en: Dict = {
     iva: "VAT",
     total: "Total",
     validoAte: "Valid until",
-    footerNote: "Any questions or changes? Reply to this email or contact us —",
+    footerNote: "Any questions or changes? Reply to this email or contact us:",
     dateLocale: "en-GB",
     response: {
       confirmRecusar: "Are you sure you want to decline the proposal?",
       confirmAceitar: "Do you confirm you want to accept this proposal?",
-      aceiteTitle: "Proposal accepted — thank you!",
+      aceiteTitle: "Proposal accepted. Thank you!",
       aceiteBody:
         "We're delighted to move forward with you. Our team will be in touch shortly with next steps.",
       rejeitadaTitle: "Response recorded.",
@@ -683,7 +683,7 @@ export const en: Dict = {
   },
 
   portal: {
-    title: "Client Portal — Líquen Events",
+    title: "Líquen Events Client Portal",
     eyebrow: "Client Portal",
     greeting: "Hello",
     intro:
@@ -710,7 +710,7 @@ export const en: Dict = {
       statusLabel: "Status",
       status: {
         rascunho: "In preparation",
-        enviada: "Sent — awaiting your response",
+        enviada: "Sent, awaiting your response",
         aceite: "Accepted",
         rejeitada: "Declined",
       },
@@ -770,7 +770,7 @@ export const en: Dict = {
     errorEyebrow: "Something went wrong",
     errorTitle: "An unexpected error occurred.",
     errorText:
-      "We're sorry for the inconvenience. Please try again — if the problem persists, contact us directly and we'll be glad to help.",
+      "We're sorry for the inconvenience. Please try again. If the problem persists, contact us directly and we'll be glad to help.",
     retry: "Try again",
     loading: "Loading",
   },

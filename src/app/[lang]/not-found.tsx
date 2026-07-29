@@ -6,7 +6,7 @@ import NotFoundView from "./NotFoundView";
 // a broken /en/* link doesn't get a Portuguese document title. The visible body
 // (NotFoundView) still renders in the correct language via LocaleProvider.
 export const metadata: Metadata = {
-  title: "404 — Líquen Events",
+  title: "404 | Líquen Events",
   robots: { index: false, follow: false },
 };
 

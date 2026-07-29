@@ -63,7 +63,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
   {
     key: "proposta-enviada",
     name: "Proposta enviada",
-    subject: "A sua proposta — Líquen Events",
+    subject: "A sua proposta | Líquen Events",
     updatedAt: "1970-01-01T00:00:00.000Z",
     body: [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
@@ -71,7 +71,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Foi um gosto conhecer a sua visão. Preparámos uma proposta à medida do seu evento, com todo o cuidado que ele merece.</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 20px">Pode consultá-la aqui: <a href="{link}" style="color:#7c854b">{link}</a></p>`,
-      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Ficamos a aguardar o seu feedback — qualquer ajuste é bem-vindo. Basta responder a este email.</p>`,
+      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Ficamos a aguardar o seu feedback e qualquer ajuste é bem-vindo. Basta responder a este email.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
       `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
       `</div>`,
@@ -80,7 +80,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
   {
     key: "sinal-recebido",
     name: "Sinal recebido",
-    subject: "Sinal recebido — reserva confirmada",
+    subject: "Sinal recebido, reserva confirmada",
     updatedAt: "1970-01-01T00:00:00.000Z",
     body: [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
@@ -88,7 +88,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Confirmamos a receção do sinal de <strong style="color:#7c854b">{valor}</strong>. A sua data está oficialmente reservada e podemos avançar com a preparação.</p>`,
       `  <p style="font-size:13px;margin:0 0 16px;color:#555">Data do evento: <strong>{data_evento}</strong></p>`,
-      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Nas próximas semanas iremos afinar cada detalhe consigo. Para já, pode descansar — o mais importante já está garantido.</p>`,
+      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Nas próximas semanas iremos afinar cada detalhe consigo. Para já, pode descansar, o mais importante já está garantido.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
       `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
       `</div>`,
@@ -97,14 +97,14 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
   {
     key: "semana-evento",
     name: "Falta uma semana",
-    subject: "Falta uma semana — {data_evento}",
+    subject: "Falta uma semana para {data_evento}",
     updatedAt: "1970-01-01T00:00:00.000Z",
     body: [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
       `  <h2 style="font-size:18px;margin:0 0 16px;color:#1b2119">A contagem decrescente começou</h2>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Falta apenas uma semana para o grande dia. Está tudo alinhado da nossa parte e mal podemos esperar por o receber em <strong>{local}</strong>.</p>`,
-      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Se surgir alguma questão de última hora, estamos a um email de distância. Aproveite estes dias com tranquilidade — o resto é connosco.</p>`,
+      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Se surgir alguma questão de última hora, estamos a um email de distância. Aproveite estes dias com tranquilidade, o resto é connosco.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
       `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
       `</div>`,

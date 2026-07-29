@@ -14,14 +14,14 @@ type Gtag = (...args: unknown[]) => void;
 
 const COPY = {
   pt: {
-    text: "Usamos cookies do Google para estatísticas de visitas (Google Analytics) e para medir a eficácia da nossa publicidade (Google Ads). Pode aceitar ou recusar — a sua escolha fica guardada.",
+    text: "Usamos cookies do Google para estatísticas de visitas (Google Analytics) e para medir a eficácia da nossa publicidade (Google Ads). Pode aceitar ou recusar e a sua escolha fica guardada.",
     more: "Saber mais",
     accept: "Aceitar",
     decline: "Recusar",
     aria: "Aviso de cookies",
   },
   en: {
-    text: "We use Google cookies for visit statistics (Google Analytics) and to measure how well our ads perform (Google Ads). You can accept or decline — your choice is remembered.",
+    text: "We use Google cookies for visit statistics (Google Analytics) and to measure how well our ads perform (Google Ads). You can accept or decline and your choice is remembered.",
     more: "Learn more",
     accept: "Accept",
     decline: "Decline",

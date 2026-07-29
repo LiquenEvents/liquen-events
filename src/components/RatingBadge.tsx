@@ -28,7 +28,7 @@ export default function RatingBadge({
     <span
       role="img"
       className={`inline-flex items-center gap-2 ${className ?? ""}`}
-      aria-label={`${ratingStr}/5 — ${label}`}
+      aria-label={`${ratingStr}/5, ${label}`}
     >
       <span className={`flex gap-0.5 ${starClassName}`} aria-hidden>
         {[0, 1, 2, 3, 4].map((i) => (

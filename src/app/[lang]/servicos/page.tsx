@@ -148,7 +148,7 @@ function ServiceBand({
               // Specific accessible name so the link's purpose is clear out of
               // context (screen-reader link list) and the anchor text carries the
               // service keyword for SEO — the visible label stays minimal.
-              aria-label={`${cta} — ${service.title}`}
+              aria-label={`${cta}: ${service.title}`}
               className={`mt-7 inline-flex items-center gap-3 ${OUTLINE_LIGHT_BUTTON_CLASS}`}
             >
               {cta} <span aria-hidden>→</span>

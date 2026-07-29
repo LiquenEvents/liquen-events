@@ -111,7 +111,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const base = d.amount / (1 + d.vatRate);
   const vat = d.amount - base;
 
-  text(`${d.kindLabel} — ${d.description || "Serviços de decoração de eventos"}`, MARGIN, y, {
+  text(`${d.kindLabel}: ${d.description || "Serviços de decoração de eventos"}`, MARGIN, y, {
     size: 10,
   });
   tr(eur(d.amount), right, y, { size: 10 });

@@ -206,7 +206,7 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   // ── Título ──
   const titleLines = wrap(
     bold,
-    "Contrato de Prestação de Serviços — Decoração de Eventos",
+    "Contrato de Prestação de Serviços de Decoração de Eventos",
     15,
     maxW,
   );
@@ -223,7 +223,7 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   y -= 13;
   text(`${SITE.email}  ·  ${SITE.phoneDisplay}`, MARGIN, y, { size: 9, color: MUTED });
   y -= 12;
-  text(`${SITE.city}, ${SITE.region} — Portugal  ·  ${SITE.url}`, MARGIN, y, {
+  text(`${SITE.city}, ${SITE.region}, Portugal  ·  ${SITE.url}`, MARGIN, y, {
     size: 9,
     color: MUTED,
   });
