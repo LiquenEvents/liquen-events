@@ -49,6 +49,77 @@ const COUNTDOWN_FROM = MAX_IMPORT_BATCH / 2;
  *  em sequência e cada um preserva a ordem que lhe deram. */
 const IMPORT_CHUNK = 8;
 
+/**
+ * QUANTOS ORIGINAIS SE DESCARREGAM AO MESMO TEMPO nesta grelha.
+ *
+ * Uma foto sem miniatura (tudo o que foi carregado antes de elas existirem)
+ * obriga a puxar o original: ~2,6 MB para desenhar uma célula de 150 px.
+ * Medido em Chromium sobre HTTP/2, 60 fotos, 50 Mbit/s partilhados: com os 60
+ * pedidos ao mesmo tempo — que é o que o browser faz, e o `loading="lazy"` não
+ * trava — a PRIMEIRA foto aparece aos 26 351 ms, porque os 60 downloads
+ * repartem o canal e acabam todos no fim. Com um tecto de 3 em voo, a primeira
+ * aparece aos 1405 ms e a última não chega mais tarde do que chegava.
+ *
+ * Às fotos COM miniatura não se põe tecto nenhum: são ~25 KB, e medir mostrou
+ * que aí um tecto só atrasa (1019 ms contra 350 ms para as 60).
+ *
+ * O número é o mesmo da Biblioteca de Temas (`Temas.tsx`) e a fila é a mesma
+ * ideia — está aqui repetida, e não partilhada, para este diálogo do estúdio
+ * não arrastar para o seu pacote o ecrã inteiro da biblioteca.
+ */
+const HEAVY_IMAGE_CONCURRENCY = 3;
+
+/** Células da primeira dobra: carregam já e com prioridade (o diálogo mostra
+ *  5 colunas, portanto duas linhas). */
+const ABOVE_FOLD = 10;
+
+/** Quanto se espera, depois de a primeira página estar no ecrã, para ir
+ *  buscar a seguinte. Ver `Temas.tsx`: a primeira página tem de chegar
+ *  primeiro, senão estaríamos a repartir o canal outra vez. */
+const PREFETCH_DELAY_MS = 1500;
+
+/** Se um download ficar pendurado, a vez volta ao fim deste tempo. */
+const HEAVY_SLOT_TIMEOUT_MS = 30_000;
+
+interface HeavySlot {
+  start: () => void;
+  started: boolean;
+  released: boolean;
+}
+const heavyWaiting: HeavySlot[] = [];
+let heavyLive = 0;
+
+function pumpHeavy() {
+  while (heavyLive < HEAVY_IMAGE_CONCURRENCY && heavyWaiting.length > 0) {
+    const slot = heavyWaiting.shift();
+    if (!slot || slot.released) continue;
+    slot.started = true;
+    heavyLive += 1;
+    if (process.env.NODE_ENV === "test") console.log("START", heavyLive, heavyWaiting.length);
+    slot.start();
+  }
+}
+
+/** Pede vez para descarregar um original; devolve a função de a largar
+ *  (acabou ou desistiu — é idempotente). */
+function queueHeavyImage(start: () => void): () => void {
+  const slot: HeavySlot = { start, started: false, released: false };
+  heavyWaiting.push(slot);
+  pumpHeavy();
+  return () => {
+    if (slot.released) return;
+    slot.released = true;
+    if (slot.started) {
+      if (process.env.NODE_ENV === "test") console.log("RELEASE", heavyLive);
+      heavyLive = Math.max(0, heavyLive - 1);
+      pumpHeavy();
+      return;
+    }
+    const i = heavyWaiting.indexOf(slot);
+    if (i >= 0) heavyWaiting.splice(i, 1);
+  };
+}
+
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -81,6 +152,17 @@ function mergePage(prev: ThemeImage[], page: ThemeImage[]): ThemeImage[] {
  */
 export interface ImportedImage extends ThemeImage {
   sourcePath?: string;
+}
+
+/** A página seguinte, pedida antes de ela a pedir. Guarda o tema e o offset com
+ *  que foi buscada: só encaixa onde foi pedida. */
+interface Ahead {
+  themeId: string;
+  offset: number;
+  images: ThemeImage[];
+  total: number | null;
+  truncated: boolean;
+  full: boolean;
 }
 
 interface Props {
@@ -120,6 +202,8 @@ export default function ThemePicker({
   const [unreadable, setUnreadable] = useState(false);
   const [loadingImages, setLoadingImages] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  /** A página seguinte, já pedida e guardada — ver o efeito de adiantamento. */
+  const [ahead, setAhead] = useState<Ahead | null>(null);
 
   const [selected, setSelected] = useState<string[]>([]);
   /** Qual a célula que responde ao Tab (roving tabindex). */
@@ -223,8 +307,28 @@ export default function ThemePicker({
   const remaining = total === null ? null : Math.max(0, total - images.length);
   const hasMore = pageFull || (remaining !== null && remaining > 0);
 
+  /** Junta ao ecrã uma página que já veio do servidor (pedida agora ou de
+   *  antemão) — um só sítio a mexer nestes quatro estados. */
+  const absorb = useCallback(
+    (page: ThemeImage[], pageTotal: number | null, pageTruncated: boolean, full: boolean) => {
+      setImages((prev) => mergePage(prev, page));
+      if (pageTotal !== null) setTotal(pageTotal);
+      setTruncated(pageTruncated);
+      setPageFull(full);
+    },
+    [],
+  );
+
   async function loadMore() {
     if (loadingMore || !themeId) return;
+    // Já cá está: o "Mostrar mais" é instantâneo (foi pedida 1,5 s depois de a
+    // primeira página aparecer).
+    if (ahead && ahead.themeId === themeId && ahead.offset === images.length) {
+      const next = ahead;
+      setAhead(null);
+      absorb(next.images, next.total, next.truncated, next.full);
+      return;
+    }
     setLoadingMore(true);
     try {
       const res = await fetch(
@@ -235,16 +339,65 @@ export default function ThemePicker({
       const data = await res.json();
       if (!alive.current) return;
       const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
-      setImages((prev) => mergePage(prev, page));
-      if (typeof data?.total === "number") setTotal(data.total);
-      setTruncated(Boolean(data?.truncated));
-      setPageFull(page.length >= THEME_PAGE_SIZE);
+      absorb(
+        page,
+        typeof data?.total === "number" ? data.total : null,
+        Boolean(data?.truncated),
+        page.length >= THEME_PAGE_SIZE,
+      );
     } catch {
       toast("Não foi possível carregar mais fotos.", "error");
     } finally {
       if (alive.current) setLoadingMore(false);
     }
   }
+
+  /**
+   * A PÁGINA SEGUINTE, ANTES DE ELA A PEDIR.
+   *
+   * Uma só, e só depois de a primeira estar no ecrã. Guarda o TEMA e o OFFSET
+   * com que foi pedida: mudar de tema (ou a grelha crescer) invalida-a, senão
+   * o "Mostrar mais" colava fotos do tema errado.
+   */
+  useEffect(() => {
+    if (!themeId || loadingImages || loadingMore || !hasMore) return;
+    if (ahead) {
+      if (ahead.themeId !== themeId || ahead.offset !== images.length) setAhead(null);
+      return;
+    }
+    let cancelled = false;
+    const offset = images.length;
+    const timer = window.setTimeout(() => {
+      (async () => {
+        try {
+          const res = await fetch(
+            `/api/temas/${themeId}/imagens?offset=${offset}&limit=${THEME_PAGE_SIZE}`,
+            { cache: "no-store" },
+          );
+          if (!res.ok) return;
+          const data = await res.json();
+          if (cancelled || !alive.current) return;
+          const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
+          if (page.length === 0) return;
+          setAhead({
+            themeId,
+            offset,
+            images: page,
+            total: typeof data?.total === "number" ? data.total : null,
+            truncated: Boolean(data?.truncated),
+            full: page.length >= THEME_PAGE_SIZE,
+          });
+        } catch {
+          // Adivinhar e falhar não é um erro que se mostre: o botão continua a
+          // fazer o pedido à mão, com a sua própria mensagem.
+        }
+      })();
+    }, PREFETCH_DELAY_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [themeId, loadingImages, loadingMore, hasMore, ahead, images.length]);
 
   // `dismiss`/`importSelected` e não `close`/`confirm`: os nomes curtos
   // escondiam o `window.close`/`window.confirm` — e o `window.confirm()` é o
@@ -691,7 +844,7 @@ export default function ThemePicker({
                             : "border-foreground/[0.1] hover:border-[#4d6350]/45"
                         } ${blocked ? "opacity-50" : ""}`}
                       >
-                        <Photo image={im} />
+                        <Photo image={im} priority={i < ABOVE_FOLD} />
                         {on && (
                           <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white">
                             <svg
@@ -901,17 +1054,54 @@ export default function ThemePicker({
  * para um objeto que já lá não está falha no browser, e sem isto ficava uma
  * célula partida no meio de uma grelha que funciona.
  */
-function Photo({ image }: { image: ThemeImage }) {
-  const [src, setSrc] = useState(image.thumbUrl || image.url);
+function Photo({ image, priority }: { image: ThemeImage; priority?: boolean }) {
+  /** A miniatura falhou (foi apagada do bucket): fica o original. */
+  const [thumbBroken, setThumbBroken] = useState(false);
+  /** A fila deu a vez a esta célula. */
+  const [turn, setTurn] = useState(false);
+  /** Sem miniatura, esta célula puxa ~2,6 MB: espera pela vez. */
+  const heavy = !image.thumbUrl || thumbBroken;
+  const release = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!heavy) return;
+    let timer = 0;
+    const free = queueHeavyImage(() => {
+      setTurn(true);
+      timer = window.setTimeout(() => release.current?.(), HEAVY_SLOT_TIMEOUT_MS);
+    });
+    release.current = () => {
+      window.clearTimeout(timer);
+      free();
+    };
+    return () => {
+      release.current?.();
+      release.current = null;
+    };
+  }, [heavy, image.url]);
+
+  // Sem vez, sem `src`: um `src` posto é um download começado, e é isso mesmo
+  // que a fila existe para espaçar.
+  const src = heavy ? (turn ? image.url : undefined) : image.thumbUrl;
+
+  const finished = () => {
+    release.current?.();
+    release.current = null;
+  };
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt=""
-      loading="lazy"
+      loading={heavy || priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       decoding="async"
+      onLoad={() => { if (process.env.NODE_ENV === "test") console.log("LOAD"); finished(); }}
       onError={() => {
-        if (src !== image.url) setSrc(image.url);
+        if (process.env.NODE_ENV === "test") console.log("ERROR-EVT");
+        finished();
+        if (!heavy) setThumbBroken(true);
       }}
       className="h-full w-full object-cover"
     />
@@ -981,6 +1171,9 @@ function Preview({
           src={image.url}
           alt=""
           decoding="async"
+          // É a foto que ela pediu para ver: passa à frente do que a grelha
+          // esteja a descarregar por trás.
+          fetchPriority="high"
           className="max-h-full max-w-full object-contain"
         />
       </div>

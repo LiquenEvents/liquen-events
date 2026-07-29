@@ -107,7 +107,40 @@ const jpg = (name: string) => new File(["x"], name, { type: "image/jpeg" });
 
 const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
 const dropZone = () => document.querySelector("div.border-dashed") as HTMLElement;
-const photos = () => Array.from(document.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+const imgs = () => Array.from(document.querySelectorAll("img"));
+
+/**
+ * As fotos que a grelha está mesmo a mostrar.
+ *
+ * As fotos SEM miniatura entram numa fila (só se descarregam três originais ao
+ * mesmo tempo — ver `HEAVY_IMAGE_CONCURRENCY`), por isso uma célula só recebe
+ * `src` quando lhe chega a vez. Em jsdom nada carrega sozinho: `settlePhotos`
+ * faz o que o browser faz — dar cada foto por carregada, o que liberta a vez
+ * seguinte — e só então a grelha tem todas as fotos com `src`.
+ */
+const photos = () => imgs().map((i) => i.getAttribute("src"));
+
+async function settlePhotos() {
+  for (let guard = 0; guard < 300; guard++) {
+    const waiting = imgs().filter((i) => i.getAttribute("src") && !i.dataset.settled);
+    if (waiting.length === 0) return;
+    await act(async () => {
+      for (const img of waiting) {
+        img.dataset.settled = "1";
+        fireEvent.load(img);
+      }
+    });
+  }
+  throw new Error("a fila das fotos não escoou");
+}
+
+/** Faz andar o relógio falso e deixa o React assentar. Com `ms = 0` é só
+ *  "deixa as promessas resolverem". */
+async function tick(ms = 0) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
 
 function renderTemas() {
   return render(
@@ -122,6 +155,7 @@ async function openFolder(name: RegExp) {
   fireEvent.click(await screen.findByRole("button", { name }));
   await screen.findByRole("button", { name: "Eliminar tema" });
   await act(async () => {});
+  await settlePhotos();
 }
 
 /** Larga fotos no seletor de ficheiros (o botão "Adicionar fotos"). */
@@ -233,12 +267,15 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 1" }));
     });
-    expect(photos()).toEqual([]);
+    // Do servidor não fica nada; o que está no ecrã é a foto que ela acabou de
+    // largar, mostrada a partir do ficheiro que está no computador.
+    expect(photos().filter((s) => !s?.startsWith("blob:"))).toEqual([]);
 
     await release("POST /api/temas/t1/imagens");
 
     // Fica só a foto nova: a apagada não pode voltar.
-    expect(photos()).toEqual([photo(2).url]);
+    expect(screen.getByRole("button", { name: "Remover foto 1 de 1" })).toBeInTheDocument();
+    expect(photos()).not.toContain(photo(1).url);
   });
 
   it("repõe só a foto cuja remoção falhou, sem deitar fora as que chegaram entretanto", async () => {
@@ -260,10 +297,14 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     // A foto nova chega primeiro; só depois se sabe que a remoção falhou.
     await release("POST /api/temas/t1/imagens");
     await release("DELETE /api/temas/t1/imagens");
+    await settlePhotos();
 
+    // Duas fotos na grelha: a que voltou (do servidor) e a que subiu — esta
+    // mostrada da cópia local, que é a que ela própria acabou de largar.
+    expect(screen.getByRole("button", { name: "Remover foto 2 de 2" })).toBeInTheDocument();
     expect(photos()).toHaveLength(2);
     expect(photos()).toContain(photo(1).url);
-    expect(photos()).toContain(photo(2).url);
+    expect(photos().some((s) => s?.startsWith("blob:"))).toBe(true);
   });
 
   it("não faz desaparecer um tema criado enquanto um DELETE falhado ia a caminho", async () => {
@@ -383,6 +424,144 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
     expect(photos()).toEqual([photo(1, true).thumbUrl, photo(2).url]);
   });
 
+  it("a foto que está no ecrã não espera pelas que não estão", async () => {
+    // O CASO DA BIBLIOTECA ANTIGA: 60 fotos sem miniatura, cada uma com o seu
+    // original de ~2,6 MB. Pedidos todos ao mesmo tempo, o canal reparte-se
+    // por 60 e NENHUMA aparece antes do fim (medido: 26 s até à primeira).
+    // Só três de cada vez, pela ordem da grelha, põe a primeira no ecrã em ~1 s.
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () =>
+      ok({ ok: true, images: many(1, THEME_PAGE_SIZE), total: THEME_PAGE_SIZE }),
+    );
+
+    renderTemas();
+    fireEvent.click(await screen.findByRole("button", { name: /Terracotta/ }));
+    await screen.findByRole("button", { name: "Eliminar tema" });
+    await act(async () => {});
+
+    const started = () => imgs().filter((i) => i.getAttribute("src")).length;
+    // As 60 células estão desenhadas; só três é que estão a descarregar.
+    expect(imgs()).toHaveLength(THEME_PAGE_SIZE);
+    expect(started()).toBe(3);
+    // E são as PRIMEIRAS: a fila respeita a ordem por que ela olha.
+    expect(photos().slice(0, 3)).toEqual([photo(1).url, photo(2).url, photo(3).url]);
+
+    // Cada foto que acaba liberta a vez seguinte — e nunca há mais do que três.
+    await act(async () => {
+      fireEvent.load(imgs()[0]);
+    });
+    expect(started()).toBe(4);
+
+    await settlePhotos();
+    expect(started()).toBe(THEME_PAGE_SIZE);
+  });
+
+  it("com miniatura não há fila nenhuma — 25 KB não precisam de vez", async () => {
+    // Medido: pôr um tecto às miniaturas PIORA (60 × 25 KB em ondas de 6 =
+    // 1019 ms, contra 350 ms sem tecto). O que é caro é o byte, não o pedido.
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () =>
+      ok({ ok: true, images: many(1, THEME_PAGE_SIZE, true), total: THEME_PAGE_SIZE }),
+    );
+
+    renderTemas();
+    fireEvent.click(await screen.findByRole("button", { name: /Terracotta/ }));
+    await screen.findByRole("button", { name: "Eliminar tema" });
+    await act(async () => {});
+
+    expect(imgs().filter((i) => i.getAttribute("src"))).toHaveLength(THEME_PAGE_SIZE);
+    // A primeira dobra não espera pelo `lazy`; o resto do rolo espera.
+    expect(imgs()[0].getAttribute("loading")).toBe("eager");
+    expect(imgs()[0].getAttribute("fetchpriority")).toBe("high");
+    expect(imgs()[THEME_PAGE_SIZE - 1].getAttribute("loading")).toBe("lazy");
+  });
+
+  it("vai buscar a página seguinte antes de ela a pedir — e o botão não espera", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 312 }]));
+    let call = 0;
+    route("GET /api/temas/t1/imagens", () => {
+      call += 1;
+      return ok({
+        ok: true,
+        images: call === 1 ? many(1, THEME_PAGE_SIZE, true) : many(1000, THEME_PAGE_SIZE, true),
+        total: 312,
+        truncated: false,
+      });
+    });
+
+    // O relógio é falso desde o princípio: a espera antes de ir buscar a
+    // página seguinte é agendada quando a pasta abre, e um relógio ligado a
+    // meio já não a apanhava.
+    vi.useFakeTimers();
+    try {
+      renderTemas();
+      await tick();
+      fireEvent.click(screen.getByRole("button", { name: /Terracotta/ }));
+      await tick();
+      // A primeira página não leva companhia: pedir as duas ao mesmo tempo era
+      // fazer exatamente o que este trabalho veio corrigir.
+      expect(callsTo("GET /api/temas/t1/imagens")).toBe(1);
+
+      await tick(2000);
+
+      // A seguinte já está cá — pedida ao servidor uma vez, e uma só.
+      expect(urlsFor("GET /api/temas/t1/imagens")[1]).toBe(
+        `/api/temas/t1/imagens?offset=${THEME_PAGE_SIZE}&limit=${THEME_PAGE_SIZE}`,
+      );
+      expect(callsTo("GET /api/temas/t1/imagens")).toBe(2);
+
+      fireEvent.click(screen.getByRole("button", { name: /Mostrar mais/ }));
+      await tick();
+      // O clique não fez pedido nenhum: as fotos já estavam em casa.
+      expect(callsTo("GET /api/temas/t1/imagens")).toBe(2);
+      expect(photos()).toHaveLength(THEME_PAGE_SIZE * 2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a página adiantada é deitada fora quando a grelha muda por baixo dela", async () => {
+    // Uma foto que sobe entra à CABEÇA e empurra tudo um lugar: a página que
+    // estava guardada para o offset 60 passaria a saltar uma foto. Só encaixa
+    // quem foi pedido para o sítio onde a grelha está agora.
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 312 }]));
+    let call = 0;
+    route("GET /api/temas/t1/imagens", () => {
+      call += 1;
+      return ok({
+        ok: true,
+        images: call === 1 ? many(1, THEME_PAGE_SIZE, true) : many(1000, THEME_PAGE_SIZE, true),
+        total: 312,
+      });
+    });
+    route("POST /api/temas/t1/imagens", () => ok({ ok: true, images: [photo(900, true)] }));
+
+    vi.useFakeTimers();
+    try {
+      renderTemas();
+      await tick();
+      fireEvent.click(screen.getByRole("button", { name: /Terracotta/ }));
+      await tick();
+      await tick(2000);
+      expect(callsTo("GET /api/temas/t1/imagens")).toBe(2); // a adiantada
+
+      // Sobe uma foto: a grelha passa a ter 61 e a página guardada (offset 60)
+      // deixou de servir.
+      fireEvent.change(fileInput(), { target: { files: [jpg("nova.jpg")] } });
+      await tick();
+      await tick();
+      await tick(2000);
+
+      // Foi deitada fora e pedida outra, agora com o offset certo.
+      const urls = urlsFor("GET /api/temas/t1/imagens");
+      expect(urls[urls.length - 1]).toBe(
+        `/api/temas/t1/imagens?offset=${THEME_PAGE_SIZE + 1}&limit=${THEME_PAGE_SIZE}`,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("o offset de 'Mostrar mais' acompanha as fotos que subiram entretanto", async () => {
     // A lista do servidor é por data decrescente: uma foto nova entra à
     // CABEÇA e empurra tudo o resto um lugar para trás. Com uma contagem de
@@ -454,6 +633,70 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
     expect(screen.getByRole("button", { name: /Terracotta/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Praia/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Boho/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Biblioteca de Temas — as fotos aparecem enquanto sobem", () => {
+  it("a foto entra na grelha ANTES de o servidor responder, vinda do ficheiro dela", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: [], total: 0 }));
+    route("POST /api/temas/t1/imagens", () => ok({ ok: true, images: [photo(1)] }));
+    hold("POST /api/temas/t1/imagens");
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    await chooseFiles(jpg("praia.jpg"));
+
+    // O servidor ainda não respondeu e a foto já está no ecrã — do disco dela.
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(1);
+    expect(photos()).toHaveLength(1);
+    expect(photos()[0]).toMatch(/^blob:/);
+    expect(screen.getByText("A carregar")).toBeInTheDocument();
+    // E ainda não é uma foto do tema: não se pode selecionar nem remover o que
+    // ainda não existe no servidor.
+    expect(screen.queryByRole("button", { name: /Remover foto/ })).toBeNull();
+
+    await release("POST /api/temas/t1/imagens");
+
+    // Chegou: a célula provisória dá lugar à foto verdadeira, sem piscar —
+    // continua a mostrar-se a cópia local, que já está no computador dela.
+    expect(screen.queryByText("A carregar")).toBeNull();
+    expect(screen.getByRole("button", { name: "Remover foto 1 de 1" })).toBeInTheDocument();
+    expect(photos()[0]).toMatch(/^blob:/);
+  });
+
+  it("uma foto que falha não deixa a célula pendurada no ecrã", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: [], total: 0 }));
+    route("POST /api/temas/t1/imagens", () => bad(413, { error: "Imagem demasiado grande" }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(jpg("enorme.jpg"));
+
+    // Fica a caixa do "tentar novamente" — e mais nada na grelha.
+    expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeInTheDocument();
+    expect(screen.queryByText("A carregar")).toBeNull();
+    expect(photos()).toHaveLength(0);
+  });
+
+  it("liberta as cópias locais ao sair da pasta", async () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: [], total: 0 }));
+    route("POST /api/temas/t1/imagens", () => ok({ ok: true, images: [photo(1)] }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(jpg("praia.jpg"));
+    const blob = photos()[0];
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "← Temas" }));
+    });
+
+    expect(revoke).toHaveBeenCalledWith(blob);
   });
 });
 
@@ -569,6 +812,122 @@ describe("Biblioteca de Temas — lote de 300 fotos", () => {
       (r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens",
     )[1].init?.body as FormData;
     expect(second.getAll("thumbs")).toEqual([]);
+  });
+});
+
+describe("Biblioteca de Temas — miniaturas em falta", () => {
+  /** Um servidor de miniaturas que percorre `total` fotos, `perLote` de cada vez. */
+  function serveThumbJob(total: number, perLote = 8) {
+    route("POST /api/temas/t1/miniaturas", () => {
+      const last = requests.filter(
+        (r) => routeKey(r.url, r.init) === "POST /api/temas/t1/miniaturas",
+      );
+      const cursor = JSON.parse(String(last[last.length - 1].init?.body ?? "{}")).cursor ?? 0;
+      const scanned = Math.min(perLote, Math.max(0, total - cursor));
+      const next = cursor + scanned;
+      return ok({
+        ok: true,
+        scanned,
+        generated: scanned,
+        skipped: 0,
+        failed: 0,
+        nextCursor: next >= total ? null : next,
+        total,
+      });
+    });
+  }
+
+  it("não aparece quando as fotos já têm miniatura", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 3, true), total: 3 }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    expect(screen.queryByRole("button", { name: /Gerar miniaturas/ })).toBeNull();
+  });
+
+  it("percorre a pasta por lotes, mostra o andamento e continua de onde ficou", async () => {
+    // A BIBLIOTECA QUE JÁ EXISTE: fotos carregadas antes de haver miniaturas.
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 20 }]));
+    let listed = 0;
+    route("GET /api/temas/t1/imagens", () => {
+      listed += 1;
+      // Depois de gerar, a mesma página volta a vir — agora com miniaturas.
+      return ok({ ok: true, images: many(1, 20, listed > 1), total: 20 });
+    });
+    serveThumbJob(20);
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    // A grelha está a mostrar ORIGINAIS: é isso que o cartão diz, e é verdade.
+    expect(photos()[0]).toBe(photo(1).url);
+    expect(screen.getByText(/Há fotos antigas sem miniatura/)).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Gerar miniaturas em falta" }));
+    });
+
+    // Três lotes (8 + 8 + 4) e o cursor foi sempre o que o servidor mandou.
+    const bodies = requests
+      .filter((r) => routeKey(r.url, r.init) === "POST /api/temas/t1/miniaturas")
+      .map((r) => JSON.parse(String(r.init?.body)).cursor);
+    expect(bodies).toEqual([0, 8, 16]);
+
+    // No fim a grelha passa a mostrar as miniaturas — sem recarregar a página.
+    await settlePhotos();
+    expect(photos()[0]).toBe(photo(1, true).thumbUrl);
+    expect(screen.queryByRole("button", { name: /Gerar miniaturas/ })).toBeNull();
+  });
+
+  it("parar a meio guarda o que já foi feito e não perde o resto", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 100 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 20), total: 100 }));
+    serveThumbJob(100);
+    hold("POST /api/temas/t1/miniaturas");
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Gerar miniaturas em falta" }));
+    });
+    await release("POST /api/temas/t1/miniaturas");
+
+    // A meio: o andamento está à vista e há como parar.
+    expect(screen.getByText(/A gerar miniaturas/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Parar" }));
+    await release("POST /api/temas/t1/miniaturas");
+
+    // Parou — e o botão convida a continuar, não a recomeçar do zero.
+    expect(screen.getByRole("button", { name: "Continuar a gerar miniaturas" })).toBeVisible();
+    expect(screen.getByText(/parado a meio/)).toBeInTheDocument();
+    // Dois lotes pedidos, e mais nenhum depois do "Parar".
+    expect(callsTo("POST /api/temas/t1/miniaturas")).toBe(2);
+  });
+
+  it("uma falha do servidor não apaga o que já tinha sido gerado", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 100 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 20), total: 100 }));
+    let n = 0;
+    route("POST /api/temas/t1/miniaturas", () => {
+      n += 1;
+      if (n === 1) {
+        return ok({ scanned: 8, generated: 8, skipped: 0, failed: 0, nextCursor: 8, total: 100 });
+      }
+      return bad(503, { error: "Não foi possível ler a pasta do tema." });
+    });
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Gerar miniaturas em falta" }));
+    });
+
+    // (a mesma frase aparece também no aviso passageiro — chegam as duas)
+    expect(screen.getAllByText(/8 miniaturas criadas/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Continuar a gerar miniaturas" })).toBeVisible();
   });
 });
 

@@ -46,10 +46,21 @@ export function SkeletonRow() {
  * A full-view loading state used by the code-split views while their JS chunk
  * arrives: a header line, a KPI strip, then a panel. Generic enough to stand
  * in for any of the dashboard views without looking wrong.
+ *
+ * `data-view-skeleton` marca especificamente a espera pelo CÓDIGO da vista (o
+ * chunk), por oposição a `SkeletonList`, que é a espera pelos DADOS. São dois
+ * atrasos diferentes com curas diferentes — o primeiro resolve-se com
+ * pré-carregamento (ver `warmViewChunks` em lazy.tsx), o segundo com cache de
+ * listas — e sem esta marca não se consegue medir um sem o outro.
  */
 export function ViewSkeleton() {
   return (
-    <div className="flex flex-col gap-8" aria-busy="true" aria-label="A carregar">
+    <div
+      className="flex flex-col gap-8"
+      data-view-skeleton=""
+      aria-busy="true"
+      aria-label="A carregar"
+    >
       {/* Greeting */}
       <div>
         <SkeletonBar className="h-2.5 w-40 mb-3" />

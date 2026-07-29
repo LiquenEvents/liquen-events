@@ -22,6 +22,8 @@
  * upload, which is the exact batch size we are sizing for.
  */
 
+import type { WorkerRequest, WorkerResponse } from "./image-worker";
+
 const SUPPORTED = /^image\/(jpe?g|png|webp)$/i;
 
 /**
@@ -36,9 +38,40 @@ const SUPPORTED = /^image\/(jpe?g|png|webp)$/i;
  * The thumbnail that travels with it adds ~30–60 KB — noise, at that scale.
  */
 export type ImageKind = "cover" | "board";
+
+/**
+ * Lado maior com que a foto de CAPA é guardada. Um só sítio: mexer aqui é
+ * reverter (ou reafinar) toda a decisão.
+ *
+ * Porquê 2200 e não 3000 — medido, não suposto:
+ *
+ * · O PDF nunca desenha uma foto acima de `MAX_IMAGE_EDGE_PX = 2200`
+ *   (`src/lib/proposal-image.ts`). A tira de capa, que é a MAIOR utilização que
+ *   existe, mede 277,8 × 595,3 pt e a 160 DPI pede exatamente 617 × 1323 px.
+ *
+ * · A pior situação é uma foto DEITADA recortada para essa tira em pé: de um
+ *   original de 2200 × 1650 o recorte aproveita 770 × 1650 px, que ainda é
+ *   1,25× mais do que os 617 × 1323 finais. Essa margem de sobreamostragem é o
+ *   que mantém a capa nítida depois do lanczos. Aos 2000 px a margem cai para
+ *   1,13× e aos 1800 px para 1,02× — aí qualquer rotação EXIF ou recorte
+ *   descentrado já começa a AMPLIAR. Por isso o corte é aos 2200, e não abaixo.
+ *
+ * · Custo em fidelidade, medido sobre a tira de capa já gerada pelo PDF: 36,9 dB
+ *   de PSNR contra o que sai hoje, num corpus propositadamente mau (detalhe de
+ *   alta frequência em todo o quadro, o pior caso para reduzir). Acima de ~35 dB
+ *   a diferença não se distingue a olho numa fotografia.
+ *
+ * · O que se ganha: 59% dos bytes de hoje (2,24 → 1,32 MB por foto medidos).
+ *   Como os bytes atravessam a rede DUAS vezes (navegador → função → Storage),
+ *   isto é o item mais pesado do tempo de carregamento.
+ */
+export const COVER_MAX_EDGE = 2200;
+/** Qualidade JPEG da capa. Ver `COVER_MAX_EDGE` para a medição. */
+export const COVER_QUALITY = 0.9;
+
 const PRESETS: Record<ImageKind, { maxEdge: number; quality: number; keepBytes: number }> = {
   // Covers: bigger + higher quality (printed large, the document's hero image).
-  cover: { maxEdge: 3000, quality: 0.92, keepBytes: 1_500_000 },
+  cover: { maxEdge: COVER_MAX_EDGE, quality: COVER_QUALITY, keepBytes: 1_500_000 },
   // Mood boards: rendered as small cells → a tighter cap keeps boards snappy.
   board: { maxEdge: 1600, quality: 0.82, keepBytes: 1_000_000 },
 };
@@ -52,7 +85,10 @@ const PRESETS: Record<ImageKind, { maxEdge: number; quality: number; keepBytes: 
  * mesmas 100 fotos originais custavam.
  */
 export const THUMB_EDGE = 400;
-const THUMB_QUALITY = 0.72;
+/** Qualidade JPEG da miniatura. Exportada para o banco de ensaio a poder
+ *  comparar com o que espelha, em vez de a ler do código-fonte com uma
+ *  expressão regular que se parte a cada arrumação. */
+export const THUMB_QUALITY = 0.72;
 
 /** Target width/height after capping the long edge (pure — unit-tested). */
 export function fitWithin(w: number, h: number, maxEdge: number): { w: number; h: number } {
@@ -102,6 +138,154 @@ export interface PreparedImage {
    *  Nunca é motivo para falhar o carregamento: sem miniatura a grelha usa o
    *  original, exatamente como faz com as fotos anteriores a esta funcionalidade. */
   thumb: File | null;
+}
+
+// ── Pool de trabalhadores ──
+//
+// O trabalho de pixéis sai do fio principal (ver `image-worker.ts`) e passa a
+// usar mais do que um núcleo. Com uma pool, preparar a foto N+1 acontece ENQUANTO
+// a foto N está a subir, em vez de as duas coisas se revezarem.
+
+/**
+ * Teto de trabalhadores. Quatro chegam: acima disto o ganho achata (o passo
+ * seguinte é a rede, não o CPU) e cada trabalhador custa memória — uma bitmap
+ * de 4032×3024 são ~48 MB descomprimidos, e há tantas em voo quantos os
+ * trabalhadores.
+ */
+const POOL_MAX = 4;
+
+/** Deixa SEMPRE um núcleo livre para a interface: o objetivo é a grelha não
+ *  tremer, e ocupar todos os núcleos com codificação trai isso. */
+function poolSize(): number {
+  const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency || 2 : 2;
+  return Math.max(1, Math.min(POOL_MAX, cores - 1));
+}
+
+/** Este browser sabe fazer o trabalho fora do fio principal? Safari só ganhou
+ *  `OffscreenCanvas` na 16.4 — e o Safari é precisamente de onde vêm os HEIC,
+ *  por isso o caminho do fio principal tem de continuar inteiro. */
+function workersUsable(): boolean {
+  try {
+    return (
+      typeof Worker !== "undefined" &&
+      typeof OffscreenCanvas !== "undefined" &&
+      typeof createImageBitmap !== "undefined" &&
+      typeof OffscreenCanvas.prototype.convertToBlob === "function"
+    );
+  } catch {
+    return false;
+  }
+}
+
+interface Lane {
+  worker: Worker;
+  busy: boolean;
+  /** Trabalho que esta faixa tem em mãos, para o poder desbloquear se o
+   *  trabalhador morrer a meio (senão a promessa ficava por resolver e o
+   *  carregamento pendurava para sempre — pior do que ser lento). */
+  job: number | null;
+}
+
+let lanes: Lane[] | null = null;
+let poolBroken = false;
+/** `null` = a faixa desistiu (trabalhador morto) e a foto segue pelo fio principal. */
+const pending = new Map<number, (r: WorkerResponse | null) => void>();
+const waiting: Array<() => void> = [];
+let nextJobId = 1;
+
+/** Cria a pool à primeira utilização. `null` = este browser não dá. */
+function ensurePool(): Lane[] | null {
+  if (poolBroken) return null;
+  if (lanes) return lanes;
+  if (!workersUsable()) {
+    poolBroken = true;
+    return null;
+  }
+  try {
+    lanes = Array.from({ length: poolSize() }, () => {
+      const worker = new Worker(new URL("./image-worker.ts", import.meta.url), { type: "module" });
+      const lane: Lane = { worker, busy: false, job: null };
+      /** Fecha o trabalho em curso desta faixa e liberta-a. */
+      const settle = (res: WorkerResponse | null) => {
+        const id = lane.job;
+        lane.job = null;
+        lane.busy = false;
+        if (id !== null) {
+          const done = pending.get(id);
+          pending.delete(id);
+          done?.(res);
+        }
+        waiting.shift()?.();
+      };
+      worker.onmessage = (e: MessageEvent<WorkerResponse>) => settle(e.data);
+      // Um trabalhador que rebenta (ficheiro gigante, memória esgotada) TEM de
+      // desbloquear a foto que tinha em mãos: quem estava à espera segue então
+      // pelo fio principal, em vez de ficar pendurado para sempre.
+      worker.onerror = () => settle(null);
+      worker.onmessageerror = () => settle(null);
+      return lane;
+    });
+    return lanes;
+  } catch {
+    poolBroken = true;
+    return null;
+  }
+}
+
+/** Espera por uma faixa livre. */
+async function acquire(): Promise<Lane | null> {
+  const pool = ensurePool();
+  if (!pool) return null;
+  for (;;) {
+    const free = pool.find((l) => !l.busy);
+    if (free) {
+      free.busy = true;
+      return free;
+    }
+    await new Promise<void>((r) => waiting.push(r));
+  }
+}
+
+/**
+ * Tenta preparar a foto num trabalhador. `null` = não deu (browser sem suporte,
+ * ou formato que o trabalhador não descodifica) e quem chamou tem de usar o
+ * caminho do fio principal — que é o que sabe ler HEIC no Safari, via `<img>`.
+ */
+async function prepareViaWorker(
+  file: File,
+  preset: { maxEdge: number; quality: number },
+  skipOriginal: boolean,
+  wantThumb: boolean,
+): Promise<{ blob: Blob | null; thumb: Blob | null } | null> {
+  const lane = await acquire();
+  if (!lane) return null;
+  const id = nextJobId++;
+  const req: WorkerRequest = {
+    id,
+    blob: file,
+    maxEdge: preset.maxEdge,
+    quality: preset.quality,
+    skipOriginal,
+    wantThumb,
+    thumbEdge: THUMB_EDGE,
+    thumbQuality: THUMB_QUALITY,
+  };
+  const res = await new Promise<WorkerResponse | null>((resolve) => {
+    pending.set(id, resolve);
+    lane.job = id;
+    try {
+      lane.worker.postMessage(req);
+    } catch {
+      // Nem sequer saiu — liberta a faixa aqui mesmo.
+      pending.delete(id);
+      lane.job = null;
+      lane.busy = false;
+      waiting.shift()?.();
+      resolve(null);
+    }
+  });
+  if (!res || !res.ok) return null;
+  return { blob: res.blob, thumb: res.thumb };
 }
 
 type Source = ImageBitmap | HTMLImageElement;
@@ -169,6 +353,20 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
   // Sem miniatura a pedir, um ficheiro já pequeno e suportado nem sequer é
   // descodificado — é o caminho barato que o estúdio de propostas já usava.
   if (keep && !wantThumb) return { file, thumb: null };
+
+  // 1ª tentativa: fora do fio principal. Devolve `null` quando este browser não
+  // tem `OffscreenCanvas` ou quando o trabalhador não consegue descodificar o
+  // ficheiro — e nesse caso segue-se, sem falhar nada, para o caminho de baixo.
+  const viaWorker = await prepareViaWorker(file, preset, keep, wantThumb);
+  if (viaWorker) {
+    const out = viaWorker.blob
+      ? new File([viaWorker.blob], jpegName(file.name), { type: "image/jpeg" })
+      : file;
+    const thumb = viaWorker.thumb
+      ? new File([viaWorker.thumb], thumbFileName(file.name), { type: "image/jpeg" })
+      : null;
+    return { file: out, thumb };
+  }
 
   let source: Source;
   try {

@@ -78,8 +78,8 @@ const WORK = path.join(os.tmpdir(), "bench-fotos-corpus");
 // ── Constantes que espelham o código em produção ─────────────────────────────
 // Se estas mudarem no código, mudam aqui — e o teste
 // src/lib/photo-pipeline.bench.test.ts falha a avisar que ficaram dessincronizadas.
-const COVER_MAX_EDGE = 3000; // PRESETS.cover.maxEdge  (image-prep.ts)
-const COVER_QUALITY = 0.92; // PRESETS.cover.quality
+const COVER_MAX_EDGE = 2200; // COVER_MAX_EDGE (image-prep.ts)
+const COVER_QUALITY = 0.9; // COVER_QUALITY (image-prep.ts)
 const COVER_KEEP_BYTES = 1_500_000; // PRESETS.cover.keepBytes
 const THUMB_EDGE = 400; // THUMB_EDGE
 const THUMB_QUALITY = 0.72; // THUMB_QUALITY
@@ -161,11 +161,19 @@ const PAGE_SETUP = () => {
     return c;
   };
   window.encode = (c, q) => new Promise((r) => c.toBlob(r, "image/jpeg", q));
+  // Os bytes viajam em base64: passar um array de milhões de números por
+  // page.evaluate é ordens de grandeza mais lento do que a própria medição.
+  window.toBytes = (b64) => {
+    const bin = atob(b64);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  };
 };
 
 /** O pipeline de hoje, cronometrado por passo. */
 const RUN_CURRENT = async ({ name, data, cfg }) => {
-  const file = new File([new Uint8Array(data)], name, { type: "image/jpeg" });
+  const file = new File([window.toBytes(data)], name, { type: "image/jpeg" });
   const now = () => performance.now();
   const out = { name, inBytes: file.size };
 
@@ -229,7 +237,7 @@ const RUN_CURRENT = async ({ name, data, cfg }) => {
  *   · webp — o mesmo, codificado em WebP em vez de JPEG.
  */
 const RUN_CANDIDATES = async ({ name, data, cfg }) => {
-  const file = new File([new Uint8Array(data)], name, { type: "image/jpeg" });
+  const file = new File([window.toBytes(data)], name, { type: "image/jpeg" });
   const now = () => performance.now();
   const res = {};
 
@@ -295,6 +303,82 @@ const RUN_CANDIDATES = async ({ name, data, cfg }) => {
   return res;
 };
 
+/**
+ * CONCORRÊNCIA — o `UPLOAD_CONCURRENCY = 4` de Temas.tsx compra alguma coisa?
+ *
+ * O pool lança 4 preparações ao mesmo tempo, mas `canvas`/`toBlob` correm na
+ * THREAD PRINCIPAL: quatro chamadas simultâneas não se dividem por quatro
+ * núcleos, fazem fila na mesma thread. Isto mede os três casos lado a lado —
+ * 4 em série, 4 pelo pool actual, e 4 em quatro Web Workers com OffscreenCanvas —
+ * para se saber quanto é que mudar de sítio o trabalho valeria.
+ */
+const RUN_CONCURRENCY = async ({ datas, cfg }) => {
+  const files = datas.map(
+    (d, i) => new File([window.toBytes(d)], `p${i}.jpg`, { type: "image/jpeg" }),
+  );
+  const prep = async (file) => {
+    const bmp = await createImageBitmap(file);
+    const { w, h } = window.fitWithin(bmp.width, bmp.height, cfg.maxEdge);
+    const c = window.drawTo(bmp, w, h);
+    const blob = await window.encode(c, cfg.quality);
+    const t = window.fitWithin(w, h, cfg.thumbEdge);
+    const c2 = window.drawTo(c, t.w, t.h);
+    const tb = await window.encode(c2, cfg.thumbQuality);
+    bmp.close();
+    return blob.size + tb.size;
+  };
+  const out = { cores: navigator.hardwareConcurrency };
+
+  await prep(files[0]); // aquecer
+
+  let t0 = performance.now();
+  for (let i = 0; i < 4; i++) await prep(files[i]);
+  out.serial4 = performance.now() - t0;
+
+  t0 = performance.now();
+  await Promise.all([0, 1, 2, 3].map((i) => prep(files[i])));
+  out.pool4 = performance.now() - t0;
+
+  const src = `
+    const fit=(w,h,m)=>{const s=Math.min(1,m/Math.max(w,h,1));return{w:Math.max(1,Math.round(w*s)),h:Math.max(1,Math.round(h*s))}};
+    self.onmessage = async (e) => {
+      const { file, cfg } = e.data;
+      const bmp = await createImageBitmap(file);
+      const { w, h } = fit(bmp.width, bmp.height, cfg.maxEdge);
+      const c = new OffscreenCanvas(w, h);
+      const x = c.getContext('2d');
+      x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+      x.drawImage(bmp, 0, 0, w, h);
+      const blob = await c.convertToBlob({ type: 'image/jpeg', quality: cfg.quality });
+      const t = fit(w, h, cfg.thumbEdge);
+      const c2 = new OffscreenCanvas(t.w, t.h);
+      const x2 = c2.getContext('2d');
+      x2.imageSmoothingEnabled = true; x2.imageSmoothingQuality = 'high';
+      x2.drawImage(c, 0, 0, t.w, t.h);
+      const tb = await c2.convertToBlob({ type: 'image/jpeg', quality: cfg.thumbQuality });
+      bmp.close();
+      self.postMessage(blob.size + tb.size);
+    };`;
+  const url = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+  const workers = [0, 1, 2, 3].map(() => new Worker(url));
+  const runW = (wk, file) =>
+    new Promise((res, rej) => {
+      wk.onerror = (e) => rej(new Error(e.message || "worker"));
+      wk.onmessage = (e) => res(e.data);
+      wk.postMessage({ file, cfg });
+    });
+  try {
+    await Promise.all(workers.map((wk, i) => runW(wk, files[i]))); // aquecer
+    t0 = performance.now();
+    await Promise.all(workers.map((wk, i) => runW(wk, files[i])));
+    out.workers4 = performance.now() - t0;
+  } catch (e) {
+    out.workersError = String(e && e.message);
+  }
+  workers.forEach((w) => w.terminate());
+  return out;
+};
+
 async function benchBrowser(corpus) {
   if (!fs.existsSync(CHROME)) {
     throw new Error(
@@ -303,7 +387,16 @@ async function benchBrowser(corpus) {
   }
   const browser = await chromium.launch({ executablePath: CHROME, args: ["--no-sandbox"] });
   const page = await browser.newPage();
-  await page.goto("about:blank");
+  // Uma origem real, e não about:blank: um Worker criado a partir de um Blob
+  // não arranca numa origem opaca, e a secção da concorrência precisa dele.
+  await page.route("**/*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><title>bench</title>",
+    }),
+  );
+  await page.goto("http://bench.local/");
   await page.addInitScript(PAGE_SETUP);
   await page.evaluate(PAGE_SETUP);
 
@@ -317,7 +410,7 @@ async function benchBrowser(corpus) {
 
   const rows = [];
   for (const item of corpus) {
-    const data = Array.from(await fsp.readFile(item.file));
+    const data = (await fsp.readFile(item.file)).toString("base64");
     const runs = [];
     for (let i = 0; i < REPEATS; i++) {
       runs.push(await page.evaluate(RUN_CURRENT, { name: item.name, data, cfg }));
@@ -351,8 +444,18 @@ async function benchBrowser(corpus) {
     );
   }
 
+  // Concorrência: usa as fotos de 8 MP (o caso central).
+  const mid = MP_LEVELS.includes(8) ? 8 : MP_LEVELS[Math.floor(MP_LEVELS.length / 2)];
+  const pick4 = corpus.filter((c) => c.mp === mid).slice(0, 4);
+  let concurrency = null;
+  if (pick4.length === 4) {
+    const datas = [];
+    for (const c of pick4) datas.push((await fsp.readFile(c.file)).toString("base64"));
+    concurrency = { mp: mid, ...(await page.evaluate(RUN_CONCURRENCY, { datas, cfg })) };
+  }
+
   await browser.close();
-  return rows;
+  return { rows, concurrency };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -548,8 +651,32 @@ function reportCandidates(rows) {
   }
 }
 
+function reportConcurrency(c) {
+  if (!c) return;
+  rule(`4. CONCORRÊNCIA — o pool de ${UPLOAD_CONCURRENCY} está mesmo a paralelizar?`);
+  console.log(
+    `\n  Quatro fotos de ${c.mp} MP, na mesma máquina (${c.cores} núcleos lógicos):\n` +
+      `    4 em série                       ${ms(c.serial4).padStart(9)}  (${(c.serial4 / 4).toFixed(0)} ms/foto)\n` +
+      `    4 pelo pool actual (thread princ.) ${ms(c.pool4).padStart(7)}  (${(c.pool4 / 4).toFixed(0)} ms/foto)  ` +
+      `→ ganho ${(c.serial4 / c.pool4).toFixed(2)}×`,
+  );
+  if (c.workers4) {
+    console.log(
+      `    4 em 4 Web Workers (OffscreenCanvas) ${ms(c.workers4).padStart(5)}  (${(c.workers4 / 4).toFixed(0)} ms/foto)  ` +
+        `→ ganho ${(c.serial4 / c.workers4).toFixed(2)}×`,
+    );
+  } else if (c.workersError) {
+    console.log(`    4 em 4 Web Workers: FALHOU (${c.workersError})`);
+  }
+  console.log(
+    `\n  ⇒ Subir o UPLOAD_CONCURRENCY não acelera a preparação: o trabalho de\n` +
+      `    canvas está todo na mesma thread e limita-se a fazer fila. Quem\n` +
+      `    paraleliza a sério são os workers.`,
+  );
+}
+
 function reportServer(byMp) {
-  rule("4. O SALTO DO MEIO — o que a função serverless paga só por estar lá");
+  rule("5. O SALTO DO MEIO — o que a função serverless paga só por estar lá");
   console.log("\n  (MEDIDO: ler o multipart + pôr os bytes em memória, em Node, na mesma máquina)");
   console.log("\n  MP    tamanho    ler multipart   arrayBuffer→Buffer   TOTAL na função");
   for (const [mp, rs] of [...byMp].sort((a, b) => a[0] - b[0])) {
@@ -578,7 +705,7 @@ function reportServer(byMp) {
 }
 
 function reportDisplay(rows, consumers) {
-  rule(`5. ORÇAMENTO DE VISUALIZAÇÃO — abrir uma página de ${THEME_PAGE_SIZE} fotos`);
+  rule(`6. ORÇAMENTO DE VISUALIZAÇÃO — abrir uma página de ${THEME_PAGE_SIZE} fotos`);
   const thumb = mean(rows.map((r) => r.thumbBytes));
   const orig = mean(rows.map((r) => r.outBytes));
   console.log(
@@ -599,7 +726,7 @@ function reportDisplay(rows, consumers) {
       `  está nos BYTES e não no número de idas e voltas.`,
   );
 
-  rule("6. DE QUE TAMANHO PRECISA MESMO O ORIGINAL?");
+  rule("7. DE QUE TAMANHO PRECISA MESMO O ORIGINAL?");
   console.log(
     `\n  Lido do código, não de memória:\n` +
       `    · Capa do PDF   caixa ${consumers.coverBoxPt.w}×${consumers.coverBoxPt.h} pt a ${consumers.coverDpi} DPI ` +
@@ -632,11 +759,12 @@ console.log(
 );
 
 console.log("  A medir o pipeline no navegador…\n");
-const rows = await benchBrowser(corpus);
+const { rows, concurrency } = await benchBrowser(corpus);
 
 const summary = reportUpload(rows);
 reportBatch(summary, UPLINKS);
 reportCandidates(rows);
+reportConcurrency(concurrency);
 
 if (!BROWSER_ONLY) {
   const server = await benchServerHop(corpus);
@@ -647,7 +775,7 @@ const consumers = await auditConsumers();
 reportDisplay(rows, consumers);
 
 if (JSON_OUT) {
-  await fsp.writeFile(JSON_OUT, JSON.stringify({ rows, summary, consumers }, null, 2));
+  await fsp.writeFile(JSON_OUT, JSON.stringify({ rows, summary, consumers, concurrency }, null, 2));
   console.log(`\n  Números em bruto gravados em ${JSON_OUT}`);
 }
 rule();

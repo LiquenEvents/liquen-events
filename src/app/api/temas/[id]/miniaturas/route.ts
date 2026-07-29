@@ -1,0 +1,326 @@
+import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
+import { isAuthed } from "@/lib/admin-auth";
+import { getTheme } from "@/lib/themes-store";
+import {
+  THEME_THUMB_BUCKET,
+  countThemeFiles,
+  fetchThemeImageBytes,
+  listThemeFiles,
+  themeFolder,
+} from "@/lib/theme-storage";
+import { BUCKET_FILE_SIZE_LIMIT, UPLOAD_MIME_TYPES } from "@/lib/proposal-storage";
+import { getSupabase, isDatabaseConfigured } from "@/lib/supabase";
+import { log } from "@/lib/logger";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+/**
+ * MINIATURAS EM FALTA — o remendo para a biblioteca que já existe.
+ *
+ * As miniaturas passaram a ser feitas no navegador ao carregar a foto. Tudo o
+ * que foi carregado ANTES disso — a biblioteca inteira da Catarina — não tem
+ * nenhuma, e a grelha cai no original: cada célula de 150 px puxa 2,6 MB. Uma
+ * página de 60 fotos são ~150 MB e (medido, a 50 Mbit/s) 26 segundos até a
+ * última aparecer. Com miniaturas a mesma página são 1,5 MB.
+ *
+ * Esta rota anda pela pasta de um tema e gera, com `sharp`, a miniatura que
+ * falta a cada foto. Porquê no servidor e não no navegador: para fazer a
+ * miniatura no browser era preciso DESCARREGAR o original (2,6 MB × 4000) para
+ * a máquina dela e voltar a subir — o dobro da rede, na ponta mais fraca da
+ * ligação. Aqui os bytes andam entre o Storage e a função, na mesma casa.
+ *
+ * COMO É CHAMADA: um POST por lote, com o `cursor` que o lote anterior
+ * devolveu. É o cliente que dá corda ao relógio, e é isso que a torna:
+ *   · RETOMÁVEL — fechar o separador a meio não perde nada; recomeçar do mesmo
+ *     cursor (ou do zero: o que já tem miniatura é saltado) acaba o trabalho;
+ *   · SEM BLOQUEIO — cada pedido é curto e a página fica a responder entre eles;
+ *   · HONESTA — cada resposta diz quantas viu, quantas gerou e quantas falharam.
+ *
+ * O ORIGINAL NUNCA É TOCADO: só se LÊ o bucket das fotos; só se ESCREVE no
+ * bucket das miniaturas, e sempre na mesma chave do original (é a regra que já
+ * existe: `theme-assets/<tema>/<uuid>.jpg` → `theme-thumbs/<tema>/<uuid>.jpg`).
+ *
+ * SEGURANÇA: o cliente manda um NÚMERO, e mais nada. Os caminhos são
+ * construídos aqui a partir da listagem da pasta deste tema, por isso não há
+ * caminho nenhum vindo de fora para validar — e continua a ser preciso sessão
+ * de admin, como em todas as rotas de temas.
+ */
+
+/**
+ * A miniatura tem de sair IGUAL à que o navegador faz (`image-prep.ts`:
+ * THUMB_EDGE = 400, THUMB_QUALITY = 0,72), senão a grelha ficava com dois
+ * tamanhos de miniatura conforme a foto fosse antiga ou nova. Estão repetidos
+ * aqui de propósito: `image-prep.ts` é um módulo "use client" e não tem nada
+ * que ser importado por uma rota.
+ */
+const THUMB_EDGE = 400;
+const THUMB_QUALITY = 72;
+
+/**
+ * Quantas fotos se EXAMINAM por pedido. Examinar é barato (uma listagem de
+ * metadados), gerar é que não — por isso a janela é larga: um tema que já
+ * esteja quase todo feito avança 200 fotos por pedido em vez de 8.
+ */
+const SCAN_WINDOW = 200;
+
+/**
+ * Quantas miniaturas se GERAM por pedido. Medido nesta máquina: descodificar +
+ * reduzir + codificar uma foto de 3000 px custa ~90 ms de CPU com o `sharp`, e
+ * a estes 8 juntam-se 8 descarregamentos de ~2,6 MB. Oito por pedido mantém-se
+ * folgadamente dentro do `maxDuration` de 60 s mesmo com o Storage lento, e é
+ * o suficiente para a barra de progresso andar a olhos vistos.
+ */
+const MAX_PER_BATCH = 8;
+
+/** Quantas fotos em voo dentro de um lote. Cada uma tem a sua bitmap
+ *  descodificada em memória (uma foto de 12 MP são ~36 MB em cru): três é o
+ *  que enche a rede sem pôr a função a arriscar a memória. */
+const BATCH_CONCURRENCY = 3;
+
+/** Uma miniatura maior do que isto não é uma miniatura — é um erro nosso. */
+const MAX_THUMB_BYTES = 2 * 1024 * 1024;
+
+/**
+ * MEMÓRIA CURTA DA PASTA DAS MINIATURAS.
+ *
+ * Para saber o que falta é preciso saber o que já lá está, e isso é listar o
+ * bucket das miniaturas: numa pasta de 4000 são 4 idas ao Storage. Fazê-lo a
+ * cada lote seriam 4 idas × 500 lotes. Guarda-se o conjunto de nomes durante
+ * 30 s DENTRO do processo e vai-se juntando o que se gera.
+ *
+ * Não é um índice nem uma segunda fonte de verdade: expira sozinho e, se
+ * estiver desactualizado, o pior que acontece é gerar-se uma miniatura que já
+ * existia (o `upsert` escreve por cima) ou saltar-se uma que foi apagada há
+ * pouco (a passagem seguinte apanha-a).
+ */
+const THUMB_SET_TTL_MS = 30_000;
+const thumbSets = new Map<string, { at: number; names: Set<string> }>();
+
+/** Páginas de miniaturas a listar (1000 × 20 = 20 000, o mesmo teto do resto
+ *  do módulo de Storage). */
+const THUMB_LIST_PAGE = 1000;
+const MAX_THUMB_PAGES = 20;
+
+/**
+ * Garante o bucket das miniaturas. Numa instalação anterior às miniaturas ele
+ * NÃO existe — que é exatamente o caso desta rota —, por isso é aqui que ele
+ * nasce, com os mesmos limites do bucket das fotos (privado, formatos e
+ * tamanho travados). Idempotente e silencioso perante uma corrida.
+ */
+async function ensureThumbBucket(): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  try {
+    const { data } = await sb.storage.getBucket(THEME_THUMB_BUCKET);
+    if (data) return true;
+    const { error } = await sb.storage.createBucket(THEME_THUMB_BUCKET, {
+      public: false,
+      fileSizeLimit: BUCKET_FILE_SIZE_LIMIT,
+      allowedMimeTypes: UPLOAD_MIME_TYPES,
+    });
+    if (error && !/exist/i.test(error.message)) {
+      log.error("miniaturas: createBucket falhou", error, {});
+      return false;
+    }
+    return true;
+  } catch (e) {
+    log.error("miniaturas: ensureThumbBucket falhou", e, {});
+    return false;
+  }
+}
+
+/** Os nomes das miniaturas que já existem na pasta deste tema. `null` = não foi
+ *  possível ler (e aí não se gera nada às cegas: seria refazer o que já existe). */
+async function existingThumbNames(folder: string): Promise<Set<string> | null> {
+  const hit = thumbSets.get(folder);
+  if (hit && Date.now() - hit.at < THUMB_SET_TTL_MS) return hit.names;
+  const sb = getSupabase();
+  if (!sb) return null;
+  const names = new Set<string>();
+  try {
+    for (let page = 0; page < MAX_THUMB_PAGES; page++) {
+      const { data, error } = await sb.storage.from(THEME_THUMB_BUCKET).list(folder, {
+        limit: THUMB_LIST_PAGE,
+        offset: page * THUMB_LIST_PAGE,
+      });
+      if (error || !data) return null;
+      for (const o of data) if (o.id && !o.name.startsWith(".")) names.add(o.name);
+      if (data.length < THUMB_LIST_PAGE) break;
+    }
+  } catch (e) {
+    log.warn("miniaturas: listagem falhou", { folder, erro: String(e) });
+    return null;
+  }
+  thumbSets.set(folder, { at: Date.now(), names });
+  return names;
+}
+
+/**
+ * Gera e guarda a miniatura de UMA foto. Devolve `true` se ficou guardada.
+ *
+ * Nunca lança e nunca toca no original: lê os bytes da foto, reduz para 400 px
+ * de lado maior e escreve na mesma chave, no bucket das miniaturas. Uma foto
+ * corrompida (ou que o `sharp` não leia) devolve `false` e o lote segue — uma
+ * foto má não pode travar as 3999 seguintes.
+ */
+async function makeThumb(path: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  try {
+    const bytes = await fetchThemeImageBytes(path);
+    if (!bytes) return false;
+    const thumb = await sharp(bytes, { failOn: "none" })
+      // `rotate()` sem argumentos = aplica a orientação do EXIF. Sem isto uma
+      // foto de telemóvel deitada aparecia deitada só na miniatura.
+      .rotate()
+      .resize(THUMB_EDGE, THUMB_EDGE, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: THUMB_QUALITY, progressive: false, chromaSubsampling: "4:2:0" })
+      .toBuffer();
+    if (thumb.byteLength === 0 || thumb.byteLength > MAX_THUMB_BYTES) return false;
+    const { error } = await sb.storage
+      .from(THEME_THUMB_BUCKET)
+      // `upsert: true` porque isto é reentrante por desenho: repetir um lote
+      // tem de dar o mesmo resultado, não um erro de "já existe".
+      .upload(path, thumb, { contentType: "image/jpeg", upsert: true });
+    if (error) {
+      log.warn("miniaturas: gravação falhou", { path, erro: error.message });
+      return false;
+    }
+    return true;
+  } catch (e) {
+    log.warn("miniaturas: geração falhou", { path, erro: String(e) });
+    return false;
+  }
+}
+
+/** Corre `worker` sobre `items` com no máximo `limit` em voo. `worker` nunca
+ *  lança — cada falha é contada por quem chama. */
+async function pool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (;;) {
+        const i = next++;
+        if (i >= items.length) return;
+        await worker(items[i]);
+      }
+    }),
+  );
+}
+
+/** O corpo JSON do pedido, ou `null` se não for sequer JSON. */
+async function body(request: NextRequest): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed = await request.json().catch(() => null);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * UM LOTE do trabalho. Corpo: `{ "cursor": 0 }` (ausente = começar do princípio).
+ *
+ * Devolve:
+ *   `scanned`    — fotos examinadas neste lote
+ *   `generated`  — miniaturas criadas
+ *   `skipped`    — já tinham miniatura
+ *   `failed`     — não foi possível gerar (foto ilegível, Storage a recusar…)
+ *   `nextCursor` — por onde continuar; `null` quando a pasta acabou
+ *   `total`      — fotos do tema (mínimo, se `truncated`), só para a barra
+ *
+ * A pasta é lida pela MESMA ordem da grelha (mais recentes primeiro), por isso
+ * as primeiras miniaturas a aparecer são as das fotos que ela vê primeiro.
+ */
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json({ error: "Armazenamento indisponível." }, { status: 503 });
+  }
+  const { id } = await params;
+  try {
+    const theme = await getTheme(id);
+    if (!theme) return NextResponse.json({ error: "Tema não encontrado" }, { status: 404 });
+
+    const folder = themeFolder(id);
+    if (!folder) return NextResponse.json({ error: "Tema inválido." }, { status: 400 });
+
+    const raw = (await body(request))?.cursor;
+    const n = Number(raw);
+    const cursor = Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0;
+
+    if (!(await ensureThumbBucket())) {
+      return NextResponse.json({ error: "Armazenamento indisponível." }, { status: 503 });
+    }
+
+    // A pasta das fotos, tal como a grelha a vê. Ilegível = 503 retomável: o
+    // cliente volta a tentar do MESMO cursor e não perde o trabalho já feito.
+    const listed = await listThemeFiles(id, SCAN_WINDOW, cursor);
+    if (!listed.ok) {
+      return NextResponse.json({ error: "Não foi possível ler a pasta do tema." }, { status: 503 });
+    }
+
+    const have = await existingThumbNames(folder);
+    if (!have) {
+      return NextResponse.json(
+        { error: "Não foi possível ler as miniaturas existentes." },
+        { status: 503 },
+      );
+    }
+
+    // Quantas fotos desta janela é que este lote consome: pára ao chegar às
+    // `MAX_PER_BATCH` que faltam, para o pedido não crescer sem limite.
+    let scanned = 0;
+    let skipped = 0;
+    const todo: string[] = [];
+    for (const name of listed.names) {
+      if (todo.length >= MAX_PER_BATCH) break;
+      scanned += 1;
+      if (have.has(name)) {
+        skipped += 1;
+        continue;
+      }
+      todo.push(name);
+    }
+
+    let generated = 0;
+    let failed = 0;
+    await pool(todo, BATCH_CONCURRENCY, async (name) => {
+      const ok = await makeThumb(`${folder}/${name}`);
+      if (ok) {
+        generated += 1;
+        // O conjunto em memória acompanha o que acabámos de escrever: sem
+        // isto, um lote repetido dentro da janela dos 30 s voltava a gerar.
+        have.add(name);
+      } else {
+        failed += 1;
+      }
+    });
+
+    // A página veio curta → a pasta acabou aqui (`listThemeFiles` marca
+    // `truncated` quando a página vem cheia).
+    const done = !listed.truncated && scanned >= listed.names.length;
+    // O cursor anda SEMPRE para a frente. Uma página cheia só de marcadores de
+    // pasta dá `names` vazio: avançar zero era ficar a pedir a mesma página
+    // para sempre.
+    const advance = scanned > 0 ? scanned : SCAN_WINDOW;
+    const counted = await countThemeFiles(id);
+
+    return NextResponse.json({
+      ok: true,
+      scanned,
+      generated,
+      skipped,
+      failed,
+      nextCursor: done ? null : cursor + advance,
+      total: counted.ok ? counted.total : null,
+      totalTruncated: counted.truncated,
+    });
+  } catch (err) {
+    log.error("temas miniaturas POST falhou", err, { id });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}

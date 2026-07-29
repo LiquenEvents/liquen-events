@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { fitWithin, keepOriginal, needsThumb, thumbFileName, THUMB_EDGE } from "./image-prep";
+import {
+  COVER_MAX_EDGE,
+  COVER_QUALITY,
+  fitWithin,
+  keepOriginal,
+  needsThumb,
+  thumbFileName,
+  THUMB_EDGE,
+} from "./image-prep";
+import { planResize, planThumb } from "./image-worker";
 
 /**
  * Pure-logic coverage for the upload image preparation. The canvas/decode path
@@ -68,6 +77,67 @@ describe("needsThumb", () => {
     // 420 px → 400 px não poupa nada que se veja; a margem de 25 % evita-o.
     expect(needsThumb(420, 300)).toBe(false);
     expect(needsThumb(700, 300)).toBe(true);
+  });
+});
+
+describe("preset da capa", () => {
+  /**
+   * A tira de capa do PDF: 277,8 × 595,3 pt desenhados a 160 DPI
+   * (`src/lib/proposal-image.ts`) = 617 × 1323 px. É a MAIOR utilização que uma
+   * foto da biblioteca alguma vez tem.
+   */
+  const COVER_PX = { w: 617, h: 1323 };
+
+  it("nunca obriga o PDF a AMPLIAR a foto de capa — nem no pior caso", () => {
+    // Pior caso: foto DEITADA (3:2) recortada para uma tira EM PÉ. O recorte só
+    // aproveita uma faixa central estreita do original.
+    const stored = fitWithin(4032, 3024, COVER_MAX_EDGE); // 2200 × 1650
+    const aspect = COVER_PX.w / COVER_PX.h;
+    const usableW = stored.h * aspect; // faixa central que o recorte aproveita
+    expect(usableW).toBeGreaterThan(COVER_PX.w);
+    expect(stored.h).toBeGreaterThan(COVER_PX.h);
+    // E com margem de sobreamostragem — é ela que mantém a capa nítida depois
+    // da redução. Abaixo de ~2000 px esta margem desaparece.
+    expect(usableW / COVER_PX.w).toBeGreaterThanOrEqual(1.2);
+  });
+
+  it("não guarda mais pixéis do que o PDF alguma vez desenha", () => {
+    // `MAX_IMAGE_EDGE_PX` em src/lib/proposal-image.ts. Guardar acima disto é
+    // pagar bytes por pixéis que nada renderiza.
+    expect(COVER_MAX_EDGE).toBeLessThanOrEqual(2200);
+  });
+
+  it("mantém a qualidade da capa alta (é a imagem herói do documento)", () => {
+    expect(COVER_QUALITY).toBeGreaterThanOrEqual(0.88);
+  });
+});
+
+describe("aritmética do trabalhador", () => {
+  /**
+   * O trabalhador tem a SUA cópia da aritmética (não pode importar um módulo
+   * "use client" cheio de DOM). Estes testes são a rede que impede as duas
+   * cópias de divergirem em silêncio — que daria fotos preparadas de maneira
+   * diferente conforme o browser tivesse ou não OffscreenCanvas.
+   */
+  const cases: [number, number, number][] = [
+    [4032, 3024, 2200],
+    [3024, 4032, 2200],
+    [800, 600, 2200],
+    [0, 0, 2200],
+    [1, 100000, 2200],
+    [4000, 3000, 400],
+  ];
+
+  it("planResize concorda com fitWithin", () => {
+    for (const [w, h, edge] of cases) {
+      expect(planResize(w, h, edge)).toEqual(fitWithin(w, h, edge));
+    }
+  });
+
+  it("planThumb concorda com needsThumb", () => {
+    for (const [w, h] of [...cases, [420, 300, 0], [700, 300, 0]] as [number, number, number][]) {
+      expect(planThumb(w, h, THUMB_EDGE)).toBe(needsThumb(w, h));
+    }
   });
 });
 

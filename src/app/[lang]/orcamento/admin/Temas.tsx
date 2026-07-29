@@ -54,6 +54,42 @@ const UPLOAD_CONCURRENCY = 4;
 /** Remoções em voo ao mesmo tempo (pedidos vazios: mais folga do que a subida). */
 const DELETE_CONCURRENCY = 6;
 
+/**
+ * QUANTOS ORIGINAIS A GRELHA DESCARREGA AO MESMO TEMPO — o número que decide
+ * se a primeira foto aparece a 1 segundo ou aos 26.
+ *
+ * Isto só se aplica às fotos SEM miniatura (a biblioteca anterior às
+ * miniaturas). Uma célula dessas puxa o original: ~2,6 MB para desenhar 150 px.
+ *
+ * Medido em Chromium, HTTP/2 (é o que o Storage fala), 60 fotos, 50 Mbit/s
+ * partilhados, TTFB de 60 ms — mediana de 2 corridas:
+ *
+ *   como estava (60 pedidos ao mesmo tempo) → 1ª foto aos 26 351 ms
+ *   tecto de 6 em voo                       → 1ª foto aos  2 634 ms
+ *   tecto de 3 em voo                       → 1ª foto aos  1 405 ms
+ *   tecto de 2 em voo                       → 1ª foto aos    928 ms
+ *
+ * A última foto chega ao mesmo tempo em todos (~26 s): o canal está cheio de
+ * qualquer maneira. O que muda é a ORDEM — sem tecto, os 60 downloads
+ * repartem o canal e acabam todos no fim, ou seja, a foto que está no ecrã
+ * espera pelas 59 que não estão.
+ *
+ * Três e não dois: a mesma medição a 300 Mbit/s (fibra) mostra que um tecto de
+ * 2 deixa de encher o canal — a última foto passa de 5316 ms (como estava)
+ * para 5389 ms, enquanto com 3 fica em 4936 ms. Com 3, a primeira foto aparece
+ * aos 297 ms a 300 Mbit/s e aos 1405 ms a 50 Mbit/s, e a última NUNCA chega
+ * depois do que chegava.
+ *
+ * As fotos COM miniatura não passam por aqui: são ~25 KB e medir mostrou que
+ * pôr-lhes um tecto PIORA (60 × 25 KB em ondas de 6 = 1019 ms contra 350 ms
+ * sem tecto). O que é caro é o byte, não o pedido.
+ */
+const HEAVY_IMAGE_CONCURRENCY = 3;
+
+/** Quantas células entram na primeira dobra — carregam já, e com prioridade.
+ *  Doze cobre duas linhas em ecrã largo (a grelha faz 6 colunas). */
+const ABOVE_FOLD = 12;
+
 /** Teto de ficheiros aceites de uma pasta largada — trava um engano
  *  ("larguei a pasta Fotos toda") antes de ele encher a memória do browser. */
 const MAX_DROP_FILES = 5000;
@@ -613,26 +649,228 @@ interface Failure {
 }
 
 /**
+ * Uma foto que ela largou e que ainda vai a caminho do servidor.
+ *
+ * Existe para uma coisa só: a foto aparecer na grelha NO MOMENTO em que ela a
+ * larga, a partir do ficheiro que já está no computador — em vez de o ecrã
+ * ficar com um espaço vazio durante os segundos que a subida demora.
+ */
+interface Pending {
+  /** Chave local da célula (a foto ainda não tem caminho no servidor). */
+  id: string;
+  name: string;
+  /** URL de objeto da foto local. `undefined` = ainda não há (ou o navegador
+   *  não sabe fazer URLs de objeto) e a célula fica um retângulo à espera. */
+  src?: string;
+}
+
+/** A página seguinte, pedida antes de ela a pedir. */
+interface Ahead {
+  /** O offset com que foi pedida: se a grelha entretanto mudou de tamanho
+   *  (subiu ou saiu uma foto), esta página deixou de encaixar e deita-se fora. */
+  offset: number;
+  images: ThemeImage[];
+  total: number | null;
+  truncated: boolean;
+  full: boolean;
+}
+
+/** O andamento da geração de miniaturas em falta. */
+interface ThumbJob {
+  running: boolean;
+  /** Por onde vai a passagem pela pasta (é o que a torna retomável). */
+  cursor: number;
+  scanned: number;
+  generated: number;
+  failed: number;
+  /** Fotos do tema, segundo o servidor. `null` = ainda não se sabe. */
+  total: number | null;
+  /** Acabou de percorrer a pasta toda. */
+  complete: boolean;
+}
+
+/**
+ * Quanto tempo se espera antes de ir buscar a página seguinte.
+ *
+ * A primeira página tem de chegar primeiro — pedir as duas ao mesmo tempo era
+ * fazer exatamente o que este trabalho todo veio corrigir. Medido, uma página
+ * de miniaturas fica no ecrã em ~350 ms; um segundo e meio é depois disso com
+ * folga, e continua a ser muito antes de ela chegar ao fundo da grelha.
+ */
+const PREFETCH_DELAY_MS = 1500;
+
+/** Quantas fotos do lote entram na grelha já com a imagem local à vista.
+ *  Mostrar as 300 de uma vez obrigava o navegador a descodificar 300 fotos de
+ *  12 MP para desenhar quadrados de 150 px; as restantes ganham a
+ *  pré-visualização quando a sua miniatura é gerada (que é logo a seguir). */
+const PREVIEW_EAGER = 12;
+
+/** Teto de lotes de uma passagem de miniaturas (8 fotos por lote): trava um
+ *  ciclo infinito se o servidor devolver sempre o mesmo cursor. */
+const MAX_THUMB_BATCHES = 2000;
+
+/** Quantas páginas já mostradas se voltam a pedir no fim da geração de
+ *  miniaturas, para a grelha passar a mostrar as novas. */
+const MAX_REFRESH_PAGES = 5;
+
+/** Um URL de objeto para a foto local, ou `undefined` onde o navegador não
+ *  saiba fazê-los (é o caso do jsdom, nos testes). */
+function objectUrl(file: File): string | undefined {
+  try {
+    return typeof URL !== "undefined" && typeof URL.createObjectURL === "function"
+      ? URL.createObjectURL(file)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function revokeUrl(url?: string) {
+  if (!url) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    /* nada a fazer — o URL já não existe */
+  }
+}
+
+/**
+ * A FILA DOS ORIGINAIS.
+ *
+ * Uma célula que não tem miniatura puxa o original (~2,6 MB). Deixar o browser
+ * pedir os 60 ao mesmo tempo — que é o que ele faz, e o `loading="lazy"` não
+ * trava: medido, pediu os 60 na mesma — reparte o canal por todos e faz com
+ * que TODOS acabem no fim. Esta fila deixa passar `HEAVY_IMAGE_CONCURRENCY` de
+ * cada vez, pela ordem da grelha, que é a ordem por que ela olha.
+ *
+ * Vive fora do componente porque o canal também é um só: duas grelhas abertas
+ * não têm o dobro da linha. É deliberadamente simples — sem estado partilhado
+ * a manter, sem React: uma foto pede vez, e larga-a quando acaba (ou quando a
+ * célula sai do ecrã).
+ */
+interface HeavySlot {
+  start: () => void;
+  started: boolean;
+  released: boolean;
+}
+const heavyWaiting: HeavySlot[] = [];
+let heavyLive = 0;
+
+/** Se um download ficar pendurado (nem carrega nem falha), a vez volta ao fim
+ *  deste tempo: uma foto encravada não pode fechar a grelha toda. */
+const HEAVY_SLOT_TIMEOUT_MS = 30_000;
+
+function pumpHeavy() {
+  while (heavyLive < HEAVY_IMAGE_CONCURRENCY && heavyWaiting.length > 0) {
+    const slot = heavyWaiting.shift();
+    if (!slot || slot.released) continue;
+    slot.started = true;
+    heavyLive += 1;
+    slot.start();
+  }
+}
+
+/** Pede vez para descarregar um original. Devolve a função de largar a vez —
+ *  serve para os dois casos (acabou / desistiu) e é idempotente. */
+function queueHeavyImage(start: () => void): () => void {
+  const slot: HeavySlot = { start, started: false, released: false };
+  heavyWaiting.push(slot);
+  pumpHeavy();
+  return () => {
+    if (slot.released) return;
+    slot.released = true;
+    if (slot.started) {
+      heavyLive = Math.max(0, heavyLive - 1);
+      pumpHeavy();
+      return;
+    }
+    const i = heavyWaiting.indexOf(slot);
+    if (i >= 0) heavyWaiting.splice(i, 1);
+  };
+}
+
+/**
  * A miniatura de uma foto na grelha.
  *
- * Mostra `thumbUrl` e cai no original quando ela não existe — é o caso das
- * fotos carregadas ANTES de as miniaturas existirem, e continua a ser o caso
- * se a miniatura tiver desaparecido do bucket (são derivadas e dispensáveis;
- * o original é que é o ativo). O `onError` é a segunda rede: um URL assinado
- * para um objeto que já lá não está falha no browser, e sem isto ficava uma
- * célula partida numa grelha inteira que funciona.
+ * Mostra, por esta ordem: a foto LOCAL (quando acabou de ser carregada nesta
+ * sessão — já está no computador dela, não se vai buscar nada), a miniatura, e
+ * só depois o original. As fotos carregadas ANTES de as miniaturas existirem
+ * não têm nenhuma, e é o original que aparece — é para essas que existe o
+ * botão "Gerar miniaturas em falta".
+ *
+ * O `onError` é a segunda rede: um URL assinado para um objeto que já lá não
+ * está falha no browser, e sem isto ficava uma célula partida numa grelha
+ * inteira que funciona.
  */
-function Photo({ image, alt }: { image: ThemeImage; alt: string }) {
-  const [src, setSrc] = useState(image.thumbUrl || image.url);
+function Photo({
+  image,
+  alt,
+  priority,
+  localSrc,
+}: {
+  image: ThemeImage;
+  alt: string;
+  /** Está na primeira dobra: não espera por nada. */
+  priority?: boolean;
+  /** URL de objeto da foto que está no disco dela (carregada agora). */
+  localSrc?: string;
+}) {
+  /** A imagem BARATA desta célula: a cópia local ou a miniatura (~25 KB). */
+  const light = localSrc || image.thumbUrl;
+  /** A barata falhou — miniatura apagada do bucket, ou cópia local já
+   *  libertada. Fica só o original, e esse entra na fila como qualquer outro. */
+  const [lightBroken, setLightBroken] = useState(false);
+  /** A fila deu a vez a esta célula. */
+  const [turn, setTurn] = useState(false);
+  /** Sem imagem barata, esta célula vai puxar ~2,6 MB: espera pela vez. */
+  const heavy = !light || lightBroken;
+  const release = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!heavy) return;
+    let timer = 0;
+    const free = queueHeavyImage(() => {
+      setTurn(true);
+      // Rede de segurança: um pedido que nunca termina não pode ficar com a
+      // vez para sempre.
+      timer = window.setTimeout(() => release.current?.(), HEAVY_SLOT_TIMEOUT_MS);
+    });
+    release.current = () => {
+      window.clearTimeout(timer);
+      free();
+    };
+    return () => {
+      release.current?.();
+      release.current = null;
+    };
+    // `image.url` entra nas dependências para uma foto reassinada voltar a
+    // pedir vez em vez de ficar com um URL expirado.
+  }, [heavy, image.url]);
+
+  // Uma célula à espera de vez fica SEM `src` (e não com `src=""`, que é um
+  // pedido à própria página). É a única forma de a fila valer alguma coisa: um
+  // `src` posto é um download começado.
+  const src = heavy ? (turn ? image.url : undefined) : light;
+
+  const finished = () => {
+    release.current?.();
+    release.current = null;
+  };
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={alt}
-      loading="lazy"
+      // As pesadas são geridas pela fila — pô-las também em `lazy` fazia uma
+      // célula fora do ecrã ficar com a vez sem chegar a pedir nada.
+      loading={heavy || priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       decoding="async"
+      onLoad={finished}
       onError={() => {
-        if (src !== image.url) setSrc(image.url);
+        finished();
+        if (!heavy) setLightBroken(true);
       }}
       className="h-full w-full object-cover"
     />
@@ -671,6 +909,16 @@ function ThemeFolder({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [failed, setFailed] = useState<Failure[]>([]);
+  /** As fotos deste lote que ainda não voltaram do servidor, já à vista com a
+   *  imagem que está no disco dela — ver `Pending`. */
+  const [pending, setPending] = useState<Pending[]>([]);
+  /** `caminho → URL de objeto` das fotos carregadas NESTA sessão: a grelha
+   *  mostra a cópia local em vez de ir buscar ao Storage o que já cá está. */
+  const [localSrc, setLocalSrc] = useState<Map<string, string>>(new Map());
+  /** A página seguinte, já pedida e guardada — ver `prefetch`. */
+  const [ahead, setAhead] = useState<Ahead | null>(null);
+  /** A geração de miniaturas em falta, quando está a decorrer ou acabou. */
+  const [thumbJob, setThumbJob] = useState<ThumbJob | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /** Índice da foto que está a ser arrastada (null = arrasto parado). */
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -693,11 +941,28 @@ function ThemeFolder({
   /** Âncora do Shift+clique (índice na grelha à vista). */
   const anchor = useRef<number | null>(null);
 
+  /** Todos os URLs de objeto criados nesta pasta. Sair da pasta liberta-os
+   *  todos de uma vez — é a única forma de garantir que nenhum fica pendurado,
+   *  seja qual for o caminho por onde o lote acabou. */
+  const objectUrls = useRef<Set<string>>(new Set());
+  /** Pedido para parar a geração de miniaturas (o botão "Parar"). */
+  const stopThumbs = useRef(false);
+
   useEffect(() => {
     alive.current = true;
+    const urls = objectUrls.current;
     return () => {
       alive.current = false;
+      for (const url of urls) revokeUrl(url);
+      urls.clear();
     };
+  }, []);
+
+  /** Um URL de objeto para esta foto, já registado para ser libertado à saída. */
+  const trackUrl = useCallback((file: File): string | undefined => {
+    const url = objectUrl(file);
+    if (url) objectUrls.current.add(url);
+    return url;
   }, []);
 
   // `onFolderState` é recriada a cada render do pai; guardá-la numa ref deixa
@@ -803,11 +1068,33 @@ function ThemeFolder({
     setProgress((p) => ({ done: p?.done ?? 0, total: (p?.total ?? 0) + files.length }));
     let added = 0;
     const errors: Failure[] = [];
+
+    // AS FOTOS ENTRAM NA GRELHA AGORA, do ficheiro que está no computador —
+    // não daqui a três segundos, quando o servidor responder. As primeiras
+    // levam já o URL de objeto; as outras recebem-no quando lhes chegar a vez
+    // de serem preparadas (aí já é a MINIATURA, que é barata de desenhar).
+    const batch = files.map((file, i) => ({
+      file,
+      item: {
+        id: `${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+        name: file.name,
+        src: i < PREVIEW_EAGER ? trackUrl(file) : undefined,
+      } as Pending,
+    }));
+    setPending((prev) => [...batch.map((b) => b.item), ...prev]);
+
+    /** Tira a célula provisória da grelha. `keepUrl` fica com o URL de objeto
+     *  (passou a ser a imagem da foto verdadeira); senão é revogado aqui. */
+    const dropPending = (item: Pending, keepUrl: boolean) => {
+      setPending((prev) => prev.filter((p) => p.id !== item.id));
+      if (!keepUrl) revokeUrl(item.src);
+    };
+
     try {
       await pool(
-        files,
+        batch,
         UPLOAD_CONCURRENCY,
-        async (f) => {
+        async ({ file: f, item }) => {
           try {
             // Preset "cover" e não "board": uma foto da biblioteca tem DOIS
             // destinos possíveis — uma célula de mood board ou uma imagem de
@@ -815,6 +1102,21 @@ function ThemeFolder({
             // sempre (o original nunca mais existe). A miniatura sai da MESMA
             // descodificação, para um lote de 300 fotos não custar o dobro.
             const { file, thumb } = await prepareImageWithThumb(f, "cover");
+            // A miniatura acabada de fazer é a melhor pré-visualização que há:
+            // 400 px, ~25 KB, e já está em memória. As células que ainda não
+            // tinham imagem ganham-na aqui; as que já tinham ficam com a que
+            // têm (trocar era piscar por nada).
+            if (!item.src) {
+              const preview = trackUrl(thumb ?? file);
+              if (preview) {
+                item.src = preview;
+                if (alive.current) {
+                  setPending((prev) =>
+                    prev.map((p) => (p.id === item.id ? { ...p, src: preview } : p)),
+                  );
+                }
+              }
+            }
             const form = new FormData();
             form.append("files", file);
             if (thumb) form.append("thumbs", thumb);
@@ -827,6 +1129,11 @@ function ThemeFolder({
             const im: ThemeImage | undefined = data?.images?.[0];
             if (!im?.path) throw new Error(`Falha ao carregar "${f.name}".`);
             if (!alive.current) return;
+            // A célula provisória dá lugar à foto verdadeira SEM piscar: o URL
+            // de objeto passa a ser a imagem desta foto na grelha, por isso não
+            // se vai buscar ao Storage uma miniatura que já cá está.
+            if (item.src) setLocalSrc((prev) => new Map(prev).set(im.path, item.src as string));
+            dropPending(item, Boolean(item.src));
             // Cada foto entra na grelha assim que chega. Juntar o lote todo e no
             // fim fazer `[...lote, ...images]` lia um `images` velho: dois lotes
             // em paralelo perdiam fotos e uma foto removida entretanto voltava.
@@ -834,6 +1141,10 @@ function ThemeFolder({
             setTotal((t) => (t === null ? null : t + 1));
             added += 1;
           } catch (e) {
+            // A foto não subiu: a célula provisória sai (a caixa vermelha do
+            // "tentar novamente" é que passa a contar a história) e o URL de
+            // objeto é libertado.
+            dropPending(item, false);
             errors.push({
               file: f,
               message: e instanceof Error ? e.message : `Falha ao carregar "${f.name}".`,
@@ -866,6 +1177,136 @@ function ThemeFolder({
         // quando já não falta nenhum ficheiro de nenhum dos lotes.
         setProgress((p) => (p && p.done >= p.total ? null : p));
       }
+    }
+  }
+
+  /**
+   * Volta a pedir as páginas que estão à vista, para a grelha passar a mostrar
+   * as miniaturas acabadas de gerar em vez dos originais.
+   *
+   * Substitui cada foto pela mesma foto (a chave é o `path`), por isso não
+   * mexe na ordem, na seleção, nem no que subiu entretanto. Só as primeiras
+   * `MAX_REFRESH_PAGES`: quem tiver aberto mais do que 300 fotos vê o resto
+   * aliviado no próximo carregamento da página — e voltar a assinar 4000 URLs
+   * para isso seria trocar um problema por outro.
+   */
+  async function refreshVisibleThumbs(count: number) {
+    const pages = Math.min(Math.ceil(count / THEME_PAGE_SIZE), MAX_REFRESH_PAGES);
+    const fresh = new Map<string, ThemeImage>();
+    for (let p = 0; p < pages; p++) {
+      try {
+        const res = await fetch(
+          `/api/temas/${theme.id}/imagens?offset=${p * THEME_PAGE_SIZE}&limit=${THEME_PAGE_SIZE}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        for (const im of (Array.isArray(data?.images) ? data.images : []) as ThemeImage[]) {
+          if (im?.path) fresh.set(im.path, im);
+        }
+      } catch {
+        return;
+      }
+    }
+    if (!alive.current || fresh.size === 0) return;
+    setImages((prev) => prev.map((im) => fresh.get(im.path) ?? im));
+    // A cópia local deixa de ser precisa para as que passaram a ter miniatura:
+    // a partir daqui a grelha mostra a miniatura do servidor, como qualquer
+    // outra foto. (Os URLs de objeto são libertados à saída da pasta.)
+  }
+
+  /**
+   * GERAR AS MINIATURAS QUE FALTAM.
+   *
+   * Um pedido por lote, com o cursor que o servidor devolve. Parece
+   * complicado e é o que torna isto usável: cada pedido é curto (o ecrã nunca
+   * congela), fechar o separador não perde nada (recomeça-se do princípio e o
+   * que já está feito é saltado), e o que falha é contado à vista em vez de
+   * desaparecer.
+   */
+  async function runThumbJob() {
+    if (thumbJob?.running) return;
+    stopThumbs.current = false;
+    let cursor = 0;
+    let scanned = 0;
+    let generated = 0;
+    let failedCount = 0;
+    let complete = false;
+    setThumbJob({
+      running: true,
+      cursor,
+      scanned,
+      generated,
+      failed: failedCount,
+      total,
+      complete: false,
+    });
+    try {
+      for (let batch = 0; batch < MAX_THUMB_BATCHES; batch++) {
+        if (!alive.current || stopThumbs.current) break;
+        let data: {
+          scanned?: number;
+          generated?: number;
+          failed?: number;
+          nextCursor?: number | null;
+          total?: number | null;
+        } | null = null;
+        try {
+          const res = await fetch(`/api/temas/${theme.id}/miniaturas`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cursor }),
+          });
+          const body = await res.json().catch(() => null);
+          if (!res.ok) {
+            toast(
+              body?.error ||
+                "Não foi possível gerar as miniaturas agora. O que já foi feito fica guardado.",
+              "error",
+            );
+            break;
+          }
+          data = body;
+        } catch {
+          toast("Erro de ligação ao gerar as miniaturas. Pode continuar mais tarde.", "error");
+          break;
+        }
+        scanned += data?.scanned ?? 0;
+        generated += data?.generated ?? 0;
+        failedCount += data?.failed ?? 0;
+        const next = data?.nextCursor;
+        cursor = typeof next === "number" ? next : cursor;
+        if (!alive.current) return;
+        setThumbJob({
+          running: true,
+          cursor,
+          scanned,
+          generated,
+          failed: failedCount,
+          total: typeof data?.total === "number" ? data.total : total,
+          complete: false,
+        });
+        if (next === null || next === undefined) {
+          complete = true;
+          break;
+        }
+      }
+    } finally {
+      if (alive.current) {
+        setThumbJob((j) =>
+          j ? { ...j, running: false, scanned, generated, failed: failedCount, complete } : j,
+        );
+      }
+    }
+    if (!alive.current) return;
+    if (generated > 0) {
+      toast(
+        `${plural(generated, "miniatura criada", "miniaturas criadas")}. O tema passa a abrir muito mais depressa.`,
+        "success",
+      );
+      await refreshVisibleThumbs(images.length);
+    } else if (complete) {
+      toast("Já não faltavam miniaturas neste tema.", "info");
     }
   }
 
@@ -916,8 +1357,28 @@ function ThemeFolder({
     pick(found);
   }
 
+  /** Junta ao ecrã uma página que já veio do servidor (pedida agora ou de
+   *  antemão). Um só sítio a mexer nestes quatro estados. */
+  const absorb = useCallback(
+    (page: ThemeImage[], pageTotal: number | null, pageTruncated: boolean, full: boolean) => {
+      setImages((prev) => mergePage(prev, page));
+      if (pageTotal !== null) setTotal(pageTotal);
+      setTruncated(pageTruncated);
+      setPageFull(full);
+    },
+    [],
+  );
+
   async function loadMore() {
     if (loadingMore) return;
+    // A página seguinte já cá está: entra sem esperar por nada. É este o
+    // caminho normal — o pedido foi feito 1,5 s depois de a pasta abrir.
+    if (ahead && ahead.offset === images.length) {
+      const next = ahead;
+      setAhead(null);
+      absorb(next.images, next.total, next.truncated, next.full);
+      return;
+    }
     setLoadingMore(true);
     try {
       const res = await fetch(
@@ -928,16 +1389,67 @@ function ThemeFolder({
       const data = await res.json();
       if (!alive.current) return;
       const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
-      setImages((prev) => mergePage(prev, page));
-      if (typeof data?.total === "number") setTotal(data.total);
-      setTruncated(Boolean(data?.truncated));
-      setPageFull(page.length >= THEME_PAGE_SIZE);
+      absorb(
+        page,
+        typeof data?.total === "number" ? data.total : null,
+        Boolean(data?.truncated),
+        page.length >= THEME_PAGE_SIZE,
+      );
     } catch {
       toast("Não foi possível carregar mais fotos.", "error");
     } finally {
       if (alive.current) setLoadingMore(false);
     }
   }
+
+  /**
+   * A PÁGINA SEGUINTE, ANTES DE ELA A PEDIR.
+   *
+   * Só depois de a primeira estar no ecrã (`PREFETCH_DELAY_MS`), e só UMA: o
+   * objetivo é que o "Mostrar mais" seja instantâneo, não descarregar o tema
+   * todo às escondidas — um tema tem 4000 fotos e assinar URLs custa ao
+   * servidor. A página guardada trava-se a um `offset`: se entretanto entrar
+   * ou sair uma foto, deixa de encaixar e é deitada fora (o efeito volta a
+   * correr e pede a certa).
+   */
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore) return;
+    if (ahead) {
+      if (ahead.offset !== images.length) setAhead(null);
+      return;
+    }
+    let cancelled = false;
+    const offset = images.length;
+    const timer = window.setTimeout(() => {
+      (async () => {
+        try {
+          const res = await fetch(
+            `/api/temas/${theme.id}/imagens?offset=${offset}&limit=${THEME_PAGE_SIZE}`,
+            { cache: "no-store" },
+          );
+          if (!res.ok) return;
+          const data = await res.json();
+          if (cancelled || !alive.current) return;
+          const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
+          if (page.length === 0) return;
+          setAhead({
+            offset,
+            images: page,
+            total: typeof data?.total === "number" ? data.total : null,
+            truncated: Boolean(data?.truncated),
+            full: page.length >= THEME_PAGE_SIZE,
+          });
+        } catch {
+          // Falhar a adivinhar não é um erro que se mostre: o botão "Mostrar
+          // mais" continua a fazer o pedido à mão, com a sua própria mensagem.
+        }
+      })();
+    }, PREFETCH_DELAY_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [theme.id, loading, loadingMore, hasMore, ahead, images.length]);
 
   function toggleAt(index: number, extend: boolean) {
     // A âncora é lida AGORA e só depois movida: o React corre o `setSelected`
@@ -1168,6 +1680,17 @@ function ThemeFolder({
   const selectedCount = selected.size;
   const pct =
     progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  /**
+   * Há fotos a ser mostradas a partir do ORIGINAL — é o que acontece a tudo o
+   * que foi carregado antes de as miniaturas existirem. Não é uma suposição: é
+   * lido das fotos que estão à vista (as que subiram agora contam-se como
+   * feitas, porque a miniatura foi com elas).
+   */
+  const missingThumbs = images.some((im) => !im.thumbUrl && !localSrc.has(im.path));
+  const thumbPct =
+    thumbJob && thumbJob.total && thumbJob.total > 0
+      ? Math.min(100, Math.round((thumbJob.cursor / thumbJob.total) * 100))
+      : 0;
 
   return (
     <div>
@@ -1258,6 +1781,84 @@ function ThemeFolder({
             Pode ir fazer outra coisa — enquanto este separador ficar aberto, as fotos continuam a
             subir e vão aparecendo aqui.
           </p>
+        </Card>
+      )}
+
+      {/* MINIATURAS EM FALTA — só aparece quando há mesmo fotos a ser
+          mostradas a partir do original, e desaparece quando deixa de haver. */}
+      {(missingThumbs || thumbJob) && !unreadable && (
+        <Card padding="sm" className="mb-4">
+          {thumbJob?.running ? (
+            <>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm text-foreground/80">
+                  A gerar miniaturas —{" "}
+                  <strong className="font-medium">
+                    {plural(thumbJob.generated, "criada", "criadas")}
+                  </strong>{" "}
+                  em {thumbJob.scanned} fotos vistas
+                  {thumbJob.total ? ` de ${thumbJob.total}` : ""}…
+                </p>
+                <span className="bo-text-muted text-xs">{thumbPct}%</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label="Progresso da geração de miniaturas"
+                aria-valuemin={0}
+                aria-valuemax={thumbJob.total ?? undefined}
+                aria-valuenow={thumbJob.cursor}
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+              >
+                <div
+                  className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
+                  style={{ width: `${thumbPct}%` }}
+                />
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    stopThumbs.current = true;
+                  }}
+                >
+                  Parar
+                </Button>
+                <span className="bo-text-muted text-xs">
+                  Pode continuar a trabalhar — e parar a meio não perde nada: da próxima vez
+                  continua de onde ficou.
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-foreground/80">
+                {missingThumbs
+                  ? "Há fotos antigas sem miniatura — a grelha está a mostrar as fotos em tamanho real (uns 2,6 MB cada), e é por isso que este tema demora a abrir."
+                  : "As miniaturas deste tema estão feitas."}
+              </p>
+              {thumbJob && (
+                <p className="bo-text-muted mt-1 text-xs">
+                  {plural(thumbJob.generated, "miniatura criada", "miniaturas criadas")} ·{" "}
+                  {thumbJob.scanned} fotos vistas
+                  {thumbJob.failed > 0
+                    ? ` · ${plural(thumbJob.failed, "foto sem miniatura", "fotos sem miniatura")}`
+                    : ""}
+                  {thumbJob.complete ? " · concluído" : " · parado a meio"}
+                </p>
+              )}
+              {missingThumbs && (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <Button size="sm" variant="secondary" onClick={() => void runThumbJob()}>
+                    {thumbJob ? "Continuar a gerar miniaturas" : "Gerar miniaturas em falta"}
+                  </Button>
+                  <span className="bo-text-muted text-xs">
+                    As fotos originais não são alteradas.
+                  </span>
+                </div>
+              )}
+            </>
+          )}
         </Card>
       )}
 
@@ -1353,7 +1954,7 @@ function ThemeFolder({
               pouco.
             </p>
           </div>
-        ) : images.length === 0 ? (
+        ) : images.length === 0 && pending.length === 0 ? (
           <div className="py-12 text-center">
             <p className="bo-text-muted text-sm">
               Arraste para aqui as fotos deste tema — ou uma pasta inteira —, ou use “Adicionar
@@ -1364,6 +1965,33 @@ function ThemeFolder({
         ) : (
           <>
             <div className="grid select-none grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+              {/* AS FOTOS QUE ELA ACABOU DE LARGAR, já à vista, ainda a
+                  caminho do servidor. Não são selecionáveis nem removíveis
+                  (ainda não existem lá), e o leitor de ecrã segue a barra de
+                  progresso — não 300 células a anunciarem-se. */}
+              {pending.map((p) => (
+                <div
+                  key={p.id}
+                  aria-hidden
+                  title={`${p.name} — a carregar`}
+                  className="relative aspect-square overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]"
+                >
+                  {p.src ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.src}
+                      alt=""
+                      decoding="async"
+                      className="h-full w-full object-cover opacity-60"
+                    />
+                  ) : (
+                    <div className="bo-skeleton h-full w-full" />
+                  )}
+                  <span className="absolute inset-x-1 bottom-1 rounded-md bg-black/55 px-1.5 py-0.5 text-center text-[10px] uppercase tracking-[0.06em] text-white">
+                    A carregar
+                  </span>
+                </div>
+              ))}
               {images.map((im, i) => {
                 const isSelected = selected.has(im.path);
                 const isCover = im.path === coverPath;
@@ -1407,8 +2035,14 @@ function ThemeFolder({
                   >
                     {/* A célula já tem `aspect-square`, por isso adiar a foto
                         não salta nada. E o que se mostra é a MINIATURA: com o
-                        original, uma página de 60 fotos puxava ~180 MB. */}
-                    <Photo image={im} alt="" />
+                        original, uma página de 60 fotos puxava ~150 MB. As da
+                        primeira dobra não esperam pela vez de ninguém. */}
+                    <Photo
+                      image={im}
+                      alt=""
+                      priority={i < ABOVE_FOLD}
+                      localSrc={localSrc.get(im.path)}
+                    />
                     {/* A célula inteira é o alvo da seleção — um alvo pequeno
                         numa grelha de 60 fotos seria um exercício de pontaria. */}
                     <button

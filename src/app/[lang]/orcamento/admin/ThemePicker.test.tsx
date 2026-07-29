@@ -184,8 +184,7 @@ describe("ThemePicker", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(photo(TOTAL));
     expect(photo(TOTAL)).toHaveAttribute("aria-pressed", "true");
-  }, // 41 cliques numa grelha de 41 células = 41 renderizações completas do
-  // diálogo. Não é lento por acidente, é o que este teste faz — e os 5 s por
+  }, // diálogo. Não é lento por acidente, é o que este teste faz — e os 5 s por // 41 cliques numa grelha de 41 células = 41 renderizações completas do
   // omissão não chegam num runner de CI partilhado.
   20_000);
 
@@ -248,6 +247,62 @@ describe("ThemePicker", () => {
 
     expect(photo(1).querySelector("img")).toHaveAttribute("src", "https://cdn.test/thumb-1.jpg");
     expect(photo(2).querySelector("img")).toHaveAttribute("src", "https://cdn.test/foto-2.jpg");
+  });
+
+  it("as fotos sem miniatura entram numa fila — a que está à vista não espera pelas outras", async () => {
+    // O caso da biblioteca antiga: 60 fotos, cada uma com o seu original de
+    // ~2,6 MB. Medido em Chromium a 50 Mbit/s: com os 60 downloads ao mesmo
+    // tempo (o que o browser faz por omissão), a PRIMEIRA foto só aparece aos
+    // 26 s. Três de cada vez, pela ordem da grelha, põe-na lá em ~1,4 s.
+    photos = folder(THEME_PAGE_SIZE, () => false);
+    await openPicker(true);
+
+    const imgs = () => cells().map((c) => c.querySelector("img") as HTMLImageElement);
+    const started = () => imgs().filter((i) => i.getAttribute("src")).length;
+
+    expect(cells()).toHaveLength(THEME_PAGE_SIZE);
+    console.log("HTML", cells()[0].outerHTML, cells()[1].outerHTML);
+    expect(started()).toBe(3);
+    expect(imgs()[0].getAttribute("src")).toBe("https://cdn.test/foto-1.jpg");
+
+    // Cada uma que acaba liberta a vez seguinte.
+    fireEvent.load(imgs()[0]);
+    await waitFor(() => expect(started()).toBe(4));
+  });
+
+  it("com miniatura não há fila: 25 KB não precisam de vez", async () => {
+    photos = folder(THEME_PAGE_SIZE);
+    await openPicker(true);
+
+    const imgs = () => cells().map((c) => c.querySelector("img") as HTMLImageElement);
+    expect(imgs().filter((i) => i.getAttribute("src"))).toHaveLength(THEME_PAGE_SIZE);
+    // A primeira dobra não espera pelo `lazy`; o resto do rolo espera.
+    expect(imgs()[0]).toHaveAttribute("loading", "eager");
+    expect(imgs()[0]).toHaveAttribute("fetchpriority", "high");
+    expect(imgs()[THEME_PAGE_SIZE - 1]).toHaveAttribute("loading", "lazy");
+  });
+
+  it("a página seguinte chega antes de ela a pedir, e mudar de tema deita-a fora", async () => {
+    photos = folder(150);
+    route("GET /api/temas", () =>
+      ok([THEME, { ...THEME, id: "t2", name: "Itália", imageCount: 2 }]),
+    );
+    route("GET /api/temas/t2/imagens", () =>
+      ok({ ok: true, images: folder(2), total: 2, truncated: false }),
+    );
+    await openPicker(true);
+
+    const pageCalls = () => calls.filter((c) => c.includes("/api/temas/t1/imagens")).length;
+    expect(pageCalls()).toBe(1);
+
+    // Passado o tempo de espera, a página seguinte já foi buscada — uma só.
+    await waitFor(() => expect(pageCalls()).toBe(2), { timeout: 4000 });
+    expect(calls[calls.length - 1]).toContain(`offset=${THEME_PAGE_SIZE}`);
+
+    // O "Mostrar mais" não faz pedido nenhum: as fotos já cá estão.
+    fireEvent.click(screen.getByRole("button", { name: /Mostrar mais/ }));
+    await waitFor(() => expect(cells()).toHaveLength(THEME_PAGE_SIZE * 2));
+    expect(pageCalls()).toBe(2);
   });
 
   it("'todas as visíveis' e o Shift+clique param no teto, avisando", async () => {

@@ -25,6 +25,14 @@ import { Button, Card, Field, Segmented } from "./ui";
 type StudioDoc = Parameters<typeof withProposalDefaults>[0];
 
 // ── Shared styling (matches ProposalBuilder / PaymentsPanel) ──
+/**
+ * Fotos a preparar/enviar ao mesmo tempo num carregamento. Quatro é o mesmo
+ * número que a Biblioteca de Temas usa: chega para a rede nunca ficar parada à
+ * espera do processador (nem o contrário) sem encher a ligação da Catarina, que
+ * é a mesma por onde ela está a trabalhar.
+ */
+const UPLOAD_CONCURRENCY = 4;
+
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-foreground/85";
 const ADD_BTN =
   "inline-flex items-center gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors";
@@ -490,18 +498,33 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     // a higher JPEG quality; mood-board photos render as small collage cells and
     // use a tighter cap. The upload key encodes which is which ("cover-…"/"board-…").
     const kind: ImageKind = key.startsWith("board-") ? "board" : "cover";
-    const paths: string[] = [];
+    // Preparar e enviar em VIAS PARALELAS. Em sequência, o processador ficava
+    // parado à espera da rede e a rede parada à espera do processador; assim a
+    // foto N+1 é preparada enquanto a N sobe. A preparação em si já corre fora
+    // do fio principal (image-prep → image-worker), por isso a interface
+    // continua a responder durante o lote.
+    const results: ({ path: string } | null)[] = new Array(files.length).fill(null);
     const errors: string[] = [];
-    try {
-      for (const f of files) {
+    let next = 0;
+    async function lane() {
+      for (;;) {
+        const i = next++;
+        if (i >= files.length) return;
+        const f = files[i];
         try {
           const prepared = await prepareImageForUpload(f, kind);
           const im = await uploadOne(prepared);
-          paths.push(im.path);
+          // Guardado pelo ÍNDICE: as vias acabam fora de ordem e a ordem das
+          // fotos escolhidas é a que a Catarina vê no documento.
+          results[i] = { path: im.path };
         } catch (e) {
           errors.push(e instanceof Error ? e.message : `Falha ao carregar "${f.name}".`);
         }
       }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, lane));
+      const paths = results.filter((r): r is { path: string } => r !== null).map((r) => r.path);
       if (paths.length > 0) onPaths(paths);
       if (errors.length > 0) {
         toast(
