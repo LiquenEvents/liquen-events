@@ -19,7 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     # Informational: surfaces scores on every PR without blocking the merge.
     continue-on-error: true
-    timeout-minutes: 15
+    # Era 15, e o job passou a bater nele: duas tentativas seguidas no mesmo
+    # commit foram canceladas aos 15m19s e 15m15s, depois de todo o dia a correr
+    # em ~14m30s. Não é uma regressão de desempenho do site — é o job a crescer
+    # (instalação + build + DUAS passagens do Lighthouse, secretária e
+    # telemóvel), e um cancelamento não distingue "lento" de "avariado".
+    #
+    # 25 dá folga sem esconder crescimento: os orçamentos que reprovam a
+    # qualidade continuam a ser os do lighthouserc, que não mexem aqui.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
