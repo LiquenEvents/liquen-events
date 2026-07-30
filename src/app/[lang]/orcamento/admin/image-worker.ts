@@ -114,6 +114,25 @@ export async function prepareInWorker(
 
 // Registo do recetor de mensagens. Guardado para este módulo poder ser
 // importado por um teste (em Node não há `DedicatedWorkerGlobalScope`).
+//
+// NÃO ACRESCENTAR UMA VERIFICAÇÃO DE `e.origin` AQUI — partiria o carregamento
+// de fotos por inteiro.
+//
+// O CodeQL assinala este `onmessage` com "Missing origin verification in
+// postMessage handler". A regra existe para `window.addEventListener("message")`,
+// onde um enquadramento de outra origem pode mandar mensagens e é preciso
+// filtrar. Um trabalhador DEDICADO não é isso: só o documento que o criou lhe
+// consegue falar, não há forma de outra origem obter uma referência para ele, e
+// o guarda `self instanceof DedicatedWorkerGlobalScope` acima garante que este
+// código nunca corre noutro contexto (um SharedWorker, esse sim, precisaria de
+// cuidado).
+//
+// MEDIDO num Chromium a sério, com um trabalhador dedicado a devolver o próprio
+// MessageEvent: `origin` é a string VAZIA e `source` é `null`. Ou seja, não há
+// origem nenhuma para verificar — e o remendo óbvio,
+// `if (e.origin !== self.location.origin) return;`, recusaria TODAS as
+// mensagens e deixaria a Biblioteca de Temas sem conseguir preparar uma única
+// foto.
 if (
   typeof DedicatedWorkerGlobalScope !== "undefined" &&
   self instanceof DedicatedWorkerGlobalScope
