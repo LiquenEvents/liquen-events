@@ -13,7 +13,7 @@ import {
   galleryKey,
   galleryImageLoader,
 } from "../app/[lang]/galeria/gallery-image-loader";
-import { heroKey } from "./hero-image-loader";
+import { heroKey, HERO_SOURCES, HERO_WIDTHS } from "./hero-image-loader";
 import nextConfig from "../../next.config";
 
 const ROOT = path.join(__dirname, "..", "..");
@@ -21,11 +21,11 @@ const PREGEN_LOGOS = path.join(ROOT, "scripts", "pregen-logos.mjs");
 
 describe("site-image-loader: nenhuma imagem local depende do optimizador", () => {
   it("as fotos (/imagens/) vão para um WebP estático, nunca para o /_next/image", () => {
-    expect(siteImageLoader({ src: "/imagens/EW1_1330.jpg", width: 640, quality: 75 })).toBe(
-      "/_img/g/EW1_1330-640.webp",
+    expect(siteImageLoader({ src: "/imagens/20_10_2025_0044.jpg", width: 640, quality: 75 })).toBe(
+      "/_img/g/20_10_2025_0044-640.webp",
     );
     expect(
-      siteImageLoader({ src: "/imagens/EW1_1330.jpg", width: 640, quality: 75 }),
+      siteImageLoader({ src: "/imagens/20_10_2025_0044.jpg", width: 640, quality: 75 }),
     ).not.toContain("/_next/image");
   });
 
@@ -170,7 +170,7 @@ describe("site-image-loader: contrato com o resto do sistema", () => {
     // A mesma foto aparece na galeria (com `loader={galleryImageLoader}`) e nas
     // páginas de serviço (pelo carregador global). Se os dois discordassem, o
     // visitante descarregava duas cópias da mesma imagem.
-    for (const src of ["/imagens/EW1_1330.jpg", "/imagens/M&F0497.jpg"]) {
+    for (const src of ["/imagens/20_10_2025_0044.jpg", "/imagens/20_10_2025_0225.jpg"]) {
       for (const width of [200, 384, 640, 1024, 1920]) {
         expect(siteImageLoader({ src, width, quality: 75 })).toBe(
           galleryImageLoader({ src, width, quality: 65 }),
@@ -238,6 +238,62 @@ describe("site-image-loader: contrato com o resto do sistema", () => {
         "/_img/l/logo-liquen-256.webp",
       );
     }
+  });
+});
+
+describe("site-image-loader: as fotografias de largura total", () => {
+  /**
+   * Estas eram servidas com o tecto de 1280 das fotos comuns quando são
+   * desenhadas a 3840 px de dispositivo num ecrã 1920 a 2x. Medido `naturalWidth`
+   * contra a caixa real: heróis 2048/4070, estas 1280/3840 — de 2x de ampliação
+   * para 3x. A escada dos heróis (até 2048) é a que lhes serve.
+   */
+  it("uma fotografia de largura total vai para a escada grande, não para a das fotos comuns", () => {
+    const url = siteImageLoader({ src: "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg", width: 1920 });
+    expect(url).toBe("/_img/JOAO_E_PEDRO_1Y1A4472-2048.webp");
+    // O ramo das fotos comuns tê-la-ia travado nos 1280.
+    expect(url).not.toContain("/_img/g/");
+  });
+
+  it("a decisão é da ORIGEM, não de quem chama", () => {
+    // O mesmo ficheiro pedido em larguras diferentes sobe a escada dos heróis
+    // inteira, venha pelo <HeroImage> (que passa o seu carregador) ou por aqui.
+    for (const [pedida, esperada] of [
+      [640, 640],
+      [800, 1080],
+      [1300, 1536],
+      [1920, 2048],
+      [4000, 2048],
+    ] as const) {
+      expect(siteImageLoader({ src: "/imagens/hd-edited.jpg", width: pedida })).toBe(
+        `/_img/hd-edited-${esperada}.webp`,
+      );
+    }
+  });
+
+  it("a lista do carregador e a do pré-gerador são a MESMA", () => {
+    // São dois ficheiros (um é .mjs e não pode importar TS). Se divergirem, o
+    // carregador aponta para ficheiros que o build não escreveu — 404 em cada
+    // fundo de secção.
+    const script = readFileSync(path.join(ROOT, "scripts", "pregen-heroes.mjs"), "utf8");
+    const bloco = script.match(/const HERO_SOURCES = \[([\s\S]*?)\];/);
+    expect(bloco, "não encontrei HERO_SOURCES em pregen-heroes.mjs").toBeTruthy();
+    const noScript = [...bloco![1].matchAll(/"(\/imagens\/[^"]+)"/g)].map((m) => m[1]).sort();
+    const noLoader = [...HERO_SOURCES].sort();
+    expect(noScript).toEqual(noLoader);
+  });
+
+  it("todas as fotografias de largura total têm ficheiros gerados", () => {
+    const dir = path.join(ROOT, "public", "_img");
+    if (!existsSync(dir)) return; // árvore acabada de clonar, sem build
+    const faltam: string[] = [];
+    for (const src of HERO_SOURCES) {
+      for (const w of HERO_WIDTHS) {
+        const f = path.join(dir, `${heroKey(src)}-${w}.webp`);
+        if (!existsSync(f)) faltam.push(path.basename(f));
+      }
+    }
+    expect(faltam).toEqual([]);
   });
 });
 

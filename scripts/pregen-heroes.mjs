@@ -21,12 +21,38 @@ const OUT_DIR = path.join(PUBLIC, "_img");
 
 // The six full-bleed page heroes (kept in sync with each page + HeroWarm).
 const HERO_SOURCES = [
+  // Os seis heróis de página originais.
   "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg", // home
   "/imagens/hd-edited.jpg", // sobre
   "/imagens/EW1_1330.jpg", // servicos
   "/imagens/DaniGui_Preview20.jpg", // galeria
   "/imagens/DJI_20250913190635_0120_D.jpg", // contacto
   "/imagens/EW1_1393.jpg", // clientes
+  // Fundos de secção, faixas e capas de serviço — tudo o que é desenhado a
+  // `sizes="100vw"`. Ver o comentário em src/lib/hero-image-loader.ts: a lista
+  // foi recolhida a MEDIR o `naturalWidth` contra a caixa em pixels de
+  // dispositivo, não a adivinhar, e TEM de ser igual à de lá (há um teste).
+  "/imagens/DaniGui_Adois_61.jpg",
+  "/imagens/DaniGui_JantarFesta_130.jpg",
+  "/imagens/DaniGui_JantarFesta_18.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
+  "/imagens/DaniGui_JantarFesta_48.jpg",
+  "/imagens/EW1_1332.jpg",
+  "/imagens/EW1_1333.jpg",
+  "/imagens/EW1_1404.jpg",
+  "/imagens/EW1_1405.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A4463.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A4738.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg",
+  "/imagens/JOAO_E_PEDRO_IMGL2823.jpg",
+  "/imagens/J&A-68.jpg",
+  "/imagens/M&F0497.jpg",
+  "/imagens/Natalia e Jonathan-198.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+  "/imagens/stephanie-mizio-715.jpg",
+  "/imagens/stephanie-mizio-760.jpg",
+  "/imagens/viaturas-classicas.jpg",
 ];
 
 // The widths the loader snaps to. A hero is 100vw, so these span phone → 2x

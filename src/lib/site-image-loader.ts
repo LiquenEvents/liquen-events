@@ -83,6 +83,7 @@
 
 import type { ImageLoaderProps } from "next/image";
 import { galleryImageUrl, galleryKey } from "@/app/[lang]/galeria/gallery-image-loader";
+import { heroImageUrl, isHeroSrc } from "@/lib/hero-image-loader";
 
 /**
  * O saneador de nomes é UM SÓ em todo o projecto — reutilizado do
@@ -138,6 +139,15 @@ export function isLogoSrc(src: string): boolean {
  * no URL só criaria URLs distintos para o mesmo ficheiro e partiria a cache.
  */
 export default function siteImageLoader({ src, width }: ImageLoaderProps): string {
+  // As fotografias desenhadas a toda a largura têm a SUA escada, até 2048 px.
+  // Vem primeiro porque também vivem em /imagens/ e o ramo seguinte apanhá-las-ia
+  // com o tecto de 1280 — que é exactamente a perda de nitidez que isto corrige.
+  //
+  // Assim a decisão é da ORIGEM e não de quem chama: uma fotografia de fundo
+  // recebe os 2048 quer venha pelo <HeroImage> (que passa o seu carregador) quer
+  // por um <SafeImage> qualquer que caia aqui. Sem isto, só as seis capas de
+  // página estariam cobertas.
+  if (isHeroSrc(src)) return heroImageUrl(src, width);
   if (src.startsWith("/imagens/")) return galleryImageUrl(src, width);
   if (isLogoSrc(src)) return logoImageUrl(src, width);
   // Recurso: o original, intacto. Ver o aviso grande lá em cima — o

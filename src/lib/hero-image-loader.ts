@@ -18,16 +18,62 @@ import type { ImageLoaderProps } from "next/image";
 // nearest of these (and clamps to the largest).
 export const HERO_WIDTHS = [640, 1080, 1536, 2048] as const;
 
-// The six sources that have pre-generated files. Anything else falls through to
-// the default optimizer so <HeroImage> can't silently 404 on an unknown src.
-const HERO_SOURCES = new Set([
+/**
+ * AS FOTOGRAFIAS DESENHADAS A TODA A LARGURA DO ECRÃ. Eram os seis heróis de
+ * página; passaram a ser todas as que o `sizes="100vw"` põe de borda a borda.
+ *
+ * PORQUÊ CRESCEU. Ao tirar o sítio do optimizador, a escada das fotos comuns
+ * (topo: 1280 px) passou a servir também os fundos de secção — que antes
+ * pediam 1920 ao optimizador. MEDIDO num ecrã de 1920 a 2x, com o `naturalWidth`
+ * de cada `<img sizes="100vw">` contra a sua caixa em pixels de dispositivo:
+ * os heróis recebiam 2048 para caixas de 4070, e estas 23 recebiam 1280 para
+ * caixas de 3840 — de uma ampliação de 2x para uma de 3x. Numa fotografia sob
+ * um véu escuro nota-se pouco, mas o sítio inteiro é fotografia e a perda foi
+ * introduzida por mim ao fixar a escada.
+ *
+ * A lista é MANTIDA À MÃO e é a única coisa deste trabalho que não se defende
+ * sozinha: acrescentar uma fotografia de largura total nova sem a pôr aqui
+ * fá-la funcionar, mas suave. A rede de segurança das imagens
+ * (e2e/imagens.spec.ts) apanha uma imagem que NÃO APARECE, não uma que apareça
+ * menos nítida do que devia. Foi assim recolhida — a medir, não a adivinhar —
+ * e é assim que deve ser refeita.
+ */
+export const HERO_SOURCES = new Set([
+  // Os seis heróis de página originais.
   "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
   "/imagens/hd-edited.jpg",
   "/imagens/EW1_1330.jpg",
   "/imagens/DaniGui_Preview20.jpg",
   "/imagens/DJI_20250913190635_0120_D.jpg",
   "/imagens/EW1_1393.jpg",
+  // Fundos de secção, faixas e capas de serviço, todos a `sizes="100vw"`.
+  "/imagens/DaniGui_Adois_61.jpg",
+  "/imagens/DaniGui_JantarFesta_130.jpg",
+  "/imagens/DaniGui_JantarFesta_18.jpg",
+  "/imagens/DaniGui_JantarFesta_26.jpg",
+  "/imagens/DaniGui_JantarFesta_48.jpg",
+  "/imagens/EW1_1332.jpg",
+  "/imagens/EW1_1333.jpg",
+  "/imagens/EW1_1404.jpg",
+  "/imagens/EW1_1405.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A4463.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A4738.jpg",
+  "/imagens/JOAO_E_PEDRO_1Y1A5248.jpg",
+  "/imagens/JOAO_E_PEDRO_IMGL2823.jpg",
+  "/imagens/J&A-68.jpg",
+  "/imagens/M&F0497.jpg",
+  "/imagens/Natalia e Jonathan-198.jpg",
+  "/imagens/stephanie-mizio-555.jpg",
+  "/imagens/stephanie-mizio-715.jpg",
+  "/imagens/stephanie-mizio-760.jpg",
+  "/imagens/viaturas-classicas.jpg",
 ]);
+
+/** Esta fotografia é desenhada a toda a largura e tem ficheiros até 2048 px? */
+export function isHeroSrc(src: string): boolean {
+  return HERO_SOURCES.has(src);
+}
 
 /** Basename without extension, non-[A-Za-z0-9_-] collapsed to "_". */
 export function heroKey(src: string): string {
