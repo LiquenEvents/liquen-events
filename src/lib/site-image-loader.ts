@@ -101,12 +101,14 @@ export const siteImageKey = galleryKey;
  * 3747×2238) — ocupa 248 px de CSS. Medido no HTML de produção, o srcset do
  * Navbar pedia w=360 (1x) e w=640 (2x) do mesmo PNG de 3747 px.
  *
- * NOTA MEDIDA: em 2x o candidato de 640 satura em 384, ou seja o wordmark passa
- * a ser servido a 384 px para 496 px de dispositivo. Ver o comentário em
- * next.config.ts — é o único sítio do sítio onde esta mudança troca nitidez por
- * fiabilidade, e é deliberado.
+ * O 512 EXISTE POR CAUSA DO WORDMARK, e é a correcção de um erro meu. A escada
+ * acabava em 384, o que servia 384 px para os 496 px de dispositivo de um ecrã
+ * 2x — na única imagem que aparece em TODAS as páginas do sítio, e a cores (os
+ * 19 logótipos de cliente são desenhados com `brightness-0`, silhuetas, onde a
+ * nitidez do RGB não se vê). Trocar nitidez por fiabilidade fazia sentido no
+ * resto; aqui não fazia, e custava um degrau.
  */
-export const LOGO_WIDTHS = [64, 128, 256, 384] as const;
+export const LOGO_WIDTHS = [64, 128, 256, 384, 512] as const;
 
 /** Os dois logótipos que vivem na raiz de public/ em vez de em /logos/. */
 const ROOT_LOGOS = ["/logo-liquen.png", "/logo-liquen-branco.png"];

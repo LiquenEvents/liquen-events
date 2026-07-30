@@ -111,16 +111,16 @@ describe("site-image-loader: as escadas", () => {
     expect(snapLogoWidth(65)).toBe(128);
     expect(snapLogoWidth(256)).toBe(256);
     expect(snapLogoWidth(257)).toBe(384);
-    expect(snapLogoWidth(385)).toBe(384);
-    expect(snapLogoWidth(1920)).toBe(384);
+    expect(snapLogoWidth(385)).toBe(512);
+    expect(snapLogoWidth(1920)).toBe(512);
     // Nunca serve MENOS do que o pedido, a não ser no topo da escada.
-    for (const w of [10, 100, 200, 300, 383]) {
+    for (const w of [10, 100, 200, 300, 383, 500]) {
       expect(snapLogoWidth(w)).toBeGreaterThanOrEqual(w);
     }
   });
 
   it("as escadas do contrato não mudam sem que alguém repare", () => {
-    expect([...LOGO_WIDTHS]).toEqual([64, 128, 256, 384]);
+    expect([...LOGO_WIDTHS]).toEqual([64, 128, 256, 384, 512]);
     expect([...GALLERY_WIDTHS]).toEqual([384, 640, 768, 1024, 1280]);
     for (const ladder of [LOGO_WIDTHS, GALLERY_WIDTHS]) {
       expect([...ladder], "escada por ordem crescente").toEqual([...ladder].sort((a, b) => a - b));
@@ -129,11 +129,14 @@ describe("site-image-loader: as escadas", () => {
 
   it("o topo da escada dos logótipos chega para o maior logótipo do sítio", () => {
     // O wordmark do Navbar é o maior: 3747x2238, desenhado no máximo a
-    // `h-[148px]` -> 148 * (3747/2238) = 248 px de CSS. A escada tem de cobrir
-    // pelo menos 1x. (Em 2x fica aquém — decisão medida e documentada no
-    // ficheiro do carregador.)
+    // `h-[148px]` -> 148 * (3747/2238) = 248 px de CSS.
+    //
+    // A escada tem de cobrir 2x, não 1x. Cobria só 1x e servia 384 px para os
+    // 496 px de dispositivo de um ecrã de alta resolução — na única imagem que
+    // aparece em TODAS as páginas. O degrau de 512 é a correcção; este teste
+    // passa a exigir os 2x para o erro não poder voltar.
     const larguraCssMaxima = Math.round(148 * (3747 / 2238));
-    expect(Math.max(...LOGO_WIDTHS)).toBeGreaterThanOrEqual(larguraCssMaxima);
+    expect(Math.max(...LOGO_WIDTHS)).toBeGreaterThanOrEqual(larguraCssMaxima * 2);
   });
 });
 

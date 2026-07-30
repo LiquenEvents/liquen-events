@@ -47,7 +47,7 @@ const INDEX_FILE = path.join(CACHE_DIR, "index.json");
 
 // Manter em sincronia com o carregador de logótipos (esse ficheiro é TS e não
 // pode ser importado daqui).
-const WIDTHS = [64, 128, 256, 384];
+const WIDTHS = [64, 128, 256, 384, 512];
 
 /**
  * QUALIDADE 80 — escolhida por medição, não por hábito. Três coisas medidas:
