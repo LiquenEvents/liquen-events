@@ -15,6 +15,14 @@ import { collectionFor } from "./collections";
 export interface Photo extends PhotoSrc {
   blurDataURL?: string;
   aspectRatio: string;
+  /**
+   * Cor média da fotografia (`#rrggbb`), gerada no build por
+   * scripts/pregen-gallery.mjs para tile-colors.json. Vai em TODAS as fotos: é
+   * o que garante que um mosaico à espera da imagem mostra uma cor sua e não o
+   * fundo liso da página, por ~7 caracteres cada (o blur, que só vai na
+   * primeira janela, custa 151 bytes cada).
+   */
+  color?: string;
 }
 
 /** The event/collection bucket a photo belongs to (named couple, else its

@@ -10,6 +10,7 @@ import {
   galleryImageLoader,
 } from "./gallery-image-loader";
 import { PHOTOS } from "./photos-data";
+import TILE_COLORS from "./tile-colors.json";
 import nextConfig from "../../../../next.config";
 
 const ROOT = path.join(__dirname, "..", "..", "..", "..");
@@ -112,6 +113,27 @@ describe("gallery-image-loader: a grelha não depende do optimizador", () => {
     ]) {
       expect(scriptKey(src)).toBe(galleryKey(src));
     }
+  });
+});
+
+describe("tile-colors.json: nenhum mosaico fica sem cor", () => {
+  it("as 427 fotos têm cor, e é um #rrggbb válido", () => {
+    // O ficheiro é gerado por scripts/pregen-gallery.mjs e VERSIONADO (como
+    // src/lib/blur-map.json), para o typecheck e os testes funcionarem numa
+    // árvore acabada de clonar. Uma foto sem cor volta a ser o rectângulo liso
+    // que se quer eliminar — e como o blur só vai para as 48 primeiras, seria
+    // um buraco visível.
+    const semCor = PHOTOS.filter(
+      (p) => !/^#[0-9a-f]{6}$/.test((TILE_COLORS as Record<string, string>)[p.src] ?? ""),
+    ).map((p) => p.src);
+    expect(semCor.slice(0, 10)).toEqual([]);
+    expect(semCor).toHaveLength(0);
+  });
+
+  it("não tem entradas a mais (fotos que já saíram da galeria)", () => {
+    const conhecidas = new Set(PHOTOS.map((p) => p.src));
+    const orfas = Object.keys(TILE_COLORS).filter((k) => !conhecidas.has(k));
+    expect(orfas).toEqual([]);
   });
 });
 

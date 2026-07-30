@@ -13,32 +13,12 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
+import { interleaveByCollection } from "./interleave";
+import TILE_COLORS from "./tile-colors.json";
 
-// Resolved server-side (from blur-map.json / image-dims.json) so those
-// site-wide JSON maps never reach the gallery's client bundle — GaleriaClient
-// only receives the handful of fields each photo actually needs. Each photo
-// object ships exactly { src, label, aspectRatio, blurDataURL? } and the client
-// consumes all four (src/label → alt + filtering, aspectRatio → masonry,
-// blurDataURL → placeholder), so there are no dead fields left to trim.
-//
-// TODAS as fotos levam aspectRatio (a masonry precisa dele à partida) e TODAS
-// levam placeholder.
-//
-// Levavam-no só as 30 primeiras. O comentário que justificava esse corte dizia
-// "~1–2KB each"; medido em src/lib/blur-map.json (557 entradas), o blur médio
-// são 151 bytes — as 427 custam 62,9 KB crus / 27,1 KB comprimidos no fio, e
-// não 500 KB. Em troca desses 27 KB: num scroll rápido com a cache fria, 90,4%
-// da área de mosaicos no ecrã era rectângulo liso (98,5% dos frames com pelo
-// menos um buraco, 5,38 mosaicos completamente vazios por frame); com
-// placeholder em todas, 0,0% e 0%, ao mesmo custo de frame (dt p50 16,7 ms,
-// p95 33,4 ms nos dois casos). Pior ainda, as 30 escolhidas eram as 30
-// primeiras da ordem POR DEFEITO, e a ordem real da visita era outra — 0 das
-// 12 primeiras fotos que o visitante via tinham placeholder.
-const withRatio = PHOTOS.map((p) => ({ ...p, aspectRatio: aspectFor(p.src) }));
-const galleryPhotos = withRatio.map((p) => ({
-  ...p,
-  blurDataURL: blurFor(p.src).blurDataURL,
-}));
+// Resolved server-side (from blur-map.json / image-dims.json / tile-colors.json)
+// so those JSON maps never reach the gallery's client bundle — GaleriaClient
+// only receives the handful of fields each photo actually needs.
 
 // Semente da arrumação, decidida NO SERVIDOR.
 //
@@ -52,8 +32,42 @@ const galleryPhotos = withRatio.map((p) => ({
 // hidratação — custava, medido, a troca das 12 fotos do primeiro ecrã a
 // t=1178 ms e 398,9 KB descarregados e deitados fora (57,8% dos bytes de
 // imagem da aterragem), incluindo a foto pré-carregada do mosaico 2x2. Agora o
-// HTML e os placeholders saem já na ordem final.
+// HTML, as cores e os placeholders saem já na ordem final.
 const ORDER_SEED = ":" + Math.floor(Math.random() * 0x7fffffff).toString(36);
+
+/**
+ * NENHUM MOSAICO É UM RECTÂNGULO LISO. Duas camadas, cada uma pelo seu preço.
+ *
+ * (1) COR, para as 427. A cor média de cada foto (tile-colors.json, gerado no
+ *     build por scripts/pregen-gallery.mjs) entra como fundo do mosaico. São
+ *     ~7 caracteres por foto.
+ * (2) BLUR, só para a primeira janela. O blur é bonito mas pesado: medido,
+ *     mandar os 427 na carga da página custa +21,4 KB comprimidos (55,1 KB
+ *     contra 33,7 KB) e atrasa a PRIMEIRA fotografia de 3,4 s para 4,2 s num
+ *     telemóvel a 1,6 Mbit/s (3 corridas cada). Por isso vai só para as fotos
+ *     que se vêem já.
+ *
+ * Estavam 30 blurs e mais nada — e as 30 eram escolhidas na ordem POR DEFEITO
+ * enquanto o cliente re-baralhava para outra, por isso 0 das 12 primeiras fotos
+ * que o visitante via tinham placeholder e 405 das 427 não tinham nada. Num
+ * scroll rápido com a cache fria isso media 90,4% da área de mosaicos no ecrã
+ * em rectângulo liso. Agora a janela é calculada na MESMA ordem que o visitante
+ * vai ver (ORDER_SEED), e o resto tem cor.
+ */
+const BLUR_WINDOW = 48;
+const withRatio = PHOTOS.map((p) => ({
+  ...p,
+  aspectRatio: aspectFor(p.src),
+  color: (TILE_COLORS as Record<string, string>)[p.src],
+}));
+const blurSrc = new Set(
+  interleaveByCollection(withRatio, ORDER_SEED)
+    .slice(0, BLUR_WINDOW)
+    .map((p) => p.src),
+);
+const galleryPhotos = withRatio.map((p) =>
+  blurSrc.has(p.src) ? { ...p, blurDataURL: blurFor(p.src).blurDataURL } : p,
+);
 
 export async function generateMetadata({
   params,

@@ -197,6 +197,26 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
       {
+        // Imagens pré-geradas no build: as capas de página (scripts/pregen-
+        // heroes.mjs) e as 2 135 miniaturas da galeria (scripts/pregen-
+        // gallery.mjs).
+        //
+        // SEM ISTO SÃO 427 IDAS AO SERVIDOR POR VISITA REPETIDA. Ficheiros em
+        // public/ são servidos com `Cache-Control: public, max-age=0`
+        // (verificado com `curl -I` contra o build de produção), ou seja o
+        // browser revalida CADA UM em cada visita. Com as miniaturas da galeria
+        // a virem daqui, isso passaria a ser uma tempestade de pedidos
+        // condicionais numa página com 427 fotos — e o que se ganhou em tirar o
+        // optimizador do caminho perdia-se outra vez em latência.
+        //
+        // `immutable` por um ano é a mesma política que /imagens já tem, e pela
+        // mesma razão: os nomes não têm hash, portanto substituir uma foto
+        // implica um nome novo. Como estes ficheiros DERIVAM de /imagens (que
+        // já é imutável), não se acrescenta risco nenhum.
+        source: "/_img/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
         // Root-level static assets fetched on effectively every visit/crawl but
         // NOT served through /_next/image (so they miss minimumCacheTTL) and NOT
         // under /imagens or /logos: the PWA manifest icons and the social OG

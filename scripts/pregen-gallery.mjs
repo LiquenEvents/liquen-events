@@ -101,6 +101,8 @@ let i = 0;
 const bytesByWidth = Object.fromEntries(WIDTHS.map((w) => [w, 0]));
 const countByWidth = Object.fromEntries(WIDTHS.map((w) => [w, 0]));
 const failures = [];
+/** src -> cor média, escrito em tile-colors.json (ver mais abaixo). */
+const colors = {};
 
 async function link(from, to) {
   await fs.rm(to, { force: true });
@@ -162,13 +164,16 @@ async function worker() {
     }
 
     let want;
+    let color;
     try {
       const st = await fh.stat();
       want = stamp(st);
 
       // Reaproveitar da cache de build quando a fonte não mudou E todos os
       // ficheiros estão lá (uma cache truncada regenera em vez de mentir).
-      let cached = index[key] === want;
+      const entry = index[key];
+      let cached = entry?.stamp === want && typeof entry.color === "string";
+      if (cached) color = entry.color;
       if (cached) {
         for (const w of WIDTHS) {
           try {
@@ -192,6 +197,7 @@ async function worker() {
           failures.push(`${src}: ${err.message}`);
           continue;
         }
+        let smallest;
         for (const w of WIDTHS) {
           // Nunca ampliar acima da fonte (igual ao next/image).
           const target = meta.width ? Math.min(w, meta.width) : w;
@@ -200,7 +206,15 @@ async function worker() {
             .webp({ quality: QUALITY })
             .toBuffer();
           await fs.writeFile(path.join(CACHE_DIR, `${key}-${w}.webp`), buf);
+          smallest ??= buf;
         }
+        // Cor média da foto, para o mosaico nunca ser um rectângulo liso do
+        // fundo da página enquanto a fotografia não chega (ver tile-colors.json
+        // e o uso em galeria/page.tsx). Calculada a partir da miniatura mais
+        // pequena que acabámos de gerar — é um decode de 384px, não do
+        // original.
+        const px = await sharp(smallest).resize(1, 1, { fit: "cover" }).raw().toBuffer();
+        color = "#" + [px[0], px[1], px[2]].map((v) => v.toString(16).padStart(2, "0")).join("");
         encoded++;
       } else {
         reused++;
@@ -216,7 +230,8 @@ async function worker() {
       bytesByWidth[w] += s.size;
       countByWidth[w]++;
     }
-    nextIndex[key] = want;
+    nextIndex[key] = { stamp: want, color };
+    colors[src] = color;
   }
 }
 
@@ -228,6 +243,42 @@ await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 if (failures.length) {
   console.error(`pregen-gallery: ${failures.length} foto(s) falharam:`);
   for (const f of failures.slice(0, 20)) console.error(`  - ${f}`);
+  process.exit(1);
+}
+
+/**
+ * CONFERIR A SAÍDA, ficheiro a ficheiro, antes de dizer que correu bem.
+ *
+ * Até aqui o script dava-se por satisfeito por nenhum passo ter lançado
+ * excepção. Não é a mesma coisa que a saída estar completa: um `link()` que
+ * caia num ramo de fallback, uma cache parcial de uma corrida anterior
+ * interrompida, um disco cheio a meio — e o build passa verde com miniaturas em
+ * falta. No site isso é um 404 por mosaico, ou seja, a queixa que este script
+ * existe para eliminar.
+ *
+ * O contrato que a galeria assume é exactamente este: PARA CADA foto de
+ * photos-data.ts e CADA largura da escada existe um ficheiro. Ou se verifica,
+ * ou não é um contrato. São ~2100 `stat` no fim de um passo de ~100s.
+ */
+const missing = [];
+for (const src of sources) {
+  const key = galleryKey(src);
+  for (const w of WIDTHS) {
+    const out = path.join(OUT_DIR, `${key}-${w}.webp`);
+    try {
+      const s = await fs.stat(out);
+      if (s.size === 0) missing.push(`${key}-${w}.webp (0 bytes)`);
+    } catch {
+      missing.push(`${key}-${w}.webp`);
+    }
+  }
+}
+if (missing.length) {
+  console.error(
+    `pregen-gallery: ${missing.length} ficheiro(s) em falta na saída, de ` +
+      `${sources.length * WIDTHS.length} esperados:`,
+  );
+  for (const m of missing.slice(0, 20)) console.error(`  - ${m}`);
   process.exit(1);
 }
 
@@ -245,6 +296,40 @@ for (const dir of [OUT_DIR, CACHE_DIR]) {
 }
 
 await fs.writeFile(INDEX_FILE, JSON.stringify(nextIndex), "utf8");
+
+/**
+ * tile-colors.json — a cor média de cada foto, para o mosaico ter uma cor sua
+ * enquanto a fotografia não chega.
+ *
+ * PORQUÊ NÃO SÓ O BLUR. O blur é bonito mas pesado: mandar os 427 na carga da
+ * página custa +21,4 KB comprimidos e, medido num telemóvel a 1,6 Mbit/s,
+ * atrasa a PRIMEIRA fotografia de 3,4 s para 4,2 s. As 427 cores custam ~2 KB
+ * comprimidos e cobrem tudo. Fica o blur para a primeira janela (o que se vê
+ * já) e a cor para as outras 300 e tal, em vez de rectângulo liso.
+ *
+ * É um ficheiro de código-fonte (versionado, como src/lib/blur-map.json), para
+ * `tsc`/`eslint`/`vitest` funcionarem numa árvore acabada de clonar sem ter de
+ * correr o build primeiro. Só se reescreve quando muda, para um build não
+ * sujar a árvore de trabalho à toa.
+ */
+const COLORS_FILE = path.join(ROOT, "src", "app", "[lang]", "galeria", "tile-colors.json");
+const colorsJson =
+  JSON.stringify(
+    Object.fromEntries(
+      Object.keys(colors)
+        .sort()
+        .map((k) => [k, colors[k]]),
+    ),
+    null,
+    2,
+  ) + "\n";
+let colorsChanged = false;
+try {
+  colorsChanged = (await fs.readFile(COLORS_FILE, "utf8")) !== colorsJson;
+} catch {
+  colorsChanged = true;
+}
+if (colorsChanged) await fs.writeFile(COLORS_FILE, colorsJson, "utf8");
 
 const seconds = (Date.now() - t0) / 1000;
 const totalBytes = Object.values(bytesByWidth).reduce((a, b) => a + b, 0);

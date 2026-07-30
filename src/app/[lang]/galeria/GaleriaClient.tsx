@@ -276,7 +276,11 @@ const Tile = memo(function Tile({
         tabIndex={tabbable ? 0 : -1}
         aria-label={label}
         className={`g-tile relative w-full overflow-hidden group ${FOCUS_RING}`}
-        style={{ aspectRatio: photo.aspectRatio }}
+        // A cor média da própria foto por baixo (ver tile-colors.json): um
+        // mosaico à espera da imagem mostra a cor DELA, não o fundo liso da
+        // página. Custa ~7 caracteres por foto e cobre as 427 — o blur, que é
+        // 20x mais pesado, fica só para a primeira janela.
+        style={{ aspectRatio: photo.aspectRatio, backgroundColor: photo.color }}
       >
         <GalleryImage
           src={photo.src}
@@ -355,7 +359,9 @@ function SatelliteTile({
       data-cap={cap.caption}
       data-sub={cap.sub}
       className={`g-hero g-tile relative hidden sm:block h-full w-full overflow-hidden group ${FOCUS_RING}`}
-      style={{ "--hero-delay": `${idx * 70}ms` } as React.CSSProperties}
+      style={
+        { "--hero-delay": `${idx * 70}ms`, backgroundColor: photo.color } as React.CSSProperties
+      }
     >
       {!hidden && (
         <VTWrap name={vtName}>
@@ -988,6 +994,7 @@ export default function GaleriaClient({
               data-cap={caption(visible[0].src, visible[0].label).caption}
               data-sub={caption(visible[0].src, visible[0].label).sub}
               className={`g-hero g-tile relative col-span-2 row-span-2 h-full w-full overflow-hidden group ${FOCUS_RING}`}
+              style={{ backgroundColor: visible[0].color }}
             >
               {/* Enquanto esta foto está aberta no lightbox, a miniatura
                   desmonta o seu <ViewTransition>: é o unmount/mount com o

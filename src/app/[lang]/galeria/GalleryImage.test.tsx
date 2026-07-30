@@ -6,7 +6,10 @@ import GalleryImage from "./GalleryImage";
 
 /** O mesmo caminho que `renderTile` usa. */
 const SRC = "/imagens/DaniGui_Preview20.jpg";
-/** Tentativas pela miniatura pré-gerada antes de se passar ao ficheiro original. */
+/**
+ * Tentativas pelo FICHEIRO ORIGINAL antes de se desistir. A miniatura
+ * pré-gerada não tem escada nenhuma: falha uma vez e passa-se logo ao original.
+ */
 const MAX_ATTEMPTS = 4;
 /** O prefixo dos ficheiros estáticos gerados por scripts/pregen-gallery.mjs. */
 const PREGEN_PREFIX = "/_img/g/DaniGui_Preview20-";
@@ -104,37 +107,47 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     expect(srcset).toContain(PREGEN_PREFIX);
   });
 
-  it("re-tenta depois de um erro e a foto acaba VISÍVEL", () => {
+  it("uma miniatura que falha vai JÁ ao original, sem esperar recuo nenhum", () => {
+    // O ponto mais importante deste ficheiro.
+    //
+    // A escada de recuo foi feita para o `/_next/image`, onde uma falha era
+    // quase sempre passageira. A miniatura pré-gerada é um ficheiro estático, e
+    // a maneira de um ficheiro estático falhar é não existir — esperar 600ms
+    // não o faz aparecer. Enquanto os dois casos partilhavam a escada, um
+    // deploy sem as miniaturas custava 4 pedidos e 7,8 segundos POR MOSAICO
+    // antes de se chegar ao `/imagens/x.jpg`, que está no repositório e
+    // portanto existe sempre. Vezes 427 mosaicos: a galeria cheia de "foto
+    // indisponível" que a dona viu.
     renderTile();
-    const first = currentSrc();
-    expect(first).toContain(PREGEN_PREFIX);
+    expect(currentSrc()).toContain(PREGEN_PREFIX);
 
-    // O pedido falha (o 5xx pontual do optimizador).
     act(() => {
       img()!.dispatchEvent(new Event("error"));
     });
-    // Enquanto espera o recuo, não há <img> pendurada em estado de erro.
-    expect(img()).toBeNull();
 
-    // Recuo de 600ms -> segunda tentativa, com URL DIFERENTE (cache-buster).
-    act(() => vi.advanceTimersByTime(600));
-    const second = currentSrc();
-    expect(second).not.toBe("");
-    expect(second).not.toBe(first);
-    expect(second).toContain("r=1");
+    // Sem avançar UM ÚNICO milissegundo já há uma foto a caminho, e é o original.
+    const el = img();
+    expect(el, "o original devia estar pedido já").not.toBeNull();
+    expect(el!.getAttribute("src")).toContain(SRC);
+    expect(el!.getAttribute("src")).not.toContain("/_img/g/");
 
-    // Desta vez o servidor responde. A foto fica no ecrã e não há fallback.
     act(() => {
-      img()!.dispatchEvent(new Event("load"));
+      el!.dispatchEvent(new Event("load"));
     });
-    expect(img()).not.toBeNull();
     expect(screen.queryByText("Foto indisponível")).toBeNull();
   });
 
-  it("o recuo é exponencial e tem tecto: 4 tentativas, depois um fallback digno", () => {
+  it("a escada de recuo é do ORIGINAL: exponencial, com tecto e depois um fallback digno", () => {
     renderTile({ blurDataURL: "data:image/webp;base64,AAAA" });
-    const urls: string[] = [currentSrc()];
 
+    // Primeiro erro: miniatura -> original, imediato.
+    act(() => {
+      img()!.dispatchEvent(new Event("error"));
+    });
+    const urls: string[] = [currentSrc()];
+    expect(urls[0]).toContain(SRC);
+
+    // A partir daqui, sim: 600ms, 1800ms, 5400ms, sempre com URL novo.
     for (const delay of [600, 1800, 5400]) {
       act(() => {
         img()!.dispatchEvent(new Event("error"));
@@ -146,20 +159,14 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
       urls.push(currentSrc());
     }
     expect(urls).toHaveLength(4);
-    expect(new Set(urls).size).toBe(4); // cada tentativa é um URL novo
+    // Cada tentativa é um URL novo: sem isto o browser podia devolver a
+    // resposta falhada em cache e a escada corria sem nunca pedir nada.
+    expect(new Set(urls).size).toBe(4);
+    expect(urls.every((u) => u.includes(SRC))).toBe(true);
 
-    // 4.ª falha: acabou o optimizador, mas ainda falta o ficheiro original.
+    // 4.ª falha do original: aí sim, não há foto para mostrar.
     act(() => {
       img()!.dispatchEvent(new Event("error"));
-    });
-    act(() => vi.advanceTimersByTime(60_000));
-    const cru = img();
-    expect(cru, "ainda faltava tentar o ficheiro original").not.toBeNull();
-    expect(cru!.getAttribute("src")).not.toContain("_next/image");
-
-    // Só quando ESSE também falha é que se mostra o fallback.
-    act(() => {
-      cru!.dispatchEvent(new Event("error"));
     });
     act(() => vi.advanceTimersByTime(60_000));
     expect(img()).toBeNull();
@@ -218,20 +225,28 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     expect(img()!.getAttribute("fetchpriority")).toBe("high");
   });
 
-  it("esgotada a miniatura, tenta o ficheiro original antes de desistir", async () => {
+  it("com a miniatura em falta, todas as tentativas seguintes são ao original", async () => {
     // Rede de segurança final: se a miniatura pré-gerada faltar (uma foto
     // acrescentada a photos-data.ts sem correr o pregen, um deploy truncado),
     // serve-se o original em tamanho inteiro. Uma fotografia pesada é melhor
-    // do que nenhuma fotografia.
+    // do que nenhuma fotografia — e nenhuma das tentativas é desperdiçada a
+    // voltar a pedir uma miniatura que não existe.
     renderTile({ priority: true });
+    const pedidos: string[] = [];
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
       const el = img();
       expect(el, `tentativa ${i + 1} devia ter um <img>`).not.toBeNull();
+      pedidos.push(el!.getAttribute("src") ?? "");
       await act(async () => {
         fireEvent.error(el!);
         await vi.runAllTimersAsync();
       });
     }
+    // Só o PRIMEIRO pedido foi à miniatura; os restantes já foram ao original.
+    expect(pedidos[0]).toContain(PREGEN_PREFIX);
+    expect(pedidos.slice(1).every((u) => u.includes(SRC))).toBe(true);
+    expect(pedidos.slice(1).some((u) => u.includes("/_img/g/"))).toBe(false);
+
     const el = img();
     expect(el, "devia haver um <img> a apontar ao ficheiro original").not.toBeNull();
     // O src é o caminho tal e qual: nem optimizador nem miniatura.

@@ -199,16 +199,36 @@ export default function GalleryImage({
 
   const handleError = useCallback(() => {
     releaseSlot();
+    /**
+     * A MINIATURA FALHOU: VAI-SE JÁ AO FICHEIRO ORIGINAL, sem esperar.
+     *
+     * A escada de recuo existia para o `/_next/image`, onde uma falha era quase
+     * sempre passageira (encode a frio, rajada, fila cheia) e esperar resolvia.
+     * As miniaturas já não são isso: são ficheiros estáticos, e a maneira de
+     * um ficheiro estático falhar é NÃO EXISTIR. Um 404 não melhora por se
+     * esperar 600 ms, depois 1800, depois 5400.
+     *
+     * O preço de tratar os dois casos como um só era o que se via no site: com
+     * as miniaturas em falta (um deploy onde o pré-gerador não correu, uma foto
+     * acrescentada sem o correr), CADA mosaico gastava 4 pedidos e 7,8 s antes
+     * de chegar ao `/imagens/x.jpg` — que está no repositório e portanto existe
+     * sempre. Vezes 427 mosaicos, através de uma fila de 6 em voo, dá uma
+     * galeria a mostrar "foto indisponível" por todo o lado.
+     *
+     * Assim, o primeiro erro passa directamente ao original e a fotografia
+     * aparece. A escada fica para o original, que é onde uma falha volta a ser
+     * plausivelmente passageira.
+     */
+    if (!raw) {
+      attemptsRef.current = 0;
+      setArmed(false);
+      setRaw(true);
+      setBust((b) => b + 1);
+      enqueue();
+      return;
+    }
     attemptsRef.current += 1;
     if (attemptsRef.current >= MAX_ATTEMPTS) {
-      if (!raw) {
-        // Ainda não tentámos sem o optimizador: é a tentativa que falta.
-        setArmed(false);
-        setRaw(true);
-        setBust((b) => b + 1);
-        enqueue();
-        return;
-      }
       // Falhou até o ficheiro original: aí sim, não há foto para mostrar.
       setArmed(false);
       setExhausted(true);
@@ -221,7 +241,12 @@ export default function GalleryImage({
     setArmed(false);
     retryTimerRef.current = setTimeout(() => {
       retryTimerRef.current = null;
-      setBust(attemptsRef.current);
+      // Incrementar, não copiar o nº da tentativa: `attemptsRef` é reposto a
+      // zero na passagem para o original, e `setBust(attemptsRef.current)`
+      // voltava então a produzir o MESMO `?r=1` que acabara de falhar. A
+      // primeira re-tentativa do original pedia o URL exacto que falhou e podia
+      // apanhá-lo em cache — ou seja, o cache-buster não bustava nada.
+      setBust((b) => b + 1);
       enqueue();
     }, delay);
     // `raw` TEM de estar nas dependências: sem ele o fecho via sempre o valor
@@ -250,7 +275,11 @@ export default function GalleryImage({
    * pré-gerado faltar, serve-se o original de `/imagens/x.jpg`.
    */
   const retryLoader = useMemo(() => {
-    if (raw) return ({ src: s }: ImageLoaderProps) => s;
+    // O original leva o mesmo cache-buster das re-tentativas. Sem ele, as
+    // tentativas seguintes repetiam o URL exacto que acabou de falhar e podiam
+    // apanhar a resposta falhada em cache — a escada corria toda sem nunca
+    // fazer um pedido novo. A query é ignorada pelo servidor de estáticos.
+    if (raw) return ({ src: s }: ImageLoaderProps) => (bust ? `${s}?r=${bust}` : s);
     return ({ src: s, width }: ImageLoaderProps) =>
       `${galleryImageUrl(s, width)}${bust ? `?r=${bust}` : ""}`;
   }, [raw, bust]);
