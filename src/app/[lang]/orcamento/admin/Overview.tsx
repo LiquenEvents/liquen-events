@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, memo } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef, memo } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
@@ -95,47 +95,408 @@ function Delta({ now, prev }: { now: number; prev: number }) {
 }
 
 /**
- * ── Meta de receita e Notas da equipa, com estado LOCAL ───────────────────
+ * ── Meta de receita e Notas da equipa: gravadas NO SERVIDOR ───────────────
  *
- * Estavam as duas dentro do `Overview`. Como o valor escrito é estado deste
- * ecrã, cada tecla voltava a desenhar o painel INTEIRO — os cinco KPI, o
- * funil, o pulso financeiro, "Precisam de atenção", "Atividade recente". Nada
- * disso muda enquanto se escreve uma nota.
+ * Antes viviam as duas no `localStorage`. O ecrã dizia "Notas partilhadas com
+ * a equipa" e "Guardado automaticamente" e as duas frases eram falsas: o texto
+ * ficava no browser daquele computador, não aparecia no telemóvel dela e
+ * desaparecia com o histórico — sem aviso nenhum. Agora vão para
+ * `/api/visao-geral`, como qualquer outro dado do back office.
  *
- * O padrão é o mesmo que o `Calendario` já usa no seu `AddEventModal`: quem
- * escreve fica dono do que escreve. `Reminders` e `Agenda` já estavam
- * protegidos por `memo()`; faltavam estes dois.
+ * Continuam em componentes próprios, com `memo()`, pelo mesmo motivo de
+ * sempre: o que se escreve é estado DELES, por isso escrever não volta a
+ * desenhar o painel inteiro (os cinco KPI, o funil, o pulso financeiro,
+ * "Precisam de atenção", "Atividade recente").
  */
-const MetaReceita = memo(function MetaReceita({ wonThisMonth }: { wonThisMonth: number }) {
-  const [goal, setGoal] = useState(0);
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [goalInput, setGoalInput] = useState("");
+const OVERVIEW_API = "/api/visao-geral";
 
-  useEffect(() => {
+type CampoId = "notas" | "meta";
+
+interface Campo {
+  id: CampoId;
+  value: string;
+  /** Sobe a cada gravação aceite; é sobre ela que o servidor faz compare-and-set. */
+  revision: number;
+  updatedAt: string;
+}
+
+type Snapshot = Record<CampoId, Campo>;
+
+const CAMPOS: CampoId[] = ["notas", "meta"];
+
+/** Onde o texto vivia antes — no browser, e só nele. */
+const CHAVE_ANTIGA: Record<CampoId, string> = {
+  notas: "liquen-team-notes",
+  meta: "liquen-meta-receita",
+};
+
+/**
+ * Depois de migrado, o valor antigo é ARQUIVADO em vez de apagado.
+ *
+ * Apagar assim que o servidor confirma seria o mais limpo, mas este ecrã
+ * existe porque alguém perdeu texto sem dar por isso; deixar uma cópia local
+ * intacta durante a passagem custa uns KB e não custa nada a ninguém.
+ */
+const chaveArquivo = (id: CampoId) => `${CHAVE_ANTIGA[id]}--copia-local`;
+
+function lerLocal(chave: string): string {
+  try {
+    return localStorage.getItem(chave) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Só é chamado DEPOIS de o servidor confirmar que já tem o texto. */
+function arquivarLocal(id: CampoId, valor: string): void {
+  try {
+    localStorage.setItem(chaveArquivo(id), valor);
+    localStorage.removeItem(CHAVE_ANTIGA[id]);
+  } catch {
+    // Um browser sem storage não impede nada: a verdade está no servidor.
+  }
+}
+
+/** Estado de gravação de UM campo. Nunca há um estado mudo. */
+type Estado =
+  | { tipo: "em-dia" }
+  | { tipo: "a-guardar" }
+  | { tipo: "guardado"; quando: string }
+  | { tipo: "erro"; mensagem: string; texto: string }
+  | { tipo: "conflito"; servidor: Campo; meu: string; origem: "servidor" | "browser" };
+
+type Conflito = Extract<Estado, { tipo: "conflito" }>;
+
+function horaCurta(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+}
+
+function motivo(err: unknown): string {
+  // Um `fetch` que nem chega ao servidor rejeita com TypeError e uma mensagem
+  // de programador ("Failed to fetch"); essa não vai para o ecrã dela.
+  if (err instanceof Error && err.name !== "TypeError" && err.message) return err.message;
+  return "Não foi possível chegar ao servidor — verifique a ligação.";
+}
+
+/**
+ * Lê os dois campos do servidor, grava-os e traz o que estava no browser.
+ *
+ * ── Edição em simultâneo (dois dispositivos, duas pessoas) ────────────────
+ * Cada gravação diz ao servidor sobre que revisão foi escrita. Se entretanto
+ * alguém gravou, o servidor responde 409 com a versão dele e a nossa NÃO é
+ * escrita: mostram-se as duas lado a lado e a escolha é de quem está a ler.
+ * O último a gravar ganhar seria mais simples — e apagaria texto sem ninguém
+ * dar por isso, que é o defeito que este ecrã tinha.
+ *
+ * ── O que estava no browser ───────────────────────────────────────────────
+ * Ao carregar, comparamos a chave antiga do `localStorage` com o servidor:
+ *   · iguais            → a passagem já foi feita; arquiva-se a chave antiga;
+ *   · servidor vazio    → o browser é a única cópia: sobe sozinha (e só depois
+ *                         de confirmada é que a chave antiga é arquivada);
+ *   · os dois com texto → ninguém decide por ela: é o mesmo aviso de conflito.
+ */
+function usePainelEquipa() {
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [carga, setCarga] = useState<"a-carregar" | "pronto" | "erro">("a-carregar");
+  const [estado, setEstado] = useState<Record<CampoId, Estado>>({
+    notas: { tipo: "em-dia" },
+    meta: { tipo: "em-dia" },
+  });
+
+  // A revisão actual tem de estar à mão no momento da gravação, sem depender
+  // do render anterior — daí o ref a acompanhar o estado.
+  const snapRef = useRef<Snapshot | null>(null);
+
+  const marcar = useCallback((id: CampoId, e: Estado) => {
+    setEstado((prev) => ({ ...prev, [id]: e }));
+  }, []);
+
+  const aplicar = useCallback((campo: Campo) => {
+    const base = snapRef.current;
+    if (!base) return;
+    const proximo = { ...base, [campo.id]: campo };
+    snapRef.current = proximo;
+    setSnapshot(proximo);
+  }, []);
+
+  const guardar = useCallback(
+    async (id: CampoId, value: string): Promise<boolean> => {
+      const base = snapRef.current?.[id];
+      if (!base) {
+        marcar(id, {
+          tipo: "erro",
+          mensagem: "Ainda não foi possível ler o que está guardado no servidor.",
+          texto: value,
+        });
+        return false;
+      }
+      marcar(id, { tipo: "a-guardar" });
+      try {
+        const res = await fetch(OVERVIEW_API, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, value, baseRevision: base.revision }),
+        });
+        if (res.status === 409) {
+          const corpo = (await res.json().catch(() => null)) as { current?: Campo } | null;
+          const servidor = corpo?.current ?? base;
+          aplicar(servidor);
+          marcar(id, { tipo: "conflito", servidor, meu: value, origem: "servidor" });
+          return false;
+        }
+        if (!res.ok) {
+          const corpo = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(
+            typeof corpo?.error === "string" && corpo.error
+              ? corpo.error
+              : `O servidor respondeu ${res.status}.`,
+          );
+        }
+        const guardado = (await res.json()) as Campo;
+        aplicar(guardado);
+        marcar(id, { tipo: "guardado", quando: horaCurta(guardado.updatedAt) });
+        return true;
+      } catch (err) {
+        marcar(id, { tipo: "erro", mensagem: motivo(err), texto: value });
+        return false;
+      }
+    },
+    [aplicar, marcar],
+  );
+
+  // Não marca "a-carregar" à entrada: no arranque já é esse o estado inicial, e
+  // fazê-lo aqui seria um setState síncrono dentro do efeito. Quem repete a
+  // leitura a partir de um botão passa por `recarregar`, que o marca.
+  const carregar = useCallback(async (): Promise<Snapshot | null> => {
     try {
-      const v = localStorage.getItem("liquen-meta-receita");
-      if (v) setGoal(Number(v));
+      const res = await fetch(OVERVIEW_API, { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const snap = (await res.json()) as Snapshot;
+      snapRef.current = snap;
+      setSnapshot(snap);
+      setCarga("pronto");
+      return snap;
     } catch {
-      /* ignore */
+      setCarga("erro");
+      return null;
     }
   }, []);
 
-  function saveGoal() {
+  const migrar = useCallback(
+    (snap: Snapshot) => {
+      for (const id of CAMPOS) {
+        const antigo = lerLocal(CHAVE_ANTIGA[id]).trim();
+        if (!antigo) continue;
+        const servidor = (snap[id]?.value ?? "").trim();
+        if (servidor === antigo) {
+          arquivarLocal(id, antigo);
+          continue;
+        }
+        if (!servidor) {
+          void guardar(id, antigo).then((ok) => {
+            if (ok) arquivarLocal(id, antigo);
+          });
+          continue;
+        }
+        marcar(id, { tipo: "conflito", servidor: snap[id], meu: antigo, origem: "browser" });
+      }
+    },
+    [guardar, marcar],
+  );
+
+  useEffect(() => {
+    let vivo = true;
+    // O estado só é escrito DEPOIS do `await fetch`, dentro de `carregar` — é a
+    // sincronização com um sistema externo (o servidor) que o efeito existe
+    // para fazer, não uma cascata de renders. Mesma isenção, e pelo mesmo
+    // motivo, que o `useCachedList` das outras vistas.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void carregar().then((snap) => {
+      if (vivo && snap) migrar(snap);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [carregar, migrar]);
+
+  const resolver = useCallback(
+    async (id: CampoId, conflito: Conflito, escolha: "meu" | "servidor") => {
+      if (escolha === "servidor") {
+        // Fica a versão do servidor. A do browser não se evapora: vai para o
+        // arquivo, onde continua legível se ela mudar de ideias.
+        if (conflito.origem === "browser") arquivarLocal(id, conflito.meu);
+        marcar(id, { tipo: "em-dia" });
+        return;
+      }
+      // Grava por cima, mas já sobre a revisão nova — o texto do servidor
+      // acabou de ser mostrado, por isso a substituição é uma decisão dela.
+      const ok = await guardar(id, conflito.meu);
+      if (ok && conflito.origem === "browser") arquivarLocal(id, conflito.meu);
+    },
+    [guardar, marcar],
+  );
+
+  const recarregar = useCallback(() => {
+    setCarga("a-carregar");
+    void carregar().then((snap) => {
+      if (snap) migrar(snap);
+    });
+  }, [carregar, migrar]);
+
+  return { snapshot, carga, estado, guardar, resolver, recarregar };
+}
+
+/** Aviso de duas versões do mesmo texto. Mostra AS DUAS e não escolhe nenhuma. */
+function AvisoConflito({
+  conflito,
+  rotulo,
+  onEscolher,
+}: {
+  conflito: Conflito;
+  rotulo: string;
+  onEscolher: (escolha: "meu" | "servidor") => void;
+}) {
+  const doBrowser = conflito.origem === "browser";
+  return (
+    <div
+      role="alert"
+      className="mt-3 rounded-xl border border-[#b5654a]/30 bg-[#b5654a]/[0.06] p-3 text-left"
+    >
+      <p className="text-[#8f4a33] text-xs font-semibold leading-snug">
+        {doBrowser
+          ? `Havia ${rotulo} guardadas só neste browser, diferentes das que estão no servidor. Nada foi apagado.`
+          : `${rotulo} foram alteradas noutro dispositivo. O que escreveu NÃO foi gravado.`}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2 mt-2.5">
+        <div>
+          <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
+            {doBrowser ? "Neste browser" : "O que escreveu"}
+          </p>
+          <p className="text-foreground/70 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+            {conflito.meu || "(vazio)"}
+          </p>
+        </div>
+        <div>
+          <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
+            No servidor
+          </p>
+          <p className="text-foreground/70 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+            {conflito.servidor.value || "(vazio)"}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2.5">
+        <button
+          onClick={() => onEscolher("meu")}
+          className={`px-3 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+        >
+          {doBrowser ? "Guardar as deste browser" : "Guardar a minha por cima"}
+        </button>
+        <button
+          onClick={() => onEscolher("servidor")}
+          className={`px-3 py-1.5 rounded-lg border border-foreground/15 text-foreground/60 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+        >
+          Ficar com a do servidor
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A legenda de estado. Antes dizia sempre "Guardado automaticamente" — mesmo
+ * quando nada tinha sido guardado. Agora diz o que se passa, e uma falha é
+ * `role="alert"`, com o texto por gravar guardado no próprio estado para o
+ * "Tentar de novo" não depender do que ainda está no ecrã.
+ */
+function LinhaEstado({
+  estado,
+  porGravar,
+  onTentarDeNovo,
+}: {
+  estado: Estado;
+  porGravar: boolean;
+  onTentarDeNovo: (texto: string) => void;
+}) {
+  if (estado.tipo === "erro") {
+    const texto = estado.texto;
+    return (
+      <span role="alert" className="text-[#b5654a] text-[10px] leading-snug">
+        Não foi possível guardar — o texto está só neste ecrã. {estado.mensagem}{" "}
+        <button
+          onClick={() => onTentarDeNovo(texto)}
+          className={`underline font-semibold rounded ${FOCUS_RING}`}
+        >
+          Tentar de novo
+        </button>
+      </span>
+    );
+  }
+  if (estado.tipo === "conflito") {
+    return <span className="text-[#b5654a] text-[10px]">Duas versões por resolver.</span>;
+  }
+  if (porGravar) return <span className="text-foreground/40 text-[10px]">Por guardar…</span>;
+  if (estado.tipo === "a-guardar")
+    return <span className="text-foreground/40 text-[10px]">A guardar…</span>;
+  if (estado.tipo === "guardado")
+    return (
+      <span className="text-[#4d6350] text-[10px]">
+        Guardado no servidor{estado.quando ? ` às ${estado.quando}` : ""}
+      </span>
+    );
+  return <span className="text-foreground/22 text-[10px]">Guardado no servidor</span>;
+}
+
+/** A leitura falhou: dizê-lo é obrigatório — um "Sem notas." seria outra mentira. */
+function AvisoLeitura({ onRecarregar }: { onRecarregar: () => void }) {
+  return (
+    <p role="alert" className="text-[#b5654a] text-xs leading-relaxed">
+      Não foi possível ler o que está guardado no servidor.{" "}
+      <button onClick={onRecarregar} className={`underline font-semibold rounded ${FOCUS_RING}`}>
+        Tentar de novo
+      </button>
+    </p>
+  );
+}
+
+interface CampoProps {
+  campo: Campo | undefined;
+  estado: Estado;
+  carga: "a-carregar" | "pronto" | "erro";
+  onGuardar: (valor: string) => Promise<boolean>;
+  onResolver: (conflito: Conflito, escolha: "meu" | "servidor") => void;
+  onRecarregar: () => void;
+}
+
+const MetaReceita = memo(function MetaReceita({
+  wonThisMonth,
+  campo,
+  estado,
+  carga,
+  onGuardar,
+  onResolver,
+  onRecarregar,
+}: CampoProps & { wonThisMonth: number }) {
+  const guardada = Number(campo?.value ?? "");
+  const goal = Number.isFinite(guardada) && guardada > 0 ? guardada : 0;
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+
+  async function saveGoal() {
     const v = parseFloat(goalInput.replace(/[^\d.]/g, "")) || 0;
-    setGoal(v);
-    setEditingGoal(false);
-    try {
-      localStorage.setItem("liquen-meta-receita", String(v));
-    } catch {
-      /* ignore */
-    }
+    // O editor só fecha quando o servidor confirma: fechá-lo antes seria a
+    // mesma promessa vazia de antes.
+    if (await onGuardar(v > 0 ? String(v) : "")) setEditingGoal(false);
   }
 
   return (
     <div className="bo-card p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="bo-eyebrow">Meta de receita — este mês</h3>
-        {!editingGoal && (
+        {!editingGoal && carga !== "erro" && (
           <button
             onClick={() => {
               setGoalInput(goal > 0 ? String(goal) : "");
@@ -148,33 +509,49 @@ const MetaReceita = memo(function MetaReceita({ wonThisMonth }: { wonThisMonth: 
         )}
       </div>
 
-      {editingGoal ? (
-        <div className="flex items-center gap-2">
-          <input
-            autoFocus
-            type="number"
-            value={goalInput}
-            onChange={(e) => setGoalInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveGoal();
-              if (e.key === "Escape") setEditingGoal(false);
-            }}
-            placeholder="Ex: 15000"
-            className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
-          />
-          <button
-            onClick={saveGoal}
-            className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors whitespace-nowrap"
-          >
-            Guardar
-          </button>
-          <button
-            onClick={() => setEditingGoal(false)}
-            className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
-          >
-            ×
-          </button>
+      {carga === "erro" ? (
+        <AvisoLeitura onRecarregar={onRecarregar} />
+      ) : editingGoal ? (
+        <div>
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              type="number"
+              value={goalInput}
+              onChange={(e) => setGoalInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void saveGoal();
+                if (e.key === "Escape") setEditingGoal(false);
+              }}
+              placeholder="Ex: 15000"
+              aria-label="Meta de receita deste mês"
+              className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
+            />
+            <button
+              onClick={() => void saveGoal()}
+              disabled={estado.tipo === "a-guardar"}
+              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors whitespace-nowrap disabled:opacity-50"
+            >
+              {estado.tipo === "a-guardar" ? "A guardar…" : "Guardar"}
+            </button>
+            <button
+              onClick={() => setEditingGoal(false)}
+              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-2">
+            <LinhaEstado
+              estado={estado}
+              porGravar={false}
+              onTentarDeNovo={(texto) => void onGuardar(texto)}
+            />
+          </div>
         </div>
+      ) : carga === "a-carregar" ? (
+        <p className="text-foreground/40 text-xs py-1">A carregar…</p>
       ) : goal > 0 ? (
         <>
           <div className="flex items-end justify-between mb-2">
@@ -216,46 +593,99 @@ const MetaReceita = memo(function MetaReceita({ wonThisMonth }: { wonThisMonth: 
       ) : (
         <p className="text-foreground/40 text-xs py-1">Sem meta definida.</p>
       )}
+
+      {estado.tipo === "conflito" && (
+        <AvisoConflito
+          conflito={estado}
+          rotulo="uma meta de receita"
+          onEscolher={(escolha) => {
+            // Ficar com a do servidor fecha o editor: deixá-lo aberto com o
+            // número dela seria prometer uma gravação que já não vai acontecer.
+            if (escolha === "servidor") setEditingGoal(false);
+            onResolver(estado, escolha);
+          }}
+        />
+      )}
+      {estado.tipo === "erro" && !editingGoal && (
+        <div className="mt-2">
+          <LinhaEstado
+            estado={estado}
+            porGravar={false}
+            onTentarDeNovo={(texto) => void onGuardar(texto)}
+          />
+        </div>
+      )}
     </div>
   );
 });
 
-const NotasEquipa = memo(function NotasEquipa() {
-  const [teamNotes, setTeamNotes] = useState("");
+/** Espera, em ms, entre a última tecla e a gravação no servidor. */
+const ATRASO_GRAVACAO = 800;
+
+const NotasEquipa = memo(function NotasEquipa({
+  campo,
+  estado,
+  carga,
+  onGuardar,
+  onResolver,
+  onRecarregar,
+}: CampoProps) {
+  const gravado = campo?.value ?? "";
+  // `null` = o que está no ecrã é o que está no servidor. Enquanto se escreve,
+  // o rascunho manda — inclusive depois de uma falha, para o texto ficar à
+  // vista em vez de ser substituído pela versão antiga do servidor.
+  const [rascunho, setRascunho] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState(false);
+  // Texto que uma gravação falhada deixou pendurado sem ninguém o ter escrito
+  // aqui — é o caso da passagem do browser para o servidor. Se não o
+  // mostrássemos, ela via "Sem notas." com as notas dela a existir algures.
+  const porMostrar = estado.tipo === "erro" ? estado.texto : "";
+  const teamNotes = rascunho ?? (gravado || porMostrar);
+  const porGravar = rascunho !== null && rascunho !== gravado;
 
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem("liquen-team-notes");
-      if (v !== null) setTeamNotes(v);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // Keep the textarea instant (setTeamNotes now), but DEBOUNCE the localStorage
-  // write: a synchronous setItem on every keystroke serialises + commits to
-  // storage on the main thread per character, which hitches typing under storage
-  // pressure. Persist ~500ms after the last keystroke instead.
+  // O texto continua a aparecer a cada tecla; o que é adiado é a IDA AO
+  // SERVIDOR — uma gravação por tecla seria um pedido por carácter.
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function persistNotes(v: string) {
-    setTeamNotes(v);
-    if (notesTimer.current) clearTimeout(notesTimer.current);
+  const cancelarTimer = () => {
+    if (notesTimer.current) {
+      clearTimeout(notesTimer.current);
+      notesTimer.current = null;
+    }
+  };
+  function escrever(v: string) {
+    setRascunho(v);
+    cancelarTimer();
     notesTimer.current = setTimeout(() => {
-      try {
-        localStorage.setItem("liquen-team-notes", v);
-      } catch {
-        /* ignore */
-      }
-    }, 500);
+      notesTimer.current = null;
+      void onGuardar(v);
+    }, ATRASO_GRAVACAO);
   }
-  useEffect(() => () => void (notesTimer.current && clearTimeout(notesTimer.current)), []);
+  function fechar() {
+    // Fechar não pode engolir o que ainda estava a caminho: o que estiver
+    // pendente vai já.
+    if (notesTimer.current) {
+      cancelarTimer();
+      void onGuardar(teamNotes);
+    }
+    setEditingNotes(false);
+  }
+  useEffect(() => cancelarTimer, []);
+
+  // Sair da página com texto por gravar (ou com uma gravação falhada) é
+  // exactamente a forma de perder trabalho sem aviso que este ecrã tinha.
+  const arriscado = porGravar || estado.tipo === "erro" || estado.tipo === "conflito";
+  useEffect(() => {
+    if (!arriscado) return;
+    const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [arriscado]);
 
   return (
     <div className="bo-card p-4">
       <div className="flex items-center justify-between mb-2">
         <h3 className="bo-eyebrow">Notas da equipa</h3>
-        {!editingNotes && (
+        {!editingNotes && carga !== "erro" && (
           <button
             onClick={() => setEditingNotes(true)}
             className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
@@ -264,42 +694,119 @@ const NotasEquipa = memo(function NotasEquipa() {
           </button>
         )}
       </div>
-      {editingNotes ? (
+      {carga === "erro" ? (
+        <AvisoLeitura onRecarregar={onRecarregar} />
+      ) : editingNotes ? (
         <div>
           <textarea
             autoFocus
             rows={4}
             value={teamNotes}
-            onChange={(e) => persistNotes(e.target.value)}
+            onChange={(e) => escrever(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") setEditingNotes(false);
+              if (e.key === "Escape") fechar();
             }}
+            aria-label="Notas da equipa"
             placeholder="Notas partilhadas com a equipa — lembretes, contexto, próximos passos…"
             className="bo-input w-full px-3 py-2 text-sm text-foreground/70 resize-none"
           />
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-foreground/22 text-[10px]">
-              Guardado automaticamente · Esc para fechar
-            </span>
+          <div className="flex items-center justify-between gap-3 mt-2">
+            <LinhaEstado
+              estado={estado}
+              porGravar={porGravar}
+              onTentarDeNovo={(texto) => void onGuardar(texto)}
+            />
             <button
-              onClick={() => setEditingNotes(false)}
-              className="text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 transition-opacity"
+              onClick={fechar}
+              className="text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 transition-opacity shrink-0"
             >
               Fechar
             </button>
           </div>
         </div>
-      ) : teamNotes ? (
-        <p
-          className="text-foreground/55 text-sm leading-relaxed whitespace-pre-wrap cursor-text"
-          onClick={() => setEditingNotes(true)}
-        >
-          {teamNotes}
-        </p>
+      ) : carga === "a-carregar" ? (
+        <p className="text-foreground/40 text-xs">A carregar…</p>
       ) : (
-        <p className="text-foreground/40 text-xs">Sem notas.</p>
+        <>
+          {teamNotes ? (
+            <p
+              className="text-foreground/55 text-sm leading-relaxed whitespace-pre-wrap cursor-text"
+              onClick={() => setEditingNotes(true)}
+            >
+              {teamNotes}
+            </p>
+          ) : (
+            <p className="text-foreground/40 text-xs">Sem notas.</p>
+          )}
+          {(porGravar || estado.tipo === "erro") && (
+            <div className="mt-2">
+              <LinhaEstado
+                estado={estado}
+                porGravar={porGravar}
+                onTentarDeNovo={(texto) => void onGuardar(texto)}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {estado.tipo === "conflito" && (
+        <AvisoConflito
+          conflito={estado}
+          rotulo="notas"
+          onEscolher={(escolha) => {
+            // Ficar com a do servidor tem de largar MESMO o rascunho: mantê-lo
+            // no ecrã por baixo de "resolvido" seria mostrar um texto que já
+            // ninguém vai gravar — outra vez a mentira que se veio corrigir.
+            if (escolha === "servidor") {
+              cancelarTimer();
+              setRascunho(null);
+            }
+            onResolver(estado, escolha);
+          }}
+        />
       )}
     </div>
+  );
+});
+
+/**
+ * Os dois cartões partilham UMA leitura do servidor (um pedido, não dois) e
+ * mantêm gravações independentes — escrever a meta no telemóvel não pode
+ * atropelar as notas abertas no portátil.
+ */
+const PainelEquipa = memo(function PainelEquipa({ wonThisMonth }: { wonThisMonth: number }) {
+  const { snapshot, carga, estado, guardar, resolver, recarregar } = usePainelEquipa();
+  const guardarMeta = useCallback((v: string) => guardar("meta", v), [guardar]);
+  const guardarNotas = useCallback((v: string) => guardar("notas", v), [guardar]);
+  const resolverMeta = useCallback(
+    (c: Conflito, escolha: "meu" | "servidor") => void resolver("meta", c, escolha),
+    [resolver],
+  );
+  const resolverNotas = useCallback(
+    (c: Conflito, escolha: "meu" | "servidor") => void resolver("notas", c, escolha),
+    [resolver],
+  );
+  return (
+    <>
+      <MetaReceita
+        wonThisMonth={wonThisMonth}
+        campo={snapshot?.meta}
+        estado={estado.meta}
+        carga={carga}
+        onGuardar={guardarMeta}
+        onResolver={resolverMeta}
+        onRecarregar={recarregar}
+      />
+      <NotasEquipa
+        campo={snapshot?.notas}
+        estado={estado.notas}
+        carga={carga}
+        onGuardar={guardarNotas}
+        onResolver={resolverNotas}
+        onRecarregar={recarregar}
+      />
+    </>
   );
 });
 
@@ -743,9 +1250,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         ))}
       </div>
 
-      <MetaReceita wonThisMonth={data.wonThisMonth} />
-
-      <NotasEquipa />
+      <PainelEquipa wonThisMonth={data.wonThisMonth} />
 
       {/* Reminders — derived urgent items */}
       <MemoReminders quotes={quotes} onOpen={onOpen} />

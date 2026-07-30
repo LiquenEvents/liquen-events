@@ -109,6 +109,20 @@ create table if not exists public.app_state (
   updated_at  timestamptz not null default now()
 );
 
+-- ── Visão Geral: notas da equipa e meta de receita ──────────────
+-- Uma linha por campo ('notas', 'meta'). Estes dois textos viviam no
+-- localStorage do browser que os escrevia — invisíveis nos outros
+-- dispositivos e apagados com o histórico. `revision` sobe a cada gravação
+-- aceite e é o testemunho do compare-and-set: quem gravar sobre uma revisão
+-- antiga é recusado (409) e vê as duas versões, em vez de apagar o texto de
+-- outra pessoa sem ninguém dar por isso.
+create table if not exists public.overview_settings (
+  id          text primary key,          -- notas | meta
+  value       text not null default '',
+  revision    integer not null default 0,
+  updated_at  timestamptz not null default now()
+);
+
 -- ── Modelos de email (transacionais, editáveis no back office) ──
 create table if not exists public.email_templates (
   id          text primary key,          -- slug: proposta-enviada, sinal-recebido…
@@ -355,6 +369,16 @@ do $$ begin
       check (condition in ('novo','bom','usado','danificado')) not valid;
   end if;
 
+  if not exists (select 1 from pg_constraint where conname = 'overview_settings_id_chk') then
+    alter table public.overview_settings add constraint overview_settings_id_chk
+      check (id in ('notas','meta')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'overview_settings_revision_chk') then
+    alter table public.overview_settings add constraint overview_settings_revision_chk
+      check (revision >= 0) not valid;
+  end if;
+
   if not exists (select 1 from pg_constraint where conname = 'contracts_status_chk') then
     alter table public.contracts add constraint contracts_status_chk
       check (status in ('pendente','aceite')) not valid;
@@ -372,6 +396,7 @@ alter table public.calendar_events enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.app_state enable row level security;
 alter table public.email_templates enable row level security;
+alter table public.overview_settings enable row level security;
 alter table public.invoices    enable row level security;
 alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
