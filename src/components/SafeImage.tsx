@@ -34,6 +34,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
  *  4. esgotado tudo, mostra-se algo digno — nunca o ícone partido;
  *  5. recupera-se quando a imagem reentra no ecrã ou quando a rede volta.
  *
+ * O ESPAÇO NUNCA COLAPSA — e isto custou um defeito para se aprender. Entre
+ * tentativas o `<img>` está desmontado de propósito (ponto 3), e na primeira
+ * versão deste componente esse intervalo não desenhava NADA. Numa imagem `fill`
+ * isso é inofensivo (a caixa do pai é que tem a altura), mas o logótipo do
+ * rodapé não é `fill`: os seus 80 px saíam do fluxo durante 600, 1800 e 5400 ms.
+ * Medido num Pixel 7, com o pedido do logótipo a falhar e o visitante parado no
+ * fim da página: `document.scrollHeight` caía de 4502 para 4422 e o browser
+ * ENCURTAVA o scroll — `window.scrollY` recuava de 3663 para 3583 sem o dedo
+ * lhe tocar. É a queixa "vai um pouco para cima", ao milímetro. Por isso o
+ * intervalo de espera desenha a MESMA superfície do último recurso: mesma
+ * `className`, mesmas dimensões, logo a mesma caixa. Ver o teste
+ * "o espaço da imagem é reservado…" em SafeImage.test.tsx.
+ *
  * O QUE FICOU DELIBERADAMENTE DE FORA (a galeria tem exigências que não são
  * genéricas — ver o relatório):
  *  • a FILA de pedidos em voo (load-queue.ts). Existe porque a galeria monta
@@ -213,6 +226,47 @@ export default function SafeImage({
     [original, bust, initialLoader],
   );
 
+  /**
+   * A superfície que ocupa a caixa da imagem quando não há `<img>` real: entre
+   * tentativas (`waiting`) e depois de esgotadas (`exhausted`). É a mesma nos
+   * dois casos DE PROPÓSITO — mesma `className` e mesmas dimensões que a
+   * imagem verdadeira, portanto a caixa não muda de tamanho em nenhum momento
+   * da escada e nada por baixo se mexe.
+   *
+   * É um `<img>` simples: o `blurDataURL` é um `data:` URI, não tem nada para
+   * optimizar, e um `next/image` aqui voltaria a passar pelo caminho que acabou
+   * de falhar. Mantém o texto alternativo distinto de cada foto (não se degrada
+   * a acessibilidade: a imagem que se mostra continua a ser aquela foto,
+   * degradada).
+   */
+  const reserva = (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      // A `ref` só é usada pelo observador de recuperação, que corre apenas com
+      // `exhausted`; deixá-la sempre ligada não custa nada e evita um segundo
+      // elemento só para isso.
+      ref={fallbackRef}
+      src={blurDataURL || NEUTRAL_BLUR}
+      alt={alt}
+      className={className}
+      width={fill ? undefined : width}
+      height={fill ? undefined : height}
+      style={
+        fill
+          ? {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: "100%",
+              height: "100%",
+            }
+          : undefined
+      }
+    />
+  );
+
   return (
     <>
       {!exhausted && !waiting && (
@@ -233,47 +287,23 @@ export default function SafeImage({
           {...rest}
         />
       )}
-      {exhausted && (
-        <>
-          {/*
-            Recurso digno: a superfície da própria imagem, desfocada. É um
-            `<img>` simples de propósito — o `blurDataURL` é um `data:` URI, não
-            tem nada para optimizar, e um `next/image` aqui voltaria a passar
-            pelo caminho que acabou de falhar. Fica com a MESMA className e as
-            mesmas dimensões, por isso não há salto de layout, e mantém o texto
-            alternativo distinto de cada foto (não se degrada a acessibilidade:
-            a imagem que se mostra continua a ser aquela foto, degradada).
-          */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            ref={fallbackRef}
-            src={blurDataURL || NEUTRAL_BLUR}
-            alt={alt}
-            className={className}
-            width={fill ? undefined : width}
-            height={fill ? undefined : height}
-            style={
-              fill
-                ? {
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    width: "100%",
-                    height: "100%",
-                  }
-                : undefined
-            }
-          />
-          {unavailableLabel && (
-            <span className="pointer-events-none absolute inset-0 flex items-end justify-start p-3">
-              <span className="rounded bg-black/55 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-white/85">
-                {unavailableLabel}
-              </span>
-            </span>
-          )}
-        </>
+      {/*
+        UMA só posição para os dois estados sem `<img>` real — a espera entre
+        tentativas e o fim da escada. Assim a passagem de `waiting` para
+        `exhausted` reaproveita o mesmo nó do DOM (nada desmonta, nada colapsa)
+        e a `fallbackRef` que o observador de recuperação usa fica estável.
+      */}
+      {(waiting || exhausted) && reserva}
+      {/*
+        A legenda é SÓ do fim da escada. A meio de um recuo de 600 ms ainda não
+        se desistiu: dizer "foto indisponível" seria mentira, e piscaria no ecrã.
+      */}
+      {exhausted && unavailableLabel && (
+        <span className="pointer-events-none absolute inset-0 flex items-end justify-start p-3">
+          <span className="rounded bg-black/55 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-white/85">
+            {unavailableLabel}
+          </span>
+        </span>
       )}
     </>
   );

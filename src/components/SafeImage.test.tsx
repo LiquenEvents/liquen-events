@@ -125,10 +125,12 @@ describe("SafeImage: uma imagem falhada volta a ser pedida", () => {
     const urls = [currentSrc()];
     for (const delay of [600, 1800, 5400]) {
       falhar();
-      // Antes de o recuo passar, o `<img>` está desmontado de propósito:
-      // sem o par desmontar/remontar o browser NÃO repete o pedido.
+      // Antes de o recuo passar, o `<img>` que pede o ficheiro está desmontado
+      // de propósito: sem o par desmontar/remontar o browser NÃO repete o
+      // pedido. O que fica no seu lugar é a superfície reservada (um `data:`
+      // URI, que não faz pedido nenhum) — ver o teste do espaço reservado.
       act(() => vi.advanceTimersByTime(delay - 1));
-      expect(img(), `não devia haver pedido antes dos ${delay}ms`).toBeNull();
+      expect(currentSrc(), `não devia haver pedido antes dos ${delay}ms`).toBe(BLUR);
       act(() => vi.advanceTimersByTime(1));
       urls.push(currentSrc());
     }
@@ -203,6 +205,62 @@ describe("SafeImage: uma imagem falhada volta a ser pedida", () => {
     expect(el.getAttribute("width")).toBe("300");
     expect(el.getAttribute("height")).toBe("179");
     expect(el.getAttribute("class")).toContain("object-contain");
+  });
+
+  it("o espaço da imagem é reservado TAMBÉM durante a espera entre tentativas", () => {
+    // A QUEIXA QUE ISTO FIXA: "ao fazer scroll no telemóvel fica tudo travado e
+    // vai um pouco para cima". Entre tentativas o `<img>` está desmontado de
+    // propósito (é a única forma de o browser repetir o pedido), e na primeira
+    // versão deste componente esse intervalo não desenhava NADA. Numa imagem
+    // `fill` é inofensivo; no logótipo do rodapé, que não é `fill`, saíam 80 px
+    // do fluxo durante 600, 1800 e 5400 ms.
+    //
+    // Medido num Pixel 7, com o pedido do logótipo a falhar e o visitante
+    // parado no fim de /sobre: `document.scrollHeight` caía de 4502 para 4422 e
+    // o browser encurtava o scroll — `window.scrollY` recuava de 3663 para 3583
+    // sem ninguém lhe tocar. Depois desta correcção: 0 recuos, altura constante.
+    render(
+      <SafeImage
+        src="/logo-liquen-branco.png"
+        alt="Líquen Events"
+        width={215}
+        height={128}
+        className="h-20 sm:h-24 w-auto object-contain"
+      />,
+    );
+    falhar(); // derivada -> original, imediato (sem espera)
+
+    for (const delay of [600, 1800, 5400]) {
+      falhar(); // agora sim, entra-se na espera
+      act(() => vi.advanceTimersByTime(Math.floor(delay / 2)));
+
+      const el = img();
+      expect(el, `a caixa não pode desaparecer durante a espera de ${delay}ms`).not.toBeNull();
+      // A caixa tem de ser A MESMA: é a `className` que dá a altura (h-20) e
+      // são os atributos que dão a proporção. Se algum se perder, o espaço
+      // colapsa e a página salta.
+      expect(el!.getAttribute("class")).toBe("h-20 sm:h-24 w-auto object-contain");
+      expect(el!.getAttribute("width")).toBe("215");
+      expect(el!.getAttribute("height")).toBe("128");
+      // E não pode ser um pedido novo ao ficheiro que acabou de falhar: o que
+      // ocupa o espaço é uma superfície `data:`, sem rede nenhuma.
+      expect(el!.getAttribute("src")).toMatch(/^data:image\//);
+      expect(el!.getAttribute("src")).not.toContain("logo-liquen-branco");
+
+      act(() => vi.advanceTimersByTime(delay)); // passa a espera, novo pedido
+      expect(currentSrc()).toContain("logo-liquen-branco");
+    }
+  });
+
+  it("durante a espera não se promete o que ainda não se sabe: sem legenda", () => {
+    // A legenda é do FIM da escada. A meio de um recuo de 600ms ainda se está a
+    // tentar; mostrá-la aí seria mentira e piscaria no ecrã a cada tentativa.
+    renderTile({ unavailableLabel: "Foto indisponível" });
+    falhar();
+    falhar();
+    act(() => vi.advanceTimersByTime(300));
+    expect(img(), "a caixa continua ocupada").not.toBeNull();
+    expect(screen.queryByText("Foto indisponível")).toBeNull();
   });
 
   it("depois de desistir, voltar a passar por cima da imagem tenta de novo", () => {
