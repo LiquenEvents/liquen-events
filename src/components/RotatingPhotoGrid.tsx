@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 
 export type GridPic = { src: string; blurDataURL?: string };
@@ -60,7 +60,7 @@ export default function RotatingPhotoGrid({
         const p = pics[i] ?? pool[i % pool.length];
         return (
           <div key={i} className={`relative overflow-hidden group ${cell.cls}`}>
-            <Image
+            <SafeImage
               src={p.src}
               alt={alt}
               fill

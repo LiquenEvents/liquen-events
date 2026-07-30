@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
@@ -115,7 +115,7 @@ function ServiceBand({
       }}
     >
       <Parallax speed={0.12} className="absolute inset-0">
-        <Image
+        <SafeImage
           src={service.image}
           alt={service.title}
           fill
@@ -272,7 +272,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
             }}
           >
             <Parallax speed={0.12} className="absolute inset-0">
-              <Image
+              <SafeImage
                 src={cat.band}
                 alt={cat.label}
                 fill
@@ -319,7 +319,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
         }}
       >
-        <Image
+        <SafeImage
           src="/imagens/J&A-68.jpg"
           alt={t.common.imageAlt.servicosCeremony}
           fill
@@ -366,7 +366,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
         }}
       >
-        <Image
+        <SafeImage
           src="/imagens/M&F0497.jpg"
           alt={t.common.imageAlt.servicosEvening}
           fill

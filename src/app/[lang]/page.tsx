@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
@@ -145,7 +145,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             className="absolute inset-0"
             start="top 88%"
           >
-            <Image
+            <SafeImage
               src={s.image}
               alt=""
               fill
@@ -213,7 +213,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
         }}
       >
-        <Image
+        <SafeImage
           src="/imagens/JOAO_E_PEDRO_1Y1A4463.jpg"
           alt={t.common.imageAlt.homeWedding}
           fill

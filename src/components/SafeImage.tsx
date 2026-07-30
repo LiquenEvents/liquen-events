@@ -82,6 +82,17 @@ export type SafeImageProps = Omit<ImageProps, "src" | "loader" | "onError" | "on
    * legenda é o que explica ao visitante o que aconteceu.
    */
   unavailableLabel?: string;
+  /**
+   * Carregador para a PRIMEIRA tentativa, quando quem chama tem um caminho
+   * próprio para a versão optimizada. É o caso dos heróis de página, que têm a
+   * sua escada até 2048 px (`heroImageLoader`) e não a das fotos comuns.
+   *
+   * Só afecta a primeira tentativa: o recurso continua a ser o ficheiro
+   * original, que é o mesmo para todos. Sem isto, os heróis — a maior imagem de
+   * cada página — eram os únicos que ficavam sem rede, e mediu-se: das 12
+   * imagens que ainda partiam com a avaria simulada, 10 eram heróis.
+   */
+  initialLoader?: (p: ImageLoaderProps) => string;
 };
 
 export default function SafeImage({
@@ -90,6 +101,7 @@ export default function SafeImage({
   className,
   blurDataURL,
   unavailableLabel,
+  initialLoader,
   fill,
   width,
   height,
@@ -195,8 +207,10 @@ export default function SafeImage({
    */
   const loader = useMemo(
     () =>
-      original ? ({ src: s }: ImageLoaderProps) => (bust > 0 ? `${s}?r=${bust}` : s) : undefined,
-    [original, bust],
+      original
+        ? ({ src: s }: ImageLoaderProps) => (bust > 0 ? `${s}?r=${bust}` : s)
+        : initialLoader,
+    [original, bust, initialLoader],
   );
 
   return (

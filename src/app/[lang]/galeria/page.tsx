@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
@@ -149,7 +149,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
 
       {/* ── Instagram CTA ── */}
       <section className="relative overflow-hidden">
-        <Image
+        <SafeImage
           src="/imagens/DaniGui_Adois_61.jpg"
           alt={t.common.imageAlt.galeriaInstagram}
           fill

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import TrackedLink from "@/components/TrackedLink";
 import FAQ from "./FAQ";
 import AnimateIn from "@/components/AnimateIn";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -247,7 +247,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                 Painel com foto de um evento decorado + véu escuro por cima,
                 para o texto (cream) manter contraste AA sobre a imagem. */}
             <div className="relative overflow-hidden flex flex-col justify-center py-14 px-8 md:py-20 md:px-12 lg:pl-20 lg:pr-12">
-              <Image
+              <SafeImage
                 src={orcamentoCtaImg}
                 {...blurFor(orcamentoCtaImg)}
                 alt=""
@@ -312,7 +312,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
               },
             ].map(({ src, alt }, i) => (
               <div key={src} className="relative overflow-hidden group">
-                <Image
+                <SafeImage
                   src={src}
                   {...blurFor(src)}
                   alt={t.common.imageAlt.contactoBand[i] ?? alt}
@@ -330,7 +330,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
 
       {/* ── O que acontece a seguir — sobre foto de evento, com véu escuro ── */}
       <section className="relative py-16 sm:py-28 overflow-hidden border-t border-foreground/8">
-        <Image
+        <SafeImage
           src={stepsBgImg}
           alt=""
           fill
@@ -382,7 +382,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
 
       {/* ── FAQ (image-backed, SpaceX-style: light text over a photo + veil) ── */}
       <section className="relative py-16 sm:py-28 border-t border-white/10 overflow-hidden">
-        <Image
+        <SafeImage
           src="/imagens/EW1_1332.jpg"
           alt=""
           fill
@@ -431,7 +431,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           antigo brilho verde de canto saiu no redesign SpaceX); o texto cream
           continua a garantir contraste AA sobre o véu escuro. */}
       <section className="py-20 sm:py-32 bg-[#0c0e0b] relative overflow-hidden border-t border-white/10">
-        <Image
+        <SafeImage
           src={whatsappCtaImg}
           {...blurFor(whatsappCtaImg)}
           alt=""

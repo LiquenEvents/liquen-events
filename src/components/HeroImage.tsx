@@ -1,6 +1,6 @@
 "use client";
 
-import Image, { type ImageProps } from "next/image";
+import SafeImage, { type SafeImageProps } from "@/components/SafeImage";
 import { heroImageLoader } from "@/lib/hero-image-loader";
 
 /**
@@ -15,9 +15,19 @@ import { heroImageLoader } from "@/lib/hero-image-loader";
  * still SSRs and still emits the `priority` preload; behaviour is otherwise
  * identical to a plain <Image>.
  */
-export default function HeroImage(props: ImageProps) {
-  // `alt` is forwarded from the caller via {...props}; the lint rule can't see
-  // through the spread, so it's disabled here rather than at every call site.
-  // eslint-disable-next-line jsx-a11y/alt-text
-  return <Image loader={heroImageLoader} {...props} />;
+/**
+ * ACRESCENTADO: o herói passou a ter rede.
+ *
+ * Era um `<Image>` cru, portanto um único erro deixava-o partido para o resto
+ * da visita — na maior imagem de cada página. Medido com a derivada forçada a
+ * falhar em todas as páginas: das 12 imagens que ainda partiam depois de o
+ * resto do sítio passar a `SafeImage`, 10 eram heróis. Agora o herói cai no
+ * ficheiro original (`/imagens/…`, versionado, existe sempre) tal como as
+ * outras, e o `heroImageLoader` fica só para a PRIMEIRA tentativa — é ele que
+ * dá a escada própria até 2048 px que os heróis precisam e as fotos comuns não.
+ */
+export default function HeroImage(props: Omit<SafeImageProps, "initialLoader">) {
+  // O `eslint-disable` do `jsx-a11y/alt-text` que aqui estava deixou de ser
+  // preciso: a regra só olha para `next/image`, e isto agora é o SafeImage.
+  return <SafeImage initialLoader={heroImageLoader} {...props} />;
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
@@ -144,7 +144,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
 
       {/* ── LEAD STATEMENT ── */}
       <section className="relative py-28 lg:py-36 overflow-hidden border-b border-foreground/8">
-        <Image
+        <SafeImage
           src={introImg}
           alt=""
           fill
@@ -212,7 +212,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
 
       {/* ── TESTIMONIALS GRID ── */}
       <section className="relative py-24 lg:py-28 overflow-hidden">
-        <Image
+        <SafeImage
           src={wordsImg}
           alt=""
           fill
@@ -293,7 +293,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
 
       {/* ── CTA with background photo ── */}
       <section className="relative py-36 lg:py-52 overflow-hidden">
-        <Image
+        <SafeImage
           src="/imagens/DJI_20250913190635_0120_D.jpg"
           alt={t.common.imageAlt.clientesAerial}
           fill

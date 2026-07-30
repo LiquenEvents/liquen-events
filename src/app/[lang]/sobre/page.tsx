@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
@@ -95,7 +95,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       {/* overflow-x-clip contains the ~4px the from-left/right reveal transforms
           and grid rounding push past the viewport edge on mobile. */}
       <section className="relative overflow-hidden flex flex-col lg:flex-row lg:min-h-[680px]">
-        <Image
+        <SafeImage
           src="/imagens/JOAO_E_PEDRO_IMGL2823.jpg"
           {...blurFor("/imagens/JOAO_E_PEDRO_IMGL2823.jpg")}
           alt=""
@@ -134,7 +134,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         {/* Right — full-height photo, covering the centre of the backdrop (the
             cross/altar) and running top-to-bottom of the section. */}
         <div className="relative z-10 lg:w-1/2 min-h-[75vw] sm:min-h-[460px] lg:min-h-0">
-          <Image
+          <SafeImage
             src="/imagens/DaniGui_Preview12.jpg"
             alt={t.common.imageAlt.sobrePortrait}
             fill
@@ -166,7 +166,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
         }}
       >
         <Parallax speed={0.1} className="absolute inset-0">
-          <Image
+          <SafeImage
             src="/imagens/M&F0497.jpg"
             alt={t.common.imageAlt.sobreGolden}
             fill
@@ -209,7 +209,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
           attribution. Just the portrait, the founder's words and her name — no
           bio paragraph, no extra lines. */}
       <section className="relative overflow-hidden">
-        <Image
+        <SafeImage
           src="/imagens/JOAO_E_PEDRO_1Y1A4738.jpg"
           {...blurFor("/imagens/JOAO_E_PEDRO_1Y1A4738.jpg")}
           alt=""
@@ -239,7 +239,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               className="relative mx-auto w-full max-w-xs lg:max-w-none"
             >
               <div className="relative aspect-[3/4] overflow-hidden">
-                <Image
+                <SafeImage
                   src="/imagens/catarina-gaspar.jpg"
                   alt={t.common.imageAlt.sobreFounder}
                   fill
@@ -280,7 +280,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
 
       {/* ── CTA ── */}
       <section className="relative py-32 lg:py-52 overflow-hidden">
-        <Image
+        <SafeImage
           src="/imagens/DaniGui_Adois_61.jpg"
           alt={t.common.imageAlt.sobreOutdoor}
           fill
