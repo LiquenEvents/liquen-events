@@ -27,7 +27,7 @@ export const SERVICES: ServiceDetail[] = [
     title: "Decoração de Casamentos",
     metaTitle: "Decoração de Casamentos no Alentejo",
     metaDescription:
-      "Decoração de casamentos no Alentejo: design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos de todo o Portugal.",
+      "Decoração de casamentos no Alentejo: design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos de Portugal.",
     keywords: [
       "decoração de casamentos Alentejo",
       "decoração de casamentos",
@@ -64,7 +64,7 @@ export const SERVICES: ServiceDetail[] = [
       },
       {
         q: "Fazem casamentos fora do Alentejo?",
-        a: "Sim. Decoramos e coordenamos casamentos em todo o Portugal continental e ilhas, em articulação com os fornecedores de cada região.",
+        a: "Sim. Decoramos e coordenamos casamentos em Portugal, em articulação com os fornecedores de cada região.",
       },
     ],
     related: ["festas-e-aniversarios"],
@@ -92,7 +92,7 @@ export const SERVICES: ServiceDetail[] = [
       "Decoração floral da viatura",
       "Chegada da noiva e transporte dos noivos",
       "Planeamento do percurso e logística",
-      "Disponível em todo o Portugal",
+      "Disponível em Portugal",
     ],
     gallery: [
       "/imagens/M&F0512.jpg",
@@ -109,7 +109,7 @@ export const SERVICES: ServiceDetail[] = [
       },
       {
         q: "O aluguer está disponível fora do Alentejo?",
-        a: "Sim. Levamos as viaturas a casamentos em todo o Portugal continental, mediante disponibilidade e planeamento da logística.",
+        a: "Sim. Levamos as viaturas a casamentos em Portugal, mediante disponibilidade e planeamento da logística.",
       },
     ],
     related: ["casamentos"],
@@ -251,7 +251,7 @@ export const SERVICES: ServiceDetail[] = [
       },
       {
         q: "Fazem batizados e comunhões fora do Alentejo?",
-        a: "Sim. Decoramos estas celebrações em todo o Portugal, em articulação com os fornecedores de cada região.",
+        a: "Sim. Decoramos estas celebrações em Portugal, em articulação com os fornecedores de cada região.",
       },
     ],
     related: ["festas-e-aniversarios", "casamentos"],
@@ -275,10 +275,10 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Wedding Decoration",
     metaTitle: "Wedding Decoration in the Alentejo",
     metaDescription:
-      "Wedding decoration in the Alentejo: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues across Portugal.",
+      "Wedding decoration in the Alentejo: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues in Portugal.",
     intro: [
       "We turn your wedding into a truly unforgettable day. We take care of every detail, from choosing the perfect venue to elegant decoration and the complete organisation of the ceremony and reception, making sure everything reflects your personality and style.",
-      "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the Alentejo and all of Portugal, so you can fully live your special moment, worry-free.",
+      "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the Alentejo and Portugal, so you can fully live your special moment, worry-free.",
     ],
     includes: [
       "Decoration concept and design",
@@ -295,7 +295,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       },
       {
         q: "Do you do weddings outside the Alentejo?",
-        a: "Yes. We decorate and coordinate weddings throughout mainland Portugal and the islands, working with each region's suppliers.",
+        a: "Yes. We decorate and coordinate weddings in Portugal, working with each region's suppliers.",
       },
     ],
   },
@@ -304,7 +304,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Classic Car Hire for Weddings",
     metaTitle: "Classic Car Hire for Weddings",
     metaDescription:
-      "Classic car hire for weddings in the Alentejo and across Portugal: vintage cars with a driver for the bride's arrival and transport for the couple and guests.",
+      "Classic car hire for weddings in the Alentejo and Portugal: vintage cars with a driver for the bride's arrival and transport for the couple and guests.",
     intro: [
       "We hire out classic cars with a driver for weddings. The car is decorated to match the rest of the wedding, and the route is agreed beforehand: where it waits, what time it leaves, how long it takes to reach the church on a Saturday morning.",
       "It covers the bride's arrival and, if you want, the couple and guests after the ceremony. The driver is always an experienced one, so nobody on your side has to drive that day.",
@@ -314,7 +314,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Floral decoration of the car",
       "Bride's arrival and transport for the couple",
       "Route planning and logistics",
-      "Available across Portugal",
+      "Available in Portugal",
     ],
     faqs: [
       {
@@ -323,7 +323,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       },
       {
         q: "Is hire available outside the Alentejo?",
-        a: "Yes. We take the cars to weddings throughout mainland Portugal, subject to availability and logistics planning.",
+        a: "Yes. We take the cars to weddings in Portugal, subject to availability and logistics planning.",
       },
     ],
   },
@@ -389,9 +389,9 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     title: "Christening & Communion Decoration in the Alentejo",
     metaTitle: "Christening & Communion Decoration",
     metaDescription:
-      "Decoration for christenings and communions in the Alentejo and across Portugal: intimate family celebrations, with bespoke concept, flowers and table styling.",
+      "Decoration for christenings and communions in the Alentejo and Portugal: intimate family celebrations, with bespoke concept, flowers and table styling.",
     intro: [
-      "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations in the Alentejo and across Portugal, intimate or larger in scale, always with the same care.",
+      "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations in the Alentejo and Portugal, intimate or larger in scale, always with the same care.",
       "We decorate the ceremony and then the lunch or dinner, with the same concept in both spaces so they do not read as two different parties. The rest of the day belongs to the family.",
     ],
     includes: [
@@ -409,7 +409,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       },
       {
         q: "Do you do christenings and communions outside the Alentejo?",
-        a: "Yes. We decorate these celebrations across Portugal, working with each region's suppliers.",
+        a: "Yes. We decorate these celebrations in Portugal, working with each region's suppliers.",
       },
     ],
   },

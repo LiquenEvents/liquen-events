@@ -111,7 +111,7 @@ export const pt = {
       "A Líquen Events decora e coordena casamentos, eventos de empresa e celebrações privadas. Com base em Évora, mais de 100 eventos desde 2018.",
     sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
     sobreDescription:
-      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
+      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em Portugal desde 2018.",
     servicosTitle: "Decoração de Casamentos e Eventos no Alentejo",
     servicosDescription:
       "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em Évora, no Alentejo e em Portugal.",
@@ -123,7 +123,7 @@ export const pt = {
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto: Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Receba uma proposta à medida para o seu evento.",
+      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em Portugal. Receba uma proposta à medida para o seu evento.",
     orcamentoTitle: "Pedir Orçamento: Casamentos e Eventos",
     orcamentoDescription:
       "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas, e receba uma proposta à medida.",
@@ -141,7 +141,7 @@ export const pt = {
     ],
     servicosServiceName: "Decoração de eventos e coordenação de casamentos",
     servicosServiceDescription:
-      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal.",
+      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para Portugal.",
   },
 
   home: {
@@ -412,7 +412,7 @@ export const pt = {
       },
       {
         q: "Trabalham em todo o território nacional?",
-        a: "Sim. Trabalhamos em todo o Portugal continental e ilhas. Temos uma vasta rede de fornecedores e parceiros em diversas regiões.",
+        a: "Sim. Trabalhamos em Portugal. Temos uma vasta rede de fornecedores e parceiros em diversas regiões.",
       },
       {
         q: "Podem assumir apenas parte da organização?",
