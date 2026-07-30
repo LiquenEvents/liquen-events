@@ -6,7 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "./supabase";
 import { getState, setState } from "./app-state";
 import { log } from "./logger";
-import type { Mapper } from "./repository";
+import { MAX_PROPOSAL_DOC_BYTES } from "./proposal-doc";
+import { isMissingTable, type Mapper } from "./repository";
 import { mapper as quotesMapper, listQuotes } from "./quotes-store";
 import { mapper as proposalsMapper, listAllProposals } from "./proposals-store";
 import { mapper as suppliersMapper, listSuppliers } from "./suppliers-store";
@@ -124,8 +125,28 @@ const quoteSchema = z.looseObject({
   submittedAt: stamp,
 });
 
+/**
+ * O documento do Estúdio de Propostas (`proposals.doc`), tal como vai na cópia.
+ *
+ * NÃO se valida campo a campo de propósito: o `ProposalDoc` é um modelo grande
+ * e em evolução (ver proposal-doc.ts), e copiá-lo para aqui criava uma segunda
+ * verdade a envelhecer em silêncio ao lado da primeira — cada campo novo do
+ * estúdio passaria a fazer uma cópia de segurança boa ser recusada. Exige-se o
+ * que importa a esta rota: ser um objeto e caber no MESMO teto que a aplicação
+ * já aplica ao gravar (512 KB; medido: 18,5 KB no documento mais cheio que o
+ * gerador desenha). O resto passa tal e qual — `looseObject` guarda as chaves
+ * que não declaramos, e é o `toRow` do store que o escreve na coluna.
+ */
+const proposalDocSchema = z
+  .looseObject({})
+  .refine((d) => JSON.stringify(d).length <= MAX_PROPOSAL_DOC_BYTES, {
+    message: `documento do Estúdio acima do limite de ${MAX_PROPOSAL_DOC_BYTES} bytes`,
+  })
+  .nullish();
+
 const proposalSchema = z.looseObject({
   id,
+  doc: proposalDocSchema,
   quoteId: z.string().max(300).default(""),
   clientName: z.string().max(300).default(""),
   clientEmail: z.string().max(300).default(""),
@@ -290,6 +311,17 @@ export interface RestoreTarget<T = Record<string, unknown>> {
   extraColumns?: (row: T) => Record<string, unknown>;
   /** Perda conhecida ao repor este conjunto neste ambiente, se houver. */
   lossWarning?: (rows: T[]) => string | null;
+  /**
+   * Verificação feita ANTES de qualquer escrita: devolve a razão pela qual este
+   * conjunto NÃO pode ser reposto nesta base de dados (ou null, se pode).
+   *
+   * Existe porque `replaceAll` apaga primeiro e insere depois: se as inserções
+   * falharem todas — por exemplo porque falta uma coluna que a cópia traz — o
+   * conjunto fica APAGADO e vazio, que é o pior resultado possível de uma
+   * ferramenta de recuperação. Um conjunto com razão para ser saltado não é
+   * tocado sequer: fica como está, e a razão sai no ecrã pelo nome.
+   */
+  preflight?: (rows: T[]) => Promise<string | null>;
 }
 
 // Os `as unknown as` abaixo: o `Mapper<T>` de cada store é tipado com o tipo de
@@ -335,15 +367,12 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     // `fromRow` LÊ `created_at`, `toRow` não a escreve: sem isto a data de
     // criação de todas as propostas passava a ser a da reposição.
     extraColumns: (p) => ({ created_at: p.createdAt }),
-    // Defeito conhecido e já testado em proposals-store.test.ts: o `doc` do
-    // Estúdio de Propostas não tem coluna em `proposals`, por isso o `toRow`
-    // deixa-o cair. Uma reposição no Supabase herda essa perda — e diz-lhe o
-    // nome aqui em vez de a deixar acontecer calada.
-    lossWarning: (rows) => {
-      const withDoc = rows.filter((p) => p.doc != null).length;
-      if (!withDoc || !getSupabase()) return null;
-      return `${withDoc} proposta(s) do Estúdio trazem o documento completo (\`doc\`), mas a tabela \`proposals\` não tem coluna para ele — a reposição devolve os valores e o PDF, não o documento editável. É a mesma perda que a aplicação já tem ao gravar (ver proposals-store.test.ts).`;
-    },
+    // O `doc` do Estúdio JÁ é reposto (coluna `proposals.doc`) — durante muito
+    // tempo não era, e aqui vivia um aviso a dizer que se perdia. O que resta é
+    // o caso de uma base onde o `alter table` desta versão ainda não correu:
+    // sem a coluna, as inserções falham TODAS e o `replaceAll` deixava as
+    // propostas apagadas. Por isso pergunta-se antes.
+    preflight: (rows) => assertProposalDocColumn(rows),
   }),
   asTarget({
     key: "contracts",
@@ -470,6 +499,38 @@ const PHOTOS_NOTICE =
   "reposto à parte, as galerias e as capas dos temas aparecem vazias.";
 
 // ── Leitura directa (conjuntos sem função de leitura própria) ───────────────
+
+/**
+ * A coluna `proposals.doc` existe nesta base de dados?
+ *
+ * Só interessa quando a cópia traz propostas COM documento: se nenhuma traz, o
+ * `toRow` nem escreve a coluna e uma base antiga repõe-nas tal como sempre
+ * repôs. Quando traz, e a coluna não existe, a reposição das propostas falharia
+ * inteira DEPOIS de as apagar — é essa a única coisa que aqui se evita.
+ *
+ * Falha para o lado seguro: só um erro RECONHECÍVEL de coluna em falta
+ * (42703/PGRST204, via `isMissingTable`) trava o conjunto. Qualquer outra
+ * avaria é ignorada aqui — a leitura verdadeira do estado actual acontece a
+ * seguir e é ela que a reporta, e um sinal ambíguo desta sonda nunca pode
+ * impedir uma reposição legítima.
+ */
+const SEM_COLUNA_DOC =
+  "a cópia traz propostas com o documento do Estúdio (`doc`) e esta base de dados ainda não tem a coluna " +
+  "`proposals.doc` — corra o db/schema.sql e repita. As propostas ficam INTACTAS (repô-las agora apagava-as " +
+  "sem conseguir inserir nenhuma).";
+
+async function assertProposalDocColumn(rows: readonly { doc?: unknown }[]): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb) return null; // desenvolvimento: escreve-se o ficheiro inteiro, sem colunas
+  if (!rows.some((p) => p.doc != null)) return null;
+  try {
+    const { error } = await sb.from(proposalsMapper.table).select("doc").limit(1);
+    if (error && isMissingTable(error)) return SEM_COLUNA_DOC;
+  } catch (err) {
+    if (isMissingTable(err)) return SEM_COLUNA_DOC;
+  }
+  return null;
+}
 
 /** As linhas da Visão Geral que existem MESMO (o store inventa as que faltam). */
 async function listOverviewRows(): Promise<AnyRow[]> {
@@ -748,6 +809,19 @@ export async function planRestore(file: ValidBackup): Promise<RestorePlan> {
     }),
   );
 
+  // Sondas de pré-voo, antes de qualquer escrita (e ainda dentro do ensaio):
+  // um conjunto que esta base de dados não consegue receber é SALTADO, em vez
+  // de ser apagado e não reposto. Ver `RestoreTarget.preflight`.
+  const preflightSkips = new Map<string, string>();
+  await Promise.all(
+    RESTORE_TARGETS.map(async (t) => {
+      const incoming = file.rows.get(t.key);
+      if (!t.preflight || !incoming) return;
+      const reason = await t.preflight(incoming);
+      if (reason) preflightSkips.set(t.key, reason);
+    }),
+  );
+
   for (const { target, rows: currentRows, error } of reads) {
     if (error) {
       unreadable.push({
@@ -759,7 +833,7 @@ export async function planRestore(file: ValidBackup): Promise<RestorePlan> {
     if (target.key === "invoices") currentInvoices = currentRows;
 
     const incomingRows = file.rows.get(target.key);
-    const skipped = skipReason(target.key, file, error != null);
+    const skipped = skipReason(target.key, file, error != null) ?? preflightSkips.get(target.key);
 
     const currentIds = new Set(currentRows.map((r) => String(target.mapper.getId(r as never))));
     const incomingIds = new Set(
@@ -875,6 +949,13 @@ export async function planRestore(file: ValidBackup): Promise<RestorePlan> {
     warnings.push({
       level: "aviso",
       message: `A cópia não traz estes conjuntos e por isso eles NÃO são tocados (ficam como estão): ${names.join(", ")}.`,
+    });
+  }
+
+  for (const [key, reason] of preflightSkips) {
+    warnings.push({
+      level: "critico",
+      message: `"${TARGET_BY_KEY.get(key)?.label ?? key}" NÃO vai ser reposto: ${reason}`,
     });
   }
 

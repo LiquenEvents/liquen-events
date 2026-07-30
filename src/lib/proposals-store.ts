@@ -22,6 +22,15 @@ export const mapper: Mapper<Proposal> = {
     status: p.status,
     sent_at: p.sentAt || null,
     responded_at: p.respondedAt || null,
+    // O documento do Estúdio (jsonb `proposals.doc`) só entra na linha quando a
+    // proposta o TEM. Duas razões, ambas concretas:
+    //  · uma proposta de linhas (criada em /api/propostas) nunca teve `doc` e
+    //    não passa a escrever uma coluna a null por causa disto;
+    //  · numa base onde o `alter table` de db/schema.sql ainda não correu, a
+    //    coluna não existe — escrevê-la sempre partia tudo, até um simples
+    //    "aceitar proposta". Assim só quem GRAVA um documento é que apanha o
+    //    erro de coluna em falta, e a rota do estúdio trata-o (isMissingTable).
+    ...(p.doc !== undefined ? { doc: p.doc } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -40,6 +49,12 @@ export const mapper: Mapper<Proposal> = {
     createdAt: String(r.created_at ?? new Date().toISOString()),
     sentAt: (r.sent_at as string) ?? undefined,
     respondedAt: (r.responded_at as string) ?? undefined,
+    // Simétrico do `toRow`: sem documento gravado (proposta antiga, proposta de
+    // linhas, ou coluna ainda por criar) a propriedade nem aparece — é o que
+    // mantém `getProposal` a devolver exatamente o que devolvia antes desta
+    // coluna existir, e o portal do cliente a esconder o botão do PDF em vez de
+    // oferecer um documento que não há.
+    ...(r.doc && typeof r.doc === "object" ? { doc: r.doc as Proposal["doc"] } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),

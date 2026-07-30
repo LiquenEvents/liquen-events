@@ -22,8 +22,13 @@ vi.mock("@/lib/quotes-store", () => ({
     updated.last = patch;
   }),
 }));
+/** Avaria a injetar na PRIMEIRA gravação (a segunda é sempre aceite). Serve
+ *  para retratar uma base onde a coluna `proposals.doc` ainda não existe. */
+const store = vi.hoisted(() => ({ failFirstWith: null as unknown, attempts: 0 }));
 vi.mock("@/lib/proposals-store", () => ({
   createProposal: vi.fn(async (p: Proposal) => {
+    store.attempts++;
+    if (store.attempts === 1 && store.failFirstWith) throw store.failFirstWith;
     created.last = p;
   }),
 }));
@@ -46,6 +51,7 @@ vi.mock("@/lib/mail", () => ({
 }));
 
 import { POST } from "./route";
+import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 
 /** Minimal studio doc — only `ref` + `clientNames` are validated by the route;
  *  the money fields under test are added per-case. */
@@ -88,6 +94,8 @@ const params = Promise.resolve({ id: "q1" });
 
 beforeEach(() => {
   created.last = null;
+  store.failFirstWith = null;
+  store.attempts = 0;
   vi.clearAllMocks();
 });
 
@@ -255,5 +263,75 @@ describe("POST /api/orcamento/[id]/proposta-doc — conteúdo CORTADO pelo desen
     const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
     const body = await res.json();
     expect(body.truncations).toEqual(renderMock.truncations);
+  });
+});
+
+// ── O DOCUMENTO fica GUARDADO com a proposta ─────────────────────────────────
+//
+// Durante muito tempo não ficava: a proposta era gravada sem o `doc` e o
+// documento morria com o pedido HTTP. O cliente recebia o PDF por email e, na
+// página onde tinha de decidir, não havia botão nenhum para o rever (a página
+// só o mostra quando há `doc`); reabrir a proposta no estúdio dava uma folha
+// em branco. Estes testes guardam esse comportamento.
+describe("POST /api/orcamento/[id]/proposta-doc — o documento fica guardado", () => {
+  it("grava o `doc` com os CAMINHOS das fotos (é o que serve o PDF do link do cliente)", async () => {
+    const doc = baseDoc({
+      totalAmount: 3000,
+      moodBoards: [{ title: "Cerimónia", images: ["q1/foto-1.jpg"] }],
+      coverImages: ["q1/capa.jpg", ""],
+    });
+    const res = await POST(sendReq(doc), { params });
+    expect(res.status).toBe(200);
+    const guardado = created.last!;
+    expect(guardado.doc).toBeTruthy();
+    expect(guardado.doc!.ref).toBe("PO Decoração Teste");
+    expect(guardado.doc!.moodBoards[0].images).toEqual(["q1/foto-1.jpg"]);
+    expect(guardado.doc!.coverImages).toEqual(["q1/capa.jpg", ""]);
+    // O texto fixo do estúdio também: é o que o PDF reimprime tal e qual.
+    expect(guardado.doc!.condicoesGerais.length).toBeGreaterThan(0);
+  });
+
+  it("recusa (413) um documento acima do teto, sem sequer desenhar o PDF", async () => {
+    // 512 KB (MAX_PROPOSAL_DOC_BYTES). Um `ProposalDoc` real são ~13 KB, e
+    // 18,5 KB no tecto de fotos — isto só acontece com um cliente avariado ou
+    // com bytes de imagem enfiados onde deviam estar caminhos.
+    const enorme = baseDoc({ totalAmount: 3000, budgetItems: ["x".repeat(600 * 1024)] });
+    const res = await POST(sendReq(enorme), { params });
+    expect(res.status).toBe(413);
+    expect(created.last).toBeNull();
+    expect(renderStoredProposalDocPdfWithReport).not.toHaveBeenCalled();
+  });
+
+  it("uma base sem a coluna `doc` guarda a proposta na mesma, e diz o que faltou", async () => {
+    // O caso de quem publica o código antes de correr o db/schema.sql. Uma
+    // proposta por enviar é um negócio parado; sem o documento é só um botão a
+    // menos. Grava-se sem ele e devolve-se o motivo pelo nome.
+    store.failFirstWith = {
+      code: "42703",
+      message: 'column "doc" of relation "proposals" does not exist',
+    };
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.docSaved).toBe(false);
+    expect(body.docError).toContain("db/schema.sql");
+    // A proposta ficou mesmo guardada — sem documento, como antes desta coluna.
+    expect(created.last).not.toBeNull();
+    expect(created.last!.doc).toBeUndefined();
+  });
+
+  it("uma avaria QUALQUER a gravar continua a ser 503 (não se inventa um caminho alternativo)", async () => {
+    store.failFirstWith = new Error("ligação perdida");
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(503);
+    expect(created.last).toBeNull();
+  });
+
+  it("numa gravação normal a resposta NÃO leva `docSaved` (só o que falha sai pelo nome)", async () => {
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const body = await res.json();
+    expect("docSaved" in body).toBe(false);
+    expect("docError" in body).toBe(false);
   });
 });

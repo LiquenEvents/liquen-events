@@ -46,6 +46,32 @@ create table if not exists public.proposals (
 -- Migração para instalações existentes (a tabela acima só é criada se não existir).
 alter table public.proposals add column if not exists responded_at timestamptz;
 
+-- Documento do Estúdio de Propostas: o PDF que o casal recebe, em estrutura —
+-- capa, mood boards, serviços, orçamento, condições e observações. As fotos NÃO
+-- estão aqui: guarda-se o CAMINHO de cada uma no bucket `proposal-assets`.
+--
+-- Sem esta coluna o `doc` era montado, usado para gerar o PDF do email e
+-- deitado fora ao gravar. Consequências medidas: o botão "ver a proposta em
+-- PDF" do link do cliente NUNCA podia aparecer (depende de o `doc` existir ao
+-- reler), e a proposta ENVIADA não tinha cópia nenhuma do lado do servidor — só
+-- o rascunho do estúdio em `app_state`, que a equipa apaga no "Limpar rascunho"
+-- e que NÃO vai na cópia de segurança. Perdido esse, a proposta que o cliente
+-- recebeu deixava de existir em lado nenhum.
+--
+-- TAMANHO (medido com as formas reais): 4,3 KB só com o texto fixo; ~13 KB numa
+-- proposta cheia de 1 mood board; 18,5 KB no tecto de 80 fotos por documento
+-- (MAX_IMAGES_PER_DOC, em proposal-doc-render.ts). São caminhos e texto, nunca
+-- bytes de imagem — a aplicação recusa acima de 512 KB
+-- (MAX_PROPOSAL_DOC_BYTES), o mesmo tecto que o rascunho do estúdio já tinha.
+-- Nada disto incomoda o jsonb; onde se sente é na cópia de segurança (ver
+-- src/app/api/backup/restore/route.ts, que já a aceita comprimida).
+--
+-- Idempotente (`if not exists`) e SEM `not null`: as propostas antigas ficam com
+-- `doc` a null, que se lê como "não há documento" e é exatamente o que a
+-- aplicação já fazia com todas elas — a página do cliente continua a abrir,
+-- apenas sem o botão do PDF.
+alter table public.proposals add column if not exists doc jsonb;
+
 create index if not exists proposals_quote_id_idx on public.proposals (quote_id);
 create index if not exists proposals_created_at_idx on public.proposals (created_at desc);
 

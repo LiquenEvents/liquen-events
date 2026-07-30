@@ -1,0 +1,72 @@
+import { NextResponse } from "next/server";
+import { readProposalToken } from "@/lib/proposal-token";
+import { getProposal } from "@/lib/proposals-store";
+import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { log } from "@/lib/logger";
+
+// pdf-lib + sharp precisam do runtime Node.
+export const runtime = "nodejs";
+// Teto de uma geração, para um documento grande não prender um worker.
+export const maxDuration = 20;
+
+/**
+ * O PDF da proposta, servido pelo MESMO link assinado que o casal usa para a
+ * aceitar (/[lang]/proposta/[token]).
+ *
+ * PORQUÊ existe. O PDF seguia em anexo no email e mais nada: na página onde se
+ * decide gastar milhares de euros não havia forma de o voltar a ver. Quem
+ * arquivasse o email, ou o abrisse no telemóvel de outra pessoa, tinha de pedir
+ * a proposta outra vez para poder aceitá-la.
+ *
+ * Modelo de confiança: o token HMAC É a autorização, tal como no aceite
+ * (POST /api/proposta) — ele só serve a proposta para a qual foi emitido, não
+ * há nada a enumerar nem a forjar, e ver o documento é estritamente MENOS do
+ * que o que esse mesmo token já permite fazer (aceitar).
+ *
+ * 404 (nunca 401/403) para tudo o que falhe — token inválido ou expirado,
+ * proposta apagada, ou proposta antiga sem documento guardado — para um link
+ * nunca revelar se um id existe.
+ *
+ * Serve a proposta do token INDEPENDENTEMENTE do estado: expirada ou já
+ * respondida, o cliente continua a poder rever o documento que lhe foi
+ * apresentado (a página já lhe explica que não pode responder). O que ele
+ * recebe é sempre o documento DESTA proposta, nunca o de uma revisão mais
+ * recente que ele não viu.
+ */
+export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+
+  // Desenhar re-codifica todas as fotos (pdf-lib + sharp) — é caro. O token
+  // vive 14 dias na caixa de correio do cliente e é reencaminhável, por isso
+  // limita-se por IP para um link na mão de alguém não poder ser repetido em
+  // ciclo até esgotar CPU/memória. Mesmo teto do PDF do portal.
+  const limited = await rateLimit(`proposta-pdf:${clientIp(request)}`, 12, 60_000);
+  if (!limited.ok) return new NextResponse(null, { status: 429 });
+
+  const claim = readProposalToken(token);
+  if (!claim) return new NextResponse(null, { status: 404 });
+
+  try {
+    const proposal = await getProposal(claim.proposalId);
+    // Sem documento guardado não há PDF nenhum para servir: é o caso das
+    // propostas anteriores à coluna `proposals.doc` e das propostas de linhas
+    // criadas em /api/propostas. A página do cliente esconde o botão nesse
+    // caso; isto fecha a mesma porta do lado do servidor.
+    if (!proposal?.doc) return new NextResponse(null, { status: 404 });
+
+    const pdf = await renderStoredProposalDocPdf(proposal.doc);
+    // O nome do ficheiro vai dentro de um cabeçalho: saneia-se a referência
+    // (aspas, espaços, acentos) em vez de a confiar tal como está gravada.
+    const ref = (proposal.quoteId || proposal.id).replace(/[^A-Za-z0-9_-]/g, "");
+    return new NextResponse(pdf, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="Proposta-Liquen-${ref}.pdf"`,
+      },
+    });
+  } catch (err) {
+    log.error("proposta pdf GET falhou", err, { proposalId: claim.proposalId });
+    return new NextResponse(null, { status: 500 });
+  }
+}

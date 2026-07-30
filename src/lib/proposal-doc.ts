@@ -35,6 +35,25 @@ export type VatMode = "incluido" | "acrescer";
  */
 export const MOOD_BOARD_MAX_IMAGES = 6;
 
+/**
+ * Teto do tamanho de um documento GUARDADO (JSON, em bytes).
+ *
+ * Um `ProposalDoc` é texto e CAMINHOS de fotos, nunca bytes de imagem. Medido
+ * com as formas reais: 4,3 KB só com o texto fixo do estúdio, ~13 KB numa
+ * proposta cheia com um mood board, 18,5 KB no tecto de 80 fotos por documento
+ * (o `MAX_IMAGES_PER_DOC` de proposal-doc-render.ts).
+ * 512 KB é ~28× a maior proposta possível — folgado para o maior casamento e,
+ * ainda assim, uma trava contra um cliente avariado a empurrar meio megabyte
+ * para dentro da coluna `proposals.doc` (e, dali, para dentro da cópia de
+ * segurança, que viaja inteira no corpo de um pedido).
+ *
+ * É de propósito o MESMO número que o rascunho do estúdio já usava
+ * (`MAX_DRAFT_BYTES`, na rota /proposta-rascunho): o que se grava ao enviar é o
+ * que se estava a rascunhar, e dois tetos diferentes deixariam passar um
+ * rascunho que depois não se conseguia enviar.
+ */
+export const MAX_PROPOSAL_DOC_BYTES = 512 * 1024;
+
 export interface MoodBoard {
   /** Elegant serif title, e.g. "Decoração Cerimónia". */
   title: string;

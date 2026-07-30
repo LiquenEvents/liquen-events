@@ -673,6 +673,7 @@ export const pt = {
     iva: "IVA",
     total: "Total",
     validoAte: "Válida até",
+    verPdf: "Ver a proposta completa (PDF)",
     footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos:",
     dateLocale: "pt-PT",
     response: {

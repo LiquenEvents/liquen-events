@@ -188,6 +188,27 @@ export default async function ProposalPage({
           </div>
         )}
 
+        {/* O DOCUMENTO COMPLETO, na página onde se decide.
+
+            O PDF seguia só em anexo no email: quem arquivasse a mensagem, ou
+            abrisse o link no telemóvel, ficava a decidir milhares de euros a
+            olhar para um total e um IVA. O botão só aparece quando há mesmo
+            documento guardado (`proposal.doc`) — as propostas anteriores à
+            coluna `proposals.doc`, e as de linhas criadas no back office, não
+            têm nenhum e a página fica exatamente como estava. */}
+        {proposal.doc && (
+          <p className="mt-6 text-center">
+            <a
+              href={`/api/proposta/${encodeURIComponent(token)}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-md border border-moss/40 px-6 py-3 text-moss text-xs tracking-[0.2em] uppercase hover:bg-moss/8 transition-colors"
+            >
+              {t.verPdf}
+            </a>
+          </p>
+        )}
+
         {validLabel && (
           <p className="text-foreground/68 text-xs mt-5 text-center">
             {t.validoAte} {validLabel}.

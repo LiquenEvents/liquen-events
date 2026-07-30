@@ -36,8 +36,30 @@ const db = vi.hoisted(() => ({
   writes: [] as string[],
   /** Tabelas que devem falhar, e em que operação. */
   fail: new Map<string, "read" | "write" | "all">(),
+  /**
+   * Colunas que uma tabela NÃO tem — o retrato de uma base onde o
+   * `alter table ... add column if not exists` do db/schema.sql ainda não
+   * correu. Pedi-las (ou escrevê-las) devolve o 42703 do Postgres, tal como lá
+   * fora. É com isto que se põe à prova a sonda de pré-voo das propostas.
+   */
+  missingColumns: new Map<string, Set<string>>(),
   configured: true,
 }));
+
+/** O erro que o Postgres devolve para uma coluna que não existe. */
+function undefinedColumn(table: string, column: string) {
+  return {
+    code: "42703",
+    message: `column ${table}.${column} does not exist`,
+  };
+}
+
+/** A primeira coluna pedida/escrita que a tabela não tem, se houver. */
+function missingColumnIn(table: string, columns: readonly string[]): string | null {
+  const absent = db.missingColumns.get(table);
+  if (!absent) return null;
+  return columns.map((c) => c.trim()).find((c) => absent.has(c)) ?? null;
+}
 
 function shouldFail(table: string, op: "read" | "write"): boolean {
   const mode = db.fail.get(table);
@@ -59,9 +81,13 @@ function fakeSupabase() {
   const client = {
     from(table: string) {
       const api = {
-        select() {
+        select(columns?: string) {
           const q: Record<string, unknown> = {};
           let filtered: Row[] | null = null;
+          // Uma coluna que a tabela não tem rebenta a leitura inteira (42703),
+          // como no Postgres. `*` não pede coluna nenhuma pelo nome.
+          const absent =
+            columns && columns !== "*" ? missingColumnIn(table, columns.split(",")) : null;
           const builder = {
             order(column: string, opts?: { ascending?: boolean }) {
               q.order = { column, ascending: opts?.ascending !== false };
@@ -75,11 +101,17 @@ function fakeSupabase() {
               return builder;
             },
             async maybeSingle() {
+              if (absent) return { data: null, error: undefinedColumn(table, absent) };
               if (shouldFail(table, "read"))
                 return { data: null, error: new Error(`${table} em baixo`) };
               return { data: (filtered ?? rowsOf(table))[0] ?? null, error: null };
             },
             then(resolve: (v: { data: Row[] | null; error: unknown }) => unknown) {
+              if (absent) {
+                return Promise.resolve(
+                  resolve({ data: null, error: undefinedColumn(table, absent) }),
+                );
+              }
               if (shouldFail(table, "read")) {
                 return Promise.resolve(
                   resolve({ data: null, error: new Error(`${table} em baixo`) }),
@@ -103,6 +135,13 @@ function fakeSupabase() {
         async insert(payload: Row | Row[]) {
           if (shouldFail(table, "write")) return { error: new Error(`${table} recusa escritas`) };
           const list = Array.isArray(payload) ? payload : [payload];
+          // Escrever numa coluna que não existe falha o lote INTEIRO — e o
+          // `replaceAll` já apagou a tabela antes de chegar aqui. É exatamente
+          // este o estrago que a sonda de pré-voo existe para evitar.
+          for (const r of list) {
+            const absent = missingColumnIn(table, Object.keys(r));
+            if (absent) return { error: undefinedColumn(table, absent) };
+          }
           db.writes.push(`insert:${table}:${list.length}`);
           rowsOf(table).push(...list.map((r) => ({ ...r })));
           return { error: null };
@@ -167,6 +206,24 @@ import { buildBackupPayload } from "@/app/api/backup/route";
 
 const ONTEM = "2026-03-01T09:00:00.000Z";
 
+/** Um documento do Estúdio como os que se guardam mesmo: texto, condições e os
+ *  caminhos das fotos no bucket (nunca os bytes das imagens). */
+const DOC_DO_ESTUDIO = {
+  ref: "PO Decoração Casamento Ana Dias 16.05.2026",
+  clientNames: "Ana Dias",
+  eventType: "Casamento",
+  eventDate: "16 de maio de 2026",
+  location: "Évora",
+  guests: "120 pax",
+  serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [{ label: "Cerimónia" }] }],
+  moodBoards: [{ title: "Cerimónia", images: ["LIQ-AAA-1/foto-1.jpg"] }],
+  budgetItems: ["Decor Cerimónia"],
+  totalLabel: "Valor Total Decoração",
+  totalText: "10.000,00 € + IVA",
+  coverImages: ["LIQ-AAA-1/capa.jpg", ""],
+  condicoesGerais: ["Aos valores acresce o IVA à taxa legal em vigor."],
+};
+
 /** Um registo representativo de CADA conjunto, com os campos que o `mapper`
  *  tem de saber levar e trazer (datas de criação incluídas — foi aí que a
  *  primeira versão desta funcionalidade perdia dados). */
@@ -206,6 +263,10 @@ function seedBusiness(): void {
     created_at: ONTEM,
     sent_at: ONTEM,
     responded_at: ONTEM,
+    // O documento do Estúdio, com os CAMINHOS das fotos no Storage. Vai no
+    // seed de propósito: é o campo mais pesado e mais fácil de perder na
+    // conversão, e é dele que depende o PDF que o cliente abre pelo link.
+    doc: DOC_DO_ESTUDIO,
   });
   rowsOf("invoices").push({
     id: "inv-1",
@@ -336,6 +397,7 @@ beforeEach(() => {
   db.tables.clear();
   db.writes.length = 0;
   db.fail.clear();
+  db.missingColumns.clear();
   db.configured = true;
   vi.clearAllMocks();
 });
@@ -390,6 +452,23 @@ describe("percurso completo: exportar → apagar → repor", () => {
     expect((depois.calendarEvents as { createdAt: string }[])[0].createdAt).toBe(ONTEM);
     // E os pedidos mantêm a ordem de chegada (created_at é a coluna de ordenação).
     expect(rowsOf("quotes")[0].created_at).toBe(ONTEM);
+  });
+
+  it("o DOCUMENTO do Estúdio volta inteiro — caminhos das fotos incluídos", async () => {
+    // A cópia leva `doc` desde que a coluna existe; se a reposição o deixasse
+    // cair, o cliente voltava a ficar sem o botão do PDF no link e o estúdio
+    // sem a proposta para reabrir — só que agora depois de um restauro, que é
+    // precisamente quando ninguém tem outra cópia de onde os ir buscar.
+    seedBusiness();
+    const antes = await buildBackupPayload();
+    wipeEverything();
+    const file = mustValidate(antes);
+    await applyRestore(file, await planRestore(file));
+
+    const depois = (await buildBackupPayload()).proposals as { doc?: Record<string, unknown> }[];
+    expect(depois[0].doc).toEqual(DOC_DO_ESTUDIO);
+    // A coluna existe MESMO na linha (não é só o `fromRow` a inventar).
+    expect(rowsOf("proposals")[0].doc).toEqual(DOC_DO_ESTUDIO);
   });
 
   it("REPÕE POR SUBSTITUIÇÃO: o que está na base e não está na cópia desaparece", async () => {
@@ -592,12 +671,48 @@ describe("avisos", () => {
     expect(rowsOf("invoices"), "as faturas boas não podiam ter sido apagadas").toHaveLength(1);
   });
 
-  it("avisa quando a cópia traz propostas com o documento do Estúdio, que a tabela não sabe guardar", async () => {
+  it("NÃO repõe as propostas numa base sem a coluna `doc` — deixa-as intactas em vez de as apagar", async () => {
+    // O cenário: a cópia vem de uma instalação já migrada (traz propostas com
+    // o documento do Estúdio) e vai para uma base onde o `alter table` do
+    // db/schema.sql ainda não correu. Sem a sonda de pré-voo, o `replaceAll`
+    // APAGAVA as propostas todas e depois falhava a inserir cada uma delas —
+    // uma ferramenta de recuperação a destruir dados.
+    seedBusiness();
+    const copia = await buildBackupPayload();
+    expect((copia.proposals as { doc?: unknown }[])[0].doc).toBeTruthy();
+
+    db.missingColumns.set("proposals", new Set(["doc"]));
+
+    const file = mustValidate(copia);
+    const plan = await planRestore(file);
+    const propostas = plan.datasets.find((d) => d.key === "proposals")!;
+    expect(propostas.skipped ?? "(as propostas NÃO foram saltadas)").toContain("proposals.doc");
+    expect(propostas.created + propostas.replaced + propostas.removed).toBe(0);
+    const aviso = plan.warnings.find((w) => w.message.includes("proposals.doc"));
+    expect(aviso?.level).toBe("critico");
+    expect(aviso?.message).toContain("db/schema.sql");
+
+    await applyRestore(file, plan);
+    expect(rowsOf("proposals"), "as propostas não podiam ter sido apagadas").toHaveLength(1);
+    expect(db.writes.some((w) => w.includes("proposals"))).toBe(false);
+    // E o resto da cópia entra na mesma: um conjunto saltado não trava os outros.
+    expect(rowsOf("invoices")).toHaveLength(1);
+  });
+
+  it("a sonda não incomoda quando a cópia não traz documentos nenhuns", async () => {
+    // Uma cópia antiga (propostas de linhas, sem `doc`) repõe-se numa base sem
+    // a coluna exatamente como sempre se repôs — a sonda nem chega a perguntar.
     seedBusiness();
     const copia = (await buildBackupPayload()) as Record<string, unknown>;
-    (copia.proposals as Record<string, unknown>[])[0].doc = { pages: [] };
-    const plan = await planRestore(mustValidate(copia));
-    expect(plan.warnings.some((w) => w.message.includes("Estúdio"))).toBe(true);
+    delete (copia.proposals as Record<string, unknown>[])[0].doc;
+    db.missingColumns.set("proposals", new Set(["doc"]));
+
+    const file = mustValidate(copia);
+    const plan = await planRestore(file);
+    expect(plan.datasets.find((d) => d.key === "proposals")!.skipped).toBeUndefined();
+    const result = await applyRestore(file, plan);
+    expect(result.failed).toEqual([]);
+    expect(rowsOf("proposals")).toHaveLength(1);
   });
 
   it("avisa quando a própria cópia tem referências penduradas", async () => {

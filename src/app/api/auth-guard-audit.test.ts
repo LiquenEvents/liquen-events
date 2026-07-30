@@ -381,6 +381,15 @@ describe("TOKEN-guarded routes deny a bad token", () => {
     expect(calls).toEqual([]);
   });
 
+  it("GET /api/proposta/[token]/pdf → 404 on a bad token", async () => {
+    // Mesmo modelo de confiança do aceite: o token assinado É a autorização, e
+    // um token que não seja o da proposta não abre o documento de ninguém.
+    const fn = await handler("./proposta/[token]/pdf/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).toBe(404);
+    expect(calls).toEqual([]); // nunca chegou à proposta nem ao gerador
+  });
+
   it("POST /api/proposta (accept link) → 401 on a bad/forged token, no mutation", async () => {
     const fn = await handler("./proposta/route", "POST");
     const res = await fn(

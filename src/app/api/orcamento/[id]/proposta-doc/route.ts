@@ -6,8 +6,10 @@ import {
   withProposalDefaults,
   resolveProposalMoney,
   resolveValidUntil,
+  MAX_PROPOSAL_DOC_BYTES,
 } from "@/lib/proposal-doc";
 import { isAuthed } from "@/lib/admin-auth";
+import { isMissingTable } from "@/lib/repository";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { createProposal } from "@/lib/proposals-store";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
@@ -42,6 +44,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Fill the studio's fixed boilerplate (condições, observações, faseamento,
     // cancelamento) + event-token substitution so the UI only sends what varies.
     const doc = withProposalDefaults(raw);
+
+    // O documento passou a ser GUARDADO (coluna `proposals.doc`), por isso o
+    // tamanho deixou de ser um detalhe do pedido e passou a ser uma linha na
+    // base de dados e uma linha na cópia de segurança. Medido: 4,3 KB de texto
+    // fixo, 18,5 KB no tecto de 80 fotos — 512 KB é ~28× isso, e é o mesmo teto
+    // que o rascunho já recusava. Recusa-se ANTES de desenhar o PDF: um
+    // documento absurdo não vale o trabalho de sharp/pdf-lib.
+    const docBytes = JSON.stringify(doc).length;
+    if (docBytes > MAX_PROPOSAL_DOC_BYTES) {
+      return NextResponse.json(
+        { error: "Proposta demasiado grande para ser guardada." },
+        { status: 413 },
+      );
+    }
 
     // Shared pipeline (resolve Storage images → render) — the exact same helper
     // the public portal PDF route uses, so both emit an identical document.
@@ -96,14 +112,47 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       doc, // stored with Storage paths so it can be re-opened + edited
     };
 
+    // A proposta fica guardada COM o documento (`doc`): é a única cópia
+    // DURÁVEL do que seguiu para o cliente (o rascunho do estúdio vive em
+    // `app_state`, apaga-se e não vai na cópia de segurança), e é dela que sai
+    // o botão "ver a proposta em PDF" do link do cliente. `docSaved` diz se
+    // isso aconteceu mesmo.
+    let docSaved = true;
+    let docError: string | undefined;
     try {
       await createProposal(proposal);
     } catch (e) {
-      log.error("proposta-doc: guardar falhou", e, { id });
-      return NextResponse.json(
-        { error: "Não foi possível guardar a proposta. Tente novamente." },
-        { status: 503 },
-      );
+      // Coluna `proposals.doc` em falta = instalação onde o db/schema.sql desta
+      // versão ainda não foi corrido. NÃO se deita fora o envio por causa
+      // disso: grava-se a proposta sem o documento (exatamente o que a
+      // aplicação fazia antes desta coluna existir) e diz-se o que se perdeu.
+      // Uma proposta por enviar é um negócio parado; uma proposta sem `doc` é
+      // só um botão a menos no link do cliente, e um `psql` de um minuto.
+      if (isMissingTable(e)) {
+        log.error(
+          "proposta-doc: coluna `proposals.doc` em falta — proposta guardada SEM o documento; corra db/schema.sql",
+          e,
+          { id },
+        );
+        try {
+          await createProposal({ ...proposal, doc: undefined });
+          docSaved = false;
+          docError =
+            "A proposta foi guardada, mas o documento não: falta correr o db/schema.sql (coluna `proposals.doc`). Sem ele o cliente não vê o PDF no link, e do documento enviado só fica o rascunho do estúdio (que se apaga e não vai na cópia de segurança).";
+        } catch (e2) {
+          log.error("proposta-doc: guardar falhou", e2, { id });
+          return NextResponse.json(
+            { error: "Não foi possível guardar a proposta. Tente novamente." },
+            { status: 503 },
+          );
+        }
+      } else {
+        log.error("proposta-doc: guardar falhou", e, { id });
+        return NextResponse.json(
+          { error: "Não foi possível guardar a proposta. Tente novamente." },
+          { status: 503 },
+        );
+      }
     }
 
     const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
@@ -198,6 +247,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       emailError,
       missingImages,
       truncations,
+      // Só viaja quando NÃO foi guardado: uma resposta normal não ganha nada
+      // com um `docSaved:true` a mais, e quem falha tem de sair pelo nome.
+      ...(docSaved ? {} : { docSaved, docError }),
     });
   } catch (err) {
     log.error("proposta-doc POST falhou", err);
