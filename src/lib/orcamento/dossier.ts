@@ -113,11 +113,6 @@ export function countdownDays(
   return Math.round((eventNoon - todayNoon) / 86_400_000);
 }
 
-/** Valor contratado (com IVA) — proposta > preço cotado > estimativa. */
-function contractedTotal(d: DossierData): number {
-  return d.proposal?.total ?? d.quote.quotedPrice ?? d.quote.priceBreakdown?.total ?? 0;
-}
-
 /**
  * Taxa de IVA efetiva do pedido — derivada do breakdown (iva/subtotal) quando
  * existe, senão a taxa normal portuguesa (23%), a mesma que o motor de preços usa.
@@ -160,6 +155,24 @@ export function contractedAmounts(quote: Quote, proposal?: Proposal | null): Con
   const pb = quote.priceBreakdown;
   if (pb) return { net: pb.subtotal, iva: pb.iva, gross: pb.total };
   return { net: 0, iva: 0, gross: 0 };
+}
+
+/**
+ * Valor contratado, sempre COM IVA — a mesma base do dinheiro com que ele é
+ * confrontado (pagamentos, faturas e custos de fornecedor são todos com IVA).
+ *
+ * Delega em `contractedAmounts` de propósito, em vez de repetir a cascata
+ * `proposta ?? preço cotado ?? estimativa`: os três sítios onde o total pode
+ * estar gravado NÃO estão na mesma unidade. `proposal.total` e
+ * `priceBreakdown.total` são brutos; o `quote.quotedPrice` é o campo "Preço
+ * final (sem IVA)" do ecrã, logo líquido. A cascata crua devolvia ora um ora
+ * outro e o limiar de "está pago" caía ~23% no ramo do meio: um casamento
+ * fechado por 20 000 € + IVA (24 600 € a receber) dava-se por concluído com
+ * 20 000 € pagos e 4 600 € por cobrar — e a margem do evento, receita líquida
+ * contra custos brutos, saía inflacionada na mesma proporção.
+ */
+function contractedTotal(d: DossierData): number {
+  return contractedAmounts(d.quote, d.proposal).gross;
 }
 
 /** Soma das faturas pagas (com IVA). */
@@ -275,11 +288,23 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
   // a rota manual permite marcar um negócio como ganho diretamente (reserva
   // offline), tal como `deriveRequestLifecycle` do stepper já reconhece. Sem
   // isto, um pedido ganho à mão aparecia como `lead`, contradizendo o stepper.
+  //
+  // O nº de contrato (`contractRef`) e o registo "proposta enviada" no
+  // `activityLog` são os sinais que SÓ o Quote traz e que o stepper do back
+  // office sempre usou. Passaram para aqui quando o stepper deixou de ter
+  // derivação própria e passou a ser uma vista desta máquina de estados: sem
+  // eles, um contrato assinado à mão (nº preenchido no painel Financeiro) ou uma
+  // proposta enviada por e-mail recuavam o pedido uma ou duas fases.
   const contratoAceite =
-    !!contract?.acceptedAt || proposal?.status === "aceite" || quote.status === "aceite";
+    !!contract?.acceptedAt ||
+    proposal?.status === "aceite" ||
+    quote.status === "aceite" ||
+    !!quote.contractRef;
 
   const propostaEnviada =
-    (!!proposal && proposal.status !== "rascunho") || quote.status === "cotado";
+    (!!proposal && proposal.status !== "rascunho") ||
+    quote.status === "cotado" ||
+    (quote.activityLog ?? []).some((a) => a.kind === "proposal_sent");
 
   const cd = countdownDays(quote.date, today);
 

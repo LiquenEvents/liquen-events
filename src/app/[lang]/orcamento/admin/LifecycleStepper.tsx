@@ -3,17 +3,17 @@
  * ciclo de vida está o pedido selecionado: Pedido → Proposta → Contrato →
  * Fatura → Evento.
  *
- * É uma vista SIMPLIFICADA (5 fases) do modelo de 7 fases do Dossier
+ * É uma vista SIMPLIFICADA (5 passos) do modelo de 7 fases do Dossier
  * (`EventStage` em `@/lib/orcamento/dossier`). Mantém o vocabulário coerente:
- * cada fase grossa agrupa uma ou mais fases finas do Dossier —
+ * cada passo grosso agrupa uma ou mais fases finas do Dossier —
  *   proposta_enviada → Proposta, aceite → Contrato,
  *   sinal_pago/em_producao → Fatura, semana_evento/concluido → Evento.
  *
- * Client-safe: só depende de tipos e de `countdownDays` (função pura). Nunca
- * importa nenhum `*-store.ts` nem `server-only`.
+ * Client-safe: só depende de tipos e de funções puras do Dossier. Nunca importa
+ * nenhum `*-store.ts` nem `server-only`.
  */
 import type { Quote } from "@/lib/orcamento/types";
-import { countdownDays } from "@/lib/orcamento/dossier";
+import { deriveStage, type DossierInvoice, type EventStage } from "@/lib/orcamento/dossier";
 
 type StageId = "pedido" | "proposta" | "contrato" | "fatura" | "evento";
 type StageState = "feito" | "atual" | "por_fazer";
@@ -32,48 +32,43 @@ const STATE_HINT: Record<StageState, string> = {
   por_fazer: "por fazer",
 };
 
+/** Em que passo grosso do stepper cai cada fase fina do Dossier. */
+const STAGE_STEP: Record<Exclude<EventStage, "perdido">, number> = {
+  lead: 0,
+  proposta_enviada: 1,
+  aceite: 2,
+  sinal_pago: 3,
+  em_producao: 3,
+  semana_evento: 4,
+  concluido: 4,
+};
+
 /**
- * Deriva, a partir apenas do Quote (os dados que o back office tem à mão),
- * qual a fase atual do pedido e se o ciclo já foi todo cumprido.
+ * Em que passo do ciclo está o pedido e se o ciclo já foi todo cumprido.
  *
- * Espelha a lógica de `deriveStage`, mas com os sinais disponíveis no Quote:
- *   - proposta enviada → status "cotado"/"aceite" ou registo "proposal_sent"
- *   - contrato aceite  → status "aceite" ou referência de contrato preenchida
- *   - fatura           → existe pelo menos um pagamento/sinal registado
- *   - evento           → data do evento na próxima semana (atual) ou já passada
- *                        (todas as fases concluídas)
- *   - perdido          → status "rejeitado" (estado terminal lateral)
+ * É uma PROJEÇÃO de `deriveStage` (o Dossier), não uma segunda derivação. Tinha
+ * a sua própria, e as duas discordavam no sítio que mais custa dinheiro: aqui,
+ * `if (eventPassed) return { allDone: true }` pintava os cinco passos de verde
+ * assim que a data do casamento ficava para trás — sem olhar para um cêntimo.
+ * O Dossier só chega a `concluido` com o evento passado E o saldo liquidado (do
+ * livro de faturas ou do registo à mão, ver `combinedPaidTotal`); é ele que está
+ * certo. O estúdio corria a lista, via tudo verde e um "Rever produção do
+ * evento" em casamentos com o saldo por receber.
+ *
+ * `invoices` é opcional porque a lista do back office só tem o Quote à mão. Sem
+ * o livro de faturas, um casamento pago APENAS por faturas (sem nenhuma linha em
+ * `quote.payments`) aparece aquém da sua fase — erra a favor de "ainda há
+ * trabalho", nunca a favor de "está tratado". O Dossier do evento, esse, recebe
+ * as faturas e fecha a conta.
  */
 export function deriveRequestLifecycle(
   quote: Quote,
   today: Date = new Date(),
+  invoices: DossierInvoice[] = [],
 ): { perdido: boolean; currentIndex: number; allDone: boolean } {
-  if (quote.status === "rejeitado") {
-    return { perdido: true, currentIndex: 0, allDone: false };
-  }
-
-  const propostaEnviada =
-    quote.status === "cotado" ||
-    quote.status === "aceite" ||
-    (quote.activityLog ?? []).some((a) => a.kind === "proposal_sent");
-  const contratoAceite = quote.status === "aceite" || !!quote.contractRef;
-  const faturaEmitida = (quote.payments ?? []).some((p) => p.amount > 0);
-  // Ancorar ao FIM do dia do evento, tomando sempre a porção da DATA (10
-  // primeiros carateres) — tal como `deriveStage` e `countdownDays`. Assim um
-  // `quote.date` com componente horária (ISO completo, permitido pela rota
-  // manual/importação) não produz `NaN` nem deixa um evento passado preso uma
-  // fase atrás.
-  const eventPassed =
-    !!quote.date && Date.parse(`${quote.date.slice(0, 10)}T23:59:59`) < today.getTime();
-  const cd = countdownDays(quote.date, today);
-  const semanaEvento = contratoAceite && cd !== null && cd >= 0 && cd <= 7;
-
-  if (eventPassed) return { perdido: false, currentIndex: 4, allDone: true };
-  if (semanaEvento) return { perdido: false, currentIndex: 4, allDone: false };
-  if (faturaEmitida) return { perdido: false, currentIndex: 3, allDone: false };
-  if (contratoAceite) return { perdido: false, currentIndex: 2, allDone: false };
-  if (propostaEnviada) return { perdido: false, currentIndex: 1, allDone: false };
-  return { perdido: false, currentIndex: 0, allDone: false };
+  const stage = deriveStage({ quote, proposal: null, contract: null, invoices }, today);
+  if (stage === "perdido") return { perdido: true, currentIndex: 0, allDone: false };
+  return { perdido: false, currentIndex: STAGE_STEP[stage], allDone: stage === "concluido" };
 }
 
 function CheckIcon() {
@@ -92,8 +87,14 @@ function CheckIcon() {
   );
 }
 
-export default function LifecycleStepper({ quote }: { quote: Quote }) {
-  const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote);
+export default function LifecycleStepper({
+  quote,
+  invoices,
+}: {
+  quote: Quote;
+  invoices?: DossierInvoice[];
+}) {
+  const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote, new Date(), invoices);
 
   if (perdido) {
     return (

@@ -325,7 +325,9 @@ describe("computeEventMetrics", () => {
     });
     const m = computeEventMetrics(d, TODAY);
     expect(m.supplierCosts).toBe(0);
-    expect(m.margin).toBe(5000);
+    // 5 000 € é o "Preço final (sem IVA)"; a receita contratada é o que o cliente
+    // paga (6 150 €), a mesma base dos custos de fornecedor.
+    expect(m.margin).toBe(6150);
     expect(m.rsvpTotal).toBe(2); // 0 + 2
     expect(m.rsvpConfirmed).toBe(2); // party 0 contributes nothing
   });
@@ -341,10 +343,13 @@ describe("computeEventMetrics", () => {
     expect(m.pctPaid).toBe(0);
   });
 
-  it("falls back quotedPrice → priceBreakdown.total when no proposal", () => {
+  it("falls back quotedPrice → priceBreakdown.total when no proposal, sempre com IVA", () => {
+    // O `quotedPrice` é líquido ("Preço final (sem IVA)") e o `priceBreakdown.total`
+    // é bruto: o contratado converte o primeiro à taxa efetiva para os dois ramos
+    // saírem na MESMA unidade (com IVA) — é com ela que se comparam pagamentos.
     expect(
       computeEventMetrics(data({ quote: makeQuote({ quotedPrice: 15000 }) }), TODAY).contracted,
-    ).toBe(15000);
+    ).toBe(18450); // 15 000 × 1,23
     expect(computeEventMetrics(data(), TODAY).contracted).toBe(12300); // priceBreakdown.total
   });
 });
