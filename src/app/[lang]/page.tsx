@@ -126,12 +126,13 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {services.map((s, i, arr) => (
         <section
           key={s.title}
-          className="relative h-[86svh] min-h-[560px] w-full overflow-hidden"
-          // Skip layout/paint (and pause the scroll-chevron animation) for these
-          // full-bleed chapters while they're off-screen; the height is
-          // deterministic so contain-intrinsic-size matches → no scroll-jump, and
-          // each chapter's big image decode is deferred to when it nears view.
-          style={{ contentVisibility: "auto", containIntrinsicSize: "auto 86svh" }}
+          // A altura real era `h-[86svh] min-h-[560px]`, ou seja `max(86svh,
+          // 560px)`, mas o espaço reservado dizia só `86svh`. Coincidem no
+          // telemóvel comum (86svh ≈ 722 px), mas num ecrã com menos de 651 px
+          // de altura — um telemóvel deitado — o piso de 560 px ganhava e o
+          // capítulo crescia ao ser desenhado. Agora as três medidas (altura,
+          // altura mínima e reserva) saem todas de `--cv-h`.
+          className="cv-panel relative h-[var(--cv-h)] w-full overflow-hidden [--cv-h:max(86svh,560px)]"
         >
           {/* The photograph settles in as the chapter enters — a slow cinematic
               zoom-out (scale 1.08 → 1) with a fade. Pure transform + opacity, so
@@ -206,12 +207,11 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
       {/* ── CTA — full-screen closing panel (matches /servicos) ── */}
       <section
-        className="relative overflow-hidden flex items-center py-28 lg:py-40"
-        style={{
-          minHeight: "clamp(560px, 90vh, 900px)",
-          contentVisibility: "auto",
-          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
-        }}
+        // O `py-28 lg:py-40` mudou-se daqui para o bloco de conteúdo — ver a
+        // nota igual em /servicos. Com o padding aqui, o espaço reservado para
+        // o painel ficava 224 px acima da altura real e a home encolhia esses
+        // 224 px na primeira descida.
+        className="cv-panel relative overflow-hidden flex items-center [--cv-h:clamp(560px,90vh,900px)]"
       >
         <SafeImage
           src="/imagens/JOAO_E_PEDRO_1Y1A4463.jpg"
@@ -232,7 +232,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           }}
         />
 
-        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="text-veil-shadow relative z-10 max-w-7xl mx-auto px-6 lg:px-16 py-28 lg:py-40 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />

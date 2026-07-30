@@ -1198,6 +1198,39 @@ body:has([data-orcamento-mode]) .eyebrow {
   will-change: auto;
 }
 
+/* ── Painéis de ecrã inteiro que saltam a renderização fora do ecrã ──────────
+   `content-visibility: auto` só é seguro se o espaço RESERVADO for igual à
+   altura REAL. Quando não é, a página encolhe (ou cresce) por baixo do dedo à
+   medida que se desce, e o visitante vê o conteúdo saltar.
+
+   Estava a acontecer, medido: a banda de serviço reservava a altura de
+   computador (`clamp(480px,60vh,680px)` ≈ 503 px) num telemóvel onde mede
+   `46svh` ≈ 386 px — 117 px a mais por banda, oito bandas — e o `/servicos`
+   encolhia 576 px na primeira descida (o `/` encolhia 224 px). O `auto` do
+   `contain-intrinsic-size` NÃO evita isto: só se lembra do tamanho depois de
+   renderizar a secção uma vez, portanto a correcção inteira é paga
+   precisamente na primeira vez que se desce a página. No Chromium a âncora de
+   scroll absorve o encolhimento; o Safari do iPhone não tem âncora nenhuma, e
+   é lá que se vê.
+
+   A defesa é estrutural, não é disciplina: a altura mínima e o tamanho
+   reservado LÊEM A MESMA VARIÁVEL, com a mesma reserva de recurso. Ficarem
+   diferentes deixa de ser possível — teria de se escrever duas vezes o mesmo
+   sítio.
+
+   DUAS REGRAS para quem usar isto:
+     1. Definir `--cv-h` (à mão ou por utilitário, ex. `[--cv-h:46svh]`), com um
+        valor por cada ecrã em que a altura muda.
+     2. NADA de padding vertical NESTE elemento. O `contain-intrinsic-size` é o
+        tamanho da CAIXA DE CONTEÚDO: com `py-28`, a caixa saltada media
+        560+224 px e a desenhada 560 px — 224 px de diferença. O padding vai
+        num filho. (`Paineis.contrato.test.ts` obriga às duas.) */
+.cv-panel {
+  min-height: var(--cv-h, clamp(480px, 60vh, 680px));
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--cv-h, clamp(480px, 60vh, 680px));
+}
+
 /* Fundo neutro (moss muito escuro) por baixo de cada foto da galeria, para que
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {

@@ -104,15 +104,13 @@ function ServiceBand({
     // Shorter on phones (≈46svh) so 8 stacked service bands don't become an
     // endless scroll; full cinematic height from lg up.
     <section
-      className="relative overflow-hidden flex items-end min-h-[46svh] lg:min-h-[clamp(480px,60vh,680px)]"
-      // Match the sibling panels: skip layout/paint while off-screen. The `auto`
-      // keyword self-corrects to the real height (incl. the 46svh mobile case)
-      // after first render, so no scroll-jump; the big image decode defers to
-      // when the band nears view.
-      style={{
-        contentVisibility: "auto",
-        containIntrinsicSize: "auto clamp(480px, 60vh, 680px)",
-      }}
+      // `cv-panel` (globals.css) salta a renderização enquanto a banda está
+      // fora do ecrã e reserva-lhe o espaço A PARTIR DE `--cv-h` — a MESMA
+      // variável que lhe dá a altura mínima. Antes eram dois valores escritos
+      // à parte e o do telemóvel estava errado: a banda mede `46svh` (≈386 px)
+      // e reservava `clamp(480px,60vh,680px)` (≈503 px), 117 px a mais vezes
+      // oito bandas. A página encolhia debaixo do dedo na primeira descida.
+      className="cv-panel relative overflow-hidden flex items-end [--cv-h:46svh] lg:[--cv-h:clamp(480px,60vh,680px)]"
     >
       <Parallax speed={0.12} className="absolute inset-0">
         <SafeImage
@@ -260,16 +258,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               the page reads as a sequence of immersive full-bleed panels. */}
           <section
             id={cat.id}
-            className="relative overflow-hidden scroll-mt-[60px] flex items-end"
-            // content-visibility skips paint+layout for this full-bleed panel
-            // while it's off-screen; contain-intrinsic-size is pinned to the SAME
-            // min-height so the reserved space matches the real height (no
-            // scroll-jump). Unsupported browsers ignore both and render normally.
-            style={{
-              minHeight: "clamp(500px, 80vh, 820px)",
-              contentVisibility: "auto",
-              containIntrinsicSize: "auto clamp(500px, 80vh, 820px)",
-            }}
+            className="cv-panel relative overflow-hidden scroll-mt-[60px] flex items-end [--cv-h:clamp(500px,80vh,820px)]"
           >
             <Parallax speed={0.12} className="absolute inset-0">
               <SafeImage
@@ -311,14 +300,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
       ))}
 
       {/* ── Cinematic statement (where we work) — full-screen, matches panels ── */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          minHeight: "clamp(560px, 90vh, 900px)",
-          contentVisibility: "auto",
-          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
-        }}
-      >
+      <section className="cv-panel relative overflow-hidden [--cv-h:clamp(560px,90vh,900px)]">
         <SafeImage
           src="/imagens/J&A-68.jpg"
           alt={t.common.imageAlt.servicosCeremony}
@@ -359,12 +341,12 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
 
       {/* ── CTA — full-screen closing panel ── */}
       <section
-        className="relative overflow-hidden flex items-center py-28 lg:py-40"
-        style={{
-          minHeight: "clamp(560px, 90vh, 900px)",
-          contentVisibility: "auto",
-          containIntrinsicSize: "auto clamp(560px, 90vh, 900px)",
-        }}
+        // O `py-28 lg:py-40` mudou-se daqui para o bloco de conteúdo. O
+        // `contain-intrinsic-size` é o tamanho da caixa de CONTEÚDO: com o
+        // padding aqui, o painel saltado media 560+224 px e o desenhado 560 px,
+        // e a página encolhia 224 px ao passar por ele. O conteúdo continua
+        // centrado na secção, por isso o aspecto é o mesmo.
+        className="cv-panel relative overflow-hidden flex items-center [--cv-h:clamp(560px,90vh,900px)]"
       >
         <SafeImage
           src="/imagens/M&F0497.jpg"
@@ -384,7 +366,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
           }}
         />
 
-        <div className="text-veil-shadow relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 flex flex-col items-center text-center">
+        <div className="text-veil-shadow relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 py-28 lg:py-40 flex flex-col items-center text-center">
           <AnimateIn>
             <p className="text-white/70 text-[10px] tracking-[0.52em] uppercase flex items-center justify-center gap-4 mb-10">
               <span className="w-8 h-px bg-gold" />

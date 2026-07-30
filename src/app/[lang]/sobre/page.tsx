@@ -157,14 +157,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
       </section>
 
       {/* ── CINEMATIC STATEMENT ── */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          minHeight: "clamp(360px, 65vh, 760px)",
-          contentVisibility: "auto",
-          containIntrinsicSize: "auto clamp(360px, 65vh, 760px)",
-        }}
-      >
+      <section className="cv-panel relative overflow-hidden [--cv-h:clamp(360px,65vh,760px)]">
         <Parallax speed={0.1} className="absolute inset-0">
           <SafeImage
             src="/imagens/M&F0497.jpg"

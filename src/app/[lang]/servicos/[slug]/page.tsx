@@ -251,14 +251,7 @@ export default async function ServiceDetailPage({
 
       {/* ── Aluguer de viaturas — cover band (weddings only) ── */}
       {svc.slug === "casamentos" && (
-        <section
-          className="relative overflow-hidden border-t border-foreground/8 flex items-end"
-          style={{
-            minHeight: "clamp(360px, 60vh, 640px)",
-            contentVisibility: "auto",
-            containIntrinsicSize: "auto clamp(360px, 60vh, 640px)",
-          }}
-        >
+        <section className="cv-panel relative overflow-hidden border-t border-foreground/8 flex items-end [--cv-h:clamp(360px,60vh,640px)]">
           <SafeImage
             src="/imagens/viaturas-classicas.jpg"
             {...blurFor("/imagens/viaturas-classicas.jpg")}
