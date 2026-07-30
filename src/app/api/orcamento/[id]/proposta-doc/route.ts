@@ -157,7 +157,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       log.error("proposta-doc: actualizar pedido falhou", e);
     }
 
-    return NextResponse.json({ ok: true, id: proposal.id, emailed, emailError });
+    // `missingImages` VAI TAMBÉM NO ENVIO, não só na pré-visualização.
+    //
+    // A contagem foi acrescentada quando a Catarina recebeu um PDF com fotos a
+    // menos e ninguém a avisou. Mas ficou só no caminho da pré-visualização — e
+    // os passos do estúdio são clicáveis, portanto dá para ir do Conteúdo
+    // direito ao Enviar sem passar por lá. Nesse caminho o número era calculado
+    // (é o mesmo `renderStoredProposalDocPdfWithReport` lá em cima) e deitado
+    // fora, o que deixava a porta aberta exactamente para o caso que a magoou:
+    // a proposta segue para o noivo com fotos a menos, em silêncio.
+    return NextResponse.json({
+      ok: true,
+      id: proposal.id,
+      emailed,
+      emailError,
+      missingImages,
+    });
   } catch (err) {
     log.error("proposta-doc POST falhou", err);
     // Rota só para administradores autenticados — incluir o motivo real ajuda a

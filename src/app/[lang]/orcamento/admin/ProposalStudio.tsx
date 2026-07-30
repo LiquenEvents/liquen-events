@@ -833,7 +833,17 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
       // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
       // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
-      if (data?.emailed) {
+      // AS FOTOS EM FALTA SÃO O AVISO MAIS IMPORTANTE DOS TRÊS, por isso é o
+      // que fica no ecrã. Uma proposta que seguiu para o noivo com fotos a
+      // menos é o problema que originou esta contagem; saber que o email saiu
+      // é secundário quando o documento que ele leva está incompleto.
+      const emFalta = Number(data?.missingImages ?? 0);
+      if (emFalta > 0) {
+        toast(
+          `${emFalta} ${emFalta === 1 ? "foto não entrou" : "fotos não entraram"} no PDF que seguiu. Verifique a proposta e reenvie.`,
+          "error",
+        );
+      } else if (data?.emailed) {
         toast("Proposta enviada ao cliente", "success");
       } else {
         toast(data?.emailError || "Proposta gerada (email não enviado)", "info");

@@ -6,6 +6,8 @@ import { splitThirtySeventy } from "@/lib/money";
 // ── Mock the auth + data layer + heavy PDF/mail side effects; keep the money
 //    math (proposal-doc) and the route logic real ──
 const created = vi.hoisted(() => ({ last: null as Proposal | null }));
+/** Quantas fotos o renderizador diz que não resolveram, por teste. */
+const renderMock = vi.hoisted(() => ({ missing: 0 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
 vi.mock("@/lib/quotes-store", () => ({
@@ -24,7 +26,7 @@ vi.mock("@/lib/proposal-doc-render", () => ({
   // resolveram, para poder avisar antes de a proposta seguir para o cliente.
   renderStoredProposalDocPdfWithReport: vi.fn(async () => ({
     pdf: Buffer.from("%PDF-1.4"),
-    missingImages: 0,
+    missingImages: renderMock.missing,
   })),
 }));
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: vi.fn(() => "tok") }));
@@ -126,5 +128,44 @@ describe("POST /api/orcamento/[id]/proposta-doc — money model", () => {
     const days = (Date.parse(p.validUntil!) - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(28);
     expect(days).toBeLessThan(31);
+  });
+});
+
+describe("POST /api/orcamento/[id]/proposta-doc — fotos em falta no ENVIO", () => {
+  /**
+   * A contagem nasceu porque a Catarina recebeu um PDF com fotos a menos sem
+   * ninguém a avisar. Mas ficou só no caminho da PRÉ-VISUALIZAÇÃO — e os passos
+   * do estúdio são clicáveis, portanto dá para ir do Conteúdo direito ao Enviar
+   * sem passar por lá. Nesse caminho o número era calculado e deitado fora, ou
+   * seja o caso exacto que a magoou continuava possível.
+   */
+  beforeEach(() => {
+    renderMock.missing = 0;
+  });
+
+  it("o envio devolve a contagem, não só a pré-visualização", async () => {
+    renderMock.missing = 3;
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.missingImages).toBe(3);
+  });
+
+  it("com tudo resolvido, a contagem vai a zero (e não ausente)", async () => {
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const body = await res.json();
+    // Zero e não `undefined`: o cliente compara com 0, e um campo em falta
+    // leria como "não sei" — que é precisamente o estado que se quer eliminar.
+    expect(body.missingImages).toBe(0);
+    expect(body.ok).toBe(true);
+  });
+
+  it("a proposta SEGUE à mesma, mesmo com fotos em falta", async () => {
+    // Recusar o envio seria pior: ela fica sem nada e sem perceber porquê. Sai,
+    // mas avisada.
+    renderMock.missing = 5;
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    expect(created.last).toBeTruthy();
   });
 });
