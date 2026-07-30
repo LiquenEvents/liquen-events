@@ -192,7 +192,14 @@ describe("commercial lifecycle — integer-euro total, across real routes + stor
     expect(prop).toMatchObject({ quoteId, status: "enviada", total: 12300 });
     const q1 = await getQuote(quoteId);
     expect(q1!.status).toBe("cotado"); // quote advanced by the proposal route
-    expect(q1!.quotedPrice).toBe(12300);
+    // SEM IVA (10000), não o total com IVA (12300). O campo chama-se "Preço
+    // final (sem IVA)" no ecrã, quem o escreve à mão escreve-o líquido, e o
+    // `contractedAmounts` trata-o como líquido para derivar o valor com IVA.
+    // Gravá-lo bruto inflacionava a margem do evento em ~23%. O resto deste
+    // percurso não se mexe porque, havendo proposta, as facturas saem dos
+    // números DELA e não deste campo — é justamente por isso que o defeito
+    // passou despercebido: só se vê onde a proposta não está à mão.
+    expect(q1!.quotedPrice).toBe(10000);
 
     // 3) Accept — twice. Contract + 30% sinal auto-issued; the double-accept must
     //    NOT duplicate either (idempotent state machine at the accept seam).

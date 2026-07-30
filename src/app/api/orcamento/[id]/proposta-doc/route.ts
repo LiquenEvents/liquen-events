@@ -152,7 +152,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     try {
-      await updateQuote(id, { status: "cotado", quotedPrice: money.gross });
+      // `money.base` (SEM IVA) e não `money.gross`. O campo chama-se "Preço
+      // final (sem IVA)" no ecrã, quem o escreve à mão escreve-o líquido, e o
+      // `contractedAmounts` (dossier.ts) trata-o como líquido — faz
+      // `gross = quotedPrice * (1 + taxa)` para obter o valor com IVA.
+      //
+      // Gravar aqui o valor COM IVA punha as três coisas em desacordo e o
+      // estrago era em cascata: a margem do evento (EventCosts) compara
+      // `revenueNet` com os custos líquidos, e `revenueNet` passava a ser o
+      // valor com IVA — margem cerca de 23% melhor do que a real. O valor "com
+      // IVA" derivado ficava 51% acima. E ao fazer uma segunda proposta para o
+      // mesmo casamento, o estúdio partia desse número já com IVA e voltava a
+      // marcar "+ IVA" por cima.
+      await updateQuote(id, { status: "cotado", quotedPrice: money.base });
     } catch (e) {
       log.error("proposta-doc: actualizar pedido falhou", e);
     }

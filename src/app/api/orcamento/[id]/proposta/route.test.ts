@@ -117,7 +117,9 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     });
     expect(mail.send).toHaveBeenCalledTimes(1);
     // Quote status advances (best-effort) to cotado with the quoted total.
-    expect(quotes.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 2460 });
+    // 2460 era o total COM IVA; o campo é o "Preço final (sem IVA)", portanto
+    // grava-se o subtotal (2000). Ver a nota na rota.
+    expect(quotes.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 2000 });
   });
 
   it("returns 503 (does not send an un-acceptable proposal) when persistence fails", async () => {

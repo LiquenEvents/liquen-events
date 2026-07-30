@@ -188,7 +188,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Advance the quote status (best-effort — the proposal is already saved & sent).
     try {
-      await updateQuote(id, { status: "cotado", quotedPrice: total });
+      // `subtotal` (SEM IVA) e não `total`. Ver a nota extensa na rota irmã
+      // proposta-doc: o campo chama-se "Preço final (sem IVA)", quem o escreve
+      // à mão escreve-o líquido, e o `contractedAmounts` multiplica-o pela taxa
+      // para obter o valor com IVA. Gravar aqui o total inflacionava a margem
+      // do evento em cerca de 23%.
+      await updateQuote(id, { status: "cotado", quotedPrice: subtotal });
     } catch (e) {
       log.error("actualizar pedido falhou", e);
     }

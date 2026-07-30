@@ -8,11 +8,15 @@ import { splitThirtySeventy } from "@/lib/money";
 const created = vi.hoisted(() => ({ last: null as Proposal | null }));
 /** Quantas fotos o renderizador diz que não resolveram, por teste. */
 const renderMock = vi.hoisted(() => ({ missing: 0 }));
+/** O que foi gravado no pedido (para verificar o "Preço final (sem IVA)"). */
+const updated = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
 vi.mock("@/lib/quotes-store", () => ({
   getQuote: vi.fn(async (id: string) => ({ id, email: "cliente@example.com" })),
-  updateQuote: vi.fn(async () => {}),
+  updateQuote: vi.fn(async (_id: string, patch: Record<string, unknown>) => {
+    updated.last = patch;
+  }),
 }));
 vi.mock("@/lib/proposals-store", () => ({
   createProposal: vi.fn(async (p: Proposal) => {
@@ -167,5 +171,41 @@ describe("POST /api/orcamento/[id]/proposta-doc — fotos em falta no ENVIO", ()
     const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
     expect(res.status).toBe(200);
     expect(created.last).toBeTruthy();
+  });
+});
+
+describe("POST /api/orcamento/[id]/proposta-doc — o preço gravado no pedido", () => {
+  /**
+   * O campo chama-se "Preço final (sem IVA)" no ecrã, quem o escreve à mão
+   * escreve-o líquido, e o `contractedAmounts` (dossier.ts) trata-o como
+   * líquido: faz `gross = quotedPrice * (1 + taxa)`. Gravar aqui o valor COM
+   * IVA punha as três coisas em desacordo e inflacionava a margem do evento em
+   * cerca de 23% — o número que ela usa para saber se um casamento deu lucro.
+   */
+  it("grava o valor SEM IVA, não o valor com IVA", async () => {
+    const res = await POST(
+      sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })),
+      { params },
+    );
+    expect(res.status).toBe(200);
+    // 3000 + 23% = 3690. O que fica no pedido tem de ser 3000.
+    expect(updated.last?.quotedPrice).toBe(3000);
+    expect(updated.last?.quotedPrice).not.toBe(3690);
+  });
+
+  it("com o total já a incluir IVA, grava na mesma o líquido", async () => {
+    const res = await POST(
+      sendReq(baseDoc({ totalAmount: 3690, totalVatMode: "incluido" })),
+      { params },
+    );
+    expect(res.status).toBe(200);
+    expect(updated.last?.quotedPrice).toBe(3000);
+  });
+
+  it("o valor gravado bate certo com o subtotal da proposta criada", async () => {
+    // As duas coisas são escritas no mesmo pedido a partir da mesma conta; se
+    // divergirem, um dos ecrãs mente sobre o mesmo casamento.
+    await POST(sendReq(baseDoc({ totalAmount: 4000, totalVatMode: "acrescer" })), { params });
+    expect(updated.last?.quotedPrice).toBe(created.last!.subtotal);
   });
 });
