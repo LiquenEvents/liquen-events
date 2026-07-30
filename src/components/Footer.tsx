@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import TrackedLink from "@/components/TrackedLink";
 import ManageCookiesLink from "@/components/ManageCookiesLink";
 import { blurFor } from "@/lib/blur";
@@ -27,7 +27,12 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
   return (
     <footer className="relative overflow-hidden bg-[#0c0e0b] text-white">
       {/* ── Background photo + dark veil ── */}
-      <Image
+      {/* Sem legenda de indisponível: isto é uma textura de fundo decorativa
+          (alt=""), coberta por dois véus escuros. Uma etiqueta "foto
+          indisponível" aqui só chamaria a atenção para uma imagem que ninguém
+          repara que existe; o recurso digno é a própria foto desfocada, que sob
+          os véus é indistinguível do resultado normal. */}
+      <SafeImage
         src={FOOTER_BG}
         {...blurFor(FOOTER_BG)}
         alt=""
@@ -59,7 +64,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           {/* Editorial hero — big white logo, serif promise, CTA, social */}
           <div className="pt-16 pb-12 flex flex-col items-center text-center">
-            <Image
+            <SafeImage
               src="/logo-liquen-branco.png"
               alt="Líquen Events"
               width={215}

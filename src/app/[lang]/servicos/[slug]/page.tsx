@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import TrackedLink from "@/components/TrackedLink";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -129,7 +129,7 @@ export default async function ServiceDetailPage({
           the very top behind the transparent navbar (no white strip / hairline). */}
       <section className="relative -mt-24 min-h-[70svh] flex items-end overflow-hidden">
         <Parallax speed={0.14} className="absolute inset-0">
-          <Image
+          <SafeImage
             src={svc.hero}
             {...blurFor(svc.hero)}
             alt=""
@@ -259,7 +259,7 @@ export default async function ServiceDetailPage({
             containIntrinsicSize: "auto clamp(360px, 60vh, 640px)",
           }}
         >
-          <Image
+          <SafeImage
             src="/imagens/viaturas-classicas.jpg"
             {...blurFor("/imagens/viaturas-classicas.jpg")}
             alt=""
@@ -340,13 +340,20 @@ export default async function ServiceDetailPage({
                 : "33vw";
             return (
               <div key={i} className={`relative overflow-hidden group ${span}`}>
-                <Image
+                <SafeImage
                   src={src}
                   {...blurFor(src)}
                   // Distinct alt per photo (base phrase + service + index) so
                   // screen-reader users can tell the portfolio images apart
                   // instead of hearing one identical string repeated.
                   alt={`${t.servicoDetalhe.galleryAlt}: ${svc.title} ${i + 1}`}
+                  // ÚNICO sítio desta página com legenda de último recurso: são
+                  // as fotos do portefólio, o conteúdo que o visitante veio ver
+                  // (e é aqui que a dona fotografou o texto alternativo à vista
+                  // por cima do ícone partido). Cada mosaico é grande o
+                  // suficiente para a legenda caber com dignidade. A mesma
+                  // frase que a galeria já usa, nos dois idiomas.
+                  unavailableLabel={t.galeria.photoUnavailable}
                   fill
                   sizes={`(max-width: 1024px) 50vw, ${dvw}`}
                   quality={75}
@@ -361,7 +368,7 @@ export default async function ServiceDetailPage({
       {/* ── FAQ (image-backed, SpaceX-style: light text over a photo + veil) ── */}
       {svc.faqs.length > 0 && (
         <section className="relative py-20 lg:py-28 border-t border-white/10 overflow-hidden">
-          <Image
+          <SafeImage
             src={svc.hero}
             alt=""
             fill
@@ -422,7 +429,7 @@ export default async function ServiceDetailPage({
                   href={localizeHref(`/servicos/${r.slug}`, locale)}
                   className="group relative overflow-hidden aspect-[16/9] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
                 >
-                  <Image
+                  <SafeImage
                     src={r.hero}
                     {...blurFor(r.hero)}
                     alt=""
@@ -454,7 +461,7 @@ export default async function ServiceDetailPage({
         className="relative flex items-center overflow-hidden border-t border-foreground/8 py-28 lg:py-40"
         style={{ minHeight: "clamp(460px, 68vh, 760px)" }}
       >
-        <Image
+        <SafeImage
           src={ctaImg}
           alt=""
           fill

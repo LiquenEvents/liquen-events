@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo, type CSSProperties } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
 import LanguageToggle from "./LanguageToggle";
@@ -235,7 +235,13 @@ const MobileMenu = memo(function MobileMenu({
               >
                 <span className="relative h-14 w-14 flex-shrink-0 overflow-hidden bg-white/5">
                   {isOpen && (
-                    <Image
+                    /* SEM legenda de indisponível de propósito: numa miniatura
+                       de 56px uma etiqueta de texto não cabe e lê-se como mais
+                       um defeito. Aqui "digno" é silencioso — a superfície
+                       desfocada da própria foto, sobre o quadrado bg-white/5
+                       que já existe, e nunca o ícone de imagem partida (que é
+                       precisamente o que a dona fotografou no menu). */
+                    <SafeImage
                       src={s.img}
                       alt=""
                       fill
@@ -463,7 +469,13 @@ export default function Navbar() {
             href={localizeHref("/", locale)}
             className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
           >
-            <Image
+            {/* O logótipo está em `public/` e portanto existe sempre; o que
+                pode faltar é a DERIVADA que o carregador do sítio pede (hoje
+                `/_img/l/…`, antes `/_next/image`). Com o SafeImage, uma falha
+                dessa derivada deixa de significar uma marca partida no topo de
+                TODAS as páginas — passa a significar um segundo pedido ao PNG
+                original. */}
+            <SafeImage
               src="/logo-liquen.png"
               alt="Líquen Events"
               width={300}
