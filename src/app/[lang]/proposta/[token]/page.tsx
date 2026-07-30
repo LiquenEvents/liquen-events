@@ -120,11 +120,23 @@ export default async function ProposalPage({
 
         {/* Line items */}
         <div className="border border-foreground/10 rounded-lg overflow-hidden bg-surface-raised/30">
-          <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/68 text-[10px] tracking-[0.2em] uppercase">
-            <span className="flex-1">{t.tableDescricao}</span>
-            <span className="w-12 text-center">{t.tableQt}</span>
-            <span className="w-28 text-right">{t.tableValor}</span>
-          </div>
+          {/* O CABEÇALHO SÓ APARECE SE HOUVER LINHAS PARA PÔR POR BAIXO.
+
+              Uma proposta feita no estúdio grava sempre `lineItems: []` (ver
+              api/orcamento/[id]/proposta-doc/route.ts) — o detalhe dos serviços
+              vive no documento em PDF que segue em anexo, não em linhas. Sem
+              esta condição, o noivo que abre a página para decidir gastar
+              milhares de euros via o cabeçalho "Descrição / Quantidade / Valor",
+              NADA por baixo, e logo a seguir o total a pagar. É a página mais
+              cara do produto para dar má impressão, e dava-a a toda a gente que
+              recebe uma proposta do estúdio. */}
+          {proposal.lineItems.length > 0 && (
+            <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/68 text-[10px] tracking-[0.2em] uppercase">
+              <span className="flex-1">{t.tableDescricao}</span>
+              <span className="w-12 text-center">{t.tableQt}</span>
+              <span className="w-28 text-right">{t.tableValor}</span>
+            </div>
+          )}
           {proposal.lineItems.map((it, i) => (
             <div
               key={i}
