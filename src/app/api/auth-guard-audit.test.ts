@@ -233,6 +233,10 @@ beforeEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./backup/route", methods: ["GET"] },
+  // A reposição é a rota mais destrutiva da casa: sem sessão tem de sair em
+  // 401 ANTES de tocar em seja o que for (e o módulo que sabe escrever nem
+  // sequer é carregado — ver o import dinâmico em restore/route.ts).
+  { path: "./backup/restore/route", methods: ["POST"] },
   { path: "./calendario/route", methods: ["GET", "POST"] },
   { path: "./calendario/[id]/route", methods: ["DELETE"] },
   { path: "./contratos/route", methods: ["GET"] },

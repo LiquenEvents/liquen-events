@@ -23,6 +23,7 @@ import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
 import AjudaGlossario from "./AjudaGlossario";
 import NewQuoteModal from "./NewQuoteModal";
+import RestoreDialog from "./RestoreDialog";
 import NotificationBell from "./NotificationBell";
 import {
   downloadCsv,
@@ -464,6 +465,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const [ajudaOpen, setAjudaOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -653,7 +655,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // Escape dismisses the open drawer/nav — but only when no modal is capturing
   // it (the palette / new-quote / shortcuts dialogs handle their own Escape).
   useEffect(() => {
-    if (paletteOpen || newQuoteOpen || shortcutsOpen || ajudaOpen) return;
+    if (paletteOpen || newQuoteOpen || shortcutsOpen || ajudaOpen || restoreOpen) return;
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       // Escape dentro de um campo de texto sai do CAMPO (dispensa autocomplete/
@@ -676,7 +678,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [paletteOpen, newQuoteOpen, shortcutsOpen, ajudaOpen, navOpen, selected]);
+  }, [paletteOpen, newQuoteOpen, shortcutsOpen, ajudaOpen, restoreOpen, navOpen, selected]);
 
   // Lock background scroll while the mobile nav drawer is open.
   useEffect(() => {
@@ -752,6 +754,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         run: () => {
           window.location.href = "/api/backup";
         },
+      },
+      {
+        // A outra metade do backup. Sai na paleta ao lado dele de propósito:
+        // quem procura "backup" num dia mau está a procurar isto.
+        id: "action-restore",
+        label: "Repor cópia de segurança (backup)",
+        group: "Ações",
+        run: () => setRestoreOpen(true),
       },
       ...NAV.map((item) => ({
         id: `nav-${item.id}`,
@@ -1327,6 +1337,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     <>
       <div className="min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        <RestoreDialog open={restoreOpen} onClose={() => setRestoreOpen(false)} toast={toast} />
         <AjudaGlossario open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
         <CommandPalette
           open={paletteOpen}
@@ -1505,6 +1516,30 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 </svg>
                 Backup
               </a>
+              {/* A outra metade do botão ao lado. Fica AQUI, encostado ao
+                  Backup, porque é aqui que se procura num dia mau — e porque
+                  uma cópia sem forma de a repor nunca foi uma cópia. */}
+              <button
+                onClick={() => setRestoreOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                title="Repor cópia de segurança"
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path
+                    d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Repor
+              </button>
               <button
                 onClick={logout}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"

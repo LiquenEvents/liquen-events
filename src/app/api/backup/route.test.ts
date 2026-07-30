@@ -191,10 +191,14 @@ describe("GET /api/backup", () => {
     expect(json.incomplete.sort()).toEqual(BACKUP_DATASETS.map((d) => d.key).sort());
   });
 
-  it("o ficheiro diz por escrito o que NÃO traz (fotos, restauro manual)", async () => {
+  it("o ficheiro diz por escrito o que NÃO traz (fotos) e COMO se repõe", async () => {
     const json = await (await GET(get())).json();
     expect(typeof json.readme).toBe("string");
-    expect(json.readme).toMatch(/restauro/i);
+    // Durante muito tempo dizia "NÃO existe botão de restauro". Agora existe, e
+    // o ficheiro tem de dizer por onde — quem o abre daqui a dois anos, num dia
+    // mau, não vai adivinhar o caminho da rota.
+    expect(json.readme).toMatch(/repor/i);
+    expect(json.readme).toContain("/api/backup/restore");
     for (const key of [...Object.keys(NOT_BACKED_UP), ...Object.keys(EXTERNAL_ASSETS)]) {
       expect(json.notIncluded[key], `exclusão "${key}" sem explicação no ficheiro`).toBeTruthy();
     }

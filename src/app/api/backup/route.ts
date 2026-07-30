@@ -127,12 +127,64 @@ const README = [
   "Cópia de segurança dos dados de negócio da Líquen Events.",
   "Inclui pedidos, propostas, faturas (livro completo + contadores de numeração), contratos aceites, fornecedores, tarefas, agenda, inventário, modelos de email, temas, as anotações da caixa de entrada e as notas/meta da Visão Geral.",
   "NÃO inclui as fotos (vivem nos buckets listados em `notIncluded`) — sem elas, propostas e temas repõem-se com os caminhos das imagens mas sem as imagens.",
-  "NÃO existe botão de restauro: repor exige carregar estas tabelas na base de dados à mão. Atenção que os campos aqui estão como a aplicação os usa (`quoteId`, `clientName`), não como as colunas se chamam na base de dados (`quote_id`, `client_name`) — a conversão é a do `mapper` de cada store em src/lib. Guarde este ficheiro fora do computador de trabalho.",
-  "Se `incomplete` não estiver vazio, ESTA CÓPIA ESTÁ INCOMPLETA — algum conjunto falhou a leitura e ficou vazio no ficheiro. Repita a exportação.",
+  "PARA REPOR: back office → Backup → Repor cópia (POST /api/backup/restore). Carregar o ficheiro mostra primeiro um ENSAIO — o que aconteceria, sem escrever nada — e a reposição real exige uma frase escrita à mão. Repor SUBSTITUI o conteúdo de cada conjunto e faz antes uma cópia do estado actual, que é entregue para o caso de a reposição ter sido um engano. Os campos aqui estão como a aplicação os usa (`quoteId`, `clientName`), não como as colunas se chamam na base de dados (`quote_id`, `client_name`) — a conversão é a do `mapper` de cada store em src/lib. Guarde este ficheiro fora do computador de trabalho.",
+  "Se `incomplete` não estiver vazio, ESTA CÓPIA ESTÁ INCOMPLETA — algum conjunto falhou a leitura e ficou vazio no ficheiro. Repita a exportação (a reposição recusa-se a repor esses conjuntos, para não trocar dados bons por um vazio de avaria).",
 ].join(" ");
 
-/** Formato do ficheiro. Subir isto quando as chaves mudarem de forma incompatível. */
-const SCHEMA_VERSION = 2;
+/** Formato do ficheiro. Subir isto quando as chaves mudarem de forma incompatível.
+ *  Exportado porque a REPOSIÇÃO tem de saber que versões sabe ler — e há um
+ *  teste que cruza este número com o `BACKUP_SCHEMA_VERSION` do lado de lá. */
+export const SCHEMA_VERSION = 2;
+
+/** A cópia completa, tal e qual como vai no ficheiro descarregável.
+ *
+ *  Exportada por uma razão de segurança, não de arrumação: a REPOSIÇÃO faz uma
+ *  cópia do estado actual antes de escrever por cima dele, e essa cópia tem de
+ *  ser exactamente a mesma coisa que o botão Backup produz — a mesma função,
+ *  não uma segunda parecida que envelheceria ao lado desta. `incomplete` é o
+ *  que diz à reposição que a cópia de recuo não é fiável e que deve desistir. */
+export async function buildBackupPayload(): Promise<{
+  exportedAt: string;
+  schemaVersion: number;
+  readme: string;
+  counts: Record<string, number>;
+  incomplete: string[];
+  notIncluded: Record<string, string>;
+  [dataset: string]: unknown;
+}> {
+  // Um conjunto que falha degrada para [] para não levar a cópia inteira
+  // atrás — mas fica REGISTADO em `incomplete`. Um vazio silencioso lê-se
+  // como "não havia nada", que é exatamente a mentira que abre este ficheiro.
+  const results = await Promise.all(
+    BACKUP_DATASETS.map(async (d) => {
+      try {
+        return { key: d.key, rows: await d.list(), ok: true };
+      } catch (err) {
+        log.error("backup: conjunto falhou a leitura — cópia INCOMPLETA", err, {
+          dataset: d.key,
+          table: d.table,
+        });
+        return { key: d.key, rows: [] as unknown[], ok: false };
+      }
+    }),
+  );
+
+  // Pela ordem de declaração, não pela ordem em que as avarias aconteceram:
+  // duas exportações seguidas do mesmo estado devem ler-se igual.
+  const incomplete = results.filter((r) => !r.ok).map((r) => r.key);
+  const data = Object.fromEntries(results.map((r) => [r.key, r.rows]));
+  const counts = Object.fromEntries(results.map((r) => [r.key, r.rows.length]));
+
+  return {
+    exportedAt: new Date().toISOString(),
+    schemaVersion: SCHEMA_VERSION,
+    readme: README,
+    counts,
+    incomplete,
+    notIncluded: { ...NOT_BACKED_UP, ...EXTERNAL_ASSETS },
+    ...data,
+  };
+}
 
 /** Cópia completa (ver `BACKUP_DATASETS`) num único ficheiro JSON descarregável. */
 export async function GET(request: NextRequest) {
@@ -140,38 +192,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   try {
-    // Um conjunto que falha degrada para [] para não levar a cópia inteira
-    // atrás — mas fica REGISTADO em `incomplete`. Um vazio silencioso lê-se
-    // como "não havia nada", que é exatamente a mentira que abre este ficheiro.
-    const results = await Promise.all(
-      BACKUP_DATASETS.map(async (d) => {
-        try {
-          return { key: d.key, rows: await d.list(), ok: true };
-        } catch (err) {
-          log.error("backup: conjunto falhou a leitura — cópia INCOMPLETA", err, {
-            dataset: d.key,
-            table: d.table,
-          });
-          return { key: d.key, rows: [] as unknown[], ok: false };
-        }
-      }),
-    );
-
-    // Pela ordem de declaração, não pela ordem em que as avarias aconteceram:
-    // duas exportações seguidas do mesmo estado devem ler-se igual.
-    const incomplete = results.filter((r) => !r.ok).map((r) => r.key);
-    const data = Object.fromEntries(results.map((r) => [r.key, r.rows]));
-    const counts = Object.fromEntries(results.map((r) => [r.key, r.rows.length]));
-
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      schemaVersion: SCHEMA_VERSION,
-      readme: README,
-      counts,
-      incomplete,
-      notIncluded: { ...NOT_BACKED_UP, ...EXTERNAL_ASSETS },
-      ...data,
-    };
+    const payload = await buildBackupPayload();
 
     return new NextResponse(JSON.stringify(payload, null, 2), {
       headers: {
