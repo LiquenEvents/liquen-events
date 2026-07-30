@@ -6,7 +6,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm run pregen && next dev",
     "pregen": "node scripts/pregen-heroes.mjs && node scripts/pregen-gallery.mjs && node scripts/pregen-logos.mjs",
     "build": "node scripts/pregen-heroes.mjs && node scripts/pregen-gallery.mjs && node scripts/pregen-logos.mjs && next build",
     "start": "next start",

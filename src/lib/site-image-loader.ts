@@ -53,6 +53,16 @@
  * é sempre servido. Fica maior e sem redimensionar, mas aparece — que é
  * exactamente o problema que estamos a resolver.
  *
+ * CONSEQUÊNCIA PARA QUEM DESENVOLVE: o `npm run dev` TEM de pré-gerar primeiro.
+ * Sem os ficheiros em public/_img, este carregador aponta para caminhos que não
+ * existem e — como o `/_next/image` já não é um recurso possível (ver acima) —
+ * o site aparece com TODAS as imagens partidas em local. Não é uma avaria
+ * subtil: é o site inteiro sem fotografias, e quem clonar o repositório de
+ * fresco assume que partiu alguma coisa. Por isso o script `dev` do
+ * package.json passou a ser `npm run pregen && next dev`. Os pré-geradores são
+ * cache-aware, portanto isto custa segundos depois da primeira vez (a primeira
+ * paga o encode das ~2 900 imagens).
+ *
  * CUSTO EM BYTES: NEGATIVO. Este ficheiro vai no bundle de TODAS as páginas,
  * mas não SOMA — SUBSTITUI. O `loaderFile` é aliased por cima do carregador por
  * omissão do Next (build/create-compiler-aliases.js:146), e esse traz consigo o
