@@ -11,7 +11,7 @@
  * funções que precisam do "hoje" aceitam-no por parâmetro (injectável nos
  * testes); o valor por omissão só é lido dentro da função, no momento da chamada.
  */
-import type { Quote, Proposal } from "./types";
+import type { Quote, Proposal, Payment } from "./types";
 import { round2 } from "@/lib/money";
 
 /**
@@ -173,6 +173,59 @@ function informalPaidTotal(quote: Quote): number {
 }
 
 /**
+ * Espécie do livro correspondente a cada espécie de pagamento informal. É o
+ * MESMO mapa que a rota de faturação aplica ao emitir o documento a partir de
+ * uma linha de pagamento (`api/orcamento/[id]/fatura`): sinal→sinal,
+ * saldo→saldo, pagamento avulso→total. Por construção, o recibo de um pagamento
+ * cai sempre no balde da linha que o originou — é isso que torna a comparação
+ * balde-a-balde abaixo fiável.
+ */
+const PAYMENT_TO_INVOICE_KIND: Record<Payment["kind"], DossierInvoice["kind"]> = {
+  sinal: "sinal",
+  saldo: "saldo",
+  pagamento: "total",
+};
+
+const INVOICE_KINDS: DossierInvoice["kind"][] = ["sinal", "saldo", "total"];
+
+/**
+ * Dinheiro recebido contando as DUAS fontes — o livro de faturas e o registo à
+ * mão (`quote.payments`) — sem somar o mesmo euro duas vezes.
+ *
+ * As duas fontes não são duas carteiras: são duas VISTAS do mesmo dinheiro (é
+ * exatamente isso que `reconcileFinance` confronta, avisando quando divergem).
+ * O fluxo normal regista o pagamento à mão e depois emite o recibo a partir
+ * dessa linha, pelo que o mesmo valor aparece dos dois lados — somá-los daria o
+ * dobro. Mas há eventos pagos só por um dos caminhos, e até eventos com o sinal
+ * faturado e o saldo só registado à mão; ficar apenas com o maior TOTAL perderia
+ * essa metade.
+ *
+ * Por isso confrontamos espécie a espécie (sinal / saldo / avulso) e ficamos com
+ * o MAIOR de cada lado:
+ *   • o mesmo dinheiro nos dois sítios → conta uma vez;
+ *   • cada espécie pela sua fonte → somam-se as espécies, não as fontes;
+ *   • registo parcial de um dos lados → prevalece o lado mais completo.
+ *
+ * Arredonda aos cêntimos no fim, como `reconcileFinance`, para um desvio de
+ * vírgula flutuante nunca deixar um evento integralmente pago aquém do total.
+ */
+export function combinedPaidTotal(d: DossierData): number {
+  const payments = d.quote.payments ?? [];
+  const total = INVOICE_KINDS.reduce((sum, kind) => {
+    const ledger = d.invoices.reduce(
+      (s, i) => s + (i.kind === kind && i.status === "paga" ? i.amount : 0),
+      0,
+    );
+    const informal = payments.reduce(
+      (s, p) => s + (p.paid && PAYMENT_TO_INVOICE_KIND[p.kind] === kind ? p.amount : 0),
+      0,
+    );
+    return sum + Math.max(ledger, informal);
+  }, 0);
+  return round2(total);
+}
+
+/**
  * Máquina de estados do Dossier. Calcula os booleanos e escolhe a fase mais
  * avançada alcançada (primeira coincidência ganha, topo = mais avançado).
  * A implementação segue à letra a tabela do plano.
@@ -195,11 +248,24 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
   const eventPassed = !Number.isNaN(eventDayEnd) && eventDayEnd < today.getTime();
 
   const contracted = contractedTotal(d);
-  const ledgerPaid = ledgerPaidTotal(invoices);
+  const combinedPaid = combinedPaidTotal(d);
 
+  // Sinal e saldo lêem as MESMAS duas fontes, com o mesmo critério: uma fatura
+  // da espécie certa dada por paga, ou uma linha de pagamento da espécie certa
+  // marcada como recebida. Enquanto o saldo só olhava para o livro, um evento já
+  // realizado e integralmente pago pelo caminho rápido (registo à mão, que é o
+  // que o painel de Pagamentos sugere e o que faz subir o "Recebido") nunca
+  // chegava a `concluido`: ficava `em_producao` para sempre e acumulava no
+  // quadro, ano após ano. Um valor registado e dado por pago vale o mesmo dos
+  // dois lados — a divergência entre livro e registo é assunto do banner de
+  // reconciliação, não da fase do evento.
   const saldoPago =
     invoices.some((i) => (i.kind === "saldo" || i.kind === "total") && i.status === "paga") ||
-    (contracted > 0 && ledgerPaid >= contracted);
+    (quote.payments ?? []).some((p) => p.kind === "saldo" && p.paid && p.amount > 0) ||
+    // Rede de segurança para quem nunca rotula a última parcela como "saldo":
+    // o contratado está coberto, venha o dinheiro de onde vier (sem contar o
+    // mesmo euro duas vezes — ver `combinedPaidTotal`).
+    (contracted > 0 && combinedPaid >= round2(contracted));
 
   const sinalPago =
     invoices.some((i) => i.kind === "sinal" && i.status === "paga") ||
