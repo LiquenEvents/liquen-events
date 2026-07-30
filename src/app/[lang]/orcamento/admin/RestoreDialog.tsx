@@ -88,6 +88,42 @@ function plural(n: number, um: string, muitos: string): string {
  * um efeito a limpá-lo à mão — que era onde se esquecia a frase de confirmação
  * escrita da vez anterior, pronta a ser submetida sobre outro ficheiro.
  */
+/**
+ * Envia o pedido COMPRIMIDO quando o navegador sabe fazê-lo.
+ *
+ * A cópia inteira viaja no corpo, e os alojamentos limitam esse corpo (~4,5 MB
+ * na Vercel). Medida com as formas reais dos dados, a cópia são 6,24 MB hoje e
+ * 24,7 MB a três anos — ou seja, esta reposição nascia já provavelmente acima
+ * do tecto. Comprimida são 0,35 MB e 1,38 MB, o que afasta o problema uma
+ * década.
+ *
+ * Sem `CompressionStream` (navegador antigo) envia-se como antes: a rota aceita
+ * as duas formas, e o aviso do 413 continua a existir para o caso de nem assim
+ * caber.
+ */
+async function enviar(corpo: unknown): Promise<Response> {
+  const texto = JSON.stringify(corpo);
+  if (typeof CompressionStream === "function") {
+    try {
+      const comprimido = await new Response(
+        new Blob([texto]).stream().pipeThrough(new CompressionStream("gzip")),
+      ).arrayBuffer();
+      return fetch("/api/backup/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
+        body: comprimido,
+      });
+    } catch {
+      // Cai para o envio normal — melhor grande do que nenhum.
+    }
+  }
+  return fetch("/api/backup/restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: texto,
+  });
+}
+
 export default function RestoreDialog({ open, onClose, toast }: Props) {
   if (!open) return null;
   return <RestoreDialogInner onClose={onClose} toast={toast} />;
@@ -155,11 +191,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
       }
       setFicheiro(json);
       // ENSAIO: sem `confirm`, o servidor lê tudo e não escreve nada.
-      const res = await fetch("/api/backup/restore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ backup: json }),
-      });
+      const res = await enviar({ backup: json });
       if (res.status === 413) {
         // O ficheiro nem chegou ao servidor: foi recusado pelo alojamento por
         // ser grande demais para um pedido. Dizer "erro de ligação" aqui era
@@ -195,11 +227,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
     setFase("a-repor");
     setErros([]);
     try {
-      const res = await fetch("/api/backup/restore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ backup: ficheiro, confirm: frase, fileHash }),
-      });
+      const res = await enviar({ backup: ficheiro, confirm: frase, fileHash });
       const data = await res.json();
       if (res.status !== 200 && res.status !== 207) {
         setErros(

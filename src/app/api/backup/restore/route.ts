@@ -4,6 +4,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 import { RESTORE_CONFIRM_PHRASE } from "@/lib/backup-restore-types";
 import { buildBackupPayload } from "../route";
+import { gunzipSync } from "node:zlib";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +74,31 @@ function hashOf(backup: unknown): string {
     .slice(0, 32);
 }
 
+/**
+ * Lê o corpo do pedido, aceitando-o COMPRIMIDO.
+ *
+ * PORQUÊ. A cópia viaja inteira no corpo, e os alojamentos limitam-no (~4,5 MB
+ * na Vercel). Medida com as formas reais dos dados: 6,24 MB hoje, 24,7 MB a
+ * três anos. Ou seja, esta reposição nascia já provavelmente acima do tecto — e
+ * um mecanismo de segurança que não corre no dia em que é preciso não é um
+ * mecanismo de segurança. Comprimida são 0,35 MB e 1,38 MB, o que afasta o
+ * problema uma década, por muito menos trabalho do que repor por pedaços.
+ *
+ * O caminho sem compressão mantém-se, para quem chame a rota à mão e para
+ * navegadores sem `CompressionStream`: decide-se pelo `Content-Encoding`.
+ */
+async function lerCorpo(request: NextRequest): Promise<unknown> {
+  try {
+    if (request.headers.get("content-encoding") === "gzip") {
+      const cru = Buffer.from(await request.arrayBuffer());
+      return JSON.parse(gunzipSync(cru).toString("utf8"));
+    }
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isAuthed(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -81,7 +107,7 @@ export async function POST(request: NextRequest) {
   const { validateBackupFile, planRestore, applyRestore } = await import("@/lib/backup-restore");
 
   try {
-    const body = (await request.json().catch(() => null)) as RestoreBody | null;
+    const body = (await lerCorpo(request)) as RestoreBody | null;
     if (!body || typeof body !== "object" || body.backup === undefined) {
       return NextResponse.json(
         { error: "Falta o ficheiro da cópia de segurança (campo `backup`)." },

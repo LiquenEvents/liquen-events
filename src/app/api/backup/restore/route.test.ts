@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { gzipSync } from "node:zlib";
 
 /**
  * A ROTA da reposição — a sequência de trancas, não a mecânica de escrever.
@@ -57,6 +58,15 @@ function req(body: unknown): NextRequest {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
+  });
+}
+
+/** O mesmo pedido, mas com o corpo comprimido — como o navegador o envia. */
+function reqGzip(body: unknown): NextRequest {
+  return new NextRequest("https://liquen.test/api/backup/restore", {
+    method: "POST",
+    headers: { "content-type": "application/json", "content-encoding": "gzip" },
+    body: gzipSync(Buffer.from(JSON.stringify(body))),
   });
 }
 
@@ -260,5 +270,42 @@ describe("POST /api/backup/restore — a reposição", () => {
     const res = await POST(req({ backup: FICHEIRO }));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toMatch(/Erro interno/);
+  });
+});
+
+describe("POST /api/backup/restore — o corpo comprimido", () => {
+  /**
+   * A cópia inteira viaja no corpo do pedido, e os alojamentos limitam-no
+   * (~4,5 MB na Vercel). Medida com as formas reais dos dados, a cópia são
+   * 6,24 MB hoje — ou seja, esta reposição nascia já provavelmente acima do
+   * tecto, e um mecanismo de segurança que não corre no dia em que é preciso
+   * não é um mecanismo de segurança. Comprimida são 0,35 MB.
+   */
+  it("aceita o corpo em gzip e planeia na mesma", async () => {
+    const res = await POST(reqGzip({ backup: FICHEIRO }));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.dryRun).toBe(true);
+    expect(data.fileHash).toBeTruthy();
+  });
+
+  it("o gzip e o não comprimido dão exactamente o mesmo resultado", async () => {
+    const ficheiro = FICHEIRO;
+    const a = await (await POST(req({ backup: ficheiro }))).json();
+    const b = await (await POST(reqGzip({ backup: ficheiro }))).json();
+    // A impressão digital é o que amarra a confirmação ao ensaio: se as duas
+    // vias divergissem aqui, confirmar depois de um ensaio comprimido daria 409.
+    expect(b.fileHash).toBe(a.fileHash);
+    expect(b.plan).toEqual(a.plan);
+  });
+
+  it("um gzip corrompido é recusado, não rebenta", async () => {
+    const mau = new NextRequest("https://liquen.test/api/backup/restore", {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-encoding": "gzip" },
+      body: Buffer.from("isto não é gzip"),
+    });
+    const res = await POST(mau);
+    expect(res.status).toBe(400);
   });
 });
