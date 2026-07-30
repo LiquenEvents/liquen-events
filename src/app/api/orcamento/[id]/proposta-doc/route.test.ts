@@ -6,8 +6,12 @@ import { splitThirtySeventy } from "@/lib/money";
 // ── Mock the auth + data layer + heavy PDF/mail side effects; keep the money
 //    math (proposal-doc) and the route logic real ──
 const created = vi.hoisted(() => ({ last: null as Proposal | null }));
-/** Quantas fotos o renderizador diz que não resolveram, por teste. */
-const renderMock = vi.hoisted(() => ({ missing: 0 }));
+/** O que o renderizador diz que ficou de fora, por teste: fotos que não
+ *  resolveram (`missing`) e conteúdo que o desenho cortou (`truncations`). */
+const renderMock = vi.hoisted(() => ({
+  missing: 0,
+  truncations: [] as { where: string; dropped: number; unit: "fotos" | "linhas" }[],
+}));
 /** O que foi gravado no pedido (para verificar o "Preço final (sem IVA)"). */
 const updated = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
 
@@ -31,6 +35,7 @@ vi.mock("@/lib/proposal-doc-render", () => ({
   renderStoredProposalDocPdfWithReport: vi.fn(async () => ({
     pdf: Buffer.from("%PDF-1.4"),
     missingImages: renderMock.missing,
+    truncations: renderMock.truncations,
   })),
 }));
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: vi.fn(() => "tok") }));
@@ -68,6 +73,14 @@ function sendReq(doc: Record<string, unknown>): NextRequest {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode: "send", doc }),
+  }) as unknown as NextRequest;
+}
+
+function previewReq(doc: Record<string, unknown>): NextRequest {
+  return new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "preview", doc }),
   }) as unknown as NextRequest;
 }
 
@@ -145,6 +158,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — fotos em falta no ENVIO", ()
    */
   beforeEach(() => {
     renderMock.missing = 0;
+    renderMock.truncations = [];
   });
 
   it("o envio devolve a contagem, não só a pré-visualização", async () => {
@@ -183,10 +197,9 @@ describe("POST /api/orcamento/[id]/proposta-doc — o preço gravado no pedido",
    * cerca de 23% — o número que ela usa para saber se um casamento deu lucro.
    */
   it("grava o valor SEM IVA, não o valor com IVA", async () => {
-    const res = await POST(
-      sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })),
-      { params },
-    );
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })), {
+      params,
+    });
     expect(res.status).toBe(200);
     // 3000 + 23% = 3690. O que fica no pedido tem de ser 3000.
     expect(updated.last?.quotedPrice).toBe(3000);
@@ -194,10 +207,9 @@ describe("POST /api/orcamento/[id]/proposta-doc — o preço gravado no pedido",
   });
 
   it("com o total já a incluir IVA, grava na mesma o líquido", async () => {
-    const res = await POST(
-      sendReq(baseDoc({ totalAmount: 3690, totalVatMode: "incluido" })),
-      { params },
-    );
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3690, totalVatMode: "incluido" })), {
+      params,
+    });
     expect(res.status).toBe(200);
     expect(updated.last?.quotedPrice).toBe(3000);
   });
@@ -207,5 +219,41 @@ describe("POST /api/orcamento/[id]/proposta-doc — o preço gravado no pedido",
     // divergirem, um dos ecrãs mente sobre o mesmo casamento.
     await POST(sendReq(baseDoc({ totalAmount: 4000, totalVatMode: "acrescer" })), { params });
     expect(updated.last?.quotedPrice).toBe(created.last!.subtotal);
+  });
+});
+
+describe("POST /api/orcamento/[id]/proposta-doc — conteúdo CORTADO pelo desenho", () => {
+  /**
+   * A outra maneira de o documento seguir incompleto: a foto chegou, foi
+   * descarregada com sucesso, e a página não a desenha (a sétima de um mood
+   * board, a terceira linha do "Local"). Não pode ficar dentro do servidor: se
+   * não sair na resposta, o estúdio não tem como avisar antes do envio.
+   */
+  beforeEach(() => {
+    renderMock.missing = 0;
+    renderMock.truncations = [];
+  });
+
+  it("a pré-visualização leva o que foi cortado, com acentos intactos", async () => {
+    renderMock.truncations = [{ where: "Mood board «Cerimónia»", dropped: 2, unit: "fotos" }];
+    const res = await POST(previewReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    const header = res.headers.get("X-Conteudo-Cortado")!;
+    expect(JSON.parse(Buffer.from(header, "base64").toString("utf8"))).toEqual(
+      renderMock.truncations,
+    );
+  });
+
+  it("sem cortes, o cabeçalho vai vazio (e não ausente)", async () => {
+    const res = await POST(previewReq(baseDoc({ totalAmount: 3000 })), { params });
+    const header = res.headers.get("X-Conteudo-Cortado")!;
+    expect(JSON.parse(Buffer.from(header, "base64").toString("utf8"))).toEqual([]);
+  });
+
+  it("o ENVIO também o devolve — dá para saltar a pré-visualização", async () => {
+    renderMock.truncations = [{ where: "Campo «Local»", dropped: 1, unit: "linhas" }];
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const body = await res.json();
+    expect(body.truncations).toEqual(renderMock.truncations);
   });
 });

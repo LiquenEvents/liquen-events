@@ -8,8 +8,8 @@ import {
   decodePDFRawStream,
   type PDFObject,
 } from "pdf-lib";
-import { renderProposalDocPdf } from "./proposal-doc-pdf";
-import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
+import { renderProposalDocPdf, renderProposalDocPdfWithReport } from "./proposal-doc-pdf";
+import { withProposalDefaults, MOOD_BOARD_MAX_IMAGES, type ProposalDoc } from "@/lib/proposal-doc";
 
 /**
  * Smoke/golden do documento-proposta multi-página (landscape). Sem imagens reais
@@ -320,5 +320,164 @@ describe("renderProposalDocPdf", () => {
     const bytes = await renderProposalDocPdf(doc);
     expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
     expect(bytes.length).toBeGreaterThan(1000);
+  });
+});
+
+/**
+ * O QUE O DESENHO CORTA TEM DE SER DITO.
+ *
+ * O gerador tem limites de composição — 6 fotos por mood board, 5 linhas de
+ * descrição, 2 linhas por campo do evento, 2 linhas no nome da capa — e até
+ * aqui o que passava desses limites desaparecia em silêncio absoluto: as fotos
+ * tinham sido carregadas pela Catarina, descarregadas do armazenamento com
+ * sucesso, e simplesmente não eram desenhadas. Nem entravam na contagem de
+ * "fotos em falta" que a avisa antes de a proposta seguir para o cliente,
+ * porque essa só conta as que não RESOLVERAM.
+ *
+ * Estes testes fixam o relatório que agora acompanha os bytes. Fixam também o
+ * DESENHO: o limite de 6 é uma decisão de composição e continua a valer — o
+ * que muda é que deixa de ser mudo.
+ */
+
+/** Quantas imagens são DESENHADAS numa página (operador `Do`). */
+function imageDraws(content: string): number {
+  return [...content.matchAll(/\/Image-\d+ Do/g)].length;
+}
+
+/** Fotos desenhadas no collage: a página do mood board é a única página de
+ *  CONTEÚDO com fotografias (as outras só desenham o logótipo do cabeçalho, e
+ *  as capas ficam de fora da procura). Procurada e não fixada num índice porque
+ *  a Apresentação pagina conforme o texto que leva. */
+function collagePhotos(pdf: PDFDocument): number {
+  let most = 0;
+  for (let i = 1; i < pdf.getPageCount() - 1; i++) {
+    most = Math.max(most, imageDraws(pageContent(pdf, i)) - 1);
+  }
+  return most;
+}
+
+/** Fotos pequenas mas TODAS DIFERENTES: iguais seriam embutidas uma só vez
+ *  (cache por conteúdo) e não se via quantas foram mesmo desenhadas. */
+async function distinctPhotos(n: number): Promise<string[]> {
+  return Promise.all(
+    Array.from({ length: n }, async (_, i) => {
+      const bytes = await sharp({
+        create: {
+          width: 90,
+          height: 90,
+          channels: 3,
+          background: { r: 20 + i * 20, g: 90, b: 70 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+      return bytes.toString("base64");
+    }),
+  );
+}
+
+describe("relatório de conteúdo CORTADO pelo desenho", () => {
+  it("uma proposta que cabe toda no desenho não inventa avisos", async () => {
+    // Se o aviso disparasse por tudo e por nada, ela deixava de o ler.
+    const { truncations } = await renderProposalDocPdfWithReport(decoracaoDoc());
+    expect(truncations).toEqual([]);
+  });
+
+  it("mood board com 9 fotos: desenha 6 e DIZ que 3 ficaram de fora", async () => {
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [{ title: "Decoração Cerimónia", images: await distinctPhotos(9) }],
+    };
+    const { bytes, truncations } = await renderProposalDocPdfWithReport(doc);
+    expect(truncations).toContainEqual({
+      where: "Mood board «Decoração Cerimónia»",
+      dropped: 3,
+      unit: "fotos",
+    });
+    // O desenho NÃO mudou para caber mais: continuam a ser 6 na página.
+    const parsed = await PDFDocument.load(bytes);
+    expect(collagePhotos(parsed)).toBe(MOOD_BOARD_MAX_IMAGES);
+  }, 30_000);
+
+  it("um mood board que cabe todo não é relatado", async () => {
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [{ title: "Cerimónia", images: await distinctPhotos(MOOD_BOARD_MAX_IMAGES) }],
+    };
+    const { bytes, truncations } = await renderProposalDocPdfWithReport(doc);
+    expect(truncations).toEqual([]);
+    const parsed = await PDFDocument.load(bytes);
+    expect(collagePhotos(parsed)).toBe(MOOD_BOARD_MAX_IMAGES);
+  }, 30_000);
+
+  it("sem título, o mood board é identificado pela POSIÇÃO (como no estúdio)", async () => {
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [
+        { title: "", images: await distinctPhotos(8) },
+        { title: "Copo d'água", images: await distinctPhotos(7) },
+      ],
+    };
+    const { truncations } = await renderProposalDocPdfWithReport(doc);
+    expect(truncations).toContainEqual({ where: "Mood board 1", dropped: 2, unit: "fotos" });
+    expect(truncations).toContainEqual({
+      where: "Mood board «Copo d'água»",
+      dropped: 1,
+      unit: "fotos",
+    });
+  }, 30_000);
+
+  it("a descrição do mood board que passa das 5 linhas é contada", async () => {
+    const annotation = Array.from({ length: 120 }, (_, i) => `hortênsia verde ${i}`).join(", ");
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [{ title: "Cerimónia", images: await distinctPhotos(2), annotation }],
+    };
+    const { truncations } = await renderProposalDocPdfWithReport(doc);
+    const corte = truncations.find((t) => t.where === "Descrição do mood board «Cerimónia»");
+    expect(corte?.unit).toBe("linhas");
+    expect(corte?.dropped).toBeGreaterThan(0);
+  }, 30_000);
+
+  it("um campo do evento com nome comprido é cortado a 2 linhas — e dito", async () => {
+    // Um local a sério, com nome comprido: pede 3 linhas, a faixa desenha 2.
+    const doc = {
+      ...decoracaoDoc(),
+      location:
+        "Herdade da Quinta do Casal Novo de São Lourenço do Barrocal, Reguengos de Monsaraz, Alentejo",
+    };
+    const { truncations } = await renderProposalDocPdfWithReport(doc);
+    expect(truncations).toContainEqual({ where: "Campo «Local»", dropped: 1, unit: "linhas" });
+  });
+
+  it("o nome do casal cortado na CAPA é dito (é a primeira coisa que o cliente vê)", async () => {
+    // Com fotos na capa, o nome vive na banda central estreita: um nome de
+    // casal a sério pede três linhas a 26pt e a capa desenha duas.
+    const photo = await photoB64();
+    const doc = {
+      ...decoracaoDoc(),
+      clientNames: "Maria Madalena Rebocho & José Francisco Themudo",
+      coverImages: [photo, photo],
+    };
+    const { truncations } = await renderProposalDocPdfWithReport(doc);
+    const corte = truncations.find((t) => t.where === "Nome na capa");
+    expect(corte).toBeDefined();
+    expect(corte?.unit).toBe("linhas");
+    expect(corte?.dropped).toBeGreaterThan(0);
+  });
+
+  it("o nome que cabe em duas linhas na capa não é relatado", async () => {
+    const photo = await photoB64();
+    const { truncations } = await renderProposalDocPdfWithReport({
+      ...decoracaoDoc(),
+      clientNames: "Maria Madalena & José Francisco",
+      coverImages: [photo, photo],
+    });
+    expect(truncations.filter((t) => t.where === "Nome na capa")).toEqual([]);
+  });
+
+  it("renderProposalDocPdf continua a devolver só os bytes", async () => {
+    const bytes = await renderProposalDocPdf(decoracaoDoc());
+    expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
   });
 });

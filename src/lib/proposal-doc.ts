@@ -24,6 +24,17 @@ export const DEFAULT_VALID_DAYS = 30;
  *  ao valor indicado ("acrescer", i.e. "+ IVA"). */
 export type VatMode = "incluido" | "acrescer";
 
+/**
+ * Fotos que a página de mood board do PDF chega a DESENHAR.
+ *
+ * É uma decisão de composição (uma foto grande à esquerda + grelha à direita),
+ * não um limite técnico. Vive aqui, no modelo, e não no gerador, porque quem
+ * precisa deste número são os DOIS lados: o gerador (`proposal-doc-pdf`, que é
+ * `server-only`) para desenhar, e o estúdio, no browser, para avisar ao pôr a
+ * sétima foto num mood board. Um número, um sítio.
+ */
+export const MOOD_BOARD_MAX_IMAGES = 6;
+
 export interface MoodBoard {
   /** Elegant serif title, e.g. "Decoração Cerimónia". */
   title: string;

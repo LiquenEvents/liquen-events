@@ -45,7 +45,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Shared pipeline (resolve Storage images → render) — the exact same helper
     // the public portal PDF route uses, so both emit an identical document.
-    const { pdf: pdfBuffer, missingImages } = await renderStoredProposalDocPdfWithReport(doc);
+    const {
+      pdf: pdfBuffer,
+      missingImages,
+      truncations,
+    } = await renderStoredProposalDocPdfWithReport(doc);
 
     if (mode === "preview") {
       return new NextResponse(pdfBuffer, {
@@ -56,6 +60,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // isso sem este cabeçalho o PDF sai com fotos a menos e o estúdio não
           // tem como saber. É lido em ProposalStudio para avisar antes de enviar.
           "X-Fotos-Em-Falta": String(missingImages),
+          // O que o DESENHO deixou de fora (a sétima foto de um mood board, a
+          // terceira linha do "Local"…) — a mesma perda, por outro caminho.
+          // Vai em base64 porque o corpo desta resposta é o PDF e um cabeçalho
+          // HTTP não transporta com segurança os acentos dos nomes dos campos.
+          "X-Conteudo-Cortado": Buffer.from(JSON.stringify(truncations), "utf8").toString("base64"),
         },
       });
     }
@@ -178,12 +187,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // (é o mesmo `renderStoredProposalDocPdfWithReport` lá em cima) e deitado
     // fora, o que deixava a porta aberta exactamente para o caso que a magoou:
     // a proposta segue para o noivo com fotos a menos, em silêncio.
+    //
+    // `truncations` viaja pelo mesmo motivo e pelo mesmo caminho: é a mesma
+    // perda vista do outro lado — conteúdo que chegou e que a página não
+    // desenhou.
     return NextResponse.json({
       ok: true,
       id: proposal.id,
       emailed,
       emailError,
       missingImages,
+      truncations,
     });
   } catch (err) {
     log.error("proposta-doc POST falhou", err);

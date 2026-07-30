@@ -9,6 +9,7 @@ import {
   parseMoneyText,
   normaliseCoverImages,
   DEFAULT_VALID_DAYS,
+  MOOD_BOARD_MAX_IMAGES,
   type VatMode,
 } from "@/lib/proposal-doc";
 import { eur, splitThirtySeventy } from "@/lib/money";
@@ -149,6 +150,83 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const copy = arr.slice();
   [copy[i], copy[j]] = [copy[j], copy[i]];
   return copy;
+}
+
+// ── O que o PDF não leva ──
+//
+// Há duas maneiras de uma proposta seguir para o cliente incompleta, e a
+// Catarina tem de ver as DUAS antes de a enviar:
+//
+//  1. a foto não chegou — o servidor não a conseguiu ir buscar (`missingImages`);
+//  2. o conteúdo chegou e NÃO COUBE — a sétima foto de um mood board, a
+//     terceira linha do "Local", uma descrição comprida de mais (`truncations`).
+//
+// O caso 2 era completamente mudo: as fotos eram carregadas, descarregadas com
+// sucesso, e simplesmente nunca desenhadas. Vem agora do gerador já com o sítio
+// e a quantidade; aqui só se escreve a frase.
+
+/** Uma perda por composição, tal como o gerador a relata (o tipo vive em
+ *  `proposal-doc-pdf`, que é `server-only` e por isso não se importa aqui). */
+interface Corte {
+  where: string;
+  dropped: number;
+  unit: "fotos" | "linhas";
+}
+
+/** Aceita só o que tem forma de corte — o resto é ignorado em vez de rebentar
+ *  a mensagem (uma resposta estranha nunca pode tapar o aviso). */
+function normalizaCortes(raw: unknown): Corte[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (c): c is Corte =>
+      !!c &&
+      typeof c === "object" &&
+      typeof (c as Corte).where === "string" &&
+      typeof (c as Corte).dropped === "number" &&
+      (c as Corte).dropped > 0 &&
+      ((c as Corte).unit === "fotos" || (c as Corte).unit === "linhas"),
+  );
+}
+
+/** Lê o cabeçalho `X-Conteudo-Cortado` da pré-visualização (JSON em base64 —
+ *  o corpo da resposta é o PDF e os nomes dos campos trazem acentos). */
+export function cortesDoCabecalho(header: string | null): Corte[] {
+  if (!header) return [];
+  try {
+    const bytes = Uint8Array.from(atob(header), (ch) => ch.charCodeAt(0));
+    return normalizaCortes(JSON.parse(new TextDecoder().decode(bytes)));
+  } catch {
+    return [];
+  }
+}
+
+/** "Mood board «Cerimónia»: 3 fotos não entram no PDF". */
+function fraseDeCorte(c: Corte): string {
+  if (c.unit === "fotos") {
+    return `${c.where}: ${c.dropped === 1 ? "1 foto não entra" : `${c.dropped} fotos não entram`} no PDF`;
+  }
+  return `${c.where}: ${c.dropped === 1 ? "1 linha cortada" : `${c.dropped} linhas cortadas`}`;
+}
+
+/**
+ * A frase única do aviso, ou `null` quando o documento vai completo.
+ *
+ * As duas perdas aparecem JUNTAS porque, para quem vai carregar em "Enviar", o
+ * problema é o mesmo — o documento vai incompleto — mas ficam DISTINTAS na
+ * frase, porque a correcção não é a mesma: uma foto que não chegou tenta-se de
+ * novo, um mood board com fotos a mais tem de perder fotos.
+ */
+export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): string | null {
+  const partes: string[] = [];
+  if (emFalta > 0) {
+    partes.push(
+      emFalta === 1
+        ? "1 foto não entrou (não foi possível ir buscá-la)"
+        : `${emFalta} fotos não entraram (não foi possível ir buscá-las)`,
+    );
+  }
+  for (const c of cortes) partes.push(fraseDeCorte(c));
+  return partes.length ? partes.join("; ") : null;
 }
 
 interface Props {
@@ -662,6 +740,21 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         i === bi ? { ...b, images: [...b.images, ...paths] } : b,
       ),
     }));
+    // AVISAR AQUI, e não só depois de gerar o PDF. Quem põe a sétima foto num
+    // mood board fica a saber nesse instante — e não quando o documento já
+    // seguiu (ou nem isso, que era o que acontecia). O cartão do mood board
+    // fica também com a marca permanente, para o aviso não se perder com o
+    // toast: ver `MOOD_BOARD_MAX_IMAGES` mais abaixo, na grelha de fotos.
+    const total = (doc.moodBoards[bi]?.images.length ?? 0) + paths.length;
+    if (total > MOOD_BOARD_MAX_IMAGES) {
+      const sobra = total - MOOD_BOARD_MAX_IMAGES;
+      toast(
+        `Este mood board fica com ${total} fotos e a página do PDF mostra ${MOOD_BOARD_MAX_IMAGES}: ` +
+          `${sobra === 1 ? "a última não entra" : `as últimas ${sobra} não entram`}. ` +
+          "Remova fotos ou crie outro mood board.",
+        "error",
+      );
+    }
   }
   function removeBoardImage(bi: number, path: string) {
     setDoc((d) => ({
@@ -797,18 +890,15 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      // O gerador SALTA a foto que não consegue ir buscar, por isso um PDF com
-      // fotos a menos sai na mesma, com ar de estar bem. Sem este aviso, a
-      // primeira pessoa a dar pela falta era o cliente. O servidor conta-as e
-      // devolve o número neste cabeçalho.
+      // O gerador SALTA a foto que não consegue ir buscar E CORTA o que não
+      // cabe no desenho, por isso um PDF incompleto sai na mesma, com ar de
+      // estar bem. Sem este aviso, a primeira pessoa a dar pela falta era o
+      // cliente. O servidor conta as duas coisas e devolve-as nos cabeçalhos.
       const emFalta = Number(res.headers.get("X-Fotos-Em-Falta") ?? "0");
-      if (emFalta > 0) {
-        toast(
-          emFalta === 1
-            ? "PDF gerado, mas 1 foto não entrou. Verifique antes de enviar."
-            : `PDF gerado, mas ${emFalta} fotos não entraram. Verifique antes de enviar.`,
-          "error",
-        );
+      const cortes = cortesDoCabecalho(res.headers.get("X-Conteudo-Cortado"));
+      const aviso = avisoDeConteudoIncompleto(emFalta, cortes);
+      if (aviso) {
+        toast(`PDF gerado, mas ${aviso}. Verifique antes de enviar.`, "error");
       } else {
         toast("Pré-visualização gerada (PDF descarregado)", "success");
       }
@@ -833,16 +923,14 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
       // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
       // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
-      // AS FOTOS EM FALTA SÃO O AVISO MAIS IMPORTANTE DOS TRÊS, por isso é o
+      // O DOCUMENTO INCOMPLETO É O AVISO MAIS IMPORTANTE DOS TRÊS, por isso é o
       // que fica no ecrã. Uma proposta que seguiu para o noivo com fotos a
       // menos é o problema que originou esta contagem; saber que o email saiu
       // é secundário quando o documento que ele leva está incompleto.
       const emFalta = Number(data?.missingImages ?? 0);
-      if (emFalta > 0) {
-        toast(
-          `${emFalta} ${emFalta === 1 ? "foto não entrou" : "fotos não entraram"} no PDF que seguiu. Verifique a proposta e reenvie.`,
-          "error",
-        );
+      const aviso = avisoDeConteudoIncompleto(emFalta, normalizaCortes(data?.truncations));
+      if (aviso) {
+        toast(`No PDF que seguiu, ${aviso}. Verifique a proposta e reenvie.`, "error");
       } else if (data?.emailed) {
         toast("Proposta enviada ao cliente", "success");
       } else {
@@ -1147,13 +1235,26 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                     placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
                     aria-label="Descrição do mood board"
                   />
+                  {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
+                      fotos. As que passam disso ficam marcadas — e ditas por
+                      extenso a seguir — em vez de desaparecerem caladas no PDF. */}
+                  {b.images.length > MOOD_BOARD_MAX_IMAGES && (
+                    <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
+                      A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
+                      {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
+                        ? "a última, marcada «fora do PDF», não é impressa"
+                        : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
+                      . Remova fotos ou crie outro mood board.
+                    </p>
+                  )}
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {b.images.map((path) => (
+                    {b.images.map((path, ii) => (
                       <Thumb
-                        key={path}
+                        key={`${path}-${ii}`}
                         url={assetUrls[path]}
                         onRemove={() => removeBoardImage(bi, path)}
                         className="aspect-square"
+                        foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
                       />
                     ))}
                     <UploadArea
@@ -1857,15 +1958,20 @@ function Thumb({
   url,
   onRemove,
   className = "",
+  foraDoPdf = false,
 }: {
   url?: string;
   onRemove: () => void;
   className?: string;
+  /** Esta foto está no rascunho mas a página do PDF já não a desenha. */
+  foraDoPdf?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   return (
     <div
-      className={`group relative overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${className}`}
+      className={`group relative overflow-hidden rounded-lg border bg-foreground/[0.04] ${
+        foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-foreground/[0.1]"
+      } ${className}`}
     >
       {url && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -1886,6 +1992,11 @@ function Thumb({
             <span className="tracking-[0.15em] uppercase text-foreground/30">Imagem</span>
           )}
         </div>
+      )}
+      {foraDoPdf && (
+        <span className="absolute inset-x-0 bottom-0 bg-[#8a2a22]/85 px-1 py-0.5 text-center text-[8px] tracking-[0.12em] uppercase text-white">
+          fora do PDF
+        </span>
       )}
       <button
         type="button"

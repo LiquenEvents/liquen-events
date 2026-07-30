@@ -19,6 +19,7 @@ import { imageContentKey, resizeToBox, type ImagePlacement } from "@/lib/proposa
 import {
   type ProposalDoc,
   type MoodBoard,
+  MOOD_BOARD_MAX_IMAGES,
   resolveProposalMoney,
   resolveValidUntil,
 } from "@/lib/proposal-doc";
@@ -89,6 +90,39 @@ interface Fonts {
   serifB: PDFFont;
   serifIt: PDFFont;
 }
+
+// ── O que o DESENHO deixa de fora ──
+//
+// O documento tem limites de composição: a página de mood board desenha 6
+// fotos, a descrição do mood board 5 linhas, cada campo do evento 2 linhas, o
+// nome na capa 2 linhas. Até aqui, o que passava desses limites desaparecia sem
+// deixar rasto: as fotos tinham sido carregadas, tinham sido descarregadas do
+// armazenamento com sucesso, e simplesmente não eram desenhadas.
+//
+// É a MESMA perda que a contagem de "fotos em falta" foi criada para apanhar
+// (uma proposta seguiu para um noivo com fotos a menos e ninguém deu por isso),
+// só que por outro caminho: ali a foto não chegou, aqui chegou e não coube.
+// Por isso é contada — mas SEPARADA de `missingImages`, porque a causa e a
+// correcção são outras: em falta = avaria, tenta-se de novo; cortado = escolha
+// editorial, tira-se uma foto ou encurta-se o texto.
+const MAX_ANNOTATION_LINES = 5; // descrição sob o collage
+const MAX_EVENT_FIELD_LINES = 2; // cada campo da faixa de detalhes
+const MAX_COVER_NAME_LINES = 2; // nome do casal na capa
+
+/** Uma perda por COMPOSIÇÃO: o conteúdo chegou inteiro ao gerador e o desenho
+ *  não o mostra todo. Estruturada (e não uma frase feita) para o estúdio poder
+ *  escrever a mensagem no idioma da interface e somar o que quiser. */
+export interface DocTruncation {
+  /** Onde, em pt-PT, como aparece ao utilizador: `Mood board «Cerimónia»`. */
+  where: string;
+  /** Quantas unidades ficaram por desenhar (nunca 0 — o que cabe não se anota). */
+  dropped: number;
+  /** O que se perdeu, para a frase concordar em número e género. */
+  unit: "fotos" | "linhas";
+}
+
+/** Regista uma truncagem (ignora `dropped <= 0`, que é o caso normal). */
+type NoteTruncation = (where: string, dropped: number, unit: DocTruncation["unit"]) => void;
 
 // ── Refined palette additions for the redesign ──
 const CREAM = rgb(0.968, 0.957, 0.933); // #f7f4ee — warm off-white on the dark cover
@@ -254,7 +288,34 @@ function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): s
   return out;
 }
 
+/** Como {@link renderProposalDocPdfWithReport}, mas só os bytes — para quem não
+ *  tem a quem dar o relatório (a pré-visualização de desenvolvimento). */
 export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array> {
+  return (await renderProposalDocPdfWithReport(doc)).bytes;
+}
+
+/**
+ * Gera o PDF E diz o que o desenho deixou de fora (ver {@link DocTruncation}).
+ *
+ * O relatório sai daqui, e não de uma contagem feita por fora, porque só aqui
+ * se sabe: as linhas dependem das métricas da fonte embutida e da largura da
+ * caixa onde o texto é desenhado. Calculá-lo noutro sítio era garantir que um
+ * dia deixava de coincidir com o que sai impresso.
+ */
+export async function renderProposalDocPdfWithReport(
+  doc: ProposalDoc,
+): Promise<{ bytes: Uint8Array; truncations: DocTruncation[] }> {
+  const truncations: DocTruncation[] = [];
+  const note: NoteTruncation = (where, dropped, unit) => {
+    if (dropped > 0) truncations.push({ where, dropped, unit });
+  };
+  /** Corta a `max` linhas E DIZ quantas ficaram de fora. Usar sempre isto em
+   *  vez de `.slice(0, max)`: o `.slice` é mudo, este não. */
+  const clampLines = (lines: string[], max: number, where: string): string[] => {
+    note(where, lines.length - max, "linhas");
+    return lines.slice(0, max);
+  };
+
   const pdf = await PDFDocument.create();
   // Uma foto = um redimensionamento e um objeto no ficheiro, por muitas vezes
   // que seja desenhada (ver EmbedCache). Vive só durante este documento.
@@ -454,7 +515,13 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     let nameSize = 52;
     while (nameSize > 26 && f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) nameSize -= 2;
     if (f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) {
-      const nl = wrap(f.serif, names, nameSize, maxNameW).slice(0, 2);
+      // Duas linhas é o que a capa comporta; um nome que peça mais é cortado —
+      // e um nome cortado na capa é a primeira coisa que o cliente vê.
+      const nl = clampLines(
+        wrap(f.serif, names, nameSize, maxNameW),
+        MAX_COVER_NAME_LINES,
+        "Nome na capa",
+      );
       let ny = 278;
       for (const ln of nl) {
         textCenter(p, ln, cx, ny, { font: f.serif, size: nameSize, color: CREAM });
@@ -532,9 +599,13 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
         const cxp = M + c * colW;
         const cyp = top - r * rowH;
         eyebrow(p, k, cxp, cyp);
-        for (const [j, ln] of wrap(f.reg, v, 11, colW - 16)
-          .slice(0, 2)
-          .entries()) {
+        // Duas linhas por campo — um local com nome comprido ("Herdade da …,
+        // Reguengos de Monsaraz") pede três e perdia o resto.
+        for (const [j, ln] of clampLines(
+          wrap(f.reg, v, 11, colW - 16),
+          MAX_EVENT_FIELD_LINES,
+          `Campo «${k}»`,
+        ).entries()) {
           text(p, ln, cxp, cyp - 16 - j * 13, { font: f.serif, size: 11.5, color: INK });
         }
       });
@@ -607,13 +678,16 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
   }
 
   // ── Mood board pages (skip empty boards — never show a client a placeholder) ──
-  for (const mb of doc.moodBoards) {
+  for (const [bi, mb] of doc.moodBoards.entries()) {
     if (!mb.images || mb.images.length === 0) continue;
     const p = pdf.addPage([W, H]);
     frame(p);
     eyebrow(p, "Inspiração", M, H - M - 48);
     text(p, mb.title, M, H - M - 76, { font: f.serifIt, size: 24, color: INK });
-    await drawCollage(pdf, p, mb, f, textFns(text, textRight), images);
+    // Como o mood board se chama num aviso. Sem título, vale a posição — é
+    // assim que ele aparece no estúdio, contado a partir de 1.
+    const boardName = mb.title.trim() ? `«${mb.title.trim()}»` : `${bi + 1}`;
+    await drawCollage(pdf, p, mb, f, textFns(text, textRight), images, boardName, note);
   }
 
   // ── Orçamento ──
@@ -924,7 +998,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     }
   }
 
-  return pdf.save();
+  return { bytes: await pdf.save(), truncations };
 }
 
 // Small helper factory so the collage function can reuse the closures.
@@ -943,17 +1017,26 @@ async function drawCollage(
   f: Fonts,
   fns: ReturnType<typeof textFns>,
   cache: EmbedCache,
+  boardName: string,
+  note: NoteTruncation,
 ) {
   // Wrap the annotation (description + optional flower list) to the page measure
   // up front so the collage reserves exactly the height the caption needs. Capped
-  // at 5 lines so a very long note never crowds out the photos.
-  const annLines = mb.annotation ? wrap(f.serifIt, mb.annotation, 11, W - 2 * M).slice(0, 5) : [];
+  // at 5 lines so a very long note never crowds out the photos — o que passa
+  // disso é anotado, não desaparece calado.
+  const annAll = mb.annotation ? wrap(f.serifIt, mb.annotation, 11, W - 2 * M) : [];
+  note(`Descrição do mood board ${boardName}`, annAll.length - MAX_ANNOTATION_LINES, "linhas");
+  const annLines = annAll.slice(0, MAX_ANNOTATION_LINES);
   const annH = annLines.length ? annLines.length * 15 + 12 : 8;
   const top = H - M - 112;
   const bottom = M + annH;
   const areaW = W - 2 * M;
   const areaH = top - bottom;
-  const imgs = mb.images.slice(0, 6);
+  // O collage tem lugar para MOOD_BOARD_MAX_IMAGES fotos. As restantes JÁ
+  // FORAM descarregadas do armazenamento com sucesso e mesmo assim não são
+  // desenhadas — é a perda que este aviso existe para tornar visível.
+  const imgs = mb.images.slice(0, MOOD_BOARD_MAX_IMAGES);
+  note(`Mood board ${boardName}`, mb.images.length - MOOD_BOARD_MAX_IMAGES, "fotos");
   const n = imgs.length;
   const gap = 8;
 

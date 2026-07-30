@@ -1,6 +1,6 @@
 import "server-only";
 import { type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
-import { renderProposalDocPdf } from "@/lib/proposal-doc-pdf";
+import { renderProposalDocPdfWithReport, type DocTruncation } from "@/lib/proposal-doc-pdf";
 import { fetchProposalImageBytes } from "@/lib/proposal-storage";
 import { log } from "@/lib/logger";
 
@@ -88,25 +88,45 @@ export async function renderStoredProposalDocPdf(doc: ProposalDoc): Promise<Buff
 }
 
 /**
- * Como `renderStoredProposalDocPdf`, mas diz também quantas fotos ficaram por
- * resolver. Existe porque o gerador SALTA a foto que não resolve: sem esta
- * contagem, uma proposta seguia para o cliente com fotografias a menos e o
- * único a dar por isso era quem abrisse o PDF.
+ * Como `renderStoredProposalDocPdf`, mas diz também o que o PDF não leva:
+ *
+ * - `missingImages` — fotos PEDIDAS que não chegaram (não resolveram, ou
+ *   passaram do tecto de imagens por documento). É uma AVARIA: a correcção é
+ *   voltar a tentar ou recarregar a foto.
+ * - `truncations` — conteúdo que chegou inteiro e que o DESENHO não mostra
+ *   todo (a sétima foto de um mood board, a terceira linha do "Local"…). É uma
+ *   ESCOLHA de composição a morder o conteúdo: a correcção é editorial —
+ *   tirar uma foto, criar outro mood board, encurtar um texto.
+ *
+ * Ficam separadas de propósito. Somá-las dava um número maior mas mais pobre:
+ * a mensagem "N fotos não entraram" ficaria errada para texto cortado, e a
+ * pessoa deixaria de saber se tem de recarregar alguma coisa ou de reescrever.
+ * O que as une — e é o que interessa — é que ambas TÊM DE APARECER no aviso
+ * antes de a proposta seguir para o cliente.
  */
 export async function renderStoredProposalDocPdfWithReport(
   doc: ProposalDoc,
-): Promise<{ pdf: Buffer<ArrayBuffer>; missingImages: number }> {
+): Promise<{ pdf: Buffer<ArrayBuffer>; missingImages: number; truncations: DocTruncation[] }> {
   // Fill the studio's fixed boilerplate (condições, observações, faseamento,
   // cancelamento) + event-token substitution so the caller only supplies what
   // varies per event.
   const withDefaults = withProposalDefaults(doc);
   const { doc: resolved, missing } = await resolveImages(withDefaults);
-  const pdfBytes = await renderProposalDocPdf(resolved);
+  // As duas contagens não se sobrepõem: o gerador só vê as fotos que
+  // RESOLVERAM (as outras já foram descartadas aqui e contadas em `missing`),
+  // por isso uma foto em falta nunca é também contada como cortada.
+  const { bytes: pdfBytes, truncations } = await renderProposalDocPdfWithReport(resolved);
   if (missing > 0) {
     log.error("proposal-doc-render: PDF gerado com fotos EM FALTA", null, {
       emFalta: missing,
       ref: doc.ref,
     });
   }
-  return { pdf: Buffer.from(pdfBytes), missingImages: missing };
+  if (truncations.length > 0) {
+    log.error("proposal-doc-render: PDF gerado com conteúdo CORTADO", null, {
+      cortado: truncations.map((t) => `${t.where}: -${t.dropped} ${t.unit}`),
+      ref: doc.ref,
+    });
+  }
+  return { pdf: Buffer.from(pdfBytes), missingImages: missing, truncations };
 }
