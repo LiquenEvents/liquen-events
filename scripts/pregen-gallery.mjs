@@ -118,7 +118,33 @@ async function worker() {
     if (k >= sources.length) return;
     const src = sources[k];
     const key = galleryKey(src);
-    const inputPath = path.join(PUBLIC, src);
+
+    /**
+     * O `src` vem de um ficheiro de dados, e juntá-lo a um caminho sem o ver
+     * primeiro é a receita para sair de `public/` (um `../` na lista chegava).
+     * Hoje a lista é código nosso, mas um script de build que escreve ficheiros
+     * a partir de caminhos que não valida é o género de coisa que se torna
+     * perigosa no dia em que a lista passar a vir de outro sítio.
+     *
+     * Duas verificações: a forma tem de ser a esperada, e o caminho RESOLVIDO
+     * tem de continuar dentro de `public/` (é esta segunda que apanha os truques
+     * que a primeira deixaria passar).
+     */
+    // A lista de caracteres do nome é deliberadamente LARGA: as fotos reais
+    // chamam-se "M&F0678.jpg", "Sophia&Artur_MAINOVA-123.jpg", "natalia e
+    // jonathan-4.jpg". Uma expressão apertada em [\w.-] recusava 153 das 427
+    // (medido ao correr o build), o que seria bem pior do que o problema que
+    // estamos a resolver. Quem faz mesmo o trabalho de segurança é a
+    // verificação do caminho resolvido, logo a seguir.
+    if (!/^\/[^\0]+\.(jpe?g|png|webp)$/i.test(src) || src.includes("..")) {
+      failures.push(`${src}: caminho de origem recusado`);
+      continue;
+    }
+    const inputPath = path.resolve(PUBLIC, "." + src);
+    if (inputPath !== path.normalize(inputPath) || !inputPath.startsWith(PUBLIC + path.sep)) {
+      failures.push(`${src}: caminho de origem fora de public/`);
+      continue;
+    }
 
     let st;
     try {
@@ -153,7 +179,17 @@ async function worker() {
       }
       // Um único read do original reutilizado para todas as larguras: o custo
       // dominante é o decode, não o encode.
-      const input = await fs.readFile(inputPath);
+      //
+      // Lê-se e trata-se o erro aqui em vez de confiar no `stat` de cima: entre
+      // as duas chamadas o ficheiro pode ter desaparecido, e um build não deve
+      // ir abaixo por causa disso.
+      let input;
+      try {
+        input = await fs.readFile(inputPath);
+      } catch (err) {
+        failures.push(`${src}: ${err.message}`);
+        continue;
+      }
       for (const w of WIDTHS) {
         // Nunca ampliar acima da fonte (igual ao next/image).
         const target = meta.width ? Math.min(w, meta.width) : w;
