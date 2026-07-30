@@ -19,7 +19,13 @@ const st = vi.hoisted(() => ({
     truncated: false,
   })),
   del: vi.fn(async () => true),
-  upload: vi.fn(async (id: string) => ({ path: `${id}/nova.jpg`, url: "https://signed/nova" })),
+  upload: vi.fn(async (id: string) => ({
+    kind: "created" as const,
+    image: { path: `${id}/nova.jpg`, url: "https://signed/nova" },
+  })),
+  /** A rede secundária (MD5 dos bytes contra o eTag da pasta). Por omissão não
+   *  conhece nada — os testes que interessam é que a encenam. */
+  byBytes: vi.fn(async (): Promise<string | null> => null),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
@@ -39,6 +45,7 @@ vi.mock("@/lib/theme-storage", async () => {
     listThemeImagePage: st.list,
     deleteThemeImage: st.del,
     uploadThemeImage: st.upload,
+    findThemeImageByBytes: st.byBytes,
   };
 });
 
@@ -61,16 +68,29 @@ function del(path: string, id = "t-1"): [NextRequest, Ctx] {
   return [{ nextUrl: url, url: url.toString() } as unknown as NextRequest, ctx(id)];
 }
 
-function post(files: File[], id = "t-1", thumbs?: File[]): [NextRequest, Ctx] {
+function post(
+  files: File[],
+  id = "t-1",
+  thumbs?: File[],
+  extra?: { hashes?: string[]; force?: boolean },
+): [NextRequest, Ctx] {
   const form = new FormData();
   for (const f of files) form.append("files", f);
   for (const t of thumbs ?? []) form.append("thumbs", t);
+  for (const h of extra?.hashes ?? []) form.append("hashes", h);
+  if (extra?.force) form.append("force", "1");
   const r = new Request(`https://liquen.test/api/temas/${id}/imagens`, {
     method: "POST",
     body: form,
   }) as unknown as NextRequest;
   return [r, ctx(id)];
 }
+
+/** O 5.º argumento do `uploadThemeImage`: o que decide o NOME do ficheiro. */
+const naming = (fingerprint: string | null, force = false) => ({ fingerprint, force });
+
+const H1 = "0123456789abcdef0123456789abcdef";
+const H2 = "fedcba9876543210fedcba9876543210";
 
 const jpg = (name = "foto.jpg", bytes = 10) =>
   new File([new Uint8Array(bytes)], name, { type: "image/jpeg" });
@@ -88,6 +108,10 @@ beforeEach(() => {
     },
   ];
   vi.clearAllMocks();
+  // `clearAllMocks` limpa as CHAMADAS, não as implementações encenadas — sem
+  // isto, um teste que encene a rede secundária contamina o seguinte.
+  st.byBytes.mockReset();
+  st.byBytes.mockImplementation(async () => null);
 });
 
 describe("GET /api/temas/[id]/imagens", () => {
@@ -217,7 +241,13 @@ describe("POST /api/temas/[id]/imagens", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).images).toHaveLength(2);
     // Sem campo `thumbs` continua tudo a funcionar (é opcional).
-    expect(st.upload).toHaveBeenLastCalledWith("t-1", expect.any(Buffer), "image/jpeg", undefined);
+    expect(st.upload).toHaveBeenLastCalledWith(
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(null),
+    );
   });
 
   it("aceita as miniaturas emparelhadas pela ordem", async () => {
@@ -225,10 +255,14 @@ describe("POST /api/temas/[id]/imagens", () => {
       ...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", [jpg("ta.jpg", 4), jpg("tb.jpg", 5)]),
     );
     expect(res.status).toBe(200);
-    expect(st.upload).toHaveBeenNthCalledWith(1, "t-1", expect.any(Buffer), "image/jpeg", {
-      bytes: expect.any(Buffer),
-      contentType: "image/jpeg",
-    });
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      { bytes: expect.any(Buffer), contentType: "image/jpeg" },
+      naming(null),
+    );
     expect(st.upload).toHaveBeenCalledTimes(2);
   });
 
@@ -241,6 +275,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       expect.any(Buffer),
       "image/jpeg",
       undefined,
+      naming(null),
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -248,6 +283,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       expect.any(Buffer),
       "image/jpeg",
       expect.objectContaining({ contentType: "image/jpeg" }),
+      naming(null),
     );
   });
 
@@ -262,6 +298,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       expect.any(Buffer),
       "image/jpeg",
       undefined,
+      naming(null),
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -269,6 +306,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       expect.any(Buffer),
       "image/jpeg",
       undefined,
+      naming(null),
     );
   });
 
@@ -276,7 +314,150 @@ describe("POST /api/temas/[id]/imagens", () => {
     const gif = new File([new Uint8Array(4)], "t.gif", { type: "image/gif" });
     const res = await POST(...post([jpg()], "t-1", [gif]));
     expect(res.status).toBe(200);
-    expect(st.upload).toHaveBeenCalledWith("t-1", expect.any(Buffer), "image/jpeg", undefined);
+    expect(st.upload).toHaveBeenCalledWith(
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(null),
+    );
+  });
+});
+
+// ── Não repetir fotos que já estão no tema ─────────────────────────────────
+describe("POST /api/temas/[id]/imagens — repetidas", () => {
+  it("entrega o resumo de cada foto, emparelhado pela ordem", async () => {
+    await POST(...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", undefined, { hashes: [H1, H2] }));
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(H1),
+    );
+    expect(st.upload).toHaveBeenNthCalledWith(
+      2,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(H2),
+    );
+  });
+
+  it("resumos em número diferente das fotos são IGNORADOS, não emparelhados à sorte", async () => {
+    // Um resumo a menos guardaria uma foto com a IDENTIDADE de outra — e a
+    // partir daí a foto certa seria sempre reportada como repetida.
+    await POST(...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", undefined, { hashes: [H1] }));
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(null),
+    );
+    expect(st.upload).toHaveBeenNthCalledWith(
+      2,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(null),
+    );
+  });
+
+  it("um resumo mal formado vira null na SUA posição, sem desalinhar os outros", async () => {
+    // É também o guarda contra travessia de diretórios: o nome do ficheiro
+    // passa a vir do cliente, e só 32 hex chegam ao Storage.
+    await POST(
+      ...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", undefined, {
+        hashes: ["../../etc/passwd", H2],
+      }),
+    );
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(null),
+    );
+    expect(st.upload).toHaveBeenNthCalledWith(
+      2,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(H2),
+    );
+  });
+
+  it("uma repetida é 200 com `duplicates` — NUNCA um erro HTTP", async () => {
+    // Um 502 mandaria a Catarina procurar uma avaria que não existe, e o
+    // "Tentar novamente" repetiria isto para sempre.
+    st.upload.mockResolvedValueOnce({ kind: "duplicate", path: "t-1/ja-la-estava.jpg" } as never);
+    const res = await POST(...post([jpg("praia.jpg")], "t-1", undefined, { hashes: [H1] }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: true,
+      images: [],
+      duplicates: [{ name: "praia.jpg", path: "t-1/ja-la-estava.jpg", reason: "no-tema" }],
+    });
+  });
+
+  it("meio lote repetido: as boas entram e as repetidas são contadas à parte", async () => {
+    st.upload
+      .mockResolvedValueOnce({ kind: "duplicate", path: "t-1/velha.jpg" } as never)
+      .mockResolvedValueOnce({
+        kind: "created",
+        image: { path: "t-1/nova.jpg", url: "https://signed/nova" },
+      } as never);
+    const res = await POST(
+      ...post([jpg("a.jpg"), jpg("b.jpg")], "t-1", undefined, {
+        hashes: [H1, H2],
+      }),
+    );
+    const body = await res.json();
+    expect(body.images).toHaveLength(1);
+    expect(body.duplicates).toHaveLength(1);
+    expect(body.duplicates[0].name).toBe("a.jpg");
+  });
+
+  it("a rede secundária apanha a foto ANTIGA (nome UUID) sem escrever nada", async () => {
+    st.byBytes.mockResolvedValueOnce("t-1/3f2504e0-4f89-11d3-9a0c-0305e82c3301.jpg");
+    const res = await POST(...post([jpg("praia.jpg")]));
+    expect(res.status).toBe(200);
+    expect(st.upload).not.toHaveBeenCalled();
+    expect((await res.json()).duplicates).toEqual([
+      {
+        name: "praia.jpg",
+        path: "t-1/3f2504e0-4f89-11d3-9a0c-0305e82c3301.jpg",
+        reason: "no-tema",
+      },
+    ]);
+  });
+
+  it("'Adicionar mesmo assim' salta as DUAS verificações", async () => {
+    st.byBytes.mockResolvedValue("t-1/velha.jpg");
+    const res = await POST(
+      ...post([jpg("praia.jpg")], "t-1", undefined, { hashes: [H1], force: true }),
+    );
+    expect(res.status).toBe(200);
+    expect(st.byBytes).not.toHaveBeenCalled();
+    expect(st.upload).toHaveBeenCalledWith(
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      undefined,
+      naming(H1, true),
+    );
+  });
+
+  it("uma avaria a sério continua a ser 502 — não se disfarça de repetida", async () => {
+    st.upload.mockResolvedValueOnce(null as never);
+    expect((await POST(...post([jpg()]))).status).toBe(502);
   });
 });
 

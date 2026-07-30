@@ -126,3 +126,84 @@ export function themeNameTakenError(name: string): string {
 
 /** Quantas fotos podem ser importadas para uma proposta de uma só vez. */
 export const MAX_IMPORT_BATCH = 40;
+
+// ── Não repetir fotos que já estão no tema ─────────────────────────────────
+
+/**
+ * Quantos resumos podem ser perguntados de uma vez a `/api/temas/[id]/repetidas`.
+ *
+ * Um teto por PEDIDO, não por arrasto: o cliente parte o lote em pedaços (ver
+ * `CHECK_CHUNK`) e um pedido feito à mão não pode mandar comparar 5000 valores.
+ */
+export const MAX_DUPLICATE_CHECK = 500;
+
+/**
+ * Resumos por pedido de pré-verificação, do lado do cliente.
+ *
+ * Em pedaços de 50 e não o lote todo: assim a primeira foto começa a subir ao
+ * fim de ~0,3 s em vez de ~2 s num arrasto de 300 (MEDIDO: sha256 a 251 MB/s,
+ * ~16 ms por foto de 4 MB). Do segundo pedaço em diante o índice do servidor
+ * já está em memória e a chamada é quase grátis.
+ */
+export const CHECK_CHUNK = 50;
+
+/** Porque é que uma foto do arrasto NÃO foi adicionada. Nunca é um erro: são
+ *  os dois casos em que a foto já lá está. */
+export type SkipReason =
+  /** Já existe uma foto igual NESTE tema. */
+  | "no-tema"
+  /** A mesma foto vinha duas vezes DENTRO deste arrasto. */
+  | "no-lote";
+
+/** Uma foto do lote que o servidor não escreveu por já lá estar. */
+export interface ThemeDuplicate {
+  /** Nome do ficheiro do lado dela — é como ela reconhece a foto. */
+  name: string;
+  /** O caminho da foto que JÁ estava no tema, quando se sabe qual é. */
+  path?: string;
+  reason: SkipReason;
+}
+
+// ── Levar fotos de um tema para outro ──────────────────────────────────────
+
+/**
+ * Fotos por pedido de cópia. O 40 já é o vocabulário desta casa
+ * (`MAX_IMPORT_BATCH`), e um lote destes são ~80 chamadas de Storage e ZERO
+ * bytes a atravessar a função — folgado nos 60 s de `maxDuration`.
+ *
+ * Acima disto a rota RECUSA (400), não corta em silêncio: um pedido feito à
+ * mão não pode pôr 5000 cópias a correr.
+ */
+export const MAX_THEME_COPY_BATCH = 40;
+
+/**
+ * Fotos por lote do lado do cliente. Maior do que o `IMPORT_CHUNK` de 8 do
+ * seletor de propostas porque aqui não passam bytes nem há ordem a preservar —
+ * o lote pode ser maior sem a barra de progresso parar.
+ */
+export const THEME_COPY_CHUNK = 20;
+
+/**
+ * Copiar ou mover. Campo OBRIGATÓRIO e sem valor por omissão na rota: um
+ * "mover" nunca pode sair de um pedido a que faltou um campo.
+ *
+ * Em português porque é o que a rota recebe e o que a equipa lê nos registos —
+ * como o resto das rotas desta casa.
+ */
+export type ThemeCopyMode = "copiar" | "mover";
+
+/** O que `POST /api/temas/[id]/imagens/copiar` devolve. */
+export interface ThemeCopyResult {
+  ok: true;
+  /** As que ficaram mesmo no destino, `de → para`. */
+  copied: { from: string; to: string }[];
+  /** As que JÁ estavam no destino (o Storage respondeu 409). Não é um erro. */
+  existing: string[];
+  /** As que não foi possível levar — continuam na origem, intactas. */
+  failed: string[];
+  /** Quantas foram pedidas (depois de tirar repetições). */
+  requested: number;
+  /** Fotos que chegaram ao destino SEM miniatura porque a cópia dela falhou.
+   *  O tema de destino passa a puxar originais e é preciso dizê-lo. */
+  thumbsMissing: number;
+}

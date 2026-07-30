@@ -1,6 +1,13 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getSupabase } from "./supabase";
+import {
+  fileNameFor,
+  fingerprintOfFileName,
+  forcedSuffix,
+  isFingerprint,
+  md5OfETag,
+} from "./theme-fingerprint";
 import {
   PROPOSAL_BUCKET,
   uploadProposalImage,
@@ -104,6 +111,27 @@ function isNotFound(err: unknown): boolean {
   const e = err as { status?: unknown; statusCode?: unknown; message?: unknown };
   if (e.status === 404 || e.statusCode === 404 || e.statusCode === "404") return true;
   return typeof e.message === "string" && /not found|does not exist/i.test(e.message);
+}
+
+/**
+ * O erro do Storage diz mesmo "já existe"? Gémeo do `isNotFound` acima, e pela
+ * mesma razão: só isto justifica contar uma escrita recusada como "já lá
+ * estava". Confundir uma avaria com um duplicado esconderia uma foto que NÃO
+ * foi copiada e diria à Catarina que estava tudo bem.
+ *
+ * Olha para o código E para a frase porque as versões do Storage não
+ * concordam: umas devolvem 409, outras uma mensagem com "already exists" ou
+ * "Duplicate". Se nenhuma das duas casar, o resultado é `failed` — visível e
+ * repetível —, nunca um duplicado silencioso.
+ */
+export function isAlreadyExists(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { status?: unknown; statusCode?: unknown; message?: unknown; error?: unknown };
+  if (e.status === 409 || e.statusCode === 409 || e.statusCode === "409") return true;
+  if (typeof e.error === "string" && /duplicate|already exists/i.test(e.error)) return true;
+  return (
+    typeof e.message === "string" && /already exists|duplicate|resource already/i.test(e.message)
+  );
 }
 
 /**
@@ -263,33 +291,76 @@ async function uploadThemeThumb(path: string, thumb: ThemeThumbInput): Promise<s
 }
 
 /**
+ * O que aconteceu a uma foto que se tentou guardar.
+ *
+ * `duplicate` NÃO é um erro: é a resposta certa a "esta foto já está no tema",
+ * e a rota devolve-a com 200. `null` é que é a avaria.
+ */
+export type ThemeUploadResult =
+  | { kind: "created"; image: ThemeImage }
+  | { kind: "duplicate"; path: string };
+
+/** O que decide o NOME do ficheiro (e, com ele, a identidade da foto). */
+export interface ThemeUploadOptions {
+  /** Resumo do ficheiro ORIGINAL, calculado no navegador. Ausente ou mal
+   *  formado = nome UUID, como sempre foi (retro-compatível: nunca recusa). */
+  fingerprint?: string | null;
+  /** "Adicionar mesmo assim": guarda com `<resumo>-<4 hex>` para a cópia
+   *  forçada continuar a contar como "esta foto está no tema". */
+  force?: boolean;
+}
+
+/**
  * Carrega uma foto (bytes) para a pasta de um tema, com a sua miniatura
  * quando o cliente a enviou.
+ *
+ * O CAMINHO é `<pasta>/<resumo>.<ext>` quando vem um resumo bem formado, e
+ * `<pasta>/<uuid>.<ext>` quando não vem. Com o resumo no nome, o `upsert:
+ * false` que já existia deixa de ser uma verificação com corrida e passa a ser
+ * uma garantia atómica do Storage: dois separadores a carregar a mesma pasta ao
+ * mesmo tempo não conseguem duplicar nada — o segundo apanha um 409, que sai
+ * daqui como `duplicate`.
  */
 export async function uploadThemeImage(
   themeId: string,
   bytes: Buffer,
   contentType: string,
   thumb?: ThemeThumbInput,
-): Promise<ThemeImage | null> {
+  options?: ThemeUploadOptions,
+): Promise<ThemeUploadResult | null> {
   const sb = getSupabase();
   if (!sb || !(await ensureBucket(THEME_BUCKET))) return null;
   const folder = themeFolder(themeId);
   if (!folder) return null;
-  const path = `${folder}/${randomUUID()}.${extFor(contentType)}`;
+  const fingerprint = isFingerprint(options?.fingerprint) ? options.fingerprint : null;
+  // 32 hex validados: não há travessia de diretórios possível e o `isThemePath`
+  // continua a aceitar o caminho tal como aceitava um UUID.
+  const name = fingerprint
+    ? fileNameFor(fingerprint, options?.force ? forcedSuffix() : undefined)
+    : randomUUID();
+  const path = `${folder}/${name}.${extFor(contentType)}`;
   const { error } = await sb.storage
     .from(THEME_BUCKET)
     .upload(path, bytes, { contentType, upsert: false });
   if (error) {
+    // A foto já lá estava — o guarda atómico a fazer o seu trabalho. Não é uma
+    // avaria e não pode sair daqui como uma.
+    if (isAlreadyExists(error)) return { kind: "duplicate", path };
     log.error("theme-storage: upload falhou", error, { themeId });
     return null;
   }
   invalidateThemeCount(themeId);
+  // O índice acompanha o que acabámos de escrever, em vez de ser reconstruído
+  // (ver a armadilha em `FINGERPRINT_TTL_MS`).
+  noteThemeFingerprint(themeId, { hash: fingerprint, md5: md5Of(bytes), path });
   const [{ data }, thumbUrl] = await Promise.all([
     sb.storage.from(THEME_BUCKET).createSignedUrl(path, SIGNED_TTL),
     thumb ? uploadThemeThumb(path, thumb) : Promise.resolve(""),
   ]);
-  return { path, url: data?.signedUrl ?? "", ...(thumbUrl ? { thumbUrl } : {}) };
+  return {
+    kind: "created",
+    image: { path, url: data?.signedUrl ?? "", ...(thumbUrl ? { thumbUrl } : {}) },
+  };
 }
 
 /**
@@ -355,6 +426,9 @@ async function mintOne(bucket: string, path: string): Promise<UploadTicket | nul
 export async function createThemeUploadTickets(
   themeId: string,
   contentTypes: readonly string[],
+  /** Resumos emparelhados pela ORDEM com `contentTypes` (opcional). Com eles, a
+   *  foto repetida nem bilhete recebe: zero bytes na rede. */
+  fingerprints?: readonly (string | null | undefined)[],
 ): Promise<ThemeUploadTicket[] | null> {
   const sb = getSupabase();
   if (!sb || !(await ensureBucket(THEME_BUCKET))) return null;
@@ -370,8 +444,13 @@ export async function createThemeUploadTickets(
   const thumbsReady = await ensureBucket(THEME_THUMB_BUCKET);
 
   const tickets = await Promise.all(
-    wanted.map(async (type) => {
-      const path = `${folder}/${randomUUID()}.${extFor(type)}`;
+    wanted.map(async (type, i) => {
+      // Mesma regra de nome da `uploadThemeImage`: o resumo quando ele existe,
+      // UUID quando não — para os dois caminhos de carregamento darem fotos
+      // com a mesma identidade.
+      const fp = fingerprints?.[i];
+      const name = isFingerprint(fp) ? fileNameFor(fp) : randomUUID();
+      const path = `${folder}/${name}.${extFor(type)}`;
       const [original, thumb] = await Promise.all([
         mintOne(THEME_BUCKET, path),
         thumbsReady ? mintOne(THEME_THUMB_BUCKET, path) : Promise.resolve(null),
@@ -461,6 +540,22 @@ export interface ThemeFileList {
   truncated: boolean;
 }
 
+/** Um objeto da pasta, com o que a listagem já traz de graça. */
+export interface ThemeObject {
+  /** Nome do ficheiro dentro da pasta (sem o prefixo). */
+  name: string;
+  /** MD5 do conteúdo guardado, quando o eTag desta instalação o for. `null`
+   *  quando não se pode afirmar (ver `md5OfETag`) — e aí não se afirma nada. */
+  md5: string | null;
+}
+
+/** O conteúdo da pasta com os metadados que a listagem já devolve. */
+export interface ThemeObjectList {
+  objects: ThemeObject[];
+  ok: boolean;
+  truncated: boolean;
+}
+
 /**
  * Lista a pasta de um tema SEM assinar nada. É a primitiva barata: assinar
  * URLs é o passo caro, e quem só precisa de contar fotos (a lista de temas)
@@ -469,13 +564,18 @@ export interface ThemeFileList {
  * A distinção que interessa é `ok`: uma pasta ilegível devolve `ok: false`, e
  * quem chama tem de a mostrar como "fotos indisponíveis" — nunca como "0
  * fotos", que a equipa leria como "as minhas fotos desapareceram". Nunca lança.
+ *
+ * Devolve também o MD5 de cada objeto porque o `list()` já o traz no
+ * `metadata.eTag` — não custa uma única ida a mais ao Storage, e é o que
+ * permite reconhecer as fotos da biblioteca ANTIGA (nome UUID, sem resumo no
+ * nome) sem migração nenhuma. Ver `readThemeFingerprints`.
  */
-export async function listThemeFiles(
+export async function listThemeObjects(
   themeId: string,
   limit = PAGE,
   offset = 0,
-): Promise<ThemeFileList> {
-  const unreadable: ThemeFileList = { names: [], ok: false, truncated: false };
+): Promise<ThemeObjectList> {
+  const unreadable: ThemeObjectList = { objects: [], ok: false, truncated: false };
   const sb = getSupabase();
   if (!sb || !(await ensureBucket(THEME_BUCKET))) return unreadable;
   const folder = themeFolder(themeId);
@@ -492,14 +592,30 @@ export async function listThemeFiles(
       return unreadable;
     }
     // Só ficheiros reais (o Storage devolve marcadores de pasta sem id).
-    const names = data.filter((o) => o.id && !o.name.startsWith(".")).map((o) => o.name);
+    const objects = data
+      .filter((o) => o.id && !o.name.startsWith("."))
+      .map((o) => ({ name: o.name, md5: md5OfETag(o.metadata?.eTag) }));
     // O limite é contado sobre a página CRUA: uma página cheia de marcadores
     // continua a significar "há mais para trás".
-    return { names, ok: true, truncated: data.length >= limit };
+    return { objects, ok: true, truncated: data.length >= limit };
   } catch (e) {
     log.error("theme-storage: list falhou", e, { themeId });
     return unreadable;
   }
+}
+
+/**
+ * Só os NOMES da pasta — o invólucro fino de `listThemeObjects` que a lista de
+ * temas e a rota das miniaturas já usavam. Mantém-se com esta forma para não
+ * obrigar quem só quer contar a saber que existem eTags.
+ */
+export async function listThemeFiles(
+  themeId: string,
+  limit = PAGE,
+  offset = 0,
+): Promise<ThemeFileList> {
+  const { objects, ok, truncated } = await listThemeObjects(themeId, limit, offset);
+  return { names: objects.map((o) => o.name), ok, truncated };
 }
 
 /** Conta as fotos de uma pasta — ver `countThemeFiles`. */
@@ -607,6 +723,182 @@ function writeCount(
 export function invalidateThemeCount(themeId: string): void {
   const folder = themeFolder(themeId);
   if (folder) countMemo.delete(folder);
+}
+
+// ── O ÍNDICE DE REPETIDAS ──────────────────────────────────────────────────
+
+/**
+ * O que a pasta sabe sobre "esta foto já cá está".
+ *
+ * Não é uma segunda fonte de verdade: é a MESMA listagem da pasta, lida de
+ * outra maneira. `hashes` vem dos NOMES (`<32 hex>.jpg`, ver
+ * `theme-fingerprint.ts`) e `md5s` vem do eTag que a listagem já traz — a rede
+ * secundária que apanha a biblioteca antiga, de nome UUID.
+ */
+export interface ThemeFingerprintIndex {
+  /** Resumos do ficheiro original das fotos que estão na pasta. */
+  hashes: Set<string>;
+  /** `MD5 do conteúdo → caminho`, para se poder DIZER qual é a repetida. */
+  md5s: Map<string, string>;
+  /** A pasta foi mesmo lida. `false` = não se pode afirmar nada. */
+  ok: boolean;
+  /** Percorreu-se a pasta até ao fim. `false` = bateu no teto de páginas e daí
+   *  para cima é melhor esforço — a UI NÃO pode anunciar poupanças. */
+  complete: boolean;
+  /** Há fotos sem resumo no nome (carregadas antes desta funcionalidade). É o
+   *  que autoriza a UI a dizer, uma vez, que nem todas são reconhecíveis. */
+  legacy: boolean;
+}
+
+/**
+ * MEMÓRIA DO ÍNDICE — e o cuidado que aqui é decisivo.
+ *
+ * ARMADILHA EVITADA: pendurar isto no `invalidateThemeCount` (que dispara a
+ * CADA foto carregada) transformaria um lote de 300 fotos em 300 reconstruções
+ * do índice. Num tema de 4000 fotos são 300 × 4 chamadas `list` × 120 ms ≈
+ * 144 s de Storage desperdiçados por arrasto — a funcionalidade ficaria mais
+ * cara do que o problema que resolve.
+ *
+ * Em vez disso: o índice é ATUALIZADO na escrita (`noteThemeFingerprint`, que
+ * acrescenta exatamente o que sabemos que mudou) e só é DEITADO FORA em
+ * remoções (`forgetThemeFingerprints`). Expira sozinho ao fim de 60 s, tal
+ * como a contagem.
+ *
+ * A staleness possível está limitada a 60 s e é sempre para o lado de "esta
+ * foto já cá está" (uma foto apagada noutra instância). É o único falso
+ * positivo do desenho, e é por isso que a lista de saltadas TEM de ser
+ * accionável ("Adicionar mesmo assim") e não um mero número.
+ */
+const FINGERPRINT_TTL_MS = 60_000;
+/** Quantos temas ficam em memória. Quatro chegam: trabalha-se num tema de cada
+ *  vez e o quinto entrada expulsa o mais antigo, em vez de a memória do
+ *  processo crescer com a biblioteca (4000 fotos ≈ 520 KB por tema). */
+const FINGERPRINT_LRU = 4;
+const fingerprintMemo = new Map<string, { at: number; index: ThemeFingerprintIndex }>();
+
+/**
+ * Lê o índice de repetidas de um tema (da pasta, com memória de 60 s).
+ *
+ * Percorre a pasta com a MESMA paginação e o MESMO teto que a contagem já usa
+ * (`COUNT_PAGE`, `MAX_COUNT_PAGES`), portanto num tema de 4000 fotos são 4
+ * chamadas `list` (~0,5 s) e ZERO assinaturas — o passo caro não acontece. É
+ * por LOTE de fotos, não por foto.
+ *
+ * Nunca lança. Uma pasta ilegível devolve `ok: false`, e quem chama tem de
+ * subir tudo: o `upsert: false` da escrita continua a ser o guarda que não
+ * falha.
+ */
+export async function readThemeFingerprints(themeId: string): Promise<ThemeFingerprintIndex> {
+  const folder = themeFolder(themeId);
+  const empty = (): ThemeFingerprintIndex => ({
+    hashes: new Set(),
+    md5s: new Map(),
+    ok: false,
+    complete: false,
+    legacy: false,
+  });
+  if (!folder) return empty();
+
+  const hit = fingerprintMemo.get(folder);
+  if (hit && Date.now() - hit.at <= FINGERPRINT_TTL_MS) return hit.index;
+  if (hit) fingerprintMemo.delete(folder);
+
+  const index = empty();
+  for (let pageIndex = 0; pageIndex < MAX_COUNT_PAGES; pageIndex++) {
+    const listed = await listThemeObjects(themeId, COUNT_PAGE, pageIndex * COUNT_PAGE);
+    // Uma leitura falhada NÃO é "pasta sem repetidas": devolve-se `ok: false`
+    // e o que já se leu fica de fora, para ninguém anunciar uma poupança que
+    // não pôde ser verificada.
+    if (!listed.ok) return empty();
+    for (const o of listed.objects) {
+      const hash = fingerprintOfFileName(o.name);
+      if (hash) index.hashes.add(hash);
+      else index.legacy = true;
+      if (o.md5) index.md5s.set(o.md5, `${folder}/${o.name}`);
+    }
+    if (!listed.truncated) {
+      index.ok = true;
+      index.complete = true;
+      break;
+    }
+    // Bateu no teto: daqui para cima é melhor esforço declarado.
+    if (pageIndex === MAX_COUNT_PAGES - 1) {
+      index.ok = true;
+      index.complete = false;
+    }
+  }
+
+  fingerprintMemo.set(folder, { at: Date.now(), index });
+  // LRU simples: o `Map` mantém a ordem de inserção, por isso a primeira chave
+  // é a mais antiga.
+  while (fingerprintMemo.size > FINGERPRINT_LRU) {
+    const oldest = fingerprintMemo.keys().next().value;
+    if (oldest === undefined) break;
+    fingerprintMemo.delete(oldest);
+  }
+  return index;
+}
+
+/**
+ * Acrescenta ao índice em memória o que ACABOU de ser escrito na pasta.
+ *
+ * É isto que substitui reconstruir o índice a cada foto (ver a armadilha em
+ * `FINGERPRINT_TTL_MS`): sabemos exatamente o que mudou, por isso não é
+ * preciso voltar a perguntar ao Storage. Sem índice em memória não faz nada —
+ * a próxima leitura constrói-o já com a foto lá dentro.
+ */
+export function noteThemeFingerprint(
+  themeId: string,
+  entry: { hash?: string | null; md5?: string | null; path?: string },
+): void {
+  const folder = themeFolder(themeId);
+  if (!folder) return;
+  const hit = fingerprintMemo.get(folder);
+  if (!hit) return;
+  if (entry.hash) hit.index.hashes.add(entry.hash);
+  if (entry.md5 && entry.path) hit.index.md5s.set(entry.md5, entry.path);
+}
+
+/**
+ * Esquece o índice de um tema. Chamado por tudo o que REMOVE da pasta —
+ * apagar uma foto, esvaziar um tema, tirar fotos ao mover.
+ *
+ * Só nas remoções: uma remoção retira do índice, e nada em memória sabe o que
+ * é preciso retirar (o `hashes` não guarda caminhos). Deitar fora é a resposta
+ * certa e é rara; deitar fora às escritas é que era o desastre de desempenho.
+ */
+export function forgetThemeFingerprints(themeId: string): void {
+  const folder = themeFolder(themeId);
+  if (folder) fingerprintMemo.delete(folder);
+}
+
+/** MD5 de uns bytes, para comparar com o eTag da listagem (rede secundária). */
+function md5Of(bytes: Buffer): string {
+  return createHash("md5").update(bytes).digest("hex");
+}
+
+/**
+ * Estes bytes já estão guardados neste tema? Devolve o caminho da foto que já
+ * lá está, ou `null`.
+ *
+ * É a REDE SECUNDÁRIA — a que apanha as repetidas da biblioteca ANTIGA, cujo
+ * nome é um UUID e não diz nada. Compara o MD5 dos bytes preparados com o eTag
+ * que a listagem já trouxe. O preço é que os bytes dessa repetida antiga
+ * viajam antes de serem recusados; só acontece para a cauda antiga, e ela
+ * encolhe sozinha à medida que a biblioteca é renovada.
+ *
+ * Falha SEMPRE para o lado seguro: se o eTag desta instalação não for o MD5 do
+ * conteúdo, ou se ela mudar de browser (os bytes preparados passam a ser
+ * outros), nada casa — que é exatamente o comportamento de hoje. Um falso
+ * positivo exigiria dois JPEG diferentes com o mesmo MD5.
+ */
+export async function findThemeImageByBytes(
+  themeId: string,
+  bytes: Buffer,
+): Promise<string | null> {
+  const index = await readThemeFingerprints(themeId);
+  if (!index.ok) return null;
+  return index.md5s.get(md5Of(bytes)) ?? null;
 }
 
 /**
@@ -806,6 +1098,9 @@ export async function deleteThemeImage(path: string): Promise<boolean> {
     return false;
   }
   invalidateThemeCount(themeIdOfPath(path));
+  // Uma REMOÇÃO tira do índice, e nada em memória sabe o quê (o conjunto de
+  // resumos não guarda caminhos): deita-se fora e reconstrói-se à próxima.
+  forgetThemeFingerprints(themeIdOfPath(path));
   await removeThumbs([path]);
   return true;
 }
@@ -870,6 +1165,7 @@ export async function deleteThemeFolder(
   }
 
   invalidateThemeCount(themeId);
+  forgetThemeFingerprints(themeId);
 
   // 3) E só então as miniaturas: são derivadas, e o seu destino não pode
   //    influenciar o resultado. Se a limpeza das fotos tivesse falhado
@@ -975,4 +1271,121 @@ export async function copyThemeImageToProposal(
   const bytes = await fetchThemeImageBytes(themePath);
   if (!bytes) return null;
   return uploadProposalImage(quoteId, bytes, contentType);
+}
+
+// ── Levar fotos de um tema para outro ──────────────────────────────────────
+
+/** O que aconteceu a uma foto que se tentou levar para outro tema. */
+export type ThemeTransferOutcome =
+  /** Ficou no destino (e, ao mover, saiu da origem). */
+  | "copied"
+  /** JÁ estava no destino. Não é um erro e não pode aparecer a vermelho. */
+  | "exists"
+  /** Não foi possível — continua na origem, intacta. */
+  | "failed";
+
+/**
+ * Leva UMA foto para outro tema, PRESERVANDO O NOME DO FICHEIRO.
+ *
+ * ESTA É A DECISÃO QUE MANDA EM TUDO O RESTO: `temaA/2f9c….jpg` vai para
+ * `temaB/2f9c….jpg` — mesmo nome, outra pasta, nunca um nome novo. Porquê:
+ *
+ *  · "esta foto já está no destino?" passa a ser uma COLISÃO DE CHAVE, que o
+ *    próprio Storage responde (409) sem ler um único byte, sem hash, sem
+ *    índice, sem tocar na regra "a pasta é a única fonte de verdade";
+ *  · a operação fica IDEMPOTENTE — repetir o mesmo lote não cria duplicados,
+ *    devolve "já lá estavam". É isto que faz o "Tentar novamente" de uma falha
+ *    parcial ser seguro em vez de perigoso;
+ *  · a IDENTIDADE VIAJA COM A FOTO. Desde que o nome é o resumo do ficheiro
+ *    original (ver `theme-fingerprint.ts`), o tema de destino fica a saber que
+ *    tem aquela foto — largar depois o ficheiro original em B é corretamente
+ *    detetado como repetido. Cunhar um UUID novo aqui abriria um buraco
+ *    permanente no índice do destino, por cada foto copiada.
+ *
+ * O destino é construído NO SERVIDOR a partir do `destThemeId` — o caminho de
+ * destino nunca é aceite do cliente.
+ *
+ * SEM RECURSO A DESCARREGAR-E-VOLTAR-A-CARREGAR, ao contrário do
+ * `copyThemeImageToProposal`: ali a cópia atravessa buckets (pode não ser
+ * suportada) e protege um PDF já prometido a um cliente; aqui é o MESMO
+ * bucket, a operação mais básica que há. O recurso custaria 109 MB a
+ * atravessar a função por lote de 40 (2,6 MB × 40 + miniaturas), com
+ * `maxDuration: 60` a rebentar antes do fim — e recodificar os bytes partiria
+ * a identidade de conteúdo de que a deteção de repetidas depende. Uma falha é
+ * uma falha reportada e repetível, não um plano B caro.
+ */
+export async function transferThemeImage(
+  fromPath: string,
+  destThemeId: string,
+  mode: "copy" | "move",
+): Promise<{ outcome: ThemeTransferOutcome; to: string; thumb: boolean }> {
+  const nowhere = { outcome: "failed" as const, to: "", thumb: false };
+  // O caminho vem do cliente: valida-o ANTES de tocar no Storage.
+  if (!isThemePath(fromPath)) return nowhere;
+  const folder = themeFolder(destThemeId);
+  if (!folder) return nowhere;
+  const name = fromPath.slice(fromPath.indexOf("/") + 1);
+  const to = `${folder}/${name}`;
+  // Copiar uma foto para cima de si própria não é uma operação: seria pedir ao
+  // Storage para escrever na chave que está a ler.
+  if (to === fromPath) return nowhere;
+
+  const sb = getSupabase();
+  if (!sb || !(await ensureBucket(THEME_BUCKET))) return nowhere;
+
+  try {
+    const bucket = sb.storage.from(THEME_BUCKET);
+    // `move` e não "copy + remove": é o que torna o mover ATÓMICO por foto —
+    // nunca existe um instante em que a foto não esteja em lado nenhum.
+    const { error } =
+      mode === "move" ? await bucket.move(fromPath, to) : await bucket.copy(fromPath, to);
+    if (error) {
+      if (isAlreadyExists(error)) {
+        // Já lá estava. Ao MOVER, a origem NÃO é apagada de propósito: apagar
+        // seria inferir, a partir do nome, que os bytes são os mesmos. Fica
+        // selecionada e a UI diz "já estava em «X» — ficou aqui".
+        return { outcome: "exists", to, thumb: true };
+      }
+      log.error("theme-storage: transferência falhou", error, { fromPath, to, mode });
+      return { outcome: "failed", to, thumb: false };
+    }
+  } catch (e) {
+    log.error("theme-storage: transferência falhou", e, { fromPath, to, mode });
+    return { outcome: "failed", to, thumb: false };
+  }
+
+  invalidateThemeCount(destThemeId);
+  noteThemeFingerprint(destThemeId, { hash: fingerprintOfFileName(name), path: to });
+  if (mode === "move") {
+    invalidateThemeCount(themeIdOfPath(fromPath));
+    forgetThemeFingerprints(themeIdOfPath(fromPath));
+  }
+
+  // A MINIATURA VAI NO MESMO GESTO — e é a diferença entre 1,78 MB e 164 MB.
+  //
+  // Sem ela, o tema de destino puxa ORIGINAIS: com os números já apurados
+  // neste repositório (2,6 MB por original, 29 KB por miniatura), uma página
+  // de 60 fotos passa de 1,78 MB / 0,3 s para 164 MB / 26 s a 50 Mbit/s —
+  // 92× mais bytes, e o mesmo 26 s que a rota `/miniaturas` já mediu em
+  // bancada. Repará-la depois custaria 818 MB por 300 fotos; copiá-la custa
+  // uma chamada e zero bytes.
+  //
+  // Melhor esforço absoluto: NUNCA muda o `outcome` e NUNCA cria o bucket das
+  // miniaturas (numa instalação antiga não há miniatura nenhuma para copiar, e
+  // o 404 é ignorado — a foto chega ao destino exatamente no estado em que
+  // estava na origem, e o banner de reparação cobre-a).
+  let thumb = false;
+  try {
+    const thumbs = sb.storage.from(THEME_THUMB_BUCKET);
+    const { error } =
+      mode === "move" ? await thumbs.move(fromPath, to) : await thumbs.copy(fromPath, to);
+    thumb = !error || isAlreadyExists(error);
+    if (error && !isAlreadyExists(error) && !isNotFound(error)) {
+      log.warn("theme-storage: miniatura não acompanhou a foto", { fromPath, to, mode });
+    }
+  } catch (e) {
+    log.warn("theme-storage: miniatura não acompanhou a foto", { fromPath, erro: String(e) });
+  }
+
+  return { outcome: "copied", to, thumb };
 }

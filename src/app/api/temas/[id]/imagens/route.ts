@@ -5,12 +5,19 @@ import {
   listThemeImagePage,
   uploadThemeImage,
   deleteThemeImage,
+  findThemeImageByBytes,
   isThemePath,
   themeIdOfPath,
   themeFolder,
   type ThemeThumbInput,
 } from "@/lib/theme-storage";
-import { THEME_PAGE_SIZE, MAX_THEME_PAGE_SIZE } from "@/lib/theme-types";
+import { isFingerprint } from "@/lib/theme-fingerprint";
+import {
+  THEME_PAGE_SIZE,
+  MAX_THEME_PAGE_SIZE,
+  type ThemeDuplicate,
+  type ThemeImage,
+} from "@/lib/theme-types";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -107,6 +114,34 @@ function pairThumbs(files: File[], form: FormData): (File | null)[] {
 }
 
 /**
+ * Os resumos das fotos, emparelhados com os ficheiros pela ORDEM (campo
+ * opcional `hashes`).
+ *
+ * A regra é a MESMA do `pairThumbs` acima e pela mesma razão: ou os dois
+ * campos têm o mesmo comprimento, ou não há emparelhamento possível. Um resumo
+ * a menos faria uma foto ser guardada com a identidade de OUTRA — e a partir
+ * daí a foto certa seria sempre reportada como repetida. Perante a menor
+ * dúvida, ignora-se o campo todo e as fotos sobem com nome UUID, que é
+ * exatamente o comportamento de antes desta funcionalidade.
+ *
+ * Um resumo mal formado (não 32 hex) vira `null` na sua posição, sem
+ * desalinhar os outros. É também a validação que impede o nome do ficheiro
+ * — que passa a vir do cliente — de conter travessia de diretórios.
+ */
+function pairHashes(files: File[], form: FormData): (string | null)[] {
+  const raw = form.getAll("hashes").filter((h): h is string => typeof h === "string");
+  if (raw.length === 0) return files.map(() => null);
+  if (raw.length !== files.length) {
+    log.warn("temas: resumos ignorados (não correspondem aos ficheiros)", {
+      files: files.length,
+      hashes: raw.length,
+    });
+    return files.map(() => null);
+  }
+  return raw.map((h) => (isFingerprint(h) ? h : null));
+}
+
+/**
  * Carrega fotos para a pasta de um tema. Aceita multipart/form-data com um ou
  * mais `files` e, opcionalmente, os `thumbs` correspondentes pela mesma ordem —
  * as miniaturas são feitas no navegador, a partir do mesmo bitmap já
@@ -114,6 +149,21 @@ function pairThumbs(files: File[], form: FormData): (File | null)[] {
  *
  * A miniatura é um acessório: falhar a guardá-la deixa a foto sem miniatura
  * (a grelha mostra o original), nunca faz o carregamento falhar.
+ *
+ * NÃO REPETIR FOTOS QUE JÁ ESTÃO NO TEMA. Além dos `thumbs`, aceita `hashes` —
+ * o resumo do ficheiro ORIGINAL de cada foto, calculado no navegador. Com ele,
+ * a foto é guardada como `<tema>/<resumo>.jpg` e o `upsert: false` que já
+ * existia recusa atomicamente uma segunda cópia. Uma foto assim recusada NÃO é
+ * um erro HTTP: sai em `duplicates`, com 200, e a UI mostra-a como "já estava
+ * neste tema" com um botão para forçar.
+ *
+ * Há ainda a rede secundária, para a biblioteca ANTIGA (nome UUID, sem resumo):
+ * compara-se o MD5 dos bytes recebidos com o eTag que a listagem da pasta já
+ * traz. Custa uma listagem memoizada por lote e apanha a cauda que o nome não
+ * consegue apanhar.
+ *
+ * `force: "1"` salta as duas verificações e guarda com `<resumo>-<4 hex>` — é o
+ * "Adicionar mesmo assim", e a recuperação de qualquer modo de falha do índice.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -142,8 +192,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Nenhuma imagem recebida." }, { status: 400 });
   }
   const thumbs = pairThumbs(files, form);
+  const hashes = pairHashes(files, form);
+  const force = form.get("force") === "1";
 
-  const uploaded = [];
+  const uploaded: ThemeImage[] = [];
+  const duplicates: ThemeDuplicate[] = [];
   for (const [i, file] of files.entries()) {
     if (!OK_TYPES.test(file.type)) {
       return NextResponse.json(
@@ -158,19 +211,40 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
     const bytes = Buffer.from(await file.arrayBuffer());
+
+    // Rede secundária: a foto antiga, de nome UUID, que o resumo não apanha.
+    // Feita ANTES de escrever, para não deixar uma segunda cópia no bucket.
+    if (!force) {
+      const already = await findThemeImageByBytes(id, bytes);
+      if (already) {
+        duplicates.push({ name: file.name, path: already, reason: "no-tema" });
+        continue;
+      }
+    }
+
     const thumb = thumbs[i];
     const thumbInput: ThemeThumbInput | undefined = thumb
       ? { bytes: Buffer.from(await thumb.arrayBuffer()), contentType: thumb.type }
       : undefined;
-    const res = await uploadThemeImage(id, bytes, file.type, thumbInput);
+    const res = await uploadThemeImage(id, bytes, file.type, thumbInput, {
+      fingerprint: hashes[i],
+      force,
+    });
     if (!res) {
       log.error("temas: upload falhou", null, { id, name: file.name });
       return NextResponse.json({ error: "Falha ao guardar a imagem." }, { status: 502 });
     }
-    uploaded.push(res);
+    // "Já cá estava" é uma resposta, não uma avaria: 200 com a foto na lista de
+    // repetidas. Um 502 aqui mandaria a Catarina procurar um problema que não
+    // existe — e o "Tentar novamente" voltaria a fazer o mesmo para sempre.
+    if (res.kind === "duplicate") {
+      duplicates.push({ name: file.name, path: res.path, reason: "no-tema" });
+      continue;
+    }
+    uploaded.push(res.image);
   }
 
-  return NextResponse.json({ ok: true, images: uploaded });
+  return NextResponse.json({ ok: true, images: uploaded, duplicates });
 }
 
 /** Remove UMA foto do tema: `?path=<themeId>/<ficheiro>`. A miniatura sai com

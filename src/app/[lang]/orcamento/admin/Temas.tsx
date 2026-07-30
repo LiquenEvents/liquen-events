@@ -3,14 +3,19 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import PhotoLightbox from "./PhotoLightbox";
+import ThemeCopyDialog, { type ThemeCopyOutcome } from "./ThemeCopyDialog";
 import { downloadMany, downloadName, downloadOne } from "./photo-download";
 import {
+  CHECK_CHUNK,
   MAX_PHOTO_ORDER,
   MAX_THEME_NAME,
   MAX_THEME_NOTES,
   THEME_PAGE_SIZE,
   normalizedThemeName,
+  type SkipReason,
+  type ThemeDuplicate,
 } from "@/lib/theme-types";
+import { fingerprintBlob } from "@/lib/theme-fingerprint";
 import { useToast } from "./Toast";
 import { prepareImageWithThumb } from "./image-prep";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
@@ -55,6 +60,25 @@ const UPLOAD_CONCURRENCY = 4;
 
 /** Remoções em voo ao mesmo tempo (pedidos vazios: mais folga do que a subida). */
 const DELETE_CONCURRENCY = 6;
+
+/**
+ * Quantos ficheiros são lidos ao mesmo tempo para lhes calcular a impressão
+ * digital.
+ *
+ * O `crypto.subtle.digest` não bloqueia o fio principal (o browser resolve-o
+ * fora dele) e é barato ao lado do resto — MEDIDO em Chromium nesta caixa:
+ * 42,9 ms numa foto de 8,1 MB (181 MB/s), contra 337 ms para PREPARAR a mesma
+ * foto. O que aqui se limita não é o CPU, é a MEMÓRIA: cada ficheiro tem de
+ * estar inteiro em `ArrayBuffer` para ser resumido, e um arrasto de 300 fotos
+ * de 8 MB lidas de uma vez seriam 2,4 GB. Quatro em voo são ~32 MB de pico — o
+ * mesmo teto de quatro que os carregamentos já usam, pela mesma razão.
+ */
+const FINGERPRINT_CONCURRENCY = 4;
+
+/** Quantas fotos saltadas mostram miniatura no relatório. As restantes
+ *  aparecem só pelo nome: desenhar 150 pré-visualizações de fotos que NÃO
+ *  foram adicionadas custaria mais do que a informação vale. */
+const SKIPPED_PREVIEWS = 12;
 
 /**
  * QUANTOS ORIGINAIS A GRELHA DESCARREGA AO MESMO TEMPO — o número que decide
@@ -476,6 +500,19 @@ export default function Temas() {
       <ThemeFolder
         key={open.id}
         theme={open}
+        // A pasta precisa da lista toda para poder oferecer "Copiar para…" — e
+        // o cartão do destino tem de somar as fotos que lá chegaram, senão a
+        // contagem só se corrige no próximo carregamento da página.
+        themes={themes}
+        onCopiedTo={(destId, added) =>
+          setThemes((prev) =>
+            prev.map((t) =>
+              t.id === destId && t.imageCount !== null
+                ? { ...t, imageCount: t.imageCount + added }
+                : t,
+            ),
+          )
+        }
         onBack={() => setOpenId(null)}
         onFolderState={(s) => syncCard(open.id, s)}
         onRename={(name) =>
@@ -648,6 +685,37 @@ interface FolderState {
 interface Failure {
   file: File;
   message: string;
+}
+
+/**
+ * Uma foto do arrasto que NÃO foi adicionada por já lá estar.
+ *
+ * Guarda o `File` em memória (como o `Failure` acima) para o "Adicionar mesmo
+ * assim" não obrigar a voltar a escolher nada — e para a miniatura do
+ * relatório sair de graça, do ficheiro que já está no computador dela.
+ *
+ * ISTO NÃO É UM ERRO e não pode aparecer a vermelho: é o comportamento que ela
+ * pediu, a acontecer.
+ */
+interface Skipped {
+  file: File;
+  reason: SkipReason;
+  /** O resumo, para o "Adicionar mesmo assim" não ter de o recalcular. */
+  hash?: string;
+}
+
+/** O que a fase de verificação decidiu sobre um arrasto. */
+interface Screening {
+  /** As que devem mesmo subir, pela ordem em que ela as largou. */
+  keep: File[];
+  skipped: Skipped[];
+  /** `ficheiro → resumo`, para viajar no formulário do carregamento. */
+  hashOf: Map<File, string>;
+  /** A pasta foi mesmo lida e percorrida até ao fim. `false` = não se pode
+   *  anunciar poupança nenhuma (ver o painel de repetidas). */
+  verified: boolean;
+  /** O tema tem fotos sem impressão digital (a biblioteca anterior a isto). */
+  legacy: boolean;
 }
 
 /**
@@ -883,20 +951,41 @@ function Photo({
   );
 }
 
+/**
+ * A miniatura de uma foto SALTADA, desenhada do ficheiro que está no
+ * computador dela.
+ *
+ * Custo zero de rede: o `File` já está em memória (é o mesmo que o "Adicionar
+ * mesmo assim" vai usar). O URL de objeto é criado uma vez e registado para
+ * ser libertado à saída da pasta, como todos os outros deste ecrã.
+ */
+function SkippedThumb({ file, track }: { file: File; track: (file: File) => string | undefined }) {
+  const [src] = useState(() => track(file));
+  if (!src) return <div className="bo-skeleton h-full w-full" aria-hidden />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" decoding="async" className="h-full w-full object-cover" />;
+}
+
 /** A pasta de UM tema: renomear, carregar fotos, remover fotos, eliminar. */
 function ThemeFolder({
   theme,
+  themes,
   onBack,
   onFolderState,
   onRename,
   onCover,
+  onCopiedTo,
   onDelete,
 }: {
   theme: ThemeSummary;
+  /** Todos os temas — para o "Copiar para…" saber para onde pode levar. */
+  themes: ThemeSummary[];
   onBack: () => void;
   onFolderState: (state: FolderState) => void;
   onRename: (name: string) => void;
   onCover: (coverPath: string, coverUrl?: string) => void;
+  /** Chegaram `added` fotos ao tema `destId` — o cartão dele tem de somar. */
+  onCopiedTo: (destId: string, added: number) => void;
   onDelete: () => void;
 }) {
   const { toast } = useToast();
@@ -915,6 +1004,23 @@ function ThemeFolder({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [failed, setFailed] = useState<Failure[]>([]);
+  /** As fotos deste arrasto que já estavam no tema. Ao lado do `failed` e com
+   *  a mesma forma, mas NEUTRA: não é uma avaria, é o que ela pediu. */
+  const [skipped, setSkipped] = useState<Skipped[]>([]);
+  /** O tema tem fotos anteriores a esta funcionalidade — dito uma vez, sem
+   *  drama, porque explica a única repetida que pode escapar. */
+  const [legacyPhotos, setLegacyPhotos] = useState(false);
+  /** A pasta não pôde ser lida toda na última verificação. As repetidas que se
+   *  encontraram são reais, mas pode ter escapado alguma — e prometer o
+   *  contrário seria anunciar uma verificação que não aconteceu. */
+  const [partialCheck, setPartialCheck] = useState(false);
+  /** A fase de impressão digital, antes de qualquer preparação ou upload. */
+  const [verifying, setVerifying] = useState<{ done: number; total: number } | null>(null);
+  /** O diálogo "Copiar para…" está aberto. */
+  const [copyOpen, setCopyOpen] = useState(false);
+  /** O que aconteceu à última cópia/mudança — fica no ecrã enquanto houver
+   *  fotos por levar (um número em que ela tem de agir não pode desaparecer). */
+  const [copyReport, setCopyReport] = useState<ThemeCopyOutcome | null>(null);
   /** As fotos deste lote que ainda não voltaram do servidor, já à vista com a
    *  imagem que está no disco dela — ver `Pending`. */
   const [pending, setPending] = useState<Pending[]>([]);
@@ -1055,25 +1161,182 @@ function ThemeFolder({
   }, [uploadingCount]);
 
   /**
-   * Carrega um lote de fotos com até `UPLOAD_CONCURRENCY` em voo.
+   * FASE 1 a 3 — quais destas fotos JÁ estão no tema.
+   *
+   * A ordem é o que faz a diferença de tempo, e é deliberada: o resumo é
+   * calculado ANTES de preparar a imagem. MEDIDO em Chromium nesta caixa, numa
+   * foto 4032×3024 de 8,1 MB: 42,9 ms para resumir contra 337 ms para
+   * preparar. Nesta ordem, cada repetida apanhada poupa a preparação E o
+   * upload; ao contrário, poupava só o upload.
+   *
+   * Num arrasto de 300 com metade repetidas: ~4,3 s de resumos (4 em voo) e
+   * ~0,5 s a construir o índice do lado do servidor, contra ~16,9 s de CPU
+   * poupados e ~160 MB que deixam de subir (≈67 s a 20 Mbit/s).
+   *
+   * NUNCA falha o carregamento. Sem `crypto.subtle` (contexto inseguro), com a
+   * pasta ilegível ou com a rota em baixo, isto devolve "sobe tudo" e o
+   * `upsert: false` do servidor continua a ser o guarda que não falha.
+   */
+  async function screenBatch(files: File[]): Promise<Screening> {
+    const nothingKnown: Screening = {
+      keep: files,
+      skipped: [],
+      hashOf: new Map(),
+      verified: false,
+      legacy: false,
+    };
+    setVerifying({ done: 0, total: files.length });
+    try {
+      // ── 1) Impressão digital do ficheiro que está no disco dela ──────────
+      const hashes = new Array<string | null>(files.length).fill(null);
+      await pool(
+        files.map((file, i) => ({ file, i })),
+        FINGERPRINT_CONCURRENCY,
+        async ({ file, i }) => {
+          hashes[i] = await fingerprintBlob(file);
+          if (alive.current) setVerifying((v) => (v ? { ...v, done: v.done + 1 } : v));
+        },
+        () => !alive.current,
+      );
+      if (!alive.current) return nothingKnown;
+      // Nenhum resumo: este ambiente não sabe fazê-los (sem contexto seguro) e
+      // a funcionalidade DESLIGA-SE — não parte, não avisa, não muda nada.
+      if (hashes.every((h) => h === null)) return nothingKnown;
+
+      const hashOf = new Map<File, string>();
+      files.forEach((f, i) => {
+        const h = hashes[i];
+        if (h) hashOf.set(f, h);
+      });
+
+      // ── 2) Pré-verificação contra a pasta, em pedaços ────────────────────
+      // Em pedaços de CHECK_CHUNK e não o lote todo: assim a primeira foto
+      // começa a subir ao fim de ~0,3 s em vez de ~2 s num arrasto de 300. Do
+      // segundo pedaço em diante o índice do servidor já está em memória.
+      const known = new Set<string>();
+      let verified = true;
+      let legacy = false;
+      for (let i = 0; i < files.length && alive.current; i += CHECK_CHUNK) {
+        const chunk = [...new Set(hashes.slice(i, i + CHECK_CHUNK).filter((h) => h !== null))];
+        if (chunk.length === 0) continue;
+        try {
+          const res = await fetch(`/api/temas/${theme.id}/repetidas`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hashes: chunk }),
+          });
+          if (!res.ok) throw new Error("falhou");
+          const data = await res.json();
+          for (const h of Array.isArray(data?.known) ? data.known : []) {
+            if (typeof h === "string") known.add(h);
+          }
+          // `read: false` = a pasta não pôde ser lida; `complete: false` = a
+          // pasta é maior do que o teto. Nos dois casos não se anuncia
+          // poupança nenhuma, mesmo que alguma repetida tenha sido apanhada.
+          if (data?.read === false || data?.complete === false) verified = false;
+          if (data?.legacy) legacy = true;
+        } catch {
+          // Falhar a VERIFICAR nunca pode travar o carregamento: sobe tudo, e
+          // o guarda da escrita apanha o que houver.
+          verified = false;
+        }
+      }
+      if (!alive.current) return nothingKnown;
+
+      // ── 3) Repetidas dentro do PRÓPRIO arrasto ───────────────────────────
+      // A pré-verificação nunca as apanharia: ainda não estão na pasta. Sem
+      // isto, largar a mesma pasta duas vezes de seguida num só gesto entrava
+      // a dobrar.
+      const seen = new Set<string>();
+      const keep: File[] = [];
+      const out: Skipped[] = [];
+      files.forEach((file, i) => {
+        const hash = hashes[i];
+        if (hash && known.has(hash)) {
+          out.push({ file, reason: "no-tema", hash });
+          return;
+        }
+        if (hash && seen.has(hash)) {
+          out.push({ file, reason: "no-lote", hash });
+          return;
+        }
+        if (hash) seen.add(hash);
+        keep.push(file);
+      });
+
+      return { keep, skipped: out, hashOf, verified, legacy };
+    } finally {
+      if (alive.current) setVerifying(null);
+    }
+  }
+
+  /**
+   * Carrega um lote de fotos, SALTANDO as que já estão no tema.
+   *
+   * `force` é o "Adicionar mesmo assim": salta a verificação toda e manda o
+   * servidor guardar com um sufixo. É a marcha-atrás de um clique — e a
+   * recuperação de todos os modos de falha do índice (memo velho noutra
+   * instância do servidor, resumo errado, colisão).
+   */
+  async function upload(files: File[], force?: { hashOf: Map<File, string> }) {
+    if (files.length === 0) return;
+    // O contador entra JÁ: a fase de verificação também é trabalho em curso, e
+    // fechar o separador a meio dela perde o arrasto todo.
+    setUploadingCount((n) => n + 1);
+    try {
+      const screened: Screening = force
+        ? // A FORÇAR, os resumos já são conhecidos e VÃO na mesma: sem eles o
+          // servidor cunharia um UUID e a foto forçada deixava de contar como
+          // "está no tema" — um buraco permanente no índice, por cada clique
+          // em "Adicionar mesmo assim".
+          { keep: files, skipped: [], hashOf: force.hashOf, verified: false, legacy: false }
+        : await screenBatch(files);
+      if (!alive.current) return;
+      if (screened.legacy) setLegacyPhotos(true);
+      if (!force) setPartialCheck(!screened.verified);
+      if (screened.skipped.length > 0) setSkipped((prev) => [...prev, ...screened.skipped]);
+      if (screened.keep.length === 0) {
+        // SEM ISTO ela vê uma barra a andar e nada a acontecer, e conclui que
+        // o site está avariado.
+        toast(
+          `Estas ${files.length} fotos já estavam todas em "${theme.name}". Não foi adicionada nenhuma.`,
+          "info",
+        );
+        return;
+      }
+      await sendBatch(screened.keep, screened.hashOf, Boolean(force), screened.skipped.length);
+    } finally {
+      if (alive.current) setUploadingCount((n) => Math.max(0, n - 1));
+    }
+  }
+
+  /**
+   * Envia o lote com até `UPLOAD_CONCURRENCY` em voo.
    *
    * Um ficheiro por pedido: o limite de corpo do alojamento (~4,5 MB) rebenta
    * com um lote inteiro de fotos de telemóvel. Cada pedido leva o original
-   * preparado E a sua miniatura (`thumbs`, na mesma ordem) — como vai um só
-   * ficheiro de cada vez, "a mesma ordem" é trivialmente respeitada, e uma foto
-   * que não gere miniatura simplesmente não acrescenta nada ao campo.
+   * preparado, a sua miniatura (`thumbs`, na mesma ordem) e o `hashes` — como
+   * vai um só ficheiro de cada vez, "a mesma ordem" é trivialmente respeitada.
    *
    * Nada aqui deita fora o lote: cada falha é apanhada, guardada COM o
    * ficheiro (para se poder repetir sem voltar a escolher nada) e o lote
    * continua.
    */
-  async function upload(files: File[]) {
-    if (files.length === 0) return;
-    setUploadingCount((n) => n + 1);
+  async function sendBatch(
+    files: File[],
+    hashOf: Map<File, string>,
+    force: boolean,
+    /** Quantas já foram saltadas antes de chegar aqui — entra na mensagem. */
+    preSkipped: number,
+  ) {
     // Os totais somam-se: dois lotes a decorrer mostram um só "47 de 312".
     setProgress((p) => ({ done: p?.done ?? 0, total: (p?.total ?? 0) + files.length }));
     let added = 0;
     const errors: Failure[] = [];
+    /** As que o SERVIDOR recusou por já lá estarem — a corrida apanhada pelo
+     *  `upsert: false`, e a foto antiga apanhada pelo eTag. Contam-se aqui, e
+     *  não na previsão, para o relatório dizer o que ACONTECEU. */
+    const serverSkipped: Skipped[] = [];
 
     // AS FOTOS ENTRAM NA GRELHA AGORA, do ficheiro que está no computador —
     // não daqui a três segundos, quando o servidor responder. As primeiras
@@ -1126,12 +1389,25 @@ function ThemeFolder({
             const form = new FormData();
             form.append("files", file);
             if (thumb) form.append("thumbs", thumb);
+            // O resumo do ficheiro ORIGINAL (não do preparado): é ele que vira
+            // o nome no Storage e torna a garantia de "não repetir" atómica.
+            const hash = hashOf.get(f);
+            if (hash) form.append("hashes", hash);
+            if (force) form.append("force", "1");
             const res = await fetch(`/api/temas/${theme.id}/imagens`, {
               method: "POST",
               body: form,
             });
             const data = await res.json().catch(() => null);
             if (!res.ok) throw new Error(data?.error || `Falha ao carregar "${f.name}".`);
+            // O servidor recusou-a por já lá estar. NÃO é um erro: sai da
+            // grelha em silêncio e entra no painel neutro das repetidas.
+            const dup: ThemeDuplicate | undefined = data?.duplicates?.[0];
+            if (dup) {
+              dropPending(item, false);
+              serverSkipped.push({ file: f, reason: "no-tema", ...(hash ? { hash } : {}) });
+              return;
+            }
             const im: ThemeImage | undefined = data?.images?.[0];
             if (!im?.path) throw new Error(`Falha ao carregar "${f.name}".`);
             if (!alive.current) return;
@@ -1162,6 +1438,16 @@ function ThemeFolder({
         () => !alive.current,
       );
       if (!alive.current) return;
+      // O RELATÓRIO É CONSTRUÍDO DO QUE ACONTECEU, não do que a verificação
+      // previu: assim uma corrida apanhada pelo 409, uma repetida antiga
+      // apanhada pelo eTag e uma repetida prevista contam todas da mesma
+      // maneira, e o número que ela lê é sempre verdadeiro.
+      if (serverSkipped.length > 0) setSkipped((prev) => [...prev, ...serverSkipped]);
+      const jaLaEstavam = preSkipped + serverSkipped.length;
+      const cauda =
+        jaLaEstavam > 0
+          ? ` ${jaLaEstavam} já ${jaLaEstavam === 1 ? "estava" : "estavam"} no tema.`
+          : "";
       if (errors.length > 0) {
         setFailed((prev) => [...prev, ...errors]);
         toast(
@@ -1170,15 +1456,16 @@ function ThemeFolder({
             : `${added} de ${files.length} carregadas — ${plural(errors.length, "falhou", "falharam")}.`,
           "error",
         );
+      } else if (added === 0 && jaLaEstavam > 0) {
+        toast(`Nada a adicionar —${cauda}`, "info");
       } else {
         toast(
-          `${plural(added, "foto adicionada", "fotos adicionadas")} a "${theme.name}".`,
+          `${plural(added, "foto adicionada", "fotos adicionadas")} a "${theme.name}".${cauda}`,
           "success",
         );
       }
     } finally {
       if (alive.current) {
-        setUploadingCount((n) => Math.max(0, n - 1));
         // Só o último lote apaga o contador: `done === total` só acontece
         // quando já não falta nenhum ficheiro de nenhum dos lotes.
         setProgress((p) => (p && p.done >= p.total ? null : p));
@@ -1335,6 +1622,29 @@ function ThemeFolder({
     if (again.length === 0) return;
     setFailed([]);
     upload(again);
+  }
+
+  /**
+   * "ADICIONAR MESMO ASSIM" — a marcha-atrás de um clique.
+   *
+   * Sobe as saltadas com `force`, e o servidor guarda-as com `<resumo>-<4 hex>`.
+   * O sufixo é a razão pela qual o analisador de nomes o descarta: uma cópia
+   * forçada CONTINUA a contar como "esta foto está no tema" para o arrasto
+   * seguinte, em vez de abrir um buraco permanente no índice.
+   *
+   * É por LOTE, no relatório — nunca uma pergunta por foto. E é a recuperação
+   * de todos os modos de falha do índice, que é por isso que o relatório tem de
+   * ser accionável e não decorativo.
+   */
+  function addSkippedAnyway() {
+    if (skipped.length === 0) return;
+    // Os resumos já foram calculados na verificação — não se voltam a ler os
+    // ficheiros, e vão com as fotos para o nome forçado os preservar.
+    const hashOf = new Map<File, string>();
+    for (const s of skipped) if (s.hash) hashOf.set(s.file, s.hash);
+    const again = skipped.map((s) => s.file);
+    setSkipped([]);
+    upload(again, { hashOf });
   }
 
   function pick(list: FileList | File[] | null) {
@@ -1552,6 +1862,56 @@ function ThemeFolder({
   }
 
   /**
+   * O que fazer com a grelha depois de levar fotos para outro tema.
+   *
+   * SEM REMOÇÃO OTIMISTA, ao contrário do `removeImages`: aqui já houve barra
+   * de progresso a explicar a espera, por isso a grelha só perde as fotos que o
+   * servidor CONFIRMOU — e assim não é preciso código de reversão nenhum (o
+   * `reinsertAt` não entra nisto).
+   *
+   * As que falharam e as que já lá estavam ficam SELECIONADAS: é o padrão que o
+   * `ThemePicker` já usa ("o que falhou volta a ser a seleção"), e evita que
+   * repetir a operação obrigue a escolher tudo de novo.
+   */
+  function applyCopyOutcome(r: ThemeCopyOutcome) {
+    setCopyOpen(false);
+    if (r.copied.length > 0) onCopiedTo(r.destId, r.copied.length);
+    if (r.mode === "mover" && r.copied.length > 0) {
+      const gone = new Set(r.copied);
+      setImages((prev) => prev.filter((im) => !gone.has(im.path)));
+      setTotal((t) => (t === null ? null : Math.max(0, t - r.copied.length)));
+      // A capa que saiu deixa de o ser: o servidor já a limpou na origem.
+      setCoverPath((c) => (c && gone.has(c) ? undefined : c));
+      anchor.current = null;
+    }
+    const stuck = new Set([...r.failed, ...r.existing]);
+    setSelected((prev) => new Set([...prev].filter((p) => stuck.has(p))));
+
+    // O cartão vermelho fica no ecrã enquanto houver fotos por levar; um
+    // número em que ela precisa de agir não pode desaparecer como um aviso.
+    setCopyReport(r.failed.length > 0 || r.stopped ? r : null);
+    if (r.failed.length > 0 || r.stopped) return;
+
+    const verbo = r.mode === "copiar" ? "copiadas" : "movidas";
+    const cauda = r.existing.length > 0 ? ` — ${r.existing.length} já lá estavam.` : ".";
+    toast(
+      r.copied.length === 0
+        ? `Estas fotos já estavam todas em "${r.destName}".`
+        : `${plural(r.copied.length, `foto ${verbo.slice(0, -1)}`, `fotos ${verbo}`)} para "${r.destName}"${cauda}`,
+      "success",
+    );
+    // Sem miniatura, o tema de destino passa a puxar ORIGINAIS (medido: 164 MB
+    // por página de 60, contra 1,78 MB). Se acontecer em massa ela tem de saber
+    // porquê — senão vê o tema a arrastar-se e não faz ideia da razão.
+    if (r.thumbsMissing > 0) {
+      toast(
+        `${plural(r.thumbsMissing, "foto chegou", "fotos chegaram")} a "${r.destName}" sem miniatura. Abra esse tema e use "Gerar miniaturas em falta".`,
+        "info",
+      );
+    }
+  }
+
+  /**
    * Fixa a ordem que está à vista.
    *
    * Guarda-se o que ESTÁ carregado (cortado no teto do servidor): essas fotos
@@ -1697,6 +2057,9 @@ function ThemeFolder({
       ? `${images.length} de ${photoCountLabel(total, truncated)}`
       : photoCountLabel(total ?? 0, truncated);
   const selectedCount = selected.size;
+  /** Há para onde levar fotos? Sem outro tema, "Copiar para…" seria um botão
+   *  que só sabe abrir um diálogo vazio. */
+  const otherThemes = useMemo(() => themes.filter((t) => t.id !== theme.id), [themes, theme.id]);
   // Ver uma foto em grande. `null` = fechado. Guarda-se também o elemento que
   // estava focado, para o foco voltar ao mosaico de onde se abriu.
   const [zoomAt, setZoomAt] = useState<number | null>(null);
@@ -1821,6 +2184,22 @@ function ThemeFolder({
           e.target.value = "";
         }}
       />
+
+      {/* A VERIFICAR — a fase que acontece ANTES de preparar seja o que for.
+          Curta (medido: ~16 ms por foto, quatro em voo) mas não pode ser
+          silenciosa: sem isto, um arrasto de 300 fotos ficava um segundo e
+          meio aparentemente parado antes de a primeira entrar na grelha. */}
+      {verifying && (
+        <Card padding="sm" className="mb-4">
+          <p className="text-sm text-foreground/80">
+            A verificar {plural(verifying.total, "foto", "fotos")} — {verifying.done} de{" "}
+            {verifying.total}…
+          </p>
+          <p className="bo-text-muted mt-1 text-xs">
+            A ver quais já estão neste tema, para não as carregar outra vez.
+          </p>
+        </Card>
+      )}
 
       {progress && (
         <Card padding="sm" className="mb-4">
@@ -1947,6 +2326,97 @@ function ThemeFolder({
         </Card>
       )}
 
+      {/* JÁ ESTAVAM NO TEMA — a caixa tem a forma da do "tentar novamente", mas
+          NEUTRA: isto não é uma avaria, é o que ela pediu a acontecer. Um só
+          botão, e por LOTE: nunca uma pergunta foto a foto. */}
+      {skipped.length > 0 && (
+        <Card padding="sm" className="mb-4">
+          <p className="text-sm text-foreground/80">
+            {plural(skipped.length, "foto não foi adicionada", "fotos não foram adicionadas")} —{" "}
+            {skipped.some((s) => s.reason === "no-tema") &&
+            skipped.some((s) => s.reason === "no-lote")
+              ? "já estavam neste tema ou vinham repetidas no mesmo arrasto"
+              : skipped[0].reason === "no-lote"
+                ? "vinham repetidas dentro do mesmo arrasto"
+                : `já ${skipped.length === 1 ? "estava" : "estavam"} em “${theme.name}”`}
+            .
+          </p>
+          {legacyPhotos && (
+            <p className="bo-text-muted mt-1 text-xs">
+              As fotos carregadas antes desta funcionalidade nem sempre podem ser reconhecidas.
+            </p>
+          )}
+          {partialCheck && (
+            <p className="bo-text-muted mt-1 text-xs">
+              Não foi possível ver a pasta toda desta vez — pode ter escapado alguma repetida.
+            </p>
+          )}
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {skipped.slice(0, SKIPPED_PREVIEWS).map((s, i) => (
+              <li
+                key={`${s.file.name}-${i}`}
+                title={`${s.file.name} — ${
+                  s.reason === "no-lote" ? "repetida neste arrasto" : "já estava no tema"
+                }`}
+                className="h-14 w-14 overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]"
+              >
+                <SkippedThumb file={s.file} track={trackUrl} />
+              </li>
+            ))}
+          </ul>
+          {skipped.length > SKIPPED_PREVIEWS && (
+            <p className="bo-text-muted mt-2 text-xs">
+              …e mais {skipped.length - SKIPPED_PREVIEWS}.
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={addSkippedAnyway}>
+              Adicionar mesmo assim
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSkipped([])}>
+              Descartar
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* O QUE NÃO FOI LEVADO para outro tema. Vermelho e persistente: é um
+          número em que ela tem de agir, e as fotos continuam aqui. */}
+      {copyReport && (
+        <Card padding="sm" className="mb-4 border-[#8a2a22]/25 bg-[#f6e6df]/40">
+          <p className="text-sm text-foreground/80">
+            {copyReport.failed.length > 0
+              ? `${copyReport.failed.length} de ${
+                  copyReport.copied.length + copyReport.existing.length + copyReport.failed.length
+                } ${
+                  copyReport.failed.length === 1
+                    ? copyReport.mode === "copiar"
+                      ? "não foi copiada"
+                      : "não foi movida"
+                    : copyReport.mode === "copiar"
+                      ? "não foram copiadas"
+                      : "não foram movidas"
+                } para “${copyReport.destName}”.`
+              : `Parou a meio — ${plural(copyReport.copied.length, "foto foi", "fotos foram")} para “${copyReport.destName}”.`}
+          </p>
+          <p className="bo-text-muted mt-1 text-xs">
+            {copyReport.failed.length > 0
+              ? "Continuam neste tema e ficaram selecionadas — pode tentar outra vez sem as escolher de novo."
+              : "As que faltavam continuam neste tema."}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {selectedCount > 0 && (
+              <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+                Tentar novamente
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setCopyReport(null)}>
+              Descartar
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {selectedCount > 0 && (
         <div className="sticky top-2 z-20 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
           <p className="text-sm text-foreground/85">
@@ -1968,6 +2438,15 @@ function ThemeFolder({
                 Definir como capa
               </Button>
             )}
+            {/* ⚠️ "Transferir", aqui ao lado, já significa DESCARREGAR. Esta
+                ação chama-se "Copiar para…" — a palavra transferir está
+                proibida para ela, senão passam a existir dois significados no
+                mesmo sítio. Só aparece havendo outro tema para onde levar. */}
+            {otherThemes.length > 0 && (
+              <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+                Copiar para…
+              </Button>
+            )}
             <Button size="sm" variant="secondary" loading={downloading} onClick={downloadSelected}>
               Transferir
             </Button>
@@ -1979,6 +2458,18 @@ function ThemeFolder({
             </Button>
           </div>
         </div>
+      )}
+
+      {copyOpen && (
+        <ThemeCopyDialog
+          sourceTheme={theme}
+          themes={themes}
+          // Pela ordem da GRELHA, não pela ordem por que ela clicou: é assim
+          // que a lista do relatório se lê como a grelha se vê.
+          paths={images.filter((im) => selected.has(im.path)).map((im) => im.path)}
+          onClose={() => setCopyOpen(false)}
+          onDone={applyCopyOutcome}
+        />
       )}
 
       {zoomAt !== null && images[zoomAt] && (

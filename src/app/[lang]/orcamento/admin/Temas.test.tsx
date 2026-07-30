@@ -2,7 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
-import { THEME_PAGE_SIZE } from "@/lib/theme-types";
+import {
+  CHECK_CHUNK,
+  MAX_THEME_COPY_BATCH,
+  THEME_COPY_CHUNK,
+  THEME_PAGE_SIZE,
+} from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
 import Temas, { mergePage, moveItem, reinsertAt } from "./Temas";
 
@@ -23,6 +28,42 @@ import Temas, { mergePage, moveItem, reinsertAt } from "./Temas";
 
 const prepare = vi.hoisted(() => vi.fn());
 vi.mock("./image-prep", () => ({ prepareImageWithThumb: prepare }));
+
+/**
+ * A IMPRESSÃO DIGITAL, encenada — e pela mesma razão por que a preparação da
+ * imagem também é.
+ *
+ * A real (`crypto.subtle.digest` sobre o ficheiro inteiro) resolve-se FORA do
+ * ciclo de microtarefas: o `arrayBuffer()` e o resumo terminam quando o
+ * browser quiser, e isso tornava estes testes dependentes do relógio — os
+ * mesmos testes passavam sozinhos e falhavam em conjunto. O resumo verdadeiro
+ * está fixado à parte, em `src/lib/theme-fingerprint.test.ts`, com o
+ * `crypto.subtle` a sério; aqui o que se está a provar é OUTRA coisa (o que o
+ * ecrã FAZ com o veredicto), por isso o resumo é uma função do CONTEÚDO
+ * declarado de cada ficheiro de mentira — que é a propriedade que interessa:
+ * bytes iguais, resumo igual.
+ */
+const fp = vi.hoisted(() => ({
+  /** `ficheiro → conteúdo`, preenchido pelos construtores de fotos falsas. */
+  content: new WeakMap<File, string>(),
+  hash: (s: string) => {
+    // Um resumo qualquer, desde que seja 32 hex e função só do conteúdo.
+    let a = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) a = Math.imul(a ^ s.charCodeAt(i), 0x01000193) >>> 0;
+    return a.toString(16).padStart(8, "0").repeat(4);
+  },
+}));
+vi.mock("@/lib/theme-fingerprint", async () => {
+  const real =
+    await vi.importActual<typeof import("@/lib/theme-fingerprint")>("@/lib/theme-fingerprint");
+  return {
+    ...real,
+    fingerprintBlob: async (blob: Blob) => {
+      const c = blob instanceof File ? fp.content.get(blob) : undefined;
+      return c === undefined ? null : fp.hash(c);
+    },
+  };
+});
 
 // ── Servidor de mentira ────────────────────────────────────────────────────
 // Cada rota responde por `MÉTODO /caminho` (sem query string). Uma rota pode
@@ -103,7 +144,27 @@ const photo = (n: number, thumb = false): ThemeImage => ({
 });
 const many = (from: number, count: number, thumb = false) =>
   Array.from({ length: count }, (_, i) => photo(from + i, thumb));
-const jpg = (name: string) => new File(["x"], name, { type: "image/jpeg" });
+/**
+ * Uma foto de mentira. O CONTEÚDO é o nome, e não uma constante: desde que a
+ * biblioteca reconhece fotos repetidas pelo resumo do ficheiro (SHA-256 do
+ * original), dois ficheiros com os mesmos bytes SÃO a mesma foto — e um lote de
+ * dez `new File(["x"])` seria corretamente reduzido a uma. Nomes distintos =
+ * fotos distintas, que é o que quase todos estes testes querem dizer.
+ */
+const jpg = (name: string) => withContent(new File([name], name, { type: "image/jpeg" }), name);
+
+/** A MESMA foto, com outro nome de ficheiro — o caso real de ela arrastar duas
+ *  cópias do mesmo ficheiro. O resumo é do CONTEÚDO, não do nome. */
+const sameAs = (file: File, name: string) =>
+  withContent(
+    new File([fp.content.get(file) ?? ""], name, { type: "image/jpeg" }),
+    fp.content.get(file) ?? "",
+  );
+
+function withContent(file: File, content: string): File {
+  fp.content.set(file, content);
+  return file;
+}
 
 const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
 const dropZone = () => document.querySelector("div.border-dashed") as HTMLElement;
@@ -158,11 +219,28 @@ async function openFolder(name: RegExp) {
   await settlePhotos();
 }
 
+/**
+ * Deixa a fase de VERIFICAÇÃO assentar.
+ *
+ * Antes de qualquer preparação ou upload, o lote é resumido e confrontado com
+ * a pasta (`POST /repetidas`, um pedido por pedaço de 50). São mais algumas
+ * voltas de microtarefas do que antes desta funcionalidade, e é por isso que
+ * um só `act` deixou de chegar para o primeiro carregamento sair.
+ */
+async function settleScreening() {
+  for (let i = 0; i < 6; i++) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+}
+
 /** Larga fotos no seletor de ficheiros (o botão "Adicionar fotos"). */
 async function chooseFiles(...files: File[]) {
   await act(async () => {
     fireEvent.change(fileInput(), { target: { files } });
   });
+  await settleScreening();
 }
 
 /** Larga fotos por arrasto — o caminho que continua aberto enquanto o botão
@@ -171,6 +249,7 @@ async function dropFiles(...files: File[]) {
   await act(async () => {
     fireEvent.drop(dropZone(), { dataTransfer: { files } });
   });
+  await settleScreening();
 }
 
 beforeEach(() => {
@@ -1091,5 +1170,412 @@ describe("ajudantes puros da grelha", () => {
   it("reinsertAt aguenta um índice que já não existe na lista encolhida", () => {
     const positions = new Map([[c.path, 9]]);
     expect(reinsertAt([a], [c], positions)).toEqual([a, c]);
+  });
+});
+
+// ── NÃO REPETIR FOTOS QUE JÁ ESTÃO NO TEMA ─────────────────────────────────
+//
+// O pedido dela, pelas palavras dela: "quando eu adicionar fotos ele perceber
+// se já aquela foto no tema e adicionar só as que ainda não estão". O que aqui
+// se fixa é o que separa isso de fazer desaparecer uma foto boa em silêncio.
+
+describe("Biblioteca de Temas — fotos que já lá estão", () => {
+  /** O tema já tem estas fotos (a rota de pré-verificação responde por elas). */
+  function themeKnows(...files: File[]) {
+    const known = new Set(files.map((f) => fp.hash(fp.content.get(f) ?? "")));
+    route("POST /api/temas/t1/repetidas", () => {
+      const last = requests.filter(
+        (r) => routeKey(r.url, r.init) === "POST /api/temas/t1/repetidas",
+      );
+      const asked: string[] = JSON.parse(String(last[last.length - 1].init?.body ?? "{}")).hashes;
+      return ok({
+        ok: true,
+        known: asked.filter((h) => known.has(h)),
+        complete: true,
+        legacy: false,
+        read: true,
+      });
+    });
+  }
+
+  function serveUploads() {
+    let n = 0;
+    route("POST /api/temas/t1/imagens", () => {
+      n += 1;
+      return ok({ ok: true, images: [photo(100 + n)], duplicates: [] });
+    });
+  }
+
+  beforeEach(() => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: [], total: 0 }));
+    route("POST /api/temas/t1/repetidas", () =>
+      ok({ ok: true, known: [], complete: true, legacy: false, read: true }),
+    );
+    serveUploads();
+  });
+
+  it("O PEDIDO: das que ela larga, só sobem as que ainda não estão no tema", async () => {
+    const ja = jpg("praia.jpg");
+    const nova = jpg("mesa.jpg");
+    themeKnows(ja);
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(ja, nova);
+
+    // Uma só subiu — e a repetida nem chegou a ser PREPARADA (é o que poupa os
+    // 383 ms por foto, contra os 16 ms que custa resumi-la).
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(1);
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(prepare).toHaveBeenCalledWith(nova, "cover");
+  });
+
+  it("o resumo do ficheiro viaja com a foto que sobe", async () => {
+    const nova = jpg("mesa.jpg");
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(nova);
+
+    const body = requests.find((r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens")
+      ?.init?.body as FormData;
+    expect(body.get("hashes")).toBe(fp.hash("mesa.jpg"));
+    expect(body.get("force")).toBeNull();
+  });
+
+  it("A MESMA FOTO DUAS VEZES NO MESMO LOTE entra uma só vez", async () => {
+    // A pré-verificação nunca as apanharia: ainda não estão na pasta.
+    const a = jpg("praia.jpg");
+    const copia = sameAs(a, "praia (1).jpg");
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(a, copia, jpg("outra.jpg"));
+
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(2);
+    expect(screen.getByText(/não foi adicionada|não foram adicionadas/)).toBeInTheDocument();
+    expect(screen.getByText(/repetidas dentro do mesmo arrasto/)).toBeInTheDocument();
+  });
+
+  it("LOTE METADE REPETIDO: a conta que ela lê é verdadeira", async () => {
+    const velhas = Array.from({ length: 3 }, (_, i) => jpg(`velha-${i}.jpg`));
+    const novas = Array.from({ length: 3 }, (_, i) => jpg(`nova-${i}.jpg`));
+    themeKnows(...velhas);
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(...velhas, ...novas);
+
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(3);
+    expect(screen.getByText(/3 fotos não foram adicionadas/)).toBeInTheDocument();
+    expect(screen.getByText(/já estavam em/)).toBeInTheDocument();
+  });
+
+  it("TODAS REPETIDAS não é uma barra a andar e nada a acontecer", async () => {
+    // Sem esta frase ela vê o progresso mexer, a grelha na mesma, e conclui
+    // que o site está avariado.
+    const velhas = Array.from({ length: 3 }, (_, i) => jpg(`velha-${i}.jpg`));
+    themeKnows(...velhas);
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(...velhas);
+
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(0);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(screen.getByText(/3 fotos não foram adicionadas/)).toBeInTheDocument();
+  });
+
+  it("'Adicionar mesmo assim' volta a subi-las, agora com force", async () => {
+    const ja = jpg("praia.jpg");
+    themeKnows(ja);
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(ja);
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar mesmo assim" }));
+    await settleScreening();
+    await act(async () => {});
+
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(1);
+    const body = requests.find((r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens")
+      ?.init?.body as FormData;
+    expect(body.get("force")).toBe("1");
+    // O RESUMO VAI NA MESMA. Sem ele o servidor cunhava um UUID e esta foto
+    // deixava de contar como "está no tema" — um buraco permanente no índice
+    // por cada clique em "Adicionar mesmo assim".
+    expect(body.get("hashes")).toBe(fp.hash("praia.jpg"));
+    // Forçar não volta a perguntar à pasta: é uma decisão dela, já tomada.
+    expect(callsTo("POST /api/temas/t1/repetidas")).toBe(1);
+    expect(screen.queryByRole("button", { name: "Adicionar mesmo assim" })).toBeNull();
+  });
+
+  it("uma repetida apanhada PELO SERVIDOR conta como as outras", async () => {
+    // A corrida (dois separadores) e a foto antiga de nome UUID só aparecem
+    // aqui — o relatório é do que ACONTECEU, não do que se previu.
+    route("POST /api/temas/t1/imagens", () =>
+      ok({
+        ok: true,
+        images: [],
+        duplicates: [{ name: "praia.jpg", path: "t1/velha.jpg", reason: "no-tema" }],
+      }),
+    );
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(jpg("praia.jpg"));
+
+    expect(screen.getByText(/1 foto não foi adicionada/)).toBeInTheDocument();
+    // E NÃO é um erro: nada de caixa vermelha nem de "tentar novamente".
+    expect(screen.queryByRole("button", { name: "Tentar novamente" })).toBeNull();
+    // A grelha continua vazia — a miniatura que se vê é a do painel das
+    // saltadas, desenhada do ficheiro que está no computador dela.
+    expect(screen.queryByRole("button", { name: /Remover foto/ })).toBeNull();
+    expect(screen.queryByText("A carregar")).toBeNull();
+  });
+
+  it("a pasta ilegível não trava o carregamento — sobe tudo", async () => {
+    // `read: false` = não se pôde verificar. Dizer "nenhuma repetida" seria
+    // prometer uma verificação que não aconteceu; travar seria pior ainda.
+    route("POST /api/temas/t1/repetidas", () => bad(503, { error: "Armazenamento indisponível." }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(jpg("a.jpg"), jpg("b.jpg"));
+
+    expect(callsTo("POST /api/temas/t1/imagens")).toBe(2);
+    expect(screen.queryByText(/não foram adicionadas/)).toBeNull();
+  });
+
+  it("diz uma vez, sem drama, que as fotos antigas nem sempre são reconhecidas", async () => {
+    const ja = jpg("praia.jpg");
+    const known = new Set([fp.hash("praia.jpg")]);
+    route("POST /api/temas/t1/repetidas", () => {
+      const last = requests.filter(
+        (r) => routeKey(r.url, r.init) === "POST /api/temas/t1/repetidas",
+      );
+      const asked: string[] = JSON.parse(String(last[last.length - 1].init?.body ?? "{}")).hashes;
+      return ok({
+        ok: true,
+        known: asked.filter((h) => known.has(h)),
+        complete: true,
+        legacy: true,
+        read: true,
+      });
+    });
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(ja);
+
+    expect(screen.getByText(/nem sempre podem ser reconhecidas/)).toBeInTheDocument();
+  });
+
+  it("pergunta à pasta em pedaços, não o arrasto todo de uma vez", async () => {
+    // Em pedaços, a primeira foto começa a subir ao fim de ~0,3 s em vez de
+    // ~2 s num arrasto de 300.
+    const files = Array.from({ length: CHECK_CHUNK + 5 }, (_, i) => jpg(`f${i}.jpg`));
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await chooseFiles(...files);
+    expect(callsTo("POST /api/temas/t1/repetidas")).toBe(2);
+  });
+});
+
+// ── LEVAR FOTOS DE UM TEMA PARA OUTRO ──────────────────────────────────────
+
+describe("Biblioteca de Temas — copiar e mover fotos entre temas", () => {
+  const OUTRO: ThemeSummary = {
+    ...THEME,
+    id: "t2",
+    name: "Itália",
+    imageCount: 7,
+  };
+  const cinco = { ok: true, images: many(1, 5), total: 5 };
+
+  /** Abre o diálogo com as fotos `n` selecionadas (índices 1-based da grelha). */
+  async function selectAndOpen(...indices: number[]) {
+    for (const i of indices) {
+      fireEvent.click(screen.getByRole("checkbox", { name: `Selecionar foto ${i} de 5` }));
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copiar para…" }));
+    });
+  }
+
+  it("o botão só existe havendo outro tema para onde levar", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok(cinco));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 5" }));
+
+    expect(screen.queryByRole("button", { name: "Copiar para…" })).toBeNull();
+    // A palavra "Transferir" continua a significar DESCARREGAR nesta barra.
+    expect(screen.getByRole("button", { name: "Transferir" })).toBeInTheDocument();
+  });
+
+  it("copia sem mexer na grelha e soma no cartão do destino", async () => {
+    route("GET /api/temas", () => ok([THEME, OUTRO]));
+    route("GET /api/temas/t1/imagens", () => ok(cinco));
+    route("POST /api/temas/t1/imagens/copiar", () =>
+      ok({
+        ok: true,
+        copied: [
+          { from: "t1/foto-1.jpg", to: "t2/foto-1.jpg" },
+          { from: "t1/foto-2.jpg", to: "t2/foto-2.jpg" },
+        ],
+        existing: [],
+        failed: [],
+        requested: 2,
+        thumbsMissing: 0,
+      }),
+    );
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await selectAndOpen(1, 2);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Copiar 2 fotos$/ }));
+    });
+
+    const body = JSON.parse(
+      String(
+        requests.find((r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens/copiar")?.init
+          ?.body,
+      ),
+    );
+    expect(body).toEqual({
+      paths: ["t1/foto-1.jpg", "t1/foto-2.jpg"],
+      destino: "t2",
+      modo: "copiar",
+    });
+    // Copiar não tira nada daqui.
+    expect(photos()).toHaveLength(5);
+
+    // O cartão do destino já conta com elas.
+    fireEvent.click(screen.getByRole("button", { name: "← Temas" }));
+    expect(await screen.findByText("9 fotos")).toBeInTheDocument();
+  });
+
+  it("mover tira da grelha SÓ as que o servidor confirmou", async () => {
+    route("GET /api/temas", () => ok([THEME, OUTRO]));
+    route("GET /api/temas/t1/imagens", () => ok(cinco));
+    route("POST /api/temas/t1/imagens/copiar", () =>
+      ok({
+        ok: true,
+        copied: [{ from: "t1/foto-1.jpg", to: "t2/foto-1.jpg" }],
+        existing: [],
+        failed: ["t1/foto-2.jpg"],
+        requested: 2,
+        thumbsMissing: 0,
+      }),
+    );
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await selectAndOpen(1, 2);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Mover" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Mover 2 fotos$/ }));
+    });
+    await settlePhotos();
+
+    // A que saiu desapareceu; a que falhou continua aqui.
+    expect(photos()).toHaveLength(4);
+    expect(photos()).not.toContain(photo(1).url);
+    expect(photos()).toContain(photo(2).url);
+    // E continua SELECIONADA, para não ser preciso escolher tudo de novo.
+    expect(screen.getByText("1 foto selecionada")).toBeInTheDocument();
+    expect(screen.getByText(/1 de 2 não foi movida para/)).toBeInTheDocument();
+  });
+
+  it("'já lá estava' não é um erro e não aparece a vermelho", async () => {
+    route("GET /api/temas", () => ok([THEME, OUTRO]));
+    route("GET /api/temas/t1/imagens", () => ok(cinco));
+    route("POST /api/temas/t1/imagens/copiar", () =>
+      ok({
+        ok: true,
+        copied: [{ from: "t1/foto-1.jpg", to: "t2/foto-1.jpg" }],
+        existing: ["t1/foto-2.jpg"],
+        failed: [],
+        requested: 2,
+        thumbsMissing: 0,
+      }),
+    );
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await selectAndOpen(1, 2);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Copiar 2 fotos$/ }));
+    });
+
+    expect(screen.queryByRole("button", { name: "Tentar novamente" })).toBeNull();
+    expect(screen.getByText(/1 já lá estavam|1 foto copiada/)).toBeInTheDocument();
+  });
+
+  it("um lote grande é partido em pedidos que cabem no teto do servidor", async () => {
+    const grande = { ok: true, images: many(1, THEME_PAGE_SIZE), total: THEME_PAGE_SIZE };
+    route("GET /api/temas", () => ok([THEME, OUTRO]));
+    route("GET /api/temas/t1/imagens", () => ok(grande));
+    route("POST /api/temas/t1/imagens/copiar", () => {
+      const last = requests.filter(
+        (r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens/copiar",
+      );
+      const paths: string[] = JSON.parse(String(last[last.length - 1].init?.body ?? "{}")).paths;
+      return ok({
+        ok: true,
+        copied: paths.map((p) => ({ from: p, to: p.replace("t1/", "t2/") })),
+        existing: [],
+        failed: [],
+        requested: paths.length,
+        thumbsMissing: 0,
+      });
+    });
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 60" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 60 de 60" }), {
+      shiftKey: true,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copiar para…" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Copiar 60 fotos$/ }));
+    });
+
+    // 60 fotos em lotes de THEME_COPY_CHUNK, e nenhum acima do teto da rota.
+    const bodies = requests
+      .filter((r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens/copiar")
+      .map((r) => JSON.parse(String(r.init?.body)).paths.length);
+    expect(bodies).toEqual([THEME_COPY_CHUNK, THEME_COPY_CHUNK, THEME_COPY_CHUNK]);
+    expect(Math.max(...bodies)).toBeLessThanOrEqual(MAX_THEME_COPY_BATCH);
+  });
+
+  it("uma cópia que falha inteira deixa as fotos onde estavam", async () => {
+    route("GET /api/temas", () => ok([THEME, OUTRO]));
+    route("GET /api/temas/t1/imagens", () => ok(cinco));
+    route("POST /api/temas/t1/imagens/copiar", () =>
+      bad(502, { error: "Não foi possível copiar as fotos." }),
+    );
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    await selectAndOpen(1);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Copiar 1 foto$/ }));
+    });
+
+    // O diálogo fica aberto, com a razão à vista — e a grelha intacta.
+    expect(screen.getByText("Não foi possível copiar as fotos.")).toBeInTheDocument();
+    expect(photos()).toHaveLength(5);
   });
 });

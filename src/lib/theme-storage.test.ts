@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createHash } from "node:crypto";
 import {
   isThemePath,
   planOrderedPage,
@@ -49,6 +50,7 @@ const st = vi.hoisted(() => ({
   signed: vi.fn(),
   signOne: vi.fn(),
   copy: vi.fn(),
+  move: vi.fn(),
   download: vi.fn(),
   upload: vi.fn(),
   thumbList: vi.fn(),
@@ -56,6 +58,11 @@ const st = vi.hoisted(() => ({
   thumbSigned: vi.fn(),
   thumbSignOne: vi.fn(),
   thumbUpload: vi.fn(),
+  // A miniatura acompanha a foto na cópia/mudança entre temas — mesma chave,
+  // outro bucket. Tem duplos PRÓPRIOS para se poder provar que a falha dela
+  // não muda o resultado da operação.
+  thumbCopy: vi.fn(),
+  thumbMove: vi.fn(),
   // ── Carregamento DIRETO ──────────────────────────────────────────────
   /** Esta instalação sabe emitir URLs de carregamento? Um Supabase antigo
    *  não sabe, e é isso que faz o cliente cair para o multipart. */
@@ -90,7 +97,8 @@ vi.mock("./supabase", () => {
       remove: thumbs ? st.thumbRemove : st.remove,
       createSignedUrls: thumbs ? st.thumbSigned : st.signed,
       createSignedUrl: thumbs ? st.thumbSignOne : st.signOne,
-      copy: st.copy,
+      copy: thumbs ? st.thumbCopy : st.copy,
+      move: thumbs ? st.thumbMove : st.move,
       download: st.download,
       upload: thumbs ? st.thumbUpload : st.upload,
       ...(st.hasUploadUrlApi
@@ -173,6 +181,9 @@ beforeEach(() => {
     error: null,
   }));
   st.copy.mockResolvedValue({ data: { path: "copiado" }, error: null });
+  st.move.mockResolvedValue({ data: { message: "movido" }, error: null });
+  st.thumbCopy.mockResolvedValue({ data: { path: "copiado" }, error: null });
+  st.thumbMove.mockResolvedValue({ data: { message: "movido" }, error: null });
   st.download.mockResolvedValue({
     data: { arrayBuffer: async () => new TextEncoder().encode("foto").buffer },
     error: null,
@@ -505,10 +516,11 @@ describe("miniaturas", () => {
       bytes: Buffer.from("mini"),
       contentType: "image/jpeg",
     });
-    expect(res?.path).toMatch(/^t-1\/[0-9a-f-]+\.jpg$/);
-    expect(res?.thumbUrl).toBe(`https://thumb/${res?.path}`);
+    const image = res?.kind === "created" ? res.image : null;
+    expect(image?.path).toMatch(/^t-1\/[0-9a-f-]+\.jpg$/);
+    expect(image?.thumbUrl).toBe(`https://thumb/${image?.path}`);
     expect(st.thumbUpload).toHaveBeenCalledWith(
-      res?.path,
+      image?.path,
       expect.any(Buffer),
       expect.objectContaining({ contentType: "image/jpeg" }),
     );
@@ -534,8 +546,9 @@ describe("miniaturas", () => {
       bytes: Buffer.from("mini"),
       contentType: "image/jpeg",
     });
-    expect(res?.url).toBeTruthy();
-    expect(res?.thumbUrl).toBeUndefined();
+    const image = res?.kind === "created" ? res.image : null;
+    expect(image?.url).toBeTruthy();
+    expect(image?.thumbUrl).toBeUndefined();
   });
 
   it("sem miniatura enviada não se toca no bucket das miniaturas", async () => {
@@ -884,5 +897,374 @@ describe("planOrderedPage", () => {
       storageSkip: 120,
       needFromStorage: 60,
     });
+  });
+});
+
+// ── NÃO REPETIR FOTOS QUE JÁ ESTÃO NO TEMA ─────────────────────────────────
+//
+// A identidade de uma foto é o resumo do ficheiro ORIGINAL, guardado no NOME
+// (`<tema>/<32 hex>.jpg`). O índice de repetidas é derivado da MESMA listagem
+// que a contagem já faz — não há segunda lista a manter. Um furo aqui não dá
+// um erro: dá uma foto BOA que desaparece em silêncio.
+
+/** Uma página de listagem com eTag por objeto (é dele que sai o MD5). */
+function pageWithETags(items: { name: string; etag?: string }[]) {
+  return {
+    data: items.map(({ name, etag }) => ({
+      id: `id-${name}`,
+      name,
+      metadata: etag ? { eTag: `"${etag}"` } : null,
+    })),
+    error: null,
+  };
+}
+
+const HASH_A = "0123456789abcdef0123456789abcdef";
+const HASH_B = "fedcba9876543210fedcba9876543210";
+const UUID_ANTIGO = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
+
+describe("readThemeFingerprints", () => {
+  it("lê os resumos dos NOMES e os MD5 dos eTags, numa só passagem pela pasta", async () => {
+    st.list.mockResolvedValue(
+      pageWithETags([
+        { name: `${HASH_A}.jpg`, etag: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        { name: `${UUID_ANTIGO}.jpg`, etag: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      ]),
+    );
+    const { readThemeFingerprints } = await load();
+    const index = await readThemeFingerprints("t-1");
+
+    expect([...index.hashes]).toEqual([HASH_A]);
+    expect(index.md5s.get("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")).toBe(`t-1/${UUID_ANTIGO}.jpg`);
+    expect(index.ok).toBe(true);
+    expect(index.complete).toBe(true);
+    // A biblioteca antiga (nome UUID) está lá: a UI tem de o poder dizer.
+    expect(index.legacy).toBe(true);
+    // Zero assinaturas: o passo caro não acontece a construir um índice.
+    expect(st.signed).not.toHaveBeenCalled();
+  });
+
+  it("um tema só com nomes de resumo não é 'legado'", async () => {
+    st.list.mockResolvedValue(
+      pageWithETags([{ name: `${HASH_A}.jpg` }, { name: `${HASH_B}.png` }]),
+    );
+    const { readThemeFingerprints } = await load();
+    const index = await readThemeFingerprints("t-1");
+    expect(index.legacy).toBe(false);
+    expect(index.hashes.size).toBe(2);
+  });
+
+  it("uma pasta ILEGÍVEL não é 'sem repetidas'", async () => {
+    // Dizer "nenhuma repetida" faria a UI prometer uma verificação que não
+    // aconteceu — e o guarda da escrita deixaria de ter quem o explicasse.
+    st.list.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const { readThemeFingerprints } = await load();
+    const index = await readThemeFingerprints("t-1");
+    expect(index.ok).toBe(false);
+    expect(index.hashes.size).toBe(0);
+  });
+
+  it("acima do teto de páginas o índice sai INCOMPLETO, não errado", async () => {
+    // 20 páginas de 1000 sempre cheias: a partir daqui é melhor esforço
+    // declarado e a UI não pode anunciar "12 já estavam".
+    st.list.mockResolvedValue(
+      pageWithETags(Array.from({ length: 1000 }, (_, i) => ({ name: `${UUID_ANTIGO}-${i}.jpg` }))),
+    );
+    const { readThemeFingerprints } = await load();
+    const index = await readThemeFingerprints("t-1");
+    expect(index.ok).toBe(true);
+    expect(index.complete).toBe(false);
+  });
+
+  it("descarta eTags que não são o MD5 do conteúdo", async () => {
+    // Um eTag de carregamento multipart traz `-<n>` e NÃO é o MD5. Casá-lo
+    // saltaria uma foto boa; descartá-lo só deixa passar uma repetida.
+    st.list.mockResolvedValue(
+      pageWithETags([
+        { name: "a.jpg", etag: "cccccccccccccccccccccccccccccccc-3" },
+        { name: "b.jpg", etag: "nao-e-um-md5" },
+      ]),
+    );
+    const { readThemeFingerprints } = await load();
+    expect((await readThemeFingerprints("t-1")).md5s.size).toBe(0);
+  });
+});
+
+describe("memória do índice de repetidas", () => {
+  it("NÃO é reconstruído a cada foto carregada — é a armadilha de desempenho", async () => {
+    // Reconstruir o índice a cada escrita transformaria um lote de 300 fotos
+    // em 300 varrimentos: num tema de 4000, 300 × 4 `list` × 120 ms ≈ 144 s de
+    // Storage desperdiçados por arrasto.
+    st.list.mockResolvedValue(pageWithETags([{ name: `${HASH_A}.jpg` }]));
+    const { readThemeFingerprints, uploadThemeImage } = await load();
+
+    await readThemeFingerprints("t-1");
+    const calls = st.list.mock.calls.length;
+
+    for (let i = 0; i < 10; i++) {
+      await uploadThemeImage("t-1", Buffer.from(`foto${i}`), "image/jpeg", undefined, {
+        fingerprint: HASH_B,
+      });
+    }
+    await readThemeFingerprints("t-1");
+
+    expect(st.list.mock.calls.length).toBe(calls);
+  });
+
+  it("mas o índice fica a saber o que acabou de ser escrito", async () => {
+    st.list.mockResolvedValue(pageWithETags([{ name: `${HASH_A}.jpg` }]));
+    const { readThemeFingerprints, uploadThemeImage } = await load();
+
+    await readThemeFingerprints("t-1");
+    await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", undefined, {
+      fingerprint: HASH_B,
+    });
+
+    expect((await readThemeFingerprints("t-1")).hashes.has(HASH_B)).toBe(true);
+  });
+
+  it("uma REMOÇÃO deita o índice fora (é o que não se sabe atualizar)", async () => {
+    st.list.mockResolvedValue(pageWithETags([{ name: `${HASH_A}.jpg` }]));
+    const { readThemeFingerprints, deleteThemeImage } = await load();
+
+    await readThemeFingerprints("t-1");
+    const calls = st.list.mock.calls.length;
+    await deleteThemeImage(`t-1/${HASH_A}.jpg`);
+    await readThemeFingerprints("t-1");
+
+    expect(st.list.mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it("cada tema tem o seu índice", async () => {
+    st.list.mockResolvedValue(pageWithETags([{ name: `${HASH_A}.jpg` }]));
+    const { readThemeFingerprints } = await load();
+    await readThemeFingerprints("t-1");
+    const calls = st.list.mock.calls.length;
+    await readThemeFingerprints("t-2");
+    expect(st.list.mock.calls.length).toBeGreaterThan(calls);
+  });
+});
+
+describe("uploadThemeImage — o nome é a identidade", () => {
+  it("guarda a foto com o resumo no nome", async () => {
+    const { uploadThemeImage } = await load();
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", undefined, {
+      fingerprint: HASH_A,
+    });
+    expect(res).toEqual({
+      kind: "created",
+      image: { path: `t-1/${HASH_A}.jpg`, url: `https://signed/t-1/${HASH_A}.jpg` },
+    });
+  });
+
+  it("sem resumo continua a ser UUID — retro-compatível, nunca recusa", async () => {
+    const { uploadThemeImage } = await load();
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg");
+    expect(res?.kind).toBe("created");
+    expect(res?.kind === "created" && res.image.path).toMatch(
+      /^t-1\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/,
+    );
+  });
+
+  it("um resumo mal formado também cai no UUID (nunca chega ao caminho)", async () => {
+    const { uploadThemeImage } = await load();
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", undefined, {
+      fingerprint: "../../etc/passwd",
+    });
+    expect(res?.kind === "created" && res.image.path).not.toContain("..");
+  });
+
+  it("o 409 do Storage vira `duplicate` — a garantia atómica, sem corrida", async () => {
+    st.upload.mockResolvedValue({ data: null, error: { statusCode: "409", message: "Duplicate" } });
+    const { uploadThemeImage } = await load();
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", undefined, {
+      fingerprint: HASH_A,
+    });
+    expect(res).toEqual({ kind: "duplicate", path: `t-1/${HASH_A}.jpg` });
+    // Nada de miniatura para uma foto que não foi escrita.
+    expect(st.thumbUpload).not.toHaveBeenCalled();
+  });
+
+  it("reconhece 'already exists' também pela frase", async () => {
+    st.upload.mockResolvedValue({
+      data: null,
+      error: { message: "The resource already exists" },
+    });
+    const { uploadThemeImage } = await load();
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", undefined, {
+      fingerprint: HASH_A,
+    });
+    expect(res?.kind).toBe("duplicate");
+  });
+
+  it("uma avaria a sério continua a ser null — não se disfarça de repetida", async () => {
+    st.upload.mockResolvedValue({ data: null, error: { statusCode: "500", message: "boom" } });
+    const { uploadThemeImage } = await load();
+    expect(
+      await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", undefined, {
+        fingerprint: HASH_A,
+      }),
+    ).toBeNull();
+  });
+
+  it("'Adicionar mesmo assim' põe sufixo — e a foto CONTINUA a contar no índice", async () => {
+    const { uploadThemeImage, readThemeFingerprints } = await load();
+    st.list.mockResolvedValue(pageWithETags([]));
+    await readThemeFingerprints("t-1");
+    const res = await uploadThemeImage("t-1", Buffer.from("foto"), "image/jpeg", undefined, {
+      fingerprint: HASH_A,
+      force: true,
+    });
+    expect(res?.kind === "created" && res.image.path).toMatch(
+      new RegExp(`^t-1/${HASH_A}-[0-9a-f]{4}\\.jpg$`),
+    );
+    // Sem isto, cada cópia forçada abria um buraco permanente no índice.
+    expect((await readThemeFingerprints("t-1")).hashes.has(HASH_A)).toBe(true);
+  });
+});
+
+describe("findThemeImageByBytes — a rede secundária da biblioteca antiga", () => {
+  /** MD5 real dos bytes, que é com o que o eTag da listagem é comparado. */
+  const md5 = (s: string) => createHash("md5").update(Buffer.from(s)).digest("hex");
+
+  it("reconhece a foto antiga pelo MD5 do conteúdo e diz QUAL é", async () => {
+    st.list.mockResolvedValue(
+      pageWithETags([{ name: `${UUID_ANTIGO}.jpg`, etag: md5("bytes-preparados") }]),
+    );
+    const { findThemeImageByBytes } = await load();
+    expect(await findThemeImageByBytes("t-1", Buffer.from("bytes-preparados"))).toBe(
+      `t-1/${UUID_ANTIGO}.jpg`,
+    );
+  });
+
+  it("bytes diferentes não casam", async () => {
+    st.list.mockResolvedValue(
+      pageWithETags([{ name: `${UUID_ANTIGO}.jpg`, etag: md5("bytes-preparados") }]),
+    );
+    const { findThemeImageByBytes } = await load();
+    expect(await findThemeImageByBytes("t-1", Buffer.from("outra-foto"))).toBeNull();
+  });
+
+  it("pasta ilegível NÃO responde 'não é repetida' com confiança", async () => {
+    st.list.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const { findThemeImageByBytes } = await load();
+    expect(await findThemeImageByBytes("t-1", Buffer.from("x"))).toBeNull();
+  });
+});
+
+// ── LEVAR FOTOS DE UM TEMA PARA OUTRO ──────────────────────────────────────
+//
+// A decisão que manda em tudo: o NOME DO FICHEIRO é preservado. É isso que faz
+// "já está no destino?" ser uma colisão de chave respondida pelo Storage, que
+// torna o lote repetível sem duplicar nada, e que leva a identidade da foto
+// com ela (senão a deteção de repetidas deixava de a reconhecer no destino).
+
+describe("transferThemeImage", () => {
+  it("PRESERVA o nome do ficheiro — a identidade viaja com a foto", async () => {
+    const { transferThemeImage } = await load();
+    const res = await transferThemeImage(`t-1/${HASH_A}.jpg`, "t-2", "copy");
+    expect(res).toEqual({ outcome: "copied", to: `t-2/${HASH_A}.jpg`, thumb: true });
+    expect(st.copy).toHaveBeenCalledWith(`t-1/${HASH_A}.jpg`, `t-2/${HASH_A}.jpg`);
+  });
+
+  it("o destino é construído NO SERVIDOR, a partir do id do tema", async () => {
+    const { transferThemeImage } = await load();
+    // Um id com travessia é limpo pelo `themeFolder` antes de virar caminho.
+    const res = await transferThemeImage("t-1/a.jpg", "../../etc", "copy");
+    expect(res.to).toBe("etc/a.jpg");
+  });
+
+  it("copiar chama `copy` no MESMO bucket, sem `destinationBucket`", async () => {
+    const { transferThemeImage } = await load();
+    await transferThemeImage("t-1/a.jpg", "t-2", "copy");
+    // Dois argumentos e mais nenhum: é dentro do bucket dos temas.
+    expect(st.copy).toHaveBeenCalledWith("t-1/a.jpg", "t-2/a.jpg");
+    expect(st.move).not.toHaveBeenCalled();
+    expect(st.buckets).toContain(THEME_BUCKET);
+  });
+
+  it("mover usa `move` (atómico por foto: a foto nunca está em lado nenhum)", async () => {
+    const { transferThemeImage } = await load();
+    await transferThemeImage("t-1/a.jpg", "t-2", "move");
+    expect(st.move).toHaveBeenCalledWith("t-1/a.jpg", "t-2/a.jpg");
+    expect(st.copy).not.toHaveBeenCalled();
+  });
+
+  it("409 no destino → `exists`, e ao MOVER a origem NÃO é apagada", async () => {
+    // Apagar aqui seria inferir, a partir do nome, que os bytes são os mesmos.
+    st.move.mockResolvedValue({ data: null, error: { statusCode: "409", message: "Duplicate" } });
+    const { transferThemeImage } = await load();
+    const res = await transferThemeImage("t-1/a.jpg", "t-2", "move");
+    expect(res.outcome).toBe("exists");
+    expect(st.remove).not.toHaveBeenCalled();
+    // E a miniatura nem é tentada: não há nada de novo no destino.
+    expect(st.thumbMove).not.toHaveBeenCalled();
+  });
+
+  it("um erro no ORIGINAL é `failed` e a miniatura nem chega a ser tentada", async () => {
+    st.copy.mockResolvedValue({ data: null, error: { statusCode: "500", message: "boom" } });
+    const { transferThemeImage } = await load();
+    expect((await transferThemeImage("t-1/a.jpg", "t-2", "copy")).outcome).toBe("failed");
+    expect(st.thumbCopy).not.toHaveBeenCalled();
+  });
+
+  it("a miniatura falhada NÃO muda o resultado — só é assinalada", async () => {
+    // 92× mais bytes se ela faltar (164 MB contra 1,78 MB por página de 60),
+    // por isso conta-se; mas a foto está no destino e isso é o que decide.
+    st.thumbCopy.mockResolvedValue({ data: null, error: { statusCode: "500", message: "boom" } });
+    const { transferThemeImage } = await load();
+    const res = await transferThemeImage("t-1/a.jpg", "t-2", "copy");
+    expect(res.outcome).toBe("copied");
+    expect(res.thumb).toBe(false);
+  });
+
+  it("uma miniatura que não existe (404) é ignorada — a foto chega na mesma", async () => {
+    st.thumbCopy.mockResolvedValue({
+      data: null,
+      error: { statusCode: "404", message: "Not found" },
+    });
+    const { transferThemeImage } = await load();
+    expect((await transferThemeImage("t-1/a.jpg", "t-2", "copy")).outcome).toBe("copied");
+  });
+
+  it("NUNCA cria o bucket das miniaturas", async () => {
+    // Numa instalação anterior às miniaturas não há nada para copiar; criá-lo
+    // seria ruído. É a regra que o módulo já segue.
+    st.thumbBucket.exists = false;
+    const { transferThemeImage } = await load();
+    await transferThemeImage("t-1/a.jpg", "t-2", "copy");
+    expect(st.thumbBucket.creates).toBe(0);
+  });
+
+  it("um caminho inválido não toca no Storage", async () => {
+    const { transferThemeImage } = await load();
+    for (const bad of ["../proposal-assets/q-1/privada.jpg", "https://exemplo.pt/a.jpg", ""]) {
+      expect((await transferThemeImage(bad, "t-2", "copy")).outcome).toBe("failed");
+    }
+    expect(st.copy).not.toHaveBeenCalled();
+    expect(st.move).not.toHaveBeenCalled();
+  });
+
+  it("origem igual a destino é recusada sem tocar no Storage", async () => {
+    const { transferThemeImage } = await load();
+    expect((await transferThemeImage("t-1/a.jpg", "t-1", "copy")).outcome).toBe("failed");
+    expect(st.copy).not.toHaveBeenCalled();
+  });
+
+  it("o destino fica a saber que tem a foto (a costura com as repetidas)", async () => {
+    st.list.mockResolvedValue(pageWithETags([]));
+    const { transferThemeImage, readThemeFingerprints } = await load();
+    await readThemeFingerprints("t-2");
+    await transferThemeImage(`t-1/${HASH_A}.jpg`, "t-2", "copy");
+    // Largar depois o ficheiro original em t-2 é corretamente detetado.
+    expect((await readThemeFingerprints("t-2")).hashes.has(HASH_A)).toBe(true);
+  });
+
+  it("repetir o mesmo lote é inofensivo: tudo `exists`, zero duplicados", async () => {
+    const { transferThemeImage } = await load();
+    expect((await transferThemeImage("t-1/a.jpg", "t-2", "copy")).outcome).toBe("copied");
+    st.copy.mockResolvedValue({ data: null, error: { statusCode: "409", message: "Duplicate" } });
+    expect((await transferThemeImage("t-1/a.jpg", "t-2", "copy")).outcome).toBe("exists");
+    expect((await transferThemeImage("t-1/a.jpg", "t-2", "copy")).outcome).toBe("exists");
   });
 });
