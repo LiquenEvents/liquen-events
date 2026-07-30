@@ -11,25 +11,44 @@ const nextConfig: NextConfig = {
   // serverless and throw when the first image is processed.
   serverExternalPackages: ["sharp"],
   images: {
-    // WebP only — no AVIF. AVIF compresses a few % smaller but its on-the-fly
-    // encode is several times slower than WebP, and the gallery has 500+ photos
-    // that are almost never pre-warmed in the optimizer cache. Serving AVIF meant
-    // every first view paid a multi-second cold encode (and, under a burst of
-    // tiles, the optimizer timing out entirely — "às vezes nem carregam"). WebP
-    // encodes fast enough that cold tiles paint quickly and never stall, which is
-    // the whole point of the desktop-fluidity pass. Once encoded, both are cached
-    // immutably for a year, so the size delta only ever costs the first visitor.
+    // WebP only — no AVIF. AVIF compresses a few % smaller but o seu encode
+    // on-the-fly é várias vezes mais lento, e um encode a frio de vários
+    // segundos por imagem é exactamente o que fazia o optimizador esgotar o
+    // tempo sob rajada ("às vezes nem carregam"). Depois de encodadas, ambas
+    // ficam em cache imutável durante um ano, por isso a diferença de tamanho
+    // só custaria ao primeiro visitante — não compensa.
+    //
+    // NOTA: as 427 miniaturas da galeria já NÃO passam por aqui. São ficheiros
+    // WebP estáticos gerados no build (scripts/pregen-gallery.mjs +
+    // src/app/[lang]/galeria/gallery-image-loader.ts), precisamente para não
+    // dependerem de encode on-demand nenhum. O que resta neste optimizador é a
+    // foto do lightbox e as imagens de conteúdo das outras páginas.
     formats: ["image/webp"],
-    // 82 is used ONLY by the full-bleed page covers (heroes) — the crispest LCP
-    // image on each page — while everything else stays ≤75. 50/72/75 keep the
-    // gallery + body imagery lean.
-    qualities: [50, 65, 72, 75, 82],
-    // Cap at 2048 (dropped 2560): only the full-bleed heroes ever reached the
-    // 2560 candidate, and cold-encoding that on first view is what kept the hero
-    // blur placeholder on screen the longest before the sharp image "opened".
-    // 2048 is still sharp on 4K (a slight, imperceptible upscale) and its cold
-    // WebP encode + download are meaningfully faster, so the blur clears sooner.
-    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920, 2048],
+    // ESTA LISTA TEM DE CONTER TODOS OS `quality={…}` DO SÍTIO. O optimizador
+    // rejeita com HTTP 400 (`"q" parameter (quality) of N is not allowed`)
+    // qualquer valor que não esteja aqui — ver
+    // node_modules/next/dist/server/image-optimizer.js:635-643. Só se avisa em
+    // DESENVOLVIMENTO (um warnOnce na consola); em produção a imagem
+    // simplesmente nunca carrega, sempre, sistematicamente. Faltavam dois
+    // valores que o código usa mesmo: 55 (o logótipo do Navbar, em todas as
+    // páginas do sítio) e 70 (a página de confirmação de orçamento).
+    //
+    // 82 saiu: nenhum `quality={82}` existe no código (os heróis são servidos
+    // por ficheiros pré-gerados a 75, ver scripts/pregen-heroes.mjs), e um
+    // valor a mais aqui é só mais uma família de chaves de cache que ninguém
+    // pede. 65 fica para o caminho de recurso da galeria.
+    //
+    // Ao mexer nesta lista: `npx tsx`-nada, basta
+    // `grep -rho 'quality={[0-9]*}' src/ | sort -u`.
+    qualities: [50, 55, 65, 70, 72, 75],
+    // Tecto em 1920 — o mesmo que estava em produção.
+    //
+    // Esteve aqui um 2048 com um comentário a dizer que "baixámos de 2560";
+    // 2560 nunca esteve na configuração publicada, por isso na prática o 2048
+    // SUBIA o tecto. Medido, fazia o lightbox pedir w=2048 a 250,0 KB por foto
+    // (a largura mais cara de toda a matriz) em portáteis 2x, para uma
+    // diferença que ninguém vê numa foto em object-contain.
+    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
     imageSizes: [16, 32, 64, 96, 128, 256, 384],
     minimumCacheTTL: 31_536_000,
     // Serve images inline instead of as attachment downloads

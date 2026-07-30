@@ -13,7 +13,6 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
-import { interleaveByCollection } from "./interleave";
 
 // Resolved server-side (from blur-map.json / image-dims.json) so those
 // site-wide JSON maps never reach the gallery's client bundle — GaleriaClient
@@ -22,24 +21,39 @@ import { interleaveByCollection } from "./interleave";
 // consumes all four (src/label → alt + filtering, aspectRatio → masonry,
 // blurDataURL → placeholder), so there are no dead fields left to trim.
 //
-// Every photo carries its aspectRatio (the masonry layout needs it up front),
-// but blur placeholders are shipped ONLY for the photos that paint first. The
-// client mounts with `shown = PAGE` (24) tiles, so the blur set is sized to
-// cover that first-paint screenful with a small margin — the dominant weight in
-// this array is the blur data-URIs (~1–2KB each), so shipping them for tiles the
-// first paint never shows was pure RSC flight-data waste. Everything past this
-// window (loaded later by infinite scroll) falls back to the gallery's near-
-// black background as it decodes, exactly like the long tail already did.
-const BLUR_PRELOAD = 30;
+// TODAS as fotos levam aspectRatio (a masonry precisa dele à partida) e TODAS
+// levam placeholder.
+//
+// Levavam-no só as 30 primeiras. O comentário que justificava esse corte dizia
+// "~1–2KB each"; medido em src/lib/blur-map.json (557 entradas), o blur médio
+// são 151 bytes — as 427 custam 62,9 KB crus / 27,1 KB comprimidos no fio, e
+// não 500 KB. Em troca desses 27 KB: num scroll rápido com a cache fria, 90,4%
+// da área de mosaicos no ecrã era rectângulo liso (98,5% dos frames com pelo
+// menos um buraco, 5,38 mosaicos completamente vazios por frame); com
+// placeholder em todas, 0,0% e 0%, ao mesmo custo de frame (dt p50 16,7 ms,
+// p95 33,4 ms nos dois casos). Pior ainda, as 30 escolhidas eram as 30
+// primeiras da ordem POR DEFEITO, e a ordem real da visita era outra — 0 das
+// 12 primeiras fotos que o visitante via tinham placeholder.
 const withRatio = PHOTOS.map((p) => ({ ...p, aspectRatio: aspectFor(p.src) }));
-const firstPaintSrc = new Set(
-  interleaveByCollection(withRatio)
-    .slice(0, BLUR_PRELOAD)
-    .map((p) => p.src),
-);
-const galleryPhotos = withRatio.map((p) =>
-  firstPaintSrc.has(p.src) ? { ...p, blurDataURL: blurFor(p.src).blurDataURL } : p,
-);
+const galleryPhotos = withRatio.map((p) => ({
+  ...p,
+  blurDataURL: blurFor(p.src).blurDataURL,
+}));
+
+// Semente da arrumação, decidida NO SERVIDOR.
+//
+// A galeria arruma-se de maneira diferente a cada build em vez de a cada
+// visita, e é de propósito: /galeria é uma página estática (generateStaticParams
+// no layout), por isso uma semente por pedido obrigaria a renderização
+// dinâmica — trocar o HTML já pronto no CDN por um render por visitante, o
+// oposto de "depressa".
+//
+// A alternativa que lá estava — sortear no cliente e re-baralhar depois da
+// hidratação — custava, medido, a troca das 12 fotos do primeiro ecrã a
+// t=1178 ms e 398,9 KB descarregados e deitados fora (57,8% dos bytes de
+// imagem da aterragem), incluindo a foto pré-carregada do mosaico 2x2. Agora o
+// HTML e os placeholders saem já na ordem final.
+const ORDER_SEED = ":" + Math.floor(Math.random() * 0x7fffffff).toString(36);
 
 export async function generateMetadata({
   params,
@@ -116,7 +130,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           borda a borda, só com o gap-0.5 interno entre fotos. O chrome dos
           filtros traz o seu próprio padding lateral (ver GaleriaClient). */}
       <section className="pb-12 lg:pb-16 bg-[#0b0b0b]">
-        <GaleriaClient photos={galleryPhotos} dict={t.galeria} />
+        <GaleriaClient photos={galleryPhotos} dict={t.galeria} orderSeed={ORDER_SEED} />
       </section>
 
       {/* ── Instagram CTA ── */}

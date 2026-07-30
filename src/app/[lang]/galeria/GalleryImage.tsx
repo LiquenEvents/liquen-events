@@ -3,6 +3,7 @@
 import Image, { type ImageLoaderProps } from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { galleryLoadQueue } from "./load-queue";
+import { galleryImageUrl } from "./gallery-image-loader";
 
 /**
  * A foto de um mosaico da galeria, com re-tentativa.
@@ -102,16 +103,14 @@ export default function GalleryImage({
   // Esgotou o tecto de tentativas: mostra-se o fallback digno.
   const [exhausted, setExhausted] = useState(false);
   /**
-   * ÚLTIMO RECURSO: o ficheiro original, sem passar pelo optimizador.
+   * ÚLTIMO RECURSO: o ficheiro original em tamanho inteiro.
    *
-   * As re-tentativas iam TODAS por `/_next/image`. Se é o optimizador que está
-   * a falhar, insistir com ele quatro vezes não resolve nada: foi o que a
-   * Catarina viu no site, com mosaicos a mostrar "Foto indisponível", que só
-   * aparece depois de quatro falhas seguidas.
-   *
-   * `/imagens/x.jpg` é um ficheiro estático servido pelo CDN e não toca no
-   * optimizador. Custa mais bytes do que a miniatura, mas a escolha aqui é
-   * entre uma fotografia pesada e nenhuma fotografia.
+   * As miniaturas já são ficheiros estáticos pré-gerados (ver `retryLoader`),
+   * por isso este caminho deixou de ser a defesa contra o optimizador e passou
+   * a ser a defesa contra uma miniatura em falta: se `/_img/g/<chave>-<w>.webp`
+   * não existir (uma foto acrescentada a photos-data.ts sem correr o pregen,
+   * um deploy truncado), serve-se `/imagens/x.jpg`. Custa mais bytes, mas a
+   * escolha aqui é entre uma fotografia pesada e nenhuma fotografia.
    */
   const [raw, setRaw] = useState(false);
 
@@ -230,27 +229,31 @@ export default function GalleryImage({
     // sempre, em vez de ser a última tentativa.
   }, [releaseSlot, enqueue, raw]);
 
-  // Cache-buster da re-tentativa. NÃO pode ir no `src`: o `localPatterns` por
-  // defeito do Next 16 é [{ pathname:"**", search:"" }], por isso um
-  // `/imagens/x.jpg?r=1` é rejeitado pelo próprio loader e o optimizador
-  // devolve 400 ("url" parameter is not allowed) — medido. Vai portanto no URL
-  // FINAL do optimizador, como parâmetro extra: `&r=N` é ignorado na chave de
-  // cache do servidor (hash de href+w+q+mime), logo não fragmenta a cache, mas
-  // é um URL diferente para o browser e força um pedido novo. Só a partir da
-  // 1ª re-tentativa: o caminho normal continua a usar o loader do Next,
-  // intocado (incluindo o `dpl` de deploy).
+  /**
+   * O URL de cada candidato do srcset.
+   *
+   * NUNCA PASSA PELO OPTIMIZADOR. Cada miniatura aponta para um WebP estático
+   * gerado no build (`/_img/g/<chave>-<largura>.webp`, ver
+   * gallery-image-loader.ts + scripts/pregen-gallery.mjs). É a mudança que
+   * resolve a queixa de raiz: um ficheiro estático no CDN não tem quota
+   * mensal, não tem encode a frio nem pode esgotar o tempo sob rajada — as
+   * três maneiras medidas de o `/_next/image` falhar. Uma travessia completa
+   * da galeria passou de 442 pedidos ao optimizador para 4.
+   *
+   * O cache-buster das re-tentativas (`?r=N`) pode agora ir no URL final sem
+   * problema nenhum: é um ficheiro estático, e a query é ignorada pelo
+   * servidor de estáticos mas conta como URL novo para o browser. (Com o
+   * optimizador não podia ir no `src` por causa do `localPatterns` por defeito
+   * do Next 16, `[{ pathname:"**", search:"" }]`, que devolvia 400.)
+   *
+   * `raw` continua a ser a rede de segurança final: se até o ficheiro
+   * pré-gerado faltar, serve-se o original de `/imagens/x.jpg`.
+   */
   const retryLoader = useMemo(() => {
-    // Sem optimizador: devolve-se o caminho tal e qual, e o `<Image>` passa a
-    // apontar directamente ao ficheiro em /public.
     if (raw) return ({ src: s }: ImageLoaderProps) => s;
-    if (bust === 0) return undefined;
-    return ({ src: s, width, quality: q }: ImageLoaderProps) => {
-      const dpl = typeof document !== "undefined" ? document.documentElement.dataset.dplId : "";
-      return `/_next/image?url=${encodeURIComponent(s)}&w=${width}&q=${q ?? quality}${
-        dpl ? `&dpl=${dpl}` : ""
-      }&r=${bust}`;
-    };
-  }, [raw, bust, quality]);
+    return ({ src: s, width }: ImageLoaderProps) =>
+      `${galleryImageUrl(s, width)}${bust ? `?r=${bust}` : ""}`;
+  }, [raw, bust]);
 
   // Fragmento com no máximo UM elemento montado de cada vez (a foto OU o
   // fallback): é o que o `<ViewTransition>` do mosaico-herói precisa para

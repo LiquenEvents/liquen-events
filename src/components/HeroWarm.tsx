@@ -40,6 +40,15 @@ export default function HeroWarm() {
   useEffect(() => {
     // Don't warm on the back office / quote flow, or the current page.
     if (pathname.startsWith("/orcamento")) return;
+    // Nem na galeria. É a única página do sítio com 427 fotografias para ir
+    // buscar, e portanto a última onde faz sentido gastar rede a pré-carregar
+    // as capas de outras páginas. Medido numa aterragem em /galeria (cache
+    // fria, 4G emulado, 1440x900): 734 KB de heros alheios pedidos a t≈1167 ms,
+    // exactamente em cima da rajada da grelha — 1536w de DJI_…_0120_D (282 KB),
+    // EW1_1330 (151 KB), JOAO_E_PEDRO_… (147 KB), EW1_1393 (83 KB) e hd-edited
+    // (71 KB). Bloqueando-os, em 3G, as fotos nítidas aos 8 s passaram de
+    // 6/9/9 para 12/12/12.
+    if (pathname === "/galeria") return;
     // Respect data-saver / slow connections.
     const conn = (
       navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }

@@ -10,6 +10,7 @@ import { type Photo, interleaveByCollection } from "./interleave";
 import type { Dict } from "@/lib/i18n";
 import { ViewTransition } from "@/components/vt";
 import GalleryImage from "./GalleryImage";
+import { galleryImageLoader } from "./gallery-image-loader";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -383,9 +384,25 @@ function SatelliteTile({
 export default function GaleriaClient({
   photos,
   dict,
+  orderSeed = "",
 }: {
   photos: Photo[];
   dict: Dict["galeria"];
+  /**
+   * Semente da arrumação, decidida NO SERVIDOR (ver galeria/page.tsx). Vinha
+   * daqui até agora: o cliente sorteava uma semente em `onIdle` e
+   * re-baralhava a grelha depois da hidratação. Medido, isso trocava as 12
+   * fotos do primeiro ecrã a t=1178 ms e deitava fora 398,9 KB já
+   * descarregados — 57,8% de todos os bytes de imagem da aterragem, incluindo
+   * a foto do `<link rel=preload>` do mosaico 2x2. Em 3G a diferença era
+   * entre 0-2 e 9 fotos nítidas aos 5 s.
+   *
+   * Com a semente a vir do servidor, o HTML, o preload, os placeholders e os
+   * pedidos saem todos já na ordem final: zero fotos trocadas, zero bytes
+   * deitados fora. A arrumação continua a mudar (por build, em vez de por
+   * visita) — ver a nota em page.tsx.
+   */
+  orderSeed?: string;
 }) {
   const collectionNames = useMemo(
     () =>
@@ -397,28 +414,6 @@ export default function GaleriaClient({
   // (in shoot order, no interleaving) instead of a category grid.
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [shown, setShown] = useState(INITIAL_PAGE);
-  // Per-visit arrangement seed. Empty on SSR + first client render (so hydration
-  // matches); a random value is set once on mount, re-rolling the interleave so
-  // every fresh entry to the gallery lays out differently. It never changes
-  // after mount, so the grid stays put while browsing (no mid-scroll reshuffle).
-  const [orderSeed, setOrderSeed] = useState("");
-  // Re-roll da ordem por visita — não crítico para a primeira pintura (o SSR
-  // mostra a ordem por defeito), por isso é adiado para idle: a grelha só se
-  // re-baralha depois de a hidratação assentar, libertando o TTI.
-  useEffect(
-    () =>
-      onIdle(() => {
-        // Don't re-interleave once the visitor has engaged — reshuffling tiles
-        // they're already looking at would visibly jump the grid. And run it as a
-        // non-urgent transition so the one-time reorder yields to the main thread
-        // instead of blocking a frame.
-        if (typeof window !== "undefined" && window.scrollY > 0) return;
-        startTransition(() =>
-          setOrderSeed(":" + Math.floor(Math.random() * 0x7fffffff).toString(36)),
-        );
-      }),
-    [],
-  );
   const [fading, setFading] = useState(false);
   const [lb, setLb] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -1247,7 +1242,21 @@ function Lightbox({
   // (and each ←/→ step) decodes only the visible photo first — no hero-vs-
   // neighbour decode contention in the open/step frame. Resets per photo.
   const [heroLoaded, setHeroLoaded] = useState(false);
-  useEffect(() => setHeroLoaded(false), [index]);
+
+  /**
+   * A foto do lightbox é a ÚNICA imagem da galeria que continua a passar pelo
+   * optimizador (é a única que precisa de mais resolução do que as miniaturas
+   * pré-geradas, e abre uma de cada vez — não faz rajada). Como não tem
+   * re-tentativa nem legenda de falha, ganha aqui a mesma rede de segurança
+   * que a grelha já tinha: se o optimizador falhar, serve-se o ficheiro
+   * original de `/imagens/x.jpg`. Uma foto pesada é melhor do que um ecrã
+   * preto. Repõe-se a cada foto.
+   */
+  const [lbRaw, setLbRaw] = useState(false);
+  useEffect(() => {
+    setHeroLoaded(false);
+    setLbRaw(false);
+  }, [index]);
 
   // Defer the (secondary) thumbnail strip to the frame AFTER the lightbox
   // opens, so the open commit only has to mount the hero photo — not also a row
@@ -1572,16 +1581,26 @@ function Lightbox({
         >
           <VTWrap key={index} name={vtId(pool[index].src)} exit="vt-lb">
             <Image
-              key={index}
+              key={`${index}${lbRaw ? "-raw" : ""}`}
               src={pool[index].src}
               alt={altText(pool[index].src, pool[index].label)}
               fill
-              // Cap the requested candidate at 1920px (via min()): on a 4K/retina
-              // screen 90vw would otherwise pick the 2560 candidate — a slow cold
-              // WebP encode + a big download on open. 1920 is still sharp for a
-              // full-screen photo and encodes/downloads much faster.
-              sizes="min(90vw, 1920px)"
+              // "90vw", não "min(90vw, 1920px)". O tecto que o min() queria pôr
+              // já é o do next.config (deviceSizes acaba em 1920), e a forma
+              // com parênteses não casa com a regex que o Next usa para ler o
+              // `sizes` — node_modules/next/dist/shared/lib/get-img-props.js:53,
+              // `/(^|\s)(1?\d?\d)vw/g`, exige início-de-string ou espaço antes
+              // do número. Com "min(90vw, …)" o 90vw vem precedido de "(", a
+              // lista de percentagens fica vazia e o Next cai no ramo que emite
+              // TODAS as 16 larguras do srcset — incluindo candidatos absurdos
+              // de 16, 32 e 64 px. Com "90vw" são 10, e a largura que o browser
+              // escolhe é a mesma (medido nos 8 perfis de dispositivo).
+              sizes="90vw"
               quality={72}
+              // Sem optimizador quando ele já falhou uma vez: o ficheiro
+              // original, tal e qual (ver `lbRaw`).
+              {...(lbRaw ? { loader: ({ src }: { src: string }) => src } : {})}
+              onError={() => setLbRaw(true)}
               // priority: the full-res lightbox photo is a DIFFERENT srcset
               // candidate than the tile thumbnail, so opening starts a cold fetch.
               // Fetching it high-priority (instead of default) shortens the
@@ -1616,7 +1635,10 @@ function Lightbox({
               src={pool[(index + 1) % pool.length].src}
               alt=""
               fill
-              sizes="min(90vw, 1920px)"
+              // O MESMO `sizes` da foto mostrada (ver a nota lá em cima sobre a
+              // regex do Next), para o browser acertar no recurso exacto que já
+              // ficou em cache e o → ser instantâneo.
+              sizes="90vw"
               quality={72}
               loading="eager"
             />
@@ -1660,7 +1682,18 @@ function Lightbox({
                   : "w-[60px] h-[44px] opacity-50 hover:opacity-80 hover:scale-105"
               }`}
             >
-              <Image src={pool[idx].src} alt="" fill sizes="72px" className="object-cover" />
+              {/* A tira usa as MESMAS miniaturas estáticas da grelha (loader
+                  pré-gerado): não gasta o optimizador e, para as fotos já
+                  vistas na grelha, o ficheiro já está na cache do browser —
+                  a tira aparece instantânea. */}
+              <Image
+                src={pool[idx].src}
+                alt=""
+                fill
+                sizes="72px"
+                loader={galleryImageLoader}
+                className="object-cover"
+              />
               <FocusRing />
             </button>
           ))}

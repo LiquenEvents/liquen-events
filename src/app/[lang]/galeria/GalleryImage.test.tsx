@@ -6,8 +6,10 @@ import GalleryImage from "./GalleryImage";
 
 /** O mesmo caminho que `renderTile` usa. */
 const SRC = "/imagens/DaniGui_Preview20.jpg";
-/** Tentativas pelo optimizador antes de se passar ao ficheiro original. */
+/** Tentativas pela miniatura pré-gerada antes de se passar ao ficheiro original. */
 const MAX_ATTEMPTS = 4;
+/** O prefixo dos ficheiros estáticos gerados por scripts/pregen-gallery.mjs. */
+const PREGEN_PREFIX = "/_img/g/DaniGui_Preview20-";
 
 /**
  * A PROVA de que a queixa da dona ("nem todas as fotos carregam") deixou de ser
@@ -84,10 +86,28 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     vi.unstubAllGlobals();
   });
 
+  it("a miniatura NUNCA passa pelo optimizador: aponta ao ficheiro pré-gerado", () => {
+    // A mudança de fundo desta ronda. Cada miniatura era uma transformação
+    // on-demand no /_next/image — 431 a 442 URLs distintos numa travessia
+    // completa da galeria — e portanto sujeita a quota mensal, a encode a frio
+    // e a esgotar o tempo sob rajada (medido: 219ms isolado -> 2900ms em 30
+    // simultâneas). Agora é um WebP estático do CDN, que não tem nenhuma
+    // dessas três maneiras de falhar.
+    renderTile();
+    const src = currentSrc();
+    expect(src).not.toContain("/_next/image");
+    expect(src).toContain(PREGEN_PREFIX);
+    expect(src).toMatch(/\.webp$/);
+    // E o srcset inteiro, não só o src: nem um único candidato pelo optimizador.
+    const srcset = img()!.getAttribute("srcset") ?? "";
+    expect(srcset).not.toContain("/_next/image");
+    expect(srcset).toContain(PREGEN_PREFIX);
+  });
+
   it("re-tenta depois de um erro e a foto acaba VISÍVEL", () => {
     renderTile();
     const first = currentSrc();
-    expect(first).toContain("/_next/image");
+    expect(first).toContain(PREGEN_PREFIX);
 
     // O pedido falha (o 5xx pontual do optimizador).
     act(() => {
@@ -198,11 +218,11 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     expect(img()!.getAttribute("fetchpriority")).toBe("high");
   });
 
-  it("esgotado o optimizador, tenta o ficheiro original antes de desistir", async () => {
-    // O caso que a Catarina viu no site: "Foto indisponível" só aparecia depois
-    // de quatro falhas, mas as quatro iam todas por /_next/image. Se é o
-    // optimizador que está em baixo, insistir com ele não serve de nada. O
-    // ficheiro em /public é servido pelo CDN e não lhe toca.
+  it("esgotada a miniatura, tenta o ficheiro original antes de desistir", async () => {
+    // Rede de segurança final: se a miniatura pré-gerada faltar (uma foto
+    // acrescentada a photos-data.ts sem correr o pregen, um deploy truncado),
+    // serve-se o original em tamanho inteiro. Uma fotografia pesada é melhor
+    // do que nenhuma fotografia.
     renderTile({ priority: true });
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
       const el = img();
@@ -214,9 +234,10 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     }
     const el = img();
     expect(el, "devia haver um <img> a apontar ao ficheiro original").not.toBeNull();
-    // Sem optimizador: o src é o caminho tal e qual, sem /_next/image.
+    // O src é o caminho tal e qual: nem optimizador nem miniatura.
     expect(el!.getAttribute("src")).toContain(SRC);
     expect(el!.getAttribute("src")).not.toContain("_next/image");
+    expect(el!.getAttribute("src")).not.toContain("/_img/g/");
   });
 
   it("só desiste depois de o ficheiro original também falhar", async () => {

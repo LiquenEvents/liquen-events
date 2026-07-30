@@ -61,6 +61,14 @@ next-env.d.ts
 # Remotion footage/render — vídeos pesados que excedem o limite do GitHub (>100MB)
 remotion/public/*.mp4
 
+# Miniaturas da galeria pré-geradas no build (scripts/pregen-gallery.mjs).
+# ~166MB / 2135 ficheiros WebP. NÃO se versionam: WebP é incompressível (medido:
+# tar|gzip -1 poupa 0,2%), por isso o git ficaria com 166MB de blobs para
+# sempre, por cima dos 271MB que public/imagens já tem — e o build regenera-as
+# de graça (e reaproveita-as de .next/cache entre builds). Os heróis, que são 24
+# ficheiros / 2,7MB, continuam versionados em public/_img.
+/public/_img/g/
+
 # Ad-hoc scratch / audit / verification scripts at the repo root — not versioned
 /*.mjs
 !/eslint.config.mjs

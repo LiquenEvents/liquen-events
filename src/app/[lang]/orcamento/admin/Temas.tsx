@@ -2,6 +2,8 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
+import PhotoLightbox from "./PhotoLightbox";
+import { downloadMany, downloadName, downloadOne } from "./photo-download";
 import {
   MAX_PHOTO_ORDER,
   MAX_THEME_NAME,
@@ -1695,6 +1697,54 @@ function ThemeFolder({
       ? `${images.length} de ${photoCountLabel(total, truncated)}`
       : photoCountLabel(total ?? 0, truncated);
   const selectedCount = selected.size;
+  // Ver uma foto em grande. `null` = fechado. Guarda-se também o elemento que
+  // estava focado, para o foco voltar ao mosaico de onde se abriu.
+  const [zoomAt, setZoomAt] = useState<number | null>(null);
+  const zoomOpener = useRef<HTMLElement | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const openZoom = useCallback((i: number) => {
+    zoomOpener.current = document.activeElement as HTMLElement | null;
+    setZoomAt(i);
+  }, []);
+  const closeZoom = useCallback(() => {
+    setZoomAt(null);
+    // O foco volta de onde veio; sem isto ficava no <body> e o teclado perdia-se.
+    zoomOpener.current?.focus?.();
+  }, []);
+
+  /** Transfere uma foto (a do visualizador ou a de um mosaico). */
+  const downloadImage = useCallback(
+    async (im: ThemeImage, i: number) => {
+      setDownloading(true);
+      const ok = await downloadOne(im.url, downloadName(im, theme.name, i));
+      setDownloading(false);
+      if (!ok) toast("Não foi possível transferir a foto.", "error");
+    },
+    [theme.name, toast],
+  );
+
+  /** Transfere as fotos selecionadas, uma de cada vez (ver photo-download.ts). */
+  const downloadSelected = useCallback(async () => {
+    const chosen = images.map((im, i) => ({ im, i })).filter(({ im }) => selected.has(im.path));
+    if (chosen.length === 0) return;
+    setDownloading(true);
+    const res = await downloadMany(
+      chosen.map(({ im, i }) => ({ url: im.url, filename: downloadName(im, theme.name, i) })),
+      () => {},
+    );
+    setDownloading(false);
+    if (res.failed > 0) {
+      toast(
+        res.failed === res.total
+          ? "Não foi possível transferir as fotos."
+          : `${res.total - res.failed} de ${res.total} transferidas.`,
+        "error",
+      );
+    } else {
+      toast(plural(res.done, "foto transferida", "fotos transferidas"), "success");
+    }
+  }, [images, selected, theme.name, toast]);
   const pct =
     progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
   /**
@@ -1918,6 +1968,9 @@ function ThemeFolder({
                 Definir como capa
               </Button>
             )}
+            <Button size="sm" variant="secondary" loading={downloading} onClick={downloadSelected}>
+              Transferir
+            </Button>
             <Button size="sm" variant="secondary" onClick={clearSelection}>
               Limpar seleção
             </Button>
@@ -1926,6 +1979,17 @@ function ThemeFolder({
             </Button>
           </div>
         </div>
+      )}
+
+      {zoomAt !== null && images[zoomAt] && (
+        <PhotoLightbox
+          images={images}
+          index={zoomAt}
+          onIndexChange={setZoomAt}
+          onClose={closeZoom}
+          onDownload={downloadImage}
+          downloading={downloading}
+        />
       )}
 
       <div
@@ -2113,6 +2177,21 @@ function ThemeFolder({
                         ↑
                       </button>
                     )}
+                    {/* Ampliar. A célula inteira já é o alvo da seleção, por
+                        isso o zoom precisa do seu próprio botão — como o ↑ e o
+                        ×. `stopPropagation` para não selecionar ao ampliar. */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openZoom(i);
+                      }}
+                      aria-label={`Ver a foto ${i + 1} em grande`}
+                      title="Ver em grande"
+                      className="absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    >
+                      ⤢
+                    </button>
                     <button
                       type="button"
                       onClick={() => removeOne(im)}
