@@ -80,8 +80,17 @@ const SEM_ANCORA = flag("sem-ancora");
 /** `--falhas N`: falha 1 em cada N pedidos a /_img/ (o caminho de re-tentativa
  *  do SafeImage/GalleryImage — desmontar/remontar o <img>). */
 const FALHAS = Number(arg("falhas", 0));
-/** `--falhar-padrao <regex>`: falha SEMPRE os pedidos cujo URL casa. Serve para
- *  isolar uma imagem concreta (ex.: "logo-liquen-branco", o logótipo do rodapé). */
+/** `--falhar-padrao <texto>`: falha SEMPRE os pedidos cujo URL CONTÉM este
+ *  texto. Serve para isolar uma imagem concreta (ex.: "logo-liquen-branco", o
+ *  logótipo do rodapé) ou uma família inteira ("/_img/g/", "-1280.webp").
+ *
+ *  É comparação literal, não expressão regular. Era um `new RegExp` sobre um
+ *  argumento da linha de comandos, e o CodeQL apontou-o com razão: um padrão
+ *  como `(a+)+$` põe o arnês a mastigar em vez de medir, e a barra invertida
+ *  de um caminho passa a significar outra coisa sem ninguém contar com isso.
+ *  Nenhum dos usos reais precisava de expressão regular — todos são "o URL
+ *  contém isto" — por isso o poder a menos não custa nada e o modo de falha
+ *  desaparece. */
 const FALHAR_PADRAO = arg("falhar-padrao", null);
 /** `--auto-teste`: prova de que o detector detecta (ver o uso, no meio da passagem). */
 const AUTO_TESTE = flag("auto-teste");
@@ -330,7 +339,7 @@ async function swipe(cdp, page, vp, dist) {
 async function passagem(page, cdp, rota) {
   if (FALHAS > 0 || FALHAR_PADRAO) {
     let n = 0;
-    const padrao = FALHAR_PADRAO ? new RegExp(FALHAR_PADRAO) : null;
+    const padrao = FALHAR_PADRAO || null;
     // Falha 1 em cada N pedidos de IMAGEM, seja qual for o caminho: `/_img/…`
     // (o carregador estático de hoje) ou `/_next/image?…` (o optimizador que
     // havia antes). Tem de apanhar os dois para a comparação HOJE/ANTES ser
@@ -339,7 +348,7 @@ async function passagem(page, cdp, rota) {
       (u) => Boolean(padrao) || /\/_img\/|\/_next\/image/.test(u.pathname + u.search),
       (r) => {
         const u = decodeURIComponent(r.request().url());
-        if (padrao) return padrao.test(u) ? r.abort("failed") : r.continue();
+        if (padrao) return u.includes(padrao) ? r.abort("failed") : r.continue();
         return ++n % FALHAS === 0 ? r.abort("failed") : r.continue();
       },
     );
