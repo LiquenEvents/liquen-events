@@ -23,13 +23,20 @@ describe("gallery-image-loader: a grelha não depende do optimizador", () => {
     expect(url).not.toContain("/_next/image");
   });
 
-  it("qualquer origem que não seja /imagens/ cai no optimizador, em vez de 404", () => {
-    // Defensivo: este loader só é usado com fotos da galeria, mas se algum dia
-    // for reutilizado noutro sítio é melhor uma imagem optimizada do que um
-    // ficheiro pré-gerado que nunca existiu.
+  it("qualquer outra origem recebe o ficheiro original, NUNCA o optimizador", () => {
+    // Este ramo mandava a origem inesperada para o `/_next/image`, e o
+    // comentário dizia que assim se evitava um 404. Passou a garanti-lo: desde
+    // que `next.config.ts` declara um `loaderFile`, o optimizador responde 404
+    // a TUDO — `next-server.js` faz `render404` mal veja
+    // `images.loader !== 'default'`, antes de olhar para os parâmetros. Medido:
+    // 200 com o carregador por omissão, 404 com o nosso.
+    //
+    // O original é maior por não ser redimensionado, mas existe. É a mesma
+    // troca que o <GalleryImage> faz quando uma miniatura falha: uma fotografia
+    // pesada vale mais do que nenhuma fotografia.
     const url = galleryImageLoader({ src: "/logos/x.png", width: 640, quality: 50 });
-    expect(url).toContain("/_next/image");
-    expect(url).toContain("q=50");
+    expect(url).toBe("/logos/x.png");
+    expect(url).not.toContain("/_next/image");
   });
 
   it("a chave é o basename saneado (e não colide entre as 427 fotos)", () => {

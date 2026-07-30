@@ -45,9 +45,23 @@ export function heroImageUrl(src: string, width: number): string {
   return `/_img/${heroKey(src)}-${snapHeroWidth(width)}.webp`;
 }
 
-export function heroImageLoader({ src, width, quality }: ImageLoaderProps): string {
+export function heroImageLoader({ src, width }: ImageLoaderProps): string {
   if (HERO_SOURCES.has(src)) return heroImageUrl(src, width);
-  // Defensive fallback: mirror the built-in optimizer URL so an unexpected src
-  // still renders (just without pre-generation).
-  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality ?? 75}`;
+  /**
+   * RECURSO: O FICHEIRO ORIGINAL, TAL E QUAL.
+   *
+   * Isto devolvia um URL do `/_next/image`, descrito como "defensivo". Deixou
+   * de o ser e passou a ser o contrário: desde que `next.config.ts` declara um
+   * `loaderFile`, o optimizador RESPONDE 404 A TUDO. Não é configuração nossa,
+   * é o próprio Next — `next-server.js` faz `render404` mal veja
+   * `images.loader !== 'default'`, antes sequer de olhar para os parâmetros.
+   * Medido nos dois sentidos: o mesmo pedido dá 200 com o carregador por
+   * omissão e 404 com o nosso.
+   *
+   * Ou seja, o ramo que existia para uma origem inesperada ainda funcionar
+   * garantia que ela NUNCA funcionava. Servir o ficheiro original custa bytes
+   * (não é redimensionado) mas aparece sempre — e um herói que aparece grande
+   * de mais é melhor do que um herói que não aparece.
+   */
+  return src;
 }

@@ -72,12 +72,21 @@ export function galleryImageUrl(src: string, width: number): string {
 }
 
 /**
- * Só as fotos da galeria (todas vivem em /imagens/) têm ficheiros
- * pré-gerados. Qualquer outra origem cai no optimizador, para este loader não
- * poder devolver silenciosamente um 404 se algum dia for reutilizado noutro
- * sítio.
+ * Só as fotos que vivem em /imagens/ têm ficheiros pré-gerados. Qualquer outra
+ * origem recebe o ficheiro original tal e qual.
+ *
+ * Este ramo mandava a origem inesperada para o `/_next/image`, com o comentário
+ * de que assim o carregador "não podia devolver silenciosamente um 404". Passou
+ * a garantir exactamente o 404 que queria evitar: desde que `next.config.ts`
+ * declara um `loaderFile`, o optimizador responde 404 a TUDO — é o próprio
+ * Next (`next-server.js` faz `render404` mal veja `images.loader !== 'default'`)
+ * e não uma opção nossa. Medido: 200 com o carregador por omissão, 404 com o
+ * nosso.
+ *
+ * O original é maior, mas existe. É a mesma escolha que o `<GalleryImage>` já
+ * faz quando uma miniatura falha.
  */
-export function galleryImageLoader({ src, width, quality }: ImageLoaderProps): string {
+export function galleryImageLoader({ src, width }: ImageLoaderProps): string {
   if (src.startsWith("/imagens/")) return galleryImageUrl(src, width);
-  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality ?? GALLERY_QUALITY}`;
+  return src;
 }

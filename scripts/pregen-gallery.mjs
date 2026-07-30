@@ -1,5 +1,6 @@
 /**
- * Pré-gera as MINIATURAS da galeria como ficheiros WebP estáticos.
+ * Pré-gera as MINIATURAS de TODAS as fotos do site como ficheiros WebP
+ * estáticos.
  *
  * PORQUÊ. Ver o cabeçalho de src/app/[lang]/galeria/gallery-image-loader.ts.
  * Em resumo: cada miniatura da grelha era uma transformação on-demand no
@@ -10,15 +11,25 @@
  * ficheiros estáticos do CDN, as miniaturas deixam de ter quota, encode,
  * arranque a frio ou tempo esgotado — deixam de poder falhar.
  *
- * SAÍDA. public/_img/g/<chave>-<largura>.webp, para as 427 fotos de
- * photos-data.ts nas larguras de GALLERY_WIDTHS. NÃO é versionado (ver
- * .gitignore): são ~166 MB de WebP incompressível (gzip -1 poupa 0,2%) que o
- * build regenera de graça.
+ * PORQUÊ TODAS E NÃO SÓ AS DA GALERIA. Retirar a galeria do optimizador
+ * resolveu a galeria e mais nada: o menu, o portefólio das páginas de serviço e
+ * os fundos de secção continuavam a passar pelo `/_next/image`, e é aí que a
+ * dona do site continuava a ver ícones de imagem partida. As fotos que essas
+ * páginas desenham vêm todas da MESMA pasta (public/imagens/), mas nem todas
+ * estão em photos-data.ts — são 557 ficheiros contra 427 na galeria. Gerar só
+ * as 427 deixava 130 sem ficheiro estático, ou seja, deixava o problema de pé
+ * exactamente onde ele estava a ser visto. A regra passa a ser simples e sem
+ * excepções: TODO o ficheiro de imagem em public/imagens/ tem escada estática.
+ *
+ * SAÍDA. public/_img/g/<chave>-<largura>.webp, para todos os ficheiros de
+ * imagem de public/imagens/ nas larguras de GALLERY_WIDTHS. NÃO é versionado
+ * (ver .gitignore): são ~220 MB de WebP incompressível (gzip -1 poupa 0,2%) que
+ * o build regenera de graça.
  *
  * CACHE DE BUILD. A saída é primeiro escrita em .next/cache/pregen-gallery/
  * (pasta que a Vercel preserva entre builds) e depois ligada por hardlink para
  * public/_img/g. Um build em que nenhuma foto mudou não re-encoda nada: só
- * refaz os links (~1 s). Só o primeiro build de cada foto paga o encode.
+ * refaz os links (~3 s). Só o primeiro build de cada foto paga o encode.
  *
  * Manter WIDTHS / QUALITY / galleryKey() em sincronia com
  * src/app/[lang]/galeria/gallery-image-loader.ts (esse ficheiro é TS e não
@@ -26,6 +37,7 @@
  * saírem de sincronia.
  *
  * Corre automaticamente no `npm run build`; à parte com `npm run pregen`.
+ * Os logótipos têm escada e pasta próprias — ver scripts/pregen-logos.mjs.
  */
 import sharp from "sharp";
 import { promises as fs } from "fs";
@@ -34,9 +46,24 @@ import os from "os";
 
 const ROOT = process.cwd();
 const PUBLIC = path.join(ROOT, "public");
+const IMAGES_DIR = path.join(PUBLIC, "imagens");
 const OUT_DIR = path.join(PUBLIC, "_img", "g");
 const CACHE_DIR = path.join(ROOT, ".next", "cache", "pregen-gallery");
 const INDEX_FILE = path.join(CACHE_DIR, "index.json");
+
+/** Extensões que contam como foto. Em sincronia com o teste de caminho lá em
+    baixo — o que este filtro deixa entrar tem de passar nesse teste. */
+const IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
+
+/**
+ * public/imagens/_intake/ é a bandeja de entrada de scripts/gallery-sync.mjs:
+ * fotos que ainda NÃO fazem parte do site e que o sync move para
+ * public/imagens/ quando entram mesmo. Gerar-lhes a escada seria encode pago
+ * por fotos que nada desenha e, pior, uma foto em trânsito existiria nos dois
+ * sítios com o mesmo basename — ou seja, uma colisão de chave a falhar o build
+ * a meio de um `gallery:sync`.
+ */
+const SKIP_DIRS = new Set(["_intake"]);
 
 // Em sincronia com GALLERY_WIDTHS / GALLERY_QUALITY do loader.
 const WIDTHS = [384, 640, 768, 1024, 1280];
@@ -52,8 +79,12 @@ function galleryKey(src) {
   return base.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
-/** As fontes, lidas do módulo de dados (é TS, por isso lê-se como texto). */
-async function readSources() {
+/**
+ * As fotos DA GALERIA, lidas do módulo de dados (é TS, por isso lê-se como
+ * texto). Já não é a lista de trabalho — é só o subconjunto que precisa de cor
+ * em tile-colors.json, e a lista que TEM de existir no disco.
+ */
+async function readGallerySources() {
   const dataFile = path.join(ROOT, "src", "app", "[lang]", "galeria", "photos-data.ts");
   const raw = await fs.readFile(dataFile, "utf8");
   const sources = [...raw.matchAll(/src: "([^"]+)"/g)].map((m) => m[1]);
@@ -63,7 +94,35 @@ async function readSources() {
   return [...new Set(sources)];
 }
 
-const sources = await readSources();
+/** Todos os ficheiros de imagem debaixo de public/imagens/, como `src` do site
+    ("/imagens/…"). Recursivo: uma pasta nova de fotos entra sozinha. */
+async function readDiskSources(dir = IMAGES_DIR) {
+  const out = [];
+  for (const ent of await fs.readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) {
+      if (SKIP_DIRS.has(ent.name)) continue;
+      out.push(...(await readDiskSources(full)));
+    } else if (ent.isFile() && IMAGE_EXT.test(ent.name)) {
+      out.push("/" + path.relative(PUBLIC, full).split(path.sep).join("/"));
+    }
+  }
+  return out;
+}
+
+const gallerySources = await readGallerySources();
+const GALLERY_SRCS = new Set(gallerySources);
+
+/**
+ * A UNIÃO, e não só o disco.
+ *
+ * Se uma foto estiver em photos-data.ts e não no disco, enumerar só o disco
+ * fazia-a desaparecer da lista de trabalho E da verificação final — build
+ * verde, mosaico partido em produção. Somando as duas listas, essa foto entra
+ * na lista, não abre, e o script falha com "ficheiro de origem não existe", que
+ * é o que tem de acontecer.
+ */
+const sources = [...new Set([...gallerySources, ...(await readDiskSources())])].sort();
 
 // Duas fotos com o mesmo basename dariam a mesma chave e uma escreveria por
 // cima da outra — silenciosamente, e a galeria mostraria a foto errada.
@@ -256,33 +315,58 @@ if (failures.length) {
  * falta. No site isso é um 404 por mosaico, ou seja, a queixa que este script
  * existe para eliminar.
  *
- * O contrato que a galeria assume é exactamente este: PARA CADA foto de
- * photos-data.ts e CADA largura da escada existe um ficheiro. Ou se verifica,
- * ou não é um contrato. São ~2100 `stat` no fim de um passo de ~100s.
+ * O contrato que o site assume é exactamente este: PARA CADA ficheiro de imagem
+ * de public/imagens/ e CADA largura da escada existe um ficheiro. Ou se
+ * verifica, ou não é um contrato. São ~2800 `stat` no fim de um passo de ~130s.
  */
 const missing = [];
+const badKeys = new Set();
 for (const src of sources) {
   const key = galleryKey(src);
   for (const w of WIDTHS) {
     const out = path.join(OUT_DIR, `${key}-${w}.webp`);
     try {
       const s = await fs.stat(out);
-      if (s.size === 0) missing.push(`${key}-${w}.webp (0 bytes)`);
+      if (s.size === 0) {
+        missing.push(`${key}-${w}.webp (0 bytes)`);
+        badKeys.add(key);
+      }
     } catch {
       missing.push(`${key}-${w}.webp`);
+      badKeys.add(key);
     }
   }
 }
 if (missing.length) {
+  /**
+   * FALHAR ALTO, MAS NÃO ENCRAVAR PARA SEMPRE.
+   *
+   * A cache vive em .next/cache/, que a Vercel guarda entre builds. Uma entrada
+   * má lá dentro (uma escrita cortada a meio por um build cancelado, por
+   * exemplo) tem o carimbo certo e o ficheiro no sítio — só que vazio. Sem isto,
+   * a verificação reprovava-a hoje e voltaria a reprová-la em TODOS os builds
+   * seguintes, e a única saída seria alguém ir limpar a cache à mão. Deitando
+   * fora as entradas culpadas antes de sair, este build falha (que é o que tem
+   * de fazer) e o próximo regenera-as sozinho.
+   */
+  for (const key of badKeys) {
+    for (const w of WIDTHS) {
+      await fs.rm(path.join(CACHE_DIR, `${key}-${w}.webp`), { force: true });
+      await fs.rm(path.join(OUT_DIR, `${key}-${w}.webp`), { force: true });
+    }
+  }
   console.error(
     `pregen-gallery: ${missing.length} ficheiro(s) em falta na saída, de ` +
       `${sources.length * WIDTHS.length} esperados:`,
   );
   for (const m of missing.slice(0, 20)) console.error(`  - ${m}`);
+  console.error(
+    `  ${badKeys.size} entrada(s) da cache deitadas fora — uma nova corrida regenera-as.`,
+  );
   process.exit(1);
 }
 
-// Limpeza: ficheiros de fotos que já não existem em photos-data.ts, tanto na
+// Limpeza: ficheiros de fotos que já não existem em public/imagens/, tanto na
 // saída como na cache (senão a cache cresce para sempre).
 const wanted = new Set();
 for (const key of byKey.keys()) for (const w of WIDTHS) wanted.add(`${key}-${w}.webp`);
@@ -311,12 +395,22 @@ await fs.writeFile(INDEX_FILE, JSON.stringify(nextIndex), "utf8");
  * `tsc`/`eslint`/`vitest` funcionarem numa árvore acabada de clonar sem ter de
  * correr o build primeiro. Só se reescreve quando muda, para um build não
  * sujar a árvore de trabalho à toa.
+ *
+ * SÓ AS FOTOS DA GALERIA. O script gera miniaturas para os 557 ficheiros de
+ * public/imagens/, mas este ficheiro fica-se pelas 427 de photos-data.ts: as
+ * outras 130 nunca são desenhadas como mosaico, portanto a cor delas não serve
+ * a ninguém — seria peso morto no bundle da página e entradas órfãs que o teste
+ * "não tem entradas a mais" de gallery-image-loader.test.ts recusa, e bem.
+ * (A cor continua a ser calculada e guardada no índice da cache para todas: é
+ * derivada da miniatura de 384 que já se gerou, não custa um decode extra, e
+ * poupa recalcular o dia em que uma foto entre na galeria.)
  */
 const COLORS_FILE = path.join(ROOT, "src", "app", "[lang]", "galeria", "tile-colors.json");
 const colorsJson =
   JSON.stringify(
     Object.fromEntries(
       Object.keys(colors)
+        .filter((src) => GALLERY_SRCS.has(src))
         .sort()
         .map((k) => [k, colors[k]]),
     ),
@@ -334,9 +428,10 @@ if (colorsChanged) await fs.writeFile(COLORS_FILE, colorsJson, "utf8");
 const seconds = (Date.now() - t0) / 1000;
 const totalBytes = Object.values(bytesByWidth).reduce((a, b) => a + b, 0);
 console.log(
-  `pregen-gallery: ${sources.length} fotos x ${WIDTHS.length} larguras = ` +
-    `${sources.length * WIDTHS.length} ficheiros (${(totalBytes / 1048576).toFixed(1)} MB) ` +
-    `em ${seconds.toFixed(1)}s — ${encoded} encodadas, ${reused} reaproveitadas da cache` +
+  `pregen-gallery: ${sources.length} fotos (${gallerySources.length} na galeria) x ` +
+    `${WIDTHS.length} larguras = ${sources.length * WIDTHS.length} ficheiros ` +
+    `(${(totalBytes / 1048576).toFixed(1)} MB) em ${seconds.toFixed(1)}s — ` +
+    `${encoded} encodadas, ${reused} reaproveitadas da cache` +
     (pruned ? `, ${pruned} obsoletas removidas` : ""),
 );
 console.log(

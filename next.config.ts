@@ -11,6 +11,31 @@ const nextConfig: NextConfig = {
   // serverless and throw when the first image is processed.
   serverExternalPackages: ["sharp"],
   images: {
+    // O CARREGADOR GLOBAL DO next/image. Toda a imagem que não passe um
+    // `loader={…}` próprio deixa de pedir ao optimizador on-demand e passa a
+    // apontar para um WebP estático gerado no build — ver
+    // src/lib/site-image-loader.ts, que explica o porquê e traz as medições.
+    //
+    // ISTO DESLIGA O `/_next/image`. Não é um efeito lateral subtil: com
+    // `images.loader !== "default"` o servidor responde 404 ao endpoint antes
+    // de validar seja o que for (node_modules/next/dist/server/next-server.js:
+    // 198). Medido contra este build, com o servidor de produção a correr:
+    //   antes -> /_next/image?url=%2Flogo-liquen.png&w=256&q=55  HTTP 200
+    //   depois-> o MESMO pedido                                  HTTP 404
+    // Portanto NENHUM caminho do código pode voltar a construir um URL
+    // `/_next/image` à mão e esperar uma imagem. Já há um sítio assim:
+    // src/lib/image-src.ts (`sizedImageSrc`), usado pelo HeroCanvas — está
+    // documentado no relatório, degrada sem partir a página (a camada WebGL
+    // fica sem textura), mas é dívida a pagar.
+    //
+    // O `loader={…}` passado como prop CONTINUA a ganhar a este carregador
+    // global — `let loader = rest.loader || defaultLoader` em
+    // node_modules/next/dist/shared/lib/get-img-props.js:175 —, por isso os
+    // heróis (src/components/HeroImage.tsx, escada até 2048) e a galeria
+    // (GalleryImage) mantêm os seus intactos. Verificado por medição: o srcset
+    // dos heróis continua a apontar para /_img/<chave>-2048.webp.
+    loader: "custom",
+    loaderFile: "./src/lib/site-image-loader.ts",
     // WebP only — no AVIF. AVIF compresses a few % smaller but o seu encode
     // on-the-fly é várias vezes mais lento, e um encode a frio de vários
     // segundos por imagem é exactamente o que fazia o optimizador esgotar o
@@ -24,6 +49,21 @@ const nextConfig: NextConfig = {
     // dependerem de encode on-demand nenhum. O que resta neste optimizador é a
     // foto do lightbox e as imagens de conteúdo das outras páginas.
     formats: ["image/webp"],
+    // NOTA DE 2026-07 (carregador global): esta lista já NÃO tem efeito
+    // nenhum sobre o que é servido. Medido: com `loader: "custom"` o
+    // `/_next/image` responde 404, portanto o `validateParams` que devolvia o
+    // HTTP 400 descrito abaixo nunca chega a correr, e o `findClosestQuality`
+    // vive no carregador por omissão, que passou a ser substituído pelo nosso
+    // (build/create-compiler-aliases.js:146). O que a lista ainda faz é o aviso
+    // de DESENVOLVIMENTO em get-img-props.js:423.
+    //
+    // FICA COMO ESTÁ, na mesma. Duas razões: é o que volta a mandar no instante
+    // em que alguém tirar o `loaderFile` (e nessa altura um valor em falta
+    // apaga a imagem em produção, sem aviso); e o teste que a guarda
+    // (galeria/next-image-config.test.ts) continua a ser a única coisa que
+    // impede um `quality={N}` novo de entrar sem ninguém olhar. Tirá-la seria
+    // poupar seis números e reabrir uma armadilha já paga.
+    //
     // ESTA LISTA TEM DE CONTER TODOS OS `quality={…}` DO SÍTIO. O optimizador
     // rejeita com HTTP 400 (`"q" parameter (quality) of N is not allowed`)
     // qualquer valor que não esteja aqui — ver
