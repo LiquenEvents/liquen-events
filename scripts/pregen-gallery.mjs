@@ -120,88 +120,93 @@ async function worker() {
     const key = galleryKey(src);
 
     /**
-     * O `src` vem de um ficheiro de dados, e juntá-lo a um caminho sem o ver
-     * primeiro é a receita para sair de `public/` (um `../` na lista chegava).
-     * Hoje a lista é código nosso, mas um script de build que escreve ficheiros
-     * a partir de caminhos que não valida é o género de coisa que se torna
-     * perigosa no dia em que a lista passar a vir de outro sítio.
+     * VALIDAR O CAMINHO ANTES DE LHE TOCAR.
      *
-     * Duas verificações: a forma tem de ser a esperada, e o caminho RESOLVIDO
-     * tem de continuar dentro de `public/` (é esta segunda que apanha os truques
-     * que a primeira deixaria passar).
+     * O `src` vem de um ficheiro de dados e vai parar a leituras e escritas no
+     * disco. Hoje a lista é código nosso, mas um script de build que escreve a
+     * partir de caminhos que não valida torna-se perigoso no dia em que a lista
+     * passar a vir de outro lado.
+     *
+     * A lista de caracteres do nome é deliberadamente LARGA: as fotos reais
+     * chamam-se "M&F0678.jpg" ou "natalia e jonathan-4.jpg". Uma expressão
+     * apertada recusava 153 das 427 (medido a correr o build), o que seria bem
+     * pior do que o problema. Quem faz o trabalho de segurança é o
+     * `path.relative` a seguir: se o caminho resolvido sair de `public/`, a
+     * relativa começa com ".." ou é absoluta.
      */
-    // A lista de caracteres do nome é deliberadamente LARGA: as fotos reais
-    // chamam-se "M&F0678.jpg", "Sophia&Artur_MAINOVA-123.jpg", "natalia e
-    // jonathan-4.jpg". Uma expressão apertada em [\w.-] recusava 153 das 427
-    // (medido ao correr o build), o que seria bem pior do que o problema que
-    // estamos a resolver. Quem faz mesmo o trabalho de segurança é a
-    // verificação do caminho resolvido, logo a seguir.
-    if (!/^\/[^\0]+\.(jpe?g|png|webp)$/i.test(src) || src.includes("..")) {
+    if (!/^\/[^\0]+\.(jpe?g|png|webp)$/i.test(src)) {
       failures.push(`${src}: caminho de origem recusado`);
       continue;
     }
     const inputPath = path.resolve(PUBLIC, "." + src);
-    if (inputPath !== path.normalize(inputPath) || !inputPath.startsWith(PUBLIC + path.sep)) {
+    const rel = path.relative(PUBLIC, inputPath);
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
       failures.push(`${src}: caminho de origem fora de public/`);
       continue;
     }
 
-    let st;
+    /**
+     * UM SÓ DESCRITOR PARA VER E PARA LER.
+     *
+     * Antes fazia-se `stat(caminho)` e, mais abaixo, `readFile(caminho)`: duas
+     * resoluções do mesmo nome, e entre elas o ficheiro pode mudar ou ser
+     * trocado. Abrindo UMA vez e usando o descritor para as duas coisas, ambas
+     * falam do mesmo ficheiro, sempre.
+     */
+    let fh;
     try {
-      st = await fs.stat(inputPath);
+      fh = await fs.open(inputPath, "r");
     } catch {
       failures.push(`${src}: ficheiro de origem não existe`);
       continue;
     }
-    const want = stamp(st);
 
-    // Reaproveitar da cache de build quando a fonte não mudou E todos os
-    // ficheiros estão lá (uma cache truncada regenera em vez de mentir).
-    let cached = index[key] === want;
-    if (cached) {
-      for (const w of WIDTHS) {
-        try {
-          await fs.access(path.join(CACHE_DIR, `${key}-${w}.webp`));
-        } catch {
-          cached = false;
-          break;
+    let want;
+    try {
+      const st = await fh.stat();
+      want = stamp(st);
+
+      // Reaproveitar da cache de build quando a fonte não mudou E todos os
+      // ficheiros estão lá (uma cache truncada regenera em vez de mentir).
+      let cached = index[key] === want;
+      if (cached) {
+        for (const w of WIDTHS) {
+          try {
+            await fs.access(path.join(CACHE_DIR, `${key}-${w}.webp`));
+          } catch {
+            cached = false;
+            break;
+          }
         }
       }
-    }
 
-    if (!cached) {
-      let meta;
-      try {
-        meta = await sharp(inputPath).metadata();
-      } catch (err) {
-        failures.push(`${src}: ${err.message}`);
-        continue;
+      if (!cached) {
+        // Um único read do original reutilizado para todas as larguras: o custo
+        // dominante é o decode, não o encode. Lido pelo MESMO descritor.
+        let input;
+        let meta;
+        try {
+          input = await fh.readFile();
+          meta = await sharp(input).metadata();
+        } catch (err) {
+          failures.push(`${src}: ${err.message}`);
+          continue;
+        }
+        for (const w of WIDTHS) {
+          // Nunca ampliar acima da fonte (igual ao next/image).
+          const target = meta.width ? Math.min(w, meta.width) : w;
+          const buf = await sharp(input)
+            .resize(target, null, { withoutEnlargement: true })
+            .webp({ quality: QUALITY })
+            .toBuffer();
+          await fs.writeFile(path.join(CACHE_DIR, `${key}-${w}.webp`), buf);
+        }
+        encoded++;
+      } else {
+        reused++;
       }
-      // Um único read do original reutilizado para todas as larguras: o custo
-      // dominante é o decode, não o encode.
-      //
-      // Lê-se e trata-se o erro aqui em vez de confiar no `stat` de cima: entre
-      // as duas chamadas o ficheiro pode ter desaparecido, e um build não deve
-      // ir abaixo por causa disso.
-      let input;
-      try {
-        input = await fs.readFile(inputPath);
-      } catch (err) {
-        failures.push(`${src}: ${err.message}`);
-        continue;
-      }
-      for (const w of WIDTHS) {
-        // Nunca ampliar acima da fonte (igual ao next/image).
-        const target = meta.width ? Math.min(w, meta.width) : w;
-        const buf = await sharp(input)
-          .resize(target, null, { withoutEnlargement: true })
-          .webp({ quality: QUALITY })
-          .toBuffer();
-        await fs.writeFile(path.join(CACHE_DIR, `${key}-${w}.webp`), buf);
-      }
-      encoded++;
-    } else {
-      reused++;
+    } finally {
+      await fh.close();
     }
 
     for (const w of WIDTHS) {
