@@ -60,10 +60,17 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Informational for now: runs the suite but never blocks the PR (the browser
-    # environment can't be validated from the dev sandbox).
-    continue-on-error: true
+    timeout-minutes: 30
+    # O `continue-on-error` DESCEU DO JOB PARA O PASSO informativo, e é a única
+    # razão por que este ficheiro foi tocado.
+    #
+    # Enquanto estava aqui em cima, NENHUM teste E2E podia pôr um PR vermelho —
+    # a suite corria e o resultado era decorativo. Era essa a peça mecânica que
+    # faltava por trás da queixa "as fotos falham imenso": mesmo que existisse um
+    # teste a apanhar uma imagem partida (e não existia), o CI deixava-a passar à
+    # mesma. A rede de segurança das imagens (e2e/imagens.spec.ts, títulos com
+    # `@imagens`) passa a correr num passo próprio e BLOQUEANTE; o resto da suite
+    # fica exactamente como estava, informativo, no passo anterior.
     steps:
       - uses: actions/checkout@v4
 
@@ -84,14 +91,27 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      # Corre primeiro o resto da suite (informativo). Se corresse depois do
+      # passo bloqueante, uma falha nas imagens saltava-o por completo.
+      - name: Run E2E tests (informational)
+        continue-on-error: true
+        run: npx playwright test --grep-invert "@imagens"
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
           # production `next start` server (which otherwise disables login).
           # Hash is the already-committed dev hash for the public "liquen2026"
           # password — no real secret; the session secret is throwaway.
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. Uma imagem que não pinte em qualquer página, em telemóvel ou
+      # em computador, com o menu fechado ou aberto, põe o PR vermelho. Corre em
+      # último para o relatório HTML que fica no artefacto ser o desta rede.
+      - name: Imagens — nenhuma imagem partida em nenhuma página
+        run: npx playwright test --grep "@imagens"
+        env:
+          CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
