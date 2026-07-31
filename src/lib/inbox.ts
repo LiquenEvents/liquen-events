@@ -348,12 +348,45 @@ async function extractBody(raw: Buffer): Promise<string> {
  * de <script>/<style> são deitados fora inteiros para não aparecerem como
  * "corpo" da mensagem.
  */
+/** Bloco `<script>`/`<style>` inteiro, com o fecho tolerante. */
+const BLOCO_EXECUTAVEL = /<(script|style)\b[^>]*>[\s\S]*?<\/\1[^>]*>/gi;
+/** Qualquer etiqueta, incluindo uma que fique por fechar no fim da string. */
+const ETIQUETA = /<[^>]*>|<[^>]*$/g;
+
+/**
+ * HTML → TEXTO SIMPLES. Não é um sanitizador de HTML, e a distinção importa.
+ *
+ * O que sai daqui vai para o campo `text` de uma `InboxMessage` e é desenhado
+ * pelo React como nó de texto, que escapa tudo. **A barreira de segurança é
+ * essa**; esta função existe para o corpo do email ser LEGÍVEL — sem folhas de
+ * estilo nem código a encher o ecrã. Se algum dia o resultado for parar a
+ * `dangerouslySetInnerHTML`, isto não chega, nem de perto: aí é preciso um
+ * sanitizador a sério.
+ *
+ * Mesmo assim vale a pena ser robusto, e o CodeQL apontou duas fraquezas reais
+ * na primeira versão:
+ *
+ *  · `<\/script>` não casa com `</script >` nem com `</script\ncorpo>` — o HTML
+ *    permite espaços e atributos na etiqueta de fecho, e um remetente que os
+ *    use fazia o corpo do `<script>` sobreviver ao filtro e aparecer como texto.
+ *  · uma passagem única não basta: `<scr<script>ipt>` volta a formar
+ *    `<script>` depois de a etiqueta do meio ser removida.
+ *
+ * Daí o ciclo até estabilizar. O tecto de voltas evita que uma entrada
+ * construída de propósito nos ponha a iterar sem fim — e chegar ao tecto é
+ * irrelevante para a segurança, porque o React escapa o que sobrar.
+ */
+/** Só para testes: o `stripHtml` é interno, mas as fraquezas que o CodeQL
+ *  apontou têm de ficar fixadas por teste, e testá-las através de um servidor
+ *  IMAP falso seria testar o mailparser, não isto. */
+export const __stripHtmlParaTestes = (html: string) => stripHtml(html);
+
 function stripHtml(html: string): string {
-  return html
-    .slice(0, MAX_HTML_PARSE)
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  let texto = html.slice(0, MAX_HTML_PARSE);
+  for (let volta = 0; volta < 8; volta++) {
+    const antes = texto;
+    texto = texto.replace(BLOCO_EXECUTAVEL, " ").replace(ETIQUETA, " ");
+    if (texto === antes) break;
+  }
+  return texto.replace(/\s+/g, " ").trim();
 }

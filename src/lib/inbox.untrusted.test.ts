@@ -141,3 +141,43 @@ describe("clampBody", () => {
     expect(out).toContain("Mensagem demasiado longa");
   });
 });
+
+/**
+ * O `stripHtml` visto como o CodeQL o vê.
+ *
+ * Não é a barreira de segurança — o React é — mas as duas fraquezas que o
+ * CodeQL apontou eram reais: a etiqueta de fecho tolerante e a necessidade de
+ * iterar. Fixadas aqui para não voltarem.
+ */
+describe("stripHtml — as duas fraquezas que o CodeQL apontou", () => {
+  // Só se testa através da API pública; o corpo HTML entra pelo caminho do
+  // segundo parser (o que não converte HTML→texto).
+  const limpar = async (html: string) => {
+    const { __stripHtmlParaTestes } = (await import("./inbox")) as unknown as {
+      __stripHtmlParaTestes?: (s: string) => string;
+    };
+    return __stripHtmlParaTestes?.(html) ?? "";
+  };
+
+  it("apanha um fecho com espaço: `</script >`", async () => {
+    const saida = await limpar('<script >alert("xss")</script >texto visível');
+    expect(saida).not.toContain("alert");
+    expect(saida).toContain("texto visível");
+  });
+
+  it("apanha um fecho com atributos: `</script foo>`", async () => {
+    const saida = await limpar("<script>maligno()</script foo>fim");
+    expect(saida).not.toContain("maligno");
+  });
+
+  it("uma passagem só não chega: `<scr<script>ipt>` volta a formar a etiqueta", async () => {
+    const saida = await limpar("<scr<script>ipt>corpo</scr</script>ipt>resto");
+    expect(saida).not.toMatch(/<script/i);
+  });
+
+  it("uma etiqueta por fechar no fim não sobrevive", async () => {
+    const saida = await limpar("visível <script");
+    expect(saida).not.toContain("<script");
+    expect(saida).toContain("visível");
+  });
+});
