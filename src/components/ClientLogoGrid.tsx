@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRef, useState } from "react";
-import { logoHeight, logoDimsFor } from "@/lib/logo";
+import { logoHeight, logoDimsFor, logoSizes } from "@/lib/logo";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 
@@ -33,11 +33,13 @@ function ClientLogo({ client, index }: { client: Client; index: number }) {
               alt={client.name}
               width={d[0]}
               height={d[1]}
-              // Match the responsive grid (2/3/4/5 cols within max-w-7xl, capped
-              // at 68% of the cell) so next/image builds a viewport-aware srcset
-              // instead of a 1x/2x one off the raw source width — same look, a
-              // fraction of the bytes across ~20 logos on /clientes.
-              sizes="(max-width: 639px) 34vw, (max-width: 1023px) 23vw, (max-width: 1279px) 17vw, 157px"
+              // O `sizes` é POR LOGÓTIPO. O 157px que aqui estava era a largura
+              // do logótipo MAIS LARGO da parede; os outros são desenhados a
+              // 30–60px (a altura vem da área, ver logoHeight) e recebiam na
+              // mesma o ficheiro de 256px. A mesma função serve a fita da
+              // página inicial, para os três `<img>` do mesmo cliente nesta
+              // página resolverem para um só URL. Ver a nota em src/lib/logo.ts.
+              sizes={logoSizes(client.logo)}
               // Flat black silhouette (brightness-0) — encoder quality is
               // imperceptible, so 50 trims the bytes of ~20 logos on /clientes.
               quality={50}

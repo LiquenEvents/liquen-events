@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { clientLogos } from "@/data";
-import { logoHeight, logoDimsFor } from "@/lib/logo";
+import { logoHeight, logoDimsFor, logoSizes } from "@/lib/logo";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { useTranslations } from "./LocaleProvider";
 
@@ -47,11 +47,14 @@ function Mark({
         alt={duplicate ? "" : name}
         width={d[0]}
         height={d[1]}
-        // Without `sizes`, next/image builds a 1x/2x srcset off the raw source
-        // width and serves a ~640–1280px file for a logo rendered ≤170px wide.
-        // Declaring the CSS cap switches it to a viewport/DPR-aware srcset that
-        // picks a correctly-small candidate — same pixels, far fewer bytes.
-        sizes="(max-width: 640px) 120px, 170px"
+        // O `sizes` é POR LOGÓTIPO, não um valor único para a fita toda: a
+        // altura é dada por área (logoHeight), portanto um logótipo alto e
+        // estreito é desenhado a 28px e um wordmark fino a 170px. Declarar 170
+        // para os dois fazia o browser ir buscar a mesma variante de 256px para
+        // ambos — 27,8 KB para pintar 28px no caso do convento. Ver a nota
+        // longa em src/lib/logo.ts; é a MESMA função que a parede usa, para os
+        // três `<img>` do mesmo cliente em /clientes caírem no mesmo URL.
+        sizes={logoSizes(logo)}
         // Rendered as flat black silhouettes (brightness-0), so encoder quality
         // is imperceptible — 50 just trims the bytes of every logo in the strip.
         quality={50}
