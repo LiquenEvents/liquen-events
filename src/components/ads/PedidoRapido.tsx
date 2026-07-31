@@ -171,7 +171,7 @@ export default function PedidoRapido({
       addons: [],
       budgetRange: null,
       urgency: "standard",
-      notes: `Pedido rápido — ${contexto}`,
+      notes: `Pedido rápido (${contexto})`,
       referralSource: lerOrigem(),
       adClick: lerAdClick(),
       name: s("nome"),

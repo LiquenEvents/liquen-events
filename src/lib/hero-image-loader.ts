@@ -68,6 +68,19 @@ export const HERO_SOURCES = new Set([
   "/imagens/stephanie-mizio-715.jpg",
   "/imagens/stephanie-mizio-760.jpg",
   "/imagens/viaturas-classicas.jpg",
+  // Heróis das landing pages das campanhas (src/lib/ads/polos.ts). São todos
+  // desenhados a `sizes="100vw"` e são o candidato a LCP de uma página que
+  // recebe tráfego PAGO — é o pior sítio do site para servir uma imagem suave.
+  // O teste `polos-heroi.test.ts` garante que nenhum herói do catálogo fica
+  // fora desta lista quando ela acrescentar um polo novo.
+  "/imagens/EW1_1392.jpg",
+  "/imagens/J&A-242.jpg",
+  "/imagens/J&P-DJI_20250628164714_0165_D.jpg",
+  "/imagens/DaniGui_Preview12.jpg",
+  "/imagens/EW1_0688.jpg",
+  "/imagens/EW1_1427.jpg",
+  "/imagens/EW1_1342.jpg",
+  "/imagens/J&A-52.jpg",
 ]);
 
 /** Esta fotografia é desenhada a toda a largura e tem ficheiros até 2048 px? */

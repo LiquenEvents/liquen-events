@@ -53,6 +53,15 @@ const HERO_SOURCES = [
   "/imagens/stephanie-mizio-715.jpg",
   "/imagens/stephanie-mizio-760.jpg",
   "/imagens/viaturas-classicas.jpg",
+  // Heróis das landing pages das campanhas (src/lib/ads/polos.ts).
+  "/imagens/EW1_1392.jpg",
+  "/imagens/J&A-242.jpg",
+  "/imagens/J&P-DJI_20250628164714_0165_D.jpg",
+  "/imagens/DaniGui_Preview12.jpg",
+  "/imagens/EW1_0688.jpg",
+  "/imagens/EW1_1427.jpg",
+  "/imagens/EW1_1342.jpg",
+  "/imagens/J&A-52.jpg",
 ];
 
 // The widths the loader snaps to. A hero is 100vw, so these span phone → 2x

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import SafeImage from "@/components/SafeImage";
+import HeroImage from "@/components/HeroImage";
 import PedidoRapido, { TEXTOS_PT, TEXTOS_EN } from "@/components/ads/PedidoRapido";
 import { blurFor } from "@/lib/blur";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -102,7 +103,12 @@ export default async function PoloPage({
           esperar pela hidratação nem por um observador de intersecção. */}
       <section className="relative min-h-[92svh] flex items-center">
         <div className="absolute inset-0">
-          <SafeImage
+          {/* HeroImage e não SafeImage: só o HeroImage usa o `heroImageLoader`,
+              que resolve a imagem para os WebP estáticos até 2048 px. Numa
+              página que recebe tráfego pago o herói é o candidato a LCP, e um
+              herói servido pela escada das fotos comuns fica visivelmente mais
+              suave no ecrã grande. */}
+          <HeroImage
             src={polo.hero}
             alt=""
             fill
@@ -163,8 +169,8 @@ export default async function PoloPage({
             </ul>
             <p className="mt-6 text-[12px] text-foreground/45 max-w-2xl leading-relaxed">
               {en
-                ? "Venues we know in the region. If yours is not listed, tell us which it is — we will have walked something like it."
-                : "Espaços que conhecemos na região. Se o seu não estiver na lista, diga-nos qual é — já montámos em espaços do mesmo género."}
+                ? "Venues we know in the region. If yours is not listed, tell us which it is. We will have walked something like it."
+                : "Espaços que conhecemos na região. Se o seu não estiver na lista, diga-nos qual é. Já montámos em espaços do mesmo género."}
             </p>
           </div>
         </section>

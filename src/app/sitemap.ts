@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { SITE } from "@/lib/site";
 import { SERVICES } from "@/lib/services-data";
 import { PHOTOS } from "@/app/[lang]/galeria/photos-data";
+import { POLOS, ESTILOS, caminhoPolo } from "@/lib/ads/polos";
 
 const base = SITE.url;
 
@@ -124,6 +125,37 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
+  // Landing pages das campanhas. Entram no sitemap de propósito, ainda que
+  // sejam destino de tráfego PAGO: uma página que a Google já conhece e indexou
+  // arranca com Índice de Qualidade melhor do que uma que ela vê pela primeira
+  // vez quando o anúncio começa a servir, e o custo por clique reflecte isso.
+  // O conteúdo delas é próprio (não é duplicado de /servicos), por isso não há
+  // risco de canibalização orgânica.
+  const campanhas: RawEntry[] = [
+    ...POLOS.map((p) => ({
+      path: caminhoPolo(p.slug),
+      // Todo o conteúdo destas páginas vive no catálogo — não há ficheiro por
+      // polo a que apontar, tal como acontece nos serviços.
+      sourceFile: "src/lib/ads/polos.ts",
+      changeFrequency: "monthly" as const,
+      priority: 0.8,
+      images: [p.hero, ...p.fotos].map(abs),
+    })),
+    ...ESTILOS.map((e) => ({
+      path: `/casamentos/estilo/${e.slug}`,
+      sourceFile: "src/lib/ads/polos.ts",
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+      images: [e.hero, ...e.fotos].map(abs),
+    })),
+    {
+      path: "/casamentos/destination",
+      sourceFile: "src/app/[lang]/casamentos/destination/page.tsx",
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+  ];
+
   const services: RawEntry[] = SERVICES.map((s) => ({
     path: `/servicos/${s.slug}`,
     // All service content (copy, hero, gallery, FAQs) lives in this single
@@ -140,7 +172,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // annotation on the PT one) — Google's documented pattern for sitemaps
   // with alternate-language pages — with both entries listing the full
   // reciprocal set, including themselves.
-  return [...core, ...services].flatMap((entry): MetadataRoute.Sitemap => {
+  return [...core, ...services, ...campanhas].flatMap((entry): MetadataRoute.Sitemap => {
     // Home is canonical without a trailing slash (matches the <link rel=canonical>
     // and OG url), so don't emit `${base}/` for it.
     const ptUrl = entry.path === "/" ? base : `${base}${entry.path}`;
