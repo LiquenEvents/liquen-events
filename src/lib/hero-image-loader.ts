@@ -71,19 +71,24 @@ export const HERO_SOURCES = new Set([
   // Heróis das landing pages das campanhas (src/lib/ads/polos.ts). São todos
   // desenhados a `sizes="100vw"` e são o candidato a LCP de uma página que
   // recebe tráfego PAGO — é o pior sítio do site para servir uma imagem suave.
-  // O teste `polos-heroi.test.ts` garante que nenhum herói do catálogo fica
-  // fora desta lista quando ela acrescentar um polo novo.
+  // Os testes `polos-heroi.test.ts` e `polos-peso.test.ts` garantem que nenhum
+  // herói do catálogo fica fora desta lista nem passa dos 100 KB.
   "/imagens/EW1_1392.jpg",
   "/imagens/J&A-243.jpg",
   "/imagens/teresinhaeze-1434.jpg",
-  "/imagens/J&A-442.jpg",
-  "/imagens/EW1_0363.jpg",
   "/imagens/DaniGui_Preview79.jpg",
+  "/imagens/M&F0508.jpg",
   "/imagens/EW1_0580.jpg",
   "/imagens/EW1_0365.jpg",
-  "/imagens/M&F0508.jpg",
+  "/imagens/EW1_0363.jpg",
+  "/imagens/J&A-442.jpg",
+  "/imagens/matilde-e-tomas28.jpg",
+  "/imagens/EW1_1396.jpg",
+  "/imagens/stephanie-mizio-7.jpg",
+  "/imagens/M&F0502.jpg",
   "/imagens/EW1_1342.jpg",
   "/imagens/J&A-52.jpg",
+  "/imagens/M&F0515.jpg",
 ]);
 
 /** Esta fotografia é desenhada a toda a largura e tem ficheiros até 2048 px? */

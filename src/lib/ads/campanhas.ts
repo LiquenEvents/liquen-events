@@ -28,8 +28,8 @@
  * ── PORQUÊ UMA CAMPANHA POR POLO ───────────────────────────────────────────
  * Porque o orçamento é a única alavanca que a Google não pode ignorar. Numa
  * campanha nacional única, o algoritmo leva o dinheiro para onde há mais
- * volume — Lisboa — e o Alentejo, que é onde a margem é melhor por não haver
- * deslocação, nunca chega a ser testado. Com uma campanha por polo, cada
+ * volume — Lisboa — e as regiões onde o clique é mais barato e a margem melhor
+ * nunca chegam a ser testadas. Com uma campanha por polo, cada
  * região tem um tecto que ela decide, e a comparação entre regiões passa a ser
  * possível.
  */
@@ -134,7 +134,7 @@ const TITULOS_BASE_PT = [
   "Conceito à medida",
   "Orçamento em 48 horas",
   "Desde 2018",
-  "Base em Évora",
+  "Visita técnica ao espaço",
   "Produção em todo o país",
   "Montagem na véspera",
   "Do desenho à desmontagem",
@@ -153,7 +153,7 @@ const TITULOS_BASE_EN = [
   "Concept made for you",
   "Quote within two days",
   "Designing since 2018",
-  "Based in Évora",
+  "We walk the venue first",
   "Producing nationwide",
   "We set up the day before",
   "From drawing to strike",
@@ -167,14 +167,14 @@ const DESCRICOES_PT = [
   "Conceito, design floral, cenografia e coordenação do dia. Equipa e material próprios.",
   "Do primeiro desenho à última peça a sair. Orçamento claro, sem extras no fim.",
   "Herdades, quintas e espaços privados. Pedido de orçamento em quatro perguntas.",
-  "Decoração de casamentos com base em Évora e produção em todo o país.",
+  "Decoração e produção de casamentos em todo o país, com equipa e material próprios.",
 ];
 
 const DESCRICOES_EN = [
   "Concept, floral design, set design and day-of coordination. Our own team and stock.",
   "From the first drawing to the last piece coming down. Clear quote, no extras at the end.",
   "Estates, quintas and private venues. Request a quote in four questions.",
-  "Wedding design based in Évora, producing across all of Portugal.",
+  "Wedding design and production across all of Portugal, with our own team and stock.",
 ];
 
 /**
@@ -387,14 +387,28 @@ export function orcamentoDoPolo(polo: Polo, totalDiario: number): number {
  * deslocação de carro no próprio dia.
  */
 const PRIORIDADE_POLO: Record<string, number> = {
+  // O Alentejo primeiro por duas razões que se somam: é dos mercados com os
+  // cliques mais baratos dos treze (menos concorrentes dedicados a licitar) e
+  // é onde a Líquen já tem presença local reconhecida, com Perfil de Empresa
+  // Google e avaliação real, o que ajuda o Índice de Qualidade e a taxa de
+  // cliques desde o primeiro dia.
   alentejo: 1,
+  // Lisboa a seguir: maior mercado doméstico do país.
   lisboa: 2,
+  // A Comporta salta à frente de mercados maiores porque o ticket médio é
+  // muito superior e a concorrência dedicada é pequena. Poucos cliques bons
+  // valem mais do que muitos cliques medianos.
+  comporta: 4,
   algarve: 5,
   "porto-douro": 6,
-  minho: 8,
-  centro: 9,
-  madeira: 10,
-  acores: 11,
+  oeste: 8,
+  minho: 9,
+  centro: 10,
+  ribatejo: 11,
+  madeira: 12,
+  "beira-interior": 16,
+  "tras-os-montes": 17,
+  acores: 18,
 };
 
 /** As campanhas regionais, uma por polo. */

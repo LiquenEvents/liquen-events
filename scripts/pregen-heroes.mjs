@@ -57,14 +57,19 @@ const HERO_SOURCES = [
   "/imagens/EW1_1392.jpg",
   "/imagens/J&A-243.jpg",
   "/imagens/teresinhaeze-1434.jpg",
-  "/imagens/J&A-442.jpg",
-  "/imagens/EW1_0363.jpg",
   "/imagens/DaniGui_Preview79.jpg",
+  "/imagens/M&F0508.jpg",
   "/imagens/EW1_0580.jpg",
   "/imagens/EW1_0365.jpg",
-  "/imagens/M&F0508.jpg",
+  "/imagens/EW1_0363.jpg",
+  "/imagens/J&A-442.jpg",
+  "/imagens/matilde-e-tomas28.jpg",
+  "/imagens/EW1_1396.jpg",
+  "/imagens/stephanie-mizio-7.jpg",
+  "/imagens/M&F0502.jpg",
   "/imagens/EW1_1342.jpg",
   "/imagens/J&A-52.jpg",
+  "/imagens/M&F0515.jpg",
 ];
 
 // The widths the loader snaps to. A hero is 100vw, so these span phone → 2x
