@@ -38,21 +38,30 @@ export async function generateMetadata({
 const eyebrow =
   "text-foreground/68 text-[10px] tracking-[0.48em] uppercase flex items-center gap-3";
 
-// The mosaic draws a fresh 7 from this pool on every entry to the page (see
-// RotatingPhotoGrid). Landscape event frames — corporate, weddings, galas.
+// O mosaico sorteia 7 desta lista a cada entrada na página (ver
+// RotatingPhotoGrid). TODAS TÊM DE SER EM PAISAGEM, e isso não é preferência:
+// as células são largas e a imagem é `object-cover`, portanto uma fotografia
+// em retrato é cortada a uma FAIXA ESTREITA do meio — perde-se o enquadramento
+// e o que fica raramente se percebe.
+//
+// O comentário aqui dizia "Landscape event frames" e quatro das catorze eram
+// retrato (r=0.67): EW1_1408, JOAO_E_PEDRO_1Y1A3439, 428694133-… e
+// JOAO_E_PEDRO_1Y1A3204. A afirmação estava escrita, não verificada — e a
+// célula grande da esquerda mostrava uma mancha irreconhecível por causa disso.
+// Agora há um teste que MEDE os ficheiros (mosaico.paisagem.test.ts).
 const MOSAIC_POOL = [
-  "/imagens/EW1_1408.jpg",
+  "/imagens/PJ-5396.jpg",
   "/imagens/DaniGui_Preview20.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3439.jpg",
+  "/imagens/stephanie-mizio-523.jpg",
   "/imagens/stephanie-mizio-558.jpg",
   "/imagens/M&F0512.jpg",
-  "/imagens/428694133-339551105742981-427109035692944303-n.jpg",
+  "/imagens/Sophia&Artur_MAINOVA-889.jpg",
   "/imagens/hd-edited.jpg",
   "/imagens/EW1_1330.jpg",
   "/imagens/J&P-IMGL4769.jpg",
   "/imagens/EW1_1404.jpg",
   "/imagens/teresinhaeze-909.jpg",
-  "/imagens/JOAO_E_PEDRO_1Y1A3204.jpg",
+  "/imagens/matilde-e-tomas27.jpg",
   "/imagens/DJI_20250913190635_0120_D.jpg",
   "/imagens/stephanie-mizio-555.jpg",
 ];
