@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
+import TrackedAnchor from "@/components/ads/TrackedAnchor";
 import PedidoRapido, { TEXTOS_PT, TEXTOS_EN } from "@/components/ads/PedidoRapido";
 import { blurFor } from "@/lib/blur";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -39,7 +40,7 @@ import { SITE } from "@/lib/site";
 export const dynamic = "force-static";
 
 const CAMINHO = "/casamentos/destination";
-const HERO = "/imagens/J&P-DJI_20250628164714_0165_D.jpg";
+const HERO = "/imagens/J&A-442.jpg";
 const FOTOS = [
   "/imagens/J&P-IMGL4767.jpg",
   "/imagens/J&A-242.jpg",
@@ -257,12 +258,14 @@ export default async function DestinationPage({ params }: { params: Promise<{ la
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-[15px] text-foreground/70">{c.contacto}</p>
-          <a
+          <TrackedAnchor
+            event="EmailClick"
+            trackProps={{ origem: "internacional" }}
             href={`mailto:${SITE.email}`}
             className="text-[12px] tracking-[0.25em] uppercase underline hover:text-moss"
           >
             {SITE.email}
-          </a>
+          </TrackedAnchor>
         </div>
       </section>
     </>

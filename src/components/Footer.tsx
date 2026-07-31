@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SafeImage from "@/components/SafeImage";
 import TrackedLink from "@/components/TrackedLink";
+import TrackedAnchor from "@/components/ads/TrackedAnchor";
 import ManageCookiesLink from "@/components/ManageCookiesLink";
 import { blurFor } from "@/lib/blur";
 import WhatsAppIcon from "./WhatsAppIcon";
@@ -168,12 +169,17 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 >
                   {SITE.email}
                 </a>
-                <a
+                {/* Um clique no telefone é o sinal de intenção mais forte que
+                    este site produz: quem liga quer falar hoje. Sem o medir, a
+                    Google optimiza com metade das conversões escondidas. */}
+                <TrackedAnchor
+                  event="PhoneClick"
+                  trackProps={{ origem: "footer" }}
                   href={`tel:${SITE.phone}`}
                   className="link-line hover:text-white transition-colors duration-300"
                 >
                   {SITE.phoneDisplay}
-                </a>
+                </TrackedAnchor>
                 <span className="text-white/55">{t.footer.country}</span>
               </div>
             </div>

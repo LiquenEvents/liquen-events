@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
+import TrackedAnchor from "@/components/ads/TrackedAnchor";
 import PedidoRapido, { TEXTOS_PT, TEXTOS_EN } from "@/components/ads/PedidoRapido";
 import { blurFor } from "@/lib/blur";
 import { pageMetadata } from "@/lib/page-metadata";
@@ -213,9 +214,14 @@ export default async function PoloPage({
             >
               {en ? "Full quote form" : "Formulário completo"}
             </Link>
-            <a href={`tel:${SITE.phone}`} className="underline hover:text-moss">
+            <TrackedAnchor
+              event="PhoneClick"
+              trackProps={{ origem: `polo:${polo.slug}` }}
+              href={`tel:${SITE.phone}`}
+              className="underline hover:text-moss"
+            >
               {SITE.phoneDisplay}
-            </a>
+            </TrackedAnchor>
             <Link href={localizeHref("/galeria", locale)} className="underline hover:text-moss">
               {en ? "Portfolio" : "Portefólio"}
             </Link>

@@ -180,9 +180,9 @@ export const POLOS: Polo[] = [
       "Quinta Marquês da Serra",
       "Quinta Cascata dos Sonhos",
     ],
-    hero: "/imagens/J&A-242.jpg",
+    hero: "/imagens/J&A-243.jpg",
     fotos: [
-      "/imagens/J&A-243.jpg",
+      "/imagens/J&A-242.jpg",
       "/imagens/J&A-442.jpg",
       "/imagens/J&A-52.jpg",
       "/imagens/J&A-59.jpg",
@@ -239,7 +239,7 @@ export const POLOS: Polo[] = [
       "Quinta do Lago",
       "Vila Vita Parc",
     ],
-    hero: "/imagens/J&P-DJI_20250628164714_0165_D.jpg",
+    hero: "/imagens/teresinhaeze-1434.jpg",
     fotos: [
       "/imagens/J&P-DJI_20250628174247_0187_D.jpg",
       "/imagens/J&P-DJI_20250628174304_0188_D.jpg",
@@ -297,7 +297,7 @@ export const POLOS: Polo[] = [
       "Quinta de Santo António",
       "Quinta de Mosteirô",
     ],
-    hero: "/imagens/DaniGui_Preview12.jpg",
+    hero: "/imagens/DaniGui_Preview79.jpg",
     fotos: [
       "/imagens/DaniGui_Preview20.jpg",
       "/imagens/DaniGui_Preview79.jpg",
@@ -355,7 +355,7 @@ export const POLOS: Polo[] = [
       "Quinta do Retiro",
       "Quinta do Outeiro",
     ],
-    hero: "/imagens/EW1_0688.jpg",
+    hero: "/imagens/M&F0508.jpg",
     fotos: [
       "/imagens/EW1_0689.jpg",
       "/imagens/EW1_0690.jpg",
@@ -405,7 +405,7 @@ export const POLOS: Polo[] = [
     geo: ["Coimbra District, Portugal", "Aveiro District, Portugal", "Leiria District, Portugal"],
     cidades: ["Coimbra", "Aveiro", "Leiria", "Viseu", "Óbidos", "Figueira da Foz"],
     espacos: [],
-    hero: "/imagens/EW1_1330.jpg",
+    hero: "/imagens/EW1_0580.jpg",
     fotos: [
       "/imagens/EW1_1332.jpg",
       "/imagens/EW1_1333.jpg",
@@ -455,7 +455,7 @@ export const POLOS: Polo[] = [
     geo: ["Madeira, Portugal"],
     cidades: ["Funchal", "Câmara de Lobos", "Santa Cruz", "Porto Santo"],
     espacos: [],
-    hero: "/imagens/EW1_1427.jpg",
+    hero: "/imagens/EW1_0365.jpg",
     fotos: [
       "/imagens/EW1_1428.jpg",
       "/imagens/EW1_1505.jpg",
@@ -506,7 +506,7 @@ export const POLOS: Polo[] = [
     geo: ["Azores, Portugal"],
     cidades: ["Ponta Delgada", "Angra do Heroísmo", "Horta", "Ilha de São Miguel"],
     espacos: [],
-    hero: "/imagens/DJI_20250913190635_0120_D.jpg",
+    hero: "/imagens/EW1_0363.jpg",
     fotos: [
       "/imagens/DJI_20250913190640_0121_D.jpg",
       "/imagens/DaniGui_JantarFesta_130.jpg",

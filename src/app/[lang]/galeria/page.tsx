@@ -1,3 +1,4 @@
+import TempoNaGaleria from "@/components/ads/TempoNaGaleria";
 import type { Metadata } from "next";
 import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
@@ -92,6 +93,11 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
   const t = getDictionary(locale);
   return (
     <>
+      {/* A galeria é a peça que vende: ninguém contrata decoração de casamento
+          sem ver trabalho feito. Sem este sinal, o funil tem um buraco entre
+          "chegou ao site" e "pediu orçamento", e as campanhas que trazem gente
+          que REPARA ficam indistinguíveis das que trazem gente que passa. */}
+      <TempoNaGaleria />
       {/*
         DESLIGA O RESTAURO DE SCROLL DO BROWSER — E TEM DE SER AQUI, no HTML.
         Esta uma linha é a diferença entre o restauro da galeria funcionar e

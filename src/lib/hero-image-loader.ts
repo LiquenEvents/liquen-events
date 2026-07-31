@@ -74,11 +74,14 @@ export const HERO_SOURCES = new Set([
   // O teste `polos-heroi.test.ts` garante que nenhum herói do catálogo fica
   // fora desta lista quando ela acrescentar um polo novo.
   "/imagens/EW1_1392.jpg",
-  "/imagens/J&A-242.jpg",
-  "/imagens/J&P-DJI_20250628164714_0165_D.jpg",
-  "/imagens/DaniGui_Preview12.jpg",
-  "/imagens/EW1_0688.jpg",
-  "/imagens/EW1_1427.jpg",
+  "/imagens/J&A-243.jpg",
+  "/imagens/teresinhaeze-1434.jpg",
+  "/imagens/J&A-442.jpg",
+  "/imagens/EW1_0363.jpg",
+  "/imagens/DaniGui_Preview79.jpg",
+  "/imagens/EW1_0580.jpg",
+  "/imagens/EW1_0365.jpg",
+  "/imagens/M&F0508.jpg",
   "/imagens/EW1_1342.jpg",
   "/imagens/J&A-52.jpg",
 ]);
