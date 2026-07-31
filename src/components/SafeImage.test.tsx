@@ -383,3 +383,84 @@ describe("SafeImage: uma imagem falhada volta a ser pedida", () => {
     expect(img()!.getAttribute("src")).toBe(BLUR);
   });
 });
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════
+ * O ERRO ANTERIOR À HIDRATAÇÃO — APANHADO SEM CUSTAR UM PEDIDO REPETIDO
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * Este componente já não passa `onError` ao `next/image`. Passava, e isso
+ * tinha um preço medido: com um `onError`, o next/image faz
+ * `img.src = img.src` na montagem (image-component.js:140) para RESSUSCITAR um
+ * erro que tenha acontecido antes de o React hidratar. Quando a hidratação
+ * apanha a imagem ainda a descarregar — o caso normal numa aterragem a frio —
+ * essa reatribuição ABORTA o pedido em voo e manda outro à rede.
+ *
+ * Medido em /clientes, produção, 1440x900, cache fria: em 4 de 6 corridas
+ * TODAS as imagens vindas no HTML foram pedidas duas vezes (21 URLs), e a
+ * página passava de 1276 KB para 1447 KB.
+ *
+ * O caso que o truque do next/image resgatava NÃO pode regredir por causa
+ * disso — é o que este teste fixa. Em vez de provocar o erro outra vez,
+ * lê-se o estado do elemento: terminou e não trouxe pixels.
+ */
+describe("SafeImage: a falha que aconteceu antes de o React chegar", () => {
+  beforeEach(() => {
+    FakeIO.instances = [];
+    vi.stubGlobal("IntersectionObserver", FakeIO);
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** Põe todos os `<img>` a dizer "já terminei e não trouxe pixels". */
+  function fingirFalhaJaAcontecida() {
+    const proto = HTMLImageElement.prototype;
+    const completo = Object.getOwnPropertyDescriptor(proto, "complete");
+    const largura = Object.getOwnPropertyDescriptor(proto, "naturalWidth");
+    Object.defineProperty(proto, "complete", { configurable: true, get: () => true });
+    Object.defineProperty(proto, "naturalWidth", { configurable: true, get: () => 0 });
+    return () => {
+      if (completo) Object.defineProperty(proto, "complete", completo);
+      else delete (proto as unknown as Record<string, unknown>).complete;
+      if (largura) Object.defineProperty(proto, "naturalWidth", largura);
+      else delete (proto as unknown as Record<string, unknown>).naturalWidth;
+    };
+  }
+
+  it("é apanhada na montagem e a escada arranca, sem ninguém repetir o pedido", () => {
+    const repor = fingirFalhaJaAcontecida();
+    renderTile();
+    // Reagiu logo na montagem: já NÃO está no caminho optimizado. (Ficou a
+    // meio do recuo, portanto o que se vê é a superfície de reserva — que é
+    // exactamente o comportamento normal da escada entre tentativas.)
+    expect(currentSrc()).not.toContain("/_next/image");
+    // A partir daqui a rede "volta"; a tentativa seguinte tem de ir ao
+    // ficheiro original, que é o que existe sempre no repositório.
+    repor();
+    act(() => vi.advanceTimersByTime(700));
+    expect(currentSrc()).toContain(SRC);
+    expect(currentSrc()).not.toContain("/_next/image");
+  });
+
+  it("uma imagem que carregou bem não dispara nada (não há falso positivo)", () => {
+    const proto = HTMLImageElement.prototype;
+    const antesC = Object.getOwnPropertyDescriptor(proto, "complete");
+    const antesL = Object.getOwnPropertyDescriptor(proto, "naturalWidth");
+    Object.defineProperty(proto, "complete", { configurable: true, get: () => true });
+    Object.defineProperty(proto, "naturalWidth", { configurable: true, get: () => 640 });
+    try {
+      renderTile();
+      // Terminada COM pixels: nada a fazer, fica-se no primeiro pedido.
+      expect(currentSrc()).toContain("/_next/image");
+    } finally {
+      if (antesC) Object.defineProperty(proto, "complete", antesC);
+      else delete (proto as unknown as Record<string, unknown>).complete;
+      if (antesL) Object.defineProperty(proto, "naturalWidth", antesL);
+      else delete (proto as unknown as Record<string, unknown>).naturalWidth;
+    }
+  });
+});

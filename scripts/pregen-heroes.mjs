@@ -105,7 +105,21 @@ for (const src of HERO_SOURCES) {
     const outPath = path.join(OUT_DIR, `${key}-${w}.webp`);
     await sharp(inputPath)
       .resize(target, null, { withoutEnlargement: true })
-      .webp({ quality: 75 })
+      // `effort: 6` (a omissão do sharp é 4) NÃO mexe na qualidade pedida —
+      // manda o codificador procurar melhor a mesma qualidade. Sai o mesmo
+      // q75, em menos bytes, à custa de tempo de BUILD (que ninguém espera).
+      // MEDIDO, ficheiro a ficheiro, sobre o MESMO conjunto (as 4 larguras das
+      // 43 origens que existem em disco, 172 ficheiros):
+      //   effort 4: 21,00 MB      effort 6: 19,93 MB      −5,1% (1097 KB)
+      // Em /clientes, nos três degraus de 1536 px que a página usa:
+      //   DJI_…_0120_D  282,0 -> 264,2 KB
+      //   EW1_1404      123,0 -> 117,5 KB
+      //   EW1_1393       83,2 ->  80,2 KB
+      // Baixar o `quality` renderia mais, e foi medido: na foto de drone, q65
+      // dava 228,5 KB mas custava 1,35 dB de PSNR contra o original (33,78 ->
+      // 32,43 dB). NÃO foi aplicado — estes ficheiros são heróis a toda a
+      // largura, e há véus que os tapam mas há páginas onde não há.
+      .webp({ quality: 75, effort: 6 })
       .toFile(outPath);
     written++;
   }

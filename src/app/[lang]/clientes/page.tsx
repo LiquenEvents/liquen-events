@@ -70,6 +70,32 @@ const MOSAIC_POOL = [
 // full-bleed (no max-width wrapper). So each cell's real rendered width is its
 // share of the viewport: on mobile 100vw when it spans both columns, else 50vw;
 // from md its column span as a fraction of 12 (span/12 of 100vw, no px cap).
+//
+// ESTES NÚMEROS FORAM MEDIDOS, não deduzidos. No build de produção a 1440px e
+// DPR 1, com o `getBoundingClientRect()` de cada célula contra o ficheiro que o
+// browser foi buscar (`currentSrc`):
+//
+//   célula    caixa real   quota real   declarado   ficheiro escolhido
+//   span-5      600,0 px    41,67vw       42vw      …-640.webp
+//   span-7      840,0 px    58,33vw       59vw      …-1024.webp / …-1080.webp
+//   span-4      480,0 px    33,33vw       34vw      …-640.webp
+//   span-3      360,0 px    25,00vw       25vw      …-384.webp
+//
+// Ou seja: o `sizes` já descreve a caixa, com uma folga de 0,7 pontos no
+// máximo, e sempre PARA CIMA (declarar a menos desfocava; declarar a mais só
+// custaria um degrau, e aqui nem isso acontece). Não há bytes a ganhar a mexer
+// nestes valores — está medido, e o que se ganharia era zero.
+//
+// O QUE AINDA FICA GORDO, e não é o `sizes`: uma fotografia que esteja em
+// `HERO_SOURCES` (src/lib/hero-image-loader.ts) usa a ESCADA DOS HERÓIS
+// (640/1080/1536/2048) mesmo dentro de uma célula pequena, porque a decisão é
+// da ORIGEM e não de quem chama. Como essa escada não tem degrau abaixo de 640,
+// uma célula de 360 px recebe o ficheiro de 640 px em vez do de 384 px da
+// escada das fotos comuns — medido: `DJI_…-640.webp` (51,8 KB) numa caixa de
+// 360 px, onde `-384` chegaria. Seis das catorze fotos deste conjunto são
+// origens de herói, portanto isto acontece em cerca de metade das entradas.
+// A correcção é acrescentar um degrau de 384 a `HERO_WIDTHS` — nas DUAS listas
+// (o carregador e scripts/pregen-heroes.mjs) — e não neste ficheiro.
 const MOSAIC_5 = "(max-width: 767px) 100vw, 42vw"; // md:col-span-5, wide on mobile
 const MOSAIC_7 = "(max-width: 767px) 100vw, 59vw"; // md:col-span-7, wide on mobile
 const MOSAIC_4 = "(max-width: 767px) 50vw, 34vw"; // md:col-span-4, one mobile column
@@ -302,6 +328,40 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
       </section>
 
       {/* ── CTA with background photo ── */}
+      {/*
+        A FOTOGRAFIA DE DRONE FICA. Foi posta em causa por ser a maior da
+        página (o degrau de 1536 px pesa 282 KB) e por haver a ideia de que uma
+        tomada de drone comprime 3 a 4 vezes pior do que uma fotografia normal
+        e portanto seria substituível por outra qualquer em paisagem. Fui ver as
+        duas coisas, e nenhuma se confirmou:
+
+        1. NÃO É DECORATIVA. Mostra uma cerimónia real: as cadeiras em duas
+           filas curvas debaixo de um pinheiro isolado, numa encosta de vinha.
+           É uma fotografia identificável de um evento — trocá-la é mudar
+           conteúdo, e não há nada a retirar deste sítio.
+
+        2. NÃO É UM CASO À PARTE. Ordenando os 48 ficheiros `-1536.webp`
+           pré-gerados por peso, esta é a OITAVA: à frente dela estão
+           `M_F0497` (489,6 KB), `J_P-DJI_…0165_D` (316,4 KB),
+           `viaturas-classicas` (310,5 KB), `J_A-68` (310,4 KB),
+           `stephanie-mizio-555` (296,1 KB), `DaniGui_JantarFesta_26`
+           (292,8 KB) e `EW1_1332` (284,3 KB) — e só uma dessas é de drone. A
+           mediana dos 48 é 110,5 KB. O que faz um ficheiro pesar não é o
+           drone, é o detalhe fino; e é geral, não desta foto.
+
+        Como é geral, a redução também tem de ser: está em
+        scripts/pregen-heroes.mjs (`effort: 6`), que corta os mesmos bytes em
+        TODOS os heróis sem tocar na qualidade pedida. Baixar o `quality` foi
+        medido e NÃO foi aplicado: q65 poupava mais 36 KB nesta foto mas custava
+        1,35 dB de PSNR contra o original (33,78 -> 32,43 dB), e esta imagem
+        também é o herói a toda a largura de /contacto, onde não há véu que a
+        proteja. Os números estão no relatório.
+
+        NOTA DE PESO, para quem vier medir /clientes: estes 282 KB são
+        descarregados nesta página mesmo que ninguém chegue ao fim dela — o
+        <HeroWarm> do layout pré-aquece as capas das outras cinco páginas, e
+        esta é a de /contacto. Mexer no `sizes` daqui não os evita.
+      */}
       <section className="relative py-36 lg:py-52 overflow-hidden">
         <SafeImage
           src="/imagens/DJI_20250913190635_0120_D.jpg"
