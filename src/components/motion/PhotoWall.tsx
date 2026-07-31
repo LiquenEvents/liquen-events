@@ -193,7 +193,9 @@ export default function PhotoWall({
         <Link href={href} className={`group ${OUTLINE_LIGHT_BUTTON_CLASS}`}>
           {label}
           <span
-            className="group-hover:translate-x-0.5 transition-transform duration-300 ease-expo"
+            // `motion-reduce`: a seta ainda deslizava ao passar o rato para quem
+            // pediu menos movimento — é um transform, não uma mudança de cor.
+            className="group-hover:translate-x-0.5 transition-transform duration-300 ease-expo motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
             aria-hidden
           >
             →

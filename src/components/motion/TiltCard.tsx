@@ -2,6 +2,7 @@
 
 import { useRef, type ReactNode } from "react";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
+import { EASE_OUT } from "@/lib/motion/tokens";
 
 /**
  * Tactile 3D tilt-on-hover wrapper — the "liquid glass" moment for the service
@@ -71,7 +72,7 @@ export default function TiltCard({
       <div
         style={{
           transform: "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))",
-          transition: "transform 260ms cubic-bezier(0.16, 1, 0.3, 1)",
+          transition: `transform 260ms ${EASE_OUT}`,
           willChange: "transform",
           ...(fill ? { height: "100%", width: "100%" } : null),
         }}

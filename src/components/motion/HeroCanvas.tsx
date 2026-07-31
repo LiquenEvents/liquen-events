@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Renderer, Triangle, Program, Mesh, Texture } from "ogl";
 import { webglAvailable, glDpr } from "@/lib/motion/webgl";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { sizedImageSrc } from "@/lib/image-src";
 
 /**
@@ -81,6 +82,17 @@ export default function HeroCanvas({ src, className }: { src: string; className?
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    // Movimento reduzido: nada de camada viva. O cabeçalho deste ficheiro sempre
+    // prometeu que "reduced-motion devices simply keep the elegant static hero",
+    // mas a promessa estava a ser cumprida SÓ pelo HeroWebGL, que é quem monta
+    // este componente. Isso deixava a única animação perpétua do sítio (deriva
+    // ambiente + parallax do ponteiro + zoom ao scroll, a desenhar em contínuo)
+    // dependente de o chamador se lembrar de perguntar. Quem monte o HeroCanvas
+    // directamente — ou um HeroWebGL a que se devolvam as verificações de
+    // capacidade — passava por cima da preferência sem aviso. A verificação vive
+    // agora onde vive a animação, e vem ANTES do `webglAvailable()` para que
+    // nem sequer se sonde a GPU.
+    if (prefersReducedMotion()) return;
     // Bail before touching OGL if the platform can't do WebGL — OGL logs a
     // console error otherwise (headless/no-GPU); the static <Image> stays.
     if (!webglAvailable()) return;

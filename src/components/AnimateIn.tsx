@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
+import { EASE_OUT, REVEAL_S } from "@/lib/motion/tokens";
 
 interface Props {
   children: React.ReactNode;
@@ -79,7 +80,9 @@ export default function AnimateIn({ children, className = "", delay = 0, from = 
     if (prefersReducedMotion()) return; // leave visible, no reveal
 
     const isClip = from === "clip";
-    const easing = `cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`;
+    // Curva e duração vêm da ficha partilhada (@/lib/motion/tokens) — eram aqui
+    // um literal e um `0.75s` escritos à mão, iguais aos do Reveal por acaso.
+    const easing = `${EASE_OUT} ${delay}ms`;
 
     // Hide synchronously, before paint.
     if (isClip) {
@@ -94,8 +97,8 @@ export default function AnimateIn({ children, className = "", delay = 0, from = 
 
     const reveal = () => {
       el.style.transition = isClip
-        ? `transform 0.75s ${easing}, clip-path 0.75s ${easing}`
-        : `opacity 0.75s ${easing}, transform 0.75s ${easing}`;
+        ? `transform ${REVEAL_S}s ${easing}, clip-path ${REVEAL_S}s ${easing}`
+        : `opacity ${REVEAL_S}s ${easing}, transform ${REVEAL_S}s ${easing}`;
       el.style.transform = "none";
       if (isClip) el.style.clipPath = "inset(0 0 0% 0)";
       else el.style.opacity = "1";

@@ -6,6 +6,15 @@ import AnimateIn from "./AnimateIn";
 import RatingBadge from "./RatingBadge";
 import { useTranslations } from "./LocaleProvider";
 import { useReducedMotion } from "@/lib/motion/useReducedMotion";
+import { EASE_OUT } from "@/lib/motion/tokens";
+
+// Duração do fade entre testemunhos. O temporizador que troca o texto e a
+// transição CSS que o desvanece TÊM de durar o mesmo — eram dois `380`
+// independentes, um em ms no setTimeout e outro em segundos no style; mexer num
+// sem o outro deixava o texto a trocar a meio do fade (ou o fade a acabar antes
+// da troca). Passa a haver um número só.
+const FADE_MS = 380;
+const FADE_S = FADE_MS / 1000;
 
 export default function TestimonialsCarousel({
   testimonials,
@@ -53,7 +62,7 @@ export default function TestimonialsCarousel({
       fadeTimer.current = setTimeout(() => {
         setActive(next);
         setVisible(true);
-      }, 380);
+      }, FADE_MS);
     },
     [reduced],
   );
@@ -145,7 +154,13 @@ export default function TestimonialsCarousel({
               style={{
                 opacity: visible ? 1 : 0,
                 transform: visible ? "none" : "translateY(10px)",
-                transition: reduced ? "none" : "opacity 0.38s ease, transform 0.38s ease",
+                // A troca de testemunho era o único movimento do sítio a
+                // desacelerar em `ease` (a curva simétrica por omissão do CSS)
+                // em vez da desaceleração de assinatura. Mesmo tempo (380 ms),
+                // mesma curva que todas as outras entradas.
+                transition: reduced
+                  ? "none"
+                  : `opacity ${FADE_S}s ${EASE_OUT}, transform ${FADE_S}s ${EASE_OUT}`,
               }}
             >
               {/* min-height reserves space for the longest testimonial so the
@@ -176,7 +191,12 @@ export default function TestimonialsCarousel({
                   className="group py-4 px-2 flex-shrink-0"
                 >
                   <span
-                    className={`block h-px transition-all duration-400 ${
+                    // Mesma duração e mesma curva do fade que este ponto
+                    // indica (era `duration-400` na curva por omissão do
+                    // Tailwind, contra os 380 ms do texto). `motion-reduce`
+                    // porque a largura ainda animava para quem pediu menos
+                    // movimento — o resto do carrossel já parava.
+                    className={`block h-px transition-[width,background-color] duration-[380ms] ease-expo motion-reduce:transition-none ${
                       i === active
                         ? "w-8 bg-moss"
                         : "w-4 bg-foreground/20 group-hover:bg-foreground/40"
