@@ -5,6 +5,7 @@ import TrackedLink from "@/components/TrackedLink";
 import SafeImage from "@/components/SafeImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import { staggerMs } from "@/lib/motion/tokens";
 import Parallax from "@/components/Parallax";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
@@ -218,7 +219,7 @@ export default async function ServiceDetailPage({
               </TrackedLink>
             </div>
           </AnimateIn>
-          <AnimateIn delay={120}>
+          <AnimateIn delay={staggerMs(1)}>
             {/* SpaceX-style hairline SPEC LIST (not a boxed card): each includes-
                 item is a ruled row divided by a 1px foreground hairline. Phrases
                 stay sentence case — uppercasing the long PT descriptions reads
@@ -299,7 +300,7 @@ export default async function ServiceDetailPage({
               {t.servicoDetalhe.galleryEyebrow}
             </p>
           </AnimateIn>
-          <AnimateIn delay={80}>
+          <AnimateIn delay={staggerMs(1)}>
             <h2
               className="text-foreground font-bold uppercase tracking-display leading-[1.05] mt-5"
               style={{ fontSize: "clamp(28px, 3.8vw, 52px)" }}
@@ -319,7 +320,7 @@ export default async function ServiceDetailPage({
         <Reveal
           as="div"
           variant="zoom"
-          stagger={0.08}
+          stagger
           className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
         >
           {gallery.map((src, i) => {
@@ -391,7 +392,7 @@ export default async function ServiceDetailPage({
                 <span className="w-8 h-px bg-gold flex-shrink-0" /> {t.servicoDetalhe.faqTitle}
               </h2>
             </AnimateIn>
-            <Reveal as="div" stagger={0.08} className="text-veil-shadow flex flex-col">
+            <Reveal as="div" stagger className="text-veil-shadow flex flex-col">
               {svc.faqs.map((f) => (
                 <div key={f.q} className="border-t border-white/12 py-7">
                   <h3 className="text-white text-base font-bold uppercase tracking-display mb-3">
@@ -415,7 +416,7 @@ export default async function ServiceDetailPage({
                 <span className="w-8 h-px bg-gold flex-shrink-0" /> {t.servicoDetalhe.relatedTitle}
               </h2>
             </AnimateIn>
-            <Reveal as="div" stagger={0.1} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Reveal as="div" stagger className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {related.map((r) => (
                 <Link
                   key={r.slug}

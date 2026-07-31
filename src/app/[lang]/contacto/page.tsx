@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import TrackedLink from "@/components/TrackedLink";
 import FAQ from "./FAQ";
 import AnimateIn from "@/components/AnimateIn";
+import { staggerMs } from "@/lib/motion/tokens";
 import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
@@ -359,7 +360,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
           </AnimateIn>
           <div>
             {steps.map((p, i) => (
-              <AnimateIn key={p.step} delay={i * 70}>
+              <AnimateIn key={p.step} delay={staggerMs(i)}>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-20 py-10 border-t border-white/15">
                   <div className="lg:col-span-1 flex items-start gap-4">
                     <span aria-hidden className="text-white/40 text-xs font-mono mt-1 tabular-nums">

@@ -9,6 +9,7 @@ import Parallax from "@/components/Parallax";
 import TitleReveal from "@/components/TitleReveal";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import Reveal from "@/components/motion/Reveal";
+import { PHOTO_REVEAL_LARGE_S, staggerMs, wordCascadeEndMs } from "@/lib/motion/tokens";
 import { BreadcrumbJsonLd } from "@/components/JsonLd";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
@@ -183,13 +184,19 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               className="text-cream font-bold uppercase tracking-display leading-[1.12] max-w-4xl"
               style={{ fontSize: "clamp(26px, 4.5vw, 64px)" }}
             >
-              <TitleReveal text={t.sobre.statementLead} as="span" step={50} />{" "}
+              <TitleReveal text={t.sobre.statementLead} as="span" />{" "}
+              {/* A segunda metade arranca onde a primeira acaba. Isto era uma
+                  conta à mão — `…split(/\s+/).length * 50 + 80` — com o passo de
+                  50 ms escrito aqui uma TERCEIRA vez, fora do componente que o
+                  usa: afinar o `step` de um dos <TitleReveal> dessincronizava as
+                  duas metades da frase sem nada avisar. Agora quem conta as
+                  palavras é quem sabe o passo. Enquanto o tecto não morde, o
+                  número é exactamente o mesmo de antes. */}
               <TitleReveal
                 text={t.sobre.statementRest}
                 as="span"
                 className="text-cream/70"
-                step={50}
-                delay={t.sobre.statementLead.split(/\s+/).length * 50 + 80}
+                delay={wordCascadeEndMs(t.sobre.statementLead)}
               />
             </p>
           </div>
@@ -228,7 +235,7 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
             <Reveal
               as="div"
               variant="zoom"
-              duration={0.9}
+              duration={PHOTO_REVEAL_LARGE_S}
               className="relative mx-auto w-full max-w-xs lg:max-w-none"
             >
               <div className="relative aspect-[3/4] overflow-hidden">
@@ -306,12 +313,12 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               <span className="text-moss">{t.sobre.ctaTitleMoss}</span>
             </h2>
           </AnimateIn>
-          <AnimateIn delay={110}>
+          <AnimateIn delay={staggerMs(1)}>
             <p className="text-white/70 text-base leading-relaxed max-w-md mb-12">
               {t.sobre.ctaText}
             </p>
           </AnimateIn>
-          <AnimateIn delay={180}>
+          <AnimateIn delay={staggerMs(2)}>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}

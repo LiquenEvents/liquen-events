@@ -5,6 +5,7 @@ import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import { staggerMs } from "@/lib/motion/tokens";
 import Parallax from "@/components/Parallax";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import { BreadcrumbJsonLd, ServiceJsonLd } from "@/components/JsonLd";
@@ -381,10 +382,10 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               <span className="text-moss-light">{ts.ctaTitleMoss}</span>
             </h2>
           </AnimateIn>
-          <AnimateIn delay={110}>
+          <AnimateIn delay={staggerMs(1)}>
             <p className="text-white/75 text-base leading-relaxed max-w-md mb-12">{ts.ctaText}</p>
           </AnimateIn>
-          <AnimateIn delay={180}>
+          <AnimateIn delay={staggerMs(2)}>
             <div className="flex flex-wrap gap-4 justify-center">
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}

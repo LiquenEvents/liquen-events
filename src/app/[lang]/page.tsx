@@ -5,6 +5,7 @@ import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import Reveal from "@/components/motion/Reveal";
+import { PHOTO_REVEAL_FULL_S, staggerMs } from "@/lib/motion/tokens";
 import { blurFor } from "@/lib/blur";
 import ClientMarquee from "@/components/ClientMarquee";
 import HeroWebGL from "@/components/motion/HeroWebGL";
@@ -142,7 +143,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           <Reveal
             as="div"
             variant="zoom"
-            duration={1.15}
+            duration={PHOTO_REVEAL_FULL_S}
             className="absolute inset-0"
             start="top 88%"
           >
@@ -165,7 +166,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               {/* The caption composes itself in a 3-beat cadence (gold eyebrow →
                   title → CTA) rather than appearing as one block — a small
                   stagger reads as "authored" without feeling slow. */}
-              <Reveal as="div" stagger={0.08} start="top 92%">
+              <Reveal as="div" stagger start="top 92%">
                 <h2
                   className="text-veil-shadow text-white font-bold uppercase tracking-display leading-[0.95]"
                   style={{ fontSize: "clamp(24px, 3.4vw, 42px)" }}
@@ -251,12 +252,12 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               <span className="block text-moss">{t.home.ctaTitleLine2}</span>
             </h2>
           </AnimateIn>
-          <AnimateIn delay={110}>
+          <AnimateIn delay={staggerMs(1)}>
             <p className="text-white/70 text-base leading-relaxed max-w-md mb-12">
               {t.home.ctaText}
             </p>
           </AnimateIn>
-          <AnimateIn delay={180}>
+          <AnimateIn delay={staggerMs(2)}>
             <div className="flex flex-wrap gap-4 justify-center">
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}

@@ -1,7 +1,23 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EASE_OUT, REVEAL_MS, REVEAL_S, STAGGER_S } from "./tokens";
+import {
+  EASE_OUT,
+  REVEAL_MS,
+  REVEAL_S,
+  STAGGER_S,
+  STAGGER_MS,
+  STAGGER_CAP,
+  WORD_STAGGER_MS,
+  WORD_STAGGER_CAP,
+  SENTENCE_GAP_MS,
+  staggerMs,
+  wordStaggerMs,
+  wordCascadeEndMs,
+  PHOTO_REVEAL_FULL_S,
+  PHOTO_REVEAL_LARGE_S,
+  PHOTO_REVEAL_TILE_S,
+} from "./tokens";
 
 /**
  * A COERÊNCIA DO MOVIMENTO, COM DENTES.
@@ -99,5 +115,122 @@ describe("valores da ficha", () => {
     // acabado bem dentro do tempo em que alguém ainda está a olhar.
     const totalS = STAGGER_S * 5 + REVEAL_S;
     expect(totalS).toBeLessThan(1.5);
+  });
+
+  it("segundos e milissegundos do passo descrevem o mesmo tempo", () => {
+    expect(STAGGER_MS).toBeCloseTo(STAGGER_S * 1000, 10);
+  });
+});
+
+describe("o tecto da cascata — nenhuma lista castiga quem chega ao fim", () => {
+  it("uma cascata de blocos nunca tem mais rasto do que STAGGER_CAP passos", () => {
+    // ESTA é a propriedade que interessa, e é sobre a lista INTEIRA, não sobre
+    // um elemento: seja de 5 elementos ou de 500, o último nunca arranca depois
+    // de `STAGGER_CAP × STAGGER_MS`. Sem tecto isto era uma multiplicação sem
+    // limite — a parede de logótipos chegava a 756 ms de rasto.
+    const tectoMs = STAGGER_CAP * STAGGER_MS;
+    for (const n of [1, 5, 19, 50, 500]) {
+      const ultimo = staggerMs(n - 1);
+      expect(ultimo, `cascata de ${n}`).toBeLessThanOrEqual(tectoMs);
+    }
+    expect(tectoMs).toBeLessThanOrEqual(400);
+  });
+
+  it("antes do tecto, o passo é regular (não é um tecto disfarçado de nada)", () => {
+    // Se o tecto fosse 0 ou 1, o teste acima passava e a cascata desaparecia.
+    expect(staggerMs(0)).toBe(0);
+    expect(staggerMs(1)).toBe(STAGGER_MS);
+    expect(staggerMs(2)).toBe(2 * STAGGER_MS);
+    expect(STAGGER_CAP).toBeGreaterThanOrEqual(3);
+  });
+
+  it("as palavras têm o seu próprio tecto, e um passo mais curto que os blocos", () => {
+    // Palavras contíguas não podem ter a cadência de blocos separados, ou uma
+    // frase deixa de se ler como uma frase.
+    expect(WORD_STAGGER_MS).toBeLessThan(STAGGER_MS);
+    const tectoPalavraMs = WORD_STAGGER_CAP * WORD_STAGGER_MS;
+    for (const n of [3, 10, 40]) {
+      expect(wordStaggerMs(n - 1), `título de ${n} palavras`).toBeLessThanOrEqual(tectoPalavraMs);
+    }
+  });
+});
+
+describe("encadear duas metades de uma frase", () => {
+  // A conta que estava escrita à mão no /sobre, para comparar contra.
+  const contaAntiga = (texto: string, passo: number) =>
+    texto.split(/\s+/).length * passo + SENTENCE_GAP_MS;
+
+  it("enquanto o tecto não morde, dá exactamente o mesmo instante de antes", () => {
+    // Prova de que a reorganização NÃO afinou nada: as frases reais do /sobre,
+    // nas duas línguas, arrancam no mesmo milissegundo em que arrancavam.
+    for (const frase of [
+      "Não decoramos apenas espaços.",
+      "We don't just decorate spaces.",
+      "Uma frase de seis palavras aqui",
+    ]) {
+      expect(wordCascadeEndMs(frase), frase).toBe(contaAntiga(frase, WORD_STAGGER_MS));
+    }
+  });
+
+  it("num título longo, o tecto morde e a segunda metade não fica à espera", () => {
+    const longa = Array.from({ length: 20 }, (_, i) => `palavra${i}`).join(" ");
+    expect(wordCascadeEndMs(longa)).toBeLessThan(contaAntiga(longa, WORD_STAGGER_MS));
+    expect(wordCascadeEndMs(longa)).toBeLessThanOrEqual(
+      (WORD_STAGGER_CAP + 1) * WORD_STAGGER_MS + SENTENCE_GAP_MS,
+    );
+  });
+
+  it("texto vazio não inventa atraso nenhum", () => {
+    expect(wordCascadeEndMs("   ")).toBe(0);
+  });
+});
+
+describe("a escala de revelação de fotografia", () => {
+  it("é uma escala a sério: maior a foto, mais tempo", () => {
+    // Não é um número por página — são degraus ordenados por tamanho da foto.
+    expect(PHOTO_REVEAL_FULL_S).toBeGreaterThan(PHOTO_REVEAL_LARGE_S);
+    expect(PHOTO_REVEAL_LARGE_S).toBeGreaterThan(PHOTO_REVEAL_TILE_S);
+  });
+
+  it("o degrau mais pequeno é a duração de entrada do resto do sítio", () => {
+    // Um mosaico é só mais um bloco a entrar; não precisa de tempo próprio.
+    expect(PHOTO_REVEAL_TILE_S).toBe(REVEAL_S);
+  });
+});
+
+describe("as páginas não voltam a escrever tempos à mão", () => {
+  // Os ficheiros já convertidos. (O `ConfirmacaoClient` ainda tem atrasos à
+  // mão — está descrito no relatório, não convertido, e por isso não está aqui:
+  // um teste que falhasse por trabalho por fazer não teria dentes nenhuns.)
+  const paginas = [
+    "../../app/[lang]/page.tsx",
+    "../../app/[lang]/sobre/page.tsx",
+    "../../app/[lang]/clientes/page.tsx",
+    "../../app/[lang]/contacto/page.tsx",
+    "../../app/[lang]/servicos/page.tsx",
+    "../../app/[lang]/servicos/[slug]/page.tsx",
+    "../../app/[lang]/legal/LegalDocView.tsx",
+  ];
+
+  it.each(paginas)("%s não tem `delay={…}` com aritmética à mão", (ficheiro) => {
+    const src = semComentarios(lerFonte(ficheiro));
+    // Apanha `delay={110}`, `delay={i * 55}`, `delay={Math.min(i, 4) * 40}`.
+    const maus = [...src.matchAll(/delay=\{([^}]*)\}/g)]
+      .map((m) => m[1].trim())
+      .filter((expr) => /\d/.test(expr) && !/^(staggerMs|wordCascadeEndMs)\(/.test(expr));
+    expect(maus).toEqual([]);
+  });
+
+  it.each(paginas)("%s não fixa a duração de um <Reveal> num número solto", (ficheiro) => {
+    const src = semComentarios(lerFonte(ficheiro));
+    const maus = [...src.matchAll(/duration=\{([^}]*)\}/g)]
+      .map((m) => m[1].trim())
+      .filter((expr) => /^[\d.]+$/.test(expr));
+    expect(maus).toEqual([]);
+  });
+
+  it.each(paginas)("%s não redefine o passo do stagger do <Reveal>", (ficheiro) => {
+    const src = semComentarios(lerFonte(ficheiro));
+    expect(src).not.toMatch(/stagger=\{[\d.]+\}/);
   });
 });

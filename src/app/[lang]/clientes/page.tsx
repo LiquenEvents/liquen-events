@@ -5,6 +5,7 @@ import SafeImage from "@/components/SafeImage";
 import HeroImage from "@/components/HeroImage";
 import { blurFor } from "@/lib/blur";
 import AnimateIn from "@/components/AnimateIn";
+import { staggerMs } from "@/lib/motion/tokens";
 import Parallax from "@/components/Parallax";
 import HeroWebGL from "@/components/motion/HeroWebGL";
 import ClientLogoGrid from "@/components/ClientLogoGrid";
@@ -195,7 +196,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                 {t.clientes.logosTitle}
               </h2>
             </AnimateIn>
-            <AnimateIn delay={80} className="hidden lg:block">
+            <AnimateIn delay={staggerMs(1)} className="hidden lg:block">
               <span
                 aria-hidden="true"
                 className="text-foreground/45 text-[9px] tracking-[0.4em] uppercase"
@@ -204,7 +205,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               </span>
             </AnimateIn>
           </div>
-          <AnimateIn delay={120}>
+          <AnimateIn delay={staggerMs(2)}>
             <ClientLogoGrid clients={clientLogos} />
           </AnimateIn>
         </div>
@@ -244,7 +245,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               contacto): sem cartões fumados nem aspas decorativas. */}
           <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-16 border-b border-white/12">
             {testimonials.map((item, i) => (
-              <AnimateIn key={item.name} delay={i * 55} className="h-full">
+              <AnimateIn key={item.name} delay={staggerMs(i)} className="h-full">
                 <figure className="h-full flex flex-col py-9 lg:py-10 border-t border-white/12">
                   <blockquote
                     className="text-cream/85 uppercase tracking-display leading-[1.55] flex-1"
@@ -326,12 +327,12 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
               {t.clientes.ctaTitleLine2}
             </h2>
           </AnimateIn>
-          <AnimateIn delay={110}>
+          <AnimateIn delay={staggerMs(1)}>
             <p className="text-white/70 text-base leading-relaxed max-w-sm mb-14">
               {t.clientes.ctaText}
             </p>
           </AnimateIn>
-          <AnimateIn delay={180}>
+          <AnimateIn delay={staggerMs(2)}>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <TrackedLink
                 href={localizeHref("/orcamento", locale)}

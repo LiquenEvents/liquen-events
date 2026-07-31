@@ -1,4 +1,5 @@
 import AnimateIn from "@/components/AnimateIn";
+import { staggerMs } from "@/lib/motion/tokens";
 import type { LegalDoc } from "./legal-content";
 
 // Shared, elegant renderer for a legal document (privacy / terms). Editorial
@@ -25,7 +26,7 @@ export default function LegalDocView({ doc }: { doc: LegalDoc }) {
 
         <div className="mt-14 flex flex-col gap-12">
           {doc.sections.map((s, i) => (
-            <AnimateIn key={s.heading} delay={Math.min(i, 4) * 40}>
+            <AnimateIn key={s.heading} delay={staggerMs(i)}>
               <div>
                 <h2
                   className="text-foreground text-xl lg:text-2xl font-bold mb-4"
