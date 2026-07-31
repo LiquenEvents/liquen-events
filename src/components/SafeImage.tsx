@@ -102,6 +102,67 @@ const MAX_REENTRY_RECOVERIES = 2;
 const NEUTRAL_BLUR =
   "data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoQAAwAA4BaJaQAA3AA/vOdgAA=";
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════
+ * PORQUE É QUE O ERRO É OUVIDO À MÃO E NÃO PELO `onError` DO next/image
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * Passar `onError` a um `<Image>` custa UM PEDIDO DE REDE REPETIDO por cada
+ * imagem da página. Não é opinião — está no próprio next/image
+ * (node_modules/next/dist/client/image-component.js:140):
+ *
+ *     if (onError) {
+ *       // If the image has an error before react hydrates, then the error is
+ *       // lost. The workaround is to wait until the image is mounted...
+ *       img.src = img.src;
+ *     }
+ *
+ * O truque serve para RECUPERAR um erro anterior à hidratação (o React ainda
+ * não tinha ouvinte nenhum ligado quando o evento passou), e a intenção é
+ * boa. O efeito colateral é que, quando a hidratação apanha a imagem AINDA A
+ * DESCARREGAR — que é o caso normal numa aterragem a frio —, reatribuir o
+ * `src` ABORTA o pedido em voo e manda outro. A resposta ainda não está na
+ * cache, portanto o segundo pedido vai mesmo à rede.
+ *
+ * MEDIDO em /clientes, build de produção, 1440x900, cache fria, 6 corridas:
+ * em 4 delas TODAS as imagens que vêm no HTML servido foram pedidas duas
+ * vezes — o herói EW1_1393, os dois fundos de secção e os 18 logótipos, 21
+ * URLs repetidos. Página: 1276 KB nas corridas limpas, 1447 KB nas outras.
+ * A repetição só não acontece quando a hidratação chega TARDE o suficiente
+ * para as imagens já terem terminado (aí a reatribuição é um acerto na
+ * cache). Ou seja: quanto mais rápida a máquina, mais caro custava.
+ *
+ * A ALTERNATIVA, que faz exactamente o mesmo trabalho sem pedido nenhum:
+ *  • o ouvinte de `error` é ligado por nós no próprio elemento, na `ref` —
+ *    ou seja no MESMO instante em que o next/image faria a reatribuição;
+ *  • o erro anterior à hidratação, que é o que o truque do next/image
+ *    resgata, lê-se do ESTADO do elemento em vez de se provocar outra vez:
+ *    um `<img>` que já terminou (`complete`) e não trouxe pixels
+ *    (`naturalWidth === 0`) falhou. É o mesmo sinal que o próprio
+ *    next/image usa duas linhas abaixo para decidir se já carregou.
+ *
+ * O `onError` interno do next/image continua ligado ao `<img>` (é ele que
+ * põe o texto alternativo à vista); o que deixámos de passar é o NOSSO, que
+ * era o único gatilho da reatribuição.
+ */
+export function useImageErrorRef(aoErro: () => void) {
+  const ultimo = useRef(aoErro);
+  useEffect(() => {
+    ultimo.current = aoErro;
+  }, [aoErro]);
+
+  return useCallback((img: HTMLImageElement | null) => {
+    if (!img) return;
+    const ouvinte = () => ultimo.current();
+    img.addEventListener("error", ouvinte);
+    // Já terminou e não trouxe pixels: falhou antes de aqui chegarmos. O `src`
+    // declarado é a guarda contra o caso degenerado de um `<img>` sem origem
+    // nenhuma, que também dá `complete` verdadeiro.
+    if (img.complete && img.naturalWidth === 0 && img.getAttribute("src")) ultimo.current();
+    return () => img.removeEventListener("error", ouvinte);
+  }, []);
+}
+
 export type SafeImageProps = Omit<ImageProps, "src" | "loader" | "onError" | "onLoad"> & {
   /** Caminho da imagem em `public/` (é ele o recurso final: existe sempre). */
   src: string;
@@ -200,49 +261,6 @@ export default function SafeImage({
     // `false` e a passagem ao ficheiro original repetia-se para sempre.
   }, [original]);
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════
-   * PORQUE É QUE O ERRO É OUVIDO À MÃO E NÃO PELO `onError` DO next/image
-   * ═══════════════════════════════════════════════════════════════════════
-   *
-   * Passar `onError` a um `<Image>` custa UM PEDIDO DE REDE REPETIDO por cada
-   * imagem da página. Não é opinião — está no próprio next/image
-   * (node_modules/next/dist/client/image-component.js:140):
-   *
-   *     if (onError) {
-   *       // If the image has an error before react hydrates, then the error is
-   *       // lost. The workaround is to wait until the image is mounted...
-   *       img.src = img.src;
-   *     }
-   *
-   * O truque serve para RECUPERAR um erro anterior à hidratação (o React ainda
-   * não tinha ouvinte nenhum ligado quando o evento passou), e a intenção é
-   * boa. O efeito colateral é que, quando a hidratação apanha a imagem AINDA A
-   * DESCARREGAR — que é o caso normal numa aterragem a frio —, reatribuir o
-   * `src` ABORTA o pedido em voo e manda outro. A resposta ainda não está na
-   * cache, portanto o segundo pedido vai mesmo à rede.
-   *
-   * MEDIDO em /clientes, build de produção, 1440x900, cache fria, 6 corridas:
-   * em 4 delas TODAS as imagens que vêm no HTML servido foram pedidas duas
-   * vezes — o herói EW1_1393, os dois fundos de secção e os 18 logótipos, 21
-   * URLs repetidos. Página: 1276 KB nas corridas limpas, 1447 KB nas outras.
-   * A repetição só não acontece quando a hidratação chega TARDE o suficiente
-   * para as imagens já terem terminado (aí a reatribuição é um acerto na
-   * cache). Ou seja: quanto mais rápida a máquina, mais caro custava.
-   *
-   * A ALTERNATIVA, que faz exactamente o mesmo trabalho sem pedido nenhum:
-   *  • o ouvinte de `error` é ligado por nós no próprio elemento, na `ref` —
-   *    ou seja no MESMO instante em que o next/image faria a reatribuição;
-   *  • o erro anterior à hidratação, que é o que o truque do next/image
-   *    resgata, lê-se do ESTADO do elemento em vez de se provocar outra vez:
-   *    um `<img>` que já terminou (`complete`) e não trouxe pixels
-   *    (`naturalWidth === 0`) falhou. É o mesmo sinal que o próprio
-   *    next/image usa duas linhas abaixo para decidir se já carregou.
-   *
-   * O `onError` interno do next/image continua ligado ao `<img>` (é ele que
-   * põe o texto alternativo à vista); o que deixámos de passar é o NOSSO, que
-   * era o único gatilho da reatribuição.
-   */
   const ligarAoErro = useImageErrorRef(handleError);
 
   // ── Recuperação depois de esgotar as tentativas ─────────────────────────
