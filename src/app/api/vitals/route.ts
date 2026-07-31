@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { log } from "@/lib/logger";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
+import { sanitizeTelemetryPath } from "@/lib/safe-path";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,12 @@ export async function POST(req: NextRequest) {
         metric: v.name,
         value,
         rating: v.rating,
-        path: v.path,
+        // Este endpoint é PÚBLICO: o corpo é escrito por quem quiser, e daqui
+        // vai direito para os registos de produção. Limpar no cliente não
+        // chega — qualquer outro emissor (um bot, um separador antigo com o
+        // pacote anterior, um pedido forjado à mão) poria na mesma um
+        // /portal/<token> nos registos. Por isso limpa-se também aqui.
+        path: v.path ? sanitizeTelemetryPath(v.path) : undefined,
         nav: v.nav,
         conn: v.conn,
       });

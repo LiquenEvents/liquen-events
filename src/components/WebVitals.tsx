@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { sanitizeTelemetryPath } from "@/lib/safe-path";
 
 /**
  * Reports real-user Web Vitals (LCP, CLS, INP, TTFB, FCP) to /api/vitals, so we
@@ -26,7 +27,13 @@ export default function WebVitals() {
           name: metric.name,
           value: metric.value,
           rating: metric.rating,
-          path: location.pathname,
+          // RGPD/segurança: `location.pathname` em /portal/<token> ou
+          // /proposta/<token> É o segredo do cliente (148 caracteres medidos,
+          // logo cabe inteiro no campo). A baliza é gravada nos registos de
+          // produção da Vercel, que ficam conservados e consultáveis, por isso
+          // o token é retirado AQUI, antes de sair do dispositivo. O servidor
+          // repete a limpeza — nenhum dos lados confia no outro.
+          path: sanitizeTelemetryPath(location.pathname),
           nav: getNavType(),
           conn,
         });
