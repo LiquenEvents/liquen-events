@@ -129,8 +129,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // sejam destino de tráfego PAGO: uma página que a Google já conhece e indexou
   // arranca com Índice de Qualidade melhor do que uma que ela vê pela primeira
   // vez quando o anúncio começa a servir, e o custo por clique reflecte isso.
-  // O conteúdo delas é próprio (não é duplicado de /servicos), por isso não há
-  // risco de canibalização orgânica.
+  //
+  // A PRIORIDADE É DELIBERADAMENTE BAIXA (0.5), abaixo das páginas de serviço
+  // (0.85) e muito abaixo da inicial (1.0). A dona foi explícita: estas páginas
+  // não podem aparecer à frente do site. O sinal de prioridade do sitemap é
+  // fraco — a Google trata-o como sugestão e muitas vezes ignora-o —, mas é o
+  // único que se declara aqui, e não custa nada.
+  //
+  // O que protege a sério é outra coisa, e está feita: os títulos destas
+  // páginas foram reescritos para NÃO repetirem os das páginas de serviço.
+  // A landing do Alentejo dizia "Decoração de Casamentos no Alentejo", que é
+  // exactamente o título de /servicos/casamentos — duas páginas do mesmo site
+  // a competir pela mesma pesquisa. Agora as regionais falam de casamentos EM
+  // QUINTAS E HERDADES de cada zona, e as de serviço continuam a ser donas do
+  // termo genérico.
   const campanhas: RawEntry[] = [
     ...POLOS.map((p) => ({
       path: caminhoPolo(p.slug),
@@ -138,21 +150,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       // polo a que apontar, tal como acontece nos serviços.
       sourceFile: "src/lib/ads/polos.ts",
       changeFrequency: "monthly" as const,
-      priority: 0.8,
+      priority: 0.5,
       images: [p.hero, ...p.fotos].map(abs),
     })),
     ...ESTILOS.map((e) => ({
       path: `/casamentos/estilo/${e.slug}`,
       sourceFile: "src/lib/ads/polos.ts",
       changeFrequency: "monthly" as const,
-      priority: 0.6,
+      priority: 0.4,
       images: [e.hero, ...e.fotos].map(abs),
     })),
     {
       path: "/casamentos/destination",
       sourceFile: "src/app/[lang]/casamentos/destination/page.tsx",
       changeFrequency: "monthly",
-      priority: 0.8,
+      priority: 0.5,
     },
   ];
 

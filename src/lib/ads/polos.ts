@@ -163,7 +163,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Alentejo",
       h1: "Decoração de casamentos no Alentejo",
-      metaTitle: "Decoração de Casamentos no Alentejo | Líquen Events",
+      metaTitle: "Casamentos em Herdades do Alentejo | Líquen Events",
       metaDescription:
         "Decoração e produção de casamentos em herdades e quintas do Alentejo. Conceito, design floral, cenografia e coordenação do dia.",
       eyebrow: "Alentejo",
@@ -178,7 +178,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "the Alentejo",
       h1: "Wedding design and production in the Alentejo",
-      metaTitle: "Alentejo Wedding Designer & Producer | Líquen Events",
+      metaTitle: "Weddings in Alentejo Estates | Líquen Events",
       metaDescription:
         "Wedding design, florals and production in Alentejo estates and quintas. Concept, floral design, set design and day-of coordination.",
       eyebrow: "Alentejo",
@@ -221,7 +221,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Lisboa",
       h1: "Decoração de casamentos em Lisboa, Cascais e Sintra",
-      metaTitle: "Decoração de Casamentos em Lisboa e Cascais | Líquen",
+      metaTitle: "Casamentos em Quintas de Lisboa e Sintra | Líquen",
       metaDescription:
         "Decoração e produção de casamentos em Lisboa, Cascais e Sintra. Conceito, design floral, cenografia e coordenação do dia.",
       eyebrow: "Lisboa, Cascais e Sintra",
@@ -236,7 +236,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "Lisbon",
       h1: "Wedding design in Lisbon, Cascais and Sintra",
-      metaTitle: "Wedding Designer in Lisbon & Cascais | Líquen Events",
+      metaTitle: "Weddings in Lisbon & Sintra Quintas | Líquen",
       metaDescription:
         "Wedding design, florals and production in Lisbon, Cascais and Sintra. Concept, floral design, set design and day-of coordination.",
       eyebrow: "Lisbon, Cascais and Sintra",
@@ -278,7 +278,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Algarve",
       h1: "Decoração de casamentos no Algarve",
-      metaTitle: "Decoração de Casamentos no Algarve | Líquen Events",
+      metaTitle: "Casamentos no Algarve: quintas e hotéis | Líquen",
       metaDescription:
         "Decoração e produção de casamentos no Algarve, para casais portugueses e estrangeiros. Conceito, flores, cenografia e coordenação.",
       eyebrow: "Algarve",
@@ -293,7 +293,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "the Algarve",
       h1: "Wedding design and production in the Algarve",
-      metaTitle: "Algarve Wedding Designer & Stylist | Líquen Events",
+      metaTitle: "Weddings in the Algarve: quintas & hotels | Líquen",
       metaDescription:
         "Wedding design, florals and production across the Algarve for Portuguese and international couples. Concept, styling and coordination.",
       eyebrow: "Algarve",
@@ -335,7 +335,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Porto e Douro",
       h1: "Decoração de casamentos no Porto e no Douro",
-      metaTitle: "Decoração de Casamentos no Porto e Douro | Líquen",
+      metaTitle: "Casamentos em Quintas do Douro e Porto | Líquen",
       metaDescription:
         "Decoração e produção de casamentos no Porto e no Vale do Douro. Conceito, design floral, cenografia e coordenação do dia.",
       eyebrow: "Porto e Vale do Douro",
@@ -350,7 +350,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "Porto and the Douro",
       h1: "Wedding design in Porto and the Douro Valley",
-      metaTitle: "Porto & Douro Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in Douro Valley Quintas | Líquen Events",
       metaDescription:
         "Wedding design, florals and production in Porto and the Douro Valley. Concept, floral design, set design and coordination.",
       eyebrow: "Porto and the Douro Valley",
@@ -387,7 +387,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Comporta",
       h1: "Decoração de casamentos na Comporta e em Melides",
-      metaTitle: "Decoração de Casamentos na Comporta | Líquen Events",
+      metaTitle: "Casamentos na Comporta e em Melides | Líquen Events",
       metaDescription:
         "Decoração e produção de casamentos na Comporta, Melides e Troia. Areia, pinhal e vento tratados como matéria do desenho.",
       eyebrow: "Comporta, Melides e Troia",
@@ -402,7 +402,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "Comporta",
       h1: "Wedding design in Comporta and Melides",
-      metaTitle: "Comporta Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in Comporta and Melides | Líquen Events",
       metaDescription:
         "Wedding design and production in Comporta, Melides and Troia. Sand, pine and wind treated as material, not obstacles.",
       eyebrow: "Comporta, Melides and Troia",
@@ -444,7 +444,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Minho",
       h1: "Decoração de casamentos no Minho e em Braga",
-      metaTitle: "Decoração de Casamentos no Minho e Braga | Líquen",
+      metaTitle: "Casamentos em Quintas do Minho e Braga | Líquen",
       metaDescription:
         "Decoração e produção de casamentos no Minho, Braga e Guimarães. Conceito, design floral, cenografia e coordenação do dia.",
       eyebrow: "Minho, Braga e Guimarães",
@@ -458,7 +458,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "the Minho",
       h1: "Wedding design in the Minho and Braga",
-      metaTitle: "Minho & Braga Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in Minho Quintas | Líquen Events",
       metaDescription:
         "Wedding design, florals and production in the Minho, Braga and Guimarães. Concept, floral design, set design and coordination.",
       eyebrow: "Minho, Braga and Guimarães",
@@ -493,7 +493,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Centro",
       h1: "Decoração de casamentos em Coimbra e no Centro",
-      metaTitle: "Decoração de Casamentos em Coimbra | Líquen Events",
+      metaTitle: "Casamentos em Coimbra, Aveiro e Viseu | Líquen",
       metaDescription:
         "Decoração e produção de casamentos em Coimbra, Aveiro e Viseu. Conceito, design floral, cenografia e coordenação do dia.",
       eyebrow: "Coimbra, Aveiro e Viseu",
@@ -508,7 +508,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "central Portugal",
       h1: "Wedding design in Coimbra and central Portugal",
-      metaTitle: "Coimbra Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in Coimbra, Aveiro & Viseu | Líquen",
       metaDescription:
         "Wedding design, florals and production in Coimbra, Aveiro and Viseu. Concept, styling, set design and coordination.",
       eyebrow: "Coimbra, Aveiro and Viseu",
@@ -543,7 +543,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Oeste",
       h1: "Decoração de casamentos no Oeste e em Óbidos",
-      metaTitle: "Decoração de Casamentos no Oeste e Óbidos | Líquen",
+      metaTitle: "Casamentos em Óbidos e no Oeste | Líquen Events",
       metaDescription:
         "Decoração e produção de casamentos no Oeste, em Óbidos, Caldas da Rainha e Nazaré. Conceito, flores, cenografia e coordenação.",
       eyebrow: "Óbidos, Caldas e Nazaré",
@@ -558,7 +558,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "the Oeste",
       h1: "Wedding design in the Oeste and Óbidos",
-      metaTitle: "Óbidos & Oeste Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in Óbidos and the Oeste | Líquen Events",
       metaDescription:
         "Wedding design and production in the Oeste, Óbidos, Caldas da Rainha and Nazaré. Concept, florals, set design and coordination.",
       eyebrow: "Óbidos, Caldas and Nazaré",
@@ -593,7 +593,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Ribatejo",
       h1: "Decoração de casamentos no Ribatejo",
-      metaTitle: "Decoração de Casamentos no Ribatejo | Líquen Events",
+      metaTitle: "Casamentos no Ribatejo e em Santarém | Líquen",
       metaDescription:
         "Decoração e produção de casamentos no Ribatejo, em Santarém, Tomar e Golegã. Conceito, flores, cenografia e coordenação.",
       eyebrow: "Santarém, Tomar e Golegã",
@@ -608,7 +608,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "the Ribatejo",
       h1: "Wedding design in the Ribatejo",
-      metaTitle: "Ribatejo Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in the Ribatejo | Líquen Events",
       metaDescription:
         "Wedding design and production in the Ribatejo, Santarém, Tomar and Golegã. Concept, florals, set design and coordination.",
       eyebrow: "Santarém, Tomar and Golegã",
@@ -644,7 +644,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Madeira",
       h1: "Decoração de casamentos na Madeira",
-      metaTitle: "Decoração de Casamentos na Madeira | Líquen Events",
+      metaTitle: "Casamentos na Madeira: decoração | Líquen Events",
       metaDescription:
         "Decoração e produção de casamentos na Madeira. Conceito, design floral e coordenação, com logística de ilha resolvida à partida.",
       eyebrow: "Madeira",
@@ -659,7 +659,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "Madeira",
       h1: "Wedding design in Madeira",
-      metaTitle: "Madeira Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in Madeira: design & florals | Líquen",
       metaDescription:
         "Wedding design, florals and coordination in Madeira, with island logistics planned and priced from the start.",
       eyebrow: "Madeira",
@@ -694,7 +694,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Trás-os-Montes",
       h1: "Decoração de casamentos em Trás-os-Montes",
-      metaTitle: "Decoração de Casamentos em Trás-os-Montes | Líquen",
+      metaTitle: "Casamentos em Trás-os-Montes | Líquen Events",
       metaDescription:
         "Decoração e produção de casamentos em Vila Real, Bragança e Chaves. Conceito, design floral, cenografia e coordenação.",
       eyebrow: "Vila Real, Bragança e Chaves",
@@ -709,7 +709,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "Trás-os-Montes",
       h1: "Wedding design in Trás-os-Montes",
-      metaTitle: "Trás-os-Montes Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in Trás-os-Montes | Líquen Events",
       metaDescription:
         "Wedding design and production in Vila Real, Bragança and Chaves. Concept, floral design, set design and coordination.",
       eyebrow: "Vila Real, Bragança and Chaves",
@@ -745,7 +745,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Beira Interior",
       h1: "Decoração de casamentos na Beira Interior",
-      metaTitle: "Decoração de Casamentos na Beira Interior | Líquen",
+      metaTitle: "Casamentos na Beira Interior e Guarda | Líquen",
       metaDescription:
         "Decoração e produção de casamentos na Guarda, Covilhã e Serra da Estrela. Conceito, flores, cenografia e coordenação.",
       eyebrow: "Guarda, Covilhã e Serra da Estrela",
@@ -760,7 +760,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "the Beira Interior",
       h1: "Wedding design in the Beira Interior",
-      metaTitle: "Beira Interior Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in the Beira Interior | Líquen Events",
       metaDescription:
         "Wedding design and production in Guarda, Covilhã and the Serra da Estrela. Concept, florals, set design and coordination.",
       eyebrow: "Guarda, Covilhã and Serra da Estrela",
@@ -796,7 +796,7 @@ export const POLOS: Polo[] = [
     pt: {
       regiao: "Açores",
       h1: "Decoração de casamentos nos Açores",
-      metaTitle: "Decoração de Casamentos nos Açores | Líquen Events",
+      metaTitle: "Casamentos nos Açores: decoração | Líquen Events",
       metaDescription:
         "Decoração e produção de casamentos nos Açores. Conceito, design floral e coordenação, com logística inter-ilhas planeada.",
       eyebrow: "Açores",
@@ -811,7 +811,7 @@ export const POLOS: Polo[] = [
     en: {
       regiao: "the Azores",
       h1: "Wedding design in the Azores",
-      metaTitle: "Azores Wedding Designer | Líquen Events",
+      metaTitle: "Weddings in the Azores: design | Líquen Events",
       metaDescription:
         "Wedding design, florals and coordination in the Azores, with inter-island logistics planned well ahead.",
       eyebrow: "Azores",

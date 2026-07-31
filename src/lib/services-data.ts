@@ -25,16 +25,21 @@ export const SERVICES: ServiceDetail[] = [
     slug: "casamentos",
     eyebrow: "Decoração e Coordenação de Casamentos",
     title: "Decoração de Casamentos",
-    metaTitle: "Decoração de Casamentos no Alentejo",
+    metaTitle: "Decoração de Casamentos em Portugal",
     metaDescription:
-      "Decoração de casamentos no Alentejo: design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos de Portugal.",
+      "Decoração de casamentos em todo o Portugal: design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos.",
+    // Termos NACIONAIS e genéricos. As variantes por região vivem nas landing
+    // pages de campanha (src/lib/ads/polos.ts) — cada uma dona da sua zona, e
+    // esta dona do termo geral. Repetir aqui "… Alentejo" punha duas páginas do
+    // mesmo site a disputar a mesma pesquisa.
     keywords: [
-      "decoração de casamentos Alentejo",
       "decoração de casamentos",
-      "coordenação de casamentos Alentejo",
+      "decoração de casamento",
+      "coordenação de casamentos",
+      "empresa de decoração de casamentos",
+      "design floral casamento",
       "aluguer de viaturas clássicas casamento",
-      "casamento herdade Alentejo",
-      "wedding decoration Alentejo",
+      "wedding decoration Portugal",
     ],
     hero: "/imagens/stephanie-mizio-715.jpg",
     intro: [
@@ -63,8 +68,8 @@ export const SERVICES: ServiceDetail[] = [
         a: "Idealmente alguns meses antes, para desenharmos a decoração e articularmos com os fornecedores. Mas conseguimos entrar mais perto da data, consoante a disponibilidade.",
       },
       {
-        q: "Fazem casamentos fora do Alentejo?",
-        a: "Sim. Decoramos e coordenamos casamentos em Portugal, em articulação com os fornecedores de cada região.",
+        q: "Que zonas do país cobrem?",
+        a: "Todo o país, continente e ilhas. Decoramos e coordenamos casamentos em qualquer região, em articulação com os fornecedores de cada zona.",
       },
     ],
     related: ["festas-e-aniversarios"],
@@ -273,12 +278,12 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
     eyebrow: "Wedding Decoration & Coordination",
     title: "Wedding Decoration",
-    metaTitle: "Wedding Decoration in the Alentejo",
+    metaTitle: "Wedding Decoration in Portugal",
     metaDescription:
-      "Wedding decoration in the Alentejo: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues in Portugal.",
+      "Wedding decoration across Portugal: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues.",
     intro: [
       "We turn your wedding into a truly unforgettable day. We take care of every detail, from choosing the perfect venue to elegant decoration and the complete organisation of the ceremony and reception, making sure everything reflects your personality and style.",
-      "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the Alentejo and Portugal, so you can fully live your special moment, worry-free.",
+      "With an experienced, dedicated team, we provide bespoke planning, guidance and day-of coordination, at estates and quintas across the whole of Portugal, so you can fully live your special moment, worry-free.",
     ],
     includes: [
       "Decoration concept and design",
@@ -294,8 +299,8 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
         a: "Ideally a few months before, so we can design the decoration and liaise with your suppliers. But we can come on board closer to the date, subject to availability.",
       },
       {
-        q: "Do you do weddings outside the Alentejo?",
-        a: "Yes. We decorate and coordinate weddings in Portugal, working with each region's suppliers.",
+        q: "Which parts of Portugal do you cover?",
+        a: "All of it, mainland and islands. We decorate and coordinate weddings across the country, working with each region's suppliers.",
       },
     ],
   },
