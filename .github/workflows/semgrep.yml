@@ -30,18 +30,36 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Regras deste projecto (bloqueante)
-        # `--strict` é obrigatório aqui, e a razão é uma lição desta auditoria.
+        # Duas coisas têm de fazer falhar este passo, e são diferentes uma da
+        # outra:
         #
-        # Com apenas `--error`, uma regra que NÃO COMPILA é registada como
-        # `[ERROR] Rule parse error` e o semgrep sai com SUCESSO à mesma — o
-        # `--error` só olha para achados. Aconteceu à primeira: a regra da
-        # guarda de sessão rebentou a compilar, o passo ficou verde, e o portão
-        # não estava a guardar coisa nenhuma.
+        #  1. UM ACHADO — é o que o `--error` faz. Cada regra corresponde a um
+        #     defeito real já corrigido, portanto um achado é uma REGRESSÃO.
         #
-        # Um portão verde que não guarda nada é pior do que portão nenhum: dá
-        # confiança sem a merecer. `--strict` transforma o erro de compilação
-        # em falha do passo.
-        run: semgrep --config .semgrep.yml --error --strict --metrics=off .
+        #  2. UMA REGRA QUE NÃO COMPILA. Esta é a lição desta auditoria: com
+        #     apenas `--error`, o semgrep escreve `[ERROR] Rule parse error`,
+        #     ignora a regra, e sai com SUCESSO. Aconteceu à primeira — a regra
+        #     da guarda de sessão rebentou, o passo ficou verde, e o portão não
+        #     guardava nada. Um portão verde que não guarda é pior do que
+        #     portão nenhum, porque dá confiança sem a merecer.
+        #
+        # `--strict` NÃO serve para o ponto 2, e experimentei: falha também
+        # quando algum ficheiro do repositório tem uma linha que o parser do
+        # semgrep não digere (0,1% das linhas aqui), o que transforma a saúde
+        # do CI numa função da cobertura do parser deles. Isso é ruído, não
+        # sinal — e ruído num portão treina a equipa a ignorá-lo.
+        #
+        # Por isso a verificação é explícita: procura-se o erro de compilação
+        # na saída e falha-se só por causa dele.
+        run: |
+          estado=0
+          semgrep --config .semgrep.yml --error --metrics=off . > /tmp/semgrep.log 2>&1 || estado=$?
+          cat /tmp/semgrep.log
+          if grep -q "Rule parse error" /tmp/semgrep.log; then
+            echo "::error::Uma regra de .semgrep.yml não compila. O semgrep ignora-a e sai com sucesso — o portão ficaria verde sem guardar nada."
+            exit 1
+          fi
+          exit "$estado"
 
       - name: Regras da comunidade (informativo)
         # O conjunto `p/typescript` é grande e ruidoso num repositório com esta
