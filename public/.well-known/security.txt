@@ -3,6 +3,15 @@ Contact: mailto:liquen.alentejo@gmail.com
 Expires: 2027-12-31T23:59:59.000Z
 Preferred-Languages: pt, en
 Canonical: https://www.liquen-events.com/.well-known/security.txt
+Policy: https://github.com/LiquenEvents/liquen-events/blob/main/SECURITY.md
 
 # If you believe you have found a security vulnerability, please email us.
 # We appreciate responsible disclosure and will respond as quickly as we can.
+#
+# NOTA (auditoria de Julho 2026): o `Canonical` acima diz `www.`, e o resto do
+# projecto trata `https://liquen-events.com` (sem `www`) como o endereço do
+# sítio — ver `SITE.url` em `src/lib/site.ts`. A RFC 9116 pede que o
+# `Canonical` seja o endereço onde o ficheiro é REALMENTE servido; se só um dos
+# dois responder, este campo está errado e deve passar a esse. Não o alterei
+# porque a rede deste ambiente de auditoria não deixa confirmar qual responde,
+# e trocar às cegas podia estragar um campo que hoje está certo.

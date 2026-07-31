@@ -1,0 +1,44 @@
+name: Static analysis (semgrep)
+
+# Complementa o CodeQL em vez de o repetir. O CodeQL é excelente nos padrões
+# genéricos (injecção, travessia, expressões regulares frágeis) e já corre
+# aqui; o que ele NÃO sabe são as invariantes deste projecto — que uma guarda
+# de posse não pode falhar aberta, que um caminho com token nunca vai para
+# telemetria, que cada rota se guarda a si própria.
+#
+# As regras de `.semgrep.yml` vieram todas de defeitos encontrados na auditoria
+# de Julho de 2026, não de um catálogo. É de propósito: uma regra que nunca
+# disparou sobre código real é ruído à espera de acontecer, e o custo do ruído
+# é a equipa aprender a ignorar o alarme.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # A imagem traz o semgrep instalado — evita depender de pip no runner.
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Regras deste projecto (bloqueante)
+        # As nossas regras têm de passar: cada uma corresponde a um defeito real
+        # já corrigido, por isso um achado aqui é uma REGRESSÃO, não um palpite.
+        run: semgrep --config .semgrep.yml --error --metrics=off .
+
+      - name: Regras da comunidade (informativo)
+        # O conjunto `p/typescript` é grande e ruidoso num repositório com esta
+        # dimensão. Corre para dar visibilidade, mas NÃO bloqueia — transformar
+        # centenas de avisos genéricos em impedimento de publicação treinaria
+        # toda a gente a passar por cima deles, e aí o passo acima também
+        # deixava de ser lido.
+        continue-on-error: true
+        run: semgrep --config p/typescript --metrics=off .

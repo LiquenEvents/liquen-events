@@ -1,0 +1,95 @@
+# Regras de análise estática para este projecto.
+#
+# NÃO são regras genéricas de Next/Supabase copiadas de um catálogo. Cada uma
+# corresponde a um defeito que a auditoria de Julho de 2026 encontrou MESMO
+# neste repositório — a ideia é que o mesmo erro não volte por outro caminho.
+# Uma regra que nunca disparou sobre código real é ruído à espera de acontecer.
+rules:
+  - id: guarda-de-posse-que-falha-aberta
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Comparação de posse com um `&&` antes: se o campo for vazio, a guarda é
+      SALTADA e serve-se o recurso de outra pessoa. Foi assim que a proposta de
+      um cliente foi servida a outro (`proposals.quote_id` é `on delete set
+      null`, e um pedido apagado deixa-o vazio). Compara sempre de forma
+      estrita — sem posse provada, não há recurso.
+    patterns:
+      - pattern-either:
+          - pattern: $X.quoteId && $X.quoteId !== $Y
+          - pattern: $X.proposalId && $X.proposalId !== $Y
+          - pattern: $X.quoteId && $Y !== $X.quoteId
+
+  - id: caminho-com-token-em-telemetria
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Um caminho de URL vai para telemetria ou para os registos sem passar por
+      `sanitizeTelemetryPath` (src/lib/safe-path.ts). As rotas `/portal/…` e
+      `/proposta/…` levam um token que AUTORIZA aceitar uma proposta — e isso
+      cria contrato e factura. Já foi parar à Google e aos registos de
+      produção.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              { ..., path: location.pathname, ... }
+          - pattern: |
+              { ..., page_location: $W.location.href, ... }
+      - pattern-not-inside: sanitizeTelemetryPath(...)
+
+  - id: fecho-de-etiqueta-html-intolerante
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Expressão regular a filtrar HTML com um fecho rígido (`</script>`): o HTML
+      permite `</script >` e `</script foo>`, e uma só passagem não desfaz
+      `<scr<script>ipt>`. O CodeQL apanhou exactamente isto aqui. Se for para
+      obter TEXTO, itera até estabilizar e diz no comentário que não é um
+      sanitizador.
+    patterns:
+      - pattern-regex: '<\\?/\(script\|style\)>'
+
+  - id: chave-de-tecto-com-endereco-quando-devia-ser-por-conta
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Chave de limitação que mistura endereço e conta. Um tecto por endereço
+      não protege um segundo factor: rodar endereços é barato e cada um compra
+      tentativas novas. O contador da conta tem de ser o MESMO para todos os
+      endereços.
+    patterns:
+      - pattern-regex: 'rateLimit\(`[^`]*conta[^`]*\$\{ip\}'
+
+  - id: rota-de-admin-sem-guarda-de-sessao
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Route handler sem `isAuthed` nem verificação por token. Cada rota
+      guarda-se a si própria — o `src/proxy.ts` faz CSRF e i18n, NÃO faz
+      autorização. Se esta rota é mesmo pública, acrescenta-a à tabela de
+      `src/app/api/auth-guard-audit.test.ts` com a razão.
+    paths:
+      include:
+        - "src/app/api/**/route.ts"
+      exclude:
+        - "src/app/api/health/**"
+        - "src/app/api/vitals/**"
+        - "src/app/api/security/**"
+        - "src/app/api/portal/**"
+        - "src/app/api/proposta/**"
+        - "src/app/api/orcamento/route.ts"
+        - "src/app/api/admin/**"
+        - "src/app/api/cron/**"
+        - "src/app/api/devproposalpreview/**"
+    patterns:
+      - pattern: |
+          export async function $METHOD(...) { ... }
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(GET|POST|PUT|PATCH|DELETE)$
+      - pattern-not-inside: |
+          ... isAuthed(...) ...
+      - pattern-not-inside: |
+          ... readPortalToken(...) ...
+      - pattern-not-inside: |
+          ... readProposalToken(...) ...
