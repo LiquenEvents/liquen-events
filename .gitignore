@@ -15,6 +15,10 @@
 
 # next.js
 /.next/
+# Pastas de compilação com outro nome (`next build --distDir`), usadas por
+# medições de antes/depois. São produto de compilação, nunca fonte — e sem esta
+# linha entram no `git status` e podem ser gravadas por engano.
+/.next-*/
 /out/
 
 # production
