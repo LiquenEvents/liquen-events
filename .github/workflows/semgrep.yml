@@ -30,9 +30,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Regras deste projecto (bloqueante)
-        # As nossas regras têm de passar: cada uma corresponde a um defeito real
-        # já corrigido, por isso um achado aqui é uma REGRESSÃO, não um palpite.
-        run: semgrep --config .semgrep.yml --error --metrics=off .
+        # `--strict` é obrigatório aqui, e a razão é uma lição desta auditoria.
+        #
+        # Com apenas `--error`, uma regra que NÃO COMPILA é registada como
+        # `[ERROR] Rule parse error` e o semgrep sai com SUCESSO à mesma — o
+        # `--error` só olha para achados. Aconteceu à primeira: a regra da
+        # guarda de sessão rebentou a compilar, o passo ficou verde, e o portão
+        # não estava a guardar coisa nenhuma.
+        #
+        # Um portão verde que não guarda nada é pior do que portão nenhum: dá
+        # confiança sem a merecer. `--strict` transforma o erro de compilação
+        # em falha do passo.
+        run: semgrep --config .semgrep.yml --error --strict --metrics=off .
 
       - name: Regras da comunidade (informativo)
         # O conjunto `p/typescript` é grande e ruidoso num repositório com esta

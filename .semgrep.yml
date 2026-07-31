@@ -60,36 +60,24 @@ rules:
     patterns:
       - pattern-regex: 'rateLimit\(`[^`]*conta[^`]*\$\{ip\}'
 
-  - id: rota-de-admin-sem-guarda-de-sessao
-    languages: [typescript]
-    severity: ERROR
-    message: >-
-      Route handler sem `isAuthed` nem verificação por token. Cada rota
-      guarda-se a si própria — o `src/proxy.ts` faz CSRF e i18n, NÃO faz
-      autorização. Se esta rota é mesmo pública, acrescenta-a à tabela de
-      `src/app/api/auth-guard-audit.test.ts` com a razão.
-    paths:
-      include:
-        - "src/app/api/**/route.ts"
-      exclude:
-        - "src/app/api/health/**"
-        - "src/app/api/vitals/**"
-        - "src/app/api/security/**"
-        - "src/app/api/portal/**"
-        - "src/app/api/proposta/**"
-        - "src/app/api/orcamento/route.ts"
-        - "src/app/api/admin/**"
-        - "src/app/api/cron/**"
-        - "src/app/api/devproposalpreview/**"
-    patterns:
-      - pattern: |
-          export async function $METHOD(...) { ... }
-      - metavariable-regex:
-          metavariable: $METHOD
-          regex: ^(GET|POST|PUT|PATCH|DELETE)$
-      - pattern-not-inside: |
-          ... isAuthed(...) ...
-      - pattern-not-inside: |
-          ... readPortalToken(...) ...
-      - pattern-not-inside: |
-          ... readProposalToken(...) ...
+  # REGRA RETIRADA: "rota de admin sem guarda de sessão".
+  #
+  # Escrevi-a, não a consegui experimentar (o semgrep não está instalado no
+  # ambiente de auditoria e a rede não deixava instalá-lo), e o CI mostrou que
+  # o padrão `... isAuthed(...) ...` não é TypeScript válido:
+  #
+  #   [ERROR] Rule parse error in rule rota-de-admin-sem-guarda-de-sessao:
+  #    Invalid pattern for TypeScript: Stdlib.Parsing.Parse_error
+  #
+  # E o mais importante: **o semgrep saiu com SUCESSO na mesma.** O `--error`
+  # só falha perante achados, não perante regras que não compilam. Um portão
+  # verde que não guarda nada é pior do que portão nenhum — é precisamente a
+  # família de defeito que esta auditoria inteira andou a encontrar. Daí o
+  # `--strict` no workflow, que passa a fazer disto um erro.
+  #
+  # Não a reescrevi porque esta invariante JÁ TEM um guarda melhor e provado:
+  # o teste de completude em `src/app/api/auth-guard-audit.test.ts` percorre
+  # `src/app/api` no disco e reprova qualquer rota não classificada. Foi
+  # verificado a sério — retirando `visao-geral` da tabela fica vermelho com
+  # `rotas sem classificação: ./visao-geral/route`. Uma segunda versão pior da
+  # mesma rede, que eu não consigo experimentar, não acrescenta nada.
