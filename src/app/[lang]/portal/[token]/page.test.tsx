@@ -53,10 +53,9 @@ vi.mock("./PortalView", () => ({ default: (props: Record<string, unknown>) => pr
 import PortalPage from "./page";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 
- 
 async function renderProps(): Promise<any> {
   const el = await PortalPage({ params: Promise.resolve({ lang: "pt", token: "good" }) });
-   
+
   return (el as any).props;
 }
 
@@ -82,12 +81,13 @@ describe("Portal page — accepted proposal is the source of truth (FIX 6)", () 
     // ser mostrada — o portal tem de refletir o que o cliente aceitou.
     db.proposalsById.set("p-acc", {
       id: "p-acc",
+      quoteId: "q-1",
       total: 10000,
       currency: "EUR",
       status: "aceite",
       doc: { some: "doc" },
     });
-    db.newestByQuote.set("q-1", { id: "p-new", total: 12000, status: "rascunho" });
+    db.newestByQuote.set("q-1", { id: "p-new", quoteId: "q-1", total: 12000, status: "rascunho" });
     db.acceptedContractByQuote.set("q-1", {
       proposalId: "p-acc",
       status: "aceite",
@@ -114,6 +114,7 @@ describe("Portal page — accepted proposal is the source of truth (FIX 6)", () 
   it("falls back to the newest proposal when there is no accepted contract (still open)", async () => {
     db.newestByQuote.set("q-1", {
       id: "p-open",
+      quoteId: "q-1",
       total: 5000,
       currency: "EUR",
       status: "enviada",

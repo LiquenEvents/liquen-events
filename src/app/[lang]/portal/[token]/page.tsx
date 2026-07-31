@@ -68,11 +68,18 @@ export default async function PortalPage({
   let proposal = acceptedContract
     ? await getProposal(acceptedContract.proposalId)
     : await getProposalByQuote(quote.id);
-  // Defense in depth: never surface a proposal that belongs to another quote
-  // via a mislinked accepted contract. The accepted-contract path resolves a
-  // proposal by a stored id (contract.proposalId); if that linkage is corrupt
-  // it must not leak another client's proposal (total, status, or PDF link).
-  if (proposal && proposal.quoteId && proposal.quoteId !== quote.id) proposal = null;
+  // Defesa em profundidade: nunca mostrar uma proposta de outro pedido através
+  // de um contrato aceite mal ligado. O caminho do contrato aceite resolve a
+  // proposta por um id gravado (contract.proposalId); se essa ligação estiver
+  // errada não pode revelar a proposta de outro cliente (total, estado ou o
+  // link do PDF).
+  //
+  // Comparação ESTRITA: a versão anterior exigia `proposal.quoteId &&` antes de
+  // comparar, o que desligava o guarda quando o campo estava vazio. Vazio é um
+  // estado REAL — `proposals.quote_id` é `on delete set null`, logo apagar um
+  // pedido esvazia o quote_id das suas propostas e `fromRow` lê-o como "".
+  // Sem pertença provada, não há proposta.
+  if (proposal && proposal.quoteId !== quote.id) proposal = null;
   const [contract, invoices] = await Promise.all([
     acceptedContract
       ? Promise.resolve(acceptedContract)

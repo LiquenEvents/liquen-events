@@ -49,11 +49,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     const proposal = acceptedContract
       ? await getProposal(acceptedContract.proposalId)
       : await getProposalByQuote(quote.id);
-    // Defense in depth: the resolved proposal MUST belong to this token's quote.
-    // The accepted-contract path trusts a stored linkage (contract.proposalId);
-    // a mislinked/corrupted contract pointing at another client's proposal must
-    // never leak that client's document. (The fallback already scopes by quote.)
-    if (!proposal?.doc || (proposal.quoteId && proposal.quoteId !== quote.id)) {
+    // Defesa em profundidade: a proposta resolvida TEM de pertencer ao pedido
+    // deste token. O caminho do contrato aceite confia numa ligação gravada
+    // (contract.proposalId); um contrato mal ligado que aponte para a proposta
+    // de outro cliente nunca pode revelar o documento desse cliente. (O caminho
+    // alternativo já filtra por pedido.)
+    //
+    // A comparação é ESTRITA de propósito. A versão anterior era
+    // `proposal.quoteId && proposal.quoteId !== quote.id`, que SALTAVA o guarda
+    // sempre que `proposal.quoteId` fosse vazio — e vazio não é um caso
+    // teórico: `proposals.quote_id` é `on delete set null` (db/schema.sql), por
+    // isso apagar um pedido no back office põe a NULL o quote_id de todas as
+    // suas propostas, e `fromRow` lê NULL como "" (falsy). Bastava então um
+    // contrato aceite a apontar para uma proposta órfã para o portal de um
+    // cliente servir o documento de outro. Falha FECHADA: sem pertença provada,
+    // 404.
+    if (!proposal?.doc || proposal.quoteId !== quote.id) {
       return new NextResponse(null, { status: 404 });
     }
 

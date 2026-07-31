@@ -50,10 +50,9 @@ vi.mock("./PortalView", () => ({ default: (props: Record<string, unknown>) => pr
 
 import PortalPage from "./page";
 
- 
 async function renderProps(): Promise<any> {
   const el = await PortalPage({ params: Promise.resolve({ lang: "pt", token: "good" }) });
-   
+
   return (el as any).props;
 }
 
@@ -84,6 +83,30 @@ describe("Portal page — cross-quote isolation", () => {
     const props = await renderProps();
 
     // The other client's proposal (total/status/PDF link) must not appear.
+    expect(props.proposal).toBeNull();
+    expect(props.pdfHref).toBeNull();
+    expect(props.schedule).toBeNull();
+  });
+
+  it("não revela a proposta de outro cliente quando o quote_id dela ficou VAZIO", async () => {
+    // O ramo que faltava. `proposals.quote_id` é `on delete set null`, por isso
+    // apagar um pedido no back office esvazia o quote_id das suas propostas —
+    // e `fromRow` lê NULL como "". Com o guarda antigo
+    // (`proposal.quoteId && proposal.quoteId !== quote.id`) esse "" era falsy,
+    // a comparação nunca chegava a correr, e o portal do Cliente A mostrava o
+    // total, o estado e o link do PDF da proposta órfã do Cliente B.
+    db.proposalsById.set("p-orfa", {
+      id: "p-orfa",
+      quoteId: "", // pedido apagado → on delete set null → fromRow devolve ""
+      total: 99999,
+      currency: "EUR",
+      status: "aceite",
+      doc: { some: "foreign" },
+    });
+    db.acceptedContractByQuote.set("q-1", { proposalId: "p-orfa", status: "aceite" });
+
+    const props = await renderProps();
+
     expect(props.proposal).toBeNull();
     expect(props.pdfHref).toBeNull();
     expect(props.schedule).toBeNull();

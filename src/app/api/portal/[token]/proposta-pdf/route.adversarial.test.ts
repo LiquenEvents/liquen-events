@@ -70,6 +70,25 @@ describe("proposta-pdf — cross-quote isolation probe", () => {
     expect(res.status).toBe(404);
   });
 
+  it("must NOT serve a proposal whose quote_id ficou VAZIO (pedido apagado)", async () => {
+    // O ramo que o guarda antigo deixava passar. `proposals.quote_id` é
+    // `on delete set null` (db/schema.sql): apagar um pedido põe a NULL o
+    // quote_id de todas as suas propostas, e `fromRow` lê NULL como "".
+    // Como "" é falsy, `proposal.quoteId && proposal.quoteId !== quote.id`
+    // saltava a comparação por completo e servia o PDF do outro cliente com
+    // um 200 — reproduzido antes da correcção.
+    db.proposalsById.set("p-orfa", {
+      id: "p-orfa",
+      quoteId: "",
+      doc: { secret: "another-clients-proposal" },
+    });
+    db.acceptedContractByQuote.set("q-1", { proposalId: "p-orfa", status: "aceite" });
+
+    const res = await call();
+    expect(db.rendered).toEqual([]);
+    expect(res.status).toBe(404);
+  });
+
   it("still serves the accepted proposal when it genuinely belongs to the quote", async () => {
     // Positive control: the guard must not over-block a correctly-linked
     // proposal whose quoteId matches the token's quote.

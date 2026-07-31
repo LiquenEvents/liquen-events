@@ -165,10 +165,88 @@ vi.mock("@/lib/push", () =>
 vi.mock("@/lib/inbox", () =>
   H.build("inbox", ["listInbox", "getInboxMessage", "setFlags"], { imapConfigured: () => false }),
 );
-vi.mock("@/lib/proposal-storage", () => H.build("proposal-storage", ["uploadProposalImage"]));
+vi.mock("@/lib/proposal-storage", () =>
+  H.build(
+    "proposal-storage",
+    [
+      "uploadProposalImage",
+      "ensureBucket",
+      "createProposalUploadTickets",
+      "confirmProposalUploads",
+    ],
+    { UPLOAD_TICKET_TTL: 300, MAX_UPLOAD_TICKETS: 40, BUCKET_FILE_SIZE_LIMIT: 12 * 1024 * 1024 },
+  ),
+);
 vi.mock("@/lib/supabase", () =>
   H.build("supabase", [], { getSupabase: () => null, isDatabaseConfigured: () => false }),
 );
+
+// ── Biblioteca de Temas + rascunhos + Visão Geral ────────────────────────────
+// Estes módulos entraram com as rotas que a tabela abaixo passou a cobrir. Tal
+// como os restantes, são espias que registam a chamada: é isso que transforma
+// "a rota tem guarda?" na asserção de que NADA no armazenamento correu.
+vi.mock("@/lib/themes-store", () =>
+  H.build("themes-store", ["getTheme", "createTheme", "updateTheme", "deleteTheme"], {
+    listThemes: H.afn("themes-store.listThemes", async () => []),
+  }),
+);
+vi.mock("@/lib/theme-storage", () =>
+  H.build(
+    "theme-storage",
+    [
+      "uploadThemeImage",
+      "createThemeUploadTickets",
+      "confirmThemeUploads",
+      "listThemeObjects",
+      "countThemeFiles",
+      "readThemeFingerprints",
+      "noteThemeFingerprint",
+      "forgetThemeFingerprints",
+      "findThemeImageByBytes",
+      "signThemeThumbs",
+      "listThemeImagePage",
+      "deleteThemeImage",
+      "deleteThemeFolder",
+      "fetchThemeImageBytes",
+      "copyThemeImageToProposal",
+      "transferThemeImage",
+    ],
+    {
+      // Constantes e auxiliares PUROS ficam síncronos e verdadeiros o suficiente
+      // para o caminho autenticado de sanidade correr até ao fim.
+      THEME_BUCKET: "temas",
+      THEME_THUMB_BUCKET: "temas-mini",
+      SIGNED_TTL: 3600,
+      isAlreadyExists: () => false,
+      themeFolder: (id: string) => `tema-${id}`,
+      isThemePath: () => true,
+      themeIdOfPath: (p: string) => p.split("/")[0],
+      contentTypeForPath: () => "image/jpeg",
+      invalidateThemeCount: () => undefined,
+      planOrderedPage: () => ({ names: [], truncated: false }),
+      listThemeFiles: H.afn("theme-storage.listThemeFiles", async () => ({
+        names: [],
+        ok: true,
+        truncated: false,
+      })),
+      signThemePaths: H.afn("theme-storage.signThemePaths", async () => new Map<string, string>()),
+    },
+  ),
+);
+vi.mock("@/lib/proposal-drafts", () =>
+  H.build("proposal-drafts", ["getProposalDraft", "saveProposalDraft", "clearProposalDraft"]),
+);
+// Parcial: o esquema Zod da rota lê OVERVIEW_FIELDS/MAX_* no topo do módulo e o
+// 409 depende da classe StaleWriteError real — só as duas funções de I/O é que
+// passam a espias.
+vi.mock("@/lib/overview-settings-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/overview-settings-store")>()),
+  readOverviewSettings: H.afn("overview-settings-store.readOverviewSettings", async () => ({})),
+  saveOverviewField: H.afn("overview-settings-store.saveOverviewField", async () => ({})),
+}));
+// `sharp` é importado no topo da rota das miniaturas; fica de fora da auditoria
+// pela mesma razão que o pdf-lib.
+vi.mock("sharp", () => ({ default: () => ({ metadata: async () => ({}) }) }));
 // PDF renderers — mocked so pdf-lib / sharp never load in the audit.
 vi.mock("@/lib/contract-pdf", () => H.build("contract-pdf", ["renderContractPdf"]));
 vi.mock("@/lib/invoice-pdf", () => H.build("invoice-pdf", ["renderInvoicePdf"]));
@@ -257,16 +335,37 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
   { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },
+  // Escrita directa e importação da biblioteca: emitem bilhetes de escrita para
+  // o Storage e copiam bytes para a pasta do pedido. Sem sessão, nem os
+  // bilhetes podem ser emitidos.
+  { path: "./orcamento/[id]/assets/url/route", methods: ["POST", "PUT"] },
+  { path: "./orcamento/[id]/assets/importar/route", methods: ["POST"] },
   { path: "./orcamento/[id]/fatura/route", methods: ["POST"] },
   { path: "./orcamento/[id]/mensagem/route", methods: ["POST"] },
   { path: "./orcamento/[id]/proposta/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/proposta-doc/route", methods: ["POST"] },
+  // O rascunho é trabalho comercial por publicar (preços, notas internas): ler
+  // conta tanto como escrever.
+  { path: "./orcamento/[id]/proposta-rascunho/route", methods: ["GET", "PUT", "DELETE"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
   { path: "./propostas/route", methods: ["GET"] },
   { path: "./propostas/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./push/subscribe/route", methods: ["GET", "POST", "DELETE"] },
   { path: "./tarefas/route", methods: ["GET", "POST"] },
   { path: "./tarefas/[id]/route", methods: ["PATCH", "DELETE"] },
+  // ── Biblioteca de Temas ────────────────────────────────────────────────────
+  // Toda a árvore /temas é back-office: fotos do estúdio, os seus metadados e
+  // as operações em lote que as movem. Estava FORA desta tabela até aqui — as
+  // guardas existiam, mas nada as prendia, e é a tabela que é o contrato.
+  { path: "./temas/route", methods: ["GET", "POST"] },
+  { path: "./temas/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./temas/[id]/imagens/route", methods: ["GET", "POST", "DELETE"] },
+  { path: "./temas/[id]/imagens/url/route", methods: ["POST", "PUT"] },
+  { path: "./temas/[id]/imagens/copiar/route", methods: ["POST"] },
+  { path: "./temas/[id]/miniaturas/route", methods: ["POST"] },
+  { path: "./temas/[id]/repetidas/route", methods: ["POST"] },
+  // Notas da equipa e meta de receita — texto interno, e uma escrita.
+  { path: "./visao-geral/route", methods: ["GET", "PUT"] },
 ];
 
 describe("ADMIN-SESSION routes reject the unauthenticated before touching the store", () => {
@@ -302,6 +401,70 @@ describe("ADMIN-SESSION routes reject the unauthenticated before touching the st
     const res = await fn(req("GET"), ctx());
     expect(res.status).not.toBe(401);
     expect(calls).toContain("calendar-store.listCalendarEvents");
+  });
+
+  // Mesma sanidade para a Biblioteca de Temas, o ramo que esta tabela acabou de
+  // adoptar: prova que os 401 acima são a guarda a decidir e não a rota a
+  // rebentar por outro motivo qualquer.
+  it("GET /api/temas passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./temas/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("themes-store.listThemes");
+  });
+
+  it("GET /api/visao-geral passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./visao-geral/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("overview-settings-store.readOverviewSettings");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1b. COMPLETUDE — a tabela acima só vale se cobrir mesmo a árvore toda. Este
+// teste lê `src/app/api` do disco e exige que cada ficheiro de rota apareça em
+// ALGUMA das listas deste ficheiro. Foi assim que onze rotas (a Biblioteca de
+// Temas inteira, a Visão Geral, o rascunho da proposta e a escrita directa)
+// se descobriram fora da auditoria: tinham guarda, mas ninguém as prendia. Uma
+// rota nova falha aqui até ser classificada — que é exactamente o ponto.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
+  it("nenhum ficheiro de rota fica fora das tabelas", async () => {
+    const { readdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const root = new URL(".", import.meta.url).pathname;
+
+    const found: string[] = [];
+    const walk = (dir: string, rel: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(join(dir, entry.name), `${rel}/${entry.name}`);
+        else if (entry.name === "route.ts") found.push(`.${rel}/route`);
+      }
+    };
+    walk(root, "");
+
+    // As rotas que NÃO são de sessão admin, cada uma coberta na sua secção.
+    const NON_ADMIN = [
+      "./admin/login/route",
+      "./admin/logout/route",
+      "./health/route",
+      "./security/csp-report/route",
+      "./vitals/route",
+      "./orcamento/route", // POST público + GET admin (ambos acima)
+      "./portal/[token]/proposta-pdf/route",
+      "./portal/[token]/contrato-pdf/route",
+      "./proposta/[token]/pdf/route",
+      "./proposta/route",
+      "./cron/reminders/route",
+      "./cron/inbox-check/route",
+      "./devproposalpreview/route",
+    ];
+    const covered = new Set([...ADMIN.map((r) => r.path), ...NON_ADMIN]);
+    const missing = found.filter((p) => !covered.has(p)).sort();
+    expect(missing, `rotas sem classificação na auditoria: ${missing.join(", ")}`).toEqual([]);
   });
 });
 

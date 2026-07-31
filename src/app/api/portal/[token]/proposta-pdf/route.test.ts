@@ -56,8 +56,16 @@ beforeEach(() => {
 
 describe("portal proposta-pdf — serves the accepted proposal's document", () => {
   it("renders the ACCEPTED proposal doc even when a newer draft exists", async () => {
-    db.proposalsById.set("p-acc", { id: "p-acc", doc: { which: "accepted" } });
-    db.newestByQuote.set("q-1", { id: "p-new", doc: { which: "draft-revision" } });
+    db.proposalsById.set("p-acc", {
+      id: "p-acc",
+      quoteId: "q-1",
+      doc: { which: "accepted" },
+    });
+    db.newestByQuote.set("q-1", {
+      id: "p-new",
+      quoteId: "q-1",
+      doc: { which: "draft-revision" },
+    });
     db.acceptedContractByQuote.set("q-1", { proposalId: "p-acc", status: "aceite" });
 
     const res = await call();
@@ -67,7 +75,7 @@ describe("portal proposta-pdf — serves the accepted proposal's document", () =
   });
 
   it("falls back to the newest proposal when there is no accepted contract", async () => {
-    db.newestByQuote.set("q-1", { id: "p-open", doc: { which: "open" } });
+    db.newestByQuote.set("q-1", { id: "p-open", quoteId: "q-1", doc: { which: "open" } });
 
     const res = await call();
     expect(res.status).toBe(200);
@@ -81,7 +89,7 @@ describe("portal proposta-pdf — serves the accepted proposal's document", () =
   });
 
   it("404s when the accepted proposal has no stored doc", async () => {
-    db.proposalsById.set("p-acc", { id: "p-acc", doc: null });
+    db.proposalsById.set("p-acc", { id: "p-acc", quoteId: "q-1", doc: null });
     db.acceptedContractByQuote.set("q-1", { proposalId: "p-acc", status: "aceite" });
 
     const res = await call();
