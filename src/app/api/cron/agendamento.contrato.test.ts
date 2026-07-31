@@ -81,6 +81,37 @@ describe("agendamento dos crons: o que existe tem de estar inscrito", () => {
     }
   });
 
+  it("nenhuma agenda corre mais do que uma vez por dia", () => {
+    // O PLANO DA VERCEL É QUE MANDA AQUI, e isto não é teoria: o deploy foi
+    // RECUSADO com `*/15 * * * *` —
+    //   "Hobby accounts are limited to daily cron jobs. This cron expression
+    //    would run more than once per day."
+    // Eu tinha assumido plano Pro por o projecto viver numa equipa. Assumi mal,
+    // e só o deploy é que mo disse. Este teste passa a dizê-lo primeiro, que é
+    // muito mais barato do que descobri-lo com a publicação em baixo.
+    //
+    // Uma agenda diária tem hora e minuto FIXOS nos dois primeiros campos. Um
+    // `*` ou um `*/n` em qualquer um deles significa mais do que uma vez por
+    // dia, e é isso que o plano recusa.
+    //
+    // AO PASSAR A PRO: apaga este teste. Ele existe para proteger a publicação
+    // no plano actual, não porque correr mais vezes seja mau — o `inbox-check`
+    // BENEFICIA de correr de 15 em 15 minutos, e uma vez por dia significa que
+    // uma resposta de um cliente pode esperar 24 horas para ser vista.
+    for (const c of agendadas) {
+      const [minuto, hora] = c.schedule.trim().split(/\s+/);
+      for (const [campo, valor] of [
+        ["minuto", minuto],
+        ["hora", hora],
+      ] as const) {
+        expect(
+          /^\d+$/.test(valor),
+          `${c.path}: "${c.schedule}" tem "${valor}" no campo ${campo} — corre mais do que uma vez por dia, e o plano Hobby recusa o deploy`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it("a rede está mesmo armada (não passa por vacuidade)", () => {
     // Se o leitor de pastas deixar de encontrar rotas, os dois primeiros testes
     // passavam sobre listas vazias e não guardavam nada.

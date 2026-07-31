@@ -74,8 +74,9 @@ Cinco testes, três mutações verificadas.
 **IMAP.** `src/lib/inbox.ts` abre e fecha ligação por operação
 (`connect()` … `logout()`). É custo real por pedido e não há reutilização de
 ligação. Fica **levantado, não resolvido**: a rota está autenticada e com tecto,
-e a tarefa agendada corre de 15 em 15 minutos, portanto o volume é conhecido e
-pequeno. Passa a valer a pena se a frequência subir.
+e a tarefa agendada corre uma vez por dia, portanto o volume é conhecido e
+pequeno. Passa a valer a pena se a frequência subir — o que acontece no dia em
+que a conta passar a Pro (ver abaixo).
 
 **Geração de PDF.** Corre em runtime e é o trabalho mais pesado por pedido. As
 rotas públicas que o fazem têm tecto (12/min por endereço nos PDFs por token).
@@ -180,10 +181,19 @@ de 4 segundos e responde mesmo com ela em baixo.
 clientes nunca corria sozinha, e o repositório dizia o contrário em dois sítios.
 
 É a família de defeito que mais aparece neste projecto: não o código que falha
-alto, mas o que não chega a correr e não se queixa. Está agendada de 15 em 15
-minutos, e `agendamento.contrato.test.ts` passa a reprovar qualquer rota de
-cron que exista sem agenda — ou qualquer agenda que aponte para uma rota que
-não existe.
+alto, mas o que não chega a correr e não se queixa.
+
+Está agendada — mas **uma vez por dia, e isso é pouco**. Tentei de 15 em 15
+minutos e a Vercel RECUSOU o deploy: *"Hobby accounts are limited to daily cron
+jobs."* Eu tinha assumido plano Pro por o projecto viver numa equipa, e assumi
+mal. Consequência prática, dita por extenso: **a resposta de um cliente pode
+esperar até 24 horas** para ser lida automaticamente. Passar a Pro resolve, e é
+uma linha.
+
+`agendamento.contrato.test.ts` passa a reprovar três coisas: uma rota de cron
+que exista sem agenda, uma agenda a apontar para uma rota que não existe, e uma
+agenda que corra mais do que uma vez por dia — esta última para que o limite do
+plano seja apanhado por um teste em vez de por uma publicação falhada.
 
 ---
 

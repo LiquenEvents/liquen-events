@@ -164,7 +164,7 @@ As tarefas estão em `vercel.json`:
 | Rota | Quando | O que faz |
 |---|---|---|
 | `/api/cron/reminders` | 07:00 diário | Resumo diário e lembretes |
-| `/api/cron/inbox-check` | de 15 em 15 minutos | Lê as respostas dos clientes na caixa de correio |
+| `/api/cron/inbox-check` | 08:00 diário | Lê as respostas dos clientes na caixa de correio |
 
 Se pararem, o suspeito nº 1 é o `CRON_SECRET` em falta: as rotas fecham-se em
 produção e param **sem dar erro nenhum**.
@@ -172,9 +172,16 @@ produção e param **sem dar erro nenhum**.
 Para testar à mão, com sessão de administrador aberta, basta abrir a rota no
 browser.
 
-> A frequência de 15 em 15 minutos exige um plano da Vercel que a permita. Se o
-> deploy for recusado por causa da agenda, baixa para uma vez por hora
-> (`0 * * * *`).
+> **Uma vez por dia é pouco, e é uma limitação do plano, não uma escolha.** O
+> plano Hobby da Vercel só permite tarefas diárias — tentar de 15 em 15 minutos
+> faz o deploy ser RECUSADO, com esta mensagem:
+>
+> > *Hobby accounts are limited to daily cron jobs.*
+>
+> Na prática: **a resposta de um cliente pode esperar até 24 horas** para ser
+> lida automaticamente. Enquanto isso não mudar, vale a pena olhar para a caixa
+> de correio à mão. Passar a Pro permite de 15 em 15 minutos — é uma linha no
+> `vercel.json` (e apagar o teste que guarda o limite diário, que diz onde).
 
 ---
 
