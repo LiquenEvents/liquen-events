@@ -173,12 +173,49 @@ const nextConfig: NextConfig = {
       ? "connect-src 'self' https: wss: ws:"
       : `connect-src 'self'${plausible}${gaConnect}`;
 
-    // Content-Security-Policy. Next's runtime still relies on inline bootstrap
-    // scripts and we use inline styles throughout, so script/style keep
-    // 'unsafe-inline' (a nonce-based policy would need middleware). The
-    // high-value, low-risk directives — object-src, base-uri, frame-ancestors,
-    // form-action, and now a tightly-scoped connect-src — are locked down.
-    // 'unsafe-eval' is dev-only (React refresh).
+    // Content-Security-Policy.
+    //
+    // O `script-src 'unsafe-inline'` FICA, e não é por preguiça — é medido. A
+    // tentação óbvia é passar a uma política com nonce emitido no proxy
+    // (src/proxy.ts), como o guia do Next descreve em
+    // node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md.
+    // NESTE SÍTIO ISSO DEITA A CASA ABAIXO, e da pior maneira: em silêncio.
+    //
+    // A razão está escrita no próprio guia (secção "How nonces work in
+    // Next.js"): o nonce é aplicado DURANTE A RENDERIZAÇÃO, a partir do
+    // cabeçalho CSP do pedido. Ora quase todas as páginas deste sítio são
+    // pré-renderizadas no build (`●` no mapa do `next build`: /, /galeria,
+    // /servicos, /sobre, …) e servidas da cache de prerender — `curl -I`
+    // devolve `x-nextjs-cache: HIT`. Não há pedido nenhum no momento em que o
+    // HTML é gerado, portanto não há nonce nenhum para lá pôr.
+    //
+    // MEDIDO: com `script-src 'self' 'nonce-…' 'strict-dynamic'` no proxy e o
+    // servidor de produção a correr, o Chromium a abrir /galeria dá
+    //   • 43 <script> no HTML, 0 com nonce;
+    //   • 42 violações de CSP na consola;
+    //   • `'strict-dynamic'` faz o browser IGNORAR o `'self'`, por isso até os
+    //     /_next/static/chunks/*.js são recusados → a hidratação nunca acontece;
+    //   • e `history.scrollRestoration` fica em "auto" em vez de "manual",
+    //     ou seja o restauro da posição da galeria morre — exactamente o
+    //     sintoma silencioso de que a nota em galeria/page.tsx avisa.
+    // A página continua a PARECER bem (o HTML estático desenha-se todo), e
+    // nenhum teste de unidade dá erro. É por isso que existe o teste de
+    // contrato em src/csp-nonce-contract.test.ts: ele prende a invariante
+    // "se a política tiver nonce, o script da galeria tem de o receber".
+    //
+    // O que seria preciso para a mudança ser segura (nenhum destes passos cabe
+    // neste ficheiro, e dois deles ficam fora da pasta que esta auditoria pode
+    // tocar): (1) pôr todas as páginas em renderização dinâmica — o que troca
+    // o HTML pronto no CDN por um render por visitante, o oposto de tudo o que
+    // está optimizado neste repositório; (2) passar `nonce={…}` ao <script> de
+    // galeria/page.tsx — MEDIDO: o React NÃO propaga o nonce para um
+    // `dangerouslySetInnerHTML` escrito pela aplicação, só para os scripts do
+    // próprio Next; (3) o mesmo em SpeculationRules.tsx e GoogleTag.tsx, que
+    // sem nonce dão as 2 violações que sobram até nas rotas já dinâmicas.
+    //
+    // O resto da política — object-src, base-uri, frame-ancestors, form-action,
+    // connect-src apertado — está fechado, e é aí que está o valor real.
+    // 'unsafe-eval' é só de desenvolvimento (React refresh).
     const csp = [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}${gaScript}`,
@@ -217,8 +254,65 @@ const nextConfig: NextConfig = {
         value: "max-age=63072000; includeSubDomains; preload",
       },
       {
+        // Permissions-Policy.
+        //
+        // O `interest-cohort=()` que aqui estava sozinho JÁ NÃO PROTEGE NADA. O
+        // FLoC foi retirado do Chrome em 2022; o nome continua a ser aceite pelo
+        // analisador (por isso não dá erro nenhum na consola e parece que está a
+        // funcionar), mas a funcionalidade que ele desligava deixou de existir.
+        // Quem lhe sucedeu é a Topics API — `browsing-topics` —, e essa estava
+        // aberta de par em par.
+        //
+        // MEDIDO neste build, com o servidor de produção a correr e o Chromium a
+        // abrir /galeria (document.featurePolicy.allowsFeature):
+        //   browsing-topics  -> true   (permitido!)
+        //   interest-cohort  -> false  (mas é um nome morto)
+        //   payment/usb/serial/hid/midi -> todos permitidos
+        // Ou seja: a intenção de "não perfilar os visitantes por interesses",
+        // escrita aqui em 2021, tinha deixado de ser cumprida — e este sítio
+        // carrega mesmo a pilha de anúncios da Google (googletagmanager,
+        // doubleclick, googleadservices), que é quem lê a Topics API.
+        //
+        // O QUE FICA DE FORA, DE PROPÓSITO: `join-ad-interest-group`,
+        // `run-ad-auction` e `attribution-reporting`. São as APIs que sustentam
+        // o REMARKETING e a MEDIÇÃO DE CONVERSÕES do Google Ads — isto é, uma
+        // funcionalidade de negócio que a dona acrescentou de propósito (ver o
+        // comentário do gtag mais acima). Desligá-las seria uma decisão
+        // comercial, não uma correcção de segurança, por isso não é feita aqui.
+        //
+        // As restantes são capacidades que o sítio comprovadamente nunca usa
+        // (não há `<video>`, nem `requestFullscreen`, nem Web USB/Serial/HID/
+        // MIDI/Bluetooth em lado nenhum do código) — `(self)` em vez de `()` no
+        // fullscreen/autoplay só para não amarrar o lightbox da galeria.
         key: "Permissions-Policy",
-        value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+        value: [
+          "accelerometer=()",
+          "autoplay=(self)",
+          // `bluetooth` NÃO entra: o Chromium ainda não a reconhece como
+          // funcionalidade de Permissions-Policy e responde com
+          // "Error with Permissions-Policy header: Unrecognized feature:
+          // 'bluetooth'" na consola de TODAS as páginas (medido). Um aviso
+          // permanente na consola é ruído que esconde os avisos verdadeiros, e
+          // a Web Bluetooth já exige gesto do utilizador e contexto seguro.
+          "browsing-topics=()",
+          "camera=()",
+          "display-capture=()",
+          "fullscreen=(self)",
+          "geolocation=()",
+          "gyroscope=()",
+          "hid=()",
+          "idle-detection=()",
+          "interest-cohort=()",
+          "local-fonts=()",
+          "magnetometer=()",
+          "microphone=()",
+          "midi=()",
+          "payment=()",
+          "screen-wake-lock=()",
+          "serial=()",
+          "usb=()",
+          "xr-spatial-tracking=()",
+        ].join(", "),
       },
       // Isolate the browsing context and block legacy cross-domain policy files.
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
