@@ -3,9 +3,19 @@ import type { NextRequest } from "next/server";
 
 // Only the rate limiter is mocked — the real auth (verifyCredentials, sessions)
 // is exercised end to end against the dev shared password.
-const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
+// `porChave` deixa esgotar UM contador de cada vez. Sem isso não dava para
+// distinguir o tecto por IP do tecto por conta — os dois respondem 429 e um
+// mock com resposta única não sabe dizer qual deles disparou.
+const rl = vi.hoisted(() => ({
+  result: { ok: true } as { ok: boolean; retryAfter?: number },
+  porChave: new Map<string, { ok: boolean; retryAfter?: number }>(),
+  chamadas: [] as string[],
+}));
 vi.mock("@/lib/rate-limit", () => ({
-  rateLimit: vi.fn(async () => rl.result),
+  rateLimit: vi.fn(async (key: string) => {
+    rl.chamadas.push(key);
+    return rl.porChave.get(key) ?? rl.result;
+  }),
   clientIp: () => "test-ip",
   sweep: () => {},
 }));
@@ -26,6 +36,8 @@ const KEYS = ["ADMIN_USERS", "ADMIN_PASSWORD_HASH", "ADMIN_TOTP_SECRET", "SESSIO
 
 beforeEach(() => {
   rl.result = { ok: true };
+  rl.porChave.clear();
+  rl.chamadas = [];
   vi.clearAllMocks();
   for (const k of KEYS) saved[k] = process.env[k];
   // Dev shared-password mode: no individual users, no extra password/2FA.
@@ -61,5 +73,58 @@ describe("POST /api/admin/login", () => {
     rl.result = { ok: false, retryAfter: 30 };
     const res = await POST(postReq({ name: "Catarina", password: "liquen2026" }));
     expect(res.status).toBe(429);
+  });
+});
+
+/**
+ * O tecto POR CONTA — o que fecha a porta ao segundo factor.
+ *
+ * O tecto por IP sozinho não protege o TOTP: quem tenha a palavra-passe fica só
+ * com 6 dígitos à frente, e rodar endereços (barato) comprava oito tentativas
+ * novas por endereço. Este contador é o mesmo para o mundo inteiro, portanto
+ * rodar endereços deixa de comprar tentativas.
+ */
+describe("POST /api/admin/login — tecto por conta", () => {
+  const chaveConta = (n: string) => `login-conta:${n.toLowerCase()}`;
+
+  it("recusa com 429 mesmo com a palavra-passe CERTA e o IP dentro do tecto", async () => {
+    // A palavra-passe está certa: se isto devolvesse 200, o contador por conta
+    // não estaria a ser consultado antes de autenticar.
+    rl.porChave.set(chaveConta("Catarina"), { ok: false, retryAfter: 900 });
+    const res = await POST(postReq({ name: "Catarina", password: "liquen2026" }));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("900");
+    expect(res.cookies.get(ADMIN_COOKIE)).toBeUndefined();
+  });
+
+  it("a chave da conta NÃO depende do endereço", async () => {
+    // Se a chave levasse o IP, rodar endereços dava contadores novos e o tecto
+    // não valia nada. O IP de teste é "test-ip".
+    await POST(postReq({ name: "Catarina", password: "wrong" }));
+    const daConta = rl.chamadas.filter((k) => k.startsWith("login-conta:"));
+    expect(daConta).toHaveLength(1);
+    expect(daConta[0]).not.toContain("test-ip");
+  });
+
+  it("conta a tentativa mesmo quando a conta não existe", async () => {
+    // Se só contasse depois de saber que a conta é válida, o tempo de resposta
+    // dizia quais os nomes que existem — e a busca ficava sem tecto nenhum.
+    await POST(postReq({ name: "nao-existe-de-certeza", password: "seja-o-que-for" }));
+    expect(rl.chamadas).toContain(chaveConta("nao-existe-de-certeza"));
+  });
+
+  it("o mesmo nome com maiúsculas diferentes partilha o contador", async () => {
+    // Senão bastava alternar CATARINA / Catarina / catarina para multiplicar
+    // o tecto pelo número de combinações.
+    await POST(postReq({ name: "CATARINA", password: "wrong" }));
+    expect(rl.chamadas).toContain("login-conta:catarina");
+  });
+
+  it("o tecto por IP continua a valer, e é o primeiro a disparar", async () => {
+    rl.porChave.set("login:test-ip", { ok: false, retryAfter: 30 });
+    const res = await POST(postReq({ name: "Catarina", password: "liquen2026" }));
+    expect(res.status).toBe(429);
+    // Disparou antes de sequer tocar no contador da conta.
+    expect(rl.chamadas.some((k) => k.startsWith("login-conta:"))).toBe(false);
   });
 });

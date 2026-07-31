@@ -44,7 +44,26 @@ export interface Mapper<T> {
   selectColumns?: string;
   /** Default ordering applied to lists. */
   order?: { column: string; ascending: boolean };
-  /** Upper bound on an unpaginated `list()` read (defaults to DEFAULT_LIST_LIMIT). */
+  /**
+   * Tecto de linhas para um `list()` sem paginação.
+   *
+   * Por OMISSÃO NÃO HÁ TECTO: um `list()` traz a tabela inteira. O comentário
+   * aqui dizia "defaults to DEFAULT_LIST_LIMIT" e essa constante nunca existiu
+   * — quem lesse ficava a pensar que havia uma rede que não há. Hoje nenhum dos
+   * 12 stores define este campo, portanto TODAS as leituras são sem tecto.
+   *
+   * E é de propósito, apesar de parecer o contrário. Um tecto por omissão
+   * ESCONDE dados: numa lista de facturas ou de contratos, devolver as
+   * primeiras N linhas em silêncio é pior do que devolver muitas — a página
+   * fica bonita e falta lá dinheiro. Por isso a truncagem é sempre por adesão
+   * explícita e nunca calada (ver o aviso no `list()` abaixo).
+   *
+   * Quando vale a pena pôr um tecto: numa tabela que cresça sem relação com o
+   * número de eventos (registos de auditoria, telemetria), ou quando uma página
+   * ganhar paginação a sério. Aí define-se aqui, e o aviso do `list()` avisa
+   * quando a página fica cheia — que é o sinal de que a paginação passou a ser
+   * mesmo necessária.
+   */
   listLimit?: number;
   /** Comparator mirroring `order` for the file backend. */
   fileCompare?: (a: T, b: T) => number;
