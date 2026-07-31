@@ -1,0 +1,235 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import SafeImage from "@/components/SafeImage";
+import PedidoRapido, { TEXTOS_PT, TEXTOS_EN } from "@/components/ads/PedidoRapido";
+import { blurFor } from "@/lib/blur";
+import { pageMetadata } from "@/lib/page-metadata";
+import { BreadcrumbJsonLd } from "@/components/JsonLd";
+import { getDictionary, localizeHref, normalizeLocale } from "@/lib/i18n";
+import { POLOS, getPolo, conteudoPolo, caminhoPolo } from "@/lib/ads/polos";
+import { SITE } from "@/lib/site";
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LANDING PAGE DE UM POLO REGIONAL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O destino de cada grupo de anúncios regional. NUNCA a página inicial: um
+ * casal que pesquisou "decoração casamento Algarve" e aterra numa homepage
+ * genérica tem de voltar a procurar o que já tinha pedido, e a maior parte não
+ * volta — sai. É a alavanca mais barata de toda esta operação, porque melhora
+ * ao mesmo tempo a taxa de conversão E o Índice de Qualidade (que baixa o custo
+ * por clique de tudo o resto).
+ *
+ * ── O QUE ESTA PÁGINA NÃO TEM, DE PROPÓSITO ────────────────────────────────
+ * Não tem herói WebGL, nem parallax, nem carrossel, nem transições de página.
+ * O resto do site tem, e faz sentido lá: quem chega organicamente está a
+ * passear. Aqui não — chegou de um clique que foi PAGO, e cada décima de
+ * segundo até à imagem principal é dinheiro. Tudo o que é decorativo e pesado
+ * fica de fora, e a página é quase toda servidor.
+ *
+ * O componente cliente é UM: o formulário. Tem de o ser.
+ *
+ * ── ESTRUTURA ──────────────────────────────────────────────────────────────
+ * 1. Imagem forte + H1 que NOMEIA A REGIÃO + formulário curto, tudo acima da
+ *    dobra em ecrã de computador. No telemóvel o formulário vem logo a seguir
+ *    ao herói, sem nada pelo meio.
+ * 2. Prova local (o que se afirma sobre trabalho feito na zona).
+ * 3. Espaços da região — o sinal mais forte de que se conhece o terreno.
+ * 4. Portefólio.
+ * 5. Saída para o formulário completo, para quem quer detalhar.
+ */
+
+// Estático. Não há nada por página que mude entre visitas (ao contrário de
+// /servicos, que sorteia fotografias), e uma landing page paga é o último
+// sítio onde se quer um render por visita.
+export const dynamic = "force-static";
+
+export function generateStaticParams() {
+  return POLOS.map((p) => ({ polo: p.slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string; polo: string }>;
+}): Promise<Metadata> {
+  const { lang, polo: slug } = await params;
+  const locale = normalizeLocale(lang);
+  const polo = getPolo(slug);
+  if (!polo) return { title: locale === "en" ? "Page not found" : "Página não encontrada" };
+  const c = conteudoPolo(polo, locale);
+  return pageMetadata({
+    locale,
+    title: c.metaTitle,
+    description: c.metaDescription,
+    path: caminhoPolo(polo.slug),
+    image: polo.hero,
+    keywords: [
+      ...polo.cidades.map((cidade) => `decoração de casamentos ${cidade}`),
+      `wedding design ${c.regiao}`,
+    ],
+    ogLocale: getDictionary(locale).meta.ogLocale,
+  });
+}
+
+export default async function PoloPage({
+  params,
+}: {
+  params: Promise<{ lang: string; polo: string }>;
+}) {
+  const { lang, polo: slug } = await params;
+  const locale = normalizeLocale(lang);
+  const polo = getPolo(slug);
+  if (!polo) notFound();
+
+  const t = getDictionary(locale);
+  const c = conteudoPolo(polo, locale);
+  const textos = locale === "en" ? TEXTOS_EN : TEXTOS_PT;
+  const en = locale === "en";
+
+  return (
+    <>
+      <BreadcrumbJsonLd
+        locale={locale}
+        homeName={t.nav.inicio}
+        items={[{ name: c.h1, path: caminhoPolo(polo.slug) }]}
+      />
+
+      {/* ── 1. HERÓI + FORMULÁRIO ─────────────────────────────────────────
+          Uma só imagem, com `priority`: é o candidato a LCP e não pode
+          esperar pela hidratação nem por um observador de intersecção. */}
+      <section className="relative min-h-[92svh] flex items-center">
+        <div className="absolute inset-0">
+          <SafeImage
+            src={polo.hero}
+            alt=""
+            fill
+            priority
+            fetchPriority="high"
+            sizes="100vw"
+            {...blurFor(polo.hero)}
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/55 to-black/30" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 py-24 lg:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_minmax(0,460px)] gap-10 lg:gap-16 items-center">
+            <div className="text-white">
+              <p className="text-[10px] tracking-[0.35em] uppercase text-white/70">{c.eyebrow}</p>
+              <h1 className="mt-4 text-[34px] sm:text-[46px] lg:text-[56px] font-bold uppercase tracking-display leading-[1.05]">
+                {c.h1}
+              </h1>
+              <div className="mt-6 space-y-4 max-w-xl">
+                {c.intro.map((p, i) => (
+                  <p key={i} className="text-[15px] sm:text-[16px] leading-relaxed text-white/85">
+                    {p}
+                  </p>
+                ))}
+              </div>
+              <p className="mt-7 text-[12px] tracking-[0.12em] uppercase text-white/60 border-l-2 border-moss pl-4 max-w-lg">
+                {c.prova}
+              </p>
+            </div>
+
+            <PedidoRapido locale={locale} textos={textos} contexto={`polo:${polo.slug}`} />
+          </div>
+        </div>
+      </section>
+
+      {/* ── 2. ESPAÇOS DA REGIÃO ──────────────────────────────────────────
+          Só desenhado quando há espaços listados. Uma secção vazia com um
+          título a dizer "espaços da região" é pior do que secção nenhuma. */}
+      {polo.espacos.length > 0 && (
+        <section className="bg-surface border-b border-foreground/8 py-20 lg:py-24">
+          <div className="max-w-7xl mx-auto px-6 lg:px-16">
+            <p className="text-[10px] tracking-[0.35em] uppercase text-foreground/45">
+              {en ? "Venues" : "Espaços"}
+            </p>
+            <h2 className="mt-3 text-[24px] sm:text-[30px] font-bold uppercase tracking-display leading-tight max-w-3xl">
+              {c.espacosIntro}
+            </h2>
+            <ul className="mt-8 flex flex-wrap gap-x-3 gap-y-3">
+              {polo.espacos.map((espaco) => (
+                <li
+                  key={espaco}
+                  className="px-4 py-2 border border-foreground/15 text-[13px] text-foreground/75"
+                >
+                  {espaco}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-[12px] text-foreground/45 max-w-2xl leading-relaxed">
+              {en
+                ? "Venues we know in the region. If yours is not listed, tell us which it is — we will have walked something like it."
+                : "Espaços que conhecemos na região. Se o seu não estiver na lista, diga-nos qual é — já montámos em espaços do mesmo género."}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* ── 3. PORTEFÓLIO ────────────────────────────────────────────────── */}
+      <section className="py-20 lg:py-24">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16">
+          <h2 className="text-[24px] sm:text-[30px] font-bold uppercase tracking-display leading-tight">
+            {en ? `Weddings in ${c.regiao}` : `Casamentos ${prep(c.regiao)}`}
+          </h2>
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {polo.fotos.map((foto) => (
+              <div key={foto} className="relative aspect-[3/2] overflow-hidden bg-foreground/5">
+                <SafeImage
+                  src={foto}
+                  alt=""
+                  fill
+                  loading="lazy"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  {...blurFor(foto)}
+                  className="object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 4. SAÍDAS ─────────────────────────────────────────────────────
+          Quem não preencheu o formulário curto tem três caminhos: detalhar o
+          pedido, ligar, ou ver mais trabalho. */}
+      <section className="bg-surface border-t border-foreground/8 py-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <p className="text-[15px] text-foreground/70">{textos.completo}</p>
+          <div className="flex flex-wrap gap-x-8 gap-y-3 text-[11px] tracking-[0.25em] uppercase">
+            <Link
+              href={localizeHref("/orcamento", locale) + "?tipo=casamentos"}
+              className="underline hover:text-moss"
+            >
+              {en ? "Full quote form" : "Formulário completo"}
+            </Link>
+            <a href={`tel:${SITE.phone}`} className="underline hover:text-moss">
+              {SITE.phoneDisplay}
+            </a>
+            <Link href={localizeHref("/galeria", locale)} className="underline hover:text-moss">
+              {en ? "Portfolio" : "Portefólio"}
+            </Link>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/**
+ * "Alentejo" → "no Alentejo"; "Lisboa" → "em Lisboa". Só para o título do
+ * portefólio em português. A lista é curta e explícita de propósito: uma regra
+ * automática para preposições e artigos em português erra mais do que acerta,
+ * e um título errado numa página paga é pior do que um título simples.
+ */
+function prep(regiao: string): string {
+  const comArtigo = ["Alentejo", "Algarve", "Porto e Douro", "Minho", "Centro"];
+  if (comArtigo.includes(regiao)) return `no ${regiao}`;
+  if (regiao === "Madeira") return "na Madeira";
+  if (regiao === "Açores") return "nos Açores";
+  return `em ${regiao}`;
+}

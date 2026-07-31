@@ -48,6 +48,12 @@ export const quoteFormSchema = z
     budgetRange: trimmed(30).nullish(),
     urgency: trimmed(30).optional(),
     referralSource: trimmed(200).optional().default(""),
+    // Identificador do clique pago (ver src/lib/ads/click-id.ts). TEM de estar
+    // declarado aqui: o esquema faz `.strip()`, portanto um campo não
+    // declarado é descartado em silêncio — o formulário enviaria o gclid, a
+    // rota aceitaria o pedido, e o campo simplesmente não chegava à base de
+    // dados. A medição de receita ficava vazia sem nada rebentar.
+    adClick: trimmed(300).optional().default(""),
     acceptTerms: z.boolean().optional(),
     acceptMarketing: z.boolean().optional(),
   })

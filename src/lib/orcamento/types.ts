@@ -68,6 +68,17 @@ export interface QuoteFormData {
   urgency: Urgency;
   notes: string;
   referralSource: string;
+  /**
+   * Identificador do clique pago que trouxe esta pessoa, na forma compacta
+   * "gclid:VALOR@2026-03-01T10:00:00.000Z" (ver src/lib/ads/click-id.ts).
+   * Vazio quando o pedido não veio de um anúncio — que é o caso da maioria.
+   *
+   * É o que permite devolver ao Google Ads o valor REAL do casamento quando
+   * ele fecha, em vez de deixar a Google a optimizar para formulários
+   * preenchidos. Ver /ads-output/medicao.md e a rota de exportação de
+   * conversões offline.
+   */
+  adClick?: string;
   name: string;
   email: string;
   phone: string;

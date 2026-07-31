@@ -12,6 +12,7 @@ import type { Dict } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
+import { lerClique, serializar } from "@/lib/ads/click-id";
 import { QUOTE_EVENT_OPTIONS } from "@/lib/orcamento/data";
 
 /**
@@ -43,6 +44,12 @@ function readLeadSource(): string {
   } catch {
     return "";
   }
+}
+
+/** Identificador do clique pago guardado à entrada, na forma compacta. */
+function lerAdClick(): string {
+  const c = lerClique();
+  return c ? serializar(c) : "";
 }
 
 const SUBMISSION_KEY = "liquen-orcamento-sid";
@@ -398,6 +405,10 @@ export default function OrcamentoForm({
       // LeadSourceCapture. Feeds the admin's conversion-by-source aggregation;
       // empty for direct visits.
       referralSource: readLeadSource(),
+      // Identificador do clique pago, se esta pessoa veio de um anúncio. É o
+      // que permite devolver à Google o valor real do casamento quando ele
+      // fechar, em vez de ela optimizar para formulários preenchidos.
+      adClick: lerAdClick(),
     };
 
     // Abort a hung request instead of spinning forever on a stalled connection
