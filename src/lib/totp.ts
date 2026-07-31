@@ -50,24 +50,93 @@ export function totp(secretB32: string, atSeconds = Date.now() / 1000): string {
  * not-yet-current code needlessly widens the guess/replay window for no real
  * usability gain. Constant-time comparison.
  *
- * Note: this does not consume codes, so a code stays valid for the rest of its
- * step (~30s) and could be replayed within that window; true single-use would
- * require persisting the last-used step per user.
+ * NOTA: não gasta o código — é o verificador puro, mantido sem estado para
+ * poder ser confrontado com os vectores da RFC. No login usa-se `verifyTotpOnce`,
+ * que recusa um código já usado.
  */
 export function verifyTotp(secretB32: string, token: string, window = 1): boolean {
+  return matchStep(secretB32, token, window) !== null;
+}
+
+/**
+ * Como `verifyTotp`, mas devolve o passo que emparelhou (ou null). É esse passo
+ * que o registo de códigos gastos precisa de conhecer.
+ */
+function matchStep(secretB32: string, token: string, window: number): number | null {
   const t = (token ?? "").replace(/\s/g, "");
-  if (!/^\d{6}$/.test(t)) return false;
+  if (!/^\d{6}$/.test(t)) return null;
   const secret = base32Decode(secretB32);
-  if (secret.length === 0) return false;
+  if (secret.length === 0) return null;
   const step = Math.floor(Date.now() / 1000 / 30);
   const provided = Buffer.from(t);
   for (let w = -window; w <= 0; w++) {
     const expected = Buffer.from(hotp(secret, step + w));
     if (expected.length === provided.length && crypto.timingSafeEqual(expected, provided)) {
-      return true;
+      return step + w;
     }
   }
-  return false;
+  return null;
+}
+
+// ── Códigos de uso único ───────────────────────────────────────────────────
+//
+// A RFC 6238 (§5.2) diz que uma validação bem sucedida NÃO pode ser aceite uma
+// segunda vez. Sem isto, um código vale os ~60 s da janela inteira e pode ser
+// reutilizado à vontade dentro dela — que é exactamente o que um phishing em
+// tempo real faz: apanha a palavra-passe e o código no site falso e usa-os no
+// site verdadeiro, segundos depois. O segundo factor deixa de acrescentar seja
+// o que for a partir do momento em que o código é reutilizável.
+//
+// Guarda-se o ÚLTIMO passo aceite por segredo e recusa-se tudo o que seja igual
+// ou anterior: isso queima também o passo anterior da janela de tolerância, que
+// de outro modo continuaria disponível depois de o actual ter sido usado.
+//
+// O segredo nunca entra no mapa em claro — a chave é o SHA-256 dele. Quem
+// partilhe o mesmo ADMIN_TOTP_SECRET partilha também o registo: se duas pessoas
+// usarem o mesmo segredo, a segunda tem de esperar pelo passo seguinte. É a
+// consequência certa — um segredo partilhado é um só factor, não dois.
+//
+// LIMITE CONHECIDO: esta memória é do processo. Em serverless com várias
+// instâncias, uma repetição que caia noutra instância passa. Fecha a janela na
+// esmagadora maioria dos casos (uma equipa pequena, poucos processos) e nunca é
+// pior do que não ter nada; a versão à prova de tudo exige guardar o passo na
+// base de dados, e isso é uma alteração de armazenamento, não deste ficheiro.
+const passosGastos = new Map<string, number>();
+
+function idDoSegredo(secretB32: string): string {
+  return crypto.createHash("sha256").update(secretB32).digest("base64url");
+}
+
+/** Descarta segredos parados há mais de uma hora para o mapa não crescer. */
+function limparGastos(passoActual: number): void {
+  if (passosGastos.size < 256) return;
+  for (const [k, passo] of passosGastos) {
+    if (passoActual - passo > 120) passosGastos.delete(k);
+  }
+}
+
+/**
+ * Verifica o código E gasta-o: a mesma combinação segredo+código só é aceite
+ * uma vez. Devolve false para um código já usado, mesmo que ainda esteja dentro
+ * da janela de tolerância. É esta a função que o login deve usar.
+ */
+export function verifyTotpOnce(secretB32: string, token: string, window = 1): boolean {
+  const passo = matchStep(secretB32, token, window);
+  if (passo === null) return false;
+
+  const id = idDoSegredo(secretB32);
+  const ultimo = passosGastos.get(id);
+  // Já gasto (ou já se avançou para lá dele) → recusa.
+  if (ultimo !== undefined && passo <= ultimo) return false;
+
+  passosGastos.set(id, passo);
+  limparGastos(passo);
+  return true;
+}
+
+/** Só para testes: esquece os códigos gastos. */
+export function resetTotpUsage(): void {
+  passosGastos.clear();
 }
 
 /** Generate a fresh base32 TOTP secret (160 bits). */

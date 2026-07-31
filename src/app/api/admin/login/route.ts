@@ -53,21 +53,40 @@ export async function POST(request: NextRequest) {
   // pessoa que se engane várias vezes (o relógio dessincronizado do telemóvel é
   // a causa mais comum) e fecha a porta a uma busca automática.
   //
-  // A chave usa o nome TAL COMO FOI ESCRITO e já truncado a 40 caracteres: o
-  // contador tem de ser incrementado ANTES de saber se a conta existe, senão
-  // dizia por omissão quais os nomes válidos. Pelo mesmo motivo a resposta é a
-  // mesma para conta inexistente e palavra-passe errada.
-  const contaLimitada = await rateLimit(`login-conta:${name.toLowerCase()}`, 20, 3_600_000);
-  if (!contaLimitada.ok) {
+  // SÓ AS TENTATIVAS FALHADAS GASTAM O CONTADOR, e por isso ele é consultado
+  // depois de verificar as credenciais, não antes. Quando era consultado antes,
+  // gastava-se em qualquer pedido: bastavam vinte pedidos anónimos com o nome
+  // "Catarina" — que está no site — para a própria, com a palavra-passe certa,
+  // levar 429 durante uma hora (medido: 20 falhas de IPs diferentes → 429 com
+  // Retry-After 3598). E como o limitador distribuído renova o PEXPIRE a cada
+  // toque, um pedido por hora mantinha o back office fechado para sempre.
+  //
+  // Contar só as falhas não afrouxa o tecto: quem procura às cegas falha SEMPRE,
+  // logo é sempre contado, e continua preso às vinte por hora. O que deixa de
+  // acontecer é um estranho poder fechar a porta a quem sabe a palavra-passe.
+  //
+  // A chave usa o nome tal como foi escrito, em minúsculas e já truncado a 40
+  // caracteres. Não abre um oráculo de enumeração: uma conta inexistente e uma
+  // palavra-passe errada seguem exactamente o mesmo caminho (`!user`), gastam o
+  // mesmo contador e devolvem a mesma resposta. Só escapa ao contador quem já
+  // acertou nas credenciais — e esse já sabe o que o oráculo lhe diria.
+  const chaveConta = `login-conta:${name.toLowerCase()}`;
+
+  /** 429 do tecto por conta, gastando uma tentativa. */
+  async function gastarTentativaDaConta(): Promise<NextResponse | null> {
+    const conta = await rateLimit(chaveConta, 20, 3_600_000);
+    if (conta.ok) return null;
     log.warn("admin login rate-limited por conta", { ip, name });
     return NextResponse.json(
       { error: "Demasiadas tentativas nesta conta. Tente mais tarde." },
-      { status: 429, headers: { "Retry-After": String(contaLimitada.retryAfter ?? 3600) } },
+      { status: 429, headers: { "Retry-After": String(conta.retryAfter ?? 3600) } },
     );
   }
 
   const user = await verifyCredentials(name, password);
   if (!user) {
+    const travado = await gastarTentativaDaConta();
+    if (travado) return travado;
     log.warn("admin login failed", { ip, name, reason: "credentials" });
     return NextResponse.json({ error: "Credenciais incorretas" }, { status: 401 });
   }
@@ -81,6 +100,10 @@ export async function POST(request: NextRequest) {
       );
     }
     if (!checkTotp(user.name, code)) {
+      // O código errado é a tentativa que mais interessa travar: é aqui que
+      // quem já tem a palavra-passe procura os 6 dígitos.
+      const travado = await gastarTentativaDaConta();
+      if (travado) return travado;
       log.warn("admin login failed", { ip, name: user.name, reason: "totp" });
       return NextResponse.json(
         { needs2fa: true, error: "Código de verificação inválido." },

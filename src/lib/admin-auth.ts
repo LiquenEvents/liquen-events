@@ -1,7 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import type { NextRequest } from "next/server";
-import { verifyTotp } from "./totp";
+import { verifyTotpOnce } from "./totp";
 import { log } from "./logger";
 
 /**
@@ -136,11 +136,16 @@ export function totpRequired(name: string): boolean {
   return totpSecretFor(name) !== null;
 }
 
-/** Verify a 2FA code for the user. Returns true when no 2FA is configured. */
+/**
+ * Verify a 2FA code for the user. Returns true when no 2FA is configured.
+ *
+ * Usa `verifyTotpOnce` e não `verifyTotp`: o código é GASTO ao ser aceite, para
+ * que não sirva uma segunda vez dentro dos ~60 s da janela (RFC 6238 §5.2).
+ */
 export function checkTotp(name: string, code: string): boolean {
   const secret = totpSecretFor(name);
   if (!secret) return true;
-  return verifyTotp(secret, code);
+  return verifyTotpOnce(secret, code);
 }
 
 /**
@@ -166,9 +171,28 @@ export async function verifyCredentials(
   if (users) {
     const u = users.find((x) => x.name.toLowerCase() === cleanName.toLowerCase());
     if (u && compareSync(password, u.passwordHash)) return { name: u.name };
-    // Unknown name: still run one bcrypt compare so the response time doesn't
-    // reveal whether the admin display-name exists (username enumeration).
-    if (!u) compareSync(password, DEV_SHARED_HASH);
+    // Nome desconhecido: corre-se na mesma UM compare de bcrypt para que o tempo
+    // de resposta não diga se a conta existe (enumeração de utilizadores).
+    //
+    // O compare-fantasma tem de usar um hash com o MESMO factor de custo dos
+    // hashes reais, senão não iguala coisa nenhuma — é ele próprio o oráculo.
+    // Antes usava-se o DEV_SHARED_HASH, que está fixo em custo 10: com contas
+    // configuradas a custo 12 (o recomendado) uma conta existente demorava
+    // ~349 ms e uma inexistente ~86 ms, um rácio de 4x, medível à distância de
+    // um pedido. Comparar contra o hash de uma conta REAL faz o trabalho passar
+    // pelo mesmo custo, seja o nome válido ou não.
+    //
+    // Resta uma diferença se as contas do ADMIN_USERS forem geradas com custos
+    // DIFERENTES entre si — aí o tempo separa a primeira conta das outras. Gere
+    // todos os hashes com o mesmo factor (12) e não sobra sinal nenhum.
+    if (!u) {
+      try {
+        compareSync(password, users[0].passwordHash);
+      } catch {
+        // Hash configurado malformado: o compare atira, mas o caminho tem de
+        // terminar em recusa na mesma — nunca em excepção para quem chama.
+      }
+    }
     return null;
   }
 

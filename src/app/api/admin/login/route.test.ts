@@ -6,15 +6,27 @@ import type { NextRequest } from "next/server";
 // `porChave` deixa esgotar UM contador de cada vez. Sem isso não dava para
 // distinguir o tecto por IP do tecto por conta — os dois respondem 429 e um
 // mock com resposta única não sabe dizer qual deles disparou.
+// `tectoReal` liga a contagem verdadeira para uma chave: é o que permite provar
+// quantas tentativas o contador deixa passar, em vez de só espreitar as chamadas.
 const rl = vi.hoisted(() => ({
   result: { ok: true } as { ok: boolean; retryAfter?: number },
   porChave: new Map<string, { ok: boolean; retryAfter?: number }>(),
   chamadas: [] as string[],
+  tectoReal: new Map<string, number>(),
+  contagens: new Map<string, number>(),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(async (key: string) => {
     rl.chamadas.push(key);
-    return rl.porChave.get(key) ?? rl.result;
+    const forcado = rl.porChave.get(key);
+    if (forcado) return forcado;
+    const tecto = rl.tectoReal.get(key);
+    if (tecto !== undefined) {
+      const n = (rl.contagens.get(key) ?? 0) + 1;
+      rl.contagens.set(key, n);
+      return n > tecto ? { ok: false, retryAfter: 3600 } : { ok: true };
+    }
+    return rl.result;
   }),
   clientIp: () => "test-ip",
   sweep: () => {},
@@ -38,6 +50,8 @@ beforeEach(() => {
   rl.result = { ok: true };
   rl.porChave.clear();
   rl.chamadas = [];
+  rl.tectoReal.clear();
+  rl.contagens.clear();
   vi.clearAllMocks();
   for (const k of KEYS) saved[k] = process.env[k];
   // Dev shared-password mode: no individual users, no extra password/2FA.
@@ -87,11 +101,9 @@ describe("POST /api/admin/login", () => {
 describe("POST /api/admin/login — tecto por conta", () => {
   const chaveConta = (n: string) => `login-conta:${n.toLowerCase()}`;
 
-  it("recusa com 429 mesmo com a palavra-passe CERTA e o IP dentro do tecto", async () => {
-    // A palavra-passe está certa: se isto devolvesse 200, o contador por conta
-    // não estaria a ser consultado antes de autenticar.
+  it("recusa com 429 uma tentativa FALHADA quando o contador está esgotado", async () => {
     rl.porChave.set(chaveConta("Catarina"), { ok: false, retryAfter: 900 });
-    const res = await POST(postReq({ name: "Catarina", password: "liquen2026" }));
+    const res = await POST(postReq({ name: "Catarina", password: "errada" }));
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("900");
     expect(res.cookies.get(ADMIN_COOKIE)).toBeUndefined();
@@ -126,5 +138,60 @@ describe("POST /api/admin/login — tecto por conta", () => {
     expect(res.status).toBe(429);
     // Disparou antes de sequer tocar no contador da conta.
     expect(rl.chamadas.some((k) => k.startsWith("login-conta:"))).toBe(false);
+  });
+});
+
+/**
+ * O tecto por conta não pode virar-se contra a dona da conta.
+ *
+ * O nome "Catarina" está no site. Quando o contador era consultado ANTES de
+ * verificar as credenciais, gastava-se em qualquer pedido: vinte pedidos
+ * anónimos, de vinte endereços diferentes, e a própria — com a palavra-passe
+ * certa — levava 429 durante uma hora (medido: Retry-After 3598). Com o
+ * limitador distribuído era pior, porque o PEXPIRE é renovado a cada toque:
+ * um pedido por hora mantinha o back office fechado indefinidamente.
+ *
+ * Contar SÓ as falhas mantém o tecto contra quem procura às cegas (que falha
+ * sempre, logo é sempre contado) e devolve a porta a quem tem a chave.
+ */
+describe("POST /api/admin/login — o tecto por conta não fecha a porta a quem sabe a palavra-passe", () => {
+  const chaveConta = (n: string) => `login-conta:${n.toLowerCase()}`;
+
+  it("depois de 20 falhas alheias, a palavra-passe certa continua a entrar", async () => {
+    rl.tectoReal.set(chaveConta("Catarina"), 20);
+    for (let i = 0; i < 20; i++) {
+      const r = await POST(postReq({ name: "Catarina", password: `tentativa-${i}` }));
+      expect(r.status).toBe(401);
+    }
+    // O contador está esgotado. A dona, com a palavra-passe certa:
+    const res = await POST(postReq({ name: "Catarina", password: "liquen2026" }));
+    expect(res.status).toBe(200);
+    expect(res.cookies.get(ADMIN_COOKIE)?.value).toBeTruthy();
+  }, 60_000);
+
+  it("uma entrada bem sucedida não gasta o contador da conta", async () => {
+    const res = await POST(postReq({ name: "Catarina", password: "liquen2026" }));
+    expect(res.status).toBe(200);
+    expect(rl.chamadas.some((k) => k.startsWith("login-conta:"))).toBe(false);
+  });
+
+  it("o tecto continua a travar a busca às cegas — a 21.ª falha é 429", async () => {
+    rl.tectoReal.set(chaveConta("Catarina"), 20);
+    for (let i = 0; i < 20; i++) {
+      await POST(postReq({ name: "Catarina", password: `tentativa-${i}` }));
+    }
+    const res = await POST(postReq({ name: "Catarina", password: "mais-uma" }));
+    expect(res.status).toBe(429);
+  }, 60_000);
+
+  it("o código de 2FA errado gasta o contador — é aí que a busca dos 6 dígitos bate", async () => {
+    process.env.ADMIN_TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"; // gitleaks:allow
+    rl.tectoReal.set(chaveConta("Catarina"), 20);
+    // Palavra-passe certa, código errado: a tentativa TEM de ser contada,
+    // senão quem tem a palavra-passe procura os 6 dígitos sem tecto nenhum.
+    const res = await POST(postReq({ name: "Catarina", password: "liquen2026", code: "000000" }));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ needs2fa: true });
+    expect(rl.contagens.get(chaveConta("Catarina"))).toBe(1);
   });
 });
