@@ -23,9 +23,9 @@ export interface ServiceDetail {
 export const SERVICES: ServiceDetail[] = [
   {
     slug: "casamentos",
-    eyebrow: "Decoração e Coordenação de Casamentos",
+    eyebrow: "",
     title: "Decoração de Casamentos",
-    metaTitle: "Decoração de Casamentos em Portugal",
+    metaTitle: "Decoração de Casamentos",
     metaDescription:
       "Decoração de casamentos em todo o Portugal: design floral e cenografia à medida, com coordenação do dia em herdades, quintas e espaços únicos.",
     // Termos NACIONAIS e genéricos. As variantes por região vivem nas landing
@@ -139,7 +139,7 @@ export const SERVICES: ServiceDetail[] = [
     hero: "/imagens/EW1_1332.jpg",
     ogImage: "/imagens/EW1_1404.jpg",
     intro: [
-      "Produzimos congressos, seminários, retiros de empresa, cerimónias de entrega de prémios e jantares corporativos, em Lisboa, em Évora e no resto do país. Já trabalhámos com a Universidade de Évora, a Câmara Municipal de Évora, a José de Mello, a Aernnova e a Mainova.",
+      "Produzimos congressos, seminários, retiros de empresa, cerimónias de entrega de prémios e jantares corporativos, em todo o país. Trabalhamos com empresas, universidades e instituições públicas, de reuniões de equipa a eventos de várias centenas de pessoas.",
       "Tratamos do espaço, da cenografia, da logística, do catering e do apoio técnico, e ficamos com a coordenação no próprio dia. Quando há convidados de fora, tratamos também da tradução simultânea, do alojamento e dos transfers.",
     ],
     includes: [
@@ -218,7 +218,7 @@ export const SERVICES: ServiceDetail[] = [
   {
     slug: "batizados-e-comunhoes",
     eyebrow: "Celebrações Familiares",
-    title: "Decoração de Batizados e Comunhões no Alentejo",
+    title: "Decoração de Batizados e Comunhões",
     metaTitle: "Decoração de Batizados e Comunhões",
     metaDescription:
       "Decoração de batizados e comunhões no Alentejo e em Portugal: celebrações familiares íntimas, com conceito, flores e mesa à medida, organizadas com carinho.",
@@ -230,7 +230,7 @@ export const SERVICES: ServiceDetail[] = [
     ],
     hero: "/imagens/DaniGui_JantarFesta_26.jpg",
     intro: [
-      "Os batizados e as comunhões são momentos de família que ficam para a vida. A Líquen Events cria a decoração destas celebrações no Alentejo e em todo o País, íntimas ou de maior escala, sempre com o mesmo cuidado.",
+      "Os batizados e as comunhões são momentos de família que ficam para a vida. A Líquen Events cria a decoração destas celebrações em todo o País, íntimas ou de maior escala, sempre com o mesmo cuidado.",
       "Decoramos a cerimónia e depois o almoço ou o jantar, com o mesmo conceito nos dois espaços, para que não pareçam duas festas diferentes. O resto do dia fica para a família.",
     ],
     includes: [
@@ -276,9 +276,9 @@ type ServiceCopy = Pick<
 
 const SERVICES_EN: Record<string, ServiceCopy> = {
   casamentos: {
-    eyebrow: "Wedding Decoration & Coordination",
+    eyebrow: "",
     title: "Wedding Decoration",
-    metaTitle: "Wedding Decoration in Portugal",
+    metaTitle: "Wedding Decoration",
     metaDescription:
       "Wedding decoration across Portugal: bespoke floral design and scenography, with day-of coordination, at estates, quintas and unique venues.",
     intro: [
@@ -339,7 +339,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
     metaDescription:
       "Decoration and scenography for corporate events in Lisbon and Portugal: conferences, congresses, team-building, product launches and company dinners.",
     intro: [
-      "We produce congresses, seminars, company retreats, award ceremonies and corporate dinners, in Lisbon, in Évora and across the country. We have worked with the University of Évora, Évora City Council, José de Mello, Aernnova and Mainova.",
+      "We produce congresses, seminars, company retreats, award ceremonies and corporate dinners across the country. We work with companies, universities and public institutions, from team meetings to events of several hundred people.",
       "We handle the venue, the scenography, the logistics, the catering and the technical support, and we take the coordination on the day. When guests come from abroad, we also arrange simultaneous translation, accommodation and transfers.",
     ],
     includes: [
@@ -391,12 +391,12 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
   },
   "batizados-e-comunhoes": {
     eyebrow: "Family Celebrations",
-    title: "Christening & Communion Decoration in the Alentejo",
+    title: "Christening & Communion Decoration",
     metaTitle: "Christening & Communion Decoration",
     metaDescription:
       "Decoration for christenings and communions in the Alentejo and Portugal: intimate family celebrations, with bespoke concept, flowers and table styling.",
     intro: [
-      "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations in the Alentejo and Portugal, intimate or larger in scale, always with the same care.",
+      "Christenings and communions are family moments that last a lifetime. Líquen Events creates the decoration for these celebrations across the whole country, intimate or larger in scale, always with the same care.",
       "We decorate the ceremony and then the lunch or dinner, with the same concept in both spaces so they do not read as two different parties. The rest of the day belongs to the family.",
     ],
     includes: [
