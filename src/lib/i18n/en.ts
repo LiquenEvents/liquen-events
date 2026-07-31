@@ -244,7 +244,7 @@ export const en: Dict = {
       "Companies, institutions and families who chose us for their most special moments, and who honour us with their trust.",
     scroll: "Scroll",
     leadPre:
-      "From large companies to family celebrations, dozens entrust Líquen Events with their most important moments, and we answer that trust with ",
+      "From large companies to family celebrations, countless clients entrust Líquen Events with their most important moments, and we answer that trust with ",
     leadMoss: "rigour, creativity and dedication",
     leadPost: " in every detail.",
     desde: "Since",
