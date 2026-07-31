@@ -73,6 +73,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 const MAX_ATTEMPTS = 4;
 /** Recuo exponencial (x3), o mesmo da galeria. */
 const BACKOFF_MS = [600, 1800, 5400];
+/**
+ * Quantas vezes reentrar no ecrã pode recomeçar a escada. Duas.
+ *
+ * O tecto existe porque não o haver era visível: uma foto que falha sempre
+ * recomeçava 4 tentativas de cada vez que reaparecia, sem fim. E o efeito é
+ * assimétrico, porque descer não faz nada reentrar e subir faz — medido com
+ * uma única foto avariada, uma só subida deu 17 pedidos falhados e dezenas de
+ * ciclos de desmontar/remontar o `<img>`. A imagem treme e pisca, e só a
+ * subir.
+ *
+ * Duas e não uma: a segunda tentativa é a que apanha o caso que motivou esta
+ * recuperação — a falha passageira (a derivada ainda a ser gerada, um pico de
+ * rede) que já passou quando a pessoa volta a olhar. A terceira, a quarta e a
+ * quinta não acrescentam nada senão barulho no ecrã. Com o tecto, o pior caso
+ * por imagem e por visita é 3 escadas × 4 tentativas = 12 pedidos, em vez de
+ * ilimitado. O `online` continua sem tecto — ver o efeito de recuperação.
+ */
+const MAX_REENTRY_RECOVERIES = 2;
 
 /**
  * Superfície neutra para o último recurso quando quem chama não passa um
@@ -132,6 +150,17 @@ export default function SafeImage({
   const attemptsRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackRef = useRef<HTMLImageElement | null>(null);
+  /**
+   * Quantas vezes já se recomeçou a escada por a imagem ter voltado ao ecrã.
+   *
+   * Sem tecto, a recuperação por reentrada era infinita: uma foto que falha
+   * sempre recomeça 4 tentativas de CADA vez que reaparece. E é assimétrico —
+   * descer nunca faz nada reentrar, subir faz. Medido com UMA única foto
+   * avariada, numa só subida: 17 pedidos falhados e dezenas de ciclos de
+   * desmontar/remontar o `<img>`. Isso vê-se como a imagem a tremer e a
+   * piscar, e só a subir, que foi exactamente a queixa.
+   */
+  const recoveriesRef = useRef(0);
 
   useEffect(
     () => () => {
@@ -174,6 +203,12 @@ export default function SafeImage({
   // ── Recuperação depois de esgotar as tentativas ─────────────────────────
   // Reentrar no ecrã (saiu e voltou) ou o regresso da rede dão nova
   // oportunidade. Sem isto, um erro pontual ficava para o resto da visita.
+  //
+  // A reentrada tem TECTO, o regresso da rede não. São sinais de qualidade
+  // diferente: "a foto voltou ao ecrã" é um palpite (a segunda tentativa já
+  // diz quase tudo, e a partir daí insistir é barulho visível); "a rede
+  // voltou" é uma mudança de estado real do dispositivo, e nesse caso vale
+  // sempre a pena tentar de novo — e traz consigo a reposição da contagem.
   useEffect(() => {
     if (!exhausted) return;
     const reset = () => {
@@ -183,7 +218,11 @@ export default function SafeImage({
       setWaiting(false);
       setBust((b) => b + 1);
     };
-    window.addEventListener("online", reset);
+    const onOnline = () => {
+      recoveriesRef.current = 0;
+      reset();
+    };
+    window.addEventListener("online", onOnline);
     let left = false;
     let io: IntersectionObserver | null = null;
     // Observa-se o próprio elemento de recurso: existe exactamente enquanto
@@ -193,13 +232,18 @@ export default function SafeImage({
       io = new IntersectionObserver((entries) => {
         for (const e of entries) {
           if (!e.isIntersecting) left = true;
-          else if (left) reset();
+          else if (left) {
+            if (recoveriesRef.current >= MAX_REENTRY_RECOVERIES) return;
+            recoveriesRef.current += 1;
+            left = false;
+            reset();
+          }
         }
       });
       io.observe(target);
     }
     return () => {
-      window.removeEventListener("online", reset);
+      window.removeEventListener("online", onOnline);
       io?.disconnect();
     };
   }, [exhausted]);

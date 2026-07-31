@@ -280,6 +280,72 @@ describe("SafeImage: uma imagem falhada volta a ser pedida", () => {
     expect(currentSrc()).toContain("/_next/image");
   });
 
+  /** Esgota a escada até aparecer o recurso digno. */
+  const esgotar = () => {
+    for (let i = 0; i < 5; i++) {
+      falhar();
+      act(() => vi.advanceTimersByTime(6_000));
+    }
+  };
+  /** Sai do ecrã e volta — o gesto de subir a página por cima da imagem. */
+  const reentrar = () => {
+    const io = FakeIO.instances[FakeIO.instances.length - 1];
+    act(() => io.fire(false));
+    act(() => io.fire(true));
+  };
+
+  it("reentrar no ecrã recomeça a escada DUAS vezes, não infinitas", () => {
+    // O defeito: sem tecto, cada reentrada recomeçava 4 tentativas, para
+    // sempre. Assimétrico — descer não faz nada reentrar, subir faz — e por
+    // isso mediu-se, com UMA foto avariada e numa só subida, 17 pedidos
+    // falhados e dezenas de ciclos de desmontar/remontar o `<img>`. É o que se
+    // vê como a foto a tremer e a piscar ao subir a página.
+    renderTile({ unavailableLabel: "Foto indisponível" });
+    esgotar();
+    expect(screen.getByText("Foto indisponível")).toBeInTheDocument();
+
+    // 1.ª e 2.ª reentradas: recomeça mesmo (é para isto que a recuperação existe).
+    for (const vez of [1, 2]) {
+      reentrar();
+      expect(screen.queryByText("Foto indisponível"), `reentrada ${vez}`).toBeNull();
+      esgotar();
+      expect(screen.getByText("Foto indisponível"), `reentrada ${vez}`).toBeInTheDocument();
+    }
+
+    // 3.ª em diante: já não mexe. A caixa fica no recurso digno, quieta.
+    for (const vez of [3, 4, 5]) {
+      reentrar();
+      expect(screen.getByText("Foto indisponível"), `reentrada ${vez}`).toBeInTheDocument();
+      expect(currentSrc(), `reentrada ${vez}`).not.toContain("/_next/image");
+    }
+  });
+
+  it("o regresso da rede NÃO tem tecto — repõe a contagem das reentradas", () => {
+    // O tecto é só para o palpite ("a foto voltou ao ecrã"). Que a rede voltou é
+    // uma mudança de estado real do aparelho, e aí tentar outra vez vale sempre
+    // a pena — senão uma pessoa que perde a rede numa página já esgotada ficava
+    // com as fotos partidas até recarregar.
+    renderTile({ unavailableLabel: "Foto indisponível" });
+    esgotar();
+    reentrar();
+    esgotar();
+    reentrar();
+    esgotar();
+    // Tecto gasto: reentrar já não faz nada.
+    reentrar();
+    expect(screen.getByText("Foto indisponível")).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(screen.queryByText("Foto indisponível"), "a rede voltou").toBeNull();
+
+    // E a contagem foi reposta: volta a haver duas reentradas de crédito.
+    esgotar();
+    reentrar();
+    expect(screen.queryByText("Foto indisponível"), "crédito reposto").toBeNull();
+  });
+
   it("depois de desistir, o regresso da rede tenta de novo", () => {
     renderTile({ unavailableLabel: "Foto indisponível" });
     for (let i = 0; i < 5; i++) {
