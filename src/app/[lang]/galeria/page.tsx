@@ -92,6 +92,30 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
   const t = getDictionary(locale);
   return (
     <>
+      {/*
+        DESLIGA O RESTAURO DE SCROLL DO BROWSER — E TEM DE SER AQUI, no HTML.
+        Esta uma linha é a diferença entre o restauro da galeria funcionar e
+        fazer o contrário do que promete; o resto vive em GaleriaClient (ver a
+        nota longa junto a POS_PREFIX).
+
+        O browser tenta restaurar a posição LOGO A SEGUIR à primeira disposição
+        da página — medido, o primeiro frame afectado é t=11 ms —, muito antes
+        de o pacote da galeria sequer ter descarregado. Nessa altura o
+        documento só tem as INITIAL_PAGE=12 fotos do HTML, portanto uma posição
+        de 51 800 px é cortada para o fim de um documento de 8 646 px. Pôr o
+        `manual` dentro do componente chegava tarde: com o CPU estrangulado 4x
+        a hidratação mediu-se a t≈2 086 ms, e no meio ficava um restauro do
+        browser que arrastava a página até ao fundo (225 865 px, as 427 fotos
+        montadas) por alimentar o sentinela do scroll infinito a cada passagem.
+
+        Não é `<Script>` do next/script de propósito: qualquer estratégia dele
+        (mesmo `beforeInteractive`) corre depois desta janela.
+      */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `try{if('scrollRestoration' in history)history.scrollRestoration='manual'}catch(e){}`,
+        }}
+      />
       <BreadcrumbJsonLd
         locale={locale}
         homeName={t.nav.inicio}

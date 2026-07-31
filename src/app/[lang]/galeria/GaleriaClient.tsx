@@ -55,6 +55,91 @@ const PAGE = 24;
 // fills the rest within a frame. Same value SSR + client → no hydration mismatch.
 const INITIAL_PAGE = 12;
 
+// ── Restauro da posição de scroll ───────────────────────────────────────────
+/**
+ * RECARREGAR OU VOLTAR ATRÁS TEM DE DEIXAR O VISITANTE ONDE ELE ESTAVA.
+ *
+ * Não deixava. Medido num Chromium de verdade (Pixel 7, build de produção,
+ * `/galeria`), com o visitante a 51 800 px (108 das 427 fotos montadas,
+ * documento com 57 350 px):
+ *
+ *   recarregar        51 800 px → 7 807 px   (-43 993 px)   3 corridas
+ *   voltar atrás      51 800 px → 7 807 px   (-43 993 px)   (histórico duro)
+ *   voltar atrás      51 800 px → 7 807 px   (-43 993 px)   (<Link> do App Router)
+ *   pior corrida      51 800 px →   869 px   (-50 931 px)
+ *
+ * O browser TENTA restaurar (`history.scrollRestoration` === "auto"), e é aí
+ * que falha: quando ele aplica a posição guardada o documento só tem as
+ * INITIAL_PAGE=12 fotos do primeiro render — 8 646 px de altura —, portanto os
+ * 51 800 px são cortados para o fim do documento curto (7 807 px = 8 646 - 839
+ * de viewport) e a posição real perde-se para sempre. Como o `html` leva
+ * `scroll-behavior: smooth` (globals.css), esse corte ainda é ANIMADO: mediu-se
+ * um deslize fantasma de 0 → 7 807 px ao longo de ~600 ms, sozinho, à frente do
+ * visitante. E numa das corridas o deslize entrou em corrida com o scroll
+ * infinito e desceu a galeria INTEIRA — parou a 225 865 px com as 427 fotos
+ * montadas, ou seja, descarregou tudo o que devia ter poupado.
+ *
+ * A correção NÃO é subir o INITIAL_PAGE (isso paga o arranque lento a TODA a
+ * gente, incluindo a quem chega pela primeira vez). É:
+ *   1. carimbar a ENTRADA DE HISTÓRICO com um identificador (`galeriaPos`) e
+ *      guardar `{y, shown}` em sessionStorage debaixo dele;
+ *   2. `scrollRestoration = "manual"` — o restauro do browser só sabe cortar;
+ *   3. ao voltar a essa entrada (recarregar, back duro ou back do App Router:
+ *      os três reencontram o mesmo `history.state`), repor `shown` e só depois
+ *      saltar para `y`, antes da primeira pintura.
+ * Quem chega de novo cria uma entrada NOVA, sem carimbo — e continua a arrancar
+ * com 12 fotos, exactamente como antes.
+ */
+const POS_PREFIX = "galeria:pos:";
+/** Quanto tempo o restauro ESPERA por altura de documento antes de desistir. */
+const RESTORE_WAIT_MS = 2000;
+/** Quanto tempo MANTÉM a posição depois de lá chegar (ver a fase de manutenção). */
+const RESTORE_HOLD_MS = 700;
+type SavedPos = { y: number; shown: number; hash: string };
+
+/**
+ * Identificador desta ENTRADA de histórico (não desta página). É o carimbo que
+ * distingue "voltei ao sítio onde estava" de "entrei agora na galeria": uma
+ * navegação nova cria uma entrada sem carimbo (`returning: false` → arranque
+ * normal de 12 fotos), enquanto recarregar ou voltar atrás reencontra o mesmo
+ * `history.state` — e é por isso que serve para os três casos, incluindo o
+ * back do App Router, onde o tipo da navegação continua a ser "navigate".
+ * Preserva o resto do `history.state` (o App Router guarda lá a sua árvore).
+ */
+function historyPosKey(): { key: string; returning: boolean } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const state = (window.history.state ?? {}) as Record<string, unknown>;
+    const existing = state.galeriaPos;
+    if (typeof existing === "string") return { key: POS_PREFIX + existing, returning: true };
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    window.history.replaceState({ ...state, galeriaPos: id }, "");
+    return { key: POS_PREFIX + id, returning: false };
+  } catch {
+    return null; // sem histórico utilizável → galeria normal, sem restauro
+  }
+}
+
+function readPos(key: string): SavedPos | null {
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as Partial<SavedPos>;
+    if (typeof v?.y !== "number" || typeof v?.shown !== "number") return null;
+    return { y: v.y, shown: v.shown, hash: typeof v.hash === "string" ? v.hash : "" };
+  } catch {
+    return null; // sessionStorage bloqueado (modo privado antigo) ou JSON partido
+  }
+}
+
+function writePos(key: string, pos: SavedPos): void {
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(pos));
+  } catch {
+    /* quota/privacidade: perder o restauro é aceitável, rebentar não é */
+  }
+}
+
 // URL-hash slugs for each category, so a filtered view is shareable &
 // bookmarkable (e.g. /galeria#casamentos) and survives the back button.
 const CAT_SLUGS: Record<Cat, string> = {
@@ -463,6 +548,205 @@ export default function GaleriaClient({
       md.removeEventListener("change", apply);
     };
   }, []);
+
+  // ── Restauro da posição (ver a nota longa junto a POS_PREFIX) ─────────────
+  /** Chave em sessionStorage desta entrada de histórico. */
+  const posKeyRef = useRef<string | null>(null);
+  /** Posição por repor; volta a null assim que o salto acontece. */
+  const restoreYRef = useRef<number | null>(null);
+  /**
+   * `shown` legível de dentro de listeners sem os re-registar a cada página.
+   * Actualizado num efeito (nunca durante o render: refs em render são
+   * exactamente o que o lint do React Compiler proíbe), e num efeito de
+   * LAYOUT, não passivo: o par `{y, shown}` que se grava tem de ser
+   * CONSISTENTE. Com um efeito passivo, esta ref ficava um commit atrás da
+   * altura real do documento e podia gravar-se "estou a 133 940 px" com
+   * "estavam 228 fotos" — 24 fotos (~12 000 px) a menos do que as precisas
+   * para lá chegar. No restauro isso deixava a posição fora do documento e o
+   * visitante acabava no topo (medido, com o CPU estrangulado 4x).
+   */
+  const shownRef = useRef(shown);
+  useIsomorphicLayoutEffect(() => {
+    shownRef.current = shown;
+  }, [shown]);
+  const lastSaveRef = useRef(0);
+  /** A subir ao topo por ordem do visitante: não gravar nada até lá chegar. */
+  const toTopRef = useRef(false);
+  const toTopTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Gravação adiada da última posição (aresta de saída — ver `savePos`). */
+  const trailingRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Carimba a entrada, desliga o restauro do browser e, se estamos a VOLTAR a
+  // esta entrada, repõe quantas fotos estavam montadas. Repor `shown` primeiro
+  // é o ponto todo: sem as fotos não há altura de documento, e sem altura
+  // qualquer posição é cortada para o fim de um documento de 12 fotos.
+  // Num efeito de LAYOUT: o `setShown` daqui volta a renderizar ANTES da
+  // primeira pintura, portanto o visitante não chega a ver o topo da galeria.
+  useIsomorphicLayoutEffect(() => {
+    const h = historyPosKey();
+    if (!h) return;
+    posKeyRef.current = h.key;
+    // Segundo cinto. Quem desliga mesmo o restauro do browser é o script
+    // inline de page.tsx (corre a t≈11 ms, contra t≈2 086 ms de hidratação com
+    // o CPU estrangulado 4x — a explicação está lá). Este aqui cobre a entrada
+    // na galeria por navegação client-side do App Router, onde não há HTML
+    // novo para o script inline correr.
+    if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+    if (h.returning) {
+      const saved = readPos(h.key);
+      // Hash diferente = outra vista (categoria/coleção), outro pool, outra
+      // altura: a posição guardada não quer dizer nada lá.
+      if (saved && saved.hash === window.location.hash) {
+        restoreYRef.current = saved.y;
+        setShown((s) => Math.max(s, Math.min(saved.shown, photos.length)));
+      }
+    }
+    return () => {
+      // Ao sair da galeria (navegação client-side) devolvemos o restauro ao
+      // browser: as outras páginas do sítio não têm scroll infinito e o
+      // comportamento nativo serve-lhes bem.
+      if ("scrollRestoration" in window.history) window.history.scrollRestoration = "auto";
+    };
+  }, [photos.length]);
+
+  // Salta para a posição guardada assim que houver altura para ela. Corre em
+  // cada commit relevante (`shown`/`cols` mudam a altura do documento) e ainda
+  // antes da pintura. `behavior: "instant"` é obrigatório: o `html` tem
+  // `scroll-behavior: smooth`, e sem isto o restauro seria uma animação de
+  // dezenas de milhares de píxeis à frente do visitante.
+  useIsomorphicLayoutEffect(() => {
+    const y = restoreYRef.current;
+    if (y === null || typeof window === "undefined") return;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    if (max + 1 < y) return; // ainda falta altura → tenta no próximo commit
+    window.scrollTo({ top: y, behavior: "instant" });
+    // NÃO se larga aqui a posição: quem fecha o restauro é a fase de
+    // manutenção abaixo (há quem faça scroll ao topo depois de nós).
+  }, [shown, cols]);
+
+  // Fase de manutenção — o restauro não acaba no primeiro salto.
+  //
+  // Duas coisas o desfaziam depois de ele acontecer:
+  //  • a navegação client-side do App Router faz scroll ao TOPO depois de
+  //    montar a rota. Medido no back por <Link> da navbar: as 108 fotos eram
+  //    repostas (documento com 57 735 px) e mesmo assim a página acabava em
+  //    y=0 — pior do que o defeito original, que pelo menos ficava a 7 807 px;
+  //  • a altura só pode chegar depois da pintura (fontes, `cols` a mudar),
+  //    e nessa altura o efeito de layout acima já não volta a correr porque
+  //    `shown` deixou de mudar.
+  // Por isso: espera-se por altura (até RESTORE_WAIT_MS) e, chegados à
+  // posição, reafirma-se durante RESTORE_HOLD_MS.
+  //
+  // Enquanto falta altura vai-se ao ponto MAIS FUNDO que já existe, nunca
+  // além de `y`. É de propósito, e tem um custo conhecido: encostado ao fim do
+  // documento o sentinela do scroll infinito carrega a página seguinte (e o
+  // ancoramento de scroll do Chromium acompanha o crescimento — medido:
+  // 20 079 → 56 896 px em 130 ms), portanto o documento cresce até `y` caber e
+  // o ciclo pára lá. O tecto em `y` é o que impede isto de ser a fuga que o
+  // restauro do browser era: ele não tinha tecto e descia a galeria inteira
+  // (225 865 px, as 427 fotos). A alternativa — ficar quieto à espera —
+  // deixava o visitante no TOPO sempre que o par gravado ficasse uma página
+  // curto (medido com o CPU estrangulado 4x).
+  useEffect(() => {
+    if (restoreYRef.current === null || typeof window === "undefined") return;
+    const t0 = performance.now();
+    let chegou: number | null = null;
+    let id = 0;
+    const parar = () => {
+      restoreYRef.current = null;
+      cancelAnimationFrame(id);
+    };
+    // O visitante manda sempre mais do que o restauro: ao primeiro gesto dele,
+    // largamos a posição (senão o "hold" agarrava a página contra o dedo).
+    const gestos = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    for (const g of gestos) window.addEventListener(g, parar, { passive: true, once: true });
+    const tick = () => {
+      const y = restoreYRef.current;
+      if (y === null) return;
+      const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const alvo = Math.min(y, max);
+      if (Math.abs(window.scrollY - alvo) > 1) window.scrollTo({ top: alvo, behavior: "instant" });
+      if (max + 1 >= y) chegou ??= performance.now();
+      const fim =
+        chegou !== null
+          ? performance.now() - chegou > RESTORE_HOLD_MS
+          : performance.now() - t0 > RESTORE_WAIT_MS;
+      if (fim) {
+        restoreYRef.current = null;
+        return;
+      }
+      id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(id);
+      for (const g of gestos) window.removeEventListener(g, parar);
+    };
+  }, [shown]);
+
+  /** Apaga a posição desta entrada (pedido explícito de esquecer o sítio). */
+  const clearPos = useCallback(() => {
+    const key = posKeyRef.current;
+    // Também cancela uma gravação adiada: sem isto ela voltava a criar a
+    // entrada 250 ms depois de a termos apagado.
+    clearTimeout(trailingRef.current);
+    if (!key) return;
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {
+      /* sessionStorage bloqueado: não havia nada gravado, também não há nada a apagar */
+    }
+  }, []);
+
+  /** Guarda `{y, shown}` desta entrada. Estrangulado a 250 ms — o scroll
+      infinito faz esta função passar por cada frame de scroll e um
+      `sessionStorage.setItem` é síncrono. `force` no pagehide/ocultação, que é
+      a última oportunidade de gravar a posição final. */
+  const savePos = useCallback((force = false) => {
+    const key = posKeyRef.current;
+    if (!key || restoreYRef.current !== null) return; // a restaurar: não gravar por cima
+    if (toTopRef.current) return; // a caminho do topo por pedido do visitante
+    const y = Math.round(window.scrollY);
+    // O TOPO NUNCA SE GRAVA. Duas razões, e a segunda é um defeito medido:
+    //  (a) restaurar para o topo é o mesmo que não restaurar nada;
+    //  (b) o topo é a posição que a navegação client-side do App Router IMPÕE
+    //      ao sair da rota — ela faz scroll ao topo com este listener ainda
+    //      ligado. Medido: sair da galeria por um <Link> da navbar reescrevia
+    //      o `{"y":51774,"shown":108}` guardado para `{"y":0,"shown":108}`, e
+    //      o voltar atrás repunha as 108 fotos e deixava o visitante no topo —
+    //      pior do que o defeito original, que ao menos parava a 7 807 px.
+    if (y === 0) return;
+    // A posição é capturada AGORA, não relida quando a gravação adiada
+    // dispara: se pelo meio a navegação levar a página ao topo, o que fica
+    // gravado continua a ser o último sítio REAL do visitante.
+    const pos = { y, shown: shownRef.current, hash: window.location.hash };
+    const escrever = () => {
+      lastSaveRef.current = performance.now();
+      writePos(key, pos);
+    };
+    clearTimeout(trailingRef.current);
+    if (force || performance.now() - lastSaveRef.current >= 250) escrever();
+    // ARESTA DE SAÍDA, não só de entrada: a ÚLTIMA posição de um scroll cai
+    // sempre dentro da janela do estrangulamento e não vem evento nenhum
+    // depois dela para a gravar. Medido sem isto, o voltar atrás por <Link>
+    // ficava 2 774 px acima do sítio — a posição gravada era a do frame
+    // anterior ao fim do scroll.
+    else trailingRef.current = setTimeout(escrever, 250);
+  }, []);
+
+  useEffect(() => {
+    // O `pagehide` cobre o que o scroll estrangulado pode ter deixado por
+    // gravar (e é o evento que dispara também quando a página vai para a
+    // bfcache); o `visibilitychange` cobre o telemóvel que muda de app.
+    const onHide = () => savePos(true);
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, [savePos]);
+
   // O `<ViewTransition name>` serve UMA coisa: o morph miniatura↔lightbox. Fora
   // desse morph, nenhuma tile da grelha precisa de nome — e tê-los sempre era o
   // que gerava os avisos "dois <ViewTransition> com o mesmo nome": ao filtrar ou
@@ -562,6 +846,12 @@ export default function GaleriaClient({
         raf = requestAnimationFrame(() => {
           raf = 0;
           setShowTop(window.scrollY > 1200);
+          // O registo da posição vive DENTRO deste listener de propósito: é o
+          // único listener de scroll da galeria e já está estrangulado por rAF
+          // (o `savePos` acrescenta o seu próprio limite de 250 ms). Um segundo
+          // listener só para gravar seria trabalho de main thread a cada frame
+          // de scroll — precisamente o que esta página passou meses a tirar.
+          savePos();
         });
       };
       window.addEventListener("scroll", onScroll, { passive: true });
@@ -573,11 +863,21 @@ export default function GaleriaClient({
       remove();
       if (raf) cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [savePos]);
   const scrollTop = useCallback(() => {
+    // Carregar em "voltar ao topo" é dizer, explicitamente, que já não se quer
+    // voltar àquele sítio: apaga-se a posição guardada e suspende-se o registo
+    // até a subida acabar (senão a própria animação de subida gravava as
+    // posições intermédias e o restauro trazia o visitante de volta a meio).
+    clearPos();
+    toTopRef.current = true;
+    clearTimeout(toTopTimerRef.current);
+    toTopTimerRef.current = setTimeout(() => {
+      toTopRef.current = false;
+    }, 1200);
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
-  }, []);
+  }, [clearPos]);
 
   // Sync the active filter with the URL hash so categories and single-couple
   // views are shareable and the browser back button restores the previous
@@ -585,14 +885,26 @@ export default function GaleriaClient({
   // hashchange.
   useEffect(() => {
     let remove = () => {};
+    // A PRIMEIRA passagem por `apply` é o mount (este efeito corre em idle,
+    // ~1,3s depois do arranque, haja hash ou não); as seguintes são
+    // hashchanges de verdade. A distinção é o que impede este efeito de
+    // ENCOLHER o que já está montado — só um hashchange real muda de vista e
+    // portanto só ele recomeça em PAGE. Ver as duas notas dentro do `apply`.
+    let first = true;
     const cancel = onIdle(() => {
       const apply = () => {
+        const mount = first;
+        first = false;
         const hash = window.location.hash.replace(/^#/, "");
         if (hash.startsWith("c-")) {
           const name = collectionFromSlug(hash.slice(2), collectionNames);
           if (name) {
             setCollectionFilter(name);
-            setShown(PAGE);
+            // No mount NUNCA encolher: se voltámos a esta entrada de histórico
+            // já cá estão as fotos repostas (podem ser 108) e um `setShown(PAGE)`
+            // aqui cortava o documento outra vez para 24 fotos — o mesmo
+            // encolhimento que faz o browser perder a posição.
+            setShown((prev) => (mount ? Math.max(prev, PAGE) : PAGE));
             return;
           }
         }
@@ -605,7 +917,9 @@ export default function GaleriaClient({
         // medido, o contador saltava de "12 de 427" para "24 de 427" aos 2,0s e
         // os pedidos do primeiro ecrã partiam em duas vagas com 964ms parados
         // no meio (…354, 354, 1318, 1318…). Com esta guarda a rampa é contínua.
-        setShown((prev) => (prev === INITIAL_PAGE && !hash ? prev : PAGE));
+        // O `Math.max` estende a mesma guarda ao restauro (`shown` reposto >
+        // INITIAL_PAGE), que de outra forma seria desfeito aqui.
+        setShown((prev) => (mount ? Math.max(prev, hash ? PAGE : 0) : PAGE));
       };
       apply();
       window.addEventListener("hashchange", apply);
@@ -892,7 +1206,11 @@ export default function GaleriaClient({
     // history entry per click.
     const slug = CAT_SLUGS[c];
     const url = slug ? `#${slug}` : window.location.pathname + window.location.search;
-    window.history.replaceState(null, "", url);
+    // `history.state` PRESERVADO (era `null`): é lá que vive o carimbo desta
+    // entrada (`galeriaPos`, ver POS_PREFIX) — e também a árvore do router do
+    // App Router. Apagá-lo aqui deixava o visitante sem restauro de posição a
+    // partir do momento em que trocasse de vista.
+    window.history.replaceState(window.history.state, "", url);
   }
 
   // Called from inside the (open) lightbox, so the grid fade doesn't apply —
@@ -913,7 +1231,8 @@ export default function GaleriaClient({
       setJustOpened(false);
       if (newIdx >= 0) setLb(newIdx);
       else if (lb !== null) close();
-      window.history.replaceState(null, "", `#c-${collectionSlug(name)}`);
+      // `history.state` preservado — ver a nota igual em `switchCat`.
+      window.history.replaceState(window.history.state, "", `#c-${collectionSlug(name)}`);
     },
     [photos, pool, lb, close],
   );
