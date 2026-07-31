@@ -133,7 +133,25 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           // de altura — um telemóvel deitado — o piso de 560 px ganhava e o
           // capítulo crescia ao ser desenhado. Agora as três medidas (altura,
           // altura mínima e reserva) saem todas de `--cv-h`.
-          className="cv-panel relative h-[var(--cv-h)] w-full overflow-hidden [--cv-h:max(86svh,560px)]"
+          // `-mb-px` fecha a costura entre capítulos.
+          //
+          // A altura é `max(86svh, 560px)` e dá quase sempre um número
+          // FRACCIONÁRIO. Quando duas caixas dessas se encostam, há browsers e
+          // níveis de zoom em que o arredondamento deixa passar uma fatia de
+          // menos de um pixel — e por essa fatia vê-se o fundo BRANCO da
+          // página, que entre duas fotografias escuras se lê como uma risca
+          // clara de bordo a bordo.
+          //
+          // Honestamente: NÃO consegui reproduzi-la aqui. Varri as três
+          // fronteiras em dez tamanhos de ecrã e medi o brilho linha a linha —
+          // nenhuma risca (a fronteira é um degrau de 29 para 53 de brilho, sem
+          // pico). Mas o mecanismo é conhecido e depende do arredondamento do
+          // browser, portanto a ausência aqui não prova a ausência no ecrã
+          // dela. Sobrepor um pixel elimina a possibilidade em vez de a
+          // perseguir, não custa nada visível (é 1 px do fundo de uma foto de
+          // sangria inteira) e não mexe no espaço reservado do
+          // `contain-intrinsic-size`, que é a caixa de conteúdo.
+          className="cv-panel relative -mb-px h-[var(--cv-h)] w-full overflow-hidden [--cv-h:max(86svh,560px)]"
         >
           {/* The photograph settles in as the chapter enters — a slow cinematic
               zoom-out (scale 1.08 → 1) with a fade. Pure transform + opacity, so
