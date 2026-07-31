@@ -259,12 +259,32 @@ async function main() {
     ),
   );
 
+  // ── 7. SEMENTE PARA O KEYWORD PLANNER ───────────────────────────────────
+  // TODAS as keywords do plano completo, sem o corte de orçamento e sem os
+  // sinais de correspondência — é o que se cola no Planeador de palavras-chave
+  // para obter volume de pesquisa e custo por clique REAIS da conta dela. É a
+  // única forma honesta de preencher as colunas que este trabalho não pode
+  // preencher de fora; ver mercado.md.
+  const { todasAsCampanhas } = carregar("src/lib/ads/campanhas.ts");
+  const todas = todasAsCampanhas(1000);
+  const semente = [
+    ...new Set(todas.flatMap((c) => c.grupos.flatMap((g) => g.keywords.map((k) => k.texto)))),
+  ].sort();
+  await fs.writeFile(
+    path.join(SAIDA, "keywords-seed.csv"),
+    csv(
+      ["Keyword"],
+      semente.map((k) => [k]),
+    ),
+  );
+
   const totalKeywords = linhasKeywords.length;
   const totalGrupos = linhasGrupos.length;
   console.log(
     `gen-ads: ${campanhas.length} campanhas, ${totalGrupos} grupos, ` +
       `${totalKeywords} keywords, ${linhasAnuncios.length} anúncios, ` +
-      `${linhasNegativas.length} negativas → ads-output/csv/`,
+      `${linhasNegativas.length} negativas, ${semente.length} termos para o Planner ` +
+      "→ ads-output/csv/",
   );
   console.log(
     `gen-ads: ${plano.mensalPedido} €/mês pedidos, ${plano.mensalAtribuido.toFixed(2)} € atribuídos ` +

@@ -315,6 +315,9 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // 401 ANTES de tocar em seja o que for (e o módulo que sabe escrever nem
   // sequer é carregado — ver o import dinâmico em restore/route.ts).
   { path: "./backup/restore/route", methods: ["POST"] },
+  // As conversões offline expõem o VALOR de cada casamento fechado — é
+  // informação comercial, não uma exportação técnica inofensiva.
+  { path: "./admin/conversoes/route", methods: ["GET"] },
   { path: "./calendario/route", methods: ["GET", "POST"] },
   { path: "./calendario/[id]/route", methods: ["DELETE"] },
   { path: "./contratos/route", methods: ["GET"] },
