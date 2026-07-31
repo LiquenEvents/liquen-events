@@ -146,6 +146,25 @@ export function isPersistenceUnavailable(err: unknown): boolean {
   );
 }
 
+/**
+ * Erro de chave duplicada com a FORMA do que o Postgres devolve (SQLSTATE
+ * 23505), para o backend de ficheiro poder recusar um id repetido tal como a
+ * chave primária o recusa no Supabase.
+ *
+ * A forma importa: quem chama não olha para o backend, olha para o erro.
+ * `saveOverviewField` decide pelo `isUniqueViolation` se aquilo foi um conflito
+ * (dois dispositivos a estrear o campo) ou uma avaria; `createContractIfAbsent`
+ * conta com o insert a perder a corrida para não emitir um segundo sinal. Se o
+ * ficheiro deixasse passar o duplicado, essas decisões mudavam consoante o
+ * backend — e é precisamente isso que aqui não pode acontecer.
+ */
+function duplicateKeyError(table: string, id: string): Error {
+  return Object.assign(
+    new Error(`duplicate key value violates unique constraint "${table}_pkey" — id "${id}"`),
+    { code: "23505" },
+  );
+}
+
 // ── Supabase backend ──────────────────────────────────────────────────────
 export class SupabaseBackend<T> implements Backend<T> {
   constructor(
@@ -253,7 +272,16 @@ export class FileBackend<T> implements Backend<T> {
   // middle, so two concurrent inserts would both read the pre-write array and the
   // second write would clobber the first (lost update). Chaining them through this
   // tail makes read-modify-write atomic within the process.
+  //
+  // A fila vive na INSTÂNCIA, por isso só serializa quem partilha a instância:
+  // ver `createRepository`, que guarda um único FileBackend por repositório
+  // exactamente por causa disto.
   private tail: Promise<unknown> = Promise.resolve();
+  // Instantâneo de cada linha tal como o `get` a devolveu, indexado pela própria
+  // entidade. É o que o `updated_at` é para o backend Supabase — aqui a linha
+  // inteira, porque o ficheiro não tem coluna de versão. WeakMap: as entradas
+  // desaparecem com as entidades, não há nada para limpar.
+  private snapshots = new WeakMap<object, string>();
 
   constructor(
     private readonly m: Mapper<T>,
@@ -307,7 +335,13 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async get(id: string): Promise<T | null> {
-    return (await this.read()).find((e) => this.m.getId(e) === id) ?? null;
+    const found = (await this.read()).find((e) => this.m.getId(e) === id) ?? null;
+    // Guarda a linha como estava nesta leitura, para o `persist` poder recusar
+    // escrever por cima de uma versão que entretanto mudou.
+    if (found && typeof found === "object") {
+      this.snapshots.set(found as object, JSON.stringify(found));
+    }
+    return found;
   }
 
   async query(_column: string, _value: unknown, predicate: (e: T) => boolean): Promise<T[]> {
@@ -317,19 +351,33 @@ export class FileBackend<T> implements Backend<T> {
 
   async insert(entity: T): Promise<void> {
     this.assertWritableInProd();
+    const id = this.m.getId(entity);
     return this.serialize(async () => {
       const all = await this.read();
+      // A chave primária que o Supabase impõe tem de valer aqui também: sem
+      // esta guarda, dois aceites em corrida punham DOIS contratos na mesma
+      // proposta (e dois sinais a caminho do cliente), porque o `insert` de
+      // ficheiro nunca perdia a corrida que o índice único faz perder.
+      if (all.some((e) => this.m.getId(e) === id)) throw duplicateKeyError(this.m.table, id);
       all.push(entity);
       await this.write(all);
     });
   }
 
-  async persist(id: string, merged: T): Promise<void> {
+  async persist(id: string, merged: T, cas?: T): Promise<void> {
     this.assertWritableInProd();
+    const expected = cas && typeof cas === "object" ? this.snapshots.get(cas as object) : undefined;
     return this.serialize(async () => {
       const all = await this.read();
       const idx = all.findIndex((e) => this.m.getId(e) === id);
       if (idx === -1) return;
+      // Bloqueio optimista, o mesmo que o backend Supabase faz sobre o
+      // `updated_at`: se a linha já não é a que foi lida, alguém escreveu no
+      // meio e o `updateWith` tem de reler e voltar a aplicar a alteração —
+      // sobrepor aqui apagaria o trabalho dessa pessoa sem ninguém dar por isso.
+      if (expected !== undefined && JSON.stringify(all[idx]) !== expected) {
+        throw new ConflictError(id);
+      }
       all[idx] = merged;
       await this.write(all);
     });
@@ -406,8 +454,19 @@ export class Repository<T> {
 /** Build a repository that targets Supabase when configured, else the dev file. */
 export function createRepository<T>(mapper: Mapper<T>): Repository<T> {
   const baseDir = path.join(process.cwd(), "data");
+  // UM só FileBackend por repositório. A fila de escrita e os instantâneos do
+  // bloqueio optimista vivem na instância: dar uma instância nova a cada
+  // chamada — como se fazia aqui — dava a cada operação uma fila vazia e uma
+  // memória em branco, e as duas protecções ficavam a não fazer nada. Duas
+  // criações em simultâneo liam ambas o mesmo array e a segunda escrita
+  // apagava a primeira, que é precisamente o que a fila existe para impedir.
+  //
+  // A ESCOLHA do backend continua a ser feita a cada chamada: o Supabase pode
+  // passar a estar configurado a meio da vida do processo.
+  let fileBackend: FileBackend<T> | null = null;
   return new Repository<T>(mapper, () => {
     const sb = getSupabase();
-    return sb ? new SupabaseBackend<T>(mapper, sb) : new FileBackend<T>(mapper, baseDir);
+    if (sb) return new SupabaseBackend<T>(mapper, sb);
+    return (fileBackend ??= new FileBackend<T>(mapper, baseDir));
   });
 }
