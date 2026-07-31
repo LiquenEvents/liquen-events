@@ -131,8 +131,26 @@ export default function ClientMarquee() {
         className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap"
         style={userPaused ? { animationPlayState: "paused" } : undefined}
       >
+        {/*
+          A CHAVE É O CLIENTE, NÃO A POSIÇÃO — e isso vale bytes, não é estilo.
+          A ordem é sorteada DEPOIS de montar (o efeito acima). Com `key={i}` o
+          React não move nada: mantém os mesmos 38 `<img>` e limita-se a trocar
+          o `src` de cada um. Cada troca ABORTA o pedido em voo daquele
+          elemento e lança outro — os mesmos 19 logótipos, pedidos duas vezes.
+          Medido em /clientes, 1440x900, cache fria, 8 corridas: 17 a 18 URLs
+          repetidos em 3 delas, 1237 KB contra 1074 KB nas corridas limpas.
+          Com a chave no nome do cliente, o React REORDENA os nós que já
+          existem e nenhum `src` muda: 0 repetidos em 8 corridas.
+          O sufixo distingue a segunda passagem da fita (a cópia `aria-hidden`
+          que fecha o ciclo), senão haveria chaves iguais.
+        */}
         {[...order, ...order].map((c, i) => (
-          <Mark key={i} name={c.name} logo={c.logo} duplicate={i >= order.length} />
+          <Mark
+            key={`${c.name}-${i >= order.length ? "eco" : "1"}`}
+            name={c.name}
+            logo={c.logo}
+            duplicate={i >= order.length}
+          />
         ))}
       </div>
       {/* Pause/resume control. Hidden from the reduced-motion path — there the
