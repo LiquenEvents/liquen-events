@@ -26,6 +26,34 @@
      is loaded and applied. */
   --font-sans: var(--font-inter);
   --font-display: var(--font-playfair);
+
+  /* ── A curva por omissão de TODAS as transições ──────────────────────────
+     O sítio tem uma curva de assinatura (`--ease-out`, no :root logo abaixo):
+     uma desaceleração forte, que arranca depressa e assenta devagar. Só que
+     essa curva estava a ser pedida À MÃO, e ~300 dos ~322 utilitários
+     `transition-*` do sítio não a pediam — herdavam a omissão do Tailwind,
+     `cubic-bezier(0.4, 0, 0.2, 1)`, que é praticamente simétrica.
+
+     O resultado media-se a olho: passar o rato num link e ver um bloco entrar
+     ao scroll eram, na mesma página, duas linguagens de movimento diferentes.
+     Não é um defeito de nenhuma delas — é a falta de uma.
+
+     Esta linha muda a OMISSÃO, e com ela as ~300 transições que nunca pediram
+     curva nenhuma. Nada muda de posição, de tamanho ou de cor: muda como
+     acelera. Quem quiser outra curva continua a poder pedi-la (`ease-linear`,
+     `.ease-expo`, um `ease-[…]` próprio) — o marquee e as barras de progresso
+     são `linear` de propósito e ficam como estão.
+
+     NOTA para quem vier a seguir: esta variável só alimenta os UTILITÁRIOS do
+     Tailwind. As regras escritas à mão neste ficheiro não a vêem — uma
+     `transition: opacity 0.5s ease` continua em `ease` até alguém lá ir. Por
+     isso as que partilham um gesto com a assinatura foram convergidas à mão
+     (`.lift`, `.field-line`, `.ff-label`, `.cl-black`, `.cl-moss`, `.bo-input`).
+
+     O valor está escrito por extenso porque o `@theme` é lido antes do :root —
+     `var(--ease-out)` aqui não resolveria. `tokens.coerencia.test.ts` guarda a
+     outra ponta (o `--ease-out` ↔ a ficha de JS). */
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Hero type scale — single source of truth for the marketing page heroes.
@@ -241,6 +269,25 @@ body.admin-mode .bo-text-faint {
     0 0 0 2px var(--color-surface),
     0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
+  /* O anel era o único estado do sítio inteiro sem movimento nenhum: aparecia e
+     desaparecia de repente, num sítio onde tudo o resto assenta. E é o estado
+     MAIS visto por quem navega por teclado.
+     ── 150 ms é um TECTO, não um gosto. As WCAG (2.4.7/2.4.11) pedem um
+     indicador de foco visível, e atrasar o seu APARECIMENTO trocaria um defeito
+     de estilo por um de acessibilidade. A 150 ms com a curva de assinatura, o
+     anel já está com ~70% do tamanho ao fim de dois quadros (~33 ms): lê-se como
+     imediato, e só o CRESCIMENTO é que assenta. Não subir daqui.
+     ── A transição é só à ENTRADA, e de graça: esta declaração vive dentro do
+     `:focus-visible`, portanto quando o foco sai o selector deixa de casar, a
+     transição desaparece com ele e o anel apaga-se no mesmo instante — que é o
+     que se quer (ninguém precisa de ver um anel a encolher num sítio onde já
+     não está o foco). */
+  transition: box-shadow 150ms var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  :focus-visible {
+    transition: none;
+  }
 }
 /* The quote confirmation is the one public page whose ground is cream
    (#f7f4ee) rather than white. That single step down drops the at-rest navbar's
@@ -403,6 +450,16 @@ body::before {
   .link-line:hover::after {
     transform-origin: left;
     transform: scaleX(1);
+  }
+}
+/* Movimento reduzido: o filete continua a APARECER (é informação — diz que o
+   link está sob o cursor), mas deixa de se DESENHAR da direita para a esquerda.
+   Mesma decisão já tomada no `.cl-cell` mais abaixo: um estado que muda não é
+   movimento; um traço a correr no ecrã é. São 10 usos (navegação e rodapé), e
+   eram a maior lacuna de `prefers-reduced-motion` que restava no ficheiro. */
+@media (prefers-reduced-motion: reduce) {
+  .link-line::after {
+    transition: none;
   }
 }
 
@@ -631,12 +688,22 @@ body:has([data-orcamento-mode]) .scroll-progress {
   background-repeat: no-repeat;
   background-position: left bottom;
   background-size: 0% 2px;
+  /* Mesma avaria do `.lift`: o filete desenhava-se na assinatura e a borda
+     acompanhava em `ease`. Duas curvas no mesmo gesto de focar um campo. */
   transition:
-    background-size 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.3s ease;
+    background-size 0.4s var(--ease-out),
+    border-color 0.3s var(--ease-out);
 }
 .field-line:focus {
   background-size: 100% 2px;
+}
+/* Movimento reduzido: o filete continua a APARECER a toda a largura — é um
+   indicador de foco e nunca pode desaparecer (WCAG 2.4.7) —, só deixa de se
+   desenhar da esquerda para a direita. */
+@media (prefers-reduced-motion: reduce) {
+  .field-line {
+    transition: none;
+  }
 }
 
 /* ── Floating labels (orçamento) ──
@@ -663,9 +730,10 @@ body:has([data-orcamento-mode]) .scroll-progress {
   pointer-events: none;
   transform-origin: left center;
   white-space: nowrap;
+  /* A etiqueta sobe na assinatura; a cor acompanhava em `ease`. Convergidas. */
   transition:
-    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    color 0.3s ease;
+    transform 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
 }
 .ff:has(.ff-input:focus) .ff-label,
 .ff:has(.ff-input:not(:placeholder-shown)) .ff-label,
@@ -976,13 +1044,29 @@ body[data-menu-open] .whatsapp-fixed {
 
 /* ── Magnetic / hover lift used across CTAs ── */
 .lift {
+  /* O `box-shadow` estava em `ease` enquanto o `transform` estava na
+     assinatura: duas curvas a mover A MESMA COISA, no mesmo gesto — a peça
+     subia com uma desaceleração e a sombra acompanhava-a com outra. Convergidas.
+     (A linha nova do `@theme` não chega aqui: só alimenta os utilitários do
+     Tailwind, não as regras escritas à mão deste ficheiro.) */
   transition:
-    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s ease;
+    transform 0.4s var(--ease-out),
+    box-shadow 0.4s var(--ease-out);
 }
 @media (hover: hover) {
   .lift:hover {
     transform: translateY(-2px);
+  }
+}
+/* Movimento reduzido: sem transição E sem subida. Os 2 px de deslocamento são
+   movimento, não estado — ao contrário da cor de um link, não dizem nada que já
+   não estivesse dito pelo cursor. Mesmo critério do `.cl-cell:hover .cl-logo`. */
+@media (prefers-reduced-motion: reduce) {
+  .lift {
+    transition: none;
+  }
+  .lift:hover {
+    transform: none;
   }
 }
 
@@ -1004,7 +1088,7 @@ body[data-menu-open] .whatsapp-fixed {
     transparent 68%
   );
   transform: translateX(-130%);
-  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.75s var(--ease-out);
   pointer-events: none;
 }
 /* :focus-visible stays ungated (keyboard users get the sweep on any device);
@@ -1063,7 +1147,7 @@ body[data-menu-open] .whatsapp-fixed {
   box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
   /* Keep the focus transition to border only: the global :focus-visible moss
      ring stays the keyboard focus indicator (not overridden here). */
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s var(--ease-out);
 }
 .bo-input:focus {
   outline: none;
@@ -1190,7 +1274,7 @@ body:has([data-orcamento-mode]) .eyebrow {
 }
 .g-reveal.in {
   transform: none;
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.7s var(--ease-out);
   transition-delay: var(--reveal-delay, 0ms);
 }
 /* Após revelar, larga o will-change (poupa memória de composição). */
@@ -1343,7 +1427,7 @@ body:has([data-orcamento-mode]) .eyebrow {
    telemóvel). Enquanto o dedo arrasta, o JS põe .lb-dragging para seguir o
    toque sem lag; ao largar, a transição trata do resto. */
 .lb-photo-layer {
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.28s var(--ease-out);
 }
 .lb-photo-layer.lb-dragging {
   transition: none;
@@ -1426,7 +1510,7 @@ body:has([data-orcamento-mode]) .eyebrow {
   z-index: 0;
   background: radial-gradient(58% 70% at 50% 50%, rgba(99, 122, 95, 0.11), transparent 72%);
   opacity: 0;
-  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.5s var(--ease-out);
   pointer-events: none;
 }
 /* Gated to hover devices so the logo-wall recolor/lift doesn't stick on tap. */
@@ -1444,10 +1528,12 @@ body:has([data-orcamento-mode]) .eyebrow {
 .cl-logo {
   position: relative;
   display: inline-flex;
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s var(--ease-out);
 }
 .cl-black {
-  transition: opacity 0.5s ease;
+  /* O logótipo levanta e cresce na assinatura (`.cl-logo`, acima) enquanto o
+     preto se desvanecia para o musgo em `ease`: um só gesto, duas curvas. */
+  transition: opacity 0.5s var(--ease-out);
 }
 @media (hover: hover) {
   .cl-cell:hover .cl-logo {
@@ -1462,7 +1548,9 @@ body:has([data-orcamento-mode]) .eyebrow {
   inset: 0;
   background-color: var(--color-moss);
   opacity: 0;
-  transition: opacity 0.5s ease;
+  /* O par do `.cl-black`: as duas metades do mesmo crossfade têm de partilhar a
+     curva, ou uma chega antes da outra e vê-se um piscar a meio. */
+  transition: opacity 0.5s var(--ease-out);
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -1490,9 +1578,9 @@ body:has([data-orcamento-mode]) .eyebrow {
   transform: none;
   filter: blur(0);
   transition:
-    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-    filter 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 0.75s var(--ease-out),
+    transform 0.75s var(--ease-out),
+    filter 0.75s var(--ease-out);
   transition-delay: var(--cl-delay, 0ms);
 }
 
@@ -1516,6 +1604,24 @@ body:has([data-orcamento-mode]) .eyebrow {
   }
   .cl-cell:hover .cl-logo {
     transform: none;
+  }
+}
+
+/* ── Movimento reduzido: o zoom das fotografias ao passar o rato ────────────
+   Dois sítios pedem `group-hover:scale-[1.06]` numa fotografia — os mosaicos da
+   galeria e o da página de clientes. É um zoom lento (0,7–0,9 s) numa imagem
+   grande: movimento a sério, e sem guarda nenhuma. Quem pede movimento reduzido
+   passa a ver a fotografia quieta; o resto do estado de hover (o gradiente, a
+   legenda) mantém-se, porque isso é informação e não deslocamento.
+
+   Fica AQUI e não nas páginas por duas razões: é a mesma decisão nos dois sítios
+   (e assim não pode divergir), e o utilitário do Tailwind vive na camada
+   `utilities` — uma regra sem camada, como esta, ganha-lhe sempre, sem precisar
+   de `!important` nem de repetir a especificidade do selector gerado. */
+@media (prefers-reduced-motion: reduce) {
+  .group-hover\:scale-\[1\.06\] {
+    scale: none;
+    transition: none;
   }
 }
 

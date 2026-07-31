@@ -11,11 +11,12 @@ import { useReducedMotion } from "@/lib/motion/useReducedMotion";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
 import type { ChromeDict } from "@/lib/i18n";
 import { track } from "@/lib/track";
+import { EASE_OUT } from "@/lib/motion/tokens";
 
-// House easing — the same expressive cubic-bézier used across the site's
-// reveals (galeria, heroes, link-line). Kept as a constant so the mobile-menu
-// cascade shares the exact motion signature of the rest of the brand.
-const MENU_EASE = "cubic-bezier(0.16,1,0.3,1)";
+// A desaceleração de assinatura, LIDA DA FICHA em vez de copiada. Era a quarta
+// cópia à mão da curva (o próprio `tokens.ts` a nomeia), e uma cópia é um sítio
+// onde o sítio pode passar a ter duas desacelerações sem ninguém dar por isso.
+const MENU_EASE = EASE_OUT;
 
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
@@ -59,14 +60,19 @@ const MobileMenu = memo(function MobileMenu({
     reduce
       ? {
           opacity: isOpen ? 1 : 0,
-          transition: isOpen ? "opacity 0.3s ease" : "opacity 0.15s ease",
+          transition: isOpen ? `opacity 0.3s ${MENU_EASE}` : `opacity 0.15s ${MENU_EASE}`,
         }
       : {
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "none" : "translateY(24px)",
+          // O FECHO estava em `ease` enquanto a ABERTURA estava na assinatura:
+          // o mesmo menu a abrir com uma curva e a fechar com outra. Medido no
+          // sítio a correr, eram as últimas 7 transições da página inicial fora
+          // da assinatura. Continua a ser rápido (0,15 s) — só deixa de ser uma
+          // desaceleração diferente.
           transition: isOpen
             ? `opacity 0.6s ${MENU_EASE} ${delay}ms, transform 0.6s ${MENU_EASE} ${delay}ms`
-            : "opacity 0.15s ease, transform 0.15s ease",
+            : `opacity 0.15s ${MENU_EASE}, transform 0.15s ${MENU_EASE}`,
         };
 
   const links = [
@@ -367,6 +373,17 @@ export default function Navbar() {
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
+    // Sincronizar com a posição ACTUAL, e não só reagir ao próximo evento.
+    // Apanhado com a sonda de transições: numa página que já está a meio (o
+    // browser repõe o scroll ao recarregar ou ao voltar atrás), o scroll é
+    // reposto ANTES de este listener existir, o evento perde-se, e nada o
+    // repõe — a barra ficava nos 164 px por cima de uma página descida, e só
+    // ao primeiro gesto do visitante é que corrigia, tocando a animação de
+    // altura de 500 ms inteira. Ou seja: um salto visível, e uma passagem
+    // extra pela ÚNICA animação de layout do sítio, exactamente no primeiro
+    // gesto — o pior momento possível. O StickyCTA ao lado já fazia esta
+    // chamada; a barra é que não fazia.
+    onScroll();
     return () => {
       if (frame) cancelAnimationFrame(frame);
       window.removeEventListener("scroll", onScroll);
@@ -427,7 +444,14 @@ export default function Navbar() {
     <nav
       data-public-nav
       aria-label={t.nav.primaryLabel}
-      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[background-color,border-color,box-shadow] duration-500 ease-expo ${
+      // `border-bottom-color`, não `border-color`: a barra só tem borda EM
+      // BAIXO (`border-b`), mas o utilitário de cor pinta as quatro, e pedir
+      // `border-color` na transição arranca as quatro — três delas em lados com
+      // 0 px de largura, que não desenham um único pixel. Medido com
+      // `transitionrun` num passo de scroll que cruza o limiar dos 30 px: 23
+      // transições a arrancar ao mesmo tempo, das quais 3 eram estas. Ficam 20,
+      // e o aspecto é o mesmo — uma borda de largura zero não se vê.
+      className={`fixed top-0 left-0 right-0 z-50 pt-safe transition-[background-color,border-bottom-color,box-shadow] duration-500 ease-expo ${
         // Barra CLARA sólida ao fazer scroll (fundo surface a 95% + filete ténue
         // + sombra suave). SEM backdrop-blur de propósito — um backdrop-filter num
         // elemento fixo cria um containing-block que prenderia o overlay

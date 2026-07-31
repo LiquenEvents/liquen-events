@@ -32,6 +32,16 @@
  * pixel neste Chromium. Cada passagem reporta o `yMax` que atingiu: é a prova de
  * que houve scroll a sério e não uma página parada a dar "zero problemas".
  *
+ * COMPUTADOR (`--desktop`). O sítio NÃO corre o mesmo código nos dois sítios: o
+ * grão de filme (`body::before`) está desligado em ponteiro grosso, e o
+ * `@media (hover: hover)` acende uma família inteira de transições que o
+ * telemóvel nunca paga. Medir só em telemóvel deixa metade do sítio por medir —
+ * e a referência que a dona deu (um estúdio de design) vê-se em computador. Em
+ * `--desktop` o contexto passa a 1440×900 com ponteiro fino e o gesto passa a
+ * roda do rato (`Input.dispatchMouseEvent`, `type: mouseWheel`), com o mesmo
+ * número de passos e a mesma cadência do gesto de toque, para que as duas
+ * travessias sejam comparáveis entre si.
+ *
  * USO
  *   node e2e/scroll-emparelhado.mjs --url http://127.0.0.1:4320 --rota / \
  *        --pares 20 --css-b ".cv-panel,.g-tile{content-visibility:visible!important}"
@@ -40,6 +50,7 @@
  *   --nome-b  etiqueta para o relatório
  *   --subir   a travessia desce E sobe (a subida tem custos próprios: nada é
  *             pré-carregado para cima)
+ *   --desktop 1440×900 com ponteiro fino e roda do rato, em vez do Pixel 7
  */
 import { chromium, devices } from "playwright";
 import { writeFileSync } from "node:fs";
@@ -61,6 +72,7 @@ const NOME_B = arg("nome-b", "sem-content-visibility");
 const SUBIR = !flag("so-descer");
 const CPU = Number(arg("cpu", 1));
 const SAIDA = arg("saida", null);
+const DESKTOP = flag("desktop");
 
 /** Orçamento por frame. Acima disto conta como atraso acumulado. */
 const ORCAMENTO_MS = 20;
@@ -95,6 +107,22 @@ async function gesto(cdp, page, vp, paraCima) {
   const dist = Math.round(vp.height * 0.65);
   const y0 = paraCima ? Math.round(vp.height * 0.18) : Math.round(vp.height * 0.82);
   const s = paraCima ? 1 : -1;
+  if (DESKTOP) {
+    // Roda do rato: MESMA distância total e MESMA cadência (12 passos de 12 ms)
+    // do gesto de toque, para as duas travessias serem comparáveis. O sinal do
+    // deltaY é o contrário do do dedo — a roda para baixo desce a página.
+    for (let i = 0; i < 12; i++) {
+      await cdp.send("Input.dispatchMouseEvent", {
+        type: "mouseWheel",
+        x,
+        y: Math.round(vp.height / 2),
+        deltaX: 0,
+        deltaY: Math.round((-s * dist) / 12),
+      });
+      await page.waitForTimeout(12);
+    }
+    return;
+  }
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: y0 }] });
   for (let i = 1; i <= 12; i++) {
     await cdp.send("Input.dispatchTouchEvent", {
@@ -139,6 +167,14 @@ async function passagem(contexto, variante) {
     carga: Math.round(carga * 100) / 100,
     frames: dts.length,
     jankMs,
+    // O `jankMs` é uma SOMA, e uma soma só se compara entre braços que produzam
+    // o mesmo número de quadros. Não é hipotético: a medir "todo o movimento
+    // desligado" contra o sítio como está, o braço sem movimento produziu 883
+    // quadros contra 792 — mais 11% de amostras a somar. (Nesse caso a conclusão
+    // não mudou: o braço com mais quadros era TAMBÉM o pior por quadro. Mas isso
+    // soube-se por se ter olhado.) Sempre que os `frames` dos dois braços
+    // diferirem, é este número que decide, não o `jankMs`.
+    jankPorFrame: dts.length ? Math.round((jankMs / dts.length) * 100) / 100 : 0,
     acima50: dts.filter((d) => d > 50).length,
     p95: ord.length ? ord[Math.floor(ord.length * 0.95)] : 0,
     longtasks: M.longtasks.length,
@@ -164,7 +200,13 @@ const desvio = (a) => {
 };
 
 const navegador = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
-const contexto = await navegador.newContext({ ...devices["Pixel 7"], serviceWorkers: "block" });
+const contexto = await navegador.newContext(
+  DESKTOP
+    ? // Sem `hasTouch`/`isMobile`: é o ponteiro FINO que acende o grão de filme
+      // e as regras `@media (hover: hover)` — é essa a diferença que se quer medir.
+      { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, serviceWorkers: "block" }
+    : { ...devices["Pixel 7"], serviceWorkers: "block" },
+);
 await contexto.addInitScript(SONDA);
 
 const corridas = [];
@@ -201,6 +243,17 @@ const resumo = {
   yMaxMediano: mediana(corridas.map((c) => c.A.yMax)),
   jankA: { mediana: mediana(A), p25: quantil(A, 0.25), p75: quantil(A, 0.75) },
   jankB: { mediana: mediana(B), p25: quantil(B, 0.25), p75: quantil(B, 0.75) },
+  // Ver a nota no `jankPorFrame`: se estes dois números de quadros não forem
+  // parecidos, comparar as somas acima é comparar amostras de tamanhos
+  // diferentes, e a leitura correcta é a de baixo.
+  framesMedianos: {
+    A: mediana(corridas.map((c) => c.A.frames)),
+    B: mediana(corridas.map((c) => c.B.frames)),
+  },
+  jankPorFrame: {
+    A: mediana(corridas.map((c) => c.A.jankPorFrame)),
+    B: mediana(corridas.map((c) => c.B.jankPorFrame)),
+  },
   diferencaEmparelhada: {
     mediana: mediana(dif),
     media: Math.round((dif.reduce((x, y) => x + y, 0) / dif.length) * 10) / 10,
