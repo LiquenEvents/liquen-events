@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
+import { useImageErrorRef } from "./SafeImage";
 import { clientLogos } from "@/data";
 import { logoHeight, logoDimsFor, logoSizes } from "@/lib/logo";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
@@ -25,6 +26,7 @@ function Mark({
   duplicate?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const refErro = useImageErrorRef(() => setFailed(true));
   const hidden = duplicate ? { "aria-hidden": true as const } : {};
 
   if (failed || !logo) {
@@ -63,7 +65,14 @@ function Mark({
         // whole band reads as a fine line — 22px on a phone, 34px from sm+ (was
         // uncapped, which let the band grow much taller on desktop).
         className="w-auto max-h-[22px] sm:max-h-[34px] max-w-[120px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
-        onError={() => setFailed(true)}
+        // O erro é ouvido pela `ref` e NÃO pelo `onError` do next/image.
+        // Passar `onError` faz o next/image reatribuir `img.src = img.src` na
+        // montagem (image-component.js:140) para ressuscitar um erro anterior à
+        // hidratação; quando a hidratação apanha a imagem ainda a descarregar,
+        // isso ABORTA o pedido em voo e manda outro. Medido em /clientes: os 18
+        // logótipos pedidos duas vezes em 3 de 8 corridas, +163 KB. O
+        // `useImageErrorRef` cobre o mesmo caso lendo o estado do elemento.
+        ref={refErro}
       />
     </div>
   );

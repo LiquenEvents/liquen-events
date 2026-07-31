@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useRef, useState } from "react";
+import { useImageErrorRef } from "./SafeImage";
 import { logoHeight, logoDimsFor, logoSizes } from "@/lib/logo";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
@@ -13,6 +14,7 @@ interface Client {
 
 function ClientLogo({ client, index }: { client: Client; index: number }) {
   const [failed, setFailed] = useState(false);
+  const refErro = useImageErrorRef(() => setFailed(true));
   // Compact footprint: smaller target area + tighter height clamp than before,
   // so the whole wall reads tighter (paired with shorter cells + more columns).
   const h = logoHeight(client.logo, 3200, 30, 54);
@@ -45,7 +47,14 @@ function ClientLogo({ client, index }: { client: Client; index: number }) {
               quality={50}
               style={{ height: `${h}px` }}
               className="cl-black object-contain w-auto max-w-[68%] brightness-0"
-              onError={() => setFailed(true)}
+              // O erro é ouvido pela `ref` e NÃO pelo `onError` do next/image.
+              // Passar `onError` faz o next/image reatribuir `img.src = img.src` na
+              // montagem (image-component.js:140) para ressuscitar um erro anterior à
+              // hidratação; quando a hidratação apanha a imagem ainda a descarregar,
+              // isso ABORTA o pedido em voo e manda outro. Medido em /clientes: os 18
+              // logótipos pedidos duas vezes em 3 de 8 corridas, +163 KB. O
+              // `useImageErrorRef` cobre o mesmo caso lendo o estado do elemento.
+              ref={refErro}
             />
             {/* Moss recolor on hover: a moss-filled layer masked by the logo's
                 own alpha, crossfaded over the black silhouette. aria-hidden — the
