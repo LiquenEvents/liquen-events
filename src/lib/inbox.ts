@@ -203,16 +203,11 @@ export async function getInboxMessage(uid: number): Promise<InboxMessage | null>
       let text = "";
       const dl = await client.download(String(uid), undefined, { uid: true });
       if (dl) {
-        const { simpleParser } = await import("mailparser");
-        // Bound the parse of an untrusted inbound message so a hostile/huge
-        // email can't exhaust memory: skip attachment buffering and cap the
-        // HTML body we attempt to parse.
-        const parsed = await simpleParser(dl.content, {
-          skipHtmlToText: false,
-          skipImageLinks: true,
-          maxHtmlLengthToParse: 2_000_000,
-        });
-        text = parsed.text || (parsed.html ? stripHtml(parsed.html) : "");
+        // O corpo é input NÃO CONFIÁVEL: qualquer pessoa consegue escrever para
+        // esta caixa. Descarregamos com tecto de bytes e extraímos o texto de
+        // forma que nunca rebenta a leitura da mensagem.
+        const raw = await readCapped(dl.content, MAX_RAW_BYTES);
+        text = clampBody(await extractBody(raw));
       }
       // Reading the message marks it \Seen on the server (download is not a peek).
       return { ...base, seen: true, text };
@@ -261,9 +256,103 @@ export async function setFlags(
   }
 }
 
+// ── Corpo da mensagem: extração defensiva ───────────────────────────────────
+// Tudo aqui trata o email recebido como hostil. As três constantes limitam,
+// por ordem, o que descarregamos, o que analisamos e o que devolvemos.
+
+/**
+ * Tecto de bytes descarregados de UMA mensagem. Sem isto, um email de dezenas
+ * de MB era inteiramente carregado em memória por pedido. O corpo de texto vive
+ * sempre nas primeiras partes MIME (os clientes põem os anexos a seguir), e os
+ * anexos aqui nem sequer são usados — a lista deles vem do BODYSTRUCTURE —, por
+ * isso cortar a cauda não tira nada ao que é mostrado.
+ */
+const MAX_RAW_BYTES = 12 * 1024 * 1024;
+
+/** Tecto de HTML que aceitamos analisar/varrer (o que o mailparser já usava). */
+const MAX_HTML_PARSE = 2_000_000;
+
+/**
+ * Tecto de caracteres do corpo devolvido ao back office. Uma mensagem é lida
+ * por uma pessoa: 200 000 caracteres estão muito acima de qualquer email real e
+ * impedem que um corpo hostil de vários MB atravesse o JSON até ao browser (que
+ * o renderiza num único parágrafo e bloqueava o separador).
+ */
+const MAX_BODY_CHARS = 200_000;
+
+/**
+ * Lê um stream até ao tecto de bytes e descarta o resto, fechando a torneira em
+ * vez de deixar a ligação IMAP escorrer a mensagem toda.
+ */
+async function readCapped(
+  source: NodeJS.ReadableStream | Buffer,
+  maxBytes: number,
+): Promise<Buffer> {
+  // O imapflow devolve um stream; aceitamos também um Buffer já materializado.
+  if (Buffer.isBuffer(source)) return source.subarray(0, maxBytes);
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of source) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+    if (total + buf.length >= maxBytes) {
+      chunks.push(buf.subarray(0, maxBytes - total));
+      total = maxBytes;
+      break;
+    }
+    chunks.push(buf);
+    total += buf.length;
+  }
+  (source as { destroy?: () => void }).destroy?.();
+  return Buffer.concat(chunks, total);
+}
+
+/** Corta o corpo no tecto, deixando marca visível de que foi cortado. */
+export function clampBody(body: string): string {
+  if (body.length <= MAX_BODY_CHARS) return body;
+  return `${body.slice(0, MAX_BODY_CHARS)}\n\n[…] Mensagem demasiado longa — mostrada apenas a primeira parte.`;
+}
+
+/**
+ * Extrai o texto legível de uma mensagem crua. NUNCA lança: o back office tem
+ * de conseguir abrir qualquer email, por pior que ele seja.
+ */
+async function extractBody(raw: Buffer): Promise<string> {
+  const { simpleParser } = await import("mailparser");
+  const base = { skipImageLinks: true, maxHtmlLengthToParse: MAX_HTML_PARSE };
+  const pick = (p: { text?: string; html?: string | false }) =>
+    p.text || (p.html ? stripHtml(p.html) : "");
+
+  try {
+    // Caminho normal: deixamos o mailparser converter HTML→texto, que dá muito
+    // melhor formatação (parágrafos, URLs das ligações) do que o nosso varrimento.
+    return pick(await simpleParser(raw, { ...base, skipHtmlToText: false }));
+  } catch {
+    // O mailparser emite 'error' — e o simpleParser rejeita a leitura INTEIRA —
+    // quando o HTML passa o tecto de análise ou não é analisável. Isso deixava a
+    // mensagem permanentemente ilegível (502 no back office): qualquer remetente
+    // o provocava de propósito, e newsletters legítimas passam o tecto à vontade.
+    // Segunda tentativa sem a conversão HTML→texto (é esse o ramo que rebenta),
+    // extraindo o texto por nós.
+    try {
+      return pick(await simpleParser(raw, { ...base, skipHtmlToText: true }));
+    } catch {
+      return "(não foi possível ler o conteúdo desta mensagem)";
+    }
+  }
+}
+
+/**
+ * Reduz HTML a texto simples. Não é um sanitizador — é uma extração: o
+ * resultado é sempre entregue como TEXTO (o React escapa-o ao renderizar), e
+ * nenhum HTML de um email chega a ser interpretado pelo browser. Os conteúdos
+ * de <script>/<style> são deitados fora inteiros para não aparecerem como
+ * "corpo" da mensagem.
+ */
 function stripHtml(html: string): string {
   return html
+    .slice(0, MAX_HTML_PARSE)
     .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
