@@ -246,7 +246,7 @@ export const pt = {
       "Empresas, instituições e famílias que nos escolheram para os seus momentos mais especiais, e que nos honram com a sua confiança.",
     scroll: "Scroll",
     leadPre:
-      "De grandes empresas a celebrações de família, são inúmeros os que confiam à Líquen Events os seus momentos mais importantes, e a essa confiança respondemos com ",
+      "De grandes empresas a celebrações de família, são inúmeros os que nos confiam os seus momentos mais importantes. A essa confiança respondemos com ",
     leadMoss: "rigor, criatividade e dedicação",
     leadPost: " em cada detalhe.",
     desde: "Desde",
