@@ -87,13 +87,27 @@ const FORMATOS = [
  * usa-se a TINTA: a partir daí o centro do desenho é o centro do elemento,
  * por construção.
  *
- * Efeito lateral, e é bom: a 560 px passa a ser o desenho a medir 560 px, e
- * não a caixa. O logótipo fica visivelmente maior sem se mudar o número.
+ * Efeito lateral, e foi o que obrigou ao ajuste seguinte: com o recorte, a
+ * largura pedida passa a ser a do DESENHO e já não a da caixa. O mesmo número
+ * desenha um logótipo bastante maior — e a 560 ficou grande de mais. Daí os
+ * 480 de LARGURA_LOGO.
  *
  * Vai como `data:` em vez de ficheiro novo em public/: é usado só aqui, e um
  * ficheiro a mais no repositório é mais um sítio onde as duas versões do
  * logótipo podem divergir.
  */
+/**
+ * A largura a que o desenho do logótipo sai, numa peça de 1080.
+ *
+ * O percurso, por ordem: 210 -> 360 -> "bem maior e no meio em cima" (560, com
+ * o recorte a fazê-lo render ainda mais) -> "mais pequeno o logo um bocadinho".
+ * 480 tira-lhe 14% e deixa-o na mesma a ocupar quase metade da largura da peça.
+ *
+ * Zona segura: 480 numa peça de 1080 deixa 300 px de cada lado, e a faixa que
+ * a app do Instagram tapa à direita nos stories são 120. Continua folgado.
+ */
+const LARGURA_LOGO = 480;
+
 async function logoRecortado() {
   const origem = path.join(RAIZ, "public", "logo-liquen-branco.png");
   const buf = await sharp(origem).trim({ threshold: 1 }).png().toBuffer();
@@ -134,7 +148,7 @@ function lerVariantes() {
 }
 
 /** O desenho da peça, em HTML. Corre dentro da página. */
-function desenhar({ formato, capaUrl, logoUrl, titulo, apoio, cta, segura, guia }) {
+function desenhar({ formato, capaUrl, logoUrl, larguraLogo, titulo, apoio, cta, segura, guia }) {
   const eStory = formato.id === "916";
   // No story o texto assenta no fundo da faixa segura; no feed, com margem.
   const fundoDoTexto = eStory ? segura.fundo : 110;
@@ -173,20 +187,18 @@ function desenhar({ formato, capaUrl, logoUrl, titulo, apoio, cta, segura, guia 
         background:linear-gradient(to bottom,
           rgba(0,0,0,.42) 0%, rgba(0,0,0,.20) 45%, rgba(0,0,0,0) 100%);"></div>
 
-      <!-- O LOGÓTIPO: CENTRADO EM CIMA, e a 560 px numa peça de 1080 — mais de
-           metade da largura. Foi o que ela pediu, por esta ordem: 210 -> 360 ->
-           "bem maior e no meio em cima".
+      <!-- O LOGOTIPO: CENTRADO EM CIMA. A largura vem de LARGURA_LOGO, que
+           tem o historico das medidas ao lado dela; aqui chega por parametro
+           porque esta funcao corre DENTRO da pagina e nao ve o modulo.
            Centrado com left:50% mais translateX(-50%) e nao com margin:auto,
-           porque o elemento e position:absolute. Fica dentro da zona segura na
-           mesma: 560 de largura numa peca de 1080 deixa 260 de cada lado, e a
-           faixa que a app tapa a direita sao 120.
+           porque o elemento e position:absolute.
            (Sem plicas invertidas neste comentario: ele vive DENTRO de um
            template literal, e uma plica invertida aqui fecha-o a meio. Foi o
            que aconteceu a primeira vez.) -->
       <img src="${logoUrl}" style="
         position:absolute;left:50%;transform:translateX(-50%);
         top:${eStory ? segura.topo + 40 : 80}px;
-        width:560px;height:auto;" />
+        width:${larguraLogo}px;height:auto;" />
 
       <div style="
         position:absolute;left:${segura.esquerda}px;
@@ -267,6 +279,7 @@ async function main() {
             formato,
             capaUrl: BASE + encodeURI(v.capa),
             logoUrl,
+            larguraLogo: LARGURA_LOGO,
             titulo: g.titulo,
             apoio: g.apoio,
             cta,
