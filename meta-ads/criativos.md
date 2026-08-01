@@ -72,6 +72,37 @@ margem em toda a volta e não ponhas informação essencial nos 120 px de baixo.
 
 ---
 
+## As peças que já existem, prontas a publicar
+
+`meta-ads/criativos/` — **22 ficheiros**, gerados a partir das fotografias
+dela e dos ganchos do catálogo:
+
+```
+<variante>-<gancho>-916.jpg    1080x1920    Reels e Stories
+<variante>-<gancho>-45.jpg     1080x1350    feed
+```
+
+Cinco variantes × dois ganchos × dois formatos, mais duas versões `-guia` com
+as zonas tapadas pela app desenhadas a vermelho, para se conferir o
+enquadramento. **As `-guia` são para ver, não para publicar.**
+
+Para as refazer depois de mexer nos ganchos ou nas capas:
+
+```
+npm run build && npx next start -p 3131 &
+node scripts/gen-criativos.mjs http://127.0.0.1:3131
+```
+
+**Duas decisões de composição que estão lá dentro, e porquê.** O texto é
+desenhado nas faces da marca (Inter e Playfair), e por isso o gerador abre uma
+página real do sítio e desenha lá dentro em vez de compor a imagem com o
+`sharp` — não há ficheiro de tipografia no repositório para embutir, e esta
+máquina só tem DejaVu. E no formato 9:16 a fotografia leva uma ampliação de
+1,32 com origem em baixo: uma fotografia em paisagem cortada para vertical
+mostra a altura toda, o casamento está sempre na metade de baixo do
+enquadramento, e a metade de baixo do story é exactamente a que a app tapa.
+Sem a ampliação, a faixa visível ficava com céu e telhado.
+
 ## ⚠ O que é preciso filmar (não existe ainda)
 
 Hoje o repositório **não tem um único ficheiro de vídeo**

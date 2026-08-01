@@ -69,14 +69,27 @@ describe("catálogo das variantes sociais", () => {
           "mesmo gancho dos dois lados não mede nada.",
       ).not.toBe(b.titulo);
       expect(a.titulo.length).toBeGreaterThan(15);
-      // O primeiro ecrã é uma frase, não um parágrafo. Acima disto parte-se em
-      // quatro linhas num ecrã de 390 px e deixa de se ler em três segundos.
-      expect(a.titulo.length, `${v.slug} (${locale}) gancho A é longo demais`).toBeLessThanOrEqual(
-        95,
-      );
-      expect(b.titulo.length, `${v.slug} (${locale}) gancho B é longo demais`).toBeLessThanOrEqual(
-        95,
-      );
+      // ── 48 CARACTERES, E O LIMITE ERA 95 ────────────────────────────────
+      // A dona olhou para as páginas desenhadas e disse: "as frases estão
+      // demasiado longas, sem foco logo no tema em que a Líquen é
+      // especializada". Tinha razão nas duas coisas. Os ganchos originais
+      // eram literários — "O areal, a sombra e a mesa posta antes de o sol
+      // descer" — e ocupavam TRÊS linhas de caixa alta num ecrã de 390 px sem
+      // nunca dizerem o que a empresa faz. Quem está a passar stories lê a
+      // primeira linha e mais nada; se essa linha não disser "decoração de
+      // casamentos", não disse nada.
+      //
+      // 48 caracteres são duas linhas no tamanho a que o H1 é desenhado.
+      // Passar disto é voltar ao problema.
+      for (const [id, g] of [
+        ["A", a],
+        ["B", b],
+      ] as const) {
+        expect(
+          g.titulo.length,
+          `${v.slug} (${locale}) gancho ${id}: "${g.titulo}" tem ${g.titulo.length} caracteres`,
+        ).toBeLessThanOrEqual(48);
+      }
     }
   });
 
@@ -123,6 +136,35 @@ describe("catálogo das variantes sociais", () => {
     expect(resolverVariante(`${primeira.slug}-c`)).toBeNull();
     expect(resolverVariante("nao-existe")).toBeNull();
     expect(resolverVariante("")).toBeNull();
+  });
+
+  it("o gancho DIZ o que a Líquen faz, logo na primeira linha", () => {
+    // A queixa que originou este teste, textual: "sem foco logo no tema em que
+    // a Líquen é especializada". Um gancho que só diz "o areal, a sombra e a
+    // mesa posta" é bonito e não vende nada — quem passa stories não fica a
+    // saber que isto é decoração de casamentos.
+    //
+    // A palavra "casamento(s)" ou "wedding(s)" tem de estar no TÍTULO, não na
+    // linha de apoio: a linha de apoio é a segunda coisa que se lê, e muita
+    // gente não chega lá.
+    const problemas: string[] = [];
+    for (const v of VARIANTES) {
+      for (const locale of ["pt", "en"] as const) {
+        // A variante restrita a um idioma só é servida nesse — o outro não
+        // chega a ninguém e não vale a pena prendê-lo.
+        if (v.soEm && v.soEm !== locale) continue;
+        for (const g of conteudoVariante(v, locale).ganchos) {
+          const t = g.titulo.toLowerCase();
+          if (!/casament|wedding/.test(t)) {
+            problemas.push(`${v.slug}/${locale} gancho ${g.id}: "${g.titulo}"`);
+          }
+        }
+      }
+    }
+    expect(
+      problemas,
+      "ganchos que não dizem que isto é de casamentos:\n" + problemas.join("\n"),
+    ).toEqual([]);
   });
 
   it("nenhum texto tem travessões nem caracteres fora do alfabeto latino", () => {

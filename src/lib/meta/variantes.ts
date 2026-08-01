@@ -133,13 +133,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "O areal, a sombra e a mesa posta antes de o sol descer.",
-          apoio: "Decoração e produção de casamentos na Comporta.",
+          titulo: "Decoração de casamentos na Comporta",
+          apoio: "O areal, a sombra, e a mesa posta antes de o sol descer.",
         },
         {
           id: "b",
-          titulo: "Na Comporta, o vento decide o desenho. Nós contamos com ele.",
-          apoio: "Decoração e produção de casamentos, com equipa e material próprios.",
+          titulo: "Casamentos na Comporta, com equipa própria",
+          apoio: "Decoração, flores e cenografia. O vento entra na conta desde o desenho.",
         },
       ],
       oQueFazemos: [
@@ -159,13 +159,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "The sand, the shade, and the table set before the sun drops.",
-          apoio: "Wedding design and production in Comporta.",
+          titulo: "Wedding design in Comporta",
+          apoio: "The sand, the shade, and the table set before the sun drops.",
         },
         {
           id: "b",
-          titulo: "In Comporta the wind designs with you. We plan for it.",
-          apoio: "Wedding design and production, with our own team and stock.",
+          titulo: "Comporta weddings, with our own team",
+          apoio: "Design, florals and set. The wind is in the plan from the first drawing.",
         },
       ],
       oQueFazemos: ["Concept and floral design", "Set design and furniture", "Full day-of running"],
@@ -190,13 +190,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "Uma herdade dá espaço a mais e sombra a menos. É aí que começa o desenho.",
-          apoio: "Decoração e produção de casamentos no Alentejo.",
+          titulo: "Decoração de casamentos no Alentejo",
+          apoio: "Uma herdade dá espaço a mais e sombra a menos. É aí que começa o desenho.",
         },
         {
           id: "b",
-          titulo: "De sessenta convidados a trezentos, montado na véspera.",
-          apoio: "Decoração e produção de casamentos em herdades e quintas.",
+          titulo: "Casamentos em herdades, montados na véspera",
+          apoio: "Decoração, flores e cenografia. De sessenta convidados a trezentos.",
         },
       ],
       oQueFazemos: [
@@ -216,13 +216,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "An estate gives you too much space and too little shade. Design starts there.",
-          apoio: "Wedding design and production in the Alentejo.",
+          titulo: "Wedding design in the Alentejo",
+          apoio: "An estate gives you too much space and too little shade. Design starts there.",
         },
         {
           id: "b",
-          titulo: "From sixty guests to three hundred, built the day before.",
-          apoio: "Wedding design and production in estates and quintas.",
+          titulo: "Estate weddings, built the day before",
+          apoio: "Design, florals and set. From sixty guests to three hundred.",
         },
       ],
       oQueFazemos: ["Concept and floral design", "Set design and furniture", "Full day-of running"],
@@ -248,13 +248,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "Uma quinta a vinte minutos de casa, montada como se fosse longe de tudo.",
-          apoio: "Decoração e produção de casamentos em Lisboa, Cascais e Sintra.",
+          titulo: "Decoração de casamentos em Lisboa",
+          apoio: "Uma quinta a vinte minutos de casa, montada como se fosse longe de tudo.",
         },
         {
           id: "b",
-          titulo: "Trinta quintas na região. Cada uma pede uma montagem diferente.",
-          apoio: "Decoração e produção de casamentos, com visita técnica antes de encomendar.",
+          titulo: "Casamentos em quintas de Cascais e Sintra",
+          apoio: "Cada quinta pede uma montagem diferente. Visita técnica antes de encomendar.",
         },
       ],
       oQueFazemos: [
@@ -274,14 +274,14 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "A quinta twenty minutes from home, built as though it were miles from anywhere.",
-          apoio: "Wedding design and production in Lisbon, Cascais and Sintra.",
+          titulo: "Wedding design near Lisbon",
+          apoio: "A venue twenty minutes from home, built as though it were miles from anywhere.",
         },
         {
           id: "b",
-          titulo: "Thirty venues in the region. Each one asks for a different build.",
+          titulo: "Weddings in Cascais and Sintra venues",
           apoio:
-            "Wedding design and production, with a technical visit before anything is ordered.",
+            "Each venue asks for a different build. A technical visit before anything is ordered.",
         },
       ],
       oQueFazemos: ["Concept and floral design", "Set design and furniture", "Full day-of running"],
@@ -306,13 +306,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "O jantar começa quando o calor acaba. Tudo se desenha a partir dessa hora.",
-          apoio: "Decoração e produção de casamentos no Algarve.",
+          titulo: "Decoração de casamentos no Algarve",
+          apoio: "O jantar começa quando o calor acaba. Tudo se desenha a partir dessa hora.",
         },
         {
           id: "b",
-          titulo: "Sol a pique até às sete. A decoração tem de aguentar o dia inteiro.",
-          apoio: "Decoração e produção de casamentos em quintas e resorts.",
+          titulo: "Casamentos no Algarve que aguentam o calor",
+          apoio: "Flor escolhida para seis horas de sol. Decoração, cenografia e coordenação.",
         },
       ],
       oQueFazemos: [
@@ -332,13 +332,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "Dinner starts when the heat stops. Everything is designed around that hour.",
-          apoio: "Wedding design and production in the Algarve.",
+          titulo: "Wedding design in the Algarve",
+          apoio: "Dinner starts when the heat stops. Everything is designed around that hour.",
         },
         {
           id: "b",
-          titulo: "Full sun until seven. The design has to survive the whole day.",
-          apoio: "Wedding design and production in quintas and resorts.",
+          titulo: "Algarve weddings built for the heat",
+          apoio: "Flowers chosen for six hours of sun. Design, set and coordination.",
         },
       ],
       oQueFazemos: ["Concept and floral design", "Set design and furniture", "Full day-of running"],
@@ -365,11 +365,15 @@ export const VARIANTES: Variante[] = [
       metaTitle: "Casamentos em Portugal | Líquen Events",
       metaDescription: "Decoração e produção de casamentos em todo o país.",
       ganchos: [
-        { id: "a", titulo: "Casar em Portugal, de onde quer que viva.", apoio: "" },
+        {
+          id: "a",
+          titulo: "Decoração de casamentos em Portugal",
+          apoio: "Conceito, flores, cenografia e coordenação, em todo o país.",
+        },
         {
           id: "b",
-          titulo: "Uma equipa no terreno, do primeiro fornecedor ao último caixote.",
-          apoio: "",
+          titulo: "Casamentos em Portugal, chave na mão",
+          apoio: "Uma equipa no terreno, do primeiro fornecedor ao último caixote.",
         },
       ],
       oQueFazemos: [
@@ -388,13 +392,13 @@ export const VARIANTES: Variante[] = [
       ganchos: [
         {
           id: "a",
-          titulo: "Most of our couples see the venue once. Some not at all.",
-          apoio: "Wedding design and production across Portugal, planned from wherever you live.",
+          titulo: "Wedding design across Portugal",
+          apoio: "Most of our couples see the venue once. Some not at all. Planned from home.",
         },
         {
           id: "b",
-          titulo: "Quoted in English. Built by the people who designed it.",
-          apoio: "Wedding design and production across Portugal.",
+          titulo: "Your Portugal wedding, quoted in English",
+          apoio: "Design, florals and production. Built by the people who designed it.",
         },
       ],
       oQueFazemos: [
