@@ -62,19 +62,73 @@ test.describe("variante social /s/comporta", () => {
     // A imagem de capa, com prioridade (é o que dá continuidade com o anúncio).
     await expect(page.locator("img").first()).toBeVisible();
 
-    // O botão principal, VISÍVEL SEM SCROLL. É a regra que a barra fixa existe
-    // para cumprir, e a que mais facilmente se parte ao mexer no desenho.
+    // O botão principal, VISÍVEL E ALCANÇÁVEL sem scroll.
+    //
+    // ⚠ A PRIMEIRA VERSÃO DESTE TESTE ERA INÚTIL. Verificava só que a caixa do
+    // botão caía dentro da janela (`y < altura`) — e passava alegremente com o
+    // botão INTEIRO tapado pelo banner de cookies, que era `bottom: 0` como
+    // ele e com z-index maior. O defeito foi encontrado a olhar para uma
+    // captura de ecrã; o teste que devia tê-lo apanhado deu verde.
+    //
+    // Agora pergunta-se o que interessa: quem está naquele ponto do ecrã? Se
+    // a resposta não for o botão (ou algo dentro dele), há alguma coisa por
+    // cima e o dedo da pessoa acerta nessa coisa, não no botão.
     const whatsapp = page.getByRole("link", { name: /whatsapp/i }).first();
     await expect(whatsapp).toBeVisible();
     const caixa = await whatsapp.boundingBox();
-    const altura = page.viewportSize()!.height;
     expect(caixa, "o botão de WhatsApp não tem caixa").not.toBeNull();
-    expect(caixa!.y, "o botão principal não está visível sem scroll").toBeLessThan(altura);
+    const noTopo = await page.evaluate(
+      ([x, y]) => {
+        const el = document.elementFromPoint(x, y);
+        const a = el?.closest("a");
+        return { href: a?.getAttribute("href") ?? "", tag: el?.tagName ?? "" };
+      },
+      [caixa!.x + caixa!.width / 2, caixa!.y + caixa!.height / 2],
+    );
+    expect(
+      noTopo.href,
+      `no centro do botão de WhatsApp está <${noTopo.tag}>, não o botão. ` +
+        "Alguma coisa fixa está por cima dele — foi o banner de cookies, uma vez.",
+    ).toContain("wa.me");
 
     // Menu nenhum: um menu é uma lista de sítios para onde a pessoa pode ir
     // que não são o formulário.
     await expect(page.locator("nav")).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^galeria$/i })).toHaveCount(0);
+  });
+
+  test("o banner de cookies assenta EM CIMA da barra, não sobre ela", async ({ page }) => {
+    // Quem clica num anúncio nunca esteve no sítio, portanto vê SEMPRE o
+    // banner. Se ele tapar a barra, a acção principal da página não existe
+    // para ninguém. E a altura declarada em `barra.ts` tem de continuar a
+    // bater certo com a que a barra desenha, ou volta a haver sobreposição.
+    await page.goto("/s/comporta");
+    // O banner só aparece depois de hidratar (é um `useEffect` a ler o
+    // localStorage). Sem esta espera o teste media a página sem ele e passava
+    // por vacuidade — que é precisamente o modo de falha que ele existe para
+    // não ter.
+    await expect(page.getByRole("region", { name: /cookie/i })).toBeVisible();
+    const geometria = await page.evaluate(() => {
+      const barra = document
+        .querySelector('a[href^="https://wa.me"]')
+        ?.closest("div[class*=fixed]");
+      const banner = document.querySelector('[role=region][aria-label*="ookie"]');
+      const b = barra?.getBoundingClientRect();
+      const n = banner?.getBoundingClientRect();
+      return {
+        temBanner: !!n,
+        alturaBarra: b ? Math.round(b.height) : 0,
+        sobrepoem: !!(b && n) && n.bottom > b.top && n.top < b.bottom,
+      };
+    });
+    expect(geometria.temBanner, "o banner de cookies não apareceu — o teste não prova nada").toBe(
+      true,
+    );
+    expect(geometria.sobrepoem, "o banner de cookies tapa a barra fixa").toBe(false);
+    // A altura declarada em `ALTURA_BARRA_FIXA_PX`. Uma diferença de dois
+    // pixels é arredondamento; mais do que isso é a barra ter mudado de
+    // tamanho sem ninguém actualizar a constante.
+    expect(Math.abs(geometria.alturaBarra - 73)).toBeLessThanOrEqual(2);
   });
 
   test("não é indexável", async ({ page }) => {

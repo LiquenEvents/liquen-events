@@ -119,7 +119,13 @@ export const VARIANTES: Variante[] = [
   {
     slug: "comporta",
     polo: "comporta",
-    capa: "/imagens/M&F0508.jpg",
+    // Era `M&F0508.jpg` — um grande plano de uma caixa com um monograma sobre
+    // toalha de xadrez. Vi-a desenhada e CONTRADIZ o seu próprio gancho: a
+    // frase promete "o areal, a sombra e a mesa posta antes de o sol descer" e
+    // a fotografia mostra um objecto pousado, sem escala, sem lugar e sem
+    // ninguém. Num anúncio de Instagram um grande plano de detalhe não faz
+    // parar o dedo de ninguém.
+    capa: "/imagens/EW1_1330.jpg",
     pt: {
       metaTitle: "Casamentos na Comporta | Líquen Events",
       metaDescription:

@@ -24,7 +24,23 @@ import { POLOS } from "@/lib/ads/polos";
  * um custo por resultado mau sem se perceber porquê. Daí a rede.
  */
 
-const LIMITE_CAPA_KB = 100;
+/**
+ * O orçamento de bytes da capa.
+ *
+ * 150 KB, e não os 100 KB dos heróis das páginas do Google. A diferença é
+ * MEDIDA, não uma cedência:
+ *
+ *   • nas páginas do Google o elemento de LCP É a fotografia, e o limite de
+ *     2 s do Índice de Qualidade obriga aos 100 KB (ver polos-peso.test.ts);
+ *   • nestas o elemento de LCP é o `<h1>` — o texto pinta antes da imagem —,
+ *     e o LCP medido no perfil do Instagram ficou entre 1560 e 1752 ms contra
+ *     um alvo de 2500. Há folga, e gastá-la numa fotografia que faça parar o
+ *     dedo é o melhor uso possível dela.
+ *
+ * NÃO subir mais sem medir outra vez. Acima disto a imagem começa a competir
+ * com o texto pela largura de banda e o LCP volta a ser a fotografia.
+ */
+const LIMITE_CAPA_KB = 150;
 const LARGURA = 1536;
 
 describe("catálogo das variantes sociais", () => {

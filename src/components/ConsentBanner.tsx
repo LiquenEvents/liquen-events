@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
+import { ALTURA_BARRA_FIXA_PX, ehRotaSocial } from "@/lib/meta/barra";
 
 // Minimal RGPD cookie-consent bar. It only governs the Google tag's Consent
 // Mode signals (ad/analytics cookies) — the site's own first-party essentials
@@ -89,6 +90,13 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
   if (isBackOffice || !show) return null;
   const t = COPY[locale === "en" ? "en" : "pt"];
 
+  // Nas variantes sociais o banner SOBE a altura da barra fixa, em vez de se
+  // sentar em cima dela. Ver o cabeçalho de src/lib/meta/barra.ts: os dois
+  // eram `bottom: 0`, o banner tem z-index maior, e o resultado era o botão
+  // de WhatsApp — a acção principal da página — invisível para toda a gente
+  // que chega de um anúncio.
+  const acimaDaBarra = ehRotaSocial(pathname);
+
   return (
     <div
       // role="region" (a labelled landmark), NOT "dialog": the bar is
@@ -98,7 +106,19 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
       role="region"
       aria-label={t.aria}
       className="fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 backdrop-blur-sm px-5 py-4 sm:px-8"
-      style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+      style={{
+        // Fora das rotas sociais nada muda: `bottom: 0` (da classe) e o
+        // preenchimento a respeitar a zona segura do iPhone.
+        //
+        // Nas sociais o banner ASSENTA EM CIMA da barra fixa. A altura da
+        // barra soma-se à zona segura porque a própria barra já a reserva por
+        // dentro — sem isso, o banner ficaria a tapar-lhe a parte de baixo
+        // num telefone com barra de gestos.
+        paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
+        bottom: acimaDaBarra
+          ? `calc(${ALTURA_BARRA_FIXA_PX}px + env(safe-area-inset-bottom))`
+          : undefined,
+      }}
     >
       <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p className="text-[12.5px] leading-relaxed text-white/80">

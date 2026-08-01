@@ -167,10 +167,16 @@ export default async function PaginaSocial({
           </a>
         </header>
 
-        {/* `pb-[7.5rem]` deixa a frase acima da barra fixa em vez de por baixo
-            dela. É a colisão mais fácil de deixar passar num desenho com barra
-            fixa, e a mais visível quando acontece. */}
-        <div className="relative z-10 px-5 pb-[7.5rem] pt-24 sm:px-8">
+        {/* O ESPAÇO EM BAIXO TEM DE CHEGAR PARA DUAS COISAS, não uma.
+            A barra fixa são 73 px. O banner de cookies, no telemóvel, são mais
+            181 px — e quem chega de um anúncio nunca esteve no sítio, portanto
+            vê-o SEMPRE. Com os 7,5rem que aqui estavam (120 px), a frase dos
+            três segundos ficava cortada a meio pelo banner na primeira visita,
+            que é a única visita que interessa nesta página.
+            17rem = 272 px cobre os dois. Depois de a pessoa responder ao
+            banner sobra mais fotografia por baixo da frase, que é o efeito
+            certo. Em ecrã largo o banner passa a uma linha e 9rem chegam. */}
+        <div className="relative z-10 px-5 pb-[17rem] pt-24 sm:px-8 sm:pb-[9rem]">
           <div className="mx-auto max-w-2xl">
             <h1 className="text-[30px] font-bold uppercase leading-[1.06] tracking-display text-white sm:text-[40px]">
               {gancho.titulo}
