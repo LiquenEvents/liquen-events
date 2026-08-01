@@ -87,26 +87,40 @@ const FORMATOS = [
  * usa-se a TINTA: a partir daí o centro do desenho é o centro do elemento,
  * por construção.
  *
- * Efeito lateral, e foi o que obrigou ao ajuste seguinte: com o recorte, a
- * largura pedida passa a ser a do DESENHO e já não a da caixa. O mesmo número
- * desenha um logótipo bastante maior — e a 560 ficou grande de mais. Daí os
- * 480 de LARGURA_LOGO.
+ * Efeito lateral, e foi o que obrigou aos dois ajustes seguintes: com o
+ * recorte, a largura pedida passa a ser a do DESENHO e já não a da caixa. O
+ * mesmo número desenha um logótipo muito maior. Ver LARGURA_LOGO.
  *
  * Vai como `data:` em vez de ficheiro novo em public/: é usado só aqui, e um
  * ficheiro a mais no repositório é mais um sítio onde as duas versões do
  * logótipo podem divergir.
  */
 /**
- * A largura a que o desenho do logótipo sai, numa peça de 1080.
+ * A largura a que o DESENHO do logótipo sai, numa peça de 1080.
  *
- * O percurso, por ordem: 210 -> 360 -> "bem maior e no meio em cima" (560, com
- * o recorte a fazê-lo render ainda mais) -> "mais pequeno o logo um bocadinho".
- * 480 tira-lhe 14% e deixa-o na mesma a ocupar quase metade da largura da peça.
+ * Este número andou às voltas, e a razão foi minha: a meio do percurso ele
+ * mudou de significado sem eu dar por isso. Antes do recorte, a largura era a
+ * da CAIXA do ficheiro, e o desenho lá dentro ocupava 2146 dos 3747 px — ou
+ * seja, 57%. Depois do recorte é o desenho que mede o que aqui se pede.
  *
- * Zona segura: 480 numa peça de 1080 deixa 300 px de cada lado, e a faixa que
- * a app do Instagram tapa à direita nos stories são 120. Continua folgado.
+ * O percurso, convertido tudo para largura de DESENHO, que é a única que se vê:
+ *
+ *     pedido           caixa   desenho   reacção
+ *     210                210       120   "maior"
+ *     360                360       206   "bem maior e no meio em cima"
+ *     560                560       320   só se queixou da centragem
+ *     560 (recortado)      -       560   "mais pequeno um bocadinho"
+ *     480                  -       480   "continua muito grande"
+ *     340                  -       340
+ *
+ * A linha que interessa é a terceira: aos 320 de desenho ela olhou para as
+ * peças e a única coisa que apontou foi o desvio para a direita. Portanto o
+ * tamanho estava aceite, e o salto para 560 foi um acidente do recorte, não
+ * um pedido. 340 volta a esse tamanho com uma nudge para cima.
+ *
+ * Zona segura: 340 numa peça de 1080 deixa 370 px de cada lado.
  */
-const LARGURA_LOGO = 480;
+const LARGURA_LOGO = 340;
 
 async function logoRecortado() {
   const origem = path.join(RAIZ, "public", "logo-liquen-branco.png");
