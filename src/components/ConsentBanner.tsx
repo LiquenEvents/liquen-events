@@ -14,14 +14,14 @@ type Gtag = (...args: unknown[]) => void;
 
 const COPY = {
   pt: {
-    text: "Usamos cookies do Google para estatísticas de visitas (Google Analytics) e para medir a eficácia da nossa publicidade (Google Ads). Pode aceitar ou recusar e a sua escolha fica guardada.",
+    text: "Usamos cookies do Google e da Meta para estatísticas de visitas (Google Analytics) e para medir a eficácia da nossa publicidade (Google Ads, Instagram e Facebook). Pode aceitar ou recusar e a sua escolha fica guardada.",
     more: "Saber mais",
     accept: "Aceitar",
     decline: "Recusar",
     aria: "Aviso de cookies",
   },
   en: {
-    text: "We use Google cookies for visit statistics (Google Analytics) and to measure how well our ads perform (Google Ads). You can accept or decline and your choice is remembered.",
+    text: "We use Google and Meta cookies for visit statistics (Google Analytics) and to measure how well our ads perform (Google Ads, Instagram and Facebook). You can accept or decline and your choice is remembered.",
     more: "Learn more",
     accept: "Accept",
     decline: "Decline",
@@ -74,6 +74,15 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
       ad_personalization: value,
       analytics_storage: value,
     });
+    // O pixel da Meta não tem Consent Mode: ou existe, ou não existe. Este
+    // aviso é o que o faz nascer no instante em que a pessoa aceita, sem ela
+    // ter de recarregar a página. O `storage` do browser só chega a OUTROS
+    // separadores, por isso não servia para isto.
+    try {
+      window.dispatchEvent(new Event("liquen:consent-changed"));
+    } catch {
+      /* ambiente sem eventos sintéticos — o pixel nasce na próxima página */
+    }
     setShow(false);
   };
 

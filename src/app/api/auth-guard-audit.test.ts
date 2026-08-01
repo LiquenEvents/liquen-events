@@ -318,6 +318,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // As conversões offline expõem o VALOR de cada casamento fechado — é
   // informação comercial, não uma exportação técnica inofensiva.
   { path: "./admin/conversoes/route", methods: ["GET"] },
+  // O mesmo, do lado da Meta: o relatório e o envio dos casamentos fechados
+  // trazem o valor de cada negócio. O POST é o que efectivamente ENVIA
+  // conversões para fora — sem sessão não pode sequer ser tentado.
+  { path: "./meta/fechos/route", methods: ["GET", "POST"] },
   { path: "./calendario/route", methods: ["GET", "POST"] },
   { path: "./calendario/[id]/route", methods: ["DELETE"] },
   { path: "./contratos/route", methods: ["GET"] },
@@ -457,6 +461,12 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       "./security/csp-report/route",
       "./vitals/route",
       "./orcamento/route", // POST público + GET admin (ambos acima)
+      // A medição da Meta. É PÚBLICA de propósito: recebe os eventos que o
+      // browser acabou de mandar ao pixel, e o browser não tem sessão nenhuma.
+      // O que a protege não é autenticação — é a lista fechada de nomes de
+      // evento, a recusa do `Purchase` (que só o back office pode enviar, por
+      // `./meta/fechos`), e o limite de 20 pedidos por minuto por IP.
+      "./meta/route",
       "./portal/[token]/proposta-pdf/route",
       "./portal/[token]/contrato-pdf/route",
       "./proposta/[token]/pdf/route",

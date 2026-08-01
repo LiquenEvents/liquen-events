@@ -23,7 +23,25 @@ const selectedAddonSchema = z.object({
 export const quoteFormSchema = z
   .object({
     name: trimmed(120).min(2, "Nome demasiado curto"),
-    email: z.email("Email inválido").max(160),
+    // ── PORQUE É QUE O EMAIL DEIXOU DE SER OBRIGATÓRIO ────────────────────
+    // Passou a OPCIONAL, com a regra "email OU telefone" imposta pelo
+    // `.refine()` no fim do esquema. Não é um afrouxamento: continua a ser
+    // impossível gravar um pedido sem forma de responder.
+    //
+    // O que mudou foi o formulário das variantes sociais
+    // (src/components/meta/PedidoRelampago.tsx): tem UM campo de contacto em
+    // vez de dois, e quem chega de um anúncio do Instagram escreve o número
+    // de telemóvel, não o email. Com o email obrigatório, esse formulário
+    // teria de ter os dois campos outra vez — ou de inventar um email, que
+    // seria pior do que tudo.
+    //
+    // Continua a ser VALIDADO como email quando vem preenchido: o que caiu
+    // foi a obrigatoriedade, não a validação. `z.union` com o literal vazio
+    // porque `z.email()` recusa "" e o formulário envia sempre a chave.
+    email: z
+      .union([z.email("Email inválido").max(160), z.literal("")])
+      .optional()
+      .default(""),
     phone: trimmed(40).optional().default(""),
     company: trimmed(160).optional().default(""),
     nif: trimmed(20).optional().default(""),
@@ -54,6 +72,14 @@ export const quoteFormSchema = z
     // rota aceitaria o pedido, e o campo simplesmente não chegava à base de
     // dados. A medição de receita ficava vazia sem nada rebentar.
     adClick: trimmed(300).optional().default(""),
+    // Os identificadores da Meta ("fbp=…;fbc=…") e o `event_id` do evento
+    // `Lead` que o browser já disparou. TÊM de estar declarados aqui pela
+    // mesma razão que o `adClick`: o esquema faz `.strip()`, portanto um campo
+    // não declarado é descartado em silêncio — o formulário enviaria, a rota
+    // aceitaria, e o campo simplesmente não chegava à base de dados. A medição
+    // ficava vazia sem nada rebentar.
+    metaClick: trimmed(900).optional().default(""),
+    leadEventId: trimmed(64).optional().default(""),
     acceptTerms: z.boolean().optional(),
     acceptMarketing: z.boolean().optional(),
   })
@@ -62,7 +88,20 @@ export const quoteFormSchema = z
   // .passthrough() let a crafted payload smuggle arbitrary unbounded keys into
   // the stored quote (data-integrity / storage abuse); a genuinely new field
   // should be added here explicitly instead.
-  .strip();
+  .strip()
+  // A invariante que substitui o "email obrigatório": tem de haver PELO MENOS
+  // UMA forma de responder. Um pedido sem email e sem telefone é um pedido que
+  // ninguém consegue atender, e gravá-lo seria pior do que recusá-lo — ficava
+  // na lista a parecer trabalho por fazer, para sempre.
+  //
+  // O telefone é validado por comprimento e não por forma: os números chegam
+  // escritos de todas as maneiras (+351, 00351, com espaços, com pontos) e uma
+  // expressão regular apertada aqui recusaria leads verdadeiros. Nove dígitos
+  // é o mínimo de um número português.
+  .refine((f) => Boolean(f.email) || f.phone.replace(/\D/g, "").length >= 9, {
+    message: "Indique um email ou um telemóvel para lhe podermos responder.",
+    path: ["email"],
+  });
 
 // Price breakdown — computed client-side, so validate the shape before it is
 // persisted and reused in emails, exports and admin revenue maths. Values are

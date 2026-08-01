@@ -9,7 +9,7 @@ import {
   THUMB_EDGE,
   THUMB_QUALITY,
   needsThumb,
-} from "@/app/[lang]/orcamento/admin/image-prep";
+} from "@/app/[lang]/(site)/orcamento/admin/image-prep";
 
 /**
  * REDE DE SEGURANÇA DO PIPELINE DAS FOTOS

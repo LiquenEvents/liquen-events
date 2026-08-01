@@ -1,23 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display, Archivo } from "next/font/google";
 import "../globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import WhatsAppButton from "@/components/WhatsAppButton";
-import StickyCTA from "@/components/StickyCTA";
-import ScrollProgress from "@/components/ScrollProgress";
 import StructuredData from "@/components/StructuredData";
 import Analytics from "@/components/Analytics";
 import GoogleTag from "@/components/GoogleTag";
 import ConsentBanner from "@/components/ConsentBanner";
-import SpeculationRules from "@/components/SpeculationRules";
 import LeadSourceCapture from "@/components/LeadSourceCapture";
-import PageTransition from "@/components/PageTransition";
-import HeroWarm from "@/components/HeroWarm";
-import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import WebVitals from "@/components/WebVitals";
 import { LocaleProvider } from "@/components/LocaleProvider";
-import SmoothScroll from "@/components/motion/SmoothScroll";
 import { getDictionary, htmlLang, normalizeLocale, LOCALES, pickChromeDict } from "@/lib/i18n";
 import { SITE, SITE_KEYWORDS } from "@/lib/site";
 
@@ -208,37 +198,31 @@ export default async function RootLayout({
       data-scroll-behavior="smooth"
       className={`${inter.variable} ${playfair.variable} ${archivo.variable}`}
     >
+      {/*
+        O QUE FICA AQUI E O QUE SAIU DAQUI.
+
+        Este layout é o de RAIZ: é ele que emite <html> e <body>, as
+        tipografias, e as peças que TODAS as ramificações precisam —
+        identidade estruturada, os dois tags de medição, o consentimento e a
+        captura de origem do lead. Nada disto é opcional em lado nenhum.
+
+        A barra de navegação, o rodapé, o CTA fixo, a barra de progresso, as
+        transições de página e o aquecimento de capas saíram para
+        <CromadoDoSitio>, que só o grupo (site) monta. A razão está escrita
+        nesse ficheiro, e é medida: eram a maior fatia dos 207 KB de
+        JavaScript que chegavam a uma landing page paga cujo trabalho inteiro
+        é mostrar uma fotografia, uma frase e um botão.
+      */}
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale} dict={pickChromeDict(t)}>
-          <SmoothScroll>
-            {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
-            <StructuredData locale={locale} />
-            <SpeculationRules />
-            <Analytics />
-            <GoogleTag />
-            <LeadSourceCapture />
-            <HeroWarm />
-            <ServiceWorkerRegister />
-            <WebVitals />
-            <a
-              href="#conteudo"
-              className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-moss focus:text-white focus:rounded-md focus:text-sm"
-            >
-              {t.skipLink}
-            </a>
-            <ScrollProgress />
-            <StickyCTA />
-            <Navbar />
-            {/* tabIndex=-1 so the skip link actually MOVES keyboard focus into
-                the content (an <a href="#conteudo"> only scrolls to a non-
-                focusable target — focus would stay on the skip link). */}
-            <main id="conteudo" tabIndex={-1} className="flex-1 pt-24 outline-none">
-              <PageTransition>{children}</PageTransition>
-            </main>
-            <Footer locale={locale} />
-            <WhatsAppButton />
-            <ConsentBanner locale={locale} />
-          </SmoothScroll>
+          {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
+          <StructuredData locale={locale} />
+          <Analytics />
+          <GoogleTag />
+          <LeadSourceCapture />
+          <WebVitals />
+          {children}
+          <ConsentBanner locale={locale} />
         </LocaleProvider>
       </body>
     </html>

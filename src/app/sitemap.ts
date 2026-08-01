@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { execFileSync } from "node:child_process";
 import { SITE } from "@/lib/site";
 import { SERVICES } from "@/lib/services-data";
-import { PHOTOS } from "@/app/[lang]/galeria/photos-data";
+import { PHOTOS } from "@/app/[lang]/(site)/galeria/photos-data";
 import { POLOS, ESTILOS, caminhoPolo } from "@/lib/ads/polos";
 
 const base = SITE.url;
@@ -60,7 +60,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const core: RawEntry[] = [
     {
       path: "/",
-      sourceFile: "src/app/[lang]/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/page.tsx",
       changeFrequency: "weekly",
       priority: 1.0,
       images: [
@@ -71,34 +71,34 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       path: "/servicos",
-      sourceFile: "src/app/[lang]/servicos/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/servicos/page.tsx",
       changeFrequency: "monthly",
       priority: 0.9,
       images: [img("EW1_1408.jpg"), img("EW1_1330.jpg"), img("EW1_0697.jpg")],
     },
     {
       path: "/contacto",
-      sourceFile: "src/app/[lang]/contacto/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/contacto/page.tsx",
       changeFrequency: "monthly",
       priority: 0.8,
     },
     // Conversion page — the quote request form.
     {
       path: "/orcamento",
-      sourceFile: "src/app/[lang]/orcamento/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/orcamento/page.tsx",
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       path: "/sobre",
-      sourceFile: "src/app/[lang]/sobre/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/sobre/page.tsx",
       changeFrequency: "monthly",
       priority: 0.8,
       images: [img("JOAO_E_PEDRO_1Y1A3204.jpg"), img("DaniGui_Preview12.jpg")],
     },
     {
       path: "/galeria",
-      sourceFile: "src/app/[lang]/galeria/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/galeria/page.tsx",
       changeFrequency: "weekly",
       priority: 0.7,
       // The full portfolio — every gallery photo, so Google can index them all.
@@ -106,20 +106,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       path: "/clientes",
-      sourceFile: "src/app/[lang]/clientes/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/clientes/page.tsx",
       changeFrequency: "monthly",
       priority: 0.7,
       images: [img("EW1_1393.jpg")],
     },
     {
       path: "/privacidade",
-      sourceFile: "src/app/[lang]/privacidade/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/privacidade/page.tsx",
       changeFrequency: "yearly",
       priority: 0.2,
     },
     {
       path: "/termos",
-      sourceFile: "src/app/[lang]/termos/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/termos/page.tsx",
       changeFrequency: "yearly",
       priority: 0.2,
     },
@@ -162,7 +162,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
     {
       path: "/casamentos/destination",
-      sourceFile: "src/app/[lang]/casamentos/destination/page.tsx",
+      sourceFile: "src/app/[lang]/(site)/casamentos/destination/page.tsx",
       changeFrequency: "monthly",
       priority: 0.5,
     },

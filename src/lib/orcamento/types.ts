@@ -79,7 +79,27 @@ export interface QuoteFormData {
    * conversões offline.
    */
   adClick?: string;
+  /**
+   * Identificadores da Meta, na forma compacta "fbp=…;fbc=…" (ver
+   * src/lib/meta/click-id.ts). O equivalente do `adClick` para o Instagram e
+   * o Facebook: é o que permite devolver à Meta o valor REAL do casamento
+   * quando ele fecha. Vazio na maioria dos pedidos.
+   */
+  metaClick?: string;
+  /**
+   * O `event_id` do evento `Lead` que o browser já disparou para o pixel.
+   * O servidor reenvia o MESMO identificador pela Conversions API, e é assim
+   * que a Meta reconhece os dois como um só acontecimento em vez de contar a
+   * conversão duas vezes. Ver src/lib/meta/eventos.ts.
+   */
+  leadEventId?: string;
   name: string;
+  /**
+   * PODE SER VAZIO desde que haja `phone` — a regra "email ou telefone" está
+   * no `quoteFormSchema`. O formulário das variantes sociais tem um campo de
+   * contacto só, e quem chega de um anúncio do Instagram escreve o número.
+   * Todo o código que envia email para o cliente TEM de verificar isto.
+   */
   email: string;
   phone: string;
   company: string;

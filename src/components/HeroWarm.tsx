@@ -40,6 +40,23 @@ export default function HeroWarm() {
   useEffect(() => {
     // Don't warm on the back office / quote flow, or the current page.
     if (pathname.startsWith("/orcamento")) return;
+    // ── NEM NAS PÁGINAS QUE RECEBEM TRÁFEGO PAGO ──────────────────────────
+    // MEDIDO (scripts/medir-social.mjs, /casamentos/estilo/boho, perfil
+    // Instagram iOS, 390x844, 4G lento, CPU a 1/4): a página descarregava
+    // 1299 KB de imagens, dos quais **623 KB eram as capas das SEIS páginas
+    // institucionais** — /contacto (266 KB), /servicos (145 KB), a inicial
+    // (134 KB), /clientes (82 KB), /sobre (70 KB) e /galeria (66 KB). Nenhuma
+    // delas é desenhada aqui.
+    //
+    // E é o pior caso possível, não um caso qualquer: o `HERO_BY_ROUTE` não
+    // tem nenhuma rota `/casamentos/…`, portanto NENHUMA das seis é "a página
+    // actual" e nenhuma é saltada pelo `continue` lá em baixo. Descarregam-se
+    // as seis, em `onIdle`, a competir com as fotografias da própria página.
+    //
+    // O aquecimento é uma aposta em navegação futura. Quem chega de um anúncio
+    // não navega: ou converte, ou sai. Aqui a aposta perde sempre, e paga-se
+    // com bytes que custam dinheiro por clique.
+    if (pathname.startsWith("/casamentos/") || pathname.startsWith("/s/")) return;
     // Nem na galeria. É a única página do sítio com 427 fotografias para ir
     // buscar, e portanto a última onde faz sentido gastar rede a pré-carregar
     // as capas de outras páginas. Medido numa aterragem em /galeria (cache

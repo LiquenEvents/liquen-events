@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import nextConfig from "../../../../next.config";
+import nextConfig from "../../../../../next.config";
 
 /**
  * Guardas sobre a secção `images` do next.config.ts.

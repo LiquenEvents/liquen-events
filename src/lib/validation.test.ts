@@ -118,6 +118,65 @@ describe("quoteFormSchema", () => {
     const r = quoteFormSchema.safeParse({ name: "João", email: "j@x.pt", guests: 999999 });
     expect(r.success).toBe(false);
   });
+
+  // ── "email OU telefone" ─────────────────────────────────────────────────
+  // O email deixou de ser obrigatório para o formulário das variantes sociais
+  // poder ter UM campo de contacto em vez de dois — quem chega de um anúncio
+  // do Instagram escreve o número, não o email. O que NÃO pode acontecer é
+  // gravar-se um pedido sem forma nenhuma de responder: ficaria na lista a
+  // parecer trabalho por fazer, para sempre.
+  it("aceita um pedido só com telemóvel, sem email", () => {
+    const r = quoteFormSchema.safeParse({ name: "João", phone: "919 259 820" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.email).toBe("");
+  });
+
+  it("aceita um pedido só com email, sem telefone", () => {
+    const r = quoteFormSchema.safeParse({ name: "João", email: "j@x.pt" });
+    expect(r.success).toBe(true);
+  });
+
+  it("RECUSA um pedido sem email e sem telefone", () => {
+    const r = quoteFormSchema.safeParse({ name: "João" });
+    expect(r.success).toBe(false);
+  });
+
+  it("RECUSA um telefone curto demais para ser um número", () => {
+    // "12345" não é contacto nenhum; aceitá-lo seria gravar um pedido que
+    // ninguém consegue atender e chamar-lhe sucesso.
+    const r = quoteFormSchema.safeParse({ name: "João", phone: "12345" });
+    expect(r.success).toBe(false);
+  });
+
+  it("continua a VALIDAR o email quando ele vem preenchido", () => {
+    // O que caiu foi a obrigatoriedade, não a validação.
+    const r = quoteFormSchema.safeParse({ name: "João", email: "isto-não-é-email" });
+    expect(r.success).toBe(false);
+  });
+
+  it("aceita um número escrito com indicativo e separadores", () => {
+    for (const phone of ["+351 919 259 820", "00351919259820", "919.259.820"]) {
+      const r = quoteFormSchema.safeParse({ name: "João", phone });
+      expect(r.success, `recusou "${phone}"`).toBe(true);
+    }
+  });
+
+  it("guarda os identificadores da Meta em vez de os descartar em silêncio", () => {
+    // O esquema faz `.strip()`: um campo não declarado passava na validação e
+    // desaparecia antes da base de dados. A medição ficava vazia sem nada
+    // rebentar, que é o pior modo de falhar.
+    const r = quoteFormSchema.safeParse({
+      name: "João",
+      phone: "919259820",
+      metaClick: "fbp=fb.1.1.aaa;fbc=fb.1.2.bbb",
+      leadEventId: "7d2f1a90-0000-4000-8000-000000000000",
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.metaClick).toBe("fbp=fb.1.1.aaa;fbc=fb.1.2.bbb");
+      expect(r.data.leadEventId).toBe("7d2f1a90-0000-4000-8000-000000000000");
+    }
+  });
 });
 
 describe("pushSubscriptionSchema", () => {

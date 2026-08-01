@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { pickServiceGallery, SERVICE_GALLERY_SIZE } from "./service-gallery";
-import { PHOTOS } from "@/app/[lang]/galeria/photos-data";
+import { PHOTOS } from "@/app/[lang]/(site)/galeria/photos-data";
 import { SERVICES } from "./services-data";
 
 const srcOf = (labels: string[]) =>

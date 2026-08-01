@@ -139,7 +139,10 @@ describe("painéis com content-visibility: o espaço reservado tem de bater com 
     // apagar os painéis todos e os testes acima passarem por vacuidade.
     const usam = paginas.filter(({ src }) => /\bcv-panel\b/.test(src)).map(({ f }) => f);
     expect(usam.some((f) => f.endsWith(join("servicos", "page.tsx")))).toBe(true);
-    expect(usam.some((f) => f.endsWith(join("[lang]", "page.tsx")))).toBe(true);
+    // A página inicial vive em `[lang]/(site)/page.tsx` desde que o cromado do
+    // sítio passou a ser um grupo de rotas — `(site)` não aparece no URL, mas
+    // aparece no caminho do ficheiro.
+    expect(usam.some((f) => f.endsWith(join("(site)", "page.tsx")))).toBe(true);
     expect(usam.length).toBeGreaterThanOrEqual(4);
   });
 });

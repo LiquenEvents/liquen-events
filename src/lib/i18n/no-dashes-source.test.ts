@@ -26,7 +26,7 @@ const ROOT = process.cwd();
 const ROOTS = ["src/components", "src/app/[lang]"];
 
 /** Sub-árvores que não são site público. */
-const SKIP = ["src/app/[lang]/orcamento/admin"];
+const SKIP = ["src/app/[lang]/(site)/orcamento/admin"];
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   const abs = path.join(ROOT, dir);

@@ -5,7 +5,7 @@
  * instead of re-hand-rolling Tailwind strings:
  *
  *   import { Button, Card, SectionCard, Field, PageHeader, EmptyState,
- *            Toolbar, Segmented } from "@/app/[lang]/orcamento/admin/ui";
+ *            Toolbar, Segmented } from "@/app/[lang]/(site)/orcamento/admin/ui";
  *
  * All are `"use client"`, presentational, and free of any store import.
  */

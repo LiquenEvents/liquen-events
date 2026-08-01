@@ -31,7 +31,7 @@ import sharp from "sharp";
  * limiar não aperta nada do que é legítimo.
  */
 
-const PAGINA = join(process.cwd(), "src/app/[lang]/clientes/page.tsx");
+const PAGINA = join(process.cwd(), "src/app/[lang]/(site)/clientes/page.tsx");
 const RACIO_MINIMO = 1.2;
 
 /** Os caminhos dentro do `MOSAIC_POOL`, lidos da fonte. */

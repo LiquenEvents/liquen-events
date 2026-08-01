@@ -138,6 +138,24 @@ const nextConfig: NextConfig = {
       " https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://googleads.g.doubleclick.net https://www.googleadservices.com https://www.google.com https://pagead2.googlesyndication.com";
     const gaFrame = "https://td.doubleclick.net https://www.googletagmanager.com";
 
+    // ── Meta (Instagram/Facebook) ────────────────────────────────────────
+    // Só abre quando NEXT_PUBLIC_META_PIXEL_ID está definido: sem pixel
+    // configurado a política fica exactamente como estava, sem hosts a mais.
+    //
+    // Três hosts, e só três:
+    //   connect.facebook.net  o `fbevents.js` (script);
+    //   www.facebook.com      o beacon `/tr` (imagem E fetch — o pixel usa os
+    //                         dois consoante o browser, por isso vai a img-src
+    //                         e a connect-src);
+    //   graph.facebook.com    NÃO entra. A Conversions API é chamada pelo
+    //                         SERVIDOR (src/lib/meta/capi.ts), portanto o
+    //                         browser nunca lhe toca e pô-la aqui seria abrir
+    //                         uma porta que ninguém usa.
+    const temMeta = Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID);
+    const metaScript = temMeta ? " https://connect.facebook.net" : "";
+    const metaImg = temMeta ? " https://www.facebook.com" : "";
+    const metaConnect = temMeta ? " https://www.facebook.com" : "";
+
     // Image hosts the BROWSER loads via <img>: proposal cover/mood-board images
     // are served as signed URLs from Supabase Storage, and the (optional) gallery
     // CDN. Without these in img-src the browser blocks them and the thumbnail
@@ -171,7 +189,7 @@ const nextConfig: NextConfig = {
     // event beacon (when enabled); dev keeps ws/https open for HMR.
     const connectSrc = isDev
       ? "connect-src 'self' https: wss: ws:"
-      : `connect-src 'self'${plausible}${gaConnect}`;
+      : `connect-src 'self'${plausible}${gaConnect}${metaConnect}`;
 
     // Content-Security-Policy.
     //
@@ -218,9 +236,9 @@ const nextConfig: NextConfig = {
     // 'unsafe-eval' é só de desenvolvimento (React refresh).
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}${gaScript}`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${plausible}${gaScript}${metaScript}`,
       "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: blob:${imgExtra}${gaImg}`,
+      `img-src 'self' data: blob:${imgExtra}${gaImg}${metaImg}`,
       "font-src 'self' data:",
       connectSrc,
       "worker-src 'self'",

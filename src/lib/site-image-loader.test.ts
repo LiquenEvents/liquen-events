@@ -12,7 +12,7 @@ import {
   GALLERY_WIDTHS,
   galleryKey,
   galleryImageLoader,
-} from "../app/[lang]/galeria/gallery-image-loader";
+} from "../app/[lang]/(site)/galeria/gallery-image-loader";
 import { heroKey, HERO_SOURCES, HERO_WIDTHS } from "./hero-image-loader";
 import nextConfig from "../../next.config";
 

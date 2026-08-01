@@ -203,13 +203,13 @@ describe("as páginas não voltam a escrever tempos à mão", () => {
   // mão — está descrito no relatório, não convertido, e por isso não está aqui:
   // um teste que falhasse por trabalho por fazer não teria dentes nenhuns.)
   const paginas = [
-    "../../app/[lang]/page.tsx",
-    "../../app/[lang]/sobre/page.tsx",
-    "../../app/[lang]/clientes/page.tsx",
-    "../../app/[lang]/contacto/page.tsx",
-    "../../app/[lang]/servicos/page.tsx",
-    "../../app/[lang]/servicos/[slug]/page.tsx",
-    "../../app/[lang]/legal/LegalDocView.tsx",
+    "../../app/[lang]/(site)/page.tsx",
+    "../../app/[lang]/(site)/sobre/page.tsx",
+    "../../app/[lang]/(site)/clientes/page.tsx",
+    "../../app/[lang]/(site)/contacto/page.tsx",
+    "../../app/[lang]/(site)/servicos/page.tsx",
+    "../../app/[lang]/(site)/servicos/[slug]/page.tsx",
+    "../../app/[lang]/(site)/legal/LegalDocView.tsx",
   ];
 
   it.each(paginas)("%s não tem `delay={…}` com aritmética à mão", (ficheiro) => {

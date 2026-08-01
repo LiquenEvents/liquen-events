@@ -11,9 +11,9 @@ import {
 } from "./gallery-image-loader";
 import { PHOTOS } from "./photos-data";
 import TILE_COLORS from "./tile-colors.json";
-import nextConfig from "../../../../next.config";
+import nextConfig from "../../../../../next.config";
 
-const ROOT = path.join(__dirname, "..", "..", "..", "..");
+const ROOT = path.join(__dirname, "..", "..", "..", "..", "..");
 const PREGEN_SCRIPT = readFileSync(path.join(ROOT, "scripts", "pregen-gallery.mjs"), "utf8");
 
 describe("gallery-image-loader: a grelha não depende do optimizador", () => {

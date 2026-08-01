@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
-import { Card, Field, Button, EmptyState } from "@/app/[lang]/orcamento/admin/ui";
+import { Card, Field, Button, EmptyState } from "@/app/[lang]/(site)/orcamento/admin/ui";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {

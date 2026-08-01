@@ -85,7 +85,7 @@ function galleryKey(src) {
  * em tile-colors.json, e a lista que TEM de existir no disco.
  */
 async function readGallerySources() {
-  const dataFile = path.join(ROOT, "src", "app", "[lang]", "galeria", "photos-data.ts");
+  const dataFile = path.join(ROOT, "src", "app", "[lang]", "(site)", "galeria", "photos-data.ts");
   const raw = await fs.readFile(dataFile, "utf8");
   const sources = [...raw.matchAll(/src: "([^"]+)"/g)].map((m) => m[1]);
   if (sources.length === 0) {
@@ -405,7 +405,15 @@ await fs.writeFile(INDEX_FILE, JSON.stringify(nextIndex), "utf8");
  * derivada da miniatura de 384 que já se gerou, não custa um decode extra, e
  * poupa recalcular o dia em que uma foto entre na galeria.)
  */
-const COLORS_FILE = path.join(ROOT, "src", "app", "[lang]", "galeria", "tile-colors.json");
+const COLORS_FILE = path.join(
+  ROOT,
+  "src",
+  "app",
+  "[lang]",
+  "(site)",
+  "galeria",
+  "tile-colors.json",
+);
 const colorsJson =
   JSON.stringify(
     Object.fromEntries(

@@ -20,8 +20,75 @@ import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quotePayloadSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 import { eur0 as eur } from "@/lib/money";
+import { enviarEventos, ipDoPedido } from "@/lib/meta/capi";
+import { EVENTOS as EVENTOS_META } from "@/lib/meta/eventos";
+import { desserializar as desserializarMeta } from "@/lib/meta/click-id";
 
 export const maxDuration = 30;
+
+/**
+ * Não há email do cliente, logo não há confirmação a enviar.
+ *
+ * É uma saída antecipada com nome, e não um `if` a envolver sessenta linhas:
+ * o bloco da confirmação já vive dentro de um `try`, e enfiá-lo num `if`
+ * mudava a indentação de tudo o que lá está sem mudar o comportamento de
+ * nada. Quem lê o `catch` vê explicitamente que este caso não é uma falha.
+ */
+class NadaParaConfirmar extends Error {}
+
+/**
+ * Reenvia o `Lead` para a Meta pela Conversions API, com o MESMO `event_id`
+ * que o browser usou no pixel.
+ *
+ * ── AS TRÊS GUARDAS, E PORQUE É QUE CADA UMA EXISTE ────────────────────────
+ *  1. sem `leadEventId` não se envia. É o que garante a deduplicação: um
+ *     identificador gerado aqui nunca encontraria o par do browser, e a
+ *     conversão contaria duas vezes;
+ *  2. sem `metaClick` não se envia. Esse campo só existe quando o pixel
+ *     correu, e o pixel só corre com consentimento — portanto a presença dele
+ *     É a prova de consentimento que o servidor tem. Não se inventa outra;
+ *  3. sem configuração (`META_DATASET_ID` / `META_CAPI_ACCESS_TOKEN`) o
+ *     `enviarEventos` devolve `sem-configuracao` sem abrir socket nenhum.
+ *
+ * NUNCA lança para fora: quem chama embrulha à mesma, mas a regra vale a pena
+ * ser dita duas vezes — o lead vale mil vezes mais do que o evento.
+ */
+async function reenviarLeadParaMeta(
+  request: NextRequest,
+  id: string,
+  form: QuoteFormData,
+): Promise<void> {
+  const eventId = (form.leadEventId ?? "").trim();
+  const meta = (form.metaClick ?? "").trim();
+  if (!eventId || !meta) return;
+
+  const { fbp, fbc } = desserializarMeta(meta);
+  const r = await enviarEventos([
+    {
+      nome: EVENTOS_META.lead,
+      eventId,
+      quando: Math.floor(Date.now() / 1000),
+      fonte: "website",
+      contexto: form.notes?.slice(0, 100) || undefined,
+      pessoa: {
+        email: form.email || undefined,
+        telefone: form.phone || undefined,
+        nome: form.name || undefined,
+        fbp: fbp || undefined,
+        fbc: fbc || undefined,
+        ip: ipDoPedido(request.headers) || undefined,
+        agente: request.headers.get("user-agent") ?? undefined,
+      },
+    },
+  ]);
+  if (!r.enviado && r.motivo !== "sem-configuracao") {
+    log.error("orcamento: Lead não chegou à Meta", undefined, {
+      id,
+      motivo: r.motivo,
+      detalhe: r.detalhe,
+    });
+  }
+}
 
 const MONTHS_PT = [
   "jan",
@@ -147,8 +214,11 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     row("Local", esc(local)) +
     (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
     (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");
+  // O email pode agora vir VAZIO (a regra é "email ou telefone" — ver
+  // quoteFormSchema). `row()` já omite a linha quando o valor é vazio, mas o
+  // `link()` construiria um `mailto:` para lado nenhum, por isso a guarda.
   const contactRows =
-    row("Email", link(`mailto:${esc(form.email)}`, form.email)) +
+    (form.email ? row("Email", link(`mailto:${esc(form.email)}`, form.email)) : "") +
     (form.phone ? row("Telefone", link(`tel:${telHref(form.phone)}`, form.phone)) : "") +
     (form.company ? row("Empresa", esc(form.company)) : "") +
     (form.nif ? row("NIF", esc(form.nif)) : "") +
@@ -171,11 +241,12 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const waDigits = form.phone ? form.phone.replace(/\D/g, "") : "";
   const waNumber = /^9\d{8}$/.test(waDigits) ? `351${waDigits}` : waDigits;
   const waHref = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg)}` : "";
-  const mailtoHref =
-    `mailto:${esc(form.email)}?subject=${encodeURIComponent(`Líquen Events — o seu pedido para o ${eventoLc}`)}` +
-    `&body=${encodeURIComponent(
-      `Olá ${firstName},\n\nMuito obrigado pelo seu pedido de orçamento para o ${eventoLc} — foi um gosto recebê-lo.\n\n\n\nCom os melhores cumprimentos,\nEquipa Líquen Events`,
-    )}`;
+  const mailtoHref = form.email
+    ? `mailto:${esc(form.email)}?subject=${encodeURIComponent(`Líquen Events — o seu pedido para o ${eventoLc}`)}` +
+      `&body=${encodeURIComponent(
+        `Olá ${firstName},\n\nMuito obrigado pelo seu pedido de orçamento para o ${eventoLc} — foi um gosto recebê-lo.\n\n\n\nCom os melhores cumprimentos,\nEquipa Líquen Events`,
+      )}`
+    : "";
 
   // Speed-to-lead nudge — urgency-aware when the client flagged it.
   const nudge = urgencyLabel
@@ -185,10 +256,22 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     "display:inline-block;background:#4c6150;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;padding:12px 24px;border-radius:10px";
   const btnOutline =
     "display:inline-block;background:#ffffff;border:1px solid #ece7dc;color:#3a3d30;text-decoration:none;font-size:14px;font-weight:500;padding:11px 22px;border-radius:10px";
-  const actionsCell = waHref
-    ? `<td style="padding-right:10px"><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>
+  // Três casos, agora que um pedido pode chegar só com telefone OU só com
+  // email: os dois botões, só o WhatsApp, ou só o email. O que NÃO pode
+  // acontecer é desenhar um botão com um `href` vazio — parecia um botão e
+  // não fazia nada, que é a pior das três avarias possíveis num email que a
+  // equipa lê com pressa.
+  const actionsCell =
+    waHref && mailtoHref
+      ? `<td style="padding-right:10px"><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>
        <td><a href="${mailtoHref}" style="${btnOutline}">Responder por email</a></td>`
-    : `<td><a href="${mailtoHref}" style="${btnPrimary}">Responder ao cliente</a></td>`;
+      : waHref
+        ? `<td><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>`
+        : mailtoHref
+          ? `<td><a href="${mailtoHref}" style="${btnPrimary}">Responder ao cliente</a></td>`
+          : // Inalcançável pelo esquema (exige email ou telefone), mas se
+            // alguém afrouxar essa regra é melhor um aviso do que um botão morto.
+            `<td style="color:#8f8a7a;font-size:13px">Sem contacto registado.</td>`;
 
   const html = `<!doctype html>
 <html lang="pt">
@@ -299,7 +382,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     urgencyLabel ? `Antecedência: ${urgencyLabel}` : "",
     estimate ? `Orçamento estimado: ${estimate}` : "",
     "",
-    `Email: ${form.email}`,
+    form.email ? `Email: ${form.email}` : "",
     form.phone ? `Telefone: ${form.phone}` : "",
     form.company ? `Empresa: ${form.company}` : "",
     form.nif ? `NIF: ${form.nif}` : "",
@@ -402,7 +485,10 @@ export async function POST(request: NextRequest) {
         subject: email.subject,
         html: email.html,
         text: email.text,
-        replyTo: form.email,
+        // Sem email do cliente não há a quem responder: omite-se o cabeçalho
+        // em vez de o enviar vazio, que faria alguns servidores recusar a
+        // mensagem inteira e perder a notificação do lead.
+        replyTo: form.email || undefined,
         attachments: [emailLogoAttachment()],
       });
       emailed = res.sent;
@@ -438,7 +524,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Confirmation to the client, in the language they were browsing in (best-effort).
+    // Só existe quando o cliente deu email. Um pedido que chega só com
+    // telemóvel — o caso normal nas variantes sociais — não tem para onde
+    // mandar a confirmação, e é a EQUIPA que responde por WhatsApp. Não é uma
+    // degradação silenciosa: o email à equipa traz o botão de WhatsApp já
+    // pré-preenchido, que é o caminho mais rápido de qualquer forma.
     try {
+      if (!form.email) throw new NadaParaConfirmar();
       const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
       // Feed the builder what the client actually told us, so the email mirrors
       // their event back in prose instead of being a generic acknowledgement.
@@ -499,7 +591,30 @@ export async function POST(request: NextRequest) {
         log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
       }
     } catch (mailErr) {
-      log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
+      // `NadaParaConfirmar` não é uma falha: é o caso previsto de um pedido
+      // que chegou só com telemóvel. Registar isso como erro encheria o
+      // fan-out de alertas com o funcionamento normal das páginas sociais, e
+      // um alerta que toca sempre deixa de ser lido.
+      if (mailErr instanceof NadaParaConfirmar) {
+        log.info("orcamento: pedido sem email — confirmação ao cliente não se aplica", { id });
+      } else {
+        log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
+      }
+    }
+
+    // ── A Meta, pelo servidor ───────────────────────────────────────────────
+    // O browser já disparou o `Lead` para o pixel com um `event_id`, e enviou-o
+    // aqui dentro do formulário. Reenvia-se o MESMO identificador pela
+    // Conversions API: a Meta reconhece os dois como um acontecimento só, e o
+    // envio do servidor é o que sobrevive ao ITP do Safari e aos bloqueadores.
+    //
+    // Sem `leadEventId` não se envia NADA. Um `event_id` inventado aqui nunca
+    // encontraria o par do browser e a conversão passaria a contar a dobrar —
+    // que é exactamente a avaria que a deduplicação existe para evitar.
+    try {
+      await reenviarLeadParaMeta(request, id, form);
+    } catch (metaErr) {
+      log.error("orcamento: reenvio do Lead para a Meta falhou", metaErr, { id });
     }
 
     // Push notification to the team's devices (best-effort).

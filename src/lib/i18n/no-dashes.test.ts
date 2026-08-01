@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { pt } from "./pt";
 import { en } from "./en";
 import { SERVICES, getService } from "../services-data";
-import { getLegal } from "@/app/[lang]/legal/legal-content";
+import { getLegal } from "@/app/[lang]/(site)/legal/legal-content";
 
 /**
  * SEM TRAVESSÕES NO TEXTO DO SITE.

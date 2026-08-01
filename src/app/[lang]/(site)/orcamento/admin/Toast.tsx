@@ -109,7 +109,6 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     timerRef.current = setTimeout(() => onCloseRef.current(), remainingRef.current);
     return clear;
     // Run once on mount; onClose is read via ref so it needn't be a dep.
-     
   }, []);
 
   return (

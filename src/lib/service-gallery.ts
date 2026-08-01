@@ -1,4 +1,4 @@
-import { PHOTOS, type Label } from "@/app/[lang]/galeria/photos-data";
+import { PHOTOS, type Label } from "@/app/[lang]/(site)/galeria/photos-data";
 
 /**
  * FOTOS DIFERENTES A CADA VISITA, MAS SEMPRE DO SERVIÇO CERTO.

@@ -82,7 +82,7 @@
  */
 
 import type { ImageLoaderProps } from "next/image";
-import { galleryImageUrl, galleryKey } from "@/app/[lang]/galeria/gallery-image-loader";
+import { galleryImageUrl, galleryKey } from "@/app/[lang]/(site)/galeria/gallery-image-loader";
 import { heroImageUrl, isHeroSrc } from "@/lib/hero-image-loader";
 
 /**
