@@ -133,7 +133,32 @@ function cartaoNotas(): HTMLElement {
     .parentElement as HTMLElement;
 }
 
+/**
+ * ── O RELÓGIO FICA PARADO, E ISTO NÃO É ZELO A MAIS ───────────────────────
+ *
+ * Dois testes deste ficheiro afirmam percentagens ("33%", "25%") que o
+ * `Overview` calcula sobre a receita GANHA ESTE MÊS. O pedido de mentira aqui
+ * em cima tem `lastUpdated: 2026-07-20`, portanto conta como "este mês"
+ * enquanto o relógio da máquina estiver em Julho de 2026 — e deixa de contar à
+ * meia-noite do dia 1 de Agosto, quando o cálculo passa a dar 0 € e 0%.
+ *
+ * Foi exactamente isso que aconteceu: a integração contínua esteve verde às
+ * 23:4x de 31 de Julho e vermelha às 02:36 de 1 de Agosto, na mesma base de
+ * código. O teste não estava frágil por causa de nenhuma alteração — estava
+ * a medir o calendário da máquina.
+ *
+ * Com o relógio fixo em 2026-07-25 os dois testes passam a afirmar o que
+ * dizem afirmar, todos os dias do ano.
+ */
+const AGORA = new Date("2026-07-25T10:00:00.000Z");
+
 beforeEach(() => {
+  vi.useFakeTimers({
+    now: AGORA,
+    // O `userEvent` e o `waitFor` do Testing Library precisam dos temporizadores
+    // e do `queueMicrotask` a correr de verdade; só a DATA é que fica presa.
+    toFake: ["Date"],
+  });
   servidor.notas = campo("notas", "", 0);
   servidor.meta = campo("meta", "", 0);
   gravacoes = [];
@@ -146,6 +171,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("as notas vêm do servidor", () => {
