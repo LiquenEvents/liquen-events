@@ -131,13 +131,20 @@ function desenhar({ formato, capaUrl, logoUrl, titulo, apoio, cta, segura, guia 
         background:linear-gradient(to bottom,
           rgba(0,0,0,.42) 0%, rgba(0,0,0,.20) 45%, rgba(0,0,0,0) 100%);"></div>
 
-      <!-- O logótipo a 360 px numa peça de 1080 é UM TERÇO da largura. Estava
-           a 210 e a dona pediu-o maior: num story visto num telemóvel a 210 px
-           o "LÍQUEN EVENTS" lia-se com esforço, e uma marca que não se lê num
-           anúncio não está lá para nada. Continua dentro da zona segura. -->
+      <!-- O LOGÓTIPO: CENTRADO EM CIMA, e a 560 px numa peça de 1080 — mais de
+           metade da largura. Foi o que ela pediu, por esta ordem: 210 -> 360 ->
+           "bem maior e no meio em cima".
+           Centrado com left:50% mais translateX(-50%) e nao com margin:auto,
+           porque o elemento e position:absolute. Fica dentro da zona segura na
+           mesma: 560 de largura numa peca de 1080 deixa 260 de cada lado, e a
+           faixa que a app tapa a direita sao 120.
+           (Sem plicas invertidas neste comentario: ele vive DENTRO de um
+           template literal, e uma plica invertida aqui fecha-o a meio. Foi o
+           que aconteceu a primeira vez.) -->
       <img src="${logoUrl}" style="
-        position:absolute;left:${segura.esquerda}px;top:${eStory ? segura.topo : 70}px;
-        width:360px;height:auto;" />
+        position:absolute;left:50%;transform:translateX(-50%);
+        top:${eStory ? segura.topo + 40 : 80}px;
+        width:560px;height:auto;" />
 
       <div style="
         position:absolute;left:${segura.esquerda}px;
