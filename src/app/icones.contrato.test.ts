@@ -21,9 +21,6 @@ import sharp from "sharp";
 
 const RAIZ = process.cwd();
 
-/** O verde de marca do emblema, medido em public/logo-liquen.png. */
-const VERDE = { r: 95, g: 124, b: 102 };
-
 interface Icone {
   caminho: string;
   lado: number;
@@ -34,17 +31,23 @@ interface Icone {
 /**
  * Os limiares não são redondos por acaso.
  *
- * Os ícones normais medem 16,6% de tinta; os 12% dão margem para o desenho
- * mudar sem deixarem passar um logótipo perdido no meio do quadrado. O
- * `maskable` mede 7,7% porque o Android recorta-o e obriga a margens largas —
- * o limiar dele é mais baixo pela mesma razão.
+ * MEDIDO nos ficheiros actuais: os ícones normais têm 7,1 a 8,4% de tinta e o
+ * `maskable` 3,6%, porque o Android recorta-o e obriga a margens largas. Os
+ * limiares ficam um pouco abaixo — dão espaço a o desenho mudar sem deixarem
+ * passar um logótipo perdido no meio do quadrado, que é o defeito de origem
+ * (o ícone antigo tinha 2,1%).
+ *
+ * A tinta é menos do que os 16,6% da versão só com o emblema, e isso é
+ * esperado: o logótipo completo é quase o dobro da largura da altura, portanto
+ * sobram margens em cima e em baixo, e as letras são traço fino. Continua a
+ * ser mais do triplo do ícone antigo.
  */
 const ICONES: Icone[] = [
-  { caminho: "src/app/icon.png", lado: 512, tintaMinima: 12 },
-  { caminho: "src/app/apple-icon.png", lado: 180, tintaMinima: 12 },
-  { caminho: "public/icon-192.png", lado: 192, tintaMinima: 12 },
-  { caminho: "public/icon-512.png", lado: 512, tintaMinima: 12 },
-  { caminho: "public/icon-maskable-512.png", lado: 512, tintaMinima: 5 },
+  { caminho: "src/app/icon.png", lado: 512, tintaMinima: 5 },
+  { caminho: "src/app/apple-icon.png", lado: 180, tintaMinima: 5 },
+  { caminho: "public/icon-192.png", lado: 192, tintaMinima: 5 },
+  { caminho: "public/icon-512.png", lado: 512, tintaMinima: 5 },
+  { caminho: "public/icon-maskable-512.png", lado: 512, tintaMinima: 2.5 },
 ];
 
 async function analisar(caminho: string) {
@@ -57,9 +60,8 @@ async function analisar(caminho: string) {
   const fundo = [data[0], data[1], data[2]];
   let tinta = 0;
   let transparentes = 0;
-  let somaR = 0;
-  let somaG = 0;
-  let somaB = 0;
+  let amarelo = 0;
+  let verde = 0;
 
   for (let i = 0; i < width * height; i++) {
     const p = i * channels;
@@ -70,9 +72,10 @@ async function analisar(caminho: string) {
       Math.abs(data[p + 2] - fundo[2]);
     if (distancia > 60) {
       tinta++;
-      somaR += data[p];
-      somaG += data[p + 1];
-      somaB += data[p + 2];
+      // O amarelo do "LÍQUEN" (#D4B23C, mais ou menos): vermelho e verde altos,
+      // azul baixo. O verde do emblema e de "EVENTS" (#5F7C66): o verde domina.
+      if (data[p] > 140 && data[p + 1] > 120 && data[p + 2] < 110) amarelo++;
+      if (data[p + 1] > data[p] + 8 && data[p + 1] > data[p + 2] + 8) verde++;
     }
   }
 
@@ -82,7 +85,8 @@ async function analisar(caminho: string) {
     fundo,
     transparentes,
     percentagemTinta: (100 * tinta) / (width * height),
-    corMedia: tinta ? { r: somaR / tinta, g: somaG / tinta, b: somaB / tinta } : null,
+    fraccaoAmarela: tinta ? amarelo / tinta : 0,
+    fraccaoVerde: tinta ? verde / tinta : 0,
   };
 }
 
@@ -103,17 +107,31 @@ describe("ícones do sítio", () => {
     ).toBeGreaterThanOrEqual(ic.tintaMinima);
   });
 
-  it.each(ICONES)("$caminho é o emblema A CORES, não a versão a branco", async (ic) => {
+  it.each(ICONES)("$caminho é A CORES, não a versão a branco nem a preto", async (ic) => {
+    // As duas cores da marca têm de estar lá. Um logótipo a branco sobre preto
+    // — que era o ícone antigo — não tem nenhuma delas e reprova aqui.
     const a = await analisar(ic.caminho);
-    expect(a.corMedia).not.toBeNull();
-    const { r, g, b } = a.corMedia!;
-    // Verde: a componente verde domina as outras duas. Um desenho a branco ou
-    // a preto tem as três componentes juntas e não passa aqui.
     expect(
-      g,
-      `${ic.caminho}: a cor média do desenho é rgb(${r.toFixed(0)}, ${g.toFixed(0)}, ${b.toFixed(0)}), ` +
-        `que não é o verde de marca rgb(${VERDE.r}, ${VERDE.g}, ${VERDE.b}).`,
-    ).toBeGreaterThan(Math.max(r, b) + 8);
+      a.fraccaoVerde,
+      `${ic.caminho}: ${(100 * a.fraccaoVerde).toFixed(0)}% do desenho é verde de marca`,
+    ).toBeGreaterThan(0.3);
+  });
+
+  it.each(ICONES)("$caminho DIZ 'Líquen Events'", async (ic) => {
+    // O pedido, textual: "quero o favicon colorido a dizer Líquen Events".
+    //
+    // A verificação é indirecta e é de propósito: a palavra "LÍQUEN" é a única
+    // parte do logótipo desenhada a AMARELO. Se ela lá estiver, há amarelo; se
+    // alguém voltar a pôr só o emblema, o amarelo desaparece e este teste
+    // acende. Não é preciso reconhecer letras para vigiar isto.
+    //
+    // MEDIDO: entre 26 e 35% da tinta é amarela nos ficheiros actuais.
+    const a = await analisar(ic.caminho);
+    expect(
+      a.fraccaoAmarela,
+      `${ic.caminho}: só ${(100 * a.fraccaoAmarela).toFixed(0)}% do desenho é o amarelo de ` +
+        `"LÍQUEN". Ou a palavra saiu do ícone, ou o logótipo mudou de cores.`,
+    ).toBeGreaterThan(0.15);
   });
 
   it.each(ICONES)("$caminho é opaco", async (ic) => {

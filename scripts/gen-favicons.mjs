@@ -55,26 +55,53 @@ const ORIGEM = path.join(RAIZ, "public", "logo-liquen.png");
 const FUNDO = { r: 255, g: 255, b: 255, alpha: 1 };
 
 /**
- * Quanto do lado do quadrado é que o emblema ocupa, por tipo de ícone.
+ * Quanto do lado do quadrado é que o desenho ocupa, por tipo de ícone.
  *
  * Os `maskable` do Android são recortados por uma máscara que o fabricante
  * escolhe, e a única zona garantida é o círculo central com 80% do lado. Daí
- * os 0,58: o emblema é mais largo do que alto, e 0,58 de largura deixa a
- * diagonal dentro desse círculo com folga.
+ * os 0,64: o logótipo é quase o dobro da largura da altura, e a essa escala a
+ * diagonal ainda cabe dentro do círculo.
  *
- * Os outros vão a 0,86 — o máximo antes de o desenho encostar ao rebordo.
- * MEDIDO: a tinta passa a ocupar 16,6% do quadrado, contra os 2,1% do ícone
- * antigo. Oito vezes mais desenho no mesmo espaço.
+ * Os outros vão a 0,92 — o máximo antes de o desenho encostar ao rebordo.
  */
-const OCUPACAO = { normal: 0.86, maskable: 0.58 };
+const OCUPACAO = { normal: 0.92, maskable: 0.64 };
 
 /**
- * O emblema, recortado à tinta.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ONDE É QUE A PALAVRA NÃO CABE — E O QUE SE FAZ AÍ
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Devolve um PNG com fundo transparente e sem uma única linha de vazio à
- * volta, para que quem compõe controle a margem toda.
+ * O pedido foi claro: "quero o favicon colorido a dizer Líquen Events". É o
+ * que sai, em todos os tamanhos menos um.
+ *
+ * A conta dos 16 px, que é o tamanho do separador do browser: o logótipo tem
+ * proporção 2,1:1, portanto a 16 px de largura ocupa 7 px de altura. Dentro
+ * desses 7 px vivem o emblema E duas linhas de texto — sobram DOIS píxeis de
+ * altura para as letras de "LÍQUEN". Não é uma questão de qualidade de
+ * ficheiro nem de compressão: duas linhas de píxeis não desenham uma letra.
+ * Seja qual for o ficheiro, o que aparece é uma barra cinzenta.
+ *
+ * Portanto: nos 16 px vai o emblema sozinho, que a essa escala ainda se lê
+ * como o líquen da marca. Em 32, 48, 180, 192 e 512 — que é onde o ícone
+ * aparece grande: favoritos, ecrã do telemóvel, cartão de sítio, aplicação
+ * instalada — vai o logótipo completo, com a palavra.
+ *
+ * Para pôr a palavra também nos 16, basta esvaziar esta lista. Fica dito
+ * porque a escolha é dela, não minha; o que é meu é a conta.
  */
-async function emblema() {
+const ONDE_SO_EMBLEMA = [16];
+
+/**
+ * O desenho recortado à tinta, com fundo transparente e sem uma única linha de
+ * vazio à volta, para que quem compõe controle a margem toda.
+ *
+ * `qual` escolhe o que sai:
+ *
+ *   "completo" — emblema mais "LÍQUEN EVENTS". É o que ela pediu: "quero o
+ *                favicon colorido a dizer Líquen Events".
+ *   "emblema"  — só o líquen. Fica reservado para os 16 px (ver ONDE_SO_EMBLEMA).
+ */
+async function recorte(qual) {
   const { data, info } = await sharp(ORIGEM)
     .ensureAlpha()
     .raw()
@@ -119,7 +146,11 @@ async function emblema() {
     );
   }
 
-  const [topo, fundo] = blocos[0];
+  // O emblema é o primeiro bloco; o logótipo completo vai do primeiro ao
+  // último, o que inclui o acento do "Í" e a palavra.
+  const topo = blocos[0][0];
+  const fundo = qual === "emblema" ? blocos[0][1] : blocos[blocos.length - 1][1];
+
   let x0 = W;
   let x1 = -1;
   for (let y = topo; y <= fundo; y++) {
@@ -133,7 +164,7 @@ async function emblema() {
 
   const largura = x1 - x0 + 1;
   const altura = fundo - topo + 1;
-  console.log(`emblema medido: ${largura}x${altura} px em (${x0}, ${topo})`);
+  console.log(`${qual}: ${largura}x${altura} px em (${x0}, ${topo})`);
 
   return {
     largura,
@@ -146,10 +177,12 @@ async function emblema() {
   };
 }
 
-/** Um ícone quadrado de `lado` px, com o emblema centrado. */
-async function icone(emb, lado, ocupacao) {
-  // O emblema é mais largo do que alto; a ocupação manda na dimensão maior,
-  // senão um emblema achatado sairia com margens desiguais.
+/** Um ícone quadrado de `lado` px, com o desenho centrado. */
+async function icone(desenhos, lado, ocupacao) {
+  const emb = ONDE_SO_EMBLEMA.includes(lado) ? desenhos.emblema : desenhos.completo;
+
+  // O desenho é mais largo do que alto; a ocupação manda na dimensão maior,
+  // senão sairia com margens desiguais.
   const escala = (lado * ocupacao) / Math.max(emb.largura, emb.altura);
   const w = Math.round(emb.largura * escala);
   const h = Math.round(emb.altura * escala);
@@ -237,14 +270,17 @@ function empacotarIco(pngs) {
 }
 
 async function main() {
-  const emb = await emblema();
+  const desenhos = {
+    completo: await recorte("completo"),
+    emblema: await recorte("emblema"),
+  };
 
   const destinos = [
     // O `icon.png` do App Router serve o <link rel="icon"> em todos os
     // tamanhos que o browser peça, portanto vale a pena ser grande.
     { caminho: "src/app/icon.png", lado: 512, ocupacao: OCUPACAO.normal },
     // 180 é o que o iOS pede. Sem transparência: o iOS compõe sobre preto e
-    // um ícone transparente ficaria com o emblema verde sobre escuro.
+    // um ícone transparente ficaria com o desenho de marca sobre escuro.
     { caminho: "src/app/apple-icon.png", lado: 180, ocupacao: OCUPACAO.normal },
     { caminho: "public/icon-192.png", lado: 192, ocupacao: OCUPACAO.normal },
     { caminho: "public/icon-512.png", lado: 512, ocupacao: OCUPACAO.normal },
@@ -252,7 +288,7 @@ async function main() {
   ];
 
   for (const d of destinos) {
-    const buf = await icone(emb, d.lado, d.ocupacao);
+    const buf = await icone(desenhos, d.lado, d.ocupacao);
     writeFileSync(path.join(RAIZ, d.caminho), buf);
     console.log(
       `${d.caminho.padEnd(32)} ${d.lado}x${d.lado}  ${(buf.length / 1024).toFixed(1)} KB`,
@@ -264,7 +300,7 @@ async function main() {
   const LADOS_ICO = [16, 32, 48];
   const pngs = [];
   for (const lado of LADOS_ICO) {
-    pngs.push({ lado, buf: await icone(emb, lado, OCUPACAO.normal) });
+    pngs.push({ lado, buf: await icone(desenhos, lado, OCUPACAO.normal) });
   }
   const ico = empacotarIco(pngs);
   writeFileSync(path.join(RAIZ, "src/app/favicon.ico"), ico);
