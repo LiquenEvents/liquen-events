@@ -121,10 +121,23 @@ function desenhar({ formato, capaUrl, logoUrl, titulo, apoio, cta, segura, guia 
           rgba(0,0,0,.72) ${eStory ? 28 : 34}%,
           rgba(0,0,0,.30) ${eStory ? 55 : 62}%,
           rgba(0,0,0,.10) 100%);"></div>
+      <!-- Um véu leve NO TOPO, só para o logótipo se ler. Sem ele, o logótipo
+           branco sobre um céu claro ao entardecer — que é metade destas
+           fotografias — ficava lavado, e um logótipo que não se lê é o mesmo
+           que não estar lá. Pára antes do meio da peça, portanto não escurece
+           a fotografia onde ela interessa. -->
+      <div style="
+        position:absolute;left:0;right:0;top:0;height:${eStory ? 46 : 40}%;
+        background:linear-gradient(to bottom,
+          rgba(0,0,0,.42) 0%, rgba(0,0,0,.20) 45%, rgba(0,0,0,0) 100%);"></div>
 
+      <!-- O logótipo a 360 px numa peça de 1080 é UM TERÇO da largura. Estava
+           a 210 e a dona pediu-o maior: num story visto num telemóvel a 210 px
+           o "LÍQUEN EVENTS" lia-se com esforço, e uma marca que não se lê num
+           anúncio não está lá para nada. Continua dentro da zona segura. -->
       <img src="${logoUrl}" style="
         position:absolute;left:${segura.esquerda}px;top:${eStory ? segura.topo : 70}px;
-        width:210px;height:auto;" />
+        width:360px;height:auto;" />
 
       <div style="
         position:absolute;left:${segura.esquerda}px;
