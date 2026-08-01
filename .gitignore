@@ -82,3 +82,6 @@ remotion/public/*.mp4
 .agents/
 .claude/skills/
 skills-lock.json
+
+# Exportação das landing pages (imagens geradas; ver scripts/exportar-lps.mjs)
+lp-export/
