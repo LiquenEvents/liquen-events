@@ -40,6 +40,7 @@
  */
 
 import { chromium } from "playwright";
+import sharp from "sharp";
 import { readFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -57,6 +58,47 @@ const FORMATOS = [
   // POR BAIXO. Por isso a zona segura aqui é só uma margem de composição.
   { id: "45", largura: 1080, altura: 1350, rotulo: "feed" },
 ];
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O LOGÓTIPO, RECORTADO — E PORQUE É QUE ISTO É PRECISO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A dona olhou para as peças e disse: "parece que o logo não está central,
+ * parece que está mais para a direita". Estava. E a culpa não era da
+ * centragem — era do ficheiro.
+ *
+ * MEDIDO em public/logo-liquen-branco.png com o `trim` do sharp:
+ *
+ *     ficheiro                3747 x 2238
+ *     tinta (o desenho)       2146 x 1084
+ *     transparente à esquerda  866 px
+ *     transparente à direita   735 px
+ *
+ * São 131 px a mais de vazio do lado esquerdo. Ou seja: a CAIXA do ficheiro
+ * estava perfeitamente centrada, e o DESENHO lá dentro está 65,5 px à direita
+ * do centro dessa caixa — o que, desenhado a 560 px de largura, dá cerca de
+ * 10 px de desvio para a direita numa peça de 1080. Perfeitamente visível, e
+ * foi o que ela viu.
+ *
+ * A correcção não é empurrar a imagem 10 px para a esquerda — isso seria um
+ * número mágico preso a este ficheiro, que se estraga em silêncio no dia em
+ * que alguém exportar o logótipo outra vez. Recorta-se o transparente e
+ * usa-se a TINTA: a partir daí o centro do desenho é o centro do elemento,
+ * por construção.
+ *
+ * Efeito lateral, e é bom: a 560 px passa a ser o desenho a medir 560 px, e
+ * não a caixa. O logótipo fica visivelmente maior sem se mudar o número.
+ *
+ * Vai como `data:` em vez de ficheiro novo em public/: é usado só aqui, e um
+ * ficheiro a mais no repositório é mais um sítio onde as duas versões do
+ * logótipo podem divergir.
+ */
+async function logoRecortado() {
+  const origem = path.join(RAIZ, "public", "logo-liquen-branco.png");
+  const buf = await sharp(origem).trim({ threshold: 1 }).png().toBuffer();
+  return `data:image/png;base64,${buf.toString("base64")}`;
+}
 
 /**
  * Lê o catálogo por expressão regular, como o guião de medição faz. É TS e
@@ -197,6 +239,7 @@ async function main() {
   }
 
   const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+  const logoUrl = await logoRecortado();
   let escritas = 0;
 
   for (const v of variantes) {
@@ -223,7 +266,7 @@ async function main() {
           await pagina.evaluate(desenhar, {
             formato,
             capaUrl: BASE + encodeURI(v.capa),
-            logoUrl: `${BASE}/logo-liquen-branco.png`,
+            logoUrl,
             titulo: g.titulo,
             apoio: g.apoio,
             cta,
