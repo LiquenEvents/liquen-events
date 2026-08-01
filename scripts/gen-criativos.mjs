@@ -282,7 +282,29 @@ async function main() {
           });
           const pagina = await contexto.newPage();
           // Uma página REAL do sítio: é ela que traz as @font-face da marca.
-          await pagina.goto(`${BASE}/s/${v.slug}`, { waitUntil: "load", timeout: 60000 });
+          //
+          // ── E TEM DE SER A DO IDIOMA CERTO ──────────────────────────────
+          // A variante internacional só é servida em inglês, portanto
+          // `/s/portugal` responde 404. Eu navegava para lá na mesma: a
+          // fotografia carregava (é um URL absoluto), o desenho fazia-se, e o
+          // que faltava eram as fontes — a página de erro não as traz. As
+          // quatro peças de `portugal` saíram durante dias com o serifado
+          // que o Chromium usa por omissão, e ninguém reparou porque as
+          // outras dezoito estavam certas.
+          //
+          // Verificar o estado da resposta, e não só navegar, é o que impede
+          // isto de voltar em silêncio.
+          const caminho = v.idioma === "en" ? `/en/s/${v.slug}` : `/s/${v.slug}`;
+          const resposta = await pagina.goto(`${BASE}${caminho}`, {
+            waitUntil: "load",
+            timeout: 60000,
+          });
+          if (!resposta || !resposta.ok()) {
+            throw new Error(
+              `${caminho} respondeu ${resposta ? resposta.status() : "nada"}. Sem a página ` +
+                "certa não há fontes de marca, e a peça sai com o tipo de letra errado.",
+            );
+          }
           // ESPERAR PELA HIDRATAÇÃO ANTES DE ESCREVER. Sem isto, o React monta
           // depois do nosso `innerHTML` e apaga o desenho todo — e o sintoma é
           // o guião ficar à espera de um `#peca` que existiu durante meio

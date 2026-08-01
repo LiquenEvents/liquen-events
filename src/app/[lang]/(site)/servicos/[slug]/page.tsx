@@ -328,7 +328,12 @@ export default async function ServiceDetailPage({
           as="div"
           variant="zoom"
           stagger
-          className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[300px]"
+          // 340 e não 300 nas filas grandes: com 300, o mosaico de quatro
+          // colunas num ecrã de 1440 media 960 x 300, ou seja 3,2:1, e mesmo
+          // uma fotografia deitada perdia 53% da altura. A 340 são 2,8:1 e a
+          // perda cai para 44%. Mais do que isto e as filas passam a empurrar
+          // a secção seguinte para fora do ecrã sem se ganhar enquadramento.
+          className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[340px]"
         >
           {gallery.map((src, i) => {
             // Match the real column span (grid is 6-col at lg) so the wide

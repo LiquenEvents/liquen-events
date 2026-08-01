@@ -262,19 +262,28 @@ Não é um bom primeiro segundo para quem não fez pergunta nenhuma.
 
 Mesmo guião, mesmas condições, 60 pares página × perfil:
 
+> **CORRECÇÃO DE 01/08/2026 — os números abaixo estavam certos e a conclusão
+> estava errada.** Ver a secção seguinte, "O banner de cookies manda no LCP".
+> Em resumo: o intervalo de 1560 – 1752 ms media as páginas SEM o banner de
+> cookies desenhado. Na primeira visita — que é a única visita que um anúncio
+> compra — o banner desenha-se, é ele o elemento de LCP, e o LCP real está
+> entre **3488 e 3908 ms**. O alvo de 2500 ms **não** é cumprido.
+
 | | páginas do Google (antes) | variantes sociais |
 | --- | ---: | ---: |
-| LCP, intervalo | 1864 – 2472 ms | **1560 – 1752 ms** |
+| LCP, sem o banner | 1864 – 2472 ms | **1344 – 1432 ms** |
+| LCP, com o banner (visita real) | — | **3488 – 3908 ms** |
 | TBT (limite superior) | 409 – 583 ms | 272 – 592 ms |
-| bytes totais | 843 – 1858 KB | **609 – 706 KB** |
-| bytes de imagem | 435 – 1299 KB | **174 – 271 KB** |
-| elemento do LCP | a fotografia | **o `<h1>`** |
+| bytes totais | 843 – 1858 KB | **630 – 853 KB** |
+| elemento do LCP, sem banner | a fotografia | **o `<h1>`** |
+| elemento do LCP, com banner | — | **o `<p>` do banner** |
 
 Três coisas a reter:
 
 1. **O LCP passou a ser o texto, não a fotografia.** A frase dos três segundos
    pinta antes da imagem. Para tráfego que decide em três segundos, é o
-   melhor sítio onde o LCP pode estar.
+   melhor sítio onde o LCP pode estar — desde que não haja um parágrafo maior
+   a desenhar-se depois dela, que é precisamente o que o banner faz.
 2. **As páginas do Google também melhoraram**, e não foi por causa das
    sociais: foi a correcção do pré-aquecimento de capas. A
    `/casamentos/estilo/boho` caiu de 1858 para 1104 KB, e a
@@ -283,6 +292,45 @@ Três coisas a reter:
    bloqueado, nem sem service worker. As únicas respostas ≥400 foram
    `429 /api/vitals`, que é o limitador de ritmo a reagir a dezenas de
    medições seguidas da mesma máquina, e não um defeito da página.
+
+## O banner de cookies manda no LCP (01/08/2026)
+
+Fui trocar as fotografias de capa, medi outra vez para justificar o orçamento
+de bytes, e o que apareceu não era sobre as fotografias.
+
+Mesmo guião, mesmo build, seis perfis. A linha que interessa é a diferença
+entre dois perfis que só diferem numa coisa — se o `localStorage` responde:
+
+| perfil | LCP | pedidos | elemento do LCP |
+| --- | ---: | ---: | --- |
+| Instagram iOS | 3576 ms | 40 | `p` |
+| Instagram, armazenamento bloqueado | 1416 ms | 27 | `h1` |
+
+Com o armazenamento bloqueado o banner de cookies não consegue ler a escolha
+guardada e **não se desenha**. Sem ele, o elemento de LCP é o `<h1>` e a página
+pinta em 1,4 s. Com ele, o elemento de LCP passa a ser o **parágrafo do
+banner** — e como esse parágrafo só existe depois de o JavaScript hidratar, o
+LCP salta para 3,6 s.
+
+Três consequências, e nenhuma é agradável:
+
+1. **O número que publiquei estava a medir o caso que não acontece.** Quem
+   chega de um anúncio nunca esteve no sítio, portanto vê o banner sempre. O
+   LCP dessa pessoa é 3,5 a 3,9 s, não 1,6 s.
+2. **O texto do banner cresceu por minha causa.** Ao acrescentar a Meta passou
+   de 189 para 214 caracteres. Não sei dizer se foi isso que o tornou o maior
+   bloco de texto da página ou se já o era — não medi antes de o mudar, e é
+   essa a falha.
+3. **A causa não é o tamanho do texto, é o momento.** O banner desenha-se
+   depois da hidratação. Encurtar o texto tirava-lhe o título de elemento de
+   LCP sem a pessoa ver a página um milissegundo mais cedo — seria maquilhar
+   a métrica.
+
+A correcção verdadeira é o banner ser desenhado no servidor, com a escolha
+guardada num cookie em vez do `localStorage` — é o servidor que passa a saber
+se há-de o mostrar, e ele aparece no primeiro pixel em vez de aparecer 3,6 s
+depois. Toca em consentimento, que é matéria legal, e por isso **fica por
+decidir e não foi feito**. Está aqui escrito para não se perder.
 
 ## O que fica igual, de propósito
 

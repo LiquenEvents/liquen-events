@@ -27,20 +27,37 @@ import { POLOS } from "@/lib/ads/polos";
 /**
  * O orçamento de bytes da capa.
  *
- * 150 KB, e não os 100 KB dos heróis das páginas do Google. A diferença é
- * MEDIDA, não uma cedência:
+ * 300 KB, e não os 100 KB dos heróis das páginas do Google. A diferença é
+ * MEDIDA, e a medição corrigiu-me duas vezes.
  *
- *   • nas páginas do Google o elemento de LCP É a fotografia, e o limite de
- *     2 s do Índice de Qualidade obriga aos 100 KB (ver polos-peso.test.ts);
- *   • nestas o elemento de LCP é o `<h1>` — o texto pinta antes da imagem —,
- *     e o LCP medido no perfil do Instagram ficou entre 1560 e 1752 ms contra
- *     um alvo de 2500. Há folga, e gastá-la numa fotografia que faça parar o
- *     dedo é o melhor uso possível dela.
+ * Nas páginas do Google o elemento de LCP É a fotografia, e o limite de 2 s do
+ * Índice de Qualidade obriga aos 100 KB (ver polos-peso.test.ts). Nestas não:
+ * aqui o texto pinta muito antes da imagem, e a imagem nunca chega a ser o
+ * elemento de LCP.
  *
- * NÃO subir mais sem medir outra vez. Acima disto a imagem começa a competir
- * com o texto pela largura de banda e o LCP volta a ser a fotografia.
+ * MEDIDO em 01/08/2026, perfil do Instagram com rede e CPU estrangulados, com
+ * o banner de cookies fora do caminho (é o eixo que isola o efeito da capa):
+ *
+ *     variante    capa a 1536 px    LCP     elemento
+ *     comporta          143 KB    1416 ms   h1
+ *     lisboa            159 KB    1344 ms   h1
+ *     algarve           231 KB    1404 ms   h1
+ *     alentejo          264 KB    1432 ms   h1
+ *     portugal          297 KB    1360 ms   h1
+ *
+ * Do mais leve ao mais pesado vão 154 KB de diferença e 16 ms de LCP — ou
+ * seja, nada. O que se paga com uma capa mais pesada não é o LCP, é a
+ * fotografia aparecer preenchida um pouco mais tarde por baixo de um texto que
+ * já lá está.
+ *
+ * Foi por isto que os 150 KB subiram: estavam a obrigar a escolher capas
+ * lisas. A capa do Algarve era um grande plano desfocado — leve porque tem
+ * pouco detalhe — e uma fotografia com detalhe em todo o quadro pesa sempre
+ * mais. O orçamento estava a premiar exactamente a fotografia errada.
+ *
+ * NÃO subir mais sem medir outra vez.
  */
-const LIMITE_CAPA_KB = 150;
+const LIMITE_CAPA_KB = 300;
 const LARGURA = 1536;
 
 describe("catálogo das variantes sociais", () => {

@@ -182,7 +182,11 @@ export const VARIANTES: Variante[] = [
   {
     slug: "alentejo",
     polo: "alentejo",
-    capa: "/imagens/EW1_1392.jpg",
+    // "Uma herdade dá espaço a mais e sombra a menos" — e a fotografia diz
+    // isso sem uma palavra: cadeiras em meia-lua debaixo da única árvore, com
+    // a terra seca à volta. Antes era EW1_1392, um grande plano com 13% do
+    // quadro nítido (ver a nota da capa do Algarve).
+    capa: "/imagens/DJI_20250913190635_0120_D.jpg",
     pt: {
       metaTitle: "Casamentos em herdades do Alentejo | Líquen Events",
       metaDescription:
@@ -240,7 +244,10 @@ export const VARIANTES: Variante[] = [
   {
     slug: "lisboa",
     polo: "lisboa",
-    capa: "/imagens/J&A-243.jpg",
+    // Fachada de quinta coberta de hera e a mesa comprida montada à frente
+    // dela. "Uma quinta a vinte minutos de casa, montada como se fosse longe
+    // de tudo" lê-se na fotografia antes de se ler no título.
+    capa: "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg",
     pt: {
       metaTitle: "Casamentos em Lisboa, Cascais e Sintra | Líquen Events",
       metaDescription:
@@ -298,7 +305,20 @@ export const VARIANTES: Variante[] = [
   {
     slug: "algarve",
     polo: "algarve",
-    capa: "/imagens/DaniGui_Preview79.jpg",
+    // ── A CAPA QUE ELA FOTOGRAFOU, E PORQUE É QUE ERA MÁ ──────────────────
+    // Era DaniGui_Preview79.jpg: um grande plano de flores com o fundo
+    // desfocado. Num ecrã de telemóvel inteiro não se percebia o que era.
+    //
+    // MEDIDO, e é por isso que isto está escrito e não só corrigido: passei
+    // um laplaciano por todas as fotografias de herói e contei a fracção do
+    // quadro com detalhe. A capa antiga do Algarve deu 4% — o valor mais
+    // baixo das 43. As outras três que troquei davam 13%, 16% e 19%. Uma
+    // fotografia com 4% do quadro nítido é, para quem passa stories, uma
+    // mancha colorida.
+    //
+    // Esta é uma festa ao fim da tarde com a casa branca atrás e as lâmpadas
+    // já acesas: "o jantar começa quando o calor acaba", que é o gancho.
+    capa: "/imagens/DaniGui_JantarFesta_130.jpg",
     pt: {
       metaTitle: "Casamentos no Algarve | Líquen Events",
       metaDescription:
@@ -356,7 +376,10 @@ export const VARIANTES: Variante[] = [
   // ───────────────────────────────────────────────────────────────────────
   {
     slug: "portugal",
-    capa: "/imagens/J&A-442.jpg",
+    // Para quem está a ver isto de Londres ou de Nova Iorque, o que vende
+    // Portugal é a paisagem: cadeiras da cerimónia debaixo de sobreiros, com
+    // a vinha a descer atrás. Antes era um grande plano.
+    capa: "/imagens/J&A-68.jpg",
     soEm: "en",
     pt: {
       // Não servida (ver `soEm`). Fica preenchida porque o tipo o exige e

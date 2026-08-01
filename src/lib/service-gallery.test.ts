@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import { pickServiceGallery, SERVICE_GALLERY_SIZE } from "./service-gallery";
 import { PHOTOS } from "@/app/[lang]/(site)/galeria/photos-data";
 import { SERVICES } from "./services-data";
+import dims from "./image-dims.json";
+
+const DIMENSOES = dims as Record<string, number[]>;
 
 const srcOf = (labels: string[]) =>
   new Set(PHOTOS.filter((p) => labels.includes(p.label)).map((p) => p.src));
@@ -41,6 +44,69 @@ describe("pickServiceGallery", () => {
       for (const src of pickServiceGallery("casamentos")!) if (tail.has(src)) hits.add(src);
     }
     expect(hits.size).toBeGreaterThan(20);
+  });
+
+  it("nunca põe uma fotografia vertical num mosaico deitado", () => {
+    // A queixa que originou o filtro: "coloca fotos que se adequem em termos
+    // de posição". O mosaico grande é 2,8:1; uma fotografia vertical lá dentro
+    // aparece como uma tira do meio dela, e é isso que se vê na página.
+    //
+    // Vinte sorteios por serviço, e não um: o defeito era probabilístico —
+    // com 254 verticais em 333, um único sorteio limpo não provava nada.
+    const problemas: string[] = [];
+    for (const svc of SERVICES) {
+      for (let i = 0; i < 20; i++) {
+        for (const src of pickServiceGallery(svc.slug) ?? []) {
+          const d = DIMENSOES[src];
+          if (!d) {
+            problemas.push(`${svc.slug}: ${src} não tem dimensões conhecidas`);
+            continue;
+          }
+          if (d[0] / d[1] < 1.4) {
+            problemas.push(`${svc.slug}: ${src} é ${d[0]}x${d[1]}, vertical`);
+          }
+        }
+      }
+    }
+    expect([...new Set(problemas)], problemas.join("\n")).toEqual([]);
+  });
+
+  it("usa sempre as maiores que o conjunto do serviço tiver", () => {
+    // Um mosaico servido a 67vw num portátil de 1440 px com ecrã de densidade
+    // dupla pede quase 2000 px de largura real; abaixo disso o browser amplia.
+    // Mas isso é uma PREFERÊNCIA, não uma exigência, e o teste tem de dizer o
+    // mesmo que o código — senão passa a proibir o degrau de recurso.
+    //
+    // MEDIDO: o conjunto "Evento" tem catorze fotografias deitadas e só UMA
+    // com 2000 px ou mais. Exigir os 2000 lá seria exigir uma grelha com
+    // buracos. Portanto o que se verifica é outra coisa: que o sorteio usa
+    // sempre o MELHOR degrau que aquele conjunto consegue encher.
+    const problemas: string[] = [];
+    for (const svc of SERVICES) {
+      const escolhas = pickServiceGallery(svc.slug);
+      if (!escolhas) continue; // serve-se da lista à mão; não é este o assunto
+
+      const conjunto = PHOTOS.filter((p) => escolhas.includes(p.src)).map((p) => p.label);
+      const irmas = PHOTOS.filter((p) => conjunto.includes(p.label)).map((p) => p.src);
+      const grandesEDeitadas = irmas.filter((s) => {
+        const d = DIMENSOES[s];
+        return d && d[0] / d[1] >= 1.4 && d[0] >= 2000;
+      });
+      if (grandesEDeitadas.length < SERVICE_GALLERY_SIZE) continue; // degrau legítimo
+
+      for (let i = 0; i < 20; i++) {
+        for (const src of pickServiceGallery(svc.slug) ?? []) {
+          const d = DIMENSOES[src];
+          if (d && d[0] < 2000) {
+            problemas.push(
+              `${svc.slug}: ${src} tem ${d[0]} px, e este conjunto tem ` +
+                `${grandesEDeitadas.length} fotografias deitadas com 2000 px ou mais`,
+            );
+          }
+        }
+      }
+    }
+    expect([...new Set(problemas)], problemas.join("\n")).toEqual([]);
   });
 
   it("recusa-se a servir um serviço sem conjunto próprio", () => {

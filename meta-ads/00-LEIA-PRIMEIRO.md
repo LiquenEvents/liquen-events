@@ -165,16 +165,26 @@ Sessenta pares de página × perfil. Corre com `node scripts/medir-social.mjs`.
 
 | | páginas do Google (antes) | variantes sociais |
 | --- | ---: | ---: |
-| LCP | 1864 – 2472 ms | **1560 – 1752 ms** |
-| bytes totais | 843 – 1858 KB | **609 – 706 KB** |
-| bytes de imagem | 435 – 1299 KB | **174 – 271 KB** |
-| elemento do LCP | a fotografia | **o `<h1>`** |
+| LCP, sem o banner de cookies | 1864 – 2472 ms | **1344 – 1432 ms** |
+| LCP, com o banner (visita real) | — | **3488 – 3908 ms** |
+| bytes totais | 843 – 1858 KB | **630 – 853 KB** |
+| elemento do LCP, sem banner | a fotografia | **o `<h1>`** |
+| elemento do LCP, com banner | — | **o `<p>` do banner** |
 
-**Alvo pedido: abaixo de 2500 ms no browser interno. Cumprido com folga em
-todas as páginas e em todos os perfis.**
+**Alvo pedido: abaixo de 2500 ms no browser interno. NÃO cumprido na visita
+real** — e a versão anterior deste documento dizia que sim, porque media o
+caso sem banner. Correcção de 01/08/2026.
 
-O LCP passou a ser o texto e não a fotografia — a frase dos três segundos pinta
-antes da imagem, que para este tráfego é o melhor sítio onde o LCP pode estar.
+A página em si é rápida: sem o banner desenhado, o elemento de LCP é o `<h1>` e
+ele pinta em 1,4 s. O que empurra o número para 3,6 s é o **banner de cookies**,
+que só se desenha depois de o JavaScript hidratar e cujo parágrafo é maior do
+que o título. Quem chega de um anúncio nunca esteve no sítio, portanto vê-o
+sempre.
+
+A correcção é desenhar o banner no servidor, guardando a escolha num cookie em
+vez do `localStorage`. Toca em consentimento, é matéria legal, e por isso está
+**por decidir**. O diagnóstico completo está em `LP-AUDIT.md`, secção "O banner
+de cookies manda no LCP".
 
 Nada parte em nenhum dos seis perfis, incluindo com o armazenamento bloqueado e
 sem service worker. Dezasseis testes de Playwright cobrem o fluxo completo de
