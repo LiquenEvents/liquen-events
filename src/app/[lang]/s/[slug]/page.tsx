@@ -51,9 +51,10 @@ import {
  * ── O QUE ESTA PÁGINA NÃO TEM ──────────────────────────────────────────────
  * Sem barra de navegação, sem rodapé, sem transições de página, sem barra de
  * progresso, sem pré-aquecimento de capas de outras páginas. Não é por
- * omissão: é o layout `/s/layout.tsx` que a mantém fora desse ramo, e a razão
- * está medida em LP-AUDIT.md — o cromado do sítio eram 207 KB de JavaScript
- * numa página cujo trabalho inteiro é mostrar uma fotografia e um botão.
+ * omissão: é o layout `/s/layout.tsx` que a mantém fora desse ramo. O que se
+ * poupa NÃO são bytes — está medido, e o cabeçalho de CromadoDoSitio.tsx traz
+ * os números — mas trabalho: ouvintes de scroll, observadores, registo de
+ * service worker, e a pré-renderização de seis páginas que ninguém vai abrir.
  *
  * Menu nenhum é intencional em segundo grau: um menu é uma lista de sítios
  * para onde a pessoa pode ir que não são o formulário.
