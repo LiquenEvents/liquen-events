@@ -80,6 +80,36 @@ describe("POST /api/orcamento", () => {
     }
   });
 
+  it("o aviso à equipa diz LOGO NO ASSUNTO que é um pedido de orçamento", async () => {
+    // A queixa que originou isto: ela fotografou a caixa de correio e o
+    // assunto era "Casamentos · 18 set 2027 · 250 pax — Catar...". Lia-se como
+    // uma marcação já feita. Numa lista de mensagens, o que a mensagem É tem
+    // de vir antes dos dados que servem para a triar.
+    await POST(req("POST", { form: { ...validForm, category: "casamentos" } }));
+    const equipa = sendMailMock.mock.calls[0][0];
+    expect(
+      equipa.subject.toLowerCase().startsWith("pedido de orçamento"),
+      `o assunto era "${equipa.subject}"`,
+    ).toBe(true);
+  });
+
+  it("a pré-visualização da caixa de correio não começa pela referência", async () => {
+    // Alguns clientes de correio mostram a versão em texto simples na linha de
+    // pré-visualização. Começava por "NOVO PEDIDO DE ORÇAMENTO / Referência:
+    // LIQ-..." — duas linhas gastas a repetir o assunto e a mostrar o dado
+    // menos útil que este email tem. A referência serve para procurar depois,
+    // não para decidir agora, e por isso desceu para o fim.
+    await POST(req("POST", { form: validForm }));
+    const equipa = sendMailMock.mock.calls[0][0];
+    const primeiraLinha = (equipa.text ?? "").split("\n")[0];
+    expect(primeiraLinha).toContain(validForm.name);
+    expect(primeiraLinha).not.toMatch(/refer[êe]ncia/i);
+    expect(primeiraLinha).not.toMatch(/^LIQ-/);
+    // E continua a estar lá, no fim — sem ela não se procura o pedido no back
+    // office.
+    expect(equipa.text).toMatch(/Referência: LIQ-/);
+  });
+
   it("silently drops a honeypot hit without persisting or emailing", async () => {
     const res = await POST(req("POST", { form: validForm, website: "i-am-a-bot" }));
     expect(res.status).toBe(200);

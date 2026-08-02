@@ -176,12 +176,28 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
       : "";
   const referral = form.referralSource?.trim() || "";
 
-  // Subject: type · date · pax — name. The triage trio leads (survives phone
-  // truncation); the name lands last where a cut is harmless.
+  // ── O ASSUNTO DIZ PRIMEIRO O QUE É ────────────────────────────────────────
+  // A queixa, textual: "não gosto disto assim, quero que fique mais claro que
+  // é um pedido de orçamento, está uma confusão enorme".
+  //
+  // O assunto começava pelo trio de triagem — "Casamentos · 18 set 2027 ·
+  // 250 pax — Catarina..." — porque isso é o que decide se o trabalho cabe na
+  // agenda. Bom raciocínio, conclusão errada: na lista da caixa de correio,
+  // ao lado de tudo o resto, aquilo lia-se como uma marcação já feita, e não
+  // como alguém a pedir orçamento. A triagem só serve depois de se saber o
+  // que a mensagem é.
+  //
+  // "Pedido de orçamento" leva 19 caracteres dos cerca de 45 que um telemóvel
+  // mostra. É caro, e paga-se de bom grado: o resto do assunto repete-se todo
+  // dentro do email, e a linha de pré-visualização — que é a seguir — leva o
+  // nome e a data. O que não se pode recuperar é a mensagem parecer outra
+  // coisa.
   const subjectLead = [et || cat, when, form.guests ? `${form.guests} pax` : ""]
     .filter(Boolean)
     .join(" · ");
-  const subject = subjectLead ? `${subjectLead} — ${name}` : `Novo pedido de orçamento — ${name}`;
+  const subject = subjectLead
+    ? `Pedido de orçamento · ${subjectLead} — ${name}`
+    : `Pedido de orçamento — ${name}`;
 
   // Hidden inbox-preview line — surfaces what the subject can't.
   const preheader = [
@@ -369,29 +385,48 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
 </body>
 </html>`;
 
+  // ── A PRIMEIRA LINHA DESTE TEXTO É A PRÉ-VISUALIZAÇÃO DA CAIXA DE CORREIO ──
+  // Ela fotografou a lista de mensagens e por baixo do assunto lia-se "NOVO
+  // PEDIDO DE ORÇAMENTO Referência: LI...". Duas linhas de espaço, e nenhuma
+  // delas a dizer quem escreveu nem quando é o casamento: o cabeçalho repetia
+  // o que o assunto passa a dizer, e a referência é o dado menos útil que este
+  // email tem — serve para procurar mais tarde, não para decidir agora.
+  //
+  // Alguns clientes de correio mostram o HTML e usam a linha invisível de
+  // pré-visualização (a `preheader`, mais acima); outros — foi o caso — mostram
+  // a versão em texto simples. As duas passam a dizer o mesmo, e a referência
+  // desce para o fim.
+  //
+  // As linhas em branco são deliberadas e têm de sobreviver. O filtro de baixo
+  // deixava cair TUDO o que fosse string vazia, e portanto deixava cair também
+  // os espaçamentos: o texto chegava como um bloco corrido de dez linhas
+  // coladas, que é a segunda metade da confusão de que ela se queixou. Os
+  // campos ausentes passam a ser `null`, e é `null` que se filtra.
   const text = [
-    "NOVO PEDIDO DE ORÇAMENTO",
-    `Referência: ${id}`,
+    preheader,
     "",
+    "O EVENTO",
+    subtitle ? `Evento: ${subtitle}` : null,
+    dateHero ? `Data: ${dateHero}${isWeekend ? " (fim de semana)" : ""}` : null,
+    form.guests ? `Convidados: ${form.guests}` : null,
+    local ? `Local: ${local}` : null,
+    budgetLabel ? `Orçamento: ${budgetLabel}` : null,
+    urgencyLabel ? `Antecedência: ${urgencyLabel}` : null,
+    estimate ? `Orçamento estimado: ${estimate}` : null,
+    "",
+    "QUEM PEDIU",
     `Nome: ${name}`,
-    subtitle ? `Evento: ${subtitle}` : "",
-    dateHero ? `Data: ${dateHero}${isWeekend ? " (fim de semana)" : ""}` : "",
-    form.guests ? `Convidados: ${form.guests}` : "",
-    local ? `Local: ${local}` : "",
-    budgetLabel ? `Orçamento: ${budgetLabel}` : "",
-    urgencyLabel ? `Antecedência: ${urgencyLabel}` : "",
-    estimate ? `Orçamento estimado: ${estimate}` : "",
-    "",
-    form.email ? `Email: ${form.email}` : "",
-    form.phone ? `Telefone: ${form.phone}` : "",
-    form.company ? `Empresa: ${form.company}` : "",
-    form.nif ? `NIF: ${form.nif}` : "",
-    referral ? `Como nos conheceu: ${referral}` : "",
-    form.notes ? `\nNotas:\n${form.notes}` : "",
+    form.email ? `Email: ${form.email}` : null,
+    form.phone ? `Telefone: ${form.phone}` : null,
+    form.company ? `Empresa: ${form.company}` : null,
+    form.nif ? `NIF: ${form.nif}` : null,
+    referral ? `Como nos conheceu: ${referral}` : null,
+    form.notes ? `\nNOTAS DO CLIENTE\n${form.notes}` : null,
     "",
     "Responda a este email para falar diretamente com o cliente.",
+    `Referência: ${id}`,
   ]
-    .filter((line) => line !== "")
+    .filter((line) => line !== null)
     .join("\n");
 
   return { subject, html, text };
