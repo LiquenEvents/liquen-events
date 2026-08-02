@@ -85,3 +85,6 @@ skills-lock.json
 
 # Exportação das landing pages (imagens geradas; ver scripts/exportar-lps.mjs)
 lp-export/
+
+# Pasta pronta a publicar no Instagram (imagens copiadas; ver scripts/exportar-instagram.mjs)
+instagram-export/
