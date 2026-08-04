@@ -17,7 +17,6 @@ export type View =
   | "fornecedores"
   | "inventario"
   | "temas"
-  | "seguimentos"
   | "estatisticas"
   | "faturas"
   | "contratos"
@@ -41,14 +40,7 @@ export type View =
  */
 export const CORE_NAV: View[] = ["overview", "pedidos", "propostas", "calendario", "tarefas"];
 
-export const MORE_NAV: View[] = [
-  "faturas",
-  "contratos",
-  "temas",
-  "kanban",
-  "seguimentos",
-  "estatisticas",
-];
+export const MORE_NAV: View[] = ["faturas", "contratos", "temas", "kanban", "estatisticas"];
 
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
@@ -175,23 +167,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
         />
         <circle cx="9.5" cy="12" r="1.2" />
         <path d="m6 17 3.5-3 3 2.5L16 13l3 4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "seguimentos",
-    label: "Seguimentos",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M12 7v5l3 2" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="9" />
       </svg>
     ),
   },

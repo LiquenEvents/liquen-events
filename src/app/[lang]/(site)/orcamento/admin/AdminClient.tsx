@@ -59,7 +59,6 @@ import {
   Contratos,
   Inventario,
   Temas,
-  Seguimentos,
   ClientMessenger,
   EventChecklist,
   EventTimeline,
@@ -1306,7 +1305,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     fornecedores: "Fornecedores",
     inventario: "Inventário",
     temas: "Temas",
-    seguimentos: "Seguimentos",
     estatisticas: "Estatísticas",
     faturas: "Faturas",
     contratos: "Propostas Aceites",
@@ -1326,7 +1324,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
     temas: "Fotos de inspiração por tema, prontas para as propostas",
-    seguimentos: "Seguimentos automáticos a fazer",
     estatisticas: "Métricas e desempenho",
     faturas: "Livro de faturação e pagamentos",
     contratos: "Aceitações de condições e estado de cada contrato",
@@ -1866,18 +1863,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "temas" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Temas />
-            </div>
-          )}
-
-          {/* ── Seguimentos automáticos ── */}
-          {view === "seguimentos" && (
-            <div className={`${VIEW_WRAP} view-in`}>
-              <Seguimentos
-                onOpenQuote={(id) => {
-                  const q = quotes.find((x) => x.id === id);
-                  if (q) openQuote(q);
-                }}
-              />
             </div>
           )}
 

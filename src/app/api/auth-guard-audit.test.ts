@@ -150,9 +150,6 @@ vi.mock("@/lib/message-links-store", () =>
   ]),
 );
 vi.mock("@/lib/app-state", () => H.build("app-state", ["getState", "setState"]));
-vi.mock("@/lib/followups", () =>
-  H.build("followups", ["computeFollowUps", "withInvoiceFollowUps"]),
-);
 vi.mock("@/lib/mail", () =>
   H.build("mail", ["sendMail"], { esc: (s: string) => s, MAIL_TO: "team@liquen.test" }),
 );
@@ -329,7 +326,6 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },
   { path: "./faturas/route", methods: ["GET", "POST"] },
   { path: "./faturas/[id]/route", methods: ["GET", "PATCH", "DELETE"] },
-  { path: "./followups/route", methods: ["GET"] },
   { path: "./fornecedores/route", methods: ["GET", "POST"] },
   { path: "./fornecedores/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./inbox/route", methods: ["GET"] },

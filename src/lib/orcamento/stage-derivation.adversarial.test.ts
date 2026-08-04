@@ -105,7 +105,7 @@ describe("deriveStage — quote.status as a first-class won signal", () => {
   it("quote marked 'aceite' with NO proposal/contract is at least 'aceite', not 'lead'", () => {
     // Deal booked/won directly in the admin (offline booking): the store allows
     // pendente → aceite with no proposal row (see quotes-store 'illegal status
-    // jump'), and followups treats such quotes as booked events. The dossier must
+    // jump'). The dossier must
     // agree with the stepper's deriveRequestLifecycle (which counts status
     // 'aceite' as contract-accepted), instead of showing a won deal as a fresh lead.
     const d = data({ quote: makeQuote({ status: "aceite" }) });

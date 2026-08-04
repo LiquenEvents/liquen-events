@@ -10,7 +10,7 @@
  *       Novo · Em revisão · Proposta enviada · Ganho · Perdido
  *   · Fases do Dossier — STAGE_LABELS em src/lib/orcamento/dossier.ts
  *   · Estados da fatura — invoice-validation.ts: emitida · paga · anulada
- *   · "Guião do dia" (folha de operações), "Seguimentos", "Mood boards",
+ *   · "Guião do dia" (folha de operações), "Mood boards",
  *     "Portal do cliente", filtro "VIP" — todos presentes na UI de admin.
  */
 
@@ -143,7 +143,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "Seguimento",
-    def: "Um lembrete para voltar a falar com o cliente numa certa data — por exemplo, para não deixar uma proposta sem resposta. Se a data já passou, aparece “em atraso”. No menu está em “Seguimentos”.",
+    def: "Um lembrete para voltar a falar com o cliente numa certa data — por exemplo, para não deixar uma proposta sem resposta. Se a data já passou, aparece “em atraso”. Marca-se no pedido, e a lista de pedidos ordena-se por ele com “Seguimentos primeiro”.",
   },
   {
     term: "Arquivar",

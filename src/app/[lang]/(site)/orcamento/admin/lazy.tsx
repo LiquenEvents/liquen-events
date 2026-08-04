@@ -110,7 +110,6 @@ const faturas = splitView(() => import("./Faturas"));
 const contratos = splitView(() => import("./Contratos"));
 const inventario = splitView(() => import("./Inventario"));
 const temas = splitView(() => import("./Temas"));
-const seguimentos = splitView(() => import("./FollowUps"));
 
 export const Kanban = kanban.View;
 export const Clientes = clientes.View;
@@ -124,7 +123,6 @@ export const Faturas = faturas.View;
 export const Contratos = contratos.View;
 export const Inventario = inventario.View;
 export const Temas = temas.View;
-export const Seguimentos = seguimentos.View;
 
 // ── Detail-panel tools (only needed once a quote is opened) ──
 export const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), {
@@ -184,7 +182,6 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   fornecedores: fornecedores.warm,
   inventario: inventario.warm,
   temas: temas.warm,
-  seguimentos: seguimentos.warm,
   estatisticas: estatisticas.warm,
   faturas: faturas.warm,
   contratos: contratos.warm,
