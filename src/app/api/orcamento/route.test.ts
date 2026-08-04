@@ -110,6 +110,26 @@ describe("POST /api/orcamento", () => {
     expect(equipa.text).toMatch(/Referência: LIQ-/);
   });
 
+  it("não mete o 'Como nos conheceu' no email", async () => {
+    // Ela fotografou a linha `Como nos conheceu  ref:www.google.com` e pediu
+    // para a tirar. O campo não é escrito por ninguém — é apanhado pelo
+    // LeadSourceCapture e traz notação de máquina (`ref:<domínio>` ou uma
+    // lista de UTMs). Continua a ser gravado, para o back office; deixou é de
+    // ser desenhado no email.
+    await POST(req("POST", { form: { ...validForm, referralSource: "ref:www.google.com" } }));
+    for (const [args] of sendMailMock.mock.calls) {
+      expect(args.html).not.toContain("Como nos conheceu");
+      expect(args.html).not.toContain("ref:www.google.com");
+      expect(args.text ?? "").not.toContain("Como nos conheceu");
+      expect(args.text ?? "").not.toContain("ref:www.google.com");
+    }
+    // E continua a ser guardado — é dali que sai a agregação "de onde vêm os
+    // pedidos" no back office. Tirar do email não pode virar tirar dos dados.
+    expect(store.create).toHaveBeenCalledWith(
+      expect.objectContaining({ referralSource: "ref:www.google.com" }),
+    );
+  });
+
   it("silently drops a honeypot hit without persisting or emailing", async () => {
     const res = await POST(req("POST", { form: validForm, website: "i-am-a-bot" }));
     expect(res.status).toBe(200);

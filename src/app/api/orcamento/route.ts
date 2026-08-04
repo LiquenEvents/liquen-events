@@ -174,7 +174,20 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     form.urgency && form.urgency !== "standard"
       ? (URGENCY_OPTIONS.find((u) => u.id === form.urgency)?.label ?? "")
       : "";
-  const referral = form.referralSource?.trim() || "";
+  // ── "COMO NOS CONHECEU" NÃO VAI NO EMAIL ─────────────────────────────────
+  // "Retira isto do email", com a fotografia da linha a dizer
+  // `Como nos conheceu  ref:www.google.com`.
+  //
+  // Tinha razão, e o problema não é o campo — é o sítio. O `referralSource`
+  // não é escrito por ninguém: é apanhado pelo LeadSourceCapture no primeiro
+  // ecrã da visita, e o que lá está é `ref:<domínio>` ou uma lista de UTMs,
+  // ou seja, notação de máquina. Num email que a equipa lê com pressa para
+  // decidir se responde, aquela linha ocupa espaço e não ajuda a decidir nada.
+  //
+  // O campo CONTINUA a ser capturado e gravado. O sítio dele é o back office,
+  // onde já alimenta a agregação "de onde vêm os pedidos"
+  // (StatsDashboard.tsx) — que é uma pergunta de fim de mês, não de resposta
+  // a um pedido. Só deixou de ser desenhado no email.
 
   // ── O ASSUNTO DIZ PRIMEIRO O QUE É ────────────────────────────────────────
   // A queixa, textual: "não gosto disto assim, quero que fique mais claro que
@@ -237,8 +250,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     (form.email ? row("Email", link(`mailto:${esc(form.email)}`, form.email)) : "") +
     (form.phone ? row("Telefone", link(`tel:${telHref(form.phone)}`, form.phone)) : "") +
     (form.company ? row("Empresa", esc(form.company)) : "") +
-    (form.nif ? row("NIF", esc(form.nif)) : "") +
-    (referral ? row("Como nos conheceu", esc(referral)) : "");
+    (form.nif ? row("NIF", esc(form.nif)) : "");
 
   // Email-specific logo: the site PNG carries ~23% transparent padding, so at a
   // 38px box the wordmark rendered only ~18px tall (illegible), and width/height
@@ -420,7 +432,6 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     form.phone ? `Telefone: ${form.phone}` : null,
     form.company ? `Empresa: ${form.company}` : null,
     form.nif ? `NIF: ${form.nif}` : null,
-    referral ? `Como nos conheceu: ${referral}` : null,
     form.notes ? `\nNOTAS DO CLIENTE\n${form.notes}` : null,
     "",
     "Responda a este email para falar diretamente com o cliente.",
