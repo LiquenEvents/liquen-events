@@ -68,16 +68,17 @@ async function expectNoHorizontalOverflow(page: Page, label: string) {
 
 // nav label → H1 heading. The five core items plus the "Mais" destinations whose
 // wide tables and image grids are the likeliest to push the page sideways on a
-// phone (Faturas/Contratos/Pipeline/Temas/Estatísticas). Every label here must
-// exist in nav.tsx — a destination that isn't in the sidebar can't be walked.
+// phone (Faturas, Propostas Aceites, Organização de propostas, Temas,
+// Estatísticas). Every label here must exist in nav.tsx — a destination that
+// isn't in the sidebar can't be walked.
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
   { nav: /^Propostas$/, heading: /^Propostas$/ },
   { nav: /^Faturas$/, heading: /^Faturas$/ },
-  { nav: /^Contratos$/, heading: /^Contratos$/ },
+  { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
-  { nav: /^Pipeline$/, heading: /^Pipeline$/ },
+  { nav: /^Organização de propostas$/, heading: /^Organização de propostas$/ },
   { nav: /^Temas$/, heading: /^Temas$/ },
   { nav: /^Tarefas$/, heading: /^Tarefas$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },

@@ -1298,7 +1298,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const VIEW_TITLES: Record<View, string> = {
     overview: "Visão Geral",
     pedidos: "Pedidos",
-    kanban: "Pipeline",
+    kanban: "Organização de propostas",
     clientes: "Clientes",
     calendario: "Calendário",
     propostas: "Propostas",
@@ -1309,7 +1309,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     seguimentos: "Seguimentos",
     estatisticas: "Estatísticas",
     faturas: "Faturas",
-    contratos: "Contratos",
+    contratos: "Propostas Aceites",
     "modelos-email": "Modelos de email",
   };
 

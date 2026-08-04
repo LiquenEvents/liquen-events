@@ -184,7 +184,7 @@ describe("AdminClient shell", () => {
 
   it("persists the chosen view to localStorage", () => {
     renderAdmin([makeQuote()]);
-    navTo(/Pipeline/);
+    navTo(/Organização de propostas/);
     expect(localStorage.getItem("liquen-admin-view")).toBe("kanban");
     // And the kanban surface is now mounted.
     expect(screen.getByTestId("view-kanban")).toBeInTheDocument();

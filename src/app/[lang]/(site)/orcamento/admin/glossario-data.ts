@@ -74,8 +74,8 @@ export const GLOSSARY: GlossaryEntry[] = [
     def: "O estado de um pedido que estamos a analisar — a preparar a proposta ou a confirmar detalhes. Ainda não enviámos nada ao cliente.",
   },
   {
-    term: "Pipeline",
-    def: "O quadro que mostra todos os pedidos organizados por fase, em colunas (do primeiro contacto ao evento concluído). Serve para ver, num relance, em que ponto está cada trabalho. Também lhe chamamos “quadro”.",
+    term: "Organização de propostas",
+    def: "O quadro que mostra todos os pedidos organizados por fase, em colunas (do primeiro contacto ao evento concluído). Serve para ver, num relance, em que ponto está cada trabalho. Também lhe chamamos “quadro”. Chamou-se “Pipeline” até Agosto de 2026.",
   },
   {
     term: "Proposta",
@@ -95,7 +95,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "Contrato",
-    def: "O acordo em que o cliente aceita as condições por escrito. Quando está aceite, o evento fica confirmado e a data reservada.",
+    def: "O acordo em que o cliente aceita as condições por escrito. Quando está aceite, o evento fica confirmado e a data reservada. No menu, o ecrã que os lista chama-se “Propostas Aceites”.",
   },
   {
     term: "Ganho",

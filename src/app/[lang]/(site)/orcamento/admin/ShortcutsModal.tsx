@@ -24,7 +24,7 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
     items: [
       { keys: ["G", "O"], label: "Visão Geral" },
       { keys: ["G", "P"], label: "Pedidos" },
-      { keys: ["G", "K"], label: "Pipeline" },
+      { keys: ["G", "K"], label: "Organização de propostas" },
       { keys: ["G", "C"], label: "Clientes" },
       { keys: ["G", "A"], label: "Calendário" },
       { keys: ["G", "R"], label: "Propostas" },
@@ -34,7 +34,7 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
     ],
   },
   {
-    title: "Pipeline — com um cartão focado",
+    title: "Organização de propostas — com um cartão focado",
     items: [
       { keys: ["Enter"], label: "Abrir o pedido" },
       { keys: ["←"], label: "Mover para a coluna anterior" },

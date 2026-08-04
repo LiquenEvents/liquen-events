@@ -90,7 +90,7 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   },
   {
     id: "kanban",
-    label: "Pipeline",
+    label: "Organização de propostas",
     icon: (
       <svg
         width="16"
@@ -231,7 +231,7 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   },
   {
     id: "contratos",
-    label: "Contratos",
+    label: "Propostas Aceites",
     icon: (
       <svg
         width="16"
