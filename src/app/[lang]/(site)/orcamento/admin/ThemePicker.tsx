@@ -187,7 +187,31 @@ export default function ThemePicker({
 
   const [themes, setThemes] = useState<ThemeSummary[]>([]);
   const [loadingThemes, setLoadingThemes] = useState(true);
-  const [themeId, setThemeId] = useState<string | null>(null);
+  /**
+   * Começa JÁ no último tema usado, sem esperar por rede nenhuma.
+   *
+   * ── O bloqueio que isto tira ──────────────────────────────────────────
+   * Antes o `themeId` só era decidido DEPOIS de `/api/temas` responder, e o
+   * efeito das imagens depende dele. Ou seja: enquanto a lista de temas não
+   * chegasse, não se pedia UMA ÚNICA imagem. Era exactamente isso que se via —
+   * os separadores com as contagens apareciam logo e a grelha ficava em
+   * cinzento durante segundos. Quatro idas ao servidor antes do primeiro pixel.
+   *
+   * Mas o id do último tema já está no `localStorage`: não é preciso perguntar
+   * a ninguém. Assim as imagens e a lista passam a ser pedidas EM PARALELO.
+   *
+   * Ler `localStorage` no desenho é seguro AQUI, e não seria em qualquer sítio:
+   * este diálogo vive atrás de `{picker && …}` no estúdio, portanto só monta
+   * depois de um clique e nunca faz parte do HTML do servidor — não há
+   * hidratação com que discordar.
+   */
+  const [themeId, setThemeId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(LAST_THEME_KEY);
+    } catch {
+      return null; // localStorage indisponível — espera-se pela lista
+    }
+  });
 
   /** As fotos JÁ CARREGADAS, mais recentes primeiro — sempre um PREFIXO da
    *  lista do servidor, que é o que faz do `images.length` um offset válido. */
@@ -226,6 +250,19 @@ export default function ThemePicker({
     };
   }, []);
 
+  /** A lista de temas, para LEITURA dentro de efeitos que não se devem repetir
+   *  quando ela chega.
+   *
+   *  Pô-la nas dependências do efeito das imagens custava um pedido inteiro a
+   *  mais: as imagens partiam a +72 ms (bem), a lista respondia a +1500 ms, e
+   *  o efeito corria OUTRA VEZ a pedir exactamente as mesmas imagens. Medido, e
+   *  visível no terceiro pedido do varrimento. Com a ref lê-se o valor mais
+   *  recente sem que a mudança dispare nada. */
+  const themesRef = useRef<ThemeSummary[]>([]);
+  useEffect(() => {
+    themesRef.current = themes;
+  }, [themes]);
+
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const usedSet = useMemo(() => new Set(usedThemePaths ?? []), [usedThemePaths]);
 
@@ -239,14 +276,15 @@ export default function ThemePicker({
         const list: ThemeSummary[] = await res.json();
         if (!active) return;
         setThemes(list);
-        // Abre no último tema usado, se ainda existir; senão no primeiro.
-        let preferred: string | null = null;
-        try {
-          preferred = localStorage.getItem(LAST_THEME_KEY);
-        } catch {
-          /* localStorage indisponível — segue com o primeiro tema */
-        }
-        setThemeId(list.some((t) => t.id === preferred) ? preferred : (list[0]?.id ?? null));
+        // A lista chega DEPOIS de já se estar a pedir as imagens do último
+        // tema. Aqui só se corrige o palpite quando ele estava errado: o tema
+        // guardado foi apagado, ou nunca houve nenhum. Quando estava certo —
+        // o caso normal — não se mexe em nada, e mexer seria voltar a pedir as
+        // mesmas imagens.
+        setThemeId((atual) => {
+          if (atual && list.some((t) => t.id === atual)) return atual;
+          return list[0]?.id ?? null;
+        });
       } catch {
         if (active) toast("Não foi possível carregar os temas.", "error");
       } finally {
@@ -278,6 +316,15 @@ export default function ThemePicker({
         const res = await fetch(`/api/temas/${themeId}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`, {
           cache: "no-store",
         });
+        // O tema que veio do `localStorage` pode já não existir — foi apagado
+        // desde a última vez. Isso é um 404 ESPERADO, e não uma avaria: a lista
+        // de temas está a chegar e vai corrigir a escolha sozinha, o que faz
+        // este efeito correr outra vez no tema certo. Queixar-se aqui era
+        // mostrar um erro por causa de um palpite nosso.
+        if (res.status === 404 && !themesRef.current.some((t) => t.id === themeId)) {
+          if (active) setLoadingImages(false);
+          return;
+        }
         if (!res.ok) throw new Error("falhou");
         const data = await res.json();
         if (!active) return;
@@ -297,6 +344,9 @@ export default function ThemePicker({
     return () => {
       active = false;
     };
+    // `themes` NÃO entra aqui de propósito — é lido pela ref. Pô-lo nas
+    // dependências fazia o efeito correr outra vez quando a lista chegasse, a
+    // repedir as mesmas imagens que já estavam a caminho.
   }, [themeId, toast]);
 
   /** O offset seguinte é sempre quantas fotos já temos: `images` é um prefixo
