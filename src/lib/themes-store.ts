@@ -30,6 +30,12 @@ export const mapper: Mapper<ProposalTheme> = {
     notes: t.notes || null,
     ...("coverPath" in t ? { cover_path: t.coverPath || null } : {}),
     ...("photoOrder" in t ? { photo_order: t.photoOrder?.length ? t.photoOrder : null } : {}),
+    // Mesma regra condicional da capa, e pela mesma razão: numa base onde o
+    // `alter table` ainda não correu estas colunas não existem, e escrevê-las
+    // sempre partia até um simples renomear. Só quem fixa ou arquiva um tema é
+    // que apanha o 503 que manda correr o schema.
+    ...("favorito" in t ? { favorito: !!t.favorito } : {}),
+    ...("arquivado" in t ? { arquivado: !!t.arquivado } : {}),
     created_at: t.createdAt || new Date().toISOString(),
     updated_at: t.updatedAt || new Date().toISOString(),
   }),
@@ -49,6 +55,10 @@ export const mapper: Mapper<ProposalTheme> = {
           ),
         }
       : {}),
+    // Simétrico: sem coluna (base antiga) ou a false, a propriedade nem aparece
+    // — é o que mantém o `toRow` calado nessas instalações.
+    ...(r.favorito === true ? { favorito: true } : {}),
+    ...(r.arquivado === true ? { arquivado: true } : {}),
     createdAt: String(r.created_at ?? new Date().toISOString()),
     updatedAt: String(r.updated_at ?? r.created_at ?? new Date().toISOString()),
   }),
@@ -86,7 +96,7 @@ export async function createTheme(input: { name: string; notes?: string }): Prom
  */
 export const updateTheme = (
   id: string,
-  patch: Partial<Pick<ProposalTheme, "name" | "notes" | "coverPath">>,
+  patch: Partial<Pick<ProposalTheme, "name" | "notes" | "coverPath" | "favorito" | "arquivado">>,
 ): Promise<ProposalTheme | null> => repo.update(id, patch);
 
 export const deleteTheme = (id: string): Promise<void> => repo.remove(id);

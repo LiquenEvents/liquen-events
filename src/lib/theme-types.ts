@@ -36,6 +36,17 @@ export interface ProposalTheme {
    * apagar uma foto nunca deixa a ordem inválida.
    */
   photoOrder?: string[];
+  /** Fixado no topo da lista. Os temas de que se usa em quase todas as
+   *  propostas não têm de ser procurados de cada vez. */
+  favorito?: boolean;
+  /**
+   * Fora da lista principal, sem ser apagado.
+   *
+   * Existe para haver uma alternativa a eliminar: um tema que já não se usa
+   * leva atrás as fotos quando é apagado, e essa decisão é definitiva. Arquivar
+   * tira-o da frente e deixa tudo onde está.
+   */
+  arquivado?: boolean;
   createdAt: string;
   updatedAt: string;
 }

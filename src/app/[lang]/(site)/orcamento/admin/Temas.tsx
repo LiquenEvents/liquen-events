@@ -175,6 +175,59 @@ const SearchIcon = (
 );
 
 /** "1 foto" / "7 fotos" — o plural aparece em meia dúzia de frases. */
+/** Por que ordem os temas aparecem. */
+export type Ordem = "alfabetica" | "recentes" | "fotos";
+
+export const ORDENS: readonly { valor: Ordem; rotulo: string }[] = [
+  { valor: "alfabetica", rotulo: "A–Z" },
+  { valor: "recentes", rotulo: "Recentes" },
+  { valor: "fotos", rotulo: "Com mais fotos" },
+];
+
+const ORDEM_KEY = "liquen-temas-ordem";
+
+export function lerOrdem(): Ordem | null {
+  try {
+    const v = window.localStorage.getItem(ORDEM_KEY);
+    return ORDENS.some((o) => o.valor === v) ? (v as Ordem) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarOrdem(o: Ordem): void {
+  try {
+    window.localStorage.setItem(ORDEM_KEY, o);
+  } catch {
+    // Ver `guardarDensidade`.
+  }
+}
+
+/**
+ * Ordena os temas — puro, para se poder testar sem desenhar nada.
+ *
+ * OS FAVORITOS VÊM SEMPRE À FRENTE, seja qual for a ordem escolhida. É o que
+ * fixar significa: um tema que se usa em quase todas as propostas não pode
+ * andar a mudar de sítio porque se ordenou por data. Dentro de cada grupo é
+ * que a ordem escolhida manda.
+ *
+ * Uma pasta ilegível (`imageCount: null`) fica no fim de "com mais fotos", em
+ * vez de valer zero e passar à frente de um tema com uma foto — não sabemos
+ * quantas tem, e adivinhar para baixo seria esconder o tema.
+ */
+export function ordenarTemas(temas: readonly ThemeSummary[], ordem: Ordem): ThemeSummary[] {
+  const porOrdem = (a: ThemeSummary, b: ThemeSummary): number => {
+    if (ordem === "recentes") return (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "");
+    if (ordem === "fotos") {
+      const na = a.imageCount ?? -1;
+      const nb = b.imageCount ?? -1;
+      if (na !== nb) return nb - na;
+    }
+    return a.name.localeCompare(b.name, "pt");
+  };
+  return [...temas].sort((a, b) => Number(!!b.favorito) - Number(!!a.favorito) || porOrdem(a, b));
+}
+
 /** Quão apertada é a grelha de temas. */
 export type Densidade = "confortavel" | "compacto";
 
@@ -434,10 +487,41 @@ export default function Temas() {
   // uma vez e não quer voltar a escolher. Começa em "compacto" porque com seis
   // temas é o que os põe todos no ecrã sem scroll — que é o pedido de origem.
   const [densidade, setDensidade] = useState<Densidade>("compacto");
+  const [ordem, setOrdem] = useState<Ordem>("alfabetica");
+  const [verArquivados, setVerArquivados] = useState(false);
+  // Lidas depois do primeiro desenho, e não durante: o servidor não tem
+  // `localStorage`, e ler ali daria um HTML diferente do que o browser desenha.
   useEffect(() => {
-    const guardada = lerDensidade();
-    if (guardada) setDensidade(guardada);
+    const d = lerDensidade();
+    if (d) setDensidade(d);
+    const o = lerOrdem();
+    if (o) setOrdem(o);
   }, []);
+
+  /** Fixar/desafixar e arquivar/desarquivar. Guarda-se PRIMEIRO no ecrã e
+   *  desfaz-se se o servidor recusar: é uma preferência de arrumação, e esperar
+   *  por uma ida à rede para ver uma estrela acender não serve ninguém. */
+  const alternarMarca = useCallback(
+    async (t: ThemeSummary, campo: "favorito" | "arquivado") => {
+      const novo = !t[campo];
+      setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, [campo]: novo } : x)));
+      try {
+        const res = await fetch(`/api/temas/${t.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [campo]: novo }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        if (campo === "arquivado") {
+          toast(novo ? `"${t.name}" arquivado` : `"${t.name}" de volta à lista`, "success");
+        }
+      } catch {
+        setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, [campo]: !novo } : x)));
+        toast("Não foi possível guardar. Verifique a ligação.", "error");
+      }
+    },
+    [toast],
+  );
   // Filtrar fora da tecla: com poucos temas é imperceptível, e mantém o campo
   // instantâneo quando a lista cresce (é o mesmo padrão do Inventário).
   const deferredSearch = useDeferredValue(search);
@@ -567,13 +651,24 @@ export default function Temas() {
 
   const open = themes.find((t) => t.id === openId) ?? null;
 
+  /** Quantos temas estão arquivados — o que autoriza (ou não) mostrar o
+   *  interruptor do arquivo. Sem nada lá dentro, seria um controlo a explicar
+   *  uma funcionalidade que ninguém ainda usou. */
+  const arquivados = useMemo(() => themes.filter((t) => t.arquivado).length, [themes]);
+
   const visible = useMemo(() => {
     const needle = normalizedThemeName(deferredSearch);
-    if (!needle) return themes;
-    // Procurar por nome E por nota: a nota ("tons quentes, para espaços de
-    // pedra") é muitas vezes como a Catarina se lembra do tema.
-    return themes.filter((t) => normalizedThemeName(`${t.name} ${t.notes ?? ""}`).includes(needle));
-  }, [themes, deferredSearch]);
+    // O arquivo é uma VISTA, não um filtro que se soma: ou se está a ver o que
+    // se usa, ou se está a ver o que se pôs de lado. Misturar os dois era
+    // devolver ao ecrã exactamente o que arquivar veio tirar de lá.
+    const base = themes.filter((t) => (verArquivados ? t.arquivado : !t.arquivado));
+    const filtrados = needle
+      ? // Procurar por nome E por nota: a nota ("tons quentes, para espaços de
+        // pedra") é muitas vezes como a Catarina se lembra do tema.
+        base.filter((t) => normalizedThemeName(`${t.name} ${t.notes ?? ""}`).includes(needle))
+      : base;
+    return ordenarTemas(filtrados, ordem);
+  }, [themes, deferredSearch, ordem, verArquivados]);
 
   if (open) {
     return (
@@ -648,6 +743,42 @@ export default function Temas() {
         }
         end={
           <div className="flex items-center gap-2">
+            {themes.length > 2 && (
+              <label className="flex items-center gap-1.5">
+                <span className="sr-only">Ordenar os temas</span>
+                <select
+                  value={ordem}
+                  onChange={(e) => {
+                    const o = e.target.value as Ordem;
+                    setOrdem(o);
+                    guardarOrdem(o);
+                  }}
+                  className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-foreground/70"
+                >
+                  {ORDENS.map((o) => (
+                    <option key={o.valor} value={o.valor}>
+                      {o.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {/* Só aparece quando há mesmo alguma coisa arquivada — senão seria
+                um interruptor a explicar uma funcionalidade que ninguém usou. */}
+            {arquivados > 0 && (
+              <button
+                type="button"
+                aria-pressed={verArquivados}
+                onClick={() => setVerArquivados((v) => !v)}
+                className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                  verArquivados
+                    ? "border-foreground/20 bg-foreground/[0.06] text-foreground/70"
+                    : "border-foreground/[0.1] text-foreground/40 hover:text-foreground/60"
+                }`}
+              >
+                Arquivados ({arquivados})
+              </button>
+            )}
             {themes.length > 2 && (
               <div
                 role="group"
@@ -742,76 +873,146 @@ export default function Temas() {
         </Card>
       ) : visible.length === 0 ? (
         <Card padding="sm">
+          {/* Sem procura escrita, dizer "nenhum tema com '' no nome" seria uma
+              frase sem sentido — o que está a acontecer é que todos os temas
+              foram arquivados. */}
           <p className="bo-text-muted text-sm">
-            Nenhum tema com “{search.trim()}” no nome ou na nota.
+            {search.trim()
+              ? `Nenhum tema com “${search.trim()}” no nome ou na nota.`
+              : verArquivados
+                ? "Não há temas arquivados."
+                : "Todos os temas estão arquivados. Abra “Arquivados” para os repor."}
           </p>
         </Card>
       ) : (
         <div className={`grid ${COLUNAS[densidade]}`}>
           {visible.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setOpenId(t.id)}
-              className="group overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors hover:border-[#4d6350]/40"
-            >
-              {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
+            /* As acções são IRMÃS do botão do cartão, não filhas: um botão
+               dentro de outro botão é HTML inválido, e o resultado prático é
+               que fixar um tema abria-o a seguir. */
+            <div key={t.id} role="group" aria-label={t.name} className="group relative">
+              <div className="absolute right-2 top-2 z-10 flex gap-1">
+                <button
+                  type="button"
+                  /* Sem o nome do tema no rótulo: o cartão está dentro de um
+                     grupo com esse nome, portanto quem usa leitor de ecrã já o
+                     ouviu — e repeti-lo aqui faria "Terracotta" identificar
+                     três botões diferentes no mesmo sítio. */
+                  aria-label={t.favorito ? "Desafixar" : "Fixar no topo"}
+                  aria-pressed={!!t.favorito}
+                  title={t.favorito ? "Desafixar" : "Fixar no topo"}
+                  onClick={() => alternarMarca(t, "favorito")}
+                  /* Um favorito JÁ FIXADO vê-se sempre; os outros só aparecem
+                     com o rato em cima — mas em ecrã táctil não há rato, e aí
+                     estão sempre visíveis (`pointer-coarse`), senão a
+                     funcionalidade não existia no telemóvel. */
+                  className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 backdrop-blur-sm transition-opacity pointer-coarse:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 ${
+                    t.favorito ? "opacity-100 text-[#8a6d2f]" : "opacity-0 text-foreground/45"
+                  }`}
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill={t.favorito ? "currentColor" : "none"}
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                  >
+                    <path
+                      d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8Z"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label={t.arquivado ? "Repor na lista" : "Arquivar"}
+                  title={t.arquivado ? "Repor na lista" : "Arquivar (não apaga nada)"}
+                  onClick={() => alternarMarca(t, "arquivado")}
+                  className="alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 text-foreground/45 opacity-0 backdrop-blur-sm transition-opacity pointer-coarse:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                  >
+                    {t.arquivado ? (
+                      <path d="M12 19V7m0 0-4 4m4-4 4 4M4 4h16" strokeLinecap="round" />
+                    ) : (
+                      <>
+                        <path d="M4 8h16v11H4z" strokeLinejoin="round" />
+                        <path d="M3 4h18v4H3zM10 12h4" strokeLinecap="round" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenId(t.id)}
+                className="block w-full overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors hover:border-[#4d6350]/40"
+              >
+                {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
                   proporções diferentes umas das outras. */}
-              <div className="flex aspect-[4/3] w-full gap-px overflow-hidden bg-foreground/[0.04]">
-                {t.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={t.coverUrl}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-foreground/40">
-                    {FolderIcon}
-                  </div>
-                )}
-                {/* Uma capa só diz o que é a foto de capa; três fotos dizem o que
+                <div className="flex aspect-[4/3] w-full gap-px overflow-hidden bg-foreground/[0.04]">
+                  {t.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.coverUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-foreground/40">
+                      {FolderIcon}
+                    </div>
+                  )}
+                  {/* Uma capa só diz o que é a foto de capa; três fotos dizem o que
                     é o TEMA. Só aparecem quando existem mesmo — um tema com uma
                     foto continua a ser uma imagem inteira, e não uma tira com
                     dois buracos. */}
-                {t.coverUrl && t.previewUrls && t.previewUrls.length > 0 && (
-                  <div className="flex w-1/4 shrink-0 flex-col gap-px">
-                    {t.previewUrls.slice(0, 3).map((u) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={u}
-                        src={u}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="min-h-0 w-full flex-1 object-cover"
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="px-3 py-2.5">
-                <p className="font-display truncate text-[14px] text-foreground/85">{t.name}</p>
-                <p className="bo-text-muted mt-0.5 truncate text-xs">
-                  {photoCountLabel(t.imageCount, t.truncated)}
-                  {/* Quando foi mexido pela última vez: é o que separa um tema
+                  {t.coverUrl && t.previewUrls && t.previewUrls.length > 0 && (
+                    <div className="flex w-1/4 shrink-0 flex-col gap-px">
+                      {t.previewUrls.slice(0, 3).map((u) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={u}
+                          src={u}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="min-h-0 w-full flex-1 object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="px-3 py-2.5">
+                  <p className="font-display truncate text-[14px] text-foreground/85">{t.name}</p>
+                  <p className="bo-text-muted mt-0.5 truncate text-xs">
+                    {photoCountLabel(t.imageCount, t.truncated)}
+                    {/* Quando foi mexido pela última vez: é o que separa um tema
                       vivo de um que ficou para trás, e cabe onde já havia
                       espaço.
                       NÃO aparece quando a pasta não pôde ser lida — "Fotos
                       indisponíveis · há 2 meses" mistura um aviso com uma
                       informação de rotina, e é o aviso que tem de se ler. */}
-                  {t.imageCount !== null && desdeQuando(t.updatedAt)
-                    ? ` · ${desdeQuando(t.updatedAt)}`
-                    : ""}
-                </p>
-                {t.notes ? (
-                  <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
-                ) : null}
-              </div>
-            </button>
+                    {t.imageCount !== null && desdeQuando(t.updatedAt)
+                      ? ` · ${desdeQuando(t.updatedAt)}`
+                      : ""}
+                  </p>
+                  {t.notes ? (
+                    <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
+                  ) : null}
+                </div>
+              </button>
+            </div>
           ))}
         </div>
       )}

@@ -9,7 +9,7 @@ import {
   THEME_PAGE_SIZE,
 } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
-import Temas, { mergePage, moveItem, reinsertAt } from "./Temas";
+import Temas, { desdeQuando, mergePage, moveItem, ordenarTemas, reinsertAt } from "./Temas";
 
 /**
  * Rede de segurança da Biblioteca de Temas.
@@ -1580,5 +1580,72 @@ describe("Biblioteca de Temas — copiar e mover fotos entre temas", () => {
     // O diálogo fica aberto, com a razão à vista — e a grelha intacta.
     expect(screen.getByText("Não foi possível copiar as fotos.")).toBeInTheDocument();
     expect(photos()).toHaveLength(5);
+  });
+});
+
+describe("Biblioteca de Temas — ordem dos cartões", () => {
+  const tema = (over: Partial<ThemeSummary>): ThemeSummary => ({ ...THEME, ...over });
+  const nomes = (lista: ThemeSummary[]) => lista.map((t) => t.name);
+
+  const A = tema({ id: "a", name: "Alfa", updatedAt: "2026-01-01T00:00:00.000Z", imageCount: 5 });
+  const B = tema({ id: "b", name: "Beta", updatedAt: "2026-06-01T00:00:00.000Z", imageCount: 1 });
+  const C = tema({ id: "c", name: "Gama", updatedAt: "2026-03-01T00:00:00.000Z", imageCount: 9 });
+
+  it("A–Z, por data e por nº de fotos", () => {
+    expect(nomes(ordenarTemas([C, A, B], "alfabetica"))).toEqual(["Alfa", "Beta", "Gama"]);
+    expect(nomes(ordenarTemas([A, B, C], "recentes"))).toEqual(["Beta", "Gama", "Alfa"]);
+    expect(nomes(ordenarTemas([A, B, C], "fotos"))).toEqual(["Gama", "Alfa", "Beta"]);
+  });
+
+  /**
+   * O que FIXAR quer dizer: um tema que se usa em quase todas as propostas não
+   * pode mudar de sítio porque se ordenou por data. Sem isto, "fixar" era só
+   * uma estrela desenhada.
+   */
+  it("um favorito vem à frente seja qual for a ordem", () => {
+    const fixado = { ...C, favorito: true };
+    for (const ordem of ["alfabetica", "recentes", "fotos"] as const) {
+      expect(nomes(ordenarTemas([A, B, fixado], ordem))[0]).toBe("Gama");
+    }
+  });
+
+  /**
+   * Uma pasta ilegível não sabe quantas fotos tem. Contá-la como zero punha-a
+   * atrás de um tema com uma foto — ou seja, escondia no fim da lista
+   * precisamente o tema que tem um problema.
+   */
+  it("uma pasta por ler fica no fim de 'com mais fotos', não à frente do 1 foto", () => {
+    const ilegivel = tema({ id: "x", name: "Xis", imageCount: null });
+    expect(nomes(ordenarTemas([ilegivel, B], "fotos"))).toEqual(["Beta", "Xis"]);
+  });
+
+  it("não mexe na lista que recebe", () => {
+    const original = [C, A, B];
+    ordenarTemas(original, "alfabetica");
+    expect(nomes(original)).toEqual(["Gama", "Alfa", "Beta"]);
+  });
+});
+
+describe("desdeQuando", () => {
+  const agora = Date.parse("2026-08-05T12:00:00.000Z");
+  const dias = (n: number) => new Date(agora - n * 86_400_000).toISOString();
+
+  it("fala como se fala", () => {
+    expect(desdeQuando(dias(0), agora)).toBe("hoje");
+    expect(desdeQuando(dias(1), agora)).toBe("ontem");
+    expect(desdeQuando(dias(9), agora)).toBe("há 9 dias");
+    expect(desdeQuando(dias(60), agora)).toBe("há 2 meses");
+    expect(desdeQuando(dias(400), agora)).toBe("há 1 ano");
+  });
+
+  /** Um relógio trocado (ou uma escrita acabada de acontecer) não pode produzir
+   *  "há -2 dias" no cartão. */
+  it("uma data no futuro conta como hoje", () => {
+    expect(desdeQuando(new Date(agora + 86_400_000).toISOString(), agora)).toBe("hoje");
+  });
+
+  it("sem data, ou com lixo, não diz nada", () => {
+    expect(desdeQuando(undefined, agora)).toBe("");
+    expect(desdeQuando("ontem à tarde", agora)).toBe("");
   });
 });

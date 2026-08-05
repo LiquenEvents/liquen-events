@@ -54,7 +54,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       notes?: string;
       coverPath?: string;
       photoOrder?: string[];
+      favorito?: boolean;
+      arquivado?: boolean;
     } = {};
+
+    // Fixar no topo e arquivar. Só se aceita um booleano a sério: um "true" em
+    // texto ou um 1 viria de código a chamar isto por engano, e gravar a
+    // interpretação de um valor ambíguo é como um tema desaparece da lista sem
+    // ninguém perceber porquê.
+    for (const campo of ["favorito", "arquivado"] as const) {
+      if (body?.[campo] === undefined) continue;
+      if (typeof body[campo] !== "boolean") {
+        return NextResponse.json({ error: `Valor inválido para ${campo}.` }, { status: 400 });
+      }
+      patch[campo] = body[campo];
+    }
 
     // A ordem arrumada à mão. Guarda-se SÓ o que ela moveu: caminhos deste
     // tema, sem repetições e limitados a MAX_PHOTO_ORDER. Uma lista vazia
