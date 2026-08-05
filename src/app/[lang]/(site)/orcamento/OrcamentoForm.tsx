@@ -146,12 +146,21 @@ export default function OrcamentoForm({
   const [dateFlexible, setDateFlexible] = useState(false);
   const [pessoas, setPessoas] = useState("");
   const [guestsFlexible, setGuestsFlexible] = useState(false);
+  /** A estimativa que substitui o número exacto quando ele ainda não existe.
+   *  Texto livre de propósito: quem não sabe o número sabe o intervalo, e
+   *  "entre 100 e 150" não cabe num campo numérico. */
+  const [pessoasEstimativa, setPessoasEstimativa] = useState("");
   const [local, setLocal] = useState("");
   const [mensagem, setMensagem] = useState("");
   // Pontos de decoração — só existem no casamento, e são sempre OPCIONAIS.
   // Nunca entram na validação: quem não faz ideia do que quer segue em frente
   // sem marcar nada, que é exactamente o estado em que muita gente chega.
   const [decor, setDecor] = useState<string[]>([]);
+  /** Os nomes dos noivos. Só existem no casamento, e só aparecem depois de ela
+   *  começar a escrever o nome de contacto — pedi-los antes disso era abrir o
+   *  formulário com quatro campos de nome à espera, que é o que faz desistir. */
+  const [noivo, setNoivo] = useState("");
+  const [noiva, setNoiva] = useState("");
   const alternarDecor = (id: string) =>
     setDecor((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
@@ -344,7 +353,11 @@ export default function OrcamentoForm({
   const okTelefone = telefone.replace(/\D/g, "").length >= 9;
   // "Ainda a definir" IS an answer — the field is satisfied either way.
   const okData = dateFlexible || data !== "";
-  const okPessoas = guestsFlexible || Number(pessoas) > 0;
+  // "Ainda a definir" deixou de ser uma saída sem resposta: passa a pedir uma
+  // ESTIMATIVA. Continua a não forçar um número exacto — que é o que perdia o
+  // contacto ou convidava a um número inventado — mas uma proposta precisa de
+  // uma ordem de grandeza, e "entre 100 e 150" é uma resposta verdadeira.
+  const okPessoas = guestsFlexible ? pessoasEstimativa.trim().length > 0 : Number(pessoas) > 0;
   const okLocal = local.trim().length >= 2;
   const okMensagem = mensagem.trim().length > 0;
 
@@ -353,7 +366,13 @@ export default function OrcamentoForm({
   const emailErr = show(touched.email) && !okEmail ? to.errEmail : "";
   const telefoneErr = show(touched.telefone) && !okTelefone ? to.errTelefone : "";
   const dataErr = show(touched.data) && !okData ? to.errData : "";
-  const pessoasErr = show(touched.pessoas) && !okPessoas ? to.errPessoas : "";
+  // Dois campos, dois erros. Com "ainda a definir" marcado, o campo numérico
+  // está desativado e a falta é da ESTIMATIVA: pôr a mesma mensagem nos dois
+  // mostrava-a a dobrar, uma delas debaixo de um campo que ela nem pode
+  // preencher.
+  const pessoasErr = show(touched.pessoas) && !guestsFlexible && !okPessoas ? to.errPessoas : "";
+  const estimativaErr =
+    show(touched.pessoas) && guestsFlexible && !okPessoas ? to.errPessoasEstimativa : "";
   const localErr = show(touched.local) && !okLocal ? to.errLocal : "";
   const mensagemErr = show(touched.mensagem) && !okMensagem ? to.errMensagem : "";
   const tipoErr = attemptedSubmit && !okTipo ? to.errTipo : "";
@@ -415,6 +434,12 @@ export default function OrcamentoForm({
       // decoração de casamento agarrada a uma festa que não é uma — e a
       // proposta nascia semeada com o que ninguém pediu.
       decorPoints: opt?.eventType === "casamentos" ? decor : [],
+      // Mesma guarda que os pontos de decoração: mudar de "Casamento" para
+      // "Aniversário" depois de escrever os nomes não pode deixar um casal
+      // agarrado a uma festa que não é um casamento.
+      partnerA: opt?.eventType === "casamentos" ? noivo.trim() || undefined : undefined,
+      partnerB: opt?.eventType === "casamentos" ? noiva.trim() || undefined : undefined,
+      guestsEstimate: guestsFlexible ? pessoasEstimativa.trim() || undefined : undefined,
       // Capture the "no fixed date yet" signal for the team (a high-value
       // early-stage lead segment) by folding it into the notes.
       notes: [
@@ -825,6 +850,38 @@ export default function OrcamentoForm({
                   />
                   <span className="text-[11px] tracking-wide">{to.guestsFlexibleLabel}</span>
                 </label>
+                {/* A estimativa só existe depois de ela dizer que não sabe o
+                    número. Aparecer antes seria um campo a mais para quem já
+                    sabe — e são a maioria. */}
+                {guestsFlexible && (
+                  <div className="mt-4">
+                    <FloatingField
+                      htmlFor="of-pessoas-est"
+                      label={to.labelPessoasEstimativa}
+                      error={estimativaErr}
+                      errorId="of-pessoas-est-err"
+                    >
+                      <input
+                        id="of-pessoas-est"
+                        type="text"
+                        maxLength={60}
+                        value={pessoasEstimativa}
+                        onBlur={() => markTouched("pessoas")}
+                        aria-required="true"
+                        aria-invalid={estimativaErr ? true : undefined}
+                        aria-describedby={
+                          estimativaErr ? "of-pessoas-est-err" : "of-pessoas-est-hint"
+                        }
+                        onChange={(e) => setPessoasEstimativa(e.target.value)}
+                        className={ffInputCls}
+                        placeholder={to.phPessoasEstimativa}
+                      />
+                    </FloatingField>
+                    <p id="of-pessoas-est-hint" className="mt-1.5 text-[11px] text-foreground/55">
+                      {to.hintPessoasEstimativa}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -899,6 +956,46 @@ export default function OrcamentoForm({
                 />
               </FloatingField>
             </div>
+
+            {/* Nomes dos noivos — só no casamento, e só depois de ela começar a
+                escrever o nome de contacto. São OPCIONAIS: quem chega ainda a
+                sondar não tem de expor os dois nomes para pedir um orçamento,
+                e travar o envio por causa disto perdia o contacto por uma
+                coisa que se pergunta depois numa frase. */}
+            {ehCasamento && nome.trim().length > 0 && (
+              <div>
+                <p className="mb-3 text-[11px] tracking-[0.14em] uppercase text-foreground/55">
+                  {to.labelNoivos}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
+                  <FloatingField htmlFor="of-noivo" label={to.phNoivo}>
+                    <input
+                      id="of-noivo"
+                      type="text"
+                      autoComplete="off"
+                      maxLength={80}
+                      value={noivo}
+                      onChange={(e) => setNoivo(e.target.value)}
+                      className={ffInputCls}
+                      placeholder={to.phNoivo}
+                    />
+                  </FloatingField>
+                  <FloatingField htmlFor="of-noiva" label={to.phNoiva}>
+                    <input
+                      id="of-noiva"
+                      type="text"
+                      autoComplete="off"
+                      maxLength={80}
+                      value={noiva}
+                      onChange={(e) => setNoiva(e.target.value)}
+                      className={ffInputCls}
+                      placeholder={to.phNoiva}
+                    />
+                  </FloatingField>
+                </div>
+                <p className="mt-2 text-[11px] text-foreground/55">{to.hintNoivos}</p>
+              </div>
+            )}
 
             {/* Telefone */}
             <FloatingField

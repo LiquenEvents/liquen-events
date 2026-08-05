@@ -74,6 +74,11 @@ export const quoteFormSchema = z
     // mais cedo ou mais tarde o formulário oferece algo que o servidor deita
     // fora. O que não conhecemos é ignorado na leitura, em `pontosConhecidos`.
     decorPoints: z.array(trimmed(40)).max(20).optional().default([]),
+    // Nomes dos noivos e estimativa de convidados: opcionais e curtos. Não são
+    // validados contra nada — um nome é o que a pessoa disser que é.
+    partnerA: trimmed(80).optional(),
+    partnerB: trimmed(80).optional(),
+    guestsEstimate: trimmed(60).optional(),
     budgetRange: trimmed(30).nullish(),
     urgency: trimmed(30).optional(),
     referralSource: trimmed(200).optional().default(""),

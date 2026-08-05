@@ -71,6 +71,25 @@ export interface QuoteFormData {
    * campo existir — por isso é opcional e nunca se pode assumir presente.
    */
   decorPoints?: string[];
+  /**
+   * Os nomes dos noivos, quando o pedido é um casamento e o casal os quis dar.
+   * O `name` continua a ser o de QUEM ESCREVEU — pode ser a mãe da noiva, uma
+   * wedding planner, um dos dois. São coisas diferentes e não se podem
+   * sobrepor: é a este par que a proposta e o contrato se dirigem, e é aquele
+   * que se trata por tu ao responder ao email.
+   *
+   * Opcionais em todos os sentidos: não existem fora dos casamentos, não
+   * existem nos pedidos anteriores a este campo, e não existem quando o casal
+   * preferiu não os escrever. Nunca assumir presentes.
+   */
+  partnerA?: string;
+  partnerB?: string;
+  /**
+   * A estimativa de convidados, quando o número exacto ainda não existe —
+   * texto livre ("entre 100 e 150"), porque um intervalo não cabe num inteiro.
+   * Só é escrita quando `guests` é 0 por a pessoa ter dito que ainda não sabe.
+   */
+  guestsEstimate?: string;
   budgetRange: BudgetRange | null;
   urgency: Urgency;
   notes: string;

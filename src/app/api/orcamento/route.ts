@@ -243,9 +243,16 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   // DECISÃO e não nas notas porque é isto que diz, antes da primeira chamada,
   // se o pedido é a cerimónia toda ou só as mesas do jantar.
   const decor = rotularPontos(form.decorPoints ?? [], "pt").join(" · ");
+  const noivos = [form.partnerA, form.partnerB]
+    .map((n) => n?.trim())
+    .filter(Boolean)
+    .join(" & ");
   const eventRows =
-    row("Convidados", form.guests ? String(form.guests) : "") +
+    // Sem número exacto vale a estimativa. A linha nunca fica vazia por causa
+    // de um `guests: 0` que só quer dizer "ainda não sabem".
+    row("Convidados", form.guests ? String(form.guests) : esc(form.guestsEstimate?.trim() ?? "")) +
     row("Local", esc(local)) +
+    (noivos ? row("Noivos", esc(noivos)) : "") +
     (decor ? row("Decoração", esc(decor)) : "") +
     (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
     (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");

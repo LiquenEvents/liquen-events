@@ -466,6 +466,16 @@ export const pt = {
     // priced. Asked as a question, not a form label.
     labelMensagem: "Como imagina o seu evento?",
     phPessoas: "Ex.: 120",
+    // Marcar "ainda a definir" não pode significar ficar sem número nenhum: uma
+    // proposta precisa de uma ordem de grandeza para existir. Pede-se uma
+    // estimativa, dita como estimativa.
+    labelPessoasEstimativa: "Mais ou menos quantas?",
+    phPessoasEstimativa: "Ex.: entre 100 e 150",
+    hintPessoasEstimativa: "Um intervalo chega. Serve só para dimensionarmos a proposta.",
+    labelNoivos: "Nomes dos noivos",
+    phNoivo: "Nome do noivo",
+    phNoiva: "Nome da noiva",
+    hintNoivos: "Aparecem na proposta e no contrato. Pode deixar em branco e dizer-nos depois.",
     phLocal: "Ex.: Évora, Alentejo…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",
@@ -478,6 +488,7 @@ export const pt = {
     errTipo: "Selecione o tipo de evento.",
     errData: "Indique a data, ou marque \u201cData ainda a definir\u201d.",
     errPessoas: "Indique quantas pessoas, ou marque \u201cAinda a definir\u201d.",
+    errPessoasEstimativa: "D\u00ea-nos uma estimativa, nem que seja um intervalo.",
     errLocal: "Indique o local ou a região.",
     errTelefone: "Indique um telefone com 9 dígitos.",
     errMensagem: "Conte-nos como imagina o evento. É o que nos permite preparar a proposta.",

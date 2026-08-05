@@ -94,15 +94,29 @@ function buildRef(d: StudioDoc): string {
   return `${tpl} ${d.eventType} ${d.clientNames} · ${d.eventDate}`.replace(/\s+/g, " ").trim();
 }
 
+/** "Maria & Zé" a partir dos nomes que o casal deu, ou "" se não deu nenhum.
+ *  Com um só nome escrito, devolve esse — meio par continua a ser melhor do que
+ *  o nome de quem preencheu o formulário. */
+function nomesDoCasal(quote: Quote): string {
+  const par = [quote.partnerA, quote.partnerB].map((n) => n?.trim()).filter(Boolean);
+  return par.join(" & ");
+}
+
 function initialDoc(quote: Quote): StudioDoc {
   const base: StudioDoc = {
     template: "decoracao",
     ref: "",
-    clientNames: quote.name ?? "",
+    // Se o casal escreveu os dois nomes no pedido, a proposta abre dirigida a
+    // ELES. O `quote.name` é de quem escreveu — pode ser a mãe da noiva ou uma
+    // planner, e uma proposta endereçada a quem preencheu o formulário em vez
+    // de a quem casa lê-se como um erro de quem a mandou.
+    clientNames: nomesDoCasal(quote) || (quote.name ?? ""),
     eventType: eventTypeLabel(quote),
     eventDate: formatEventDate(quote.date),
     location: quote.location ?? "",
-    guests: quote.guests ? `${quote.guests} pax` : "",
+    // Sem número exacto, vale a estimativa que o casal deu ("entre 100 e 150").
+    // Escrever "0 pax" era pior do que não escrever nada.
+    guests: quote.guests ? `${quote.guests} pax` : (quote.guestsEstimate ?? ""),
     ceremony: "",
     time: "",
     weddingPlanners: "",

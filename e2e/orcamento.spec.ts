@@ -11,6 +11,9 @@ async function fillAll(page: Page, name = "Ana Teste") {
   await page.getByRole("radio", { name: "Casamento", exact: true }).click();
   await page.getByLabel("Data ainda a definir").check();
   await page.getByLabel("Ainda a definir", { exact: true }).check();
+  // Dizer "ainda não sabemos" deixou de bastar: pede-se uma estimativa, porque
+  // uma proposta precisa de uma ordem de grandeza para poder existir.
+  await page.getByPlaceholder("Ex.: entre 100 e 150").fill("entre 100 e 150");
   await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
   await page.getByPlaceholder("O seu nome").fill(name);
   await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
@@ -76,6 +79,66 @@ test.describe("Pedido de orçamento", () => {
     await expect(page.getByLabel("Data ainda a definir")).toBeChecked();
     await page.getByRole("button", { name: /Enviar pedido/ }).click();
     await expect(page).toHaveURL(/\/orcamento\/confirmacao\/LIQ-E2E-OPEN$/);
+  });
+
+  test("“ainda a definir” pede uma estimativa, e sem ela não avança", async ({ page }) => {
+    await page.goto("/orcamento");
+    await page.getByRole("radio", { name: "Casamento", exact: true }).click();
+
+    // Antes de marcar a caixa, o campo da estimativa não existe: quem sabe o
+    // número não tem de ver um campo a mais.
+    const estimativa = page.getByPlaceholder("Ex.: entre 100 e 150");
+    await expect(estimativa).toHaveCount(0);
+
+    await page.getByLabel("Ainda a definir", { exact: true }).check();
+    await expect(estimativa).toBeVisible();
+
+    // Deixá-la em branco trava o envio, com a razão certa — não a mensagem de
+    // "indique quantas pessoas", que já não se aplica.
+    await page.getByLabel("Data ainda a definir").check();
+    await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
+    await page.getByPlaceholder("O seu nome").fill("Rita Sem Numero");
+    await page.getByPlaceholder("email@exemplo.com").fill("rita@exemplo.pt");
+    await page.getByPlaceholder("+351 9XX XXX XXX").fill("912345678");
+    await page
+      .getByPlaceholder("Estilo, cores, ambiente, inspirações que guardou…")
+      .fill("Simples e com muita luz.");
+    await page.getByRole("button", { name: /Enviar pedido/ }).click();
+    await expect(page.getByText("Dê-nos uma estimativa, nem que seja um intervalo.")).toBeVisible();
+    await expect(page).not.toHaveURL(/confirmacao/);
+
+    // Com o intervalo escrito, segue.
+    await estimativa.fill("entre 100 e 150");
+    await page.route("**/api/orcamento", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "LIQ-E2E-EST", status: "ok" }),
+      }),
+    );
+    await page.getByRole("button", { name: /Enviar pedido/ }).click();
+    await expect(page).toHaveURL(/\/orcamento\/confirmacao\/LIQ-E2E-EST$/);
+  });
+
+  test("os nomes dos noivos só aparecem no casamento, e só ao escrever o nome", async ({
+    page,
+  }) => {
+    await page.goto("/orcamento");
+    const noivo = page.getByPlaceholder("Nome do noivo");
+
+    // Casamento escolhido, nome ainda em branco → os campos não existem.
+    await page.getByRole("radio", { name: "Casamento", exact: true }).click();
+    await expect(noivo).toHaveCount(0);
+
+    // Começa a escrever o nome → aparecem.
+    await page.getByPlaceholder("O seu nome").fill("Ana");
+    await expect(noivo).toBeVisible();
+    await expect(page.getByPlaceholder("Nome da noiva")).toBeVisible();
+
+    // Muda para um tipo de evento sem noivos → desaparecem, mesmo com o nome
+    // escrito. Um aniversário não tem noivos.
+    await page.getByRole("radio", { name: "Aniversário", exact: true }).click();
+    await expect(noivo).toHaveCount(0);
   });
 
   test("o rascunho sobrevive a sair e voltar à página", async ({ page }) => {
