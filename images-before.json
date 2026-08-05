@@ -1,0 +1,164 @@
+{
+  "base": "http://localhost:3210",
+  "celulas": 24,
+  "caixaPx": 160,
+  "originalMedioBytes": 1157181,
+  "fotos": [
+    {
+      "nome": "J&P-1Y1A3489.jpg",
+      "bytes": 1293772
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-303.jpg",
+      "bytes": 1257413
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-424.jpg",
+      "bytes": 1219179
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-490.jpg",
+      "bytes": 1210880
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-233.jpg",
+      "bytes": 1208672
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-427.jpg",
+      "bytes": 1205149
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-488.jpg",
+      "bytes": 1197945
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-305.jpg",
+      "bytes": 1195583
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-485.jpg",
+      "bytes": 1186214
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA-123.jpg",
+      "bytes": 1181686
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA-576.jpg",
+      "bytes": 1149920
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA-593.jpg",
+      "bytes": 1133046
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-234.jpg",
+      "bytes": 1127484
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-507.jpg",
+      "bytes": 1125524
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-505.jpg",
+      "bytes": 1122126
+    },
+    {
+      "nome": "J&A-338.jpg",
+      "bytes": 1122024
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-517.jpg",
+      "bytes": 1112667
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-313.jpg",
+      "bytes": 1111474
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-308.jpg",
+      "bytes": 1108377
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-236.jpg",
+      "bytes": 1107667
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA_capa-302.jpg",
+      "bytes": 1103063
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA-584.jpg",
+      "bytes": 1099606
+    },
+    {
+      "nome": "20_10_2025_0406.jpg",
+      "bytes": 1097956
+    },
+    {
+      "nome": "Sophia&Artur_MAINOVA-135.jpg",
+      "bytes": 1094917
+    }
+  ],
+  "resultados": [
+    {
+      "nome": "sem-nada",
+      "descricao": "original por célula, sem miniatura, sem fila, sem lazy, sem prioridade (o comportamento das Imagens de capa e dos moodboards)",
+      "celulas": 24,
+      "pedidosDeImagem": 17,
+      "bytesTotais": 19778577,
+      "bytesMedios": 1163446,
+      "picoParalelo": 17,
+      "msPrimeiraImagem": 120,
+      "msGrelhaCompleta": 381,
+      "msAteTudoPintado": 663,
+      "formatos": ["image/jpeg"],
+      "cache": ["public, max-age=31536000, immutable"],
+      "dimensoes": [
+        {
+          "natural": 1707,
+          "desenhada": 174
+        },
+        {
+          "natural": 1707,
+          "desenhada": 174
+        },
+        {
+          "natural": 1707,
+          "desenhada": 174
+        }
+      ],
+      "rede": "sem estrangular"
+    },
+    {
+      "nome": "sem-nada",
+      "descricao": "original por célula, sem miniatura, sem fila, sem lazy, sem prioridade (o comportamento das Imagens de capa e dos moodboards)",
+      "celulas": 24,
+      "pedidosDeImagem": 24,
+      "bytesTotais": 27772344,
+      "bytesMedios": 1157181,
+      "picoParalelo": 24,
+      "msPrimeiraImagem": 34680,
+      "msGrelhaCompleta": 132866,
+      "msAteTudoPintado": 133063,
+      "formatos": ["image/jpeg"],
+      "cache": ["public, max-age=31536000, immutable"],
+      "dimensoes": [
+        {
+          "natural": 1707,
+          "desenhada": 174
+        },
+        {
+          "natural": 1707,
+          "desenhada": 174
+        },
+        {
+          "natural": 1707,
+          "desenhada": 174
+        }
+      ],
+      "rede": "4G lento"
+    }
+  ]
+}
