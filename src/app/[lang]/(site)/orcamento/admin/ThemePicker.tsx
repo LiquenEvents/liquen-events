@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import {
   MAX_IMPORT_BATCH,
   THEME_PAGE_SIZE,
@@ -29,8 +30,37 @@ import { Button } from "./ui";
  *     abrir um tema com 2000 fotos custa o mesmo que abrir um com 30;
  *   · o original (`url`, ~3000 px) só é puxado na pré-visualização grande, que
  *     é onde ele faz falta para distinguir duas mesas de terracota;
- *   · a importação corre em lotes com barra de progresso, em vez de um pedido
- *     único de dez segundos com o diálogo congelado.
+ *   · o que a biblioteca já leu fica em cache DE MÓDULO: reabrir o diálogo na
+ *     mesma sessão não custa pedido nenhum e reabre no mesmo tema, no mesmo
+ *     sítio do rolo;
+ *   · a CÓPIA saiu do diálogo. Ver mais abaixo.
+ *
+ * ── Porque é que a cópia deixou de acontecer "dentro" do diálogo ───────────
+ *
+ * Havia aqui uma barra de progresso. Com 5 fotos ela mostrava exatamente dois
+ * estados — 0 % e 100 % —, porque um lote de 8 é UM pedido: a barra não estava
+ * a mostrar progresso nenhum, estava a mostrar o princípio e o fim, com o
+ * diálogo refém pelo meio. E o diálogo refém é o verdadeiro custo: quem
+ * escolheu as fotos já decidiu, não tem mais nada a fazer ali.
+ *
+ * Agora o botão FECHA o diálogo no instante em que é premido e a cópia
+ * continua em segundo plano, num runtime que vive fora do React (ver
+ * `startImport`) — por isso sobrevive ao diálogo desaparecer. Cada lote que
+ * chega é entregue ao estúdio, com a miniatura que viajou com a cópia: a foto
+ * aparece no mood board já leve, no mesmo sítio e com o mesmo aspect-ratio das
+ * outras, sem salto de layout e sem um único pedido novo para a VER.
+ *
+ * O que ficou por fazer, e porquê: as fotos ainda aparecem no estúdio quando a
+ * cópia CONFIRMA, não no instante do clique. Pôr lá um cartão provisório antes
+ * disso obriga a trocar depois o caminho provisório pelo definitivo dentro do
+ * documento — e o documento é do `ProposalStudio`, que tem o seu próprio dono.
+ * O contrato `onPicked(imagens)` é de acrescentar, não de substituir; forçá-lo
+ * daqui deixaria caminhos do bucket de TEMAS gravados no rascunho, que é
+ * precisamente o que a cópia existe para evitar.
+ *
+ * O estado da cópia mora numa pastilha discreta no canto (ver `ImportChip`),
+ * fora do diálogo e fora do documento: nunca bloqueia nada, mostra o que
+ * falhou, deixa repetir e deixa parar.
  */
 
 /** Último tema usado, para abrir já no sítio certo na proposta seguinte. */
@@ -42,12 +72,26 @@ const COUNTDOWN_FROM = MAX_IMPORT_BATCH / 2;
 
 /** Fotos por pedido de importação.
  *
- *  A rota aceita as 40 de uma assentada, mas isso são ~10 s com a barra
- *  parada e um "falhou" que não diz quais. Em lotes de 8 a barra mexe-se cinco
- *  vezes, o que falha fica circunscrito ao lote (as outras já entraram) e a
- *  ordem por que a Catarina tocou nas fotos mantém-se — os lotes são enviados
- *  em sequência e cada um preserva a ordem que lhe deram. */
+ *  A rota aceita as 40 de uma assentada, mas isso são ~10 s de silêncio e um
+ *  "falhou" que não diz quais. Em lotes de 8 o que falha fica circunscrito ao
+ *  lote (as outras já entraram), as primeiras fotos aparecem no estúdio muito
+ *  antes das últimas, e a ordem por que a Catarina tocou nas fotos mantém-se —
+ *  os lotes são enviados em sequência e cada um preserva a ordem que lhe deram. */
 const IMPORT_CHUNK = 8;
+
+/**
+ * A partir de quantas fotos é que a pastilha mostra uma BARRA.
+ *
+ * Abaixo disto a barra mentiria: um lote de 5 fotos é um pedido só, portanto
+ * teria dois estados (0 % e 100 %). Acima disto há lotes que cheguem para a
+ * barra andar de verdade — e um lote grande demora o suficiente para valer a
+ * pena dizer por onde vai.
+ */
+const BIG_BATCH = 16;
+
+/** Quanto tempo a pastilha fica no ecrã depois de correr tudo bem. O suficiente
+ *  para se ler "8 fotos adicionadas", pouco para não virar mobília. */
+const DONE_LINGER_MS = 4000;
 
 /**
  * QUANTOS ORIGINAIS SE DESCARREGAM AO MESMO TEMPO nesta grelha.
@@ -72,6 +116,12 @@ const HEAVY_IMAGE_CONCURRENCY = 3;
 /** Células da primeira dobra: carregam já e com prioridade (o diálogo mostra
  *  5 colunas, portanto duas linhas). */
 const ABOVE_FOLD = 10;
+
+/** Quantas miniaturas se aquecem ao adivinhar um tema (o rato passou por cima
+ *  do separador, ou do botão que abre a biblioteca). É a primeira dobra e mais
+ *  uma linha: o que ela vai VER antes de rolar. Só miniaturas — aquecer
+ *  originais seria trocar 25 KB por 2,6 MB de palpite. */
+const WARM_THUMBS = 15;
 
 /** Quanto se espera, depois de a primeira página estar no ecrã, para ir
  *  buscar a seguinte. Ver `Temas.tsx`: a primeira página tem de chegar
@@ -152,6 +202,629 @@ export interface ImportedImage extends ThemeImage {
   sourcePath?: string;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Cache da biblioteca (vive no módulo, sobrevive a fechar o diálogo)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Quanto tempo uma leitura serve para reabrir o diálogo sem ir à rede.
+ *
+ * Não é uma política de frescura — a política é a invalidação explícita
+ * (`invalidateThemeLibraryCache`, disparada quando uma foto é ADICIONADA ou
+ * REMOVIDA na biblioteca). Isto é só o prazo de validade das ASSINATURAS: os
+ * URLs vêm assinados por 6 h (`SIGNED_TTL`), e servir um URL expirado seria
+ * mostrar uma grelha de células partidas. Cinco horas deixa margem de sobra.
+ */
+const CACHE_TTL_MS = 5 * 60 * 60 * 1000;
+
+/** O que se guarda de um tema: exatamente o que a grelha precisa para desenhar
+ *  sem pedir nada, incluindo as páginas que ela já mandou vir com "Mostrar
+ *  mais" — reabrir devolve o rolo onde ele ficou, não o princípio. */
+interface CachedTheme {
+  images: ThemeImage[];
+  total: number | null;
+  truncated: boolean;
+  /** A última página veio cheia → é provável que haja mais. */
+  full: boolean;
+  /** Quando foi a PRIMEIRA leitura (o relógio das assinaturas). */
+  at: number;
+}
+
+const themePages = new Map<string, CachedTheme>();
+let themeList: { list: ThemeSummary[]; at: number } | null = null;
+/** Onde o rolo ficou, por tema. */
+const themeScroll = new Map<string, number>();
+/** O tema em que o diálogo estava quando fechou (a memória curta; o
+ *  `localStorage` é a longa, entre sessões). */
+let lastThemeId: string | null = null;
+/** O que ficou por entrar, por proposta: reabrir o seletor traz a seleção de
+ *  volta em vez de a obrigar a escolher tudo outra vez. */
+const failedByQuote = new Map<string, string[]>();
+/** As fotos da biblioteca que JÁ foram copiadas para cada proposta nesta
+ *  sessão — a marca "já nesta proposta" aparece sem esperar pelo estúdio. */
+const importedByQuote = new Map<string, Set<string>>();
+
+function fresh<T extends { at: number }>(entry: T | null | undefined): T | null {
+  if (!entry) return null;
+  return Date.now() - entry.at < CACHE_TTL_MS ? entry : null;
+}
+
+function cachedThemes(): ThemeSummary[] | null {
+  return fresh(themeList)?.list ?? null;
+}
+
+function cachedTheme(themeId: string | null): CachedTheme | null {
+  if (!themeId) return null;
+  return fresh(themePages.get(themeId) ?? null);
+}
+
+/** Guarda (ou atualiza) o que a grelha tem de um tema, mantendo o relógio da
+ *  primeira leitura — senão a cache renovava-se sozinha para lá da assinatura. */
+function rememberTheme(themeId: string, next: Omit<CachedTheme, "at">): void {
+  const at = themePages.get(themeId)?.at ?? Date.now();
+  themePages.set(themeId, { ...next, at });
+}
+
+/**
+ * Deita fora o que está guardado da biblioteca.
+ *
+ * Só há uma razão para isto: uma foto foi ADICIONADA ou REMOVIDA num tema (o
+ * que acontece no ecrã `Temas`, não aqui). Fica exportada — e à escuta do
+ * evento `liquen:biblioteca-alterada` — para esse ecrã poder avisar sem que
+ * este módulo precise de o conhecer.
+ */
+export function invalidateThemeLibraryCache(): void {
+  themeList = null;
+  themePages.clear();
+  themeScroll.clear();
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("liquen:biblioteca-alterada", invalidateThemeLibraryCache);
+}
+
+let themesInFlight: Promise<ThemeSummary[]> | null = null;
+
+/** Os temas — da cache, do pedido que já vai a caminho, ou da rede. */
+async function getThemes(): Promise<ThemeSummary[]> {
+  const have = cachedThemes();
+  if (have) return have;
+  if (themesInFlight) return themesInFlight;
+  const run = (async () => {
+    const res = await fetch("/api/temas", { cache: "no-store" });
+    if (!res.ok) throw new Error("falhou");
+    const list: ThemeSummary[] = await res.json();
+    themeList = { list, at: Date.now() };
+    return list;
+  })();
+  themesInFlight = run;
+  void run
+    .catch(() => {})
+    .finally(() => {
+      if (themesInFlight === run) themesInFlight = null;
+    });
+  return run;
+}
+
+const pagesInFlight = new Map<string, Promise<CachedTheme & { unreadable: boolean }>>();
+
+/** A primeira página de um tema — da cache, do pedido em voo, ou da rede. Uma
+ *  viagem por tema, mesmo que o adivinhar e o abrir peçam ao mesmo tempo. */
+async function getFirstPage(themeId: string): Promise<CachedTheme & { unreadable: boolean }> {
+  const have = cachedTheme(themeId);
+  if (have) return { ...have, unreadable: false };
+  const running = pagesInFlight.get(themeId);
+  if (running) return running;
+  const run = (async () => {
+    const res = await fetch(`/api/temas/${themeId}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("falhou");
+    const data = await res.json();
+    const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
+    // `ok: false` (com 200) é "a pasta não pôde ser lida agora".
+    const unreadable = data?.ok === false;
+    const entry: CachedTheme & { unreadable: boolean } = {
+      images: page,
+      total: typeof data?.total === "number" ? data.total : page.length,
+      truncated: Boolean(data?.truncated),
+      full: page.length >= THEME_PAGE_SIZE,
+      at: Date.now(),
+      unreadable,
+    };
+    // Uma falha de LEITURA não se guarda: seria congelar cinco horas de "não
+    // foi possível ler a pasta" por causa de um soluço do Storage.
+    if (!unreadable) rememberTheme(themeId, entry);
+    return entry;
+  })();
+  pagesInFlight.set(themeId, run);
+  void run
+    .catch(() => {})
+    .finally(() => {
+      if (pagesInFlight.get(themeId) === run) pagesInFlight.delete(themeId);
+    });
+  return run;
+}
+
+/** Põe as miniaturas na cache do browser antes de a grelha as pedir. */
+function warmThumbs(images: readonly ThemeImage[]): void {
+  if (typeof window === "undefined" || typeof window.Image !== "function") return;
+  for (const im of images.slice(0, WARM_THUMBS)) {
+    // Só `thumbUrl`: uma foto sem miniatura custa ~2,6 MB e tem a sua própria
+    // fila (ver `HEAVY_IMAGE_CONCURRENCY`). Adivinhar não pode furar essa fila.
+    if (!im.thumbUrl) continue;
+    const img = new window.Image();
+    img.decoding = "async";
+    img.src = im.thumbUrl;
+  }
+}
+
+/** Qual o tema por que o diálogo abre: o desta sessão, o da sessão passada, ou
+ *  o primeiro da lista. */
+function preferredThemeId(list: readonly ThemeSummary[]): string | null {
+  if (lastThemeId && list.some((t) => t.id === lastThemeId)) return lastThemeId;
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(LAST_THEME_KEY);
+  } catch {
+    /* localStorage indisponível — segue com o primeiro tema */
+  }
+  if (saved && list.some((t) => t.id === saved)) return saved;
+  return list[0]?.id ?? null;
+}
+
+/** Adivinha um tema: metadados + miniaturas, sem nada no ecrã ainda. */
+export function prefetchTheme(themeId: string): void {
+  const have = cachedTheme(themeId);
+  if (have) {
+    warmThumbs(have.images);
+    return;
+  }
+  void getFirstPage(themeId)
+    .then((entry) => warmThumbs(entry.images))
+    .catch(() => {
+      /* adivinhar e falhar não é um erro que se mostre: quem abrir pede outra vez */
+    });
+}
+
+/**
+ * Aquece a biblioteca ANTES de o diálogo abrir: a lista de temas e as
+ * miniaturas do tema por onde ele vai abrir.
+ *
+ * Exportada para quem desenha o botão "Escolher da biblioteca de temas" a
+ * poder chamar no `onPointerEnter`/`onFocus`. Como esse botão vive noutro
+ * ficheiro, há também a rede de segurança abaixo, que apanha o gesto por
+ * delegação. Idempotente e barata: com cache, não faz nada.
+ */
+export function prefetchThemeLibrary(): void {
+  void getThemes()
+    .then((list) => {
+      const id = preferredThemeId(list);
+      if (id) prefetchTheme(id);
+    })
+    .catch(() => {});
+}
+
+/**
+ * O gesto que abre a biblioteca começa a carregá-la.
+ *
+ * Por delegação no documento, e não por um `onPointerEnter` no botão, porque o
+ * botão é do estúdio de propostas. Quem quiser ser explícito marca-o com
+ * `data-biblioteca-temas`; sem marca, reconhece-se pelo nome ("Escolher da
+ * biblioteca de temas"). Custa uma leitura de `textContent` no rato a passar e
+ * o resultado é o diálogo abrir já com as fotos desenhadas.
+ */
+const OPEN_HINT = /biblioteca de temas/i;
+let hintInstalled = false;
+function installOpenHint(): void {
+  if (hintInstalled || typeof document === "undefined") return;
+  hintInstalled = true;
+  const hint = (e: Event) => {
+    const el = e.target;
+    if (!(el instanceof Element)) return;
+    const trigger = el.closest("[data-biblioteca-temas],button,a");
+    if (!trigger) return;
+    if (
+      !trigger.hasAttribute("data-biblioteca-temas") &&
+      !OPEN_HINT.test(trigger.textContent ?? "")
+    )
+      return;
+    prefetchThemeLibrary();
+  };
+  document.addEventListener("pointerover", hint, { passive: true });
+  document.addEventListener("focusin", hint, { passive: true });
+}
+installOpenHint();
+
+// ───────────────────────────────────────────────────────────────────────────
+// A cópia, em segundo plano (fora do React, para sobreviver ao diálogo)
+// ───────────────────────────────────────────────────────────────────────────
+
+type PhotoState = "pending" | "done" | "failed";
+
+interface JobPhoto {
+  /** Caminho na BIBLIOTECA. */
+  path: string;
+  /** A imagem que a pastilha mostra — a miniatura que a grelha já desenhou,
+   *  portanto já está na cache do browser: vê-la não custa pedido nenhum. */
+  thumb?: string;
+  state: PhotoState;
+}
+
+interface ImportJob {
+  id: number;
+  quoteId: string;
+  photos: JobPhoto[];
+  /** Onde entregar cada lote que chega. É o `onPicked` tal como estava no
+   *  instante do clique — e é isso que faz as fotos irem parar ao mood board
+   *  (ou à capa) de onde o diálogo foi aberto, mesmo já com ele fechado. */
+  deliver: (images: ImportedImage[]) => void;
+  running: boolean;
+  /** Pediram para parar: o que ainda não saiu não sai. */
+  stopping: boolean;
+  stopped: boolean;
+  /** A primeira mensagem de erro do servidor, para se poder dizer porquê. */
+  error: string | null;
+}
+
+const jobs: ImportJob[] = [];
+/** `quoteId\npath` de tudo o que está em voo — a rede contra o duplo clique. */
+const inFlight = new Set<string>();
+let jobSeq = 0;
+
+const flightKey = (quoteId: string, path: string) => `${quoteId}\n${path}`;
+
+// Um contador de versão como estado externo: quem depende disto (a pastilha e
+// o próprio diálogo) volta a desenhar; a informação verdadeira lê-se de `jobs`.
+let version = 0;
+const listeners = new Set<() => void>();
+function emit(): void {
+  version += 1;
+  for (const l of Array.from(listeners)) l();
+  syncOverlay();
+}
+function subscribe(l: () => void): () => void {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+}
+const snapshot = () => version;
+function useImportRuntime(): number {
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}
+
+/** As fotos desta proposta que estão a ser copiadas AGORA. */
+function pendingSources(quoteId: string): Set<string> {
+  const out = new Set<string>();
+  for (const job of jobs) {
+    if (job.quoteId !== quoteId) continue;
+    for (const p of job.photos) if (p.state === "pending") out.add(p.path);
+  }
+  return out;
+}
+
+/** As fotos desta proposta que já foram copiadas nesta sessão. */
+function importedSources(quoteId: string): ReadonlySet<string> {
+  return importedByQuote.get(quoteId) ?? new Set<string>();
+}
+
+/** O que ficou por entrar nesta proposta, à espera de uma segunda tentativa. */
+function failedFor(quoteId: string): string[] {
+  return failedByQuote.get(quoteId) ?? [];
+}
+
+function clearFailed(quoteId: string): void {
+  if (failedByQuote.delete(quoteId)) emit();
+}
+
+function rememberImported(quoteId: string, path: string): void {
+  const set = importedByQuote.get(quoteId) ?? new Set<string>();
+  set.add(path);
+  importedByQuote.set(quoteId, set);
+}
+
+function mark(job: ImportJob, path: string, state: PhotoState): void {
+  const photo = job.photos.find((p) => p.path === path);
+  if (photo) photo.state = state;
+}
+
+/**
+ * Põe a copiar as fotos escolhidas e devolve o número do lote (0 = não havia
+ * nada por copiar).
+ *
+ * Tudo o que já vai a caminho é descartado aqui, em silêncio e de forma
+ * síncrona — é isto que faz do duplo clique (ou do segundo clique numa rede
+ * lenta) um não-acontecimento em vez de uma importação a dobrar.
+ */
+function startImport(opts: {
+  quoteId: string;
+  images: readonly ThemeImage[];
+  deliver: (images: ImportedImage[]) => void;
+}): number {
+  const photos: JobPhoto[] = [];
+  const seen = new Set<string>();
+  for (const im of opts.images) {
+    if (seen.has(im.path)) continue;
+    seen.add(im.path);
+    const key = flightKey(opts.quoteId, im.path);
+    if (inFlight.has(key)) continue;
+    inFlight.add(key);
+    photos.push({ path: im.path, thumb: im.thumbUrl || im.url || undefined, state: "pending" });
+  }
+  if (photos.length === 0) return 0;
+
+  const job: ImportJob = {
+    id: ++jobSeq,
+    quoteId: opts.quoteId,
+    photos,
+    deliver: opts.deliver,
+    running: true,
+    stopping: false,
+    stopped: false,
+    error: null,
+  };
+  jobs.push(job);
+  emit();
+  void runJob(job);
+  return job.id;
+}
+
+async function runJob(job: ImportJob): Promise<void> {
+  job.running = true;
+  job.error = null;
+  job.stopped = false;
+
+  const queue = job.photos.filter((p) => p.state === "pending").map((p) => p.path);
+
+  for (let i = 0; i < queue.length; i += IMPORT_CHUNK) {
+    if (job.stopping) {
+      job.stopped = true;
+      break;
+    }
+    const chunk = queue.slice(i, i + IMPORT_CHUNK);
+    try {
+      const res = await fetch(`/api/orcamento/${job.quoteId}/assets/importar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths: chunk }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Falha ao adicionar as imagens.");
+      const copied: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
+      const failedHere: string[] = Array.isArray(data?.failed) ? data.failed : [];
+      // A rota devolve as cópias pela ordem pedida, saltando as que falharam —
+      // é isso que deixa emparelhar cada cópia com a foto da biblioteca de onde
+      // veio. Se as contas não baterem certo, prefere-se ficar sem a marca "já
+      // nesta proposta" a inventar uma origem errada.
+      const sources = chunk.filter((p) => !failedHere.includes(p));
+      const aligned = sources.length === copied.length;
+      const picked: ImportedImage[] = copied.map((im, k) =>
+        aligned ? { ...im, sourcePath: sources[k] } : { ...im },
+      );
+      for (const p of sources) {
+        mark(job, p, "done");
+        if (aligned) rememberImported(job.quoteId, p);
+      }
+      for (const p of failedHere) mark(job, p, "failed");
+      if (picked.length > 0) job.deliver(picked);
+    } catch (err) {
+      if (!job.error) {
+        job.error = err instanceof Error ? err.message : "Falha ao adicionar as imagens.";
+      }
+      for (const p of chunk) mark(job, p, "failed");
+    } finally {
+      for (const p of chunk) inFlight.delete(flightKey(job.quoteId, p));
+    }
+    emit();
+  }
+
+  // Parar é parar o que FALTA. O lote que já ia a caminho não se aborta: o
+  // servidor copia dentro do Storage e uma resposta abortada deixaria ficheiros
+  // escritos que ninguém receberia — ficheiros órfãos na pasta da proposta.
+  for (const p of job.photos) {
+    if (p.state !== "pending") continue;
+    p.state = "failed";
+    inFlight.delete(flightKey(job.quoteId, p.path));
+  }
+
+  job.running = false;
+  // O que este lote deixou por entrar junta-se ao que já estava à espera (pode
+  // haver mais do que um lote a caminho da mesma proposta) e tira de lá o que
+  // este conseguiu.
+  const failed = job.photos.filter((p) => p.state === "failed").map((p) => p.path);
+  const done = new Set(job.photos.filter((p) => p.state === "done").map((p) => p.path));
+  const carried = failedFor(job.quoteId).filter((p) => !done.has(p) && !failed.includes(p));
+  const next = [...carried, ...failed];
+  if (next.length > 0) failedByQuote.set(job.quoteId, next);
+  else failedByQuote.delete(job.quoteId);
+  emit();
+
+  if (failed.length === 0) {
+    window.setTimeout(() => dismissJob(job.id), DONE_LINGER_MS);
+  }
+}
+
+function stopJob(id: number): void {
+  const job = jobs.find((j) => j.id === id);
+  if (!job) return;
+  job.stopping = true;
+  emit();
+}
+
+function retryJob(id: number): void {
+  const job = jobs.find((j) => j.id === id);
+  if (!job || job.running) return;
+  job.stopping = false;
+  job.stopped = false;
+  for (const p of job.photos) {
+    if (p.state !== "failed") continue;
+    p.state = "pending";
+    inFlight.add(flightKey(job.quoteId, p.path));
+  }
+  emit();
+  void runJob(job);
+}
+
+function dismissJob(id: number): void {
+  const i = jobs.findIndex((j) => j.id === id);
+  if (i < 0) return;
+  const [job] = jobs.splice(i, 1);
+  // Descartar esta pastilha esquece o que ELA tinha por entrar — nunca o que
+  // ficou de outro lote da mesma proposta.
+  const gone = new Set(job.photos.map((p) => p.path));
+  const rest = failedFor(job.quoteId).filter((p) => !gone.has(p));
+  if (rest.length > 0) failedByQuote.set(job.quoteId, rest);
+  else failedByQuote.delete(job.quoteId);
+  emit();
+}
+
+// ── A pastilha, na proposta e fora do diálogo ──────────────────────────────
+//
+// Vive na sua própria raiz de React, colada ao `body`: é o que lhe permite
+// continuar no ecrã depois de o diálogo (que é quem a manda começar)
+// desaparecer da árvore. Fixa no canto, sem fundo por cima de nada — não
+// bloqueia o estúdio nem o diálogo.
+
+let overlayRoot: Root | null = null;
+let overlayHost: HTMLElement | null = null;
+let overlayTeardown = 0;
+
+function syncOverlay(): void {
+  if (typeof document === "undefined" || !document.body) return;
+  if (jobs.length > 0) {
+    if (overlayTeardown) {
+      window.clearTimeout(overlayTeardown);
+      overlayTeardown = 0;
+    }
+    if (overlayRoot) return;
+    overlayHost = document.createElement("div");
+    overlayHost.setAttribute("data-importacoes", "");
+    document.body.appendChild(overlayHost);
+    overlayRoot = createRoot(overlayHost);
+    overlayRoot.render(<ImportOverlay />);
+    return;
+  }
+  if (!overlayRoot || overlayTeardown) return;
+  // Desmontar uma raiz a partir de dentro de uma renderização é proibido —
+  // isto chega sempre de um `emit()`, que pode vir de um evento. Sai do caminho.
+  overlayTeardown = window.setTimeout(() => {
+    overlayTeardown = 0;
+    if (jobs.length > 0) return;
+    overlayRoot?.unmount();
+    overlayRoot = null;
+    overlayHost?.remove();
+    overlayHost = null;
+  }, 0);
+}
+
+function ImportOverlay() {
+  useImportRuntime();
+  if (jobs.length === 0) return null;
+  return (
+    <div className="pointer-events-none fixed bottom-6 left-6 z-[70] flex max-w-[calc(100vw-3rem)] flex-col gap-2 sm:max-w-sm">
+      {jobs.map((job) => (
+        <ImportChip key={job.id} job={job} />
+      ))}
+    </div>
+  );
+}
+
+function ImportChip({ job }: { job: ImportJob }) {
+  const total = job.photos.length;
+  const done = job.photos.filter((p) => p.state === "done").length;
+  const failed = job.photos.filter((p) => p.state === "failed").length;
+  const settled = !job.running;
+  const withBar = total > BIG_BATCH && job.running;
+
+  const message = job.running
+    ? `A adicionar ${plural(total, "foto", "fotos")} à proposta…`
+    : failed === 0
+      ? `${plural(done, "foto adicionada", "fotos adicionadas")} à proposta.`
+      : job.stopped
+        ? `Parou — ${plural(failed, "foto ficou", "fotos ficaram")} por adicionar.`
+        : `${plural(failed, "foto não entrou", "fotos não entraram")} na proposta.`;
+
+  return (
+    <div
+      role="group"
+      aria-label="Fotos a caminho da proposta"
+      className={`pointer-events-auto rounded-xl border bg-white px-4 py-3 shadow-xl shadow-black/10 ${
+        settled && failed > 0 ? "border-[#8a2a22]/25" : "border-foreground/10"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        {/* As mesmas miniaturas que a grelha desenhou: já estão na cache do
+            browser, portanto vê-las aqui não custa um pedido novo. */}
+        <div className="flex shrink-0 -space-x-2" aria-hidden="true">
+          {job.photos.slice(0, 4).map((p) => (
+            <span
+              key={p.path}
+              className={`block h-7 w-7 overflow-hidden rounded-md border-2 border-white bg-foreground/[0.06] ${
+                p.state === "pending" ? "opacity-55" : ""
+              } ${p.state === "failed" ? "ring-2 ring-[#8a2a22]/60" : ""}`}
+            >
+              {p.thumb && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.thumb} alt="" decoding="async" className="h-full w-full object-cover" />
+              )}
+            </span>
+          ))}
+          {total > 4 && (
+            <span className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-white bg-foreground/[0.08] text-[10px] text-foreground/70">
+              +{total - 4}
+            </span>
+          )}
+        </div>
+        <p role="status" aria-live="polite" className="min-w-0 flex-1 text-sm text-foreground/80">
+          {message}
+        </p>
+      </div>
+
+      {withBar && (
+        <div
+          role="progressbar"
+          aria-label="Progresso da importação"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={done + failed}
+          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+        >
+          <div
+            className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
+            style={{ width: `${Math.round(((done + failed) / total) * 100)}%` }}
+          />
+        </div>
+      )}
+
+      {settled && failed > 0 && (
+        <>
+          <p className="bo-text-muted mt-1 text-xs">
+            {done > 0 ? `${done} entraram. ` : ""}
+            {job.error && !job.stopped ? job.error : "Continuam por adicionar — pode repetir."}
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => retryJob(job.id)}>
+              Repetir
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => dismissJob(job.id)}>
+              Descartar
+            </Button>
+          </div>
+        </>
+      )}
+
+      {job.running && (
+        <div className="mt-2 flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => stopJob(job.id)}>
+            Parar
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** A página seguinte, pedida antes de ela a pedir. Guarda o tema e o offset com
  *  que foi buscada: só encaixa onde foi pedida. */
 interface Ahead {
@@ -184,40 +857,50 @@ export default function ThemePicker({
 }: Props) {
   const { toast } = useToast();
   const trapRef = useFocusTrap<HTMLDivElement>(true);
+  const tick = useImportRuntime();
 
-  const [themes, setThemes] = useState<ThemeSummary[]>([]);
-  const [loadingThemes, setLoadingThemes] = useState(true);
-  const [themeId, setThemeId] = useState<string | null>(null);
+  // O que já está em cache entra no estado LOGO no primeiro desenho: reabrir o
+  // diálogo na mesma sessão mostra a grelha desenhada, sem esqueleto nem
+  // pedido — e sem um instante de "este tema não tem fotos".
+  const [themes, setThemes] = useState<ThemeSummary[]>(() => cachedThemes() ?? []);
+  const [loadingThemes, setLoadingThemes] = useState(() => cachedThemes() === null);
+  const [themeId, setThemeId] = useState<string | null>(() => {
+    const list = cachedThemes();
+    return list ? preferredThemeId(list) : null;
+  });
 
   /** As fotos JÁ CARREGADAS, mais recentes primeiro — sempre um PREFIXO da
    *  lista do servidor, que é o que faz do `images.length` um offset válido. */
-  const [images, setImages] = useState<ThemeImage[]>([]);
-  const [total, setTotal] = useState<number | null>(null);
-  const [truncated, setTruncated] = useState(false);
+  const [images, setImages] = useState<ThemeImage[]>(() => cachedTheme(themeId)?.images ?? []);
+  const [total, setTotal] = useState<number | null>(() => cachedTheme(themeId)?.total ?? null);
+  const [truncated, setTruncated] = useState(() => cachedTheme(themeId)?.truncated ?? false);
   /** A última página veio cheia → é provável que haja mais. */
-  const [pageFull, setPageFull] = useState(false);
+  const [pageFull, setPageFull] = useState(() => cachedTheme(themeId)?.full ?? false);
   /** A pasta não pôde ser LIDA. Não é o mesmo que "tema sem fotos". */
   const [unreadable, setUnreadable] = useState(false);
-  const [loadingImages, setLoadingImages] = useState(false);
+  const [loadingImages, setLoadingImages] = useState(() => cachedTheme(themeId) === null);
   const [loadingMore, setLoadingMore] = useState(false);
   /** A página seguinte, já pedida e guardada — ver o efeito de adiantamento. */
   const [ahead, setAhead] = useState<Ahead | null>(null);
 
-  const [selected, setSelected] = useState<string[]>([]);
+  /** A seleção sobrevive à troca de tema (é uma lista de caminhos, não de
+   *  índices) e volta a aparecer quando o que ficou por entrar espera por uma
+   *  segunda tentativa. */
+  const [selected, setSelected] = useState<string[]>(() => {
+    const carried = failedFor(quoteId);
+    return multiple ? carried.slice(0, MAX_IMPORT_BATCH) : carried.slice(0, 1);
+  });
   /** Qual a célula que responde ao Tab (roving tabindex). */
   const [focusIndex, setFocusIndex] = useState(0);
   /** Foto aberta em grande, por índice na grelha. */
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  /** O que não entrou na última tentativa — continua selecionado. */
-  const [failedPaths, setFailedPaths] = useState<string[]>([]);
-
   /** Onde começou o intervalo do Shift (clique ou seta). */
   const anchor = useRef<number | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
-  const stopRequested = useRef(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  /** O rolo volta ao sítio uma vez por tema, não a cada renderização. */
+  const restoreScroll = useRef(true);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -226,27 +909,76 @@ export default function ThemePicker({
     };
   }, []);
 
+  // O `tick` do runtime entra nestas memórias porque é ele que diz que algo
+  // mudou lá fora (um lote arrancou, chegou ou falhou) — o valor em si não
+  // interessa a ninguém.
   const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const usedSet = useMemo(() => new Set(usedThemePaths ?? []), [usedThemePaths]);
+  /** As que estão a ser copiadas AGORA: escolher outra vez seria importar a
+   *  dobrar, por isso o toque é ignorado em silêncio. */
+  const pendingSet = useMemo(() => pendingSources(quoteId), [quoteId, tick]);
+  const usedSet = useMemo(() => {
+    const set = new Set<string>(usedThemePaths ?? []);
+    for (const p of importedSources(quoteId)) set.add(p);
+    return set;
+  }, [usedThemePaths, quoteId, tick]);
+  /** O que não entrou na última tentativa — continua selecionado e marcado. */
+  const failedPaths = useMemo(() => failedFor(quoteId), [quoteId, tick]);
+  /** O que a grelha está a mostrar, para a seleção poder falar de outros temas. */
+  const visiblePaths = useMemo(() => new Set(images.map((i) => i.path)), [images]);
+
+  // O que ficou por entrar volta a ficar selecionado — inclusive quando falha
+  // com o diálogo ainda aberto ("Adicionar e continuar"). A seleção nunca se
+  // perde por uma falha de rede.
+  const failedKey = failedPaths.join("\n");
+  useEffect(() => {
+    // Nas capas é uma foto por espaço: a que ficou por entrar já veio
+    // selecionada na montagem, e juntar mais seria mentir sobre o espaço.
+    if (failedPaths.length === 0 || !multiple) return;
+    setSelected((prev) => {
+      const have = new Set(prev);
+      const next = prev.slice();
+      for (const p of failedPaths) {
+        if (have.has(p) || next.length >= MAX_IMPORT_BATCH) continue;
+        next.push(p);
+      }
+      return next.length === prev.length ? prev : next;
+    });
+    // `failedKey` é o conteúdo da lista; a lista em si muda de referência a
+    // cada `tick` do runtime e voltaria a correr isto sem nada ter mudado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [failedKey]);
+
+  /** Passa o diálogo para um tema, usando o que já está em cache se lá estiver
+   *  (sem esqueleto, sem pedido). Um só sítio a mexer nestes estados. */
+  const showTheme = useCallback((id: string) => {
+    const cached = cachedTheme(id);
+    setThemeId(id);
+    lastThemeId = id;
+    setImages(cached?.images ?? []);
+    setTotal(cached?.total ?? null);
+    setTruncated(cached?.truncated ?? false);
+    setPageFull(cached?.full ?? false);
+    setUnreadable(false);
+    setLoadingImages(cached === null);
+    setFocusIndex(0);
+    setPreviewIndex(null);
+    setAhead(null);
+    anchor.current = null;
+    restoreScroll.current = true;
+  }, []);
 
   // ── Temas disponíveis ──
   useEffect(() => {
+    // Já vieram da cache no primeiro desenho: reabrir não custa um pedido.
+    if (cachedThemes()) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch("/api/temas", { cache: "no-store" });
-        if (!res.ok) throw new Error("falhou");
-        const list: ThemeSummary[] = await res.json();
+        const list = await getThemes();
         if (!active) return;
         setThemes(list);
-        // Abre no último tema usado, se ainda existir; senão no primeiro.
-        let preferred: string | null = null;
-        try {
-          preferred = localStorage.getItem(LAST_THEME_KEY);
-        } catch {
-          /* localStorage indisponível — segue com o primeiro tema */
-        }
-        setThemeId(list.some((t) => t.id === preferred) ? preferred : (list[0]?.id ?? null));
+        const id = preferredThemeId(list);
+        if (id) showTheme(id);
       } catch {
         if (active) toast("Não foi possível carregar os temas.", "error");
       } finally {
@@ -256,38 +988,24 @@ export default function ThemePicker({
     return () => {
       active = false;
     };
-  }, [toast]);
+  }, [toast, showTheme]);
 
   // ── Primeira página de fotos do tema selecionado ──
   // Só esta página é assinada pelo servidor; o resto vem em "Mostrar mais".
   useEffect(() => {
-    // `themeId` só passa de null para um tema (nunca de volta), por isso não há
-    // nada a limpar quando ainda não há seleção.
     if (!themeId) return;
+    // Em cache: o `showTheme` já a pôs no ecrã.
+    if (cachedTheme(themeId)) return;
     let active = true;
     (async () => {
-      setLoadingImages(true);
-      setImages([]);
-      setTotal(null);
-      setTruncated(false);
-      setPageFull(false);
-      setUnreadable(false);
-      setFocusIndex(0);
-      anchor.current = null;
       try {
-        const res = await fetch(`/api/temas/${themeId}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("falhou");
-        const data = await res.json();
+        const entry = await getFirstPage(themeId);
         if (!active) return;
-        const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
-        setImages(page);
-        setTotal(typeof data?.total === "number" ? data.total : page.length);
-        setTruncated(Boolean(data?.truncated));
-        setPageFull(page.length >= THEME_PAGE_SIZE);
-        // `ok: false` (com 200) é "a pasta não pôde ser lida agora".
-        setUnreadable(data?.ok === false);
+        setImages(entry.images);
+        setTotal(entry.total);
+        setTruncated(entry.truncated);
+        setPageFull(entry.full);
+        setUnreadable(entry.unreadable);
       } catch {
         if (active) toast("Não foi possível carregar as fotos deste tema.", "error");
       } finally {
@@ -298,6 +1016,22 @@ export default function ThemePicker({
       active = false;
     };
   }, [themeId, toast]);
+
+  // O que a grelha tem passa a ser o que a cache tem — incluindo as páginas
+  // que ela mandou vir com "Mostrar mais". Reabrir devolve o rolo inteiro.
+  useEffect(() => {
+    if (!themeId || loadingImages || unreadable || images.length === 0) return;
+    rememberTheme(themeId, { images, total, truncated, full: pageFull });
+  }, [themeId, images, total, truncated, pageFull, loadingImages, unreadable]);
+
+  // O rolo volta ao sítio onde ficou neste tema (uma vez, quando há fotos).
+  useEffect(() => {
+    if (!themeId || images.length === 0 || !restoreScroll.current) return;
+    restoreScroll.current = false;
+    // Sempre atribuído, mesmo a 0: trocar de um tema rolado para um por
+    // estrear tem de começar no princípio, não a meio da grelha nova.
+    if (scrollRef.current) scrollRef.current.scrollTop = themeScroll.get(themeId) ?? 0;
+  }, [themeId, images.length]);
 
   /** O offset seguinte é sempre quantas fotos já temos: `images` é um prefixo
    *  exato da lista do servidor (ver `mergePage`). */
@@ -400,9 +1134,11 @@ export default function ThemePicker({
   // `dismiss`/`importSelected` e não `close`/`confirm`: os nomes curtos
   // escondiam o `window.close`/`window.confirm` — e o `window.confirm()` é o
   // idioma de confirmação desta ferramenta, não se pode ficar ambíguo.
+  //
+  // Fechar deixou de ter de esperar por nada: a cópia não vive aqui dentro.
   const dismiss = useCallback(() => {
-    if (!importing) onClose();
-  }, [importing, onClose]);
+    onClose();
+  }, [onClose]);
 
   // Escape fecha — primeiro a pré-visualização, só depois o diálogo (o foco
   // fica preso dentro do diálogo pelo useFocusTrap).
@@ -426,10 +1162,10 @@ export default function ThemePicker({
 
   function pickTheme(id: string) {
     if (id === themeId) return;
-    setThemeId(id);
-    setSelected([]);
-    setFailedPaths([]);
-    setPreviewIndex(null);
+    // A SELEÇÃO NÃO SE LIMPA: escolher três fotos de "Itália" e duas de
+    // "Terracotta" é um gesto normal, e limpar aqui obrigava a duas viagens ao
+    // estúdio para o fazer. O rodapé diz quantas estão escolhidas ao todo.
+    showTheme(id);
     try {
       localStorage.setItem(LAST_THEME_KEY, id);
     } catch {
@@ -445,6 +1181,9 @@ export default function ThemePicker({
     const have = new Set(next);
     for (const p of paths) {
       if (have.has(p)) continue;
+      // Já vai a caminho: escolher outra vez seria pedir a mesma cópia duas
+      // vezes. Salta-se sem dizer nada — a pastilha já a mostra a entrar.
+      if (pendingSet.has(p)) continue;
       if (next.length >= MAX_IMPORT_BATCH) return { next, capped: true };
       next.push(p);
       have.add(p);
@@ -478,9 +1217,10 @@ export default function ThemePicker({
   }
 
   function toggleAt(index: number, extend: boolean) {
-    if (importing) return;
     const im = images[index];
     if (!im) return;
+    // Ignorado em silêncio: esta foto já vai a caminho desta proposta.
+    if (pendingSet.has(im.path)) return;
     // A âncora é lida AGORA e só depois movida: dentro de um `setSelected`
     // preguiçoso já valeria `index`, e o Shift+clique passava a clique normal.
     const from = anchor.current;
@@ -581,7 +1321,7 @@ export default function ThemePicker({
     const moved = focusCell(target);
     // Shift + seta estende a seleção sem largar a âncora — é o gesto de
     // intervalo para quem não usa rato.
-    if (e.shiftKey && multiple && !importing) {
+    if (e.shiftKey && multiple) {
       if (anchor.current === null) anchor.current = current;
       selectRange(anchor.current, moved, true);
     } else if (!e.shiftKey) {
@@ -591,91 +1331,45 @@ export default function ThemePicker({
 
   // ── Importação ────────────────────────────────────────────────────────────
 
+  /** A `ThemeImage` de um caminho escolhido. Pode estar noutro tema (a seleção
+   *  atravessa separadores), por isso procura-se também na cache. Não achar
+   *  nada não impede a cópia: o que a rota precisa é do caminho — o resto só
+   *  serve para a pastilha mostrar a miniatura. */
+  function imageFor(path: string): ThemeImage {
+    const here = images.find((i) => i.path === path);
+    if (here) return here;
+    for (const entry of themePages.values()) {
+      const hit = entry.images.find((i) => i.path === path);
+      if (hit) return hit;
+    }
+    return { path, url: "" };
+  }
+
   /**
-   * Copia `paths` para a proposta, em lotes, com progresso real.
+   * Entrega a seleção à cópia e devolve o diálogo a quem o abriu.
    *
-   * Cada lote que chega é entregue já ao estúdio (`onPicked`) em vez de se
-   * esperar pelo fim: se a ligação cair a meio, o que entrou fica. O que
-   * falhou volta a ser a seleção, para o "Tentar outra vez" não obrigar a
-   * escolher tudo de novo.
+   * Nada aqui espera pela rede: o `startImport` é síncrono a arrancar (e a
+   * descartar o que já vai a caminho), por isso um duplo clique não chega a
+   * ser dois lotes — o segundo encontra os caminhos em voo e não faz nada.
    */
-  async function runImport(paths: string[]) {
-    if (paths.length === 0 || importing) return;
-    stopRequested.current = false;
-    setImporting(true);
-    setFailedPaths([]);
-    setProgress({ done: 0, total: paths.length });
-
-    const stillFailed: string[] = [];
-    let added = 0;
-    let firstError: string | null = null;
-    let stopped = false;
-
-    for (let i = 0; i < paths.length; i += IMPORT_CHUNK) {
-      if (stopRequested.current) {
-        stopped = true;
-        stillFailed.push(...paths.slice(i));
-        break;
-      }
-      const chunk = paths.slice(i, i + IMPORT_CHUNK);
-      try {
-        const res = await fetch(`/api/orcamento/${quoteId}/assets/importar`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paths: chunk }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.error || "Falha ao adicionar as imagens.");
-        const copied: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
-        const failedHere: string[] = Array.isArray(data?.failed) ? data.failed : [];
-        // A rota devolve as cópias pela ordem pedida, saltando as que
-        // falharam — é isso que deixa emparelhar cada cópia com a foto da
-        // biblioteca de onde veio. Se as contas não baterem certo, prefere-se
-        // ficar sem a marca "já nesta proposta" a inventar uma origem errada.
-        const sources = chunk.filter((p) => !failedHere.includes(p));
-        const aligned = sources.length === copied.length;
-        const picked: ImportedImage[] = copied.map((im, k) =>
-          aligned ? { ...im, sourcePath: sources[k] } : { ...im },
-        );
-        if (picked.length > 0) {
-          added += picked.length;
-          onPicked(picked);
-        }
-        stillFailed.push(...failedHere);
-      } catch (err) {
-        if (!firstError) {
-          firstError = err instanceof Error ? err.message : "Falha ao adicionar as imagens.";
-        }
-        stillFailed.push(...chunk);
-      }
-      if (!alive.current) return;
-      setProgress({ done: Math.min(i + IMPORT_CHUNK, paths.length), total: paths.length });
-    }
-
-    if (!alive.current) return;
-    setImporting(false);
-    setProgress(null);
-    stopRequested.current = false;
-    setSelected(stillFailed);
-    setFailedPaths(stillFailed);
-
-    if (stillFailed.length === 0) {
-      toast(plural(added, "imagem adicionada", "imagens adicionadas") + ".", "success");
-      onClose();
-      return;
-    }
-    if (added === 0 && !stopped) {
-      toast(firstError ?? "Falha ao adicionar as imagens.", "error");
-      return;
-    }
-    toast(`${added} de ${paths.length} imagens adicionadas.`, stopped ? "info" : "error");
+  function submit(close: boolean) {
+    if (selected.length === 0) return;
+    startImport({ quoteId, images: selected.map(imageFor), deliver: onPicked });
+    // A seleção é entregue e limpa no MESMO gesto: é isso que desliga já o
+    // botão ("desativado durante a submissão") sem o deixar preso ao lote — o
+    // "continuar" existe precisamente para se escolher o lote seguinte
+    // enquanto o anterior ainda vai a caminho.
+    setSelected([]);
+    clearFailed(quoteId);
+    if (close) onClose();
   }
 
   const activeTheme = themes.find((t) => t.id === themeId) ?? null;
   /** Chegou-se ao teto: só se pode tirar fotos da seleção, não juntar mais. */
   const atLimit = multiple && selected.length >= MAX_IMPORT_BATCH;
-  const pct =
-    progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  /** Quantas das escolhidas não estão neste tema — o rodapé tem de o dizer,
+   *  senão a conta não bate certo com o que se vê. */
+  const elsewhere = selected.filter((p) => !visiblePaths.has(p)).length;
   const preview = previewIndex === null ? null : (images[previewIndex] ?? null);
 
   return (
@@ -745,6 +1439,10 @@ export default function ThemePicker({
                   variant={t.id === themeId ? "subtle" : "ghost"}
                   aria-pressed={t.id === themeId}
                   onClick={() => pickTheme(t.id)}
+                  // O rato a passar (ou o Tab a chegar) já manda vir as
+                  // miniaturas deste tema: quando ela clica, está desenhado.
+                  onPointerEnter={() => prefetchTheme(t.id)}
+                  onFocus={() => prefetchTheme(t.id)}
                 >
                   {t.name}
                   <span className="bo-text-muted">{themeCountLabel(t)}</span>
@@ -757,21 +1455,11 @@ export default function ThemePicker({
         {/* Barra de seleção — só faz sentido com várias fotos a escolher */}
         {multiple && images.length > 0 && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-foreground/[0.06] px-5 py-2.5">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={selectAllVisible}
-              disabled={importing || atLimit}
-            >
+            <Button size="sm" variant="ghost" onClick={selectAllVisible} disabled={atLimit}>
               Selecionar todas as visíveis
             </Button>
             {selected.length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setSelected([])}
-                disabled={importing}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
                 Limpar seleção
               </Button>
             )}
@@ -783,7 +1471,13 @@ export default function ThemePicker({
         )}
 
         {/* Fotos */}
-        <div className="min-h-[10rem] flex-1 overflow-y-auto px-5 py-4">
+        <div
+          ref={scrollRef}
+          onScroll={(e) => {
+            if (themeId) themeScroll.set(themeId, e.currentTarget.scrollTop);
+          }}
+          className="min-h-[10rem] flex-1 overflow-y-auto px-5 py-4"
+        >
           {loadingImages ? (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {Array.from({ length: 10 }).map((_, i) => (
@@ -814,11 +1508,14 @@ export default function ThemePicker({
               >
                 {images.map((im, i) => {
                   const on = selectedSet.has(im.path);
-                  const used = usedSet.has(im.path);
+                  const going = pendingSet.has(im.path);
+                  const used = !going && usedSet.has(im.path);
+                  const failed = failedPaths.includes(im.path);
                   // No teto, as fotos por escolher ficam apagadas e anunciadas
                   // como indisponíveis (aria-disabled, não `disabled`: o botão
-                  // continua alcançável pelo teclado).
-                  const blocked = (atLimit && !on) || importing;
+                  // continua alcançável pelo teclado). O mesmo para as que já
+                  // vão a caminho.
+                  const blocked = (atLimit && !on) || going;
                   return (
                     <div key={im.path} className="group relative">
                       <button
@@ -832,14 +1529,16 @@ export default function ThemePicker({
                         // porque é a única forma de a marca visual chegar a
                         // quem não vê a grelha.
                         aria-label={`Foto ${i + 1} de ${images.length}${
-                          used ? " (já nesta proposta)" : ""
-                        }`}
+                          going ? " (a adicionar)" : used ? " (já nesta proposta)" : ""
+                        }${failed ? " (não entrou)" : ""}`}
                         onClick={(e) => toggleAt(i, e.shiftKey)}
                         onFocus={() => setFocusIndex(i)}
                         className={`relative block aspect-square w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
-                          on
-                            ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
-                            : "border-foreground/[0.1] hover:border-[#4d6350]/45"
+                          failed
+                            ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
+                            : on
+                              ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
+                              : "border-foreground/[0.1] hover:border-[#4d6350]/45"
                         } ${blocked ? "opacity-50" : ""}`}
                       >
                         <Photo image={im} priority={i < ABOVE_FOLD} />
@@ -860,12 +1559,12 @@ export default function ThemePicker({
                             </svg>
                           </span>
                         )}
-                        {used && (
+                        {(used || going) && (
                           <span
                             aria-hidden
                             className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-black/65 px-1.5 py-0.5 text-center text-[10px] uppercase tracking-[0.06em] text-white"
                           >
-                            Já nesta proposta
+                            {going ? "A adicionar…" : "Já nesta proposta"}
                           </span>
                         )}
                       </button>
@@ -921,34 +1620,9 @@ export default function ThemePicker({
           )}
         </div>
 
-        {/* Progresso da importação */}
-        {progress && (
-          <div className="border-t border-foreground/[0.06] px-5 py-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm text-foreground/80">
-                A adicionar <strong className="font-medium">{progress.done}</strong> de{" "}
-                {plural(progress.total, "foto", "fotos")}…
-              </p>
-              <span className="bo-text-muted text-xs">{pct}%</span>
-            </div>
-            <div
-              role="progressbar"
-              aria-label="Progresso da importação"
-              aria-valuemin={0}
-              aria-valuemax={progress.total}
-              aria-valuenow={progress.done}
-              className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
-            >
-              <div
-                className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* O que não entrou — os caminhos ficam guardados, não se volta a escolher */}
-        {failedPaths.length > 0 && !importing && (
+        {/* O que não entrou da última vez — os caminhos ficam guardados e
+            voltam selecionados, não se volta a escolher */}
+        {failedPaths.length > 0 && (
           <div className="border-t border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-3">
             <p className="text-sm text-foreground/80">
               {plural(failedPaths.length, "foto não entrou", "fotos não entraram")} na proposta.
@@ -957,10 +1631,10 @@ export default function ThemePicker({
               Continuam selecionadas — pode tentar outra vez sem as escolher de novo.
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => void runImport(failedPaths)}>
+              <Button size="sm" variant="secondary" onClick={() => submit(true)}>
                 Tentar outra vez
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setFailedPaths([])}>
+              <Button size="sm" variant="ghost" onClick={() => clearFailed(quoteId)}>
                 Descartar
               </Button>
             </div>
@@ -983,36 +1657,43 @@ export default function ThemePicker({
                   ? `${selected.length} de ${MAX_IMPORT_BATCH} selecionadas`
                   : `${selected.length} ${selected.length === 1 ? "selecionada" : "selecionadas"}`}
             </p>
+            {elsewhere > 0 && (
+              <p className="bo-text-muted mt-0.5 text-xs">
+                {elsewhere === 1 ? "1 é de outro tema" : `${elsewhere} são de outros temas`}.
+              </p>
+            )}
             {atLimit && (
               <p className="bo-text-muted mt-0.5 text-xs">
                 Pode adicionar até {MAX_IMPORT_BATCH} fotos de cada vez.
               </p>
             )}
+            {pendingSet.size > 0 && (
+              <p className="bo-text-muted mt-0.5 text-xs">
+                {plural(pendingSet.size, "foto a caminho", "fotos a caminho")} da proposta.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Durante a importação este botão passa a "Parar": um lote de 40
-                demora segundos e ficar com o diálogo refém não é opção. O que
-                já entrou fica; o resto vai para a caixa do "Tentar outra vez". */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={
-                importing
-                  ? () => {
-                      stopRequested.current = true;
-                    }
-                  : dismiss
-              }
-            >
-              {importing ? "Parar" : "Cancelar"}
+            <Button variant="ghost" size="sm" onClick={dismiss}>
+              Cancelar
             </Button>
-            <Button
-              size="sm"
-              onClick={() => void runImport(selected)}
-              loading={importing}
-              disabled={selected.length === 0 || importing}
-            >
-              {importing ? "A adicionar…" : "Adicionar à proposta"}
+            {/* "Continuar" mantém o diálogo aberto e limpa a seleção: a cópia
+                já saiu daqui, portanto escolher o lote seguinte não espera pelo
+                anterior. Nas capas não existe — é uma foto por espaço. */}
+            {multiple && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => submit(false)}
+                disabled={selected.length === 0}
+              >
+                {selected.length > 0
+                  ? `Adicionar ${selected.length} e continuar`
+                  : "Adicionar e continuar"}
+              </Button>
+            )}
+            <Button size="sm" onClick={() => submit(true)} disabled={selected.length === 0}>
+              {selected.length > 0 ? `Adicionar ${selected.length} e fechar` : "Adicionar e fechar"}
             </Button>
           </div>
         </div>
@@ -1024,7 +1705,7 @@ export default function ThemePicker({
             count={images.length}
             selected={selectedSet.has(preview.path)}
             used={usedSet.has(preview.path)}
-            canSelect={!importing && (!atLimit || selectedSet.has(preview.path))}
+            canSelect={!pendingSet.has(preview.path) && (!atLimit || selectedSet.has(preview.path))}
             onToggle={() => toggleAt(previewIndex, false)}
             onStep={(dir) => {
               const next = Math.max(0, Math.min(images.length - 1, previewIndex + dir));
@@ -1199,4 +1880,28 @@ function Preview({
       </div>
     </div>
   );
+}
+
+/**
+ * Esquece tudo o que este módulo guarda entre montagens — cache da biblioteca,
+ * lotes em curso e a pastilha. Só para testes: em produção a cache é
+ * precisamente o que faz o diálogo reabrir instantâneo.
+ */
+export function __resetThemePickerState(): void {
+  invalidateThemeLibraryCache();
+  lastThemeId = null;
+  failedByQuote.clear();
+  importedByQuote.clear();
+  jobs.length = 0;
+  inFlight.clear();
+  themesInFlight = null;
+  pagesInFlight.clear();
+  if (overlayTeardown) {
+    clearTimeout(overlayTeardown);
+    overlayTeardown = 0;
+  }
+  overlayRoot?.unmount();
+  overlayRoot = null;
+  overlayHost?.remove();
+  overlayHost = null;
 }

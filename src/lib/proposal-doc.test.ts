@@ -248,6 +248,35 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(doc.coverImages).toEqual(["", ""]);
   });
 
+  it("BUG-GUARD: os ids dos serviços vêm da POSIÇÃO, nunca sorteados", () => {
+    // Isto corre a cada pré-visualização e a cada envio. Um id sorteado aqui
+    // faria o MESMO documento serializar diferente de cada vez — rascunho a
+    // "mudar" sozinho, gravações e comparações a acordar sem motivo.
+    const partida = base({
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+    });
+    const uma = withProposalDefaults(partida);
+    const outra = withProposalDefaults(partida);
+    expect(JSON.stringify(uma.serviceGroups)).toBe(JSON.stringify(outra.serviceGroups));
+    expect(uma.serviceGroups[0].id).toBe("g0");
+    expect(uma.serviceGroups[0].items[0].id).toBe("g0~i0");
+  });
+
+  it("respeita os ids que o editor já atribuiu (e desempata repetidos)", () => {
+    const doc = withProposalDefaults(
+      base({
+        serviceGroups: [
+          { id: "sA", title: "Um", items: [{ id: "sX", label: "L" }] },
+          { id: "sA", title: "Dois", items: [] },
+        ],
+      }),
+    );
+    expect(doc.serviceGroups[0].id).toBe("sA");
+    expect(doc.serviceGroups[0].items[0].id).toBe("sX");
+    // Um rascunho estragado com o id repetido não pode dar duas chaves iguais.
+    expect(doc.serviceGroups[1].id).toBe("sA_2");
+  });
+
   it("substitutes {DATA} and {CONVIDADOS} in the general conditions", () => {
     const doc = withProposalDefaults(base());
     const joined = doc.condicoesGerais.join("\n");

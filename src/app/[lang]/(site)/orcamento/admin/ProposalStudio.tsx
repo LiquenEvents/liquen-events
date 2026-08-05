@@ -1143,6 +1143,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                       onDown={() => moveBoard(bi, 1)}
                       disUp={bi === 0}
                       disDown={bi === doc.moodBoards.length - 1}
+                      what="mood board"
                     />
                     <button
                       type="button"
@@ -1231,6 +1232,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                       onDown={() => movePhase(pi, 1)}
                       disUp={pi === 0}
                       disDown={pi === (doc.cronograma?.length ?? 0) - 1}
+                      what="fase"
                     />
                     <button
                       type="button"
