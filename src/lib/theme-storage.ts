@@ -17,6 +17,7 @@ import {
   UPLOAD_MIME_TYPES,
   BUCKET_FILE_SIZE_LIMIT,
   MAX_UPLOAD_TICKETS,
+  PROPOSAL_THUMB_BUCKET,
   type UploadTicket,
 } from "./proposal-storage";
 import { log } from "./logger";
@@ -1239,7 +1240,7 @@ export async function fetchThemeImageBytes(path: string): Promise<Buffer | null>
 export async function copyThemeImageToProposal(
   themePath: string,
   quoteId: string,
-): Promise<{ path: string; url: string } | null> {
+): Promise<{ path: string; url: string; thumbUrl?: string } | null> {
   // O caminho vem do cliente: valida-o ANTES de tocar no Storage.
   if (!isThemePath(themePath)) return null;
   const sb = getSupabase();
@@ -1257,7 +1258,9 @@ export async function copyThemeImageToProposal(
       const { data } = await sb.storage
         .from(PROPOSAL_BUCKET)
         .createSignedUrl(dest, PROPOSAL_COPY_TTL);
-      return { path: dest, url: data?.signedUrl ?? "" };
+      const thumbUrl = await copiarMiniaturaParaProposta(themePath, dest);
+      const copia = { path: dest, url: data?.signedUrl ?? "" };
+      return thumbUrl ? { ...copia, thumbUrl } : copia;
     }
     log.warn("theme-storage: cópia no Storage falhou, a descarregar", {
       themePath,
@@ -1270,7 +1273,41 @@ export async function copyThemeImageToProposal(
   // Recurso: puxar os bytes e voltar a carregá-los.
   const bytes = await fetchThemeImageBytes(themePath);
   if (!bytes) return null;
-  return uploadProposalImage(quoteId, bytes, contentType);
+  const carregada = await uploadProposalImage(quoteId, bytes, contentType);
+  if (!carregada) return null;
+  const thumbUrl = await copiarMiniaturaParaProposta(themePath, carregada.path);
+  return thumbUrl ? { ...carregada, thumbUrl } : carregada;
+}
+
+/**
+ * Leva a miniatura do tema com a foto, quando a foto é copiada para uma
+ * proposta.
+ *
+ * Sem isto, uma foto escolhida da Biblioteca chegava à proposta SEM miniatura —
+ * e a grelha do estúdio voltava a puxar o original por célula, que é
+ * exactamente o que as miniaturas vieram resolver. O tema já tem a sua; é só
+ * copiá-la para a chave nova.
+ *
+ * Melhor esforço do princípio ao fim: a foto boa já está copiada quando isto
+ * corre, e falhar aqui deixa a proposta a cair para o original — o
+ * comportamento de antes. Nunca lança e nunca impede uma importação.
+ */
+async function copiarMiniaturaParaProposta(themePath: string, dest: string): Promise<string> {
+  const sb = getSupabase();
+  if (!sb) return "";
+  try {
+    const { error } = await sb.storage
+      .from(THEME_THUMB_BUCKET)
+      .copy(themePath, dest, { destinationBucket: PROPOSAL_THUMB_BUCKET });
+    // Sem miniatura no tema (foto anterior às miniaturas) não é avaria nenhuma.
+    if (error) return "";
+    const { data } = await sb.storage
+      .from(PROPOSAL_THUMB_BUCKET)
+      .createSignedUrl(dest, PROPOSAL_COPY_TTL);
+    return data?.signedUrl ?? "";
+  } catch {
+    return "";
+  }
 }
 
 // ── Levar fotos de um tema para outro ──────────────────────────────────────

@@ -663,7 +663,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     if (images.length === 0) return;
     setAssetUrls((prev) => {
       const next = { ...prev };
-      for (const im of images) if (im.path && im.url) next[im.path] = im.url;
+      // A miniatura do TEMA viaja com a foto na cópia (ver
+      // `copiarMiniaturaParaProposta`), portanto uma foto escolhida da
+      // Biblioteca chega à grelha já leve.
+      for (const im of images) if (im.path && im.url) next[im.path] = im.thumbUrl || im.url;
       return next;
     });
     setThemeOrigins((prev) => {
