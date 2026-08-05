@@ -22,6 +22,9 @@ const stores = vi.hoisted(() => ({
   themes: vi.fn(async () => [] as unknown[]),
   messageLinks: vi.fn(async () => [] as unknown[]),
   overviewSettings: vi.fn(async () => [] as unknown[]),
+  bibliotecaEtiquetas: vi.fn(async () => [] as unknown[]),
+  bibliotecaFotos: vi.fn(async () => [] as unknown[]),
+  bibliotecaFotoEtiquetas: vi.fn(async () => [] as unknown[]),
 }));
 
 /** Estado do cliente Supabase falso que serve os contadores de numeração. */
@@ -42,6 +45,11 @@ vi.mock("@/lib/email-templates-store", () => ({
 }));
 vi.mock("@/lib/themes-store", () => ({ listThemes: stores.themes }));
 vi.mock("@/lib/message-links-store", () => ({ listLinks: stores.messageLinks }));
+vi.mock("@/lib/biblioteca-etiquetas-store", () => ({ listEtiquetas: stores.bibliotecaEtiquetas }));
+vi.mock("@/lib/biblioteca-fotos-store", () => ({ listFotos: stores.bibliotecaFotos }));
+vi.mock("@/lib/biblioteca-foto-etiquetas-store", () => ({
+  listFotoEtiquetas: stores.bibliotecaFotoEtiquetas,
+}));
 // `readOverviewSettings` devolve os campos indexados; a rota faz-lhes
 // `Object.values`, que sobre um array devolve o próprio conteúdo — por isso o
 // mock pode servir uma lista como todos os outros.

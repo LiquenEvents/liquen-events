@@ -11,6 +11,9 @@ import { listItems } from "@/lib/inventory-store";
 import { listTemplatesWithDefaults } from "@/lib/email-templates-store";
 import { listThemes } from "@/lib/themes-store";
 import { listLinks } from "@/lib/message-links-store";
+import { listEtiquetas } from "@/lib/biblioteca-etiquetas-store";
+import { listFotos } from "@/lib/biblioteca-fotos-store";
+import { listFotoEtiquetas } from "@/lib/biblioteca-foto-etiquetas-store";
 import { readOverviewSettings } from "@/lib/overview-settings-store";
 import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
@@ -89,6 +92,13 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
   // equipa os vê, incluindo os que ainda estão na versão de origem.
   { key: "emailTemplates", table: "email_templates", list: listTemplatesWithDefaults },
   { key: "themes", table: "proposal_themes", list: listThemes },
+  // A Biblioteca visual, os três a seguir. O que aqui importa mesmo é o
+  // terceiro: as fotos reconstroem-se do bucket e o vocabulário são 23 linhas,
+  // mas "esta foto é um seating plan em terracotta" só existe porque alguém o
+  // disse — é trabalho à mão que nada repõe.
+  { key: "bibliotecaEtiquetas", table: "biblioteca_etiquetas", list: listEtiquetas },
+  { key: "bibliotecaFotos", table: "biblioteca_fotos", list: listFotos },
+  { key: "bibliotecaFotoEtiquetas", table: "biblioteca_foto_etiquetas", list: listFotoEtiquetas },
   { key: "messageLinks", table: "message_links", list: listLinks },
   // A Visão Geral guarda os dois campos como duas LINHAS (`notas`, `meta`);
   // `readOverviewSettings` devolve-as indexadas por campo — aqui voltam a ser

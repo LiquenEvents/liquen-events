@@ -443,6 +443,167 @@ do $$ begin
   end if;
 end $$;
 
+-- ── Biblioteca visual: etiquetas por eixo ───────────────────────
+-- O que isto resolve: os temas misturavam três eixos diferentes no mesmo
+-- nível — "Bouquets Branco e Amarelo" (tipo + paleta), "Itália" (estilo),
+-- "Terracotta" (paleta) — numa estrutura de PASTAS, onde cada foto vive num
+-- sítio só. Um seating plan em terracotta tinha de estar em dois temas ao
+-- mesmo tempo, e "seating plans em terracotta" era uma pergunta que não se
+-- podia fazer.
+--
+-- A partir daqui: a FOTO tem etiquetas em três eixos independentes, e um TEMA
+-- é uma pergunta com nome (ver `filter_rule` mais abaixo). A mesma foto
+-- responde a várias perguntas sem existir duas vezes.
+--
+-- O QUE ISTO NÃO É: uma segunda fonte de verdade sobre o que existe. A pasta
+-- do bucket continua a mandar nisso (ver src/lib/theme-storage.ts). Uma linha
+-- sem ficheiro é um fantasma; um ficheiro sem linha é uma foto por etiquetar,
+-- e a linha nasce sozinha ao listar. Nenhum byte se move por causa disto.
+
+-- Os valores de cada eixo. É uma TABELA e não uma lista no código porque o
+-- vocabulário é da equipa: acrescentar "champanhe" à paleta não pode obrigar
+-- a um deploy.
+create table if not exists public.biblioteca_etiquetas (
+  id          text primary key,          -- 'paleta:terracotta' — legível no SQL Editor
+  eixo        text not null,             -- 'tipo' | 'paleta' | 'estilo'
+  nome        text not null,             -- 'terracotta'
+  ordem       int  not null default 0,   -- ordem de apresentação dentro do eixo
+  created_at  timestamptz not null default now()
+);
+
+-- Um valor por eixo: "Terracotta" e "terracotta" não são duas etiquetas.
+create unique index if not exists biblioteca_etiquetas_uk
+  on public.biblioteca_etiquetas (eixo, lower(btrim(nome)));
+
+create index if not exists biblioteca_etiquetas_eixo_idx
+  on public.biblioteca_etiquetas (eixo, ordem);
+
+-- Uma linha por FICHEIRO do bucket `theme-assets`. Existe para haver onde
+-- pendurar etiquetas — e, de lambuja, para a contagem de cada cartão deixar de
+-- custar uma ida ao Storage por tema.
+create table if not exists public.biblioteca_fotos (
+  path        text primary key,          -- '<pasta>/<ficheiro>.jpg' dentro do bucket
+  -- A pasta de ORIGEM. Depois da migração deixa de significar "tema" e passa a
+  -- ser só a primeira parte do endereço — que é o que sempre foi de facto.
+  pasta       text generated always as (split_part(path, '/', 1)) stored,
+  fingerprint text,                      -- resumo do original, quando o nome o traz
+  -- MD5 do conteúdo, vindo do eTag que a listagem do Storage já devolve. É o
+  -- que permite reconhecer a MESMA foto carregada em duas pastas e juntar as
+  -- etiquetas das duas sem olhar para a imagem.
+  md5         text,
+  largura     int,
+  altura      int,
+  lqip        text,                      -- placeholder curto servido inline (nulo até existir)
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists biblioteca_fotos_pasta_idx on public.biblioteca_fotos (pasta);
+create index if not exists biblioteca_fotos_md5_idx
+  on public.biblioteca_fotos (md5) where md5 is not null;
+
+create table if not exists public.biblioteca_foto_etiquetas (
+  path        text not null references public.biblioteca_fotos (path) on delete cascade,
+  etiqueta_id text not null references public.biblioteca_etiquetas (id) on delete cascade,
+  -- QUEM pôs esta etiqueta — a coluna mais importante da tabela:
+  --   'migracao' — adivinhada a partir da pasta onde a foto estava
+  --   'fusao'    — herdada de uma cópia byte-a-byte da mesma foto noutra pasta
+  --   'upload'   — aplicada ao largar a foto num tema
+  --   'manual'   — confirmada ou posta à mão
+  -- É o que deixa a revisão em lote mostrar "por confirmar", e o que torna a
+  -- migração reversível com um único DELETE.
+  origem      text not null default 'manual',
+  created_at  timestamptz not null default now(),
+  -- A chave é DERIVADA das duas colunas acima, em vez de ser um par
+  -- (path, etiqueta_id). Dá exactamente a mesma garantia — a mesma etiqueta
+  -- não entra duas vezes na mesma foto — e dá mais uma: a linha passa a ter um
+  -- `id` de texto, que é o que o Repository partilhado (src/lib/repository.ts)
+  -- e a cópia de segurança precisam para saber ler, repor e apagar isto como
+  -- lêem tudo o resto. Sem ele, esta tabela seria a única do sistema que a
+  -- reposição não sabia tratar — e é aqui que mora o trabalho à mão de
+  -- etiquetar as fotos, que é precisamente o que não se pode perder.
+  id          text generated always as (path || '#' || etiqueta_id) stored,
+  primary key (id)
+);
+
+create index if not exists biblioteca_foto_etiquetas_etiqueta_idx
+  on public.biblioteca_foto_etiquetas (etiqueta_id);
+
+-- ── Os temas passam a poder ser filtros ─────────────────────────
+-- Colunas acrescentadas à tabela que já existe, em vez de uma tabela nova: é
+-- onde já estão os 6 temas, as capas escolhidas, as ordens manuais e o índice
+-- único de nome. Trocar de tabela seria mover dados reais para ganhar uma
+-- palavra.
+--
+-- `kind` por omissão é 'pasta' — o comportamento de hoje. Correr este ficheiro
+-- NÃO muda nada do que se vê; é a migração (scripts/migrar-temas.sql) que
+-- converte os temas em filtros, e só quando for corrida.
+alter table public.proposal_themes add column if not exists kind text not null default 'pasta';
+
+-- A regra de um tema-filtro. Uma entrada por EIXO, e a foto tem de cumprir
+-- TODAS as entradas (E entre eixos). Dentro de um eixo, `modo` decide:
+--   'todas'    — a foto tem de ter todas as etiquetas listadas (o normal:
+--                "Bouquets Branco e Amarelo" é branco E amarelo)
+--   'qualquer' — basta uma delas
+-- Um eixo ausente não restringe nada ("Terracotta" aceita qualquer tipo).
+--   {"v":1,"eixos":[{"eixo":"tipo","modo":"todas","etiquetas":["tipo:bouquet"]}]}
+alter table public.proposal_themes add column if not exists filter_rule jsonb;
+
+-- Lista de caminhos escolhidos à mão, para os temas que não encaixam em
+-- etiqueta nenhuma (`kind = 'manual'`).
+alter table public.proposal_themes add column if not exists manual_paths jsonb;
+
+alter table public.proposal_themes add column if not exists favorito boolean not null default false;
+alter table public.proposal_themes add column if not exists arquivado boolean not null default false;
+alter table public.proposal_themes add column if not exists ordem int;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'biblioteca_etiquetas_eixo_chk') then
+    alter table public.biblioteca_etiquetas add constraint biblioteca_etiquetas_eixo_chk
+      check (eixo in ('tipo','paleta','estilo')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'biblioteca_foto_etiquetas_origem_chk') then
+    alter table public.biblioteca_foto_etiquetas add constraint biblioteca_foto_etiquetas_origem_chk
+      check (origem in ('migracao','fusao','upload','manual')) not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'proposal_themes_kind_chk') then
+    alter table public.proposal_themes add constraint proposal_themes_kind_chk
+      check (kind in ('pasta','filtro','manual')) not valid;
+  end if;
+end $$;
+
+-- O vocabulário inicial. `on conflict do nothing` para o ficheiro poder ser
+-- colado outra vez sem desfazer o que a equipa entretanto mudou — e note-se
+-- que APAGAR uma destas etiquetas na aplicação é definitivo: correr o ficheiro
+-- de novo volta a criá-la.
+insert into public.biblioteca_etiquetas (id, eixo, nome, ordem) values
+  ('tipo:bouquet',        'tipo',   'bouquet',        10),
+  ('tipo:seating-plan',   'tipo',   'seating plan',   20),
+  ('tipo:centro-de-mesa', 'tipo',   'centro de mesa', 30),
+  ('tipo:arco',           'tipo',   'arco',           40),
+  ('tipo:cerimonia',      'tipo',   'cerimónia',      50),
+  ('tipo:entrada',        'tipo',   'entrada',        60),
+  ('tipo:mesa-de-doces',  'tipo',   'mesa de doces',  70),
+  ('tipo:papelaria',      'tipo',   'papelaria',      80),
+  ('tipo:iluminacao',     'tipo',   'iluminação',     90),
+  ('tipo:espaco',         'tipo',   'espaço',        100),
+  ('paleta:branco',       'paleta', 'branco',         10),
+  ('paleta:amarelo',      'paleta', 'amarelo',        20),
+  ('paleta:verde',        'paleta', 'verde',          30),
+  ('paleta:terracotta',   'paleta', 'terracotta',     40),
+  ('paleta:rosa',         'paleta', 'rosa',           50),
+  ('paleta:colorido',     'paleta', 'colorido',       60),
+  ('paleta:neutro',       'paleta', 'neutro',         70),
+  ('estilo:minimalista',  'estilo', 'minimalista',    10),
+  ('estilo:campo',        'estilo', 'campo',          20),
+  ('estilo:mediterranico','estilo', 'mediterrânico',  30),
+  ('estilo:classico',     'estilo', 'clássico',       40),
+  ('estilo:boho',         'estilo', 'boho',           50),
+  ('estilo:editorial',    'estilo', 'editorial',      60)
+on conflict (id) do nothing;
+
 -- ── Segurança ───────────────────────────────────────────────────
 -- Ativamos RLS sem políticas públicas: só o servidor (service_role key,
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.
@@ -459,6 +620,9 @@ alter table public.invoices    enable row level security;
 alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
 alter table public.proposal_themes enable row level security;
+alter table public.biblioteca_etiquetas enable row level security;
+alter table public.biblioteca_fotos enable row level security;
+alter table public.biblioteca_foto_etiquetas enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;
 alter table public.passkeys enable row level security;

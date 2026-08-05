@@ -20,6 +20,12 @@ import { mapper as templatesMapper, listTemplates } from "./email-templates-stor
 import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
 import { mapper as overviewMapper, type OverviewField } from "./overview-settings-store";
+import { mapper as etiquetasMapper, listEtiquetas } from "./biblioteca-etiquetas-store";
+import { mapper as fotosMapper, listFotos } from "./biblioteca-fotos-store";
+import {
+  mapper as fotoEtiquetasMapper,
+  listFotoEtiquetas,
+} from "./biblioteca-foto-etiquetas-store";
 import {
   BACKUP_SCHEMA_MIN_VERSION,
   BACKUP_SCHEMA_VERSION,
@@ -270,6 +276,39 @@ const overviewSchema = z.looseObject({
   updatedAt: z.string().max(64),
 });
 
+// ── Biblioteca visual ───────────────────────────────────────────────────────
+const bibliotecaEtiquetaSchema = z.object({
+  id: z.string().min(1).max(120),
+  eixo: z.enum(["tipo", "paleta", "estilo"]),
+  nome: z.string().min(1).max(80),
+  ordem: z.number().int().min(0).max(100_000).default(0),
+  createdAt: z.string().max(64),
+});
+
+const bibliotecaFotoSchema = z.object({
+  path: z.string().min(3).max(512),
+  // Coluna GERADA na base de dados a partir do `path`. Vem na cópia porque o
+  // `fromRow` a devolve, mas o `toRow` não a escreve — e é assim que tem de
+  // ser: escrevê-la seria tentar gravar uma coluna gerada.
+  pasta: z.string().max(256).default(""),
+  fingerprint: z.string().max(64).optional(),
+  md5: z.string().max(64).optional(),
+  largura: z.number().int().min(0).max(100_000).optional(),
+  altura: z.number().int().min(0).max(100_000).optional(),
+  lqip: z.string().max(8192).optional(),
+  createdAt: z.string().max(64),
+  updatedAt: z.string().max(64),
+});
+
+const bibliotecaFotoEtiquetaSchema = z.object({
+  // `<path>#<etiqueta_id>`, também gerado pela base.
+  id: z.string().min(3).max(700),
+  path: z.string().min(3).max(512),
+  etiquetaId: z.string().min(1).max(120),
+  origem: z.enum(["migracao", "fusao", "upload", "manual"]).default("manual"),
+  createdAt: z.string().max(64),
+});
+
 const counterSchema = z.object({
   year: z.number().int().min(1900).max(9999),
   n: z.number().int().min(0).max(1_000_000),
@@ -473,6 +512,37 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     // existem mesmo. Lê-se pelo backend, como todos os outros.
     current: () => listOverviewRows() as unknown as Promise<OverviewField[]>,
     stamp: (f) => f.updatedAt,
+  }),
+  // ── Biblioteca visual, POR ESTA ORDEM ───────────────────────────────────
+  // `biblioteca_foto_etiquetas` tem chaves estrangeiras para as outras duas
+  // (db/schema.sql): repor as ligações antes das etiquetas e das fotos rebenta
+  // com integridade referencial, e apagar faz-se pela ordem inversa.
+  asTarget({
+    key: "bibliotecaEtiquetas",
+    label: "Biblioteca — etiquetas",
+    table: etiquetasMapper.table,
+    mapper: etiquetasMapper,
+    schema: bibliotecaEtiquetaSchema,
+    current: listEtiquetas,
+    stamp: (e) => e.createdAt,
+  }),
+  asTarget({
+    key: "bibliotecaFotos",
+    label: "Biblioteca — fotos",
+    table: fotosMapper.table,
+    mapper: fotosMapper,
+    schema: bibliotecaFotoSchema,
+    current: listFotos,
+    stamp: (f) => f.updatedAt ?? f.createdAt,
+  }),
+  asTarget({
+    key: "bibliotecaFotoEtiquetas",
+    label: "Biblioteca — etiquetas das fotos",
+    table: fotoEtiquetasMapper.table,
+    mapper: fotoEtiquetasMapper,
+    schema: bibliotecaFotoEtiquetaSchema,
+    current: listFotoEtiquetas,
+    stamp: (l) => l.createdAt,
   }),
 ];
 
