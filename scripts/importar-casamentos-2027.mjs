@@ -7,6 +7,12 @@
  *   (por omissão faz ENSAIO — não escreve nada)
  *   --aplicar   escreve mesmo
  *
+ * OU, sem terminal, sem chaves e sem instalar nada:
+ *   node scripts/importar-casamentos-2027.mjs --sql
+ * ...e colar o resultado no SQL Editor do Supabase, onde já se está
+ * autenticado. É o caminho mais simples e não precisa do resto deste
+ * ficheiro — nem sequer das variáveis de ambiente.
+ *
  * ── Porque é que isto é um guião e não foi feito por mim ──────────────────
  * O calendário do back office vive na tabela `calendar_events` do Supabase. A
  * máquina onde este guião foi escrito não tem as chaves do projecto, portanto
@@ -32,6 +38,7 @@ import { randomUUID } from "node:crypto";
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const APLICAR = process.argv.includes("--aplicar");
+const SO_SQL = process.argv.includes("--sql");
 
 /**
  * A lista, tal como está na fotografia — e é de propósito que os nomes vão
@@ -111,8 +118,57 @@ function notaDe(c) {
   return partes.join(" · ");
 }
 
+/**
+ * O mesmo trabalho, em SQL para colar no editor do Supabase.
+ *
+ * Existe porque a alternativa — terminal, Node, dependências instaladas, e uma
+ * chave `service_role` copiada para a linha de comandos — é muito pedir para
+ * catorze linhas. No SQL Editor já se está autenticado: cola-se e carrega-se
+ * em Run.
+ *
+ * Sai da MESMA tabela `CASAMENTOS` daqui de cima, portanto os dois caminhos
+ * nunca podem discordar.
+ *
+ * `where not exists` faz o mesmo que a deduplicação do guião: correr duas
+ * vezes não duplica nada.
+ */
+function comoSql() {
+  const esc = (t) => String(t).replace(/'/g, "''");
+  const linhas = [...CASAMENTOS]
+    .sort((a, b) => a.data.localeCompare(b.data))
+    .map((c) => {
+      const title = esc(tituloDe(c));
+      const note = esc(notaDe(c));
+      return (
+        `insert into public.calendar_events (event_date, title, kind, note)\n` +
+        `select date '${c.data}', '${title}', 'evento', '${note}'\n` +
+        `where not exists (\n` +
+        `  select 1 from public.calendar_events\n` +
+        `  where event_date = date '${c.data}' and title = '${title}'\n` +
+        `);`
+      );
+    });
+  return (
+    `-- Casamentos de 2027 no calendário do back office.\n` +
+    `-- Colar no SQL Editor do Supabase e carregar em Run.\n` +
+    `-- Correr duas vezes é seguro: cada linha só entra se ainda não existir.\n\n` +
+    linhas.join("\n\n") +
+    `\n\n-- Para conferir depois:\n` +
+    `-- select event_date, title, note from public.calendar_events\n` +
+    `--  where event_date between date '2027-01-01' and date '2027-12-31'\n` +
+    `--  order by event_date;\n`
+  );
+}
+
 const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const diaDaSemana = (iso) => DIAS[new Date(`${iso}T12:00:00Z`).getUTCDay()];
+
+// O caminho do SQL não toca na rede nem precisa de chave nenhuma — por isso
+// responde antes de tudo o resto.
+if (SO_SQL) {
+  console.log(comoSql());
+  process.exit(0);
+}
 
 if (!URL || !KEY) {
   console.error(
