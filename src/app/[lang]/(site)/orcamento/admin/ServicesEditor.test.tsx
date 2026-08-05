@@ -193,3 +193,21 @@ describe("identidade das linhas", () => {
     expect(linhas().map((i) => i.value)).toEqual(["Um", "Dois"]);
   });
 });
+
+describe("alinhamento", () => {
+  it("os campos do grupo alinham à esquerda, marcador incluído", () => {
+    // O marcador ("a)") nasceu centrado. Um campo de texto centrado faz o
+    // cursor saltar de sítio enquanto se escreve, e num editor onde se escreve
+    // com o cliente ao telefone isso lê-se como o programa a tremer. Este teste
+    // existe porque `text-center` é uma classe que volta sozinha.
+    render(<Host initial={grupo(["Uma linha"])} />);
+
+    for (const campo of [
+      screen.getByLabelText(/^Marcador do grupo 1/),
+      screen.getByLabelText("Título do grupo 1"),
+      screen.getByLabelText("Linha 1 do grupo 1"),
+    ]) {
+      expect(campo.className).not.toMatch(/\btext-center\b/);
+    }
+  });
+});

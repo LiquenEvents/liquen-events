@@ -214,6 +214,45 @@ describe("AdminClient shell", () => {
     expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
   });
 
+  /**
+   * O botão "Atualizar" era o programa a perguntar a quem o usa se os dados
+   * estariam velhos. Foi-se, e no lugar dele a lista revalida-se sozinha ao
+   * voltar ao separador. Estes dois testes existem para o botão não voltar por
+   * distração e para a revalidação não morrer em silêncio.
+   */
+  it("já não há botão de atualizar — a lista trata disso sozinha", () => {
+    renderAdmin([makeQuote()]);
+    expect(screen.queryByRole("button", { name: /Atualizar/i })).not.toBeInTheDocument();
+  });
+
+  it("volta a ler os pedidos ao regressar ao separador", async () => {
+    const novo = makeQuote({ name: "Filipa Nova" });
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        status: 200,
+        ok: true,
+        headers: { get: () => 'W/"2"' },
+        json: () => Promise.resolve([novo]),
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAdmin([makeQuote({ name: "Gabriel Antigo" })]);
+    navTo(/Pedidos/);
+    expect(screen.getByText("Gabriel Antigo")).toBeInTheDocument();
+    expect(screen.queryByText("Filipa Nova")).not.toBeInTheDocument();
+
+    // Sair e voltar ao separador é o gesto que dispara a revalidação.
+    fireEvent(document, new Event("visibilitychange"));
+    await screen.findByText("Filipa Nova");
+
+    const pedidos = fetchMock.mock.calls.filter(
+      (args) => (args as unknown as [string])[0] === "/api/orcamento",
+    );
+    expect(pedidos).toHaveLength(1);
+    expect(screen.queryByText("Gabriel Antigo")).not.toBeInTheDocument();
+  });
+
   it("tracks bulk selection via the row checkboxes", () => {
     renderAdmin([makeQuote({ name: "Diogo Reis" }), makeQuote({ name: "Eva Lopes" })]);
     navTo(/Pedidos/);

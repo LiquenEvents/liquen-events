@@ -462,11 +462,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // management form and the tools (tabs) section.
   const gestaoRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  // ETag da última lista de pedidos vinda de `/api/orcamento`, para que o botão
-  // "Atualizar" possa perguntar "mudou alguma coisa?" em vez de mandar vir tudo
+  // ETag da última lista de pedidos vinda de `/api/orcamento`, para a
+  // revalidação poder perguntar "mudou alguma coisa?" em vez de mandar vir tudo
   // outra vez. Começa vazio: a primeira lista veio no HTML, sem carimbo.
   const quotesEtag = useRef<string | null>(null);
+  /** Quando foi a última revalidação, para não a repetir a cada piscar de olhos. */
+  const ultimaRevalidacao = useRef(0);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
   /** Pedido escolhido na vista "Fazer proposta".
@@ -908,38 +909,80 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }
 
-  async function refresh() {
-    setRefreshing(true);
-    try {
-      const res = await fetch("/api/orcamento", {
-        cache: "no-store",
-        headers: {
-          "x-admin-refresh": "1",
-          // Pedido condicional: se a lista no servidor for a mesma que
-          // recebemos da última vez, ele responde 304 sem corpo.
-          ...(quotesEtag.current ? { "If-None-Match": quotesEtag.current } : {}),
-        },
-      });
-      // 304 = o servidor leu a tabela e nada mudou. É uma resposta tão fresca
-      // como um 200 — poupa a transferência (com 300 pedidos, ~440 KB) e, o
-      // que se nota mais, evita substituir a lista inteira por uma cópia
-      // idêntica, o que faria a página redesenhar-se toda sem motivo.
-      if (res.status === 304) {
-        toast(`Atualizado — ${quotes.length} pedido${quotes.length !== 1 ? "s" : ""}`, "success");
-        return;
+  /**
+   * Vai buscar a lista de pedidos ao servidor, em silêncio.
+   *
+   * Isto era um botão "Atualizar" no cimo da página. Um botão desses é uma
+   * pergunta que o programa faz a quem o usa — "achas que isto está velho?" —
+   * quando é o programa que sabe a resposta. Passou a correr sozinho: ao voltar
+   * ao separador, ao devolver o foco à janela, e de dois em dois minutos com a
+   * página à vista. Um pedido novo entrado pelo site aparece sem ninguém pedir.
+   *
+   * Custa quase nada porque vai com `If-None-Match`: quando nada mudou o
+   * servidor responde **304 sem corpo** e ficamos com o array que já tínhamos —
+   * a MESMA referência, por isso o React nem sequer volta a desenhar as linhas.
+   *
+   * `forcar` salta o intervalo mínimo. É o que as mutações usam: depois de
+   * gravar quero a lista do servidor, não a que tinha há trinta segundos.
+   */
+  const revalidarPedidos = useCallback(
+    async (forcar = false) => {
+      const agora = Date.now();
+      if (!forcar && agora - ultimaRevalidacao.current < 15_000) return;
+      ultimaRevalidacao.current = agora;
+      try {
+        const res = await fetch("/api/orcamento", {
+          cache: "no-store",
+          headers: {
+            "x-admin-refresh": "1",
+            ...(quotesEtag.current ? { "If-None-Match": quotesEtag.current } : {}),
+          },
+        });
+        if (res.status === 304) return;
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          quotesEtag.current = res.headers.get("etag");
+          setQuotes(data);
+        }
+      } catch {
+        // Sem rede não há nada a dizer: a lista que está no ecrã continua a ser
+        // a última verdade conhecida, e um erro por cada tentativa falhada
+        // seria ruído de fundo em vez de informação.
       }
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        quotesEtag.current = res.headers.get("etag");
-        setQuotes(data);
-        toast(`Atualizado — ${data.length} pedido${data.length !== 1 ? "s" : ""}`, "success");
-      }
-    } catch {
-      toast("Não foi possível atualizar. Verifique a ligação.", "error");
-    } finally {
-      setRefreshing(false);
-    }
-  }
+    },
+    [setQuotes],
+  );
+
+  /**
+   * A lista mantém-se fresca sozinha — é isto que dispensa o botão "Atualizar".
+   *
+   * Três gatilhos, todos com uma razão concreta:
+   *   • voltar ao separador (`visibilitychange`) — o caso comum, estar noutro
+   *     lado e regressar depois de o telefone ter tocado;
+   *   • devolver o foco à janela (`focus`) — o mesmo, sem trocar de separador;
+   *   • dois em dois minutos com a página à vista, para o pedido que entra pelo
+   *     site enquanto a Catarina está a olhar para a lista.
+   *
+   * O relógio pára quando a página está escondida: revalidar um separador que
+   * ninguém vê é gastar bateria para nada. O `revalidarPedidos` tem um intervalo
+   * mínimo próprio, por isso alt-tab a repetir não dispara pedidos a repetir.
+   */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") void revalidarPedidos();
+    };
+    const relogio = setInterval(() => {
+      if (document.visibilityState === "visible") void revalidarPedidos();
+    }, 120_000);
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      clearInterval(relogio);
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [revalidarPedidos]);
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -1379,7 +1422,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     <>
       <div className="min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-        <RestoreDialog open={restoreOpen} onClose={() => setRestoreOpen(false)} toast={toast} />
+        {/* Repor uma cópia troca os dados TODOS no servidor, e a lista que está
+            aqui em memória não tem como saber o que mudou. É o único sítio onde
+            a revalidação salta o intervalo mínimo: ao fechar o diálogo, o que
+            está no ecrã tem de ser o que ficou gravado. */}
+        <RestoreDialog
+          open={restoreOpen}
+          onClose={() => {
+            setRestoreOpen(false);
+            void revalidarPedidos(true);
+          }}
+          toast={toast}
+        />
         <PasskeysDialog open={passkeysOpen} onClose={() => setPasskeysOpen(false)} toast={toast} />
         <AjudaGlossario open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
         <CommandPalette
@@ -1800,35 +1854,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   <kbd className="text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
                     ⌘K
                   </kbd>
-                </button>
-                <button
-                  onClick={refresh}
-                  disabled={refreshing}
-                  aria-label="Atualizar pedidos"
-                  className="alvo-toque group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
-                >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className={
-                      refreshing
-                        ? "animate-spin"
-                        : "group-hover:rotate-180 transition-transform duration-500"
-                    }
-                  >
-                    <path
-                      d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">
-                    {refreshing ? "A atualizar" : "Atualizar"}
-                  </span>
                 </button>
                 <button
                   onClick={() => setNewQuoteOpen(true)}
