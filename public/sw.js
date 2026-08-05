@@ -5,13 +5,16 @@
 
    Caching posture is deliberately safe: NAVIGATIONS are network-first (online
    visitors always get fresh HTML; the cache only steps in when offline), and
-   only content-hashed static assets + images are cache-first. The API and the
-   whole /orcamento surface (auth'd back office + live quote flow) are never
-   touched, so nothing dynamic is ever served stale. Bump CACHE to invalidate. */
+   only content-hashed static assets + images are cache-first. The API is never
+   touched, so nothing dynamic is ever served stale. Bump CACHE to invalidate.
 
-// v2: stop caching the private token-gated client pages (/portal, /proposta).
-// Bumping the name purges any v1 cache that may already hold such a page.
-const CACHE = "liquen-cache-v2";
+   The /orcamento surface (auth'd back office + live quote flow) is excluded
+   too, with ONE deliberate exception: the material loading view. See
+   `isCarregamento` below for why, and for what it does NOT cache. */
+
+// v3: a vista de carregamento de material passa a poder abrir offline (uma
+// rota, o invólucro só). Bumping the name purges older caches.
+const CACHE = "liquen-cache-v3";
 
 // Best-effort precache so a first-ever offline load still has a shell to show.
 // Kept tiny; large heroes are cached lazily as they're requested.
@@ -39,9 +42,26 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/* A ÚNICA EXCEÇÃO À REGRA DE NÃO TOCAR NO /orcamento.
+ *
+ * A vista de carregamento de material (`/orcamento/admin/carregamento/<id>`)
+ * TEM de abrir sem rede: quem a usa está numa quinta a carregar uma carrinha,
+ * e esquecer um escadote a 200 km custa horas. É a única rota do back office
+ * com essa necessidade, e por isso é a única a sair da lista de exclusão.
+ *
+ * O que fica em cache é só o INVÓLUCRO da página, e mesmo assim
+ * network-first — online vê-se sempre o HTML fresco. Os DADOS não passam por
+ * aqui: vivem no armazenamento local do próprio ecrã, com a sua fila de saída.
+ * Nenhuma resposta da API é cacheada, aqui como em lado nenhum.
+ */
+function isCarregamento(url) {
+  return /^\/(?:en\/)?orcamento\/admin\/carregamento\//.test(url.pathname);
+}
+
 // Same-origin GETs we must never cache: dynamic, auth'd, or optimized on the
 // fly. Everything under here goes straight to the network.
 function isBypassed(url) {
+  if (isCarregamento(url)) return false;
   return (
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/orcamento") ||

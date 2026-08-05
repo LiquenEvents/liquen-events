@@ -8,7 +8,11 @@ import { listLists } from "@/lib/material-lists-store";
 import { listAllListItems } from "@/lib/material-list-items-store";
 import { listRules } from "@/lib/material-rules-store";
 import { gerarChecklist, type ContextoEvento } from "@/lib/material-rules";
-import { getForQuote, createEventMaterial, updateEventMaterial } from "@/lib/event-material-store";
+import {
+  getForQuote,
+  obterOuCriarParaPedido,
+  updateEventMaterial,
+} from "@/lib/event-material-store";
 import {
   listItemsOfEvent,
   addEventItem,
@@ -98,8 +102,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const geradas = gerarChecklist(ctx, { regras, listas, linhasDeLista, catalogo });
 
-    let evento = await getForQuote(id);
-    const anteriores = evento ? await listItemsOfEvent(evento.id) : [];
+    const anterior = await getForQuote(id);
+    const anteriores = anterior ? await listItemsOfEvent(anterior.id) : [];
     // Guardado por `itemId` porque é a identidade estável entre gerações; as
     // linhas manuais não têm par na geração e vão à parte.
     const preservar = new Map(
@@ -109,9 +113,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
     const manuais = anteriores.filter((i) => i.origin === "manual");
 
-    if (!evento) {
-      evento = await createEventMaterial({ quoteId: id, status: "preparada", vehicles: [] });
-    } else {
+    // Uma só por evento, mesmo com dois "gerar" ao mesmo tempo (ver
+    // `obterOuCriarParaPedido`).
+    const jaExistia = Boolean(anterior);
+    const evento = await obterOuCriarParaPedido(id);
+    if (jaExistia) {
       await removeItemsOfEvent(evento.id);
       await updateEventMaterial(evento.id, { generatedAt: new Date().toISOString() });
     }

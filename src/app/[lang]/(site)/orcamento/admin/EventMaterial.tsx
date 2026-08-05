@@ -85,6 +85,16 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
         <Button size="sm" onClick={gerar} disabled={gerando}>
           {dados.evento ? "Voltar a gerar" : "Gerar checklist"}
         </Button>
+        {dados.evento && itens.length > 0 && (
+          // O carregamento faz-se no telemóvel, de pé, ao lado da carrinha —
+          // não aqui. Este botão é a ponte para lá.
+          <a
+            href={`/orcamento/admin/carregamento/${dados.evento.id}`}
+            className="bo-btn-ghost inline-flex min-h-[32px] items-center rounded-xl px-3 text-xs"
+          >
+            Abrir para carregar
+          </a>
+        )}
         {dados.evento && (
           <span className="bo-text-muted text-xs">
             {p.total} {p.total === 1 ? "item" : "itens"}

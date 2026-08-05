@@ -43,6 +43,27 @@ export async function getForQuote(quoteId: string): Promise<EventMaterial | null
   return (await repo.list()).find((e) => e.quoteId === quoteId) ?? null;
 }
 
+/**
+ * A checklist deste evento, criando-a só se ainda não existir.
+ *
+ * Verificar e criar em dois passos é uma corrida: dois "gerar" ao mesmo tempo
+ * leem ambos "não existe" e criam ambos, e as marcações passam a dividir-se por
+ * duas checklists. O índice único em `quote_id` é a rede verdadeira; aqui
+ * apanha-se o choque e devolve-se a que ganhou, para quem perdeu continuar a
+ * trabalhar em vez de ver um erro que não sabe explicar.
+ */
+export async function obterOuCriarParaPedido(quoteId: string): Promise<EventMaterial> {
+  const existente = await getForQuote(quoteId);
+  if (existente) return existente;
+  try {
+    return await createEventMaterial({ quoteId, status: "preparada", vehicles: [] });
+  } catch {
+    const depois = await getForQuote(quoteId);
+    if (depois) return depois;
+    throw new Error("não foi possível criar a checklist");
+  }
+}
+
 export async function createEventMaterial(
   input: Omit<EventMaterial, "id" | "generatedAt" | "updatedAt"> & { id?: string },
 ): Promise<EventMaterial> {

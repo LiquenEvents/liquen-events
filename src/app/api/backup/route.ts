@@ -14,6 +14,7 @@ import { listAllListItems } from "@/lib/material-list-items-store";
 import { listRules } from "@/lib/material-rules-store";
 import { listEventMaterial } from "@/lib/event-material-store";
 import { listAllEventItems } from "@/lib/event-material-items-store";
+import { listAllLog } from "@/lib/event-material-log-store";
 import { listTemplatesWithDefaults } from "@/lib/email-templates-store";
 import { listThemes } from "@/lib/themes-store";
 import { listLinks } from "@/lib/message-links-store";
@@ -104,6 +105,9 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
   { key: "materialRules", table: "material_rules", list: listRules },
   { key: "eventMaterial", table: "event_material", list: listEventMaterial },
   { key: "eventMaterialItems", table: "event_material_items", list: listAllEventItems },
+  // O registo é a prova de quem marcou o quê. Sem ele, uma discussão sobre
+  // material perdido não tem como se resolver.
+  { key: "eventMaterialLog", table: "event_material_log", list: listAllLog },
   // `...WithDefaults` de propósito: interessa guardar os modelos TAL COMO a
   // equipa os vê, incluindo os que ainda estão na versão de origem.
   { key: "emailTemplates", table: "email_templates", list: listTemplatesWithDefaults },

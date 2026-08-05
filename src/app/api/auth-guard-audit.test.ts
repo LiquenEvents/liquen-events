@@ -144,6 +144,11 @@ vi.mock("@/lib/event-material-store", () =>
     { listEventMaterial: H.afn("event-material-store.listEventMaterial", async () => []) },
   ),
 );
+vi.mock("@/lib/event-material-log-store", () =>
+  H.build("event-material-log-store", ["registar", "listLogOf"], {
+    listAllLog: H.afn("event-material-log-store.listAllLog", async () => []),
+  }),
+);
 vi.mock("@/lib/event-material-items-store", () =>
   H.build(
     "event-material-items-store",
@@ -423,6 +428,7 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./material/regras/route", methods: ["GET", "POST"] },
   { path: "./material/regras/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./orcamento/[id]/material/route", methods: ["GET", "POST"] },
+  { path: "./orcamento/[id]/material/marcar/route", methods: ["POST"] },
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
   { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },

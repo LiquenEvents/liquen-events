@@ -22,6 +22,7 @@ import { mapper as materialListItemMapper, listAllListItems } from "./material-l
 import { mapper as materialRuleMapper, listRules } from "./material-rules-store";
 import { mapper as eventMaterialMapper, listEventMaterial } from "./event-material-store";
 import { mapper as eventMaterialItemMapper, listAllEventItems } from "./event-material-items-store";
+import { mapper as eventMaterialLogMapper, listAllLog } from "./event-material-log-store";
 import { mapper as templatesMapper, listTemplates } from "./email-templates-store";
 import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
@@ -304,6 +305,17 @@ const eventMaterialItemSchema = z.looseObject({
   missing: z.boolean().default(false),
 });
 
+const eventMaterialLogSchema = z.looseObject({
+  id,
+  eventId: z.string().max(120),
+  itemId: z.string().max(120),
+  action: z.enum(["loaded", "unloaded", "returned", "missing", "note", "used"]),
+  actor: z.string().max(200),
+  markedAt: z.string().max(64),
+  syncedAt: z.string().max(64),
+  superseded: z.boolean().default(false),
+});
+
 const templateSchema = z.looseObject({
   key: z.string().trim().min(1).max(120),
   name: z.string().max(300).default(""),
@@ -568,6 +580,18 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     // Sem relógio próprio: as linhas pertencem à checklist e o carimbo dela
     // é que conta.
     stamp: () => "",
+  }),
+  asTarget({
+    key: "eventMaterialLog",
+    label: "Registo de marcações de material",
+    table: eventMaterialLogMapper.table,
+    mapper: eventMaterialLogMapper,
+    schema: eventMaterialLogSchema,
+    current: listAllLog,
+    // O relógio que interessa é o de QUEM MARCOU, não o de chegada: é por ele
+    // que os conflitos foram resolvidos, e é ele que explica o histórico.
+    stamp: (l) => l.markedAt,
+    extraColumns: (l) => ({ marked_at: l.markedAt, synced_at: l.syncedAt }),
   }),
   asTarget({
     key: "emailTemplates",

@@ -340,7 +340,12 @@ create table if not exists public.event_material (
   updated_at   timestamptz not null default now()
 );
 
-create index if not exists event_material_quote_idx on public.event_material (quote_id);
+-- UMA checklist por evento, imposta pela base de dados e não pela boa vontade
+-- de quem chama. Dois pedidos de "gerar" ao mesmo tempo — duas pessoas, ou dois
+-- separadores — liam ambos "ainda não há" e criavam ambos; ficavam duas
+-- checklists e as marcações dividiam-se entre elas, sem ninguém dar por isso.
+create unique index if not exists event_material_quote_uidx
+  on public.event_material (quote_id);
 
 create table if not exists public.event_material_items (
   id          text primary key,
@@ -375,6 +380,27 @@ create table if not exists public.event_material_items (
 
 create index if not exists event_material_items_event_idx
   on public.event_material_items (event_id);
+
+-- Quem marcou o quê e quando. Guarda TAMBÉM as marcações que perderam um
+-- conflito: uma marcação que desaparece sem rasto é o que faz duas pessoas
+-- discutirem sobre quem carregou o escadote.
+create table if not exists public.event_material_log (
+  id         text primary key,
+  event_id   text not null references public.event_material(id) on delete cascade,
+  item_id    text not null,
+  action     text not null,          -- loaded|unloaded|returned|missing|note|used
+  value      text,
+  actor      text not null,
+  -- Relógio de QUEM MARCOU. Pode vir do passado: o telemóvel esteve offline.
+  marked_at  timestamptz not null,
+  -- Relógio do servidor, quando a marcação finalmente chegou.
+  synced_at  timestamptz not null default now(),
+  -- A marcação chegou mas perdeu para uma mais recente. Fica registada.
+  superseded boolean not null default false
+);
+
+create index if not exists event_material_log_event_idx
+  on public.event_material_log (event_id);
 
 -- ── Biblioteca de temas (fotos de inspiração reutilizáveis) ─────
 -- Só os METADADOS de cada tema ("Itália", "Terracotta"). As fotos vivem no
@@ -598,6 +624,7 @@ alter table public.material_list_items enable row level security;
 alter table public.material_rules        enable row level security;
 alter table public.event_material        enable row level security;
 alter table public.event_material_items  enable row level security;
+alter table public.event_material_log    enable row level security;
 alter table public.proposal_themes enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;
