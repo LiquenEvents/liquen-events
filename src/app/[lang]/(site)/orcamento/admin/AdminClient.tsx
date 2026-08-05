@@ -288,8 +288,12 @@ const QuoteCard = memo(function QuoteCard({
     daysSince >= 14;
   return (
     <div className="relative">
+      {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
+          toque no rótulo activar o controlo. 24 px chegavam para o rato e não
+          para o dedo; `alvo-toque` leva-o a 44 px no telemóvel sem mexer no
+          quadrado desenhado, que continua a ser o de 16 px. */}
       <label
-        className="absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
+        className="alvo-toque absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
         onClick={(e) => e.stopPropagation()}
       >
         <input
@@ -1265,7 +1269,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
+        className={`alvo-toque !justify-start group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
           active
             ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
             : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
@@ -1423,7 +1427,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     type="button"
                     onClick={() => setMoreNavOpen((o) => !o)}
                     aria-expanded={expanded}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                    className="alvo-toque !justify-start group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
                   >
                     <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
                       <svg
@@ -1478,7 +1482,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 logo debaixo de quem está com a sessão aberta. */}
             <button
               onClick={() => setPasskeysOpen(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+              className="alvo-toque w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
               title="Entrar sem palavra-passe neste aparelho"
             >
               <svg
@@ -1494,10 +1498,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </svg>
               Os meus dispositivos
             </button>
-            <div className="flex gap-1">
+            <div className="flex gap-1 pointer-coarse:gap-2">
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Atalhos de teclado"
               >
                 <svg
@@ -1518,7 +1522,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a
                 href="/api/backup"
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Exportar backup"
               >
                 <svg
@@ -1542,7 +1546,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   uma cópia sem forma de a repor nunca foi uma cópia. */}
               <button
                 onClick={() => setRestoreOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Repor cópia de segurança"
               >
                 <svg
@@ -1563,7 +1567,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </button>
               <button
                 onClick={logout}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Terminar sessão"
               >
                 <svg
@@ -1702,12 +1706,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   {VIEW_TITLES[view]}
                 </h1>
               </div>
-              <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className="ml-auto flex items-center gap-1.5 pointer-coarse:gap-2.5 sm:gap-2 shrink-0">
                 <button
                   onClick={() => setAjudaOpen(true)}
                   aria-label="Ajuda e glossário"
                   title="Ajuda e glossário"
-                  className="w-10 h-10 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
+                  className="alvo-toque w-10 h-10 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
                   <svg
                     width="16"
@@ -1751,7 +1755,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   onClick={refresh}
                   disabled={refreshing}
                   aria-label="Atualizar pedidos"
-                  className="group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
+                  className="alvo-toque group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
                 >
                   <svg
                     width="13"
@@ -1779,7 +1783,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <button
                   onClick={() => setNewQuoteOpen(true)}
                   aria-label="Novo pedido"
-                  className="flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
+                  className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
                   title="Criar pedido manualmente"
                 >
                   <svg
@@ -1941,7 +1945,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <button
                   onClick={() => setMineOnly((v) => !v)}
                   title={`Mostrar apenas pedidos atribuídos a ${userName}`}
-                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border shadow-sm transition-all ${
+                  className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border shadow-sm transition-all ${
                     mineOnly
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
                       : "bg-white border-foreground/[0.09] text-foreground/45 hover:text-foreground/65"
@@ -2022,7 +2026,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                    className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -2032,7 +2036,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                        className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -2046,7 +2050,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
+                  className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>

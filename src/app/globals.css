@@ -381,6 +381,34 @@ body {
 .pt-safe {
   padding-top: env(safe-area-inset-top);
 }
+/* ── Alvo de toque de 44 px ────────────────────────────────────────────────
+   Põe um alvo no mínimo das Human Interface Guidelines (44×44 px) SEM mexer no
+   aspecto: só cresce onde se toca com o dedo.
+
+   Porquê 44: a polpa do dedo cobre ~10 mm de ecrã e o telemóvel não sabe onde
+   está o centro dela. Abaixo disto acerta-se ao lado — e no back office o que
+   está ao lado é muitas vezes outra acção.
+
+   Porquê só no dedo: com rato o ponteiro tem um pixel de precisão, e as
+   alturas de 28–40 px são o que dá a densidade calma que este back office quer
+   no portátil. `(pointer: coarse)` é verdade no telemóvel e no tablet, falso
+   com rato — portanto o portátil fica exactamente como está.
+
+   `inline-flex` + centragem porque quase todos estes alvos são botões de ícone
+   com o rótulo em maiúsculas pequenas: sem isto o conteúdo colava-se ao topo
+   da caixa mais alta.
+
+   Nos botões que passam por `ui/Button.tsx` e `ui/Segmented.tsx` isto já vem de
+   lá (`pointer-coarse:h-11`); esta classe é para os que são escritos à mão. */
+@media (pointer: coarse) {
+  .alvo-toque {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
 /* Subtle scrim behind white text that sits over the near-transparent MIDDLE of
    a hero veil (vertically-centered statements/CTAs). It lifts contrast to AA on
    bright photo regions without darkening the photo itself — imperceptible over

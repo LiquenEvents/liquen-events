@@ -410,7 +410,13 @@ export default function Calendario({ quotes, onOpen }: Props) {
   return (
     <>
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-        <Card padding="lg">
+        {/* Margem interna estreita no telemóvel, a de sempre a partir de `sm`.
+            A CONTA: num ecrã de 375 px sobram 343 depois da margem da vista.
+            Com os 24 px de `p-6` de cada lado ficavam 295 para sete colunas com
+            seis filetes de 1 px — 41 px por dia, três abaixo do mínimo de 44.
+            Com 12 px sobram 319, e cada dia fica com 44. É a diferença entre
+            acertar no dia certo e abrir o do lado. */}
+        <Card padding="lg" className="!p-3 sm:!p-8">
           {/* ── Header: month title + quiet controls on one row ── */}
           <div className="flex items-center justify-between gap-3 mb-6">
             <div className="min-w-0">
@@ -443,7 +449,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   size="sm"
                   onClick={() => goTo(new Date(year, month - 1, 1))}
                   aria-label="Mês anterior"
-                  className="w-8 px-0"
+                  className="w-8 pointer-coarse:w-11 px-0"
                 >
                   <svg
                     width="14"
@@ -474,7 +480,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   size="sm"
                   onClick={() => goTo(new Date(year, month + 1, 1))}
                   aria-label="Mês seguinte"
-                  className="w-8 px-0"
+                  className="w-8 pointer-coarse:w-11 px-0"
                 >
                   <svg
                     width="14"
@@ -703,7 +709,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     size="sm"
                     onClick={() => setSelectedDay(null)}
                     aria-label="Fechar dia"
-                    className="w-8 px-0"
+                    className="w-8 pointer-coarse:w-11 px-0"
                   >
                     ×
                   </Button>
