@@ -449,6 +449,11 @@ export const pt = {
       "Outro",
     ],
     labelTipo: "Tipo de evento",
+    // Só aparece no casamento. Perguntado como uma conversa, não como uma
+    // lista de compras: o que se quer saber é ONDE querem decoração.
+    labelDecor: "Onde quer decoração?",
+    hintDecor:
+      "Marque o que fizer sentido. Ajuda-nos a preparar uma proposta só com o que quer, e se ainda não souber, salte esta parte: falamos disso juntos.",
     labelData: "Data do evento",
     dateFlexibleLabel: "Data ainda a definir",
     guestsFlexibleLabel: "Ainda a definir",
@@ -596,6 +601,7 @@ export const pt = {
     convidados: "Convidados",
     data: "Data",
     local: "Local",
+    decoracao: "Decoração",
     mensagem: "Mensagem",
     adicionais: "Serviços Adicionais",
     openDate: "Ainda a definir",

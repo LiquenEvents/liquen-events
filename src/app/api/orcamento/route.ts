@@ -8,6 +8,7 @@ import {
   URGENCY_OPTIONS,
 } from "@/lib/orcamento/data";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { SITE } from "@/lib/site";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
@@ -238,9 +239,14 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     `<a href="${href}" style="color:#4c6150;text-decoration:none">${esc(text)}</a>`;
 
   // Decision block first (can we do it?), contact block second (how to reply).
+  // Os pontos de decoração que o casal escolheu no pedido. Vão no bloco de
+  // DECISÃO e não nas notas porque é isto que diz, antes da primeira chamada,
+  // se o pedido é a cerimónia toda ou só as mesas do jantar.
+  const decor = rotularPontos(form.decorPoints ?? [], "pt").join(" · ");
   const eventRows =
     row("Convidados", form.guests ? String(form.guests) : "") +
     row("Local", esc(local)) +
+    (decor ? row("Decoração", esc(decor)) : "") +
     (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
     (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");
   // O email pode agora vir VAZIO (a regra é "email ou telefone" — ver
@@ -422,6 +428,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     dateHero ? `Data: ${dateHero}${isWeekend ? " (fim de semana)" : ""}` : null,
     form.guests ? `Convidados: ${form.guests}` : null,
     local ? `Local: ${local}` : null,
+    decor ? `Decoração: ${decor}` : null,
     budgetLabel ? `Orçamento: ${budgetLabel}` : null,
     urgencyLabel ? `Antecedência: ${urgencyLabel}` : null,
     estimate ? `Orçamento estimado: ${estimate}` : null,
@@ -602,6 +609,9 @@ export async function POST(request: NextRequest) {
           guests: form.guests || undefined,
           location: form.location?.trim() || undefined,
           plural: form.eventType === "casamentos" || form.eventType === "batizados",
+          // Na língua do email, não na da equipa: quem escreveu em inglês
+          // recebe "Ceremony · Dinner tables", não "Cerimónia · Mesas".
+          decor: rotularPontos(form.decorPoints ?? [], locale),
         },
       });
       // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so

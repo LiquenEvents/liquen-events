@@ -18,6 +18,7 @@ import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
+import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
@@ -2667,6 +2668,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   v: selected.addons?.length
                                     ? `${selected.addons.length} serviços`
                                     : null,
+                                },
+                                {
+                                  // O que o casal marcou no pedido. Aparece
+                                  // aqui em cima, com a data e o local, porque
+                                  // é o que decide o desenho da proposta e não
+                                  // se pode ficar a saber só ao abri-la.
+                                  l: "Decoração",
+                                  v:
+                                    rotularPontos(selected.decorPoints ?? [], "pt").join(" · ") ||
+                                    null,
                                 },
                               ]
                                 .filter((f) => f.v)

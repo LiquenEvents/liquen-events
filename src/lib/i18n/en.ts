@@ -439,6 +439,9 @@ export const en: Dict = {
       "Other",
     ],
     labelTipo: "Event type",
+    labelDecor: "Where would you like decoration?",
+    hintDecor:
+      "Tick whatever feels right. It helps us prepare a proposal with only what you want, and if you are not sure yet, skip this part: we will work it out together.",
     labelData: "Event date",
     dateFlexibleLabel: "Date still to be decided",
     guestsFlexibleLabel: "Still to be decided",
@@ -584,6 +587,7 @@ export const en: Dict = {
     convidados: "Guests",
     data: "Date",
     local: "Location",
+    decoracao: "Decoration",
     mensagem: "Message",
     adicionais: "Additional Services",
     openDate: "Still to be decided",

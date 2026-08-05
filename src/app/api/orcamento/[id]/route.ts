@@ -49,6 +49,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       date: quote.date,
       location: quote.location,
       addons: (quote.addons ?? []).map(({ id, name, tier }) => ({ id, name, tier })),
+      // Sem isto, a página de confirmação mostrava os pontos de decoração
+      // enquanto o `sessionStorage` durasse e perdia-os ao recarregar — o
+      // casal recarrega a página e metade do que escolheu desapareceu. São
+      // dados que a própria pessoa acabou de escrever; o que esta lista
+      // protege é o que é INTERNO (preços, notas da equipa), e isto não é.
+      decorPoints: quote.decorPoints ?? [],
     };
     return NextResponse.json(safe);
   } catch (err) {
