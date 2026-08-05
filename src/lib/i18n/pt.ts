@@ -106,24 +106,24 @@ export const pt = {
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
+    homeTitle: "Decoração de Casamentos e Eventos em Portugal | Líquen Events",
     homeDescription:
-      "A Líquen Events decora e coordena casamentos, eventos de empresa e celebrações privadas. Com base em Évora, mais de 100 eventos desde 2018.",
-    sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
+      "A Líquen Events decora e coordena casamentos, eventos de empresa e celebrações privadas em todo o Portugal. Mais de 100 eventos desde 2018.",
+    sobreTitle: "Empresa de Decoração de Eventos em Portugal",
     sobreDescription:
-      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em Portugal desde 2018.",
-    servicosTitle: "Decoração de Casamentos e Eventos no Alentejo",
+      "Líquen Events, empresa de decoração e coordenação de eventos em todo o Portugal. Mais de 100 casamentos e celebrações decorados desde 2018.",
+    servicosTitle: "Decoração de Casamentos e Eventos em Portugal",
     servicosDescription:
-      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em Évora, no Alentejo e em Portugal.",
-    galeriaTitle: "Galeria de Casamentos e Eventos no Alentejo",
+      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em todo o Portugal.",
+    galeriaTitle: "Galeria de Casamentos e Eventos em Portugal",
     galeriaDescription:
-      "Galeria de fotografias de eventos decorados pela Líquen Events no Alentejo e em Portugal: casamentos, eventos corporativos, conferências e celebrações.",
+      "Galeria de fotografias de eventos decorados pela Líquen Events em todo o Portugal: casamentos, eventos corporativos, conferências e celebrações.",
     clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto: Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em Portugal. Receba uma proposta à medida para o seu evento.",
+      "Contacte a Líquen Events para decorar o seu evento em qualquer ponto do país. Receba uma proposta à medida para o seu evento.",
     orcamentoTitle: "Pedir Orçamento: Casamentos e Eventos",
     orcamentoDescription:
       "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas, e receba uma proposta à medida.",
@@ -416,7 +416,7 @@ export const pt = {
       },
       {
         q: "Podem assumir apenas parte da organização?",
-        a: "Absolutamente. Podemos tratar de tudo, da conceção à execução, ou assumir apenas áreas específicas como decoração, coordenação do dia, catering ou audiovisual. Adaptamos o serviço ao que precisa.",
+        a: "Absolutamente. O que fazemos é decoração e coordenação: podemos desenhar e executar toda a decoração do evento e coordenar o dia, ou entrar apenas numa parte, só o conceito, só a decoração floral, só a coordenação. Adaptamos o serviço ao que precisa.",
       },
       {
         q: "Como funciona o processo de orçamentação?",
@@ -521,7 +521,7 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial: coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
+            desc: "O vosso dia mais especial: conceito, decoração floral, cenografia e coordenação no dia. Tratamos de cada detalhe para só terem de o viver.",
           },
           {
             title: "Batizados & Comunhões",

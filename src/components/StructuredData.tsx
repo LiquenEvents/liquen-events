@@ -10,8 +10,9 @@ import { getDictionary, htmlLang, type Locale } from "@/lib/i18n";
  *  - WebSite (enables sitelinks search box potential)
  *  - Service catalog (weddings, corporate, social) for service-intent queries
  *
- * This is what helps the site surface for "empresa de eventos Alentejo",
- * "wedding coordinator Alentejo", "coordenação de casamentos", etc., and earn rich results.
+ * This is what helps the site surface for "empresa de decoração de eventos",
+ * "coordenação de casamentos Portugal", etc., and earn rich results. Region-
+ * specific relevance is carried by the polo landing pages, not by this node.
  *
  * Locale-aware: the /en mirror shows English copy, so the description/service
  * names are emitted in the active language too. Note we deliberately do NOT
@@ -48,7 +49,8 @@ export default function StructuredData({ locale }: { locale: Locale }) {
         addressRegion: SITE.region,
         addressCountry: SITE.country,
       },
-      // Approximate geo (Alentejo) — helps local-pack / map relevance.
+      // Approximate geo of the registered address — schema.org requires a
+      // LocalBusiness to carry one. The SERVICE area is national (areaServed).
       geo: {
         "@type": "GeoCoordinates",
         latitude: 38.5714,

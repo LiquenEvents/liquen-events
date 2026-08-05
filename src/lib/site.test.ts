@@ -23,9 +23,11 @@ describe("SITE identity invariants", () => {
     expect(SITE.locale).toBe("pt_PT");
   });
 
-  it("leads the areas served with the home city, then the region (SEO priority)", () => {
-    expect(AREAS_SERVED[0]).toBe("Évora");
-    expect(AREAS_SERVED).toContain("Alentejo");
-    expect(AREAS_SERVED[0]).toBe(SITE.city);
+  it("declares a national service area, not a single home region", () => {
+    // The site-wide service area is the country, not a home region: a
+    // region-first list here is what made every page read as "Évora vendor".
+    expect(AREAS_SERVED[0]).toBe("Portugal");
+    expect(AREAS_SERVED).not.toContain("Alentejo");
+    expect(AREAS_SERVED).not.toContain("Évora");
   });
 });

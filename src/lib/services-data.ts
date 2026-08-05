@@ -140,7 +140,7 @@ export const SERVICES: ServiceDetail[] = [
     ogImage: "/imagens/EW1_1404.jpg",
     intro: [
       "Produzimos congressos, seminários, retiros de empresa, cerimónias de entrega de prémios e jantares corporativos, em todo o país. Trabalhamos com empresas, universidades e instituições públicas, de reuniões de equipa a eventos de várias centenas de pessoas.",
-      "Tratamos do espaço, da cenografia, da logística, do catering e do apoio técnico, e ficamos com a coordenação no próprio dia. Quando há convidados de fora, tratamos também da tradução simultânea, do alojamento e dos transfers.",
+      "Tratamos da cenografia, da decoração e da logística de montagem no espaço, articulamos com os restantes fornecedores, do catering ao apoio técnico, e ficamos com a coordenação no próprio dia. Quando há convidados de fora, ajudamos também a articular a tradução simultânea, o alojamento e os transfers.",
     ],
     includes: [
       "Congressos",
@@ -185,7 +185,7 @@ export const SERVICES: ServiceDetail[] = [
     hero: "/imagens/DaniGui_JantarFesta_130.jpg",
     intro: [
       "Aniversários, festas temáticas e celebrações privadas, de festas de criança a jantares de adultos. O conceito é desenhado à volta do tema que tiver em mente, e não escolhido de um catálogo.",
-      "Tratamos do espaço, da decoração, do catering e da coordenação no dia da festa. Quanto mais cedo falarmos, mais fácil é garantir a data, mas conseguimos entrar perto do dia consoante a dimensão da festa.",
+      "Tratamos do conceito, da decoração e da coordenação no dia da festa, e articulamos com os fornecedores que faltarem, do catering à animação. Quanto mais cedo falarmos, mais fácil é garantir a data, mas conseguimos entrar perto do dia consoante a dimensão da festa.",
     ],
     includes: [
       "Conceito e tema da festa",
@@ -340,7 +340,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Decoration and scenography for corporate events in Lisbon and Portugal: conferences, congresses, team-building, product launches and company dinners.",
     intro: [
       "We produce congresses, seminars, company retreats, award ceremonies and corporate dinners across the country. We work with companies, universities and public institutions, from team meetings to events of several hundred people.",
-      "We handle the venue, the scenography, the logistics, the catering and the technical support, and we take the coordination on the day. When guests come from abroad, we also arrange simultaneous translation, accommodation and transfers.",
+      "We handle the scenography, the decoration and the on-site build, liaise with your other suppliers, from catering to technical support, and take the coordination on the day. When guests come from abroad, we also help arrange simultaneous translation, accommodation and transfers.",
     ],
     includes: [
       "Congresses",
@@ -368,7 +368,7 @@ const SERVICES_EN: Record<string, ServiceCopy> = {
       "Decoration for birthday parties, christenings, communions and private celebrations in the Alentejo. Concept, scenography, atmosphere and bespoke coordination.",
     intro: [
       "Birthdays, themed parties and private celebrations, from children's parties to grown-up dinners. The concept is designed around whatever theme you have in mind, rather than picked from a catalogue.",
-      "We handle the venue, the decoration, the catering and the coordination on the day of the party. The earlier we talk, the easier it is to secure the date, though we can come on board close to the day depending on the size of the party.",
+      "We handle the concept, the decoration and the coordination on the day of the party, and liaise with whatever suppliers are still needed, from catering to entertainment. The earlier we talk, the easier it is to secure the date, though we can come on board close to the day depending on the size of the party.",
     ],
     includes: [
       "Party concept and theme",
