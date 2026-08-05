@@ -25,10 +25,22 @@ const WINANSI_EXTRA: ReadonlySet<number> = new Set([
   0x0153, 0x017e, 0x0178,
 ]);
 
-/** Substitui por "?" qualquer caráter que o WinAnsi (CP1252) não codifique. */
+/**
+ * Substitui por "?" qualquer caráter que o WinAnsi (CP1252) não codifique.
+ *
+ * NORMALIZA PARA NFC PRIMEIRO. Sem isso, "Decoração" escrito na forma
+ * decomposta — "c" + cedilha, "a" + til, que é o que sai de alguns teclados,
+ * do macOS e de texto colado — saía "Decorac?a?o": as marcas combinatórias
+ * (U+0300–U+036F) não vivem no Latin-1 e viravam "?", deixando a letra base
+ * órfã. Em NFC as mesmas palavras passam a "ç" e "ã" de um só ponto de código,
+ * que o WinAnsi codifica, e chegam ao PDF inteiras.
+ *
+ * As duas formas são a MESMA palavra em Unicode e ninguém que escreve no back
+ * office sabe qual está a produzir — a diferença não pode chegar ao PDF.
+ */
 export function winAnsiSafe(input: string): string {
   let out = "";
-  for (const ch of input) {
+  for (const ch of input.normalize("NFC")) {
     const cp = ch.codePointAt(0) ?? 0;
     const ok =
       (cp >= 0x20 && cp <= 0x7e) || // ASCII imprimível
