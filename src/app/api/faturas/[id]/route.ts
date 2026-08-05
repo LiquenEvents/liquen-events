@@ -12,7 +12,7 @@ import {
   type Invoice,
 } from "@/lib/invoices-store";
 import { getProposalByQuote } from "@/lib/proposals-store";
-import { round2, splitSinal, saldoAPartirDoSinal } from "@/lib/money";
+import { splitSinal, saldoAPartirDoSinal } from "@/lib/money";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceUpdateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
