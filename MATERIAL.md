@@ -2,9 +2,10 @@
 
 O que vai nas carrinhas, o que volta, e o que falta repor.
 
-Isto é a **proposta**, para leres antes de eu construir. Está escrita para
-poderes discordar de coisas concretas: cada decisão que te pode custar dinheiro
-ou trabalho está marcada com **▸ decisão tua**.
+O desenho, **com as quatro decisões já tomadas** (resumo em §9). Onde mudei de
+ideias por causa de uma resposta tua, ficou escrito o que propunha e porquê —
+saber porque é que uma coisa NÃO é como parecia óbvia vale mais, seis meses
+depois, do que a decisão sozinha.
 
 ---
 
@@ -12,40 +13,60 @@ ou trabalho está marcada com **▸ decisão tua**.
 
 Não parto do zero, e duas delas mudam o desenho.
 
-### 0.1 Já existe um inventário — e sobrepõe-se ao que pediste
+### 0.1 Já existe um inventário — mas é de OUTRA coisa *(decidido)*
 
-`public.inventory_items`, com o ecrã `Inventario.tsx`:
+`public.inventory_items`, com o ecrã `Inventario.tsx`, guarda **adereços de
+decoração**: *Vasos e Jarras, Castiçais e Velas, Têxteis, Mobiliário,
+Iluminação, Estruturas e Arcos, Loiça e Copos, Sinalética*.
 
+Cheguei a propor estendê-lo, por "decoração" aparecer na lista de oito
+categorias do pedido. **Ficou decidido que não:** este módulo é do material de
+trabalho — bricolage, ferramentas, consumíveis, o que faz a montagem
+acontecer. Um berbequim e um vaso não se gerem da mesma maneira, não se
+compram pelas mesmas razões e não interessam às mesmas pessoas.
+
+Portanto: **tabela nova, `material_items`**, e o `inventory_items` fica
+exactamente como está.
+
+```sql
+create table if not exists public.material_items (
+  id          text primary key,
+  name        text not null,
+  category    text not null default 'Ferramentas',
+  kind        text not null default 'reutilizavel',  -- consumivel|reutilizavel
+  unit        text,                                   -- unidade|metro|rolo|par|caixa
+  stock       numeric not null default 0,
+  min_stock   numeric,
+  notes       text,
+  photo_path  text,
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.material_items
+  add constraint material_kind_ck check (kind in ('consumivel','reutilizavel'));
+
+create index if not exists material_items_category_idx on public.material_items (category);
 ```
-id · name · category · quantity · unit · condition · location · notes · updated_at
-```
 
-As categorias são de decoração: *Vasos e Jarras, Castiçais e Velas, Têxteis,
-Mobiliário, Iluminação, Estruturas e Arcos, Loiça e Copos, Sinalética, Outro*.
+Categorias: *Ferramentas, Consumíveis, Estrutura, Iluminação, Limpeza,
+Segurança, Escritório*. Sete, não oito — "decoração" sai, porque é o outro
+inventário.
 
-O catálogo que pediste tem oito categorias, e **"decoração" é uma delas**. Ou
-seja: o que pediste não é um catálogo ao lado deste — é este, mais largo.
+#### E a checklist é só de logística *(decidido)*
 
-**▸ decisão tua.** Recomendo **estender a tabela que existe**, não criar uma
-segunda. A razão é prática: se houver duas, a mesma jarra passa a existir duas
-vezes, com dois stocks, e a partir do primeiro mês nenhum dos dois está certo.
-Um inventário que ninguém confia é trabalho a dobrar e decisões erradas.
+Cheguei a desenhar a linha da checklist com uma coluna `source`, para poder
+puxar adereços do outro inventário — as jarras e os suportes de vela que
+apareciam no exemplo dos 120 pax. **Ficou decidido que não: só logística.**
+Tirei a coluna. Uma coluna que existe "para o caso de" é uma coluna que ninguém
+sabe explicar seis meses depois.
 
-O que a tabela ganha:
+O que isto quer dizer na prática: a checklist responde a *"a carrinha leva o que
+é preciso para montar?"*, não a *"leva tudo o que vai para o evento?"*. Os
+adereços continuam no ecrã Inventário, onde já estão.
 
-| coluna | porquê |
-|---|---|
-| `kind` — `consumivel` \| `reutilizavel` | é isto que decide se desconta do stock e se tem de voltar |
-| `min_stock` | o limiar do alerta de reposição |
-| `photo_path` | foto opcional, no Storage privado, como a biblioteca de temas |
-
-`condition` e `location` ficam como estão — já servem, e apagá-las perdia dados
-reais.
-
-O custo desta escolha: as 9 categorias atuais passam a conviver com as 8 novas
-numa lista de 17. Se preferires duas listas separadas (decoração vs logística),
-digo já que é mais arrumado no ecrã e pior nos dados, porque um castiçal é as
-duas coisas.
+Se um dia quiseres os adereços na mesma lista, é **aditivo** — uma coluna e um
+seletor com dois separadores, sem tocar em nada do que já lá estiver. Digo-o
+para ficar registado que não é uma porta que estamos a fechar à chave.
 
 ### 0.2 Já existe um `EventChecklist` — e não é este
 
@@ -64,29 +85,19 @@ são tocadas, para nada dinâmico ser servido em versão velha"*.
 A vista de carregamento vive em `/orcamento`. Ou seja: **o requisito de
 funcionar offline colide com uma decisão de segurança já tomada.**
 
-Não a vou revogar. Proponho uma exceção estreita, explicada em §5.
+**Decidido:** fica offline, dentro do `/orcamento`, com uma exceção estreita a
+uma rota só — os detalhes em §5.1. O resto do back office continua fora do
+cache, como está hoje.
 
 ---
 
 ## 1. Catálogo de material
 
-`inventory_items`, estendida (§0.1).
+`material_items` (esquema em §0.1). Ecrã próprio, ao lado do Inventário de
+adereços, não dentro dele.
 
-```sql
-alter table public.inventory_items
-  add column if not exists kind       text not null default 'reutilizavel',
-  add column if not exists min_stock  integer,
-  add column if not exists photo_path text;
-
-alter table public.inventory_items
-  add constraint inventory_kind_ck check (kind in ('consumivel','reutilizavel'));
-
-create index if not exists inventory_kind_idx on public.inventory_items (kind);
-```
-
-`unit` passa a ter valores sugeridos (`unidade`, `metro`, `rolo`, `par`,
-`caixa`) sem ser fechada — inventar uma unidade nova não pode obrigar a uma
-migração.
+`unit` tem valores sugeridos (`unidade`, `metro`, `rolo`, `par`, `caixa`) sem
+ser fechada — inventar uma unidade nova não pode obrigar a uma migração.
 
 **Importação CSV.** Cabeçalho `nome,categoria,unidade,tipo,stock,minimo,notas`.
 Importa em pré-visualização: mostro-te o que vai entrar, o que vai ser
@@ -110,7 +121,7 @@ create table if not exists public.material_lists (
 create table if not exists public.material_list_items (
   id        text primary key,
   list_id   text not null references public.material_lists(id) on delete cascade,
-  item_id   text not null references public.inventory_items(id) on delete restrict,
+  item_id   text not null references public.material_items(id) on delete restrict,
   qty       numeric not null default 1,
   -- Escala com convidados: qty_per_pax = 1/50 → um saco por cada 50 pax.
   qty_per_pax numeric,
@@ -123,7 +134,8 @@ create index if not exists material_list_items_list_idx
 ```
 
 `on delete restrict` no `item_id` é deliberado: apagar do catálogo um item que
-está em listas tem de doer, senão as listas esvaziam-se sozinhas.
+está em listas tem de doer, senão as listas esvaziam-se sozinhas sem ninguém
+dar por isso. O ecrã mostra em que listas ele está, antes de recusar.
 
 **"Essenciais de carrinha"** entra como `is_default = true` e é semeada com os
 15 itens que enumeraste. Os críticos (escadote, extensões, ferramentas) já vêm
@@ -154,7 +166,7 @@ create table if not exists public.event_material (
 create table if not exists public.event_material_items (
   id          text primary key,
   event_id    text not null references public.event_material(id) on delete cascade,
-  item_id     text references public.inventory_items(id) on delete set null,
+  item_id     text references public.material_items(id) on delete set null,
   -- O NOME É COPIADO, não lido por junção. Se o catálogo mudar amanhã, a
   -- checklist de um evento já preparado continua a dizer o que ela leu no dia.
   name        text not null,
@@ -202,7 +214,7 @@ create table if not exists public.material_rules (
   -- ENTÃO: o que acrescentar.
   action     text not null default 'add_list',  -- add_list|add_item
   list_id    text references public.material_lists(id) on delete cascade,
-  item_id    text references public.inventory_items(id) on delete cascade,
+  item_id    text references public.material_items(id) on delete cascade,
   qty        numeric,
   qty_per_pax numeric,
   position   integer not null default 0
@@ -215,10 +227,10 @@ floral_ → acrescenta a lista _Estrutura e fixação_."** Sem me chamar.
 `match_kind = servico` procura nos grupos de serviços da proposta; `texto`
 procura no documento todo; `pax` dispara por número de convidados.
 
-**O que deliberadamente NÃO faço:** regras com condições compostas (E/OU,
-aninhadas). Isso é uma linguagem de programação com outro nome, e o sítio onde
-estas coisas passam a ser impossíveis de depurar. Se precisares de duas
-condições, fazes duas regras — e vês na checklist qual delas disparou.
+**O que deliberadamente NÃO faço, e ficou confirmado:** regras com condições
+compostas (E/OU, aninhadas). Isso é uma linguagem de programação com outro
+nome, e o sítio onde estas coisas passam a ser impossíveis de depurar. Duas
+condições fazem-se com duas regras, e a checklist mostra qual delas disparou.
 
 ### 3.3 Notas do espaço
 
@@ -242,11 +254,11 @@ Regras que disparam:
 |---|---|---|
 | sempre | — | **Essenciais de carrinha** (15 itens) |
 | `arco floral` | serviço "Arco floral cerimónia" | lista **Estrutura e fixação** |
-| `velas` | serviço "Centros de mesa com velas" | isqueiros ×2, suportes ×30 |
+| `velas` | serviço "Centros de mesa com velas" | isqueiros ×2, apagadores ×2 |
 | `iluminação` | serviço "Iluminação de jardim" | extensões ×3, fita sinalização ×1 |
 | pax | 120 | sacos do lixo ×3 *(1 por 50)* |
 
-Checklist gerada — **41 itens**:
+Checklist gerada — **33 itens**:
 
 ```
 FERRAMENTAS                                    origem
@@ -279,10 +291,6 @@ CONSUMÍVEIS
     Sacos do lixo 100 L           3 un        regra: 120 pax ÷ 50
     Isqueiros                     2 un        regra: velas
 
-DECORAÇÃO
-    Suportes de vela              30 un       regra: velas
-    Jarras médias                 12 un       manual (Catarina)
-
 LIMPEZA
     Panos microfibra              6 un        essenciais
     Vassoura + pá                 1 un        essenciais
@@ -313,7 +321,7 @@ ESCRITÓRIO
 
 O service worker atual **não toca em `/orcamento`**, de propósito (§0.3).
 
-**▸ decisão tua.** Proponho uma exceção de **uma rota só**:
+**Decidido:** exceção de **uma rota só**,
 `/orcamento/admin/carregamento/[eventId]`. Nessa rota, e só nessa:
 
 - o HTML é *network-first* com fallback a cache (como o site público);
@@ -324,7 +332,7 @@ servido em versão velha fora desta rota.
 
 ### 5.2 Como as marcações sobrevivem
 
-- **IndexedDB** guarda a checklist inteira ao abrir (é pequena: 41 linhas).
+- **IndexedDB** guarda a checklist inteira ao abrir (é pequena: 33 linhas).
 - Marcar escreve **primeiro no IndexedDB**, e só depois tenta a rede. O dedo
   nunca espera pela rede — no meio de uma quinta, esperar é perder a marcação.
 - O que não chegou ao servidor fica numa **fila de saída** (outbox), reenviada
@@ -354,7 +362,7 @@ o escadote fica para trás — por isso a fila é persistente, não memória.
 - **A linha inteira é o alvo de toque**, 56px de altura (pediste 44px mínimo;
   56 é o que dá para acertar com a carrinha a abanar). A caixa é um desenho,
   não o alvo.
-- Contador fixo no topo: **"34 de 41 carregados"**.
+- Contador fixo no topo: **"27 de 33 carregados"**.
 - Críticos por marcar → o botão "Carrinha carregada" **avisa antes**, a dizer
   quais: *"Faltam 2 itens críticos: Escadote, Colete refletor."* Não bloqueia —
   às vezes há razão — mas obriga a confirmar.
@@ -400,17 +408,33 @@ o escadote fica para trás — por isso a fila é persistente, não memória.
 
 ---
 
-## 9. Onde quero a tua opinião antes de começar
+## 9. As quatro decisões — todas tomadas
 
-1. **Um inventário ou dois?** (§0.1) — recomendo um, estendido. É a decisão que
-   mais custa a inverter depois.
-2. **A exceção offline no service worker** (§5.1) — uma rota só. Se preferires
-   que o back office continue intocável, a alternativa é a vista de carregamento
-   viver fora de `/orcamento`, num endereço próprio com o mesmo login.
-3. **17 categorias numa lista só**, ou decoração e logística separadas no ecrã?
-4. **Regras sem E/OU** (§3.2) — chega para o que fazes, ou já tens um caso com
-   duas condições?
+| | decisão |
+|---|---|
+| 1 | **Tabela nova, `material_items`.** É material de trabalho (bricolage, ferramentas, consumíveis), não adereços. O `inventory_items` fica intocado. |
+| 2 | **Offline dentro do `/orcamento`**, com exceção a uma rota só no service worker. |
+| 3 | **Só logística.** Nem categorias de decoração no catálogo, nem adereços na checklist. |
+| 4 | **Regras de uma condição.** Sem E/OU. |
 
-Diz-me isto e construo. Se estiver tudo bem, digo já que a ordem será: catálogo
-e listas → geração da checklist → vista de carregamento offline → regresso e
-avisos, com os testes Playwright móveis a acompanhar cada bloco.
+Uma consequência da 1 + 3 que vale a pena estar escrita: a checklist responde a
+*"a carrinha leva o que é preciso para montar?"*, não a *"leva tudo o que vai
+para o evento?"*. As jarras e os castiçais que saíram do exemplo dos 120 pax
+continuam a ser geridos no ecrã Inventário. Se um dia os quiseres na mesma
+lista, é aditivo.
+
+## 10. Ordem de construção
+
+1. **Catálogo** — tabela, ecrã, pesquisa e filtro, importação CSV com
+   pré-visualização.
+2. **Listas base** — "Essenciais de carrinha" semeada, duplicar, quantidades
+   que escalam com os convidados.
+3. **Geração da checklist** — motor de regras editável, derivação da proposta,
+   itens à mão, notas do espaço.
+4. **Vista de carregamento** — 375px, IndexedDB, fila de saída, críticos,
+   veículos.
+5. **Regresso e avisos** — em falta por espaço, desconto de consumíveis, lista
+   de compras, conflito de material.
+
+Testes Playwright em viewport móvel a acompanhar cada bloco, e o modo offline
+coberto no 4. Começo pelo 1.
