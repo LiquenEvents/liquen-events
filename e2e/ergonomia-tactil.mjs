@@ -206,6 +206,17 @@ export const AUDITOR = `(() => {
     if (r.right > 0 && r.left < innerWidth) continue;
     if (el.closest("[inert],[aria-hidden=true]")) continue;
     if (el.hasAttribute("disabled") || el.tabIndex < 0) continue;
+    // Dentro de um contentor com scroll próprio, estar fora do ecrã é NORMAL e
+    // é o desenho: os cartões das colunas da direita do quadro de propostas
+    // vivem em \`x = 1185\`, e chega-se lá arrastando o quadro. O foco também
+    // lá chega, porque o browser rola o contentor sozinho ao focar. Mesma
+    // distinção que a regra do overflow acima já faz — \`clip\`/\`hidden\` não
+    // contam, porque desses não há como sair.
+    if (temScrollProprio(el)) continue;
+    // \`preventScroll\` de propósito: medir não pode arrastar a página, senão a
+    // asserção seguinte já não vê o mesmo ecrã. Isso quer dizer que o que se
+    // testa aqui é só a revelação por CSS (\`:focus\`), que é a do skip link —
+    // a revelação por SCROLL já saiu acima, na linha do contentor arrastável.
     try {
       el.focus({ preventScroll: true });
     } catch {
