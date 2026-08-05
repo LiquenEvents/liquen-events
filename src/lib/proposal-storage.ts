@@ -626,3 +626,77 @@ export async function signProposalThumbs(paths: string[]): Promise<Map<string, s
   }
   return out;
 }
+
+/**
+ * COPIAR AS FOTOS DE UMA PROPOSTA PARA OUTRO PEDIDO.
+ *
+ * ── Porque é que não basta copiar os caminhos ─────────────────────────────
+ * Os caminhos das fotos vivem debaixo do pedido a que pertencem
+ * (`{quoteId}/{uuid}.jpg` — ver {@link isProposalPath}). Quando ela cria uma
+ * proposta "a partir de" outra, copiar o caminho tal e qual deixaria a
+ * proposta NOVA a apontar para a pasta do pedido ANTIGO. Enquanto ninguém
+ * mexer no antigo ninguém dá por nada; no dia em que esse pedido for apagado,
+ * a proposta nova — provavelmente já enviada — fica sem imagens, em silêncio.
+ *
+ * ── Porquê `copy` e não descarregar e voltar a carregar ───────────────────
+ * `storage.copy()` é feita DENTRO do Supabase: os bytes nunca atravessam esta
+ * função. Trinta fotos de mood board são trinta chamadas curtas em vez de
+ * trinta descarregamentos e trinta carregamentos. O recurso de descarregar
+ * existe, mas fica atrás de um aviso nos registos — se aparecer a sério, é ele
+ * que explica porque é que de repente tudo ficou lento.
+ *
+ * Devolve o mapa `caminho antigo → caminho novo`. O que falhar não aparece no
+ * mapa: quem chama mantém o caminho antigo (a proposta continua a funcionar,
+ * acoplada à antiga) em vez de ficar com um buraco onde estava uma foto.
+ */
+export async function duplicarFotosParaPedido(
+  caminhos: readonly string[],
+  quoteIdDestino: string,
+): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>();
+  const sb = getSupabase();
+  const destino = quoteIdDestino.replace(/[^a-zA-Z0-9_-]/g, "");
+  // Só caminhos do Storage. Uma imagem embutida (`data:`) viaja no documento e
+  // não tem nada para copiar.
+  const validos = [
+    ...new Set(caminhos.filter((p) => typeof p === "string" && p && !p.startsWith("data:"))),
+  ];
+  if (!sb || !destino || validos.length === 0) return mapa;
+  if (!(await ensureBucket())) return mapa;
+
+  const extDe = (p: string) => {
+    const m = /\.([a-zA-Z0-9]+)$/.exec(p);
+    return m ? m[1].toLowerCase() : "jpg";
+  };
+
+  // O mesmo tecto do import da biblioteca, e pela mesma razão: sem ele, uma
+  // proposta com quarenta fotos abre oitenta ligações ao Storage de uma vez.
+  const EM_PARALELO = 8;
+  for (let i = 0; i < validos.length; i += EM_PARALELO) {
+    const lote = validos.slice(i, i + EM_PARALELO);
+    await Promise.all(
+      lote.map(async (origem) => {
+        const novo = `${destino}/${randomUUID()}.${extDe(origem)}`;
+        try {
+          const { error } = await sb.storage.from(PROPOSAL_BUCKET).copy(origem, novo);
+          if (error) {
+            log.warn("proposal-storage: cópia da foto falhou", { origem, erro: error.message });
+            return;
+          }
+        } catch (e) {
+          log.error("proposal-storage: cópia da foto rebentou", e, { origem });
+          return;
+        }
+        mapa.set(origem, novo);
+        // A miniatura é melhor esforço: sem ela a grelha cai para o original,
+        // que é feio mas funciona. Falhar aqui não pode perder a foto.
+        try {
+          await sb.storage.from(PROPOSAL_THUMB_BUCKET).copy(origem, novo);
+        } catch {
+          /* a foto entra na mesma */
+        }
+      }),
+    );
+  }
+  return mapa;
+}

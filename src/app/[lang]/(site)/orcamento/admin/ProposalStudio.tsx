@@ -14,6 +14,9 @@ import {
   type VatMode,
 } from "@/lib/proposal-doc";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
+import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
+import ModelosParciais from "./ModelosParciais";
+import type { CampoAMudar } from "@/lib/proposal-copy";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -302,6 +305,17 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
 
   const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
+  const [copiarAberto, setCopiarAberto] = useState(false);
+  /**
+   * Os campos que vieram de OUTRA proposta e ainda não foram confirmados.
+   *
+   * Depois de copiar, estes cinco são os únicos que mudam de casamento para
+   * casamento — e são exactamente aqueles cujo erro só se descobre com o PDF
+   * já enviado. Ficam marcados até ela lhes tocar.
+   */
+  const [porConfirmar, setPorConfirmar] = useState<Set<CampoAMudar>>(() => new Set());
+  /** Caixa do nome, aberta pelo "Guardar como modelo" do cabeçalho. */
+  const [nomeModelo, setNomeModelo] = useState<string | null>(null);
   // Free-typed mirror of the structured total, so pt-PT formatting ("3.000,00")
   // survives keystrokes. Parsed into `doc.totalAmount` (the money source of truth).
   const [totalInput, setTotalInput] = useState<string>("");
@@ -1131,6 +1145,68 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     }
   }
 
+  /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
+  function aplicarCopia(e: Escolha) {
+    setDoc(e.doc as StudioDoc);
+    setPorConfirmar(new Set(e.camposAMudar));
+    // O título interno volta a gerar-se sozinho: a cópia esvaziou-o de
+    // propósito para não ficar com o nome do casal anterior no cabeçalho.
+    setRefEdited(false);
+    const partilha =
+      e.fotosPartilhadas > 0
+        ? ` ${e.fotosPartilhadas} foto(s) ficaram na pasta da proposta antiga.`
+        : "";
+    toast(
+      `Copiado de ${e.nomeDaOrigem}. Confirme o que está marcado.${partilha}`,
+      e.fotosPartilhadas > 0 ? "error" : "success",
+    );
+  }
+
+  /**
+   * O realce de um campo por confirmar, e a forma de o desmarcar.
+   *
+   * Laranja e não verde: é um AVISO de coisa por rever, não uma acção. O
+   * `DESIGN-TOKENS.md` fixa esta regra para a página toda.
+   */
+  const realce = (campo: CampoAMudar) =>
+    porConfirmar.has(campo)
+      ? "rounded-lg ring-2 ring-[#c98a2e]/45 ring-offset-2 ring-offset-background"
+      : undefined;
+  const confirmado = (campo: CampoAMudar) => {
+    // Tocar-lhe É a confirmação. Um botão "confirmar" ao lado de cada campo
+    // seria mais um clique para dizer o que o gesto já disse.
+    setPorConfirmar((atual) => {
+      if (!atual.has(campo)) return atual;
+      const proximo = new Set(atual);
+      proximo.delete(campo);
+      return proximo;
+    });
+  };
+
+  /** Guarda ESTA proposta como modelo reutilizável, com o nome que ela der. */
+  async function guardarComoModelo(nome: string) {
+    const limpo = nome.trim();
+    if (!limpo) return;
+    try {
+      const r = await fetch("/api/propostas/modelos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // O documento vai TAL COMO ESTÁ, com o nome e a data deste casal lá
+        // dentro. Não faz mal: quem o usar passa pelo `copiarParaPedido`, que
+        // é o mesmo caminho de qualquer proposta anterior e substitui tudo o
+        // que é de outra pessoa. Limpar aqui seria uma segunda regra a poder
+        // discordar da primeira.
+        body: JSON.stringify({ nome: limpo, tipo: "completo", doc, origem: doc.clientNames }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error ?? "Não deu para guardar o modelo.");
+      setNomeModelo(null);
+      toast(`Modelo «${limpo}» guardado.`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não deu para guardar o modelo.", "error");
+    }
+  }
+
   const isDeco = doc.template !== "organizacao";
   // Também exige um total > 0: uma proposta a €0 seria enviada e poluiria os
   // indicadores (total enviado, taxa de aceitação) com um negócio vazio.
@@ -1146,10 +1222,58 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
             pré-visualizar antes de enviar.
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={clearDraft} className="shrink-0">
-          Limpar rascunho
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* A acção principal desta secção: quase todas as propostas são uma
+              variação de uma anterior. É a única aqui a verde. */}
+          <Button size="sm" onClick={() => setCopiarAberto(true)}>
+            Criar a partir de…
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setNomeModelo(doc.eventType || "")}>
+            Guardar como modelo
+          </Button>
+          <Button variant="ghost" size="sm" onClick={clearDraft}>
+            Limpar rascunho
+          </Button>
+        </div>
       </div>
+
+      {nomeModelo !== null && (
+        <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-3">
+          <label className="flex-1 min-w-[14rem]">
+            <span className="bo-eyebrow">Nome do modelo</span>
+            <input
+              autoFocus
+              value={nomeModelo}
+              onChange={(e) => setNomeModelo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void guardarComoModelo(nomeModelo);
+                if (e.key === "Escape") setNomeModelo(null);
+              }}
+              placeholder="Casamento standard"
+              className="bo-input mt-1 w-full px-3 py-2 text-sm"
+            />
+          </label>
+          <Button
+            size="sm"
+            disabled={!nomeModelo.trim()}
+            onClick={() => void guardarComoModelo(nomeModelo)}
+          >
+            Guardar
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setNomeModelo(null)}>
+            Cancelar
+          </Button>
+        </div>
+      )}
+
+      <CriarAPartirDe
+        open={copiarAberto}
+        onClose={() => setCopiarAberto(false)}
+        quoteId={quote.id}
+        clienteAtual={quote.name ?? ""}
+        onEscolhido={aplicarCopia}
+        toast={toast}
+      />
 
       {/* Passos do fluxo — sempre visível, dá o sentido de "onde estou / o que
           fazer a seguir". Clicável para saltar entre passos. */}
@@ -1176,7 +1300,11 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
             <Field
               label="Clientes"
               value={doc.clientNames}
-              onChange={(e) => patch({ clientNames: e.target.value })}
+              onChange={(e) => {
+                confirmado("clientNames");
+                patch({ clientNames: e.target.value });
+              }}
+              containerClassName={realce("clientNames")}
               placeholder="Maria & Zé"
             />
             <Field
@@ -1188,19 +1316,31 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
             <Field
               label="Data"
               value={doc.eventDate}
-              onChange={(e) => patch({ eventDate: e.target.value })}
+              onChange={(e) => {
+                confirmado("eventDate");
+                patch({ eventDate: e.target.value });
+              }}
+              containerClassName={realce("eventDate")}
               placeholder="12 de setembro de 2026"
             />
             <Field
               label="Local"
               value={doc.location}
-              onChange={(e) => patch({ location: e.target.value })}
+              onChange={(e) => {
+                confirmado("location");
+                patch({ location: e.target.value });
+              }}
+              containerClassName={realce("location")}
               placeholder="Monte da Oliveirinha, Évora"
             />
             <Field
               label="Convidados"
               value={doc.guests}
-              onChange={(e) => patch({ guests: e.target.value })}
+              onChange={(e) => {
+                confirmado("guests");
+                patch({ guests: e.target.value });
+              }}
+              containerClassName={realce("guests")}
               placeholder="150 pax"
             />
             {isDeco && (
@@ -1379,9 +1519,32 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
               </div>
             ))}
           </div>
-          <button type="button" className={`${ADD_BTN} mt-3`} onClick={addGroup}>
-            + Adicionar grupo de serviços
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            <button type="button" className={ADD_BTN} onClick={addGroup}>
+              + Adicionar grupo de serviços
+            </button>
+            <ModelosParciais
+              tipo="grupo"
+              toast={toast}
+              onInserir={(g) =>
+                setDoc((d) => ({
+                  ...d,
+                  serviceGroups: [
+                    ...d.serviceGroups,
+                    // A letra é a POSIÇÃO na lista, não uma propriedade do
+                    // modelo: inserir um bloco guardado como "b)" no fim de uma
+                    // proposta que já tem três grupos daria dois "b)".
+                    {
+                      ...(g as StudioDoc["serviceGroups"][number]),
+                      letter: `${LETTERS[d.serviceGroups.length] ?? ""})`,
+                    },
+                  ],
+                }))
+              }
+              paraGuardar={doc.serviceGroups.find((g) => (g.title ?? "").trim())}
+              nomeSugerido={doc.serviceGroups.find((g) => (g.title ?? "").trim())?.title}
+            />
+          </div>
         </Section>
 
         {/* Mood boards — decoracao only */}
@@ -1472,9 +1635,23 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 </div>
               ))}
             </div>
-            <button type="button" className={`${ADD_BTN} mt-3`} onClick={addBoard}>
-              + Adicionar mood board
-            </button>
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              <button type="button" className={ADD_BTN} onClick={addBoard}>
+                + Adicionar mood board
+              </button>
+              <ModelosParciais
+                tipo="moodboard"
+                toast={toast}
+                onInserir={(b) =>
+                  setDoc((d) => ({
+                    ...d,
+                    moodBoards: [...d.moodBoards, b as StudioDoc["moodBoards"][number]],
+                  }))
+                }
+                paraGuardar={doc.moodBoards.find((b) => (b.title ?? "").trim())}
+                nomeSugerido={doc.moodBoards.find((b) => (b.title ?? "").trim())?.title}
+              />
+            </div>
           </Section>
         )}
 
@@ -1703,8 +1880,12 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
               label="Valor (sem IVA)"
               inputMode="decimal"
               value={totalInput}
-              onChange={(e) => onTotalInput(e.target.value)}
+              onChange={(e) => {
+                confirmado("totalAmount");
+                onTotalInput(e.target.value);
+              }}
               placeholder="3000"
+              containerClassName={realce("totalAmount")}
             />
             <div className="flex flex-col gap-1.5">
               <span className="bo-eyebrow">IVA</span>
