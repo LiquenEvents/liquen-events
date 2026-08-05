@@ -3,30 +3,26 @@
  *
  * Uso: node scripts/medir-imagens-admin.mjs [url]   (por omissão http://localhost:3210)
  *
- * ── O que isto mede, e o que NÃO mede ─────────────────────────────────────
- * As fotos verdadeiras vivem num bucket privado de Supabase, que esta máquina
- * não tem. Em vez de inventar números, o medidor INTERCEPTA a resposta da API
- * e serve, no lugar de cada foto, um ficheiro real do repositório com o tamanho
- * de uma fotografia de casamento. O browser é o verdadeiro, o componente é o
- * verdadeiro, a fila é a verdadeira — o que fica de fora é a latência do bucket
- * e a distância entre a região da Vercel e a do Supabase.
+ * ── O que isto mede ───────────────────────────────────────────────────────
+ * UMA configuração: um `<img>` com o original por célula, sem miniatura, sem
+ * fila, sem `lazy` e sem prioridade. É o comportamento EXACTO das Imagens de
+ * capa e dos moodboards do estúdio de propostas (ProposalStudio.tsx, linhas
+ * 1794 e 1978) — a parte do back office que NÃO foi tratada. A Biblioteca de
+ * Temas já tem miniaturas e fila, e não é o que aqui se mede.
  *
- * Portanto: os BYTES, as CONTAGENS, o paralelismo e a ordem são reais e
- * repetíveis. Os TEMPOS ABSOLUTOS são um PISO — o bucket a sério só pode
- * tornar tudo mais lento, nunca mais rápido.
+ * A grelha é desenhada numa página nua da mesma origem, e não no ecrã do back
+ * office: ali o React volta a desenhar por cima e mede-se a hidratação em vez
+ * das imagens.
  *
- * Mede três configurações, porque o back office tem três comportamentos e só
- * um deles está optimizado:
+ * ── O que NÃO mede ────────────────────────────────────────────────────────
+ * As fotos verdadeiras vivem num bucket privado de Supabase que esta máquina
+ * não tem. Em vez de inventar números, servem-se fotografias REAIS do
+ * repositório (`public/imagens/`), com o peso de uma fotografia de casamento.
  *
- *   1. `temas-hoje`      — a grelha dos temas como está: miniatura por célula.
- *   2. `temas-sem-thumb` — as mesmas células sem miniatura. É o que acontece às
- *                          fotos carregadas antes de as miniaturas existirem, e
- *                          exercita a fila de originais.
- *   3. `sem-nada`        — original por célula, sem miniatura, sem fila, sem
- *                          `lazy` e sem prioridade. É o comportamento EXACTO
- *                          das Imagens de capa e dos moodboards do estúdio de
- *                          propostas (ver ProposalStudio.tsx), desenhado aqui
- *                          numa página nua para se poder medir isolado.
+ * Portanto: os BYTES, as CONTAGENS e as DIMENSÕES são reais e repetíveis. Fica
+ * de fora a latência do bucket, a região e o custo de assinar cada URL — e por
+ * isso os TEMPOS ABSOLUTOS são um PISO: o bucket a sério só pode tornar tudo
+ * mais lento, nunca mais rápido.
  */
 
 import { chromium } from "@playwright/test";
@@ -34,7 +30,6 @@ import { readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const BASE = process.argv[2] || "http://localhost:3210";
-const SENHA = "liquen2026";
 const CELULAS = 24;
 /** Largura em px da caixa onde cada miniatura é desenhada na grelha real. */
 const CAIXA_PX = 160;
@@ -95,26 +90,6 @@ function picoDeParalelismo(imagens) {
     pico = Math.max(pico, vivo);
   }
   return pico;
-}
-
-async function entrar(page) {
-  await page.goto(`${BASE}/orcamento/admin`, {
-    waitUntil: "domcontentloaded",
-    timeout: 120_000,
-  });
-  await page.getByLabel(/O teu nome/i).fill("Catarina");
-  await page.getByLabel(/Palavra-passe/i).fill(SENHA);
-  // Esperar pela RESPOSTA e não só pelo clique: em desenvolvimento o
-  // `router.refresh()` que se segue recompila a rota, e uma espera curta media
-  // o compilador em vez do ecrã.
-  const [res] = await Promise.all([
-    page.waitForResponse((r) => r.url().includes("/api/admin/login"), { timeout: 120_000 }),
-    page.getByRole("button", { name: /^Entrar$/ }).click(),
-  ]);
-  if (!res.ok()) throw new Error(`entrada recusada: ${res.status()}`);
-  await page.getByRole("navigation", { name: /Navegação do back office/i }).waitFor({
-    timeout: 120_000,
-  });
 }
 
 /**

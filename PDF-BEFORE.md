@@ -1,0 +1,169 @@
+# PDF-BEFORE — autópsia do PDF de proposta
+
+Fase 0, antes de uma linha de código. Amostra: uma proposta de decoração com
+**14 fotografias reais** do repositório (16,4 MB de originais), capa dupla e três
+mood boards cheios.
+
+Reproduzir:
+
+```
+PDF_AUTOPSIA=/tmp/proposta-antes.pdf npx vitest run proposal-doc-pdf.autopsia
+pdfimages -list /tmp/proposta-antes.pdf ; pdffonts /tmp/proposta-antes.pdf ; qpdf --check /tmp/proposta-antes.pdf
+```
+
+---
+
+## Resposta curta: a hipótese de partida está REFUTADA
+
+> "As fotos estão a ser embebidas em resolução original, sem downsampling e
+> possivelmente em PNG."
+
+**Não estão.** O gerador já redimensiona cada foto ao tamanho de exibição, já
+reencoda em JPEG e já deduplica por conteúdo. Os números abaixo mostram-no.
+
+Mas a autópsia encontrou **três defeitos reais** que ninguém tinha visto — e
+nenhum deles é uma fotografia.
+
+---
+
+## 1. Peso
+
+| | |
+| --- | --- |
+| **Ficheiro completo** | **0,95 MB** |
+| Páginas | 11 |
+| Fotografias de origem | 14 ficheiros, 16,4 MB |
+| Redução conseguida | **16,4 MB → 0,95 MB (94%)** |
+| Página mais pesada | 1 e 11 (as capas): ~470 KB de fotografia cada |
+
+O alvo que me deu para a Fase 2 era "PDF de 10 páginas abaixo de 5 MB". **Já
+está cinco vezes abaixo disso.**
+
+## 2. As imagens, uma a uma
+
+38 objectos de imagem: **16 fotografias em JPEG** e **22 objectos do logótipo**
+(11 imagens + 11 máscaras).
+
+| O quê | Píxeis | DPI efectivo | Compressão | Peso |
+| --- | --- | --- | --- | --- |
+| Capa, foto esquerda | 617×1323 | **160** | JPEG (DCTDecode) | 260 KB |
+| Capa, foto direita | 617×1323 | **160** | JPEG | 207 KB |
+| Mood board, foto grande | 714×613 | **130** | JPEG | 77–102 KB |
+| Mood board, fotos pequenas | 266×299 | **130** | JPEG | 10–21 KB |
+| **Logótipo** | 720×430 | **720** ⚠️ | **PNG (FlateDecode) + SMask** ⚠️ | 20 KB |
+
+Os DPI vêm do código, não por acaso: `PLACEMENT_DPI` em
+`src/lib/proposal-image.ts` fixa **160 para capas e 130 para colagens**, e
+`MAX_IMAGE_EDGE_PX = 2200` protege contra caixas absurdas. É a regra que me
+pediu (150 DPI para ecrã), já implementada, com um ponto de folga nas capas.
+
+**Só duas imagens passam dos 150 KB que pediu** — as duas fotos de capa, a
+160 DPI. Baixá-las para 150 DPI tira-lhes ~12% do peso.
+
+## 3. Duplicados: não há
+
+O gerador tem cache por **conteúdo × caixa** (`imageContentKey` +
+`EmbedCache`). A mesma foto usada na capa e na contracapa é embutida **uma vez**
+e referenciada duas — vê-se nos objectos 11 e 12, que reaparecem na página 11
+com os mesmos IDs. O logótipo é um só objecto (7 para as páginas interiores, 8
+para as capas) partilhado pelas 11 páginas.
+
+## 4. PNG em fotografias: não há
+
+Todas as 16 fotografias são **DCTDecode (JPEG)**, q84, 4:2:0. Nenhuma
+fotografia em PNG.
+
+## 5. ⚠️ Transparência: o logótipo, em todas as páginas
+
+**Este é o achado principal.** O logótipo é um **PNG com máscara alfa (SMask)**,
+composto em **todas as 11 páginas**. É a única transparência do ficheiro — e a
+transparência é, como escreveu, das coisas mais caras de desenhar num
+visualizador de PDF.
+
+Pior: está embutido a **720×430 px para ser desenhado com ~72 pt de largura**, o
+que dá **720 DPI** — quatro vezes e meia acima dos 160 DPI a que as fotografias
+são tratadas. É a única coisa neste ficheiro em resolução absurda, e não é uma
+foto.
+
+## 6. ⚠️ Fontes: embebidas, mas NÃO em subconjunto
+
+```
+Carlito-Bold      CID TrueType   emb: yes   sub: NO
+Carlito-Regular   CID TrueType   emb: yes   sub: NO
+Carlito-Italic    CID TrueType   emb: yes   sub: NO
+```
+
+Três faces completas, com todos os glifos, quando a proposta usa algumas
+dezenas. Estão embebidas uma só vez cada (não repetidas por página), mas
+inteiras.
+
+## 7. Espaço de cor: limpo
+
+Tudo em **RGB**. Nenhuma imagem em CMYK, nenhum perfil ICC pesado embebido.
+
+## 8. ⚠️ Estrutura: não linearizado
+
+```
+File is not linearized
+```
+
+Sem *fast web view*: o visualizador tem de ter o ficheiro todo antes de mostrar
+a primeira página. Num PDF servido por rede é exactamente isto que faz uma
+abertura parecer lenta.
+
+## 9. Como é gerado
+
+**pdf-lib**, em código — `src/lib/proposal-doc-pdf.ts` (`renderProposalDocPdf`),
+com o redimensionamento em `src/lib/proposal-image.ts` (sharp).
+
+**Não é Puppeteer nem HTML impresso.** O AGENTE 4 da missão — CSS de impressão,
+`box-shadow`, `networkidle`, `@page` — **não se aplica**: não existe HTML nenhum
+neste caminho.
+
+---
+
+## O que isto muda no plano
+
+**O que já está feito e não é para refazer:** downsampling a 130–160 DPI, JPEG
+q84 com 4:2:0, deduplicação por conteúdo, tecto de 2200 px, RGB sem ICC.
+
+**O que a autópsia mandou fazer, e que não estava no plano:**
+
+1. **O logótipo.** Achatar a transparência (fundo sólido em vez de SMask) e
+   embuti-lo à resolução a que é desenhado. Tira 11 composições alfa do
+   ficheiro — a única fonte de custo de desenho que aqui existe.
+2. **Subconjunto das fontes.** Três faces completas onde bastam os glifos usados.
+3. **Linearizar** (`qpdf --linearize`), para a primeira página aparecer antes do
+   ficheiro todo ter chegado.
+4. Baixar as capas de 160 para 150 DPI — as únicas duas imagens acima dos 150 KB.
+
+**Uma correcção ao que me pediu:** o AGENTE 1 diz "recomprime em JPEG
+progressivo". **Isso partiria o PDF.** O filtro `DCTDecode` do PDF assume JPEG
+*baseline*, e vários visualizadores recusam ou desenham mal um JPEG progressivo
+embutido. O código já sabe disso e tem o aviso escrito (`PDF_JPEG_OPTIONS`:
+"Explícito e inegociável: baseline, nunca progressivo"). Fica em baseline.
+
+---
+
+## O que esta autópsia NÃO explica, e é o mais importante
+
+**Um ficheiro de 0,95 MB com 11 páginas não trava o scroll de ninguém.** O
+sintoma que descreve — travar a percorrer, blocos de fotos em branco durante
+segundos — não é compatível com o que está neste ficheiro. Restam três
+explicações, e não consigo distinguir entre elas daqui:
+
+1. **As suas propostas reais têm muitas mais fotografias** do que as 14 desta
+   amostra. Com 60 ou 80 fotos o ficheiro cresce proporcionalmente.
+2. **O caminho de recurso está a disparar em produção.** Se o `sharp` falhar,
+   `drawCoverImage` embute o **ORIGINAL inteiro** em vez da versão
+   redimensionada (`proposal-doc-pdf.ts:264`). Um PDF gerado por esse caminho
+   tem exactamente o aspecto da sua hipótese de partida — fotos em resolução
+   original — e seria a explicação mais provável do que descreve.
+3. **O problema não está no ficheiro, está em como é aberto.** Um PDF servido
+   dentro de um iframe no portal, sem *Range requests* e sem linearização,
+   comporta-se muito pior do que o mesmo ficheiro aberto localmente.
+
+**Para distinguir preciso de um PDF verdadeiro seu** — um que tenha travado a
+sério. Guarde-o e dê-mo, e em minutos digo qual das três é. Sem isso, corrigir
+os três defeitos acima melhora o ficheiro, mas posso estar a tratar o sintoma
+errado.
