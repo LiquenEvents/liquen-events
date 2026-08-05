@@ -14,7 +14,7 @@ import {
 } from "@/lib/proposal-doc";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
-import { prepareImageForUpload, type ImageKind } from "./image-prep";
+import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage } from "./ThemePicker";
 import { Button, Card, Field, Segmented } from "./ui";
 
@@ -374,13 +374,16 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         const res = await fetch(`/api/orcamento/${quote.id}/assets`);
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
-        const imgs: { path: string; url: string }[] = Array.isArray(data?.images)
+        const imgs: { path: string; url: string; thumbUrl?: string }[] = Array.isArray(data?.images)
           ? data.images
           : [];
         if (!alive || imgs.length === 0) return;
         setAssetUrls((prev) => {
           const next = { ...prev };
-          for (const im of imgs) if (im.path && im.url && !next[im.path]) next[im.path] = im.url;
+          // A miniatura ganha ao original: é este o caminho que corre quando se
+          // REABRE uma proposta, que é onde a grelha mais pesa.
+          for (const im of imgs)
+            if (im.path && im.url && !next[im.path]) next[im.path] = im.thumbUrl || im.url;
           return next;
         });
       } catch {
@@ -541,10 +544,19 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   // "às vezes não funcionava". Cada ficheiro é comprimido no navegador
   // (image-prep) e enviado individualmente, com uma repetição automática em
   // falha de rede; um ficheiro mau nunca deita fora os restantes.
-  async function uploadOne(file: File): Promise<{ path: string; url: string }> {
+  async function uploadOne(
+    file: File,
+    thumb: File | null,
+  ): Promise<{ path: string; url: string; thumbUrl?: string }> {
     const post = () => {
       const form = new FormData();
       form.append("files", file);
+      // A miniatura viaja ao lado do original, no mesmo pedido: sai da MESMA
+      // descodificação que já se fez para encolher a foto, portanto não custa
+      // tempo nenhum, e ~30–60 KB não se notam ao lado de uma foto de 2 MB.
+      // Sem ela, a grelha voltava a puxar 1130 KB por célula para desenhar
+      // 174 px (medido em IMAGES-BEFORE.md).
+      if (thumb) form.append("thumbs", thumb);
       return fetch(`/api/orcamento/${quote.id}/assets`, { method: "POST", body: form });
     };
     let res: Response;
@@ -563,9 +575,11 @@ export default function ProposalStudio({ quote, onSent }: Props) {
             : "Falha ao carregar a imagem."),
       );
     }
-    const im: { path: string; url: string } | undefined = data?.images?.[0];
+    const im: { path: string; url: string; thumbUrl?: string } | undefined = data?.images?.[0];
     if (!im) throw new Error("Falha ao carregar a imagem.");
-    setAssetUrls((prev) => ({ ...prev, [im.path]: im.url }));
+    // A grelha desenha pela miniatura quando existe; o original fica para o
+    // detalhe e para o PDF.
+    setAssetUrls((prev) => ({ ...prev, [im.path]: im.thumbUrl || im.url }));
     return im;
   }
 
@@ -590,8 +604,8 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         if (i >= files.length) return;
         const f = files[i];
         try {
-          const prepared = await prepareImageForUpload(f, kind);
-          const im = await uploadOne(prepared);
+          const prepared = await prepareImageWithThumb(f, kind);
+          const im = await uploadOne(prepared.file, prepared.thumb);
           // Guardado pelo ÍNDICE: as vias acabam fora de ordem e a ordem das
           // fotos escolhidas é a que a Catarina vê no documento.
           results[i] = { path: im.path };

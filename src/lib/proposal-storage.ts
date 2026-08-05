@@ -319,6 +319,12 @@ function extFor(contentType: string): string {
 export interface UploadedImage {
   path: string;
   url: string;
+  /**
+   * URL da miniatura, quando existe. As fotos carregadas antes das miniaturas
+   * existirem não têm nenhuma — e é por isso que é opcional em vez de "" : quem
+   * desenha distingue "não há" de "há e está vazia", e cai para o original.
+   */
+  thumbUrl?: string;
 }
 
 /** Upload one image (bytes) for a quote; returns its storage path + signed URL. */
@@ -367,9 +373,18 @@ export async function listProposalImages(quoteId: string): Promise<UploadedImage
     const { data: signed } = await sb.storage
       .from(PROPOSAL_BUCKET)
       .createSignedUrls(paths, SIGNED_TTL);
-    return (signed ?? [])
+    const imagens = (signed ?? [])
       .map((s) => ({ path: s.path ?? "", url: s.signedUrl ?? "" }))
       .filter((im) => im.path && im.url);
+    // As miniaturas EM LOTE, num só pedido: assinar uma de cada vez seria uma
+    // ida ao servidor por célula antes de a primeira imagem sequer começar a
+    // descarregar. Sem miniaturas nesta instalação, o mapa vem vazio e cada
+    // célula fica com o original — o comportamento de hoje.
+    const miniaturas = await signProposalThumbs(imagens.map((im) => im.path));
+    return imagens.map((im) => {
+      const thumbUrl = miniaturas.get(im.path);
+      return thumbUrl ? { ...im, thumbUrl } : im;
+    });
   } catch (e) {
     log.error("proposal-storage: list falhou", e, { quoteId });
     return [];
@@ -477,4 +492,111 @@ async function fetchProposalImageBytesInner(ref: string): Promise<Buffer | null>
   } catch {
     return null;
   }
+}
+
+// ── Miniaturas ─────────────────────────────────────────────────────────────
+/**
+ * Bucket das miniaturas das fotos das propostas.
+ *
+ * O desenho é o mesmo que a Biblioteca de Temas já usa e que está provado:
+ * **bucket paralelo, MESMA chave**. A miniatura de
+ * `proposal-assets/<pedido>/<uuid>.jpg` é `proposal-thumbs/<pedido>/<uuid>.jpg`.
+ *
+ * Sem índice para manter, sem coluna nova na base de dados: o caminho do
+ * original É o caminho da miniatura. E, o que mais importa, uma miniatura em
+ * falta cai sozinha para o original — as fotos carregadas antes disto existir
+ * continuam a funcionar sem migração obrigatória.
+ *
+ * Porquê isto: medido em IMAGES-BEFORE.md, a grelha do estúdio puxava 1130 KB
+ * por célula para desenhar 174 px. A miniatura pesa ~30–60 KB, e é o browser
+ * que já a fabrica na mesma descodificação que faz para encolher o original.
+ */
+export const PROPOSAL_THUMB_BUCKET = "proposal-thumbs";
+
+let thumbBucketReady = false;
+
+/**
+ * Garante o bucket das miniaturas. SÓ QUEM ESCREVE chama isto: ler ou assinar
+ * miniaturas nunca o cria, para uma instalação antiga (sem miniatura nenhuma)
+ * não pagar uma chamada por leitura.
+ */
+async function ensureThumbBucket(): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  if (thumbBucketReady) return true;
+  const { data } = await sb.storage.getBucket(PROPOSAL_THUMB_BUCKET);
+  if (!data) {
+    const { error } = await sb.storage.createBucket(PROPOSAL_THUMB_BUCKET, {
+      public: false,
+      fileSizeLimit: BUCKET_FILE_SIZE_LIMIT,
+      allowedMimeTypes: UPLOAD_MIME_TYPES,
+    });
+    if (error && !/exist/i.test(error.message)) {
+      log.warn("proposal-storage: createBucket das miniaturas falhou", { erro: error.message });
+      return false;
+    }
+  }
+  thumbBucketReady = true;
+  return true;
+}
+
+/**
+ * Guarda a miniatura de uma foto, na MESMA chave do original mas no bucket das
+ * miniaturas.
+ *
+ * Melhor esforço do princípio ao fim, e é deliberado: a miniatura é derivada e
+ * descartável, e a foto boa já está guardada quando isto corre. Falhar aqui
+ * deixa a foto sem miniatura — a grelha cai para o original, que é o
+ * comportamento de hoje — e NUNCA faz falhar um carregamento.
+ */
+export async function uploadProposalThumb(
+  path: string,
+  bytes: Buffer,
+  contentType: string,
+): Promise<string> {
+  const sb = getSupabase();
+  if (!sb || !path) return "";
+  try {
+    if (!(await ensureThumbBucket())) return "";
+    const { error } = await sb.storage
+      .from(PROPOSAL_THUMB_BUCKET)
+      .upload(path, bytes, { contentType, upsert: true });
+    if (error) {
+      log.warn("proposal-storage: miniatura não guardada", { path, erro: error.message });
+      return "";
+    }
+    const { data } = await sb.storage.from(PROPOSAL_THUMB_BUCKET).createSignedUrl(path, SIGNED_TTL);
+    return data?.signedUrl ?? "";
+  } catch (e) {
+    log.warn("proposal-storage: miniatura não guardada", { path, erro: String(e) });
+    return "";
+  }
+}
+
+/**
+ * URL assinado da miniatura de cada caminho, EM LOTE.
+ *
+ * Em lote e não um a um: são até 24 células numa grelha, e assinar uma de cada
+ * vez é uma ida ao servidor por célula antes de a primeira imagem sequer
+ * começar a descarregar. Caminhos sem miniatura simplesmente não aparecem no
+ * mapa — quem chama cai para o original.
+ *
+ * Nunca cria o bucket e nunca lança: numa instalação sem miniatura nenhuma
+ * devolve um mapa vazio, e a grelha comporta-se como hoje.
+ */
+export async function signProposalThumbs(paths: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const sb = getSupabase();
+  if (!sb || paths.length === 0) return out;
+  try {
+    const { data } = await sb.storage
+      .from(PROPOSAL_THUMB_BUCKET)
+      .createSignedUrls(paths, SIGNED_TTL);
+    for (const row of data ?? []) {
+      if (row?.path && row.signedUrl) out.set(row.path, row.signedUrl);
+    }
+  } catch {
+    /* sem miniaturas nesta instalação — a grelha cai para os originais */
+  }
+  return out;
 }

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { isAuthed } from "@/lib/admin-auth";
-import { uploadProposalImage, listProposalImages } from "@/lib/proposal-storage";
+import {
+  uploadProposalImage,
+  uploadProposalThumb,
+  listProposalImages,
+} from "@/lib/proposal-storage";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -63,8 +67,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Nenhuma imagem recebida." }, { status: 400 });
   }
 
-  const uploaded: { path: string; url: string }[] = [];
-  for (const file of files) {
+  // As miniaturas vêm num campo PARALELO, alinhado por índice com `files`. O
+  // browser já as fabrica na mesma descodificação que faz para encolher o
+  // original (ver `image-prep.ts`), portanto chegam aqui de borla.
+  //
+  // São OPCIONAIS de propósito: um cliente antigo, ou um browser onde a
+  // fabricação falhou, envia só o original e o carregamento corre na mesma —
+  // a grelha cai para o original, que é o comportamento de hoje.
+  const thumbs = form.getAll("thumbs").filter((f): f is File => f instanceof File);
+
+  const uploaded: { path: string; url: string; thumbUrl?: string }[] = [];
+  for (const [indice, file] of files.entries()) {
     if (!OK_TYPES.test(file.type)) {
       return NextResponse.json(
         { error: `Formato não suportado: ${file.name}. Use JPG, PNG ou WEBP.` },
@@ -101,7 +114,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       log.error("assets: upload falhou", null, { id, name: file.name });
       return NextResponse.json({ error: "Falha ao guardar a imagem." }, { status: 502 });
     }
-    uploaded.push(res);
+    // A miniatura só depois de o original estar guardado, e sempre em melhor
+    // esforço: falhar aqui não pode fazer falhar um carregamento que já correu
+    // bem. `uploadProposalThumb` nunca lança e devolve "" quando não dá.
+    const thumb = thumbs[indice];
+    let thumbUrl = "";
+    if (thumb && OK_TYPES.test(thumb.type) && thumb.size <= MAX_BYTES) {
+      thumbUrl = await uploadProposalThumb(
+        res.path,
+        Buffer.from(await thumb.arrayBuffer()),
+        thumb.type,
+      );
+    }
+    uploaded.push(thumbUrl ? { ...res, thumbUrl } : res);
   }
 
   return NextResponse.json({ ok: true, images: uploaded });
