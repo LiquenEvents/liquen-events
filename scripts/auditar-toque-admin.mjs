@@ -44,6 +44,10 @@
  */
 
 import { chromium } from "@playwright/test";
+// As regras e os limiares vivem num sítio só, partilhados com o passeio do
+// CI (`e2e/admin-mobile.spec.ts`). Duas cópias afastavam-se, e o relatório
+// passava a dizer uma coisa e o CI outra.
+import { AUDITOR, ECRA_ESTREITO } from "../e2e/ergonomia-tactil.mjs";
 import { existsSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -63,14 +67,6 @@ const CAPTURAS = (() => {
   return i >= 0 ? process.argv[i + 1] : null;
 })();
 
-/** iPhone SE — o mais estreito que ainda se usa a sério. */
-const ECRA = { width: 375, height: 667 };
-
-/** Os mínimos, e de onde vêm (ver cabeçalho). */
-const ALVO_MIN = 44;
-const ESPACO_MIN = 8;
-const LETRA_CAMPO_MIN = 16;
-
 /**
  * As vistas, pelo RÓTULO que aparece no menu — que nem sempre é o id: a vista
  * `contratos` chama-se "Propostas Aceites" no ecrã. É o rótulo que se clica,
@@ -88,200 +84,6 @@ const VISTAS = [
   "Organização de propostas",
   "Estatísticas",
 ];
-
-/**
- * O auditor que corre DENTRO da página.
- *
- * Escrito como string e injectado, para não depender de o Playwright
- * serializar closures. Devolve dados simples — a decisão fica no Node.
- */
-const AUDITOR = `(() => {
-  const ALVO_MIN = ${ALVO_MIN};
-  const ESPACO_MIN = ${ESPACO_MIN};
-  const LETRA_CAMPO_MIN = ${LETRA_CAMPO_MIN};
-
-  const SELECTOR_INTERACTIVO = [
-    "a[href]", "button", "input", "select", "textarea",
-    "[role=button]", "[role=link]", "[role=tab]", "[role=checkbox]",
-    "[role=switch]", "[role=menuitem]", "[role=option]", "[tabindex]:not([tabindex='-1'])",
-  ].join(",");
-
-  const CAMPOS = "input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea";
-
-  /** Visível = pintado, com área, e dentro do documento. */
-  function visivel(el) {
-    const cs = getComputedStyle(el);
-    if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") return false;
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) return false;
-    // FORA DO ECRÃ na horizontal. A gaveta de navegação fechada fica em
-    // \`x = -244\` — continua no DOM, com tamanho, e sem esta linha entrava em
-    // TODAS as vistas como se fosse conteúdo visível. Não se inventa aqui um
-    // limiar: só conta o que intersecta mesmo a largura do ecrã.
-    if (r.right <= 0 || r.left >= innerWidth) return false;
-    // Escondido por um antepassado (a gaveta fechada tem \`opacity:0\` no véu,
-    // e os grupos colapsados têm \`display:none\` no pai, não no filho).
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const cp = getComputedStyle(p);
-      if (cp.display === "none" || cp.visibility === "hidden") return false;
-    }
-    // Marcado como inerte para toque e para leitores de ecrã.
-    if (el.closest("[inert],[aria-hidden=true]")) return false;
-    return true;
-  }
-
-  /** Assinatura para depois procurar no código-fonte. */
-  function assinatura(el) {
-    const cls = typeof el.className === "string" ? el.className : "";
-    return {
-      tag: el.tagName.toLowerCase(),
-      tipo: el.getAttribute("type") || "",
-      papel: el.getAttribute("role") || "",
-      rotulo: (el.getAttribute("aria-label") || "").slice(0, 80),
-      texto: (el.textContent || "").trim().replace(/\\s+/g, " ").slice(0, 60),
-      classes: cls.slice(0, 400),
-      titulo: (el.getAttribute("title") || "").slice(0, 80),
-    };
-  }
-
-  const interactivos = Array.from(document.querySelectorAll(SELECTOR_INTERACTIVO)).filter(visivel);
-
-  // ── 1. Alvos pequenos ───────────────────────────────────────────────────
-  // Mede-se a caixa do próprio elemento. Um ícone de 20px dentro de um botão
-  // de 44px não é achado — o alvo é o botão.
-  /**
-   * A caixa em que se TOCA, que nem sempre é a do elemento.
-   *
-   * Um \`<input type=checkbox>\` de 16 px dentro de um \`<label>\` de 44 px tem um
-   * alvo de 44 px: o HTML manda o toque no rótulo activar o controlo. Medir o
-   * input dava um achado falso — e, pior, um achado que continuaria a aparecer
-   * depois de estar corrigido, porque a correcção é no rótulo.
-   */
-  function caixaDeToque(el) {
-    const r = el.getBoundingClientRect();
-    const rot = el.closest("label");
-    if (!rot || rot === el) return r;
-    const rr = rot.getBoundingClientRect();
-    // Só conta se o rótulo é mesmo o alvo — um rótulo que envolve meia linha de
-    // texto não faz do checkbox um alvo largo.
-    if (rr.width > 400 || rr.height > 120) return r;
-    return rr.width * rr.height > r.width * r.height ? rr : r;
-  }
-
-  const pequenos = [];
-  for (const el of interactivos) {
-    const r = caixaDeToque(el);
-    const l = Math.round(r.width), a = Math.round(r.height);
-    if (l >= ALVO_MIN && a >= ALVO_MIN) continue;
-    // Um link dentro de um parágrafo de texto corrido não é um "alvo" no
-    // sentido das guidelines — é palavra sublinhada. Distinguem-se porque o
-    // pai imediato tem mais texto do que o link.
-    if (el.tagName === "A") {
-      const pai = el.parentElement;
-      const textoPai = (pai?.textContent || "").trim();
-      const textoEl = (el.textContent || "").trim();
-      if (textoPai.length > textoEl.length + 20) continue;
-    }
-    pequenos.push({ ...assinatura(el), largura: l, altura: a, x: Math.round(r.x), y: Math.round(r.y) });
-  }
-
-  // ── 2. Alvos encostados ─────────────────────────────────────────────────
-  // Só entre pares que se veem ao mesmo tempo e que não estão um dentro do
-  // outro (um botão dentro de um cartão clicável não é um par colado).
-  const encostados = [];
-  for (let i = 0; i < interactivos.length; i++) {
-    for (let j = i + 1; j < interactivos.length; j++) {
-      const a = interactivos[i], b = interactivos[j];
-      if (a.contains(b) || b.contains(a)) continue;
-      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-      const dx = Math.max(0, Math.max(ra.left - rb.right, rb.left - ra.right));
-      const dy = Math.max(0, Math.max(ra.top - rb.bottom, rb.top - ra.bottom));
-      // Sobrepostos (ambos 0) são normalmente camadas, não vizinhos.
-      if (dx === 0 && dy === 0) continue;
-      const d = Math.round(Math.hypot(dx, dy));
-      if (d >= ESPACO_MIN) continue;
-      encostados.push({
-        distancia: d,
-        a: assinatura(a),
-        b: assinatura(b),
-      });
-    }
-  }
-
-  // ── 3. Campos que provocam zoom no iOS ──────────────────────────────────
-  const camposPequenos = [];
-  for (const el of Array.from(document.querySelectorAll(CAMPOS)).filter(visivel)) {
-    const px = parseFloat(getComputedStyle(el).fontSize);
-    if (px >= LETRA_CAMPO_MIN - 0.01) continue;
-    camposPequenos.push({ ...assinatura(el), fontSize: Math.round(px * 100) / 100 });
-  }
-
-  // ── 4. Scroll lateral ───────────────────────────────────────────────────
-  // ATENÇÃO: \`globals.css\` tem \`body { overflow-x: clip }\`. Isso faz com que
-  // \`scrollWidth\` NUNCA passe de \`clientWidth\` — o teste clássico
-  // (\`scrollWidth > clientWidth\`) está cego neste site e dá sempre verde. O que
-  // o clip faz é tirar a BARRA de scroll, não o conteúdo que sai fora: o que
-  // passa da margem fica CORTADO e inalcançável, que é pior do que poder
-  // arrastar até lá. Por isso o que se mede aqui é a margem direita de cada
-  // elemento, e não o scroll do documento.
-  const de = document.documentElement;
-  const overflow = {
-    scrollW: de.scrollWidth,
-    clientW: de.clientWidth,
-    clipado: getComputedStyle(document.body).overflowX,
-    culpados: [],
-  };
-  // Um antepassado com scroll próprio significa que o conteúdo largo é
-  // ARRASTÁVEL de propósito (uma tabela dentro de \`overflow-x-auto\`) — desenho,
-  // não defeito. \`clip\`/\`hidden\` não contam como "arrastável".
-  const temScrollProprio = (el) => {
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const ox = getComputedStyle(p).overflowX;
-      if (ox === "auto" || ox === "scroll") return true;
-    }
-    return false;
-  };
-  for (const el of document.querySelectorAll("body *")) {
-    const r = el.getBoundingClientRect();
-    if (r.right <= de.clientWidth + 1) continue;
-    if (r.width === 0 || r.height === 0) continue;
-    if (getComputedStyle(el).position === "fixed") continue;
-    if (temScrollProprio(el)) continue;
-    overflow.culpados.push({
-      ...assinatura(el),
-      direita: Math.round(r.right),
-      largura: Math.round(r.width),
-      corta: Math.round(r.right - de.clientWidth),
-    });
-    if (overflow.culpados.length >= 20) break;
-  }
-
-  // ── 5. Foco perdido fora do ecrã ────────────────────────────────────────
-  // A gaveta fechada fica em \`x = -244\`: continua no DOM, com tamanho. Se não
-  // estiver marcada \`inert\` (ou \`aria-hidden\`), o TAB do teclado externo e o
-  // varrimento do VoiceOver entram lá dentro e o foco desaparece do ecrã —
-  // fica-se a carregar em Tab às cegas. Contam-se os que se podem focar.
-  const foraDoEcra = [];
-  for (const el of document.querySelectorAll(SELECTOR_INTERACTIVO)) {
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) continue;
-    if (r.right > 0 && r.left < innerWidth) continue;
-    if (el.closest("[inert],[aria-hidden=true]")) continue;
-    if (el.hasAttribute("disabled")) continue;
-    if (el.tabIndex < 0) continue;
-    foraDoEcra.push({ ...assinatura(el), x: Math.round(r.x) });
-  }
-
-  return {
-    foraDoEcra,
-    examinados: interactivos.length,
-    campos: document.querySelectorAll(CAMPOS).length,
-    pequenos,
-    encostados,
-    camposPequenos,
-    overflow,
-  };
-})()`;
 
 /** ── Procurar a assinatura no código-fonte ────────────────────────────────
  * Usa `git grep -n` com uma string fixa (as classes Tailwind), o que é rápido
@@ -397,7 +199,7 @@ async function main() {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     storageState: SESSAO && existsSync(SESSAO) ? SESSAO : undefined,
-    viewport: ECRA,
+    viewport: ECRA_ESTREITO,
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,

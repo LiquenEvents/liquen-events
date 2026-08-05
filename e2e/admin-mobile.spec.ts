@@ -1,4 +1,13 @@
 import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
+import {
+  AUDITOR,
+  ECRA_ESTREITO,
+  ALVO_MIN,
+  LETRA_CAMPO_MIN,
+  descreverAlvo,
+  descreverCampo,
+  descreverCulpado,
+} from "./ergonomia-tactil.mjs";
 
 /**
  * Mobile back-office smoke test (~390px phone, touch).
@@ -12,7 +21,11 @@ import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
  * phone the sidebar is off-canvas. Read-only: never creates/edits/deletes data.
  */
 
-test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+// 375 px e não 390: o iPhone SE é o telemóvel mais estreito que ainda se usa a
+// sério, e é a largura em que tudo o que é apertado se parte primeiro.
+// `hasTouch` importa para além do gesto — é o que faz `(pointer: coarse)` ser
+// verdade, e é nessa media query que assentam os alvos de 44 px.
+test.use({ viewport: ECRA_ESTREITO, isMobile: true, hasTouch: true });
 
 const IGNORED_CONSOLE = [
   /Download the React DevTools/i,
@@ -55,15 +68,54 @@ async function login(page: Page): Promise<boolean> {
   }
 }
 
-/** Assert the document does not scroll sideways on this phone width. */
-async function expectNoHorizontalOverflow(page: Page, label: string) {
-  const { scrollW, clientW } = await page.evaluate(() => ({
-    scrollW: document.documentElement.scrollWidth,
-    clientW: document.documentElement.clientWidth,
-  }));
-  expect(scrollW, `Horizontal overflow on "${label}": ${scrollW} > ${clientW}`).toBeLessThanOrEqual(
-    clientW + 1,
+/**
+ * As três regras de ergonomia táctil, numa vista.
+ *
+ * O que se mede e porquê está escrito em `ergonomia-tactil.mjs`, que é o mesmo
+ * módulo que o varrimento `scripts/auditar-toque-admin.mjs` usa para produzir o
+ * relatório. Aqui só se transforma o resultado em falha de CI.
+ *
+ * Nota sobre o overflow: o teste clássico (`scrollWidth > clientWidth`) está
+ * CEGO neste site, porque `globals.css` tem `body { overflow-x: clip }` — o
+ * clip tira a barra de scroll e o número nunca cresce. Este é o teste que
+ * mede a margem direita de cada elemento, que é o que se quer saber: o que
+ * passa da margem fica cortado e inalcançável.
+ */
+async function expectErgonomiaTactil(page: Page, label: string) {
+  const r = (await page.evaluate(AUDITOR)) as {
+    examinados: number;
+    pequenos: Parameters<typeof descreverAlvo>[0][];
+    camposPequenos: Parameters<typeof descreverCampo>[0][];
+    overflow: { culpados: Parameters<typeof descreverCulpado>[0][] };
+  };
+
+  // A vista tem de ter sido mesmo desenhada — zero elementos interactivos quer
+  // dizer que se mediu um ecrã vazio, e três verdes falsos valem menos do que
+  // uma falha honesta.
+  expect(r.examinados, `"${label}": nada interactivo para medir — a vista montou?`).toBeGreaterThan(
+    0,
   );
+
+  expect(
+    r.pequenos,
+    `"${label}": ${r.pequenos.length} alvo(s) abaixo de ${ALVO_MIN}x${ALVO_MIN}px:\n` +
+      r.pequenos.map(descreverAlvo).join("\n"),
+  ).toEqual([]);
+
+  expect(
+    r.camposPequenos,
+    `"${label}": ${r.camposPequenos.length} campo(s) com letra < ${LETRA_CAMPO_MIN}px — ` +
+      `o Safari do iOS amplia a página ao focá-los e não desamplia:\n` +
+      r.camposPequenos.map(descreverCampo).join("\n"),
+  ).toEqual([]);
+
+  expect(
+    r.overflow.culpados,
+    `"${label}": ${r.overflow.culpados.length} elemento(s) para lá da margem direita a ` +
+      `${ECRA_ESTREITO.width}px. Ficam CORTADOS (o body tem overflow-x: clip), ` +
+      `portanto não há como chegar lá:\n` +
+      r.overflow.culpados.map(descreverCulpado).join("\n"),
+  ).toEqual([]);
 }
 
 // nav label → H1 heading. The five core items plus the "Mais" destinations whose
@@ -85,13 +137,25 @@ const VIEWS: { nav: RegExp; heading: RegExp }[] = [
 ];
 
 test.describe("Back office — mobile", () => {
-  test("phone: every view mounts, no horizontal overflow, no runtime errors", async ({ page }) => {
+  test("@movel phone: every view mounts, touch ergonomics hold, no runtime errors", async ({
+    page,
+  }) => {
     const errors = collectErrors(page);
     const loggedIn = await login(page);
-    test.skip(!loggedIn, "Admin login unavailable here (prod build without ADMIN_PASSWORD_HASH).");
+    // Fora do CI, uma máquina sem `ADMIN_PASSWORD_HASH` não consegue entrar e o
+    // passeio salta-se — é o que permite corrê-lo à mão sem montar nada. No CI
+    // o segredo ESTÁ definido (ver ci.yml), portanto não entrar é uma avaria,
+    // não uma condição do ambiente. Saltar em silêncio ali seria transformar
+    // esta rede num passo verde que nunca mede nada.
+    if (process.env.CI) {
+      expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
+        true,
+      );
+    } else {
+      test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    }
 
-    // On a phone the initial content must not already scroll sideways.
-    await expectNoHorizontalOverflow(page, "Visão Geral (initial)");
+    await expectErgonomiaTactil(page, "Visão Geral (inicial)");
 
     const errorBoundary = page.getByRole("heading", { name: /Ocorreu um erro inesperado/i });
 
@@ -114,7 +178,7 @@ test.describe("Back office — mobile", () => {
       await item.first().click();
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
-      await expectNoHorizontalOverflow(page, view.nav.source);
+      await expectErgonomiaTactil(page, view.nav.source);
     }
 
     expect(errors, `Unexpected runtime errors:\n${errors.join("\n")}`).toEqual([]);
