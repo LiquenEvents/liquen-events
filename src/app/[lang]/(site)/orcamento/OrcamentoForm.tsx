@@ -14,6 +14,7 @@ import { track } from "@/lib/track";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 import { lerClique, serializar } from "@/lib/ads/click-id";
 import { QUOTE_EVENT_OPTIONS } from "@/lib/orcamento/data";
+import { PONTOS_DECORACAO } from "@/lib/orcamento/decoracao";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -147,6 +148,12 @@ export default function OrcamentoForm({
   const [guestsFlexible, setGuestsFlexible] = useState(false);
   const [local, setLocal] = useState("");
   const [mensagem, setMensagem] = useState("");
+  // Pontos de decoração — só existem no casamento, e são sempre OPCIONAIS.
+  // Nunca entram na validação: quem não faz ideia do que quer segue em frente
+  // sem marcar nada, que é exactamente o estado em que muita gente chega.
+  const [decor, setDecor] = useState<string[]>([]);
+  const alternarDecor = (id: string) =>
+    setDecor((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,6 +213,7 @@ export default function OrcamentoForm({
       if (d.pessoas) setPessoas(d.pessoas);
       if (d.local) setLocal(d.local);
       if (d.mensagem) setMensagem(d.mensagem);
+      if (d.decor) setDecor(d.decor.split(",").filter(Boolean));
     } catch {
       /* localStorage indisponível — segue sem rascunho */
     }
@@ -251,6 +259,10 @@ export default function OrcamentoForm({
       pessoas,
       local,
       mensagem,
+      // Guardado como lista separada por vírgulas porque o rascunho inteiro é
+      // um `Record<string, string>` — e os identificadores do catálogo não
+      // têm vírgulas.
+      decor: decor.join(","),
     };
   }, [
     eventType,
@@ -263,6 +275,7 @@ export default function OrcamentoForm({
     guestsFlexible,
     local,
     mensagem,
+    decor,
   ]);
   // Once the quote is submitted the draft is intentionally cleared; block any
   // later lifecycle flush (the router.push unmount below) from resurrecting it.
@@ -296,6 +309,7 @@ export default function OrcamentoForm({
     guestsFlexible,
     local,
     mensagem,
+    decor,
     flushDraft,
   ]);
 
@@ -319,6 +333,10 @@ export default function OrcamentoForm({
   // One predicate per field, so the error text, the focus target and the
   // submit gate can never disagree about what "valid" means.
   const okTipo = eventType !== "";
+  // Os pontos de decoração são a linguagem do casamento — a cerimónia, o
+  // cocktail, o seating plan. Num aniversário ou num corporativo não querem
+  // dizer nada, por isso a secção nem chega a existir.
+  const ehCasamento = EVENT_TYPES.find((o) => o.label === eventType)?.eventType === "casamentos";
   const okNome = nome.trim().length >= 2;
   const okEmail = /\S+@\S+\.\S+/.test(email);
   // 9 digits is the Portuguese national number; an international one arrives
@@ -392,6 +410,11 @@ export default function OrcamentoForm({
       date: dateFlexible ? "" : data,
       guests: guestsFlexible ? 0 : Number(pessoas) || 0,
       location: local.trim(),
+      // Só viajam quando o pedido É um casamento. Sem esta guarda, marcar
+      // pontos e depois mudar de ideias para "Aniversário" enviava uma
+      // decoração de casamento agarrada a uma festa que não é uma — e a
+      // proposta nascia semeada com o que ninguém pediu.
+      decorPoints: opt?.eventType === "casamentos" ? decor : [],
       // Capture the "no fixed date yet" signal for the team (a high-value
       // early-stage lead segment) by folding it into the notes.
       notes: [
@@ -663,7 +686,7 @@ export default function OrcamentoForm({
                       aria-checked={active}
                       tabIndex={focusable ? 0 : -1}
                       onClick={() => setEventType(o.label)}
-                      className={`px-4 py-2 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
+                      className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                         active
                           ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
                           : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
@@ -680,6 +703,50 @@ export default function OrcamentoForm({
                 </p>
               )}
             </fieldset>
+
+            {/* Pontos de decoração — só no casamento.
+                Sem preços de propósito: uma lista com valores ao lado
+                transforma um pedido de casamento numa loja, e o preço destes
+                pontos depende sempre do espaço, da paleta e do número de
+                mesas. O que se pergunta aqui é ONDE querem decoração, não
+                quanto estão dispostos a pagar. */}
+            {ehCasamento && (
+              <fieldset className="group">
+                <legend id="of-decor-legend" className={labelCls}>
+                  {to.labelDecor}
+                </legend>
+                <p className="mt-2 mb-4 text-[12px] leading-relaxed text-foreground/50">
+                  {to.hintDecor}
+                </p>
+                <div
+                  role="group"
+                  aria-labelledby="of-decor-legend"
+                  className="flex flex-wrap gap-3"
+                >
+                  {PONTOS_DECORACAO.map((p) => {
+                    const active = decor.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          markStart();
+                          alternarDecor(p.id);
+                        }}
+                        className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
+                          active
+                            ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
+                            : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
+                        }`}
+                      >
+                        {locale.startsWith("en") ? p.en : p.pt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            )}
 
             {/* Data + Nº de pessoas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">

@@ -193,6 +193,59 @@ const renderStudio = () =>
     </ToastProvider>,
   );
 
+/**
+ * O CASO DA CATARINA MARTINS.
+ *
+ * A proposta saiu com cinco pontos de decoração; a resposta dela foi «pode me
+ * atualizar o orçamento apenas para» três, e o trabalho teve de ser refeito.
+ * Agora o casal escolhe no pedido — e o estúdio abre já com esses pontos.
+ *
+ * O teste que interessa não é o feliz: é o de baixo, que garante que quem NÃO
+ * escolheu nada continua a ver o estúdio de sempre, em vez de uma proposta
+ * inventada por mim.
+ */
+describe("pontos de decoração escolhidos no pedido", () => {
+  const comEscolhas = {
+    ...quote,
+    decorPoints: ["cocktail", "seating", "mesas"],
+  } as unknown as Quote;
+
+  const renderCom = (q: Quote) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={q} />
+      </ToastProvider>,
+    );
+
+  it("abre a proposta já com as linhas que o casal pediu", async () => {
+    renderCom(comEscolhas);
+    // As palavras são as do quadro "3. Orçamento Proposto" das propostas
+    // reais — o que o casal marcou e o que ela vê no estúdio têm de ser
+    // reconhecivelmente a mesma coisa.
+    expect(await screen.findAllByDisplayValue("Decoração Cocktail")).not.toHaveLength(0);
+    expect(screen.getAllByDisplayValue("Design Floral e Decoração Mesas")).not.toHaveLength(0);
+    expect(
+      screen.getAllByDisplayValue("Seating Plan e Decor Floral Seating Plan"),
+    ).not.toHaveLength(0);
+  });
+
+  it("não semeia o que o casal NÃO pediu", async () => {
+    renderCom(comEscolhas);
+    await screen.findAllByDisplayValue("Decoração Cocktail");
+    // A cerimónia e os complementos dos noivos foram exactamente os dois
+    // pontos que a Catarina mandou tirar. Não podem reaparecer sozinhos.
+    expect(screen.queryByDisplayValue("Decoração Cerimónia")).toBeNull();
+    expect(screen.queryByDisplayValue("Complementos dos Noivos")).toBeNull();
+  });
+
+  it("um pedido sem escolhas abre o estúdio como sempre abriu", async () => {
+    renderCom(quote);
+    // Um grupo vazio à espera de ser escrito — nada semeado.
+    const grupo = await screen.findByPlaceholderText("Decoração Floral de Casamento");
+    expect((grupo as HTMLInputElement).value).toBe("");
+  });
+});
+
 describe("mood board com mais fotos do que a página desenha", () => {
   it("marca AO MONTAR as fotos que não vão ser impressas", async () => {
     seedDraft(8);

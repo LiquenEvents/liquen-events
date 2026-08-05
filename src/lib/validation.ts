@@ -63,6 +63,17 @@ export const quoteFormSchema = z
     isMultiDay: z.boolean().optional(),
     packageTier: trimmed(30).optional(),
     addons: z.array(selectedAddonSchema).max(100).optional().default([]),
+    // Pontos de decoração escolhidos no formulário. TEM de estar declarado
+    // aqui pela mesma razão do `adClick`: o esquema faz `.strip()`, portanto
+    // um campo não declarado é descartado em silêncio — o casal escolhia, a
+    // rota aceitava, e as escolhas nunca chegavam à proposta.
+    //
+    // Guardados como identificadores livres e limitados (e não como um enum
+    // fechado) pela mesma razão que os outros campos de taxonomia: acrescentar
+    // um ponto ao catálogo não pode exigir uma alteração coordenada aqui, ou
+    // mais cedo ou mais tarde o formulário oferece algo que o servidor deita
+    // fora. O que não conhecemos é ignorado na leitura, em `pontosConhecidos`.
+    decorPoints: z.array(trimmed(40)).max(20).optional().default([]),
     budgetRange: trimmed(30).nullish(),
     urgency: trimmed(30).optional(),
     referralSource: trimmed(200).optional().default(""),

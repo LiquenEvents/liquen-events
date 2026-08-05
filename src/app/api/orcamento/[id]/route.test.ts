@@ -83,12 +83,16 @@ describe("GET /api/orcamento/[id] — PII protection", () => {
     // keys, so a new Quote field can never leak by accident. (JSON drops the
     // allowlisted-but-undefined ones, e.g. packageTier/eventName here.)
     expect(Object.keys(json).sort()).toEqual(
-      ["id", "submittedAt", "status", "guests", "date", "addons"].sort(),
+      ["id", "submittedAt", "status", "guests", "date", "addons", "decorPoints"].sort(),
     );
     expect(json.status).toBe("pendente");
     expect(json.guests).toBe(50);
     // Addons are trimmed to id/name/tier — no pricing internals.
     expect(json.addons).toEqual([{ id: "dj", name: "DJ", tier: "completo" }]);
+    // Os pontos de decoração são dados que a própria pessoa escreveu, e a
+    // página de confirmação precisa deles para os mostrar depois de um
+    // recarregamento. Um pedido antigo, sem escolhas, dá uma lista vazia.
+    expect(json.decorPoints).toEqual([]);
   });
 
   it("returns the full record to an authenticated admin", async () => {

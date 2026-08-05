@@ -16,6 +16,7 @@ import {
   MOOD_BOARD_MAX_IMAGES,
   type VatMode,
 } from "@/lib/proposal-doc";
+import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -163,13 +164,32 @@ function baseDoDoc(d: Partial<StudioDoc>): number | undefined {
   return m.base > 0 ? m.base : undefined;
 }
 
-function seedDefaults(d: StudioDoc, quotedPrice?: number): StudioDoc {
+function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
+  const quotedPrice = quote.quotedPrice;
+  // O que o casal marcou no pedido de orçamento. É a razão de ser desta
+  // funcionalidade: a proposta da Catarina Martins saiu com cinco pontos, ela
+  // pediu para refazer com três, e o trabalho teve de ser todo repetido. Se o
+  // casal já disse o que quer, a proposta abre com esses pontos e mais nenhum.
+  const linhas = linhasDeOrcamento(quote.decorPoints ?? []);
   let next = d;
   if (next.serviceGroups.length === 0) {
     next = {
       ...next,
-      serviceGroups: [{ letter: "a)", title: "", items: [{ label: "", desc: "" }] }],
+      serviceGroups: [
+        linhas.length > 0
+          ? {
+              letter: "a)",
+              title: "Decoração Floral e Decoração",
+              items: linhas.map((label) => ({ label, desc: "" })),
+            }
+          : { letter: "a)", title: "", items: [{ label: "", desc: "" }] },
+      ],
     };
+  }
+  // O quadro "3. Orçamento Proposto" com as mesmas linhas. Sem preços: o valor
+  // continua a ser um só, no total, tal como nas propostas dela.
+  if (next.budgetItems.length === 0 && linhas.length > 0) {
+    next = { ...next, budgetItems: [...linhas] };
   }
   // O valor vem do "Preço final (sem IVA)" do pedido, e é o mesmo número —
   // não há aqui um segundo. A condição `== null` que aqui estava era a origem
@@ -407,7 +427,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     // Só semeia defaults quando NÃO havia rascunho guardado — um rascunho
     // existente (mesmo sem grupos) nunca é sobrescrito.
     if (!hadDraft) {
-      setDoc((d) => seedDefaults(d, quote.quotedPrice));
+      setDoc((d) => seedDefaults(d, quote));
     }
 
     // O VALOR é a excepção, e de propósito: vem SEMPRE do pedido, haja rascunho
@@ -756,7 +776,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     void fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, { method: "DELETE" }).catch(() => {
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
     });
-    setDoc(seedDefaults(initialDoc(quote), quote.quotedPrice));
+    setDoc(seedDefaults(initialDoc(quote), quote));
     setTotalInput(
       typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
         ? String(quote.quotedPrice)

@@ -64,6 +64,13 @@ export interface QuoteFormData {
   isMultiDay: boolean;
   packageTier: PackageTier;
   addons: SelectedAddon[];
+  /**
+   * Pontos de decoração escolhidos pelo casal no pedido (ver
+   * `src/lib/orcamento/decoracao.ts`). Só aparece nos casamentos; vazio em
+   * todos os outros tipos de evento e em todos os pedidos anteriores a este
+   * campo existir — por isso é opcional e nunca se pode assumir presente.
+   */
+  decorPoints?: string[];
   budgetRange: BudgetRange | null;
   urgency: Urgency;
   notes: string;

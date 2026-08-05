@@ -110,6 +110,64 @@ describe("POST /api/orcamento", () => {
     expect(equipa.text).toMatch(/Referência: LIQ-/);
   });
 
+  /**
+   * O caso que deu origem a isto: a proposta da Catarina Martins saiu com
+   * cinco pontos de decoração, e a resposta dela foi «pode me atualizar o
+   * orçamento apenas para» três. Escolher no PEDIDO evita a ida e volta — mas
+   * só se a escolha sobreviver ao caminho todo até à equipa.
+   */
+  describe("pontos de decoração", () => {
+    const comDecor = {
+      ...validForm,
+      eventType: "casamentos",
+      decorPoints: ["cocktail", "seating", "mesas"],
+    };
+
+    it("chegam ao pedido gravado", async () => {
+      await POST(req("POST", { form: comDecor }));
+      expect(store.create).toHaveBeenCalledTimes(1);
+      // O duplo `as` é por causa do duplo do `createQuote`, declarado sem
+      // argumentos — o TypeScript não sabe que a rota lhe passa o pedido.
+      const [gravado] = store.create.mock.calls[0] as unknown as [{ decorPoints?: string[] }];
+      expect(gravado.decorPoints).toEqual(["cocktail", "seating", "mesas"]);
+    });
+
+    it("aparecem no email à equipa, na ordem do dia", async () => {
+      // É o que decide se vale a pena ligar já: um pedido só das mesas do
+      // jantar e um pedido da cerimónia inteira não são o mesmo trabalho.
+      await POST(req("POST", { form: comDecor }));
+      const equipa = sendMailMock.mock.calls[0][0];
+      expect(equipa.text ?? "").toContain("Decoração: Cocktail · Mesas do jantar · Seating plan");
+    });
+
+    it("são devolvidos ao casal no email de confirmação", async () => {
+      // A preocupação do João era o automático soar impessoal. Repetir de
+      // volta o que a pessoa escolheu é o que faz parecer que alguém leu.
+      await POST(req("POST", { form: comDecor }));
+      const cliente = sendMailMock.mock.calls[1][0];
+      expect(cliente.text ?? "").toContain("Cocktail");
+      expect(cliente.text ?? "").toContain("Seating plan");
+    });
+
+    it("um identificador inventado não passa para os emails", async () => {
+      await POST(req("POST", { form: { ...comDecor, decorPoints: ["<script>", "bar"] } }));
+      for (const [args] of sendMailMock.mock.calls) {
+        expect(args.html).not.toContain("<script>");
+        expect(args.text ?? "").not.toContain("<script>");
+      }
+      expect(sendMailMock.mock.calls[0][0].text ?? "").toContain("Decoração: Bar");
+    });
+
+    it("um pedido sem escolhas não ganha uma linha vazia", async () => {
+      // Quem não marcou nada não pode ver "Decoração:" seguido de nada — é
+      // pior do que não ter a linha.
+      await POST(req("POST", { form: validForm }));
+      for (const [args] of sendMailMock.mock.calls) {
+        expect(args.text ?? "").not.toMatch(/Decora[çc][ãa]o:\s*$/m);
+      }
+    });
+  });
+
   it("não mete o 'Como nos conheceu' no email", async () => {
     // Ela fotografou a linha `Como nos conheceu  ref:www.google.com` e pediu
     // para a tirar. O campo não é escrito por ninguém — é apanhado pelo

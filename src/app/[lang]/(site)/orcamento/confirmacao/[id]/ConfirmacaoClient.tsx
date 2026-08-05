@@ -20,6 +20,7 @@ import type { Dict } from "@/lib/i18n";
 import { daysUntil, isHighSeason, longDate } from "@/lib/workdays";
 import { track } from "@/lib/track";
 import { reportLeadConversion } from "@/lib/ads-conversion";
+import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { CONFIRMACAO_PHOTOS, type ConfirmacaoPhotoKey } from "./photos";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -314,6 +315,14 @@ export default function ConfirmacaoClient({
           note: !eventDate && openDate ? tc.openDateNote : undefined,
         },
         { label: tc.local, value: quote.location ?? "" },
+        {
+          // O mesmo resumo que vai no email. Se o casal escolheu os pontos de
+          // decoração, tem de os ver de volta nos dois sítios — ver uma coisa
+          // no ecrã e outra na caixa de correio é o que faz duvidar de que o
+          // pedido tenha chegado inteiro.
+          label: tc.decoracao,
+          value: rotularPontos(quote.decorPoints ?? [], locale).join(" · "),
+        },
       ].filter((d) => d.value)
     : [];
 
