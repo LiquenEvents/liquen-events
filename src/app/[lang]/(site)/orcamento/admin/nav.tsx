@@ -13,6 +13,7 @@ export type View =
   | "clientes"
   | "calendario"
   | "propostas"
+  | "fazer-proposta"
   | "tarefas"
   | "fornecedores"
   | "inventario"
@@ -38,7 +39,14 @@ export type View =
  * — the owner asked to hide them. Nothing about them was deleted: add an id
  * back to `NAV` (and to one of the arrays above) to surface it again.
  */
-export const CORE_NAV: View[] = ["overview", "pedidos", "propostas", "calendario", "tarefas"];
+export const CORE_NAV: View[] = [
+  "overview",
+  "pedidos",
+  "fazer-proposta",
+  "propostas",
+  "calendario",
+  "tarefas",
+];
 
 export const MORE_NAV: View[] = ["faturas", "contratos", "temas", "kanban", "estatisticas"];
 
@@ -112,6 +120,24 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <rect x="3" y="4" width="18" height="17" rx="2" />
         <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "fazer-proposta",
+    label: "Fazer proposta",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6" />
+        <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M17 14v6M14 17h6" strokeLinecap="round" />
       </svg>
     ),
   },

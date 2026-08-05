@@ -137,6 +137,7 @@ async function expectErgonomiaTactil(page: Page, label: string) {
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
+  { nav: /^Fazer proposta$/, heading: /^Fazer proposta$/ },
   { nav: /^Propostas$/, heading: /^Propostas$/ },
   { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },

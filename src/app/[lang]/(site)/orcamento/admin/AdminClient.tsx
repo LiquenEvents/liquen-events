@@ -54,6 +54,7 @@ import {
   StatsDashboard,
   ProposalBuilder,
   ProposalStudio,
+  FazerProposta,
   ProductionPlan,
   EmailTemplates,
   Faturas,
@@ -464,6 +465,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const quotesEtag = useRef<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
+  /** Pedido escolhido na vista "Fazer proposta".
+   *
+   *  Vive aqui e não dentro da vista porque a vista desmonta ao mudar de
+   *  ecrã: sem isto, ir ver o calendário a meio de escrever uma proposta
+   *  devolvia-a à lista de clientes ao voltar. (O conteúdo da proposta em si
+   *  não se perde — o estúdio grava rascunho —, mas ter de reescolher a
+   *  pessoa a cada volta era atrito puro.) */
+  const [propostaPara, setPropostaPara] = useState<string | null>(null);
   // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
   const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1329,6 +1338,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Clientes",
     calendario: "Calendário",
     propostas: "Propostas",
+    "fazer-proposta": "Fazer proposta",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
@@ -1348,6 +1358,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Histórico por cliente",
     calendario: "Os seus eventos no tempo",
     propostas: "Todas as propostas enviadas",
+    "fazer-proposta": "Escolha o cliente e escreva a proposta",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
@@ -1875,6 +1886,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "calendario" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Calendario quotes={activeQuotes} onOpen={openQuote} />
+            </div>
+          )}
+
+          {/* ── Fazer proposta ── */}
+          {view === "fazer-proposta" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <FazerProposta
+                quotes={activeQuotes}
+                selectedId={propostaPara}
+                onSelect={setPropostaPara}
+                onNovoPedido={() => setNewQuoteOpen(true)}
+                onSent={(q) => {
+                  setQuotes((prev) =>
+                    prev.map((x) => (x.id === q.id ? { ...x, status: "cotado" } : x)),
+                  );
+                  setSelected((prev) => (prev?.id === q.id ? { ...prev, status: "cotado" } : prev));
+                }}
+              />
             </div>
           )}
 
