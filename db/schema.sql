@@ -278,6 +278,35 @@ end $$;
 create index if not exists material_items_category_idx on public.material_items (category);
 create index if not exists material_items_kind_idx     on public.material_items (kind);
 
+-- ── Listas base de material (conjuntos reutilizáveis) ───────────
+-- "Essenciais de carrinha" (`is_default`) vai SEMPRE, em todos os eventos. As
+-- outras são criadas por tipo de montagem e entram por regra ou à mão.
+create table if not exists public.material_lists (
+  id          text primary key,
+  name        text not null,
+  is_default  boolean not null default false,
+  notes       text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create table if not exists public.material_list_items (
+  id          text primary key,
+  list_id     text not null references public.material_lists(id) on delete cascade,
+  -- `restrict` de propósito: apagar do catálogo um item que está em listas tem
+  -- de doer, senão as listas esvaziam-se sozinhas sem ninguém dar por isso.
+  item_id     text not null references public.material_items(id) on delete restrict,
+  qty         numeric not null default 1,
+  -- Escala com o número de convidados: 0.02 (=1/50) → um saco por cada 50 pax.
+  -- A conta é ceil(pax × qty_per_pax), nunca abaixo de `qty`.
+  qty_per_pax numeric,
+  critical    boolean not null default false,
+  position    integer not null default 0
+);
+
+create index if not exists material_list_items_list_idx
+  on public.material_list_items (list_id);
+
 -- ── Biblioteca de temas (fotos de inspiração reutilizáveis) ─────
 -- Só os METADADOS de cada tema ("Itália", "Terracotta"). As fotos vivem no
 -- bucket privado de Storage `theme-assets`, uma pasta por id de tema — a
@@ -495,6 +524,8 @@ alter table public.invoices    enable row level security;
 alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
 alter table public.material_items  enable row level security;
+alter table public.material_lists      enable row level security;
+alter table public.material_list_items enable row level security;
 alter table public.proposal_themes enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;

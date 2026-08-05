@@ -17,6 +17,8 @@ import { mapper as invoicesMapper, listInvoices } from "./invoices-store";
 import { mapper as contractsMapper, listContracts } from "./contracts-store";
 import { mapper as inventoryMapper, listItems } from "./inventory-store";
 import { mapper as materialMapper, listMaterial } from "./material-store";
+import { mapper as materialListMapper, listLists } from "./material-lists-store";
+import { mapper as materialListItemMapper, listAllListItems } from "./material-list-items-store";
 import { mapper as templatesMapper, listTemplates } from "./email-templates-store";
 import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
@@ -249,6 +251,26 @@ const materialSchema = z.looseObject({
   updatedAt: z.string().max(64),
 });
 
+const materialListSchema = z.looseObject({
+  id,
+  name: z.string().max(300),
+  isDefault: z.boolean().default(false),
+  createdAt: z.string().max(64),
+  updatedAt: z.string().max(64),
+});
+
+const materialListItemSchema = z.looseObject({
+  id,
+  listId: z.string().max(120),
+  itemId: z.string().max(120),
+  qty: z.number().min(0).max(1_000_000),
+  // Ausente = não escala com convidados. Um `.default(0)` aqui era inofensivo
+  // na conta (0 nunca ganha ao mínimo) mas mentia sobre a intenção da linha.
+  qtyPerPax: z.number().min(0).max(1_000_000).optional(),
+  critical: z.boolean().default(false),
+  position: z.number().default(0),
+});
+
 const templateSchema = z.looseObject({
   key: z.string().trim().min(1).max(120),
   name: z.string().max(300).default(""),
@@ -462,6 +484,27 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     schema: materialSchema,
     current: listMaterial,
     stamp: (i) => i.updatedAt,
+  }),
+  asTarget({
+    key: "materialLists",
+    label: "Listas de material",
+    table: materialListMapper.table,
+    mapper: materialListMapper,
+    schema: materialListSchema,
+    current: listLists,
+    stamp: (l) => l.updatedAt,
+    extraColumns: (l) => ({ created_at: l.createdAt }),
+  }),
+  asTarget({
+    key: "materialListItems",
+    label: "Linhas das listas de material",
+    table: materialListItemMapper.table,
+    mapper: materialListItemMapper,
+    schema: materialListItemSchema,
+    current: listAllListItems,
+    // As linhas não têm relógio próprio: pertencem à lista e vivem e morrem
+    // com ela. O carimbo da lista é o que interessa.
+    stamp: () => "",
   }),
   asTarget({
     key: "emailTemplates",

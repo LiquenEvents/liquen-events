@@ -111,6 +111,34 @@ vi.mock("@/lib/inventory-store", () =>
     PROP_CATEGORIES: ["Outro"],
   }),
 );
+// Material de logística: catálogo e listas base. Simulados como os outros —
+// sem isto, a auditoria só conseguia afirmar que a rota devolve 401, e não a
+// parte que interessa, que é NENHUMA escrita ter acontecido antes disso.
+vi.mock("@/lib/material-store", () =>
+  H.build("material-store", ["createMaterial", "deleteMaterial", "updateMaterial", "getMaterial"], {
+    listMaterial: H.afn("material-store.listMaterial", async () => []),
+  }),
+);
+vi.mock("@/lib/material-lists-store", () =>
+  H.build(
+    "material-lists-store",
+    [
+      "createList",
+      "updateList",
+      "deleteList",
+      "getList",
+      "addListItem",
+      "updateListItem",
+      "removeListItem",
+      "listItemsOf",
+      "duplicateList",
+    ],
+    {
+      listLists: H.afn("material-lists-store.listLists", async () => []),
+      listAllListItems: H.afn("material-lists-store.listAllListItems", async () => []),
+    },
+  ),
+);
 vi.mock("@/lib/invoices-store", () =>
   H.build("invoices-store", [
     "listInvoices",
@@ -352,6 +380,8 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // Escreve o catálogo todo de uma vez a partir de um CSV. Sem sessão, um
   // pedido só podia apagar meio inventário.
   { path: "./material/importar/route", methods: ["POST"] },
+  { path: "./material/listas/route", methods: ["GET", "POST"] },
+  { path: "./material/listas/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
   { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },

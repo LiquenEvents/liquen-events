@@ -11,7 +11,8 @@ import {
 import type { PlanoCsv } from "@/lib/material-csv";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { Button, Card, EmptyState, Field, Segmented, Toolbar } from "./ui";
+import MaterialListas from "./MaterialListas";
 import { useCachedList } from "./useCachedList";
 
 /**
@@ -109,6 +110,27 @@ function KindChip({ kind }: { kind: MaterialKind }) {
 }
 
 export default function Material() {
+  // Catálogo e listas são a mesma matéria vista de dois ângulos — o que existe,
+  // e o que costuma ir junto — por isso vivem no mesmo sítio em vez de
+  // ocuparem duas entradas do menu.
+  const [aba, setAba] = useState<"catalogo" | "listas">("catalogo");
+  return (
+    <Card>
+      <Segmented
+        ariaLabel="Catálogo ou listas base"
+        value={aba}
+        onChange={(v) => setAba(v as "catalogo" | "listas")}
+        options={[
+          { value: "catalogo", label: "Catálogo" },
+          { value: "listas", label: "Listas base" },
+        ]}
+      />
+      <div className="mt-5">{aba === "catalogo" ? <Catalogo /> : <MaterialListas />}</div>
+    </Card>
+  );
+}
+
+function Catalogo() {
   const { toast } = useToast();
   const {
     data: items = [],
@@ -361,7 +383,7 @@ export default function Material() {
   );
 
   return (
-    <Card>
+    <>
       <Toolbar>
         <input
           className="bo-input max-w-xs"
@@ -561,6 +583,6 @@ export default function Material() {
           )}
         </ul>
       )}
-    </Card>
+    </>
   );
 }
