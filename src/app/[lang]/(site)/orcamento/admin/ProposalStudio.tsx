@@ -17,6 +17,17 @@ import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import type { CampoAMudar } from "@/lib/proposal-copy";
+import {
+  adicionarLinha,
+  definirItem,
+  definirPreco,
+  desalinhamento,
+  linhasDe,
+  normalizarValor,
+  removerLinha,
+  somaDosItens,
+  asDuasFormas,
+} from "@/lib/proposal-budget";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -643,6 +654,12 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   // Split 30/70 sobre o BRUTO — o que o estúdio vê é o que será faturado.
   const money = resolveProposalMoney(doc);
   const split = splitThirtySeventy(money.gross);
+  // A soma das linhas e o desvio do total escrito à mão. Os dois vivem aqui em
+  // cima porque são lidos em três sítios: ao lado das linhas, no aviso junto ao
+  // total, e na barra fixa do fundo.
+  const soma = somaDosItens(doc);
+  const desvio = desalinhamento(doc, money.base);
+  const duasFormas = asDuasFormas(money.base, doc.vatRate ?? DEFAULT_VAT_RATE);
 
   // ── O preço mudou na Gestão do pedido: aparece aqui ─────────────────────
   // O outro sentido do mesmo número. Sem isto voltava a haver duas verdades:
@@ -1020,14 +1037,21 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }
 
   // ── Budget: decoracao (grouped) ──
+  // Tudo passa pelos ajudantes de `proposal-budget`: os nomes e os preços são
+  // dois arrays paralelos, e mexer num sem mexer no outro faz os preços
+  // deslizarem uma posição — o preço da cerimónia acabaria no ramo da noiva,
+  // sem nada a assinalar.
   function addBudgetItem() {
-    setDoc((d) => ({ ...d, budgetItems: [...d.budgetItems, ""] }));
+    setDoc((d) => adicionarLinha(d));
   }
   function updateBudgetItem(i: number, value: string) {
-    setDoc((d) => ({ ...d, budgetItems: d.budgetItems.map((v, j) => (j === i ? value : v)) }));
+    setDoc((d) => definirItem(d, i, value));
   }
   function removeBudgetItem(i: number) {
-    setDoc((d) => ({ ...d, budgetItems: d.budgetItems.filter((_, j) => j !== i) }));
+    setDoc((d) => removerLinha(d, i));
+  }
+  function updateBudgetPrice(i: number, texto: string) {
+    setDoc((d) => definirPreco(d, i, normalizarValor(texto)));
   }
 
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
@@ -1280,7 +1304,12 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       <StepNav step={step} onSelect={setStep} sent={sent} />
 
       {/* ══════════ PASSO 1 · Conteúdo ══════════ */}
-      <div hidden={step !== "conteudo"}>
+      {/* `pb-20`: a barra do fundo é `sticky`, e sem folga por baixo do
+          conteúdo ela desenha-se POR CIMA do último campo. Estava a tapar o
+          "Título interno" antes desta missão (ficou anotado na Fase 0) e, com
+          o total lá dentro, passou a tapar o "Valor (sem IVA)" — logo o campo
+          que a barra existe para acompanhar. */}
+      <div hidden={step !== "conteudo"} className="pb-20">
         {/* Template selector */}
         <div className="mb-4">
           <Segmented
@@ -1725,15 +1754,39 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           {isDeco ? (
             <>
               <div className="flex flex-col gap-2 mb-3">
-                {doc.budgetItems.map((it, i) => (
+                <p className="text-xs leading-relaxed text-foreground/50">
+                  Os preços por linha são <strong className="font-semibold">só para si</strong>:
+                  servem para somar e para avisar quando o total já não bate certo. O PDF continua a
+                  mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único, como
+                  nas suas propostas.
+                </p>
+                {linhasDe(doc).map((l, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <input
-                      className={INPUT_SM}
-                      value={it}
+                      className={`${INPUT_SM} flex-1`}
+                      value={l.item}
                       onChange={(e) => updateBudgetItem(i, e.target.value)}
                       placeholder="Decor Cerimónia"
                       aria-label="Item de orçamento"
                     />
+                    {/* A largura vai no invólucro e não no campo: `.bo-input`
+                        tem `width: 100%` escrito em CSS, que ganha a um
+                        `w-28` do Tailwind. Sem isto o preço comia a linha
+                        toda e o nome ficava numa caixa de trinta pixels — foi
+                        o que a captura de ecrã mostrou. */}
+                    <span className="w-28 shrink-0">
+                      <input
+                        className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                        defaultValue={l.preco === null ? "" : String(l.preco)}
+                        // `onBlur` e não `onChange`: normalizar a cada tecla
+                        // apagava o que ela estava a escrever a meio ("1." vira
+                        // 1, e o "500" seguinte já não tinha onde entrar).
+                        onBlur={(e) => updateBudgetPrice(i, e.target.value)}
+                        placeholder="900"
+                        inputMode="decimal"
+                        aria-label={`Preço de ${l.item || "linha sem nome"}`}
+                      />
+                    </span>
                     <button
                       type="button"
                       className={REMOVE_BTN}
@@ -1744,9 +1797,16 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                     </button>
                   </div>
                 ))}
-                <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
-                  + Adicionar item
-                </button>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
+                    + Adicionar item
+                  </button>
+                  {soma !== null && (
+                    <span className="text-xs text-foreground/55">
+                      Soma das linhas: <strong className="font-semibold">{eur(soma)}</strong>
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field
@@ -1886,7 +1946,34 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
               }}
               placeholder="3000"
               containerClassName={realce("totalAmount")}
+              hint={
+                desvio
+                  ? `Total manual — a soma das linhas é ${eur(desvio.soma)}`
+                  : soma !== null
+                    ? "Bate certo com a soma das linhas."
+                    : undefined
+              }
             />
+            {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
+                errado sem dar o gesto que o arruma é meio trabalho. */}
+            {desvio && (
+              <div className="sm:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+                <span className="text-xs text-foreground/70">
+                  O total está escrito à mão e difere da soma das linhas em{" "}
+                  <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
+                </span>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                  onClick={() => {
+                    confirmado("totalAmount");
+                    onTotalInput(String(desvio.soma));
+                  }}
+                >
+                  Usar {eur(desvio.soma)}
+                </button>
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <span className="bo-eyebrow">IVA</span>
               <Segmented
@@ -1902,6 +1989,38 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
                 «incluído» mostra já a soma. O valor acima é sempre sem IVA.
               </p>
+              {/* As duas leituras lado a lado, para ela ver o que o cliente vai
+                  ver antes de decidir. A escolhida fica marcada; a outra está
+                  lá para comparar, não para confundir. */}
+              {money.base > 0 && (
+                <div className="mt-1 grid grid-cols-2 gap-2 text-[11px]">
+                  {(["acrescer", "incluido"] as const).map((modo) => {
+                    const v = duasFormas[modo];
+                    const ativa = vatMode === modo;
+                    return (
+                      <div
+                        key={modo}
+                        className={`rounded-lg border px-2.5 py-2 ${
+                          ativa
+                            ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
+                            : "border-foreground/10 text-foreground/45"
+                        }`}
+                      >
+                        <span className="block font-medium">
+                          {modo === "acrescer" ? "+ IVA" : "IVA incluído"}
+                          {ativa && " · escolhido"}
+                        </span>
+                        <span className="mt-0.5 block">
+                          base {eur(v.base)} · IVA {eur(v.iva)}
+                        </span>
+                        <span className="block">
+                          o cliente paga <strong className="font-semibold">{eur(v.total)}</strong>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <Field
               label="Validade (dias)"
@@ -1993,11 +2112,36 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
       {/* Ação principal — muda conforme o passo, para haver sempre UMA próxima
           ação óbvia. */}
-      <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/95 px-1 py-3">
+      <div // `z-20` não é enfeite: sem ele os cartões das secções — que criam o seu
+        // próprio contexto de empilhamento — desenham-se POR CIMA desta barra, e o
+        // texto do total aparecia misturado com o do campo por baixo. Vê-se na
+        // captura de ecrã antes desta linha existir; nenhum teste apanhava.
+        className="sticky bottom-0 z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-3 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)]"
+      >
         {step === "conteudo" && (
           <>
-            <p className="mr-auto text-xs text-foreground/45">
-              Preencha o conteúdo e avance para pré-visualizar.
+            {/* O TOTAL SEMPRE À VISTA.
+                Palavras dela: «não quero fazer scroll para saber quanto vai a
+                proposta». O valor vive cinco ecrãs abaixo do sítio onde ela
+                está a escrever os serviços; aqui acompanha-a por toda a
+                página, e muda enquanto ela escreve. */}
+            <p className="mr-auto text-xs text-foreground/55">
+              {money.base > 0 ? (
+                <>
+                  <span className="text-foreground/45">Total</span>{" "}
+                  <strong className="font-semibold text-foreground/85">{eur(money.base)}</strong>{" "}
+                  <span className="text-foreground/45">
+                    sem IVA · o cliente paga {eur(money.gross)}
+                  </span>
+                  {desvio && (
+                    <span className="ml-2 rounded-full bg-[#c98a2e]/15 px-2 py-0.5 text-[10px] text-[#8a5d13]">
+                      soma das linhas: {eur(desvio.soma)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Preencha o conteúdo e avance para pré-visualizar."
+              )}
             </p>
             <Button
               variant="primary"

@@ -130,6 +130,77 @@ const renderStudio = () =>
  * escolheu nada continua a ver o estúdio de sempre, em vez de uma proposta
  * inventada por mim.
  */
+/**
+ * O ORÇAMENTO QUE SE SOMA SOZINHO.
+ *
+ * Palavras dela: «altero um item e esqueço-me de atualizar o total». O aviso
+ * existe para esse esquecimento ter voz.
+ */
+describe("total desalinhado da soma das linhas", () => {
+  function seedComPrecos(total: number) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia", "Decor Jantar"],
+        budgetAmounts: [900, 2350],
+        coverImages: ["", ""],
+        totalAmount: total,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+  }
+
+  it("mostra a soma das linhas ao lado do botão de acrescentar", async () => {
+    seedComPrecos(3250);
+    renderStudio();
+    // O `^` não é preciosismo: "Bate certo com a soma das linhas" também
+    // contém a frase, e sem a âncora o teste apanhava as duas.
+    expect(await screen.findByText(/^Soma das linhas:/)).toBeTruthy();
+  });
+
+  it("avisa quando o total escrito à mão já não bate certo", async () => {
+    seedComPrecos(4000);
+    renderStudio();
+    const aviso = await screen.findByText(/difere da soma das linhas/i);
+    expect(aviso.textContent).toMatch(/750/);
+  });
+
+  it("cala-se quando o total bate certo", async () => {
+    seedComPrecos(3250);
+    renderStudio();
+    await screen.findByText(/^Soma das linhas:/);
+    expect(screen.queryByText(/difere da soma das linhas/i)).toBeNull();
+  });
+
+  it("o botão do aviso arruma o total", async () => {
+    // Dizer que está errado sem dar o gesto que o corrige é meio trabalho.
+    seedComPrecos(4000);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Usar/ }));
+    expect(screen.queryByText(/difere da soma das linhas/i)).toBeNull();
+  });
+
+  it("mostra as duas leituras do IVA lado a lado", async () => {
+    // Para ela ver o que o cliente vai ver, antes de decidir.
+    seedComPrecos(3250);
+    renderStudio();
+    // A barra fixa do fundo também diz "o cliente paga", precedida de
+    // "sem IVA ·" — daí a âncora no início.
+    expect(await screen.findAllByText(/^o cliente paga/)).toHaveLength(2);
+  });
+});
+
 describe("pontos de decoração escolhidos no pedido", () => {
   const comEscolhas = {
     ...quote,
