@@ -18,6 +18,8 @@ import {
   BUCKET_FILE_SIZE_LIMIT,
   MAX_UPLOAD_TICKETS,
   PROPOSAL_THUMB_BUCKET,
+  signProposalPaths,
+  signProposalThumbs,
   type UploadTicket,
 } from "./proposal-storage";
 import { log } from "./logger";
@@ -1222,6 +1224,154 @@ export async function fetchThemeImageBytes(path: string): Promise<Buffer | null>
     log.error("theme-storage: download falhou", e, { path });
     return null;
   }
+}
+
+/**
+ * IMPORTAR UM LOTE de fotos da Biblioteca para uma proposta.
+ *
+ * ── O que isto arruma, e porquê importa mesmo com UMA foto ────────────────
+ * A versão anterior (`copyThemeImageToProposal`, ainda aqui em baixo) fazia
+ * QUATRO idas ao Storage por foto, uma a seguir à outra:
+ *
+ *     copiar a foto → assinar a foto → copiar a miniatura → assinar a miniatura
+ *
+ * Nenhuma delas move bytes pela rede — a cópia acontece dentro do Supabase —
+ * mas cada uma paga a latência até lá. Quatro esperas encadeadas são os
+ * segundos que se viam ao adicionar UMA foto, com a barra parada nos 0%.
+ *
+ * Duas observações mudam tudo:
+ *
+ *  1. **A foto e a miniatura são independentes.** Não há razão para a segunda
+ *     esperar pela primeira: vão as duas ao mesmo tempo.
+ *  2. **As assinaturas juntam-se.** `createSignedUrls` (plural) assina o lote
+ *     inteiro num pedido — é o que a grelha dos temas já faz há muito.
+ *
+ * O caminho crítico passa de 4 idas ENCADEADAS para 2, e — o que interessa —
+ * deixa de crescer com o número de fotos: 1 foto e 40 fotos custam as mesmas
+ * duas esperas.
+ *
+ *     antes:  4 × ceil(N/5) idas encadeadas      (N=1 → 4;  N=40 → 32)
+ *     depois: 2 idas encadeadas, sempre          (N=1 → 2;  N=40 → 2)
+ *
+ * ── O que se mantém, e é de propósito ─────────────────────────────────────
+ * · Continua a COPIAR em vez de referenciar. A proposta fica autónoma:
+ *   reorganizar ou limpar a Biblioteca nunca pode partir uma proposta já
+ *   enviada, e o gerador de PDF continua a resolver um bucket só.
+ * · A ORDEM é a que ela pediu. Cada cópia escreve na sua posição, nunca no
+ *   fim — a ordem por que se tocou nas fotos é a ordem por que saem no PDF.
+ * · Uma foto que falhe não leva as outras atrás: sai da lista e o seu caminho
+ *   é devolvido em `failed`, para o estúdio a poder manter seleccionada.
+ * · Uma miniatura que falhe não é avaria nenhuma: a foto entra na mesma e a
+ *   grelha cai para o original, como já fazia.
+ *
+ * @returns as cópias pela ordem pedida (sem os falhados) e a lista do que falhou.
+ */
+/** Fotos a copiar ao mesmo tempo. Cada uma são DUAS chamadas ao Storage (a
+ *  foto e a miniatura), portanto oito fotos são dezasseis chamadas em voo. */
+const COPIAS_EM_PARALELO = 8;
+
+export async function importarFotosDaBiblioteca(
+  themePaths: readonly string[],
+  quoteId: string,
+): Promise<{
+  images: { path: string; url: string; thumbUrl?: string }[];
+  failed: string[];
+}> {
+  const sb = getSupabase();
+  const safeQuoteId = quoteId.replace(/[^a-zA-Z0-9_-]/g, "");
+  const validos = themePaths.filter(isThemePath);
+  if (!sb || !safeQuoteId || validos.length === 0) {
+    return { images: [], failed: [...themePaths] };
+  }
+  if (!(await ensureProposalBucket())) return { images: [], failed: [...themePaths] };
+
+  /** O destino de cada foto, decidido AQUI para a ordem não depender de nada
+   *  que aconteça na rede. */
+  const destinos = validos.map((themePath) => ({
+    themePath,
+    dest: `${safeQuoteId}/${randomUUID()}.${extFor(contentTypeForPath(themePath))}`,
+  }));
+
+  // ── Ida 1: copiar tudo — fotos e miniaturas — ao mesmo tempo ────────────
+  const copiarFoto = async (d: (typeof destinos)[number]): Promise<boolean> => {
+    try {
+      const { error } = await sb.storage
+        .from(THEME_BUCKET)
+        .copy(d.themePath, d.dest, { destinationBucket: PROPOSAL_BUCKET });
+      if (!error) return true;
+      log.warn("theme-storage: cópia no Storage falhou, a descarregar", {
+        themePath: d.themePath,
+        erro: error.message,
+      });
+    } catch (e) {
+      log.error("theme-storage: cópia no Storage falhou", e, { themePath: d.themePath });
+    }
+    // Recurso: puxar os bytes e voltar a carregá-los. É lento (atravessa a
+    // função) e por isso fica ATRÁS de um aviso nos registos — se aparecer a
+    // sério, é ele que explica tudo o resto.
+    const bytes = await fetchThemeImageBytes(d.themePath);
+    if (!bytes) return false;
+    const carregada = await uploadProposalImage(quoteId, bytes, contentTypeForPath(d.themePath));
+    if (!carregada) return false;
+    // O recurso escolhe o seu próprio nome; a ordem mantém-se porque é a
+    // posição no array que manda, não o nome.
+    d.dest = carregada.path;
+    return true;
+  };
+
+  /** Melhor esforço: sem miniatura no tema não há nada a fazer, e não é erro. */
+  const copiarMiniatura = async (d: (typeof destinos)[number]): Promise<void> => {
+    try {
+      await sb.storage
+        .from(THEME_THUMB_BUCKET)
+        .copy(d.themePath, d.dest, { destinationBucket: PROPOSAL_THUMB_BUCKET });
+    } catch {
+      /* a foto entra na mesma; a grelha cai para o original */
+    }
+  };
+
+  // Com tecto: 40 fotos sem limite eram 80 chamadas ao Storage ao mesmo tempo,
+  // que é pedir para ser estrangulado. Oito de cada vez (16 chamadas em voo)
+  // mantém o ganho — o caminho crítico passa a ceil(N/8) + 1 idas em vez das
+  // 4×ceil(N/5) de antes — sem afogar o Supabase. Com UMA foto, que é o caso
+  // que doía, são duas idas e ponto final.
+  const ok = new Array<boolean>(destinos.length).fill(false);
+  let proxima = 0;
+  const trabalhador = async () => {
+    for (let i = proxima++; i < destinos.length; i = proxima++) {
+      const d = destinos[i];
+      // As duas cópias em paralelo — a miniatura não tem de esperar pela foto.
+      const [copiada] = await Promise.all([copiarFoto(d), copiarMiniatura(d)]);
+      ok[i] = copiada;
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(COPIAS_EM_PARALELO, destinos.length) }, trabalhador),
+  );
+
+  const entraram = destinos.filter((_, i) => ok[i]);
+  const failed = destinos.filter((_, i) => !ok[i]).map((d) => d.themePath);
+  if (entraram.length === 0) return { images: [], failed };
+
+  // ── Ida 2: assinar tudo, dois pedidos, em paralelo ──────────────────────
+  const caminhos = entraram.map((d) => d.dest);
+  const [urls, thumbs] = await Promise.all([
+    signProposalPaths(caminhos),
+    signProposalThumbs(caminhos),
+  ]);
+
+  const images = entraram
+    .map((d) => {
+      const url = urls.get(d.dest) ?? "";
+      const thumbUrl = thumbs.get(d.dest);
+      return { path: d.dest, url, ...(thumbUrl ? { thumbUrl } : {}) };
+    })
+    // Sem URL a foto é inútil para o estúdio — conta como falhada, com
+    // honestidade, em vez de aparecer como uma célula vazia.
+    .filter((im) => im.url);
+
+  const semUrl = entraram.filter((d) => !urls.get(d.dest)).map((d) => d.themePath);
+  return { images, failed: [...failed, ...semUrl] };
 }
 
 /**
