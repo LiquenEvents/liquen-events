@@ -224,6 +224,19 @@ const CENSO = `() => {
  * sai daqui é portanto o PISO: na vida real ainda há as fotos por cima.
  */
 async function construirPropostaReal(page) {
+  // COMEÇAR DE FACTO DO ZERO.
+  //
+  // Sem isto, a segunda passagem (o tablet) constrói por cima do rascunho que
+  // a primeira deixou, e o resultado é o dobro das linhas com ar de medição.
+  // Deu 59 campos e 8,4 ecrãs num sítio onde a proposta tem 42 e 5,12 — e o
+  // número saía com toda a confiança do mundo.
+  const limpar = page.getByRole("button", { name: /Limpar rascunho/ });
+  if (await limpar.isVisible().catch(() => false)) {
+    await limpar.click();
+    await page.waitForTimeout(1200);
+    await page.getByPlaceholder("Maria & Zé").waitFor({ timeout: 15000 });
+  }
+
   let cliques = 0;
   let escritos = 0;
   const clicar = async (loc) => {
