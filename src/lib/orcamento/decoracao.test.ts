@@ -23,6 +23,7 @@ describe("catálogo de pontos de decoração", () => {
       "cocktail",
       "mesas",
       "seating",
+      "papelaria",
       "bar",
       "bolo",
       "complementos",

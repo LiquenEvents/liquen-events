@@ -68,6 +68,20 @@ export const PONTOS_DECORACAO: PontoDecoracao[] = [
     linhaOrcamento: "Seating Plan e Decor Floral Seating Plan",
   },
   {
+    id: "papelaria",
+    pt: "Papelaria",
+    en: "Stationery",
+    // Menus, marcadores de lugar, números de mesa. Fica a seguir ao seating
+    // plan porque é onde se vê — as cartolinas do plano de mesa e os menus são
+    // a mesma família de trabalho.
+    //
+    // Não é um SÍTIO, ao contrário dos outros sete, e a pergunta da secção é
+    // «Onde quer decoração?». Fica assim de propósito: um item entre oito lê-se
+    // sem tropeço, e mudar a pergunta para caber neste caso tornava-a mais
+    // vaga para os outros sete.
+    linhaOrcamento: "Papelaria",
+  },
+  {
     id: "bar",
     pt: "Bar",
     en: "Bar",
