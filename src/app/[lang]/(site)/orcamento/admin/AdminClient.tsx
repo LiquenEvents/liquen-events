@@ -479,6 +479,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // is an inline sticky column. Only the overlay should behave as a dialog (focus
   // trap, aria-modal, scroll lock) — the inline panel must not trap focus.
   const [isDetailOverlay, setIsDetailOverlay] = useState(false);
+  /**
+   * A barra lateral está fora do ecrã (gaveta), e não encostada como coluna?
+   *
+   * Abaixo de `lg` a barra é uma gaveta que vive em `-translate-x-full` quando
+   * fechada: continua no DOM, com tamanho, apenas empurrada para fora. A partir
+   * de `lg` é uma coluna sempre visível. Sem saber em qual dos dois estamos não
+   * há como marcá-la inerte só no caso certo.
+   */
+  const [navEhGaveta, setNavEhGaveta] = useState(false);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
   // Focus trap for the mobile detail drawer — active only while it's the overlay.
@@ -694,6 +703,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       document.body.style.overflow = prev;
     };
   }, [navOpen]);
+
+  // A barra lateral é gaveta abaixo de `lg` (1024px) — o mesmo ponto de corte
+  // do `lg:sticky` / `lg:translate-x-0` que a desenha. Mesmo guarda do efeito
+  // abaixo: sem `matchMedia` (SSR / jsdom) fica em `false`, que é o estado
+  // seguro — nunca marca inerte uma barra que possa estar visível.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setNavEhGaveta(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // Track whether the detail panel is currently a modal overlay (below xl) so the
   // dialog/focus-trap behaviour is gated to that state. matchMedia may be absent
@@ -1361,7 +1383,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           }}
         />
         {/* ── Sidebar ── */}
+        {/* `inert` quando é gaveta E está fechada.
+            Sem isto, os 20 botões da gaveta fechada continuavam alcançáveis: o
+            `-translate-x-full` empurra-os para `x = -244` mas não os tira do
+            DOM, portanto o TAB de um teclado externo e o varrimento do
+            VoiceOver entravam lá dentro e o foco desaparecia do ecrã — ficava-se
+            a carregar em Tab às cegas. `inert` tira-os da ordem de foco e da
+            árvore de acessibilidade de uma vez.
+            As duas condições são precisas: a partir de `lg` a barra é uma
+            coluna sempre visível, e marcá-la inerte ali desligava a navegação
+            no portátil. */}
         <aside
+          inert={navEhGaveta && !navOpen}
           className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
             navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}

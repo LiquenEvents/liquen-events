@@ -106,8 +106,9 @@ jobs:
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
       # BLOQUEANTE. A ergonomia táctil do back office num iPhone SE (375 px,
-      # toque ligado): alvos de 44x44 px, campos com letra >= 16 px, e nada de
-      # conteúdo para lá da margem direita. As três regras e os limiares estão
+      # toque ligado): alvos de 44x44 px, campos com letra >= 16 px, nada de
+      # conteúdo para lá da margem direita, e nada de focável fora do ecrã. As
+      # quatro regras e os limiares estão
       # em e2e/ergonomia-tactil.mjs, partilhados com o varrimento que produz o
       # relatório (scripts/auditar-toque-admin.mjs), para o CI e o relatório
       # nunca discordarem.

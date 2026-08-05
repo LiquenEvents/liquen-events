@@ -22,7 +22,11 @@
  *   ao focar o campo, e não volta a desamplíar. É comportamento do sistema,
  *   não gosto.
  *
- * · Sem conteúdo para lá da margem direita a 375 px.
+ * · Sem conteúdo para lá da margem direita a 375 px. O que passa fica CORTADO
+ *   (o body tem `overflow-x: clip`), e não há como chegar lá.
+ *
+ * · Nada de focável fora do ecrã, a menos que se revele ao receber o foco — que
+ *   é o que distingue um defeito de um "Saltar para o conteúdo".
  */
 
 /** 375 px — o iPhone SE, o telemóvel mais estreito que ainda se usa a sério. */
@@ -187,14 +191,38 @@ export const AUDITOR = `(() => {
   // A gaveta fechada continua no DOM. Se não estiver \`inert\`, o TAB de um
   // teclado externo e o varrimento do VoiceOver entram lá dentro e o foco
   // desaparece do ecrã.
+  //
+  // Um "Saltar para o conteúdo" TAMBÉM vive fora do ecrã, e está certo: é a
+  // técnica normal de um skip link, que só aparece quando recebe o foco. A
+  // diferença entre o defeito e a técnica não é o elemento — é o que acontece
+  // ao FOCÁ-LO. Portanto é isso que se testa, em vez de tratar por nome os
+  // casos conhecidos: foca-se, mede-se outra vez, e só fica como achado o que
+  // continua fora do ecrã depois de ter o foco.
   const foraDoEcra = [];
+  const focoAntes = document.activeElement;
   for (const el of document.querySelectorAll(SELECTOR_INTERACTIVO)) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
     if (r.right > 0 && r.left < innerWidth) continue;
     if (el.closest("[inert],[aria-hidden=true]")) continue;
     if (el.hasAttribute("disabled") || el.tabIndex < 0) continue;
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      /* um elemento que nem sequer aceita foco não é problema de foco */
+    }
+    const depois = el.getBoundingClientRect();
+    const revelaSeAoFocar = depois.right > 0 && depois.left < innerWidth;
+    // Largar o foco JÁ. Um skip link revelado por \`:focus\` fica desenhado por
+    // cima do canto superior esquerdo e intercepta o toque seguinte — medir
+    // não pode deixar a página noutro estado do que a encontrou.
+    if (el.blur) el.blur();
+    if (revelaSeAoFocar) continue;
     foraDoEcra.push({ ...assinatura(el), x: Math.round(r.x) });
+  }
+  // Devolver o foco a quem o tinha, pela mesma razão.
+  if (focoAntes instanceof HTMLElement && focoAntes !== document.body) {
+    focoAntes.focus({ preventScroll: true });
   }
 
   return {

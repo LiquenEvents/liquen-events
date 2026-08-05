@@ -69,7 +69,7 @@ async function login(page: Page): Promise<boolean> {
 }
 
 /**
- * As três regras de ergonomia táctil, numa vista.
+ * As quatro regras de ergonomia táctil, numa vista.
  *
  * O que se mede e porquê está escrito em `ergonomia-tactil.mjs`, que é o mesmo
  * módulo que o varrimento `scripts/auditar-toque-admin.mjs` usa para produzir o
@@ -86,6 +86,7 @@ async function expectErgonomiaTactil(page: Page, label: string) {
     examinados: number;
     pequenos: Parameters<typeof descreverAlvo>[0][];
     camposPequenos: Parameters<typeof descreverCampo>[0][];
+    foraDoEcra: { x: number; rotulo: string; texto: string; tag: string }[];
     overflow: { culpados: Parameters<typeof descreverCulpado>[0][] };
   };
 
@@ -107,6 +108,16 @@ async function expectErgonomiaTactil(page: Page, label: string) {
     `"${label}": ${r.camposPequenos.length} campo(s) com letra < ${LETRA_CAMPO_MIN}px — ` +
       `o Safari do iOS amplia a página ao focá-los e não desamplia:\n` +
       r.camposPequenos.map(descreverCampo).join("\n"),
+  ).toEqual([]);
+
+  // Nada focável fora do ecrã. A gaveta fechada continua no DOM em `x = -244`;
+  // sem `inert`, o TAB de um teclado externo e o varrimento do VoiceOver entram
+  // lá dentro e o foco desaparece do ecrã.
+  expect(
+    r.foraDoEcra,
+    `"${label}": ${r.foraDoEcra.length} elemento(s) focáveis fora do ecrã — ` +
+      `o foco do teclado desaparece lá para dentro. Falta \`inert\`?\n` +
+      r.foraDoEcra.map((f) => `  x=${f.x}  "${f.rotulo || f.texto || f.tag}"`).join("\n"),
   ).toEqual([]);
 
   expect(
