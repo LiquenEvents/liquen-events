@@ -161,6 +161,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * O botão de adicionar.
+ *
+ * O rótulo passou a trazer a CONTAGEM ("Adicionar 5 fotos") — antes dizia
+ * sempre "Adicionar à proposta" e, ao lado do "Cancelar", lia-se como
+ * desactivado mesmo com fotos escolhidas. Os testes procuram os dois.
+ */
+const botaoAdicionar = () =>
+  screen.getByRole("button", { name: /^Adicionar (à proposta|\d+ fotos?)$/ });
+
 describe("ThemePicker", () => {
   it("trava a seleção nas 40 fotos e explica o limite", async () => {
     await openPicker(true);
@@ -215,7 +225,7 @@ describe("ThemePicker", () => {
     await openPicker(true);
 
     fireEvent.click(photo(1));
-    fireEvent.click(screen.getByRole("button", { name: "Adicionar à proposta" }));
+    fireEvent.click(botaoAdicionar());
 
     expect(await screen.findByText("Não foi possível copiar as fotos.")).toBeInTheDocument();
     // O diálogo continua de pé, com a seleção intacta, para se tentar de novo.
@@ -294,6 +304,35 @@ describe("ThemePicker", () => {
     expect(imgs()[0]).toHaveAttribute("loading", "eager");
     expect(imgs()[0]).toHaveAttribute("fetchpriority", "high");
     expect(imgs()[THEME_PAGE_SIZE - 1]).toHaveAttribute("loading", "lazy");
+  });
+
+  /**
+   * MUDAR DE TEMA NÃO PODE APAGAR O QUE JÁ FOI ESCOLHIDO.
+   *
+   * Antes apagava — o que obrigava a uma importação por tema e tornava
+   * impossível montar um mood board com fotos de dois sítios sem repetir o
+   * percurso todo. A seleção é um conjunto de CAMINHOS, por isso guardá-la
+   * entre temas não custa nada.
+   */
+  it("a seleção sobrevive à troca de tema", async () => {
+    route("GET /api/temas", () =>
+      ok([THEME, { ...THEME, id: "t2", name: "Itália", imageCount: 2 }]),
+    );
+    route("GET /api/temas/t2/imagens", () =>
+      ok({ ok: true, images: folder(2), total: 2, truncated: false }),
+    );
+    await openPicker(true);
+
+    fireEvent.click(photo(1));
+    fireEvent.click(photo(2));
+    expect(screen.getByText("2 selecionadas")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Itália/ }));
+    await waitFor(() => expect(cells()).toHaveLength(2));
+
+    // As duas do primeiro tema continuam contadas, e o botão diz quantas vão.
+    expect(screen.getByText("2 selecionadas")).toBeInTheDocument();
+    expect(botaoAdicionar()).toHaveAccessibleName("Adicionar 2 fotos");
   });
 
   it("a página seguinte chega antes de ela a pedir, e mudar de tema deita-a fora", async () => {
@@ -375,7 +414,7 @@ describe("ThemePicker", () => {
 
     await openPicker(true);
     for (let n = 1; n <= 10; n++) fireEvent.click(photo(n));
-    fireEvent.click(screen.getByRole("button", { name: "Adicionar à proposta" }));
+    fireEvent.click(botaoAdicionar());
 
     // Enquanto copia: barra de progresso real e um botão para parar.
     const bar = await screen.findByRole("progressbar", { name: "Progresso da importação" });
@@ -450,7 +489,7 @@ describe("ThemePicker", () => {
 
     await openPicker(true);
     fireEvent.click(photo(1));
-    fireEvent.click(screen.getByRole("button", { name: "Adicionar à proposta" }));
+    fireEvent.click(botaoAdicionar());
 
     // Continua a dizer que está a acontecer — o "Parar" só aparece a importar.
     expect(await screen.findByRole("button", { name: "Parar" })).toBeInTheDocument();
@@ -482,7 +521,7 @@ describe("ThemePicker", () => {
 
     await openPicker(true);
     fireEvent.click(photo(1));
-    fireEvent.click(screen.getByRole("button", { name: "Adicionar à proposta" }));
+    fireEvent.click(botaoAdicionar());
 
     fireEvent.click(await screen.findByRole("button", { name: "Parar" }));
 
@@ -501,7 +540,7 @@ describe("ThemePicker", () => {
     await openPicker(true);
 
     for (let n = 1; n <= 10; n++) fireEvent.click(photo(n));
-    fireEvent.click(screen.getByRole("button", { name: "Adicionar à proposta" }));
+    fireEvent.click(botaoAdicionar());
 
     expect(await screen.findByText("1 foto não entrou na proposta.")).toBeInTheDocument();
     // O diálogo fica aberto e a seleção passa a ser exatamente o que falhou.
