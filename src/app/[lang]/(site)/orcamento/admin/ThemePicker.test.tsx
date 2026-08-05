@@ -81,6 +81,13 @@ const TOTAL = MAX_IMPORT_BATCH + 1;
 
 const onClose = vi.fn();
 const onPicked = vi.fn();
+const onReserve = vi.fn();
+const onDropped = vi.fn();
+
+/** Todos os marcadores reservados, pela ordem por que o estúdio os recebeu. */
+function reservados(): { token: string; thumbUrl?: string; sourcePath: string }[] {
+  return onReserve.mock.calls.flatMap((c) => c[0]);
+}
 
 /**
  * O seletor como o estúdio o monta: aberto enquanto for preciso, DESMONTADO
@@ -100,6 +107,8 @@ function Host({ multiple, usedThemePaths }: { multiple: boolean; usedThemePaths?
         setOpen(false);
       }}
       onPicked={onPicked}
+      onReserve={onReserve}
+      onDropped={onDropped}
     />
   );
 }
@@ -143,6 +152,8 @@ function importCalls() {
 beforeEach(() => {
   onClose.mockReset();
   onPicked.mockReset();
+  onReserve.mockReset();
+  onDropped.mockReset();
   localStorage.clear();
   // A cache da biblioteca e os lotes em curso vivem no módulo: sem isto um
   // teste abria com as fotos do anterior.
@@ -357,6 +368,125 @@ describe("ThemePicker", () => {
     const falhada = await screen.findByRole("button", { name: "Foto 1 de 6 (não entrou)" });
     expect(falhada).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("1 selecionada")).toBeInTheDocument();
+  });
+
+  // ── O lugar guardado no instante do clique ───────────────────────────────
+  //
+  // O estúdio precisa de pôr a foto no mood board JÁ, e a cópia demora. O que
+  // sai daqui nesse instante é um MARCADOR por foto — `pending:<uuid>`, que
+  // não é caminho de coisa nenhuma —, e é ele que volta dentro da cópia
+  // confirmada para o estúdio saber que lugar trocar. Quem não pede reserva
+  // continua a receber só o `onPicked` de antes, a acrescentar.
+
+  it("reserva o lugar de cada foto no instante do clique e devolve-o com o caminho", async () => {
+    photos = folder(3);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const real = routes.get("POST /api/orcamento/LQ-001/assets/importar")!;
+    route("POST /api/orcamento/LQ-001/assets/importar", async (url, init) => {
+      await gate;
+      return real(url, init);
+    });
+
+    await openPicker(true);
+    fireEvent.click(photo(1));
+    fireEvent.click(photo(2));
+    fireEvent.click(photo(3));
+    fireEvent.click(addAndClose(3));
+
+    // Sem esperar por nada: os três lugares já estão guardados, com a
+    // miniatura que a grelha JÁ desenhou (nenhum pedido novo para a ver).
+    expect(onReserve).toHaveBeenCalledTimes(1);
+    const lugares = reservados();
+    expect(lugares).toHaveLength(3);
+    expect(lugares.map((r) => r.sourcePath)).toEqual([
+      "t1/foto-1.jpg",
+      "t1/foto-2.jpg",
+      "t1/foto-3.jpg",
+    ]);
+    expect(lugares[0].thumbUrl).toBe("https://cdn.test/t1-thumb-1.jpg");
+    // Marcadores, não caminhos — e todos diferentes.
+    expect(lugares.every((r) => r.token.startsWith("pending:"))).toBe(true);
+    expect(new Set(lugares.map((r) => r.token)).size).toBe(3);
+    expect(onPicked).not.toHaveBeenCalled();
+
+    // A cópia confirma e cada foto diz que lugar vem ocupar.
+    release();
+    await waitFor(() => expect(onPicked).toHaveBeenCalledTimes(1));
+    expect(onPicked.mock.calls[0][0]).toEqual(
+      lugares.map((r, i) =>
+        expect.objectContaining({
+          path: `LQ-001/copia-foto-${i + 1}.jpg`,
+          sourcePath: r.sourcePath,
+          token: r.token,
+        }),
+      ),
+    );
+    expect(onDropped).not.toHaveBeenCalled();
+  });
+
+  it("a foto que não entra devolve o lugar, e o Repetir guarda um lugar NOVO", async () => {
+    photos = folder(4);
+    flaky = new Set(["t1/foto-2.jpg"]);
+    await openPicker(true);
+
+    fireEvent.click(photo(1));
+    fireEvent.click(photo(2));
+    fireEvent.click(addAndClose(2));
+
+    const primeiros = reservados();
+    expect(primeiros).toHaveLength(2);
+
+    // A que falhou larga o lugar; a que entrou fica com o dela.
+    await waitFor(() => expect(onDropped).toHaveBeenCalledTimes(1));
+    expect(onDropped.mock.calls[0][0]).toEqual([primeiros[1].token]);
+    expect(onPicked.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ sourcePath: "t1/foto-1.jpg", token: primeiros[0].token }),
+    ]);
+
+    // À segunda vai — com um lugar NOVO, porque o anterior já saiu do documento.
+    flaky.clear();
+    fireEvent.click(await screen.findByRole("button", { name: "Repetir" }));
+    await waitFor(() => expect(onReserve).toHaveBeenCalledTimes(2));
+    const segundo = onReserve.mock.calls[1][0];
+    expect(segundo).toEqual([expect.objectContaining({ sourcePath: "t1/foto-2.jpg" })]);
+    expect(segundo[0].token).not.toBe(primeiros[1].token);
+    await waitFor(() =>
+      expect(onPicked.mock.calls.at(-1)?.[0]).toEqual([
+        expect.objectContaining({ sourcePath: "t1/foto-2.jpg", token: segundo[0].token }),
+      ]),
+    );
+  });
+
+  it("o Parar devolve os lugares das fotos que ficaram por copiar", async () => {
+    photos = folder(20);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const real = routes.get("POST /api/orcamento/LQ-001/assets/importar")!;
+    route("POST /api/orcamento/LQ-001/assets/importar", async (url, init) => {
+      await gate;
+      return real(url, init);
+    });
+
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: "Selecionar todas as visíveis" }));
+    fireEvent.click(addAndClose(20));
+    const lugares = reservados();
+    expect(lugares).toHaveLength(20);
+
+    fireEvent.click(screen.getByRole("button", { name: "Parar" }));
+    release();
+
+    // As 8 do lote que já ia a caminho entram; as outras 12 largam o lugar —
+    // um marcador que ninguém vai trocar não pode ficar no documento.
+    await waitFor(() => expect(onDropped).toHaveBeenCalled());
+    const largados = onDropped.mock.calls.flatMap((c) => c[0]);
+    await waitFor(() => expect(largados.length + onPicked.mock.calls[0][0].length).toBe(20));
+    expect(largados).toEqual(lugares.slice(8).map((r) => r.token));
   });
 
   it("num lote grande a pastilha mostra progresso — e o Parar guarda o que já entrou", async () => {

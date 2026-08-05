@@ -8,6 +8,9 @@ import {
   detectVatMode,
   parseMoneyText,
   normaliseCoverImages,
+  countPendingImages,
+  isPendingImage,
+  stripPendingImages,
   DEFAULT_VALID_DAYS,
   MOOD_BOARD_MAX_IMAGES,
   type VatMode,
@@ -15,7 +18,7 @@ import {
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
-import ThemePicker, { type ImportedImage } from "./ThemePicker";
+import ThemePicker, { type ImportedImage, type ReservedImage } from "./ThemePicker";
 import ServicesEditor, { MoveBtns } from "./ServicesEditor";
 import { Button, Card, Field, Segmented } from "./ui";
 
@@ -149,6 +152,46 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const copy = arr.slice();
   [copy[i], copy[j]] = [copy[j], copy[i]];
   return copy;
+}
+
+/**
+ * Reescreve TODAS as posições de foto do documento (capas + mood boards) com
+ * `f`, que devolve o caminho novo ou `null` para a foto sair.
+ *
+ * Um só sítio a andar por dentro do documento à procura de fotos, porque as
+ * duas operações do estado provisório — trocar o marcador pelo caminho
+ * definitivo e tirar o marcador que ficou sem foto — têm de tratar os DOIS
+ * sítios da mesma maneira, e falhar um deles deixaria um `pending:` para trás.
+ *
+ * Numa capa, "sair" é ficar `""` e NÃO encolher o array: é a posição que decide
+ * o lado onde a foto é impressa. Num mood board é ordem, e sai mesmo.
+ *
+ * Devolve o mesmo objeto quando nada muda — uma entrega que já não encontra o
+ * seu lugar (a foto foi removida à mão entretanto) não pode marcar o rascunho
+ * como alterado.
+ */
+function mapImagePaths(d: StudioDoc, f: (path: string) => string | null): StudioDoc {
+  let changed = false;
+  const cover = normaliseCoverImages(d.coverImages).map((p) => {
+    if (!p) return p;
+    const next = f(p);
+    if (next === p) return p;
+    changed = true;
+    return next ?? "";
+  });
+  const boards = d.moodBoards.map((b) => {
+    let touched = false;
+    const images: string[] = [];
+    for (const p of b.images) {
+      const next = f(p);
+      if (next !== p) touched = true;
+      if (next !== null) images.push(next);
+    }
+    if (!touched) return b;
+    changed = true;
+    return { ...b, images };
+  });
+  return changed ? { ...d, coverImages: cover, moodBoards: boards } : d;
 }
 
 // ── O que o PDF não leva ──
@@ -288,7 +331,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           // na posição da direita.
           setDoc((d) => {
             const merged = { ...d, ...parsed };
-            return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
+            // `stripPendingImages` também aqui: gravar já os filtra, mas um
+            // rascunho escrito por uma versão anterior (ou por outra aba) não
+            // pode fazer aparecer no ecrã um caminho que nunca vai existir.
+            return stripPendingImages({
+              ...merged,
+              coverImages: normaliseCoverImages(merged.coverImages),
+            });
           });
           if (typeof parsed.totalAmount === "number") setTotalInput(String(parsed.totalAmount));
         }
@@ -348,7 +397,10 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         if (localStamp > Date.parse(draft.updatedAt ?? 0)) return;
         setDoc((d) => {
           const merged = { ...d, ...(draft.doc as Partial<StudioDoc>) };
-          return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
+          return stripPendingImages({
+            ...merged,
+            coverImages: normaliseCoverImages(merged.coverImages),
+          });
         });
         const amount = (draft.doc as { totalAmount?: unknown }).totalAmount;
         if (typeof amount === "number") setTotalInput(String(amount));
@@ -412,12 +464,30 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   useEffect(() => {
     if (!hydrated.current) return;
     const save = () => {
+      // NADA DE MARCADORES PROVISÓRIOS NO RASCUNHO GRAVADO.
+      //
+      // Um `pending:<uuid>` é uma promessa viva na memória desta aba: a cópia
+      // que lhe vai dar morada corre aqui, e mais ninguém a conhece. Gravado,
+      // sobreviveria ao recarregar da página como um caminho que nunca vai
+      // existir — uma foto fantasma no mood board, e um buraco silencioso no
+      // PDF que ninguém volta a saber explicar. Sai do documento e sai também
+      // dos mapas de apoio, que são gravados ao lado dele.
+      const gravavel = stripPendingImages(doc);
+      const semProvisorios = <T,>(mapa: Record<string, T>): Record<string, T> => {
+        const out: Record<string, T> = {};
+        for (const [k, v] of Object.entries(mapa)) if (!isPendingImage(k)) out[k] = v;
+        return out;
+      };
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(gravavel));
         localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
         localStorage.setItem(
           SIDE_KEY,
-          JSON.stringify({ urls: assetUrls, themeOrigins, refEdited }),
+          JSON.stringify({
+            urls: semProvisorios(assetUrls),
+            themeOrigins: semProvisorios(themeOrigins),
+            refEdited,
+          }),
         );
       } catch {
         /* quota / unavailable — non-fatal */
@@ -430,7 +500,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           const res = await fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ doc, baseUpdatedAt: serverStamp.current }),
+            body: JSON.stringify({ doc: gravavel, baseUpdatedAt: serverStamp.current }),
           });
           if (!res.ok) return;
           const data = await res.json().catch(() => null);
@@ -664,36 +734,115 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     return sources;
   }, [picker, doc.coverImages, doc.moodBoards, themeOrigins]);
 
+  /**
+   * O INSTANTE DO CLIQUE — a foto ocupa já o seu lugar.
+   *
+   * O seletor entrega um marcador por foto (`pending:<uuid>`), que não é
+   * caminho de coisa nenhuma, e a miniatura que ele JÁ tem desenhada em
+   * memória. O marcador entra no documento no sítio para onde o seletor foi
+   * aberto e o `assetUrls` aponta-o a essa miniatura: a foto aparece no mood
+   * board (ou na capa) sem um único pedido de rede novo, na célula certa e com
+   * o mesmo `aspect-ratio` das outras — nada salta quando ela assentar.
+   *
+   * A origem entra AQUI e não só na confirmação: uma foto a caminho já conta
+   * como "já nesta proposta" (ver `usedThemePaths`), senão dava para a escolher
+   * outra vez enquanto a primeira cópia ainda ia a caminho.
+   */
+  function onReservedFromLibrary(reservas: ReservedImage[]) {
+    if (reservas.length === 0) return;
+    setAssetUrls((prev) => {
+      const next = { ...prev };
+      for (const r of reservas) if (r.thumbUrl) next[r.token] = r.thumbUrl;
+      return next;
+    });
+    setThemeOrigins((prev) => {
+      const next = { ...prev };
+      for (const r of reservas) if (r.sourcePath) next[r.token] = r.sourcePath;
+      return next;
+    });
+    if (picker?.kind === "board") {
+      addBoardImages(
+        picker.bi,
+        reservas.map((r) => r.token),
+      );
+    } else if (picker?.kind === "cover") {
+      setCoverAt(picker.idx, reservas[0].token);
+    }
+  }
+
   // As fotos escolhidas já vêm COPIADAS para a pasta desta proposta pela rota
   // /assets/importar, com os mesmos `path` que um carregamento manual daria —
   // por isso entram no rascunho exatamente pelo mesmo caminho.
   //
   // O seletor entrega as fotos LOTE A LOTE (é assim que a barra de progresso
-  // pode ser verdadeira), por isso isto corre várias vezes por importação —
-  // tudo o que faz é acrescentar, nunca substituir.
+  // pode ser verdadeira), por isso isto corre várias vezes por importação.
+  //
+  // Cada foto que traz o seu `token` é uma TROCA NO LUGAR: o marcador provisório
+  // dá lugar ao caminho definitivo na mesma célula, sem reordenar nada. As que
+  // vêm sem `token` — quem não reservou lugar, ou um lote que o servidor não
+  // deixou emparelhar com segurança — são acrescentadas, como sempre foram.
+  //
+  // Um marcador que já não esteja no documento (ela removeu a foto enquanto a
+  // cópia ia a caminho) não volta a entrar: a decisão dela é mais recente.
   function onPickedFromLibrary(images: ImportedImage[]) {
     if (images.length === 0) return;
+    const trocas = new Map<string, string>();
+    const novas: ImportedImage[] = [];
+    for (const im of images) {
+      if (!im.path) continue;
+      if (im.token) trocas.set(im.token, im.path);
+      else novas.push(im);
+    }
     setAssetUrls((prev) => {
       const next = { ...prev };
       // A miniatura do TEMA viaja com a foto na cópia (ver
       // `copiarMiniaturaParaProposta`), portanto uma foto escolhida da
       // Biblioteca chega à grelha já leve.
       for (const im of images) if (im.path && im.url) next[im.path] = im.thumbUrl || im.url;
+      for (const token of trocas.keys()) delete next[token];
       return next;
     });
     setThemeOrigins((prev) => {
       const next = { ...prev };
       for (const im of images) if (im.path && im.sourcePath) next[im.path] = im.sourcePath;
+      for (const token of trocas.keys()) delete next[token];
       return next;
     });
+    if (trocas.size > 0) {
+      setDoc((d) => mapImagePaths(d, (p) => trocas.get(p) ?? p));
+    }
+    if (novas.length === 0) return;
     if (picker?.kind === "board") {
       addBoardImages(
         picker.bi,
-        images.map((im) => im.path),
+        novas.map((im) => im.path),
       );
     } else if (picker?.kind === "cover") {
-      setCoverAt(picker.idx, images[0].path);
+      setCoverAt(picker.idx, novas[0].path);
     }
+  }
+
+  /**
+   * A cópia falhou (ou foi parada): o lugar reservado desaparece.
+   *
+   * SEM AVISO NENHUM daqui — a pastilha do seletor já diz quantas não entraram,
+   * porquê, e oferece "Repetir". Um segundo aviso a dizer o mesmo só ensinaria
+   * a ignorar os dois.
+   */
+  function onDroppedFromLibrary(tokens: string[]) {
+    if (tokens.length === 0) return;
+    const perdidos = new Set(tokens);
+    setDoc((d) => mapImagePaths(d, (p) => (perdidos.has(p) ? null : p)));
+    setAssetUrls((prev) => {
+      const next = { ...prev };
+      for (const t of tokens) delete next[t];
+      return next;
+    });
+    setThemeOrigins((prev) => {
+      const next = { ...prev };
+      for (const t of tokens) delete next[t];
+      return next;
+    });
   }
 
   // ── Serviços ──
@@ -859,6 +1008,23 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   // ── Actions ──
+  //
+  // ── FOTOS POR CONFIRMAR ──
+  //
+  // O documento que sai daqui NUNCA leva marcadores provisórios: o gerador não
+  // os sabe ir buscar e o resultado seria uma foto a menos, em silêncio, no PDF
+  // do cliente. `stripPendingImages` é a fronteira.
+  //
+  // Filtrar sozinho não chega — seria enviar com buracos e calar. Por isso:
+  //
+  //  · PRÉ-VISUALIZAR gera à mesma, sem elas, e DIZ-LO. É um PDF para ela ver,
+  //    volta a gerar-se daqui a dez segundos, e travar aqui só a impedia de ir
+  //    ver o resto da proposta enquanto as fotos assentam.
+  //
+  //  · ENVIAR ESPERA. É o gesto irreversível: o email sai uma vez e o noivo lê
+  //    o que lhe chegou. A cópia demora segundos; um PDF sem a foto que ela
+  //    escolheu dura para sempre. O botão fica desligado enquanto houver fotos
+  //    a caminho, com a razão escrita ao lado, e volta sozinho quando assentam.
   async function preview() {
     if (busy) return;
     setBusy("preview");
@@ -866,7 +1032,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "preview", doc }),
+        body: JSON.stringify({ mode: "preview", doc: stripPendingImages(doc) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
@@ -894,6 +1060,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
       const aviso = avisoDeConteudoIncompleto(emFalta, cortes);
       if (aviso) {
         toast(`PDF gerado, mas ${aviso}. Verifique antes de enviar.`, "error");
+      } else if (porConfirmar > 0) {
+        toast(
+          porConfirmar === 1
+            ? "PDF gerado sem 1 foto que ainda está a entrar na proposta. Gere outra vez daqui a pouco."
+            : `PDF gerado sem ${porConfirmar} fotos que ainda estão a entrar na proposta. Gere outra vez daqui a pouco.`,
+          "info",
+        );
       } else {
         toast("Pré-visualização gerada (PDF descarregado)", "success");
       }
@@ -906,13 +1079,27 @@ export default function ProposalStudio({ quote, onSent }: Props) {
 
   async function send() {
     if (busy) return;
+    // A trava do envio é o `canSend` (o botão nem chega a estar ligado), mas
+    // repete-se aqui: entre carregar em "Enviar" e carregar em "Confirmar" pode
+    // ter entrado outro lote de fotos, e o segundo clique não pode ser o que
+    // manda a proposta sem elas.
+    if (porConfirmar > 0) {
+      toast(
+        porConfirmar === 1
+          ? "Ainda há 1 foto a entrar na proposta. Assim que assentar, o envio fica disponível."
+          : `Ainda há ${porConfirmar} fotos a entrar na proposta. Assim que assentarem, o envio fica disponível.`,
+        "info",
+      );
+      setConfirmSend(false);
+      return;
+    }
     setBusy("send");
     setConfirmSend(false);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "send", doc }),
+        body: JSON.stringify({ mode: "send", doc: stripPendingImages(doc) }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
@@ -943,9 +1130,13 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }
 
   const isDeco = doc.template !== "organizacao";
+  /** Fotos que ocupam já o seu lugar no documento mas ainda não têm caminho. */
+  const porConfirmar = countPendingImages(doc);
   // Também exige um total > 0: uma proposta a €0 seria enviada e poluiria os
   // indicadores (total enviado, taxa de aceitação) com um negócio vazio.
-  const canSend = !!doc.ref.trim() && !!doc.clientNames.trim() && money.gross > 0;
+  // E exige que não haja fotos a caminho: ver a nota em «FOTOS POR CONFIRMAR».
+  const canSend =
+    !!doc.ref.trim() && !!doc.clientNames.trim() && money.gross > 0 && porConfirmar === 0;
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -1078,6 +1269,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                       url={assetUrls[path]}
                       onRemove={() => removeCoverAt(idx)}
                       className="aspect-[4/3]"
+                      pendente={isPendingImage(path)}
                     />
                   ) : (
                     <>
@@ -1177,11 +1369,17 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {b.images.map((path, ii) => (
                       <Thumb
-                        key={`${path}-${ii}`}
+                        // A chave é a POSIÇÃO na colagem, não o caminho: quando
+                        // uma foto provisória assenta, o caminho muda e a chave
+                        // pelo caminho desmontava a célula para montar outra
+                        // igual — a foto piscava e o lugar chegava a saltar. A
+                        // célula é o lugar; o que muda lá dentro é a morada.
+                        key={ii}
                         url={assetUrls[path]}
                         onRemove={() => removeBoardImage(bi, path)}
                         className="aspect-square"
                         foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
+                        pendente={isPendingImage(path)}
                       />
                     ))}
                     <UploadArea
@@ -1527,7 +1725,25 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                 />
                 <SummaryRow label="Sinal 30%" value={money.gross > 0 ? eur(split.sinal) : "—"} />
               </dl>
-              {!canSend && (
+              {/* As fotos a caminho têm a sua própria linha, e não a genérica
+                  dos campos por preencher: aqui não há nada a fazer senão
+                  esperar uns segundos — dizer-lhe para "preencher" seria
+                  mandá-la procurar um campo que está bem. */}
+              {porConfirmar > 0 && (
+                <p
+                  aria-live="polite"
+                  className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]"
+                >
+                  <span aria-hidden="true">⏳</span>
+                  <span>
+                    {porConfirmar === 1
+                      ? "1 foto ainda está a entrar na proposta."
+                      : `${porConfirmar} fotos ainda estão a entrar na proposta.`}{" "}
+                    O envio fica disponível mal ela assente — assim a proposta segue completa.
+                  </span>
+                </p>
+              )}
+              {!canSend && porConfirmar === 0 && (
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
                   <span aria-hidden="true">⚠</span>
                   <span>
@@ -1613,7 +1829,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                 title={
                   canSend
                     ? undefined
-                    : "Preencha clientes, referência e um total maior que 0 antes de enviar."
+                    : porConfirmar > 0
+                      ? "Há fotos ainda a entrar na proposta. Falta pouco."
+                      : "Preencha clientes, referência e um total maior que 0 antes de enviar."
                 }
                 iconRight={<span aria-hidden="true">→</span>}
                 className="ml-auto"
@@ -1638,6 +1856,8 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           usedThemePaths={usedThemePaths}
           onClose={() => setPicker(null)}
           onPicked={onPickedFromLibrary}
+          onReserve={onReservedFromLibrary}
+          onDropped={onDroppedFromLibrary}
         />
       )}
     </div>
@@ -1713,10 +1933,15 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 }
 
 /** Miniatura só de leitura (sem botão de remover) para o resumo. */
-function PreviewThumb({ url }: { url?: string }) {
+function PreviewThumb({ url, pendente = false }: { url?: string; pendente?: boolean }) {
   const [failed, setFailed] = useState(false);
   return (
-    <div className="aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]">
+    <div
+      aria-busy={pendente || undefined}
+      className={`aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${
+        pendente ? "opacity-45" : ""
+      }`}
+    >
       {url && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -1756,6 +1981,7 @@ function PreviewSummary({
   split: ReturnType<typeof splitThirtySeventy>;
 }) {
   const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
+  const porConfirmar = countPendingImages(doc);
   const groups = doc.serviceGroups.filter((g) => (g.title ?? "").trim() || g.items.length > 0);
   const extras = (doc.budgetExtras ?? []).filter(
     (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
@@ -1767,10 +1993,20 @@ function PreviewSummary({
         «Descarregar PDF».
       </p>
 
+      {/* O resumo mostra as fotos a caminho esbatidas; dizer quantas são evita
+          que um PDF gerado agora — que não as leva — pareça um erro. */}
+      {porConfirmar > 0 && (
+        <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[#b5654a]">
+          {porConfirmar === 1
+            ? "1 foto ainda está a entrar na proposta e não entra num PDF gerado agora."
+            : `${porConfirmar} fotos ainda estão a entrar na proposta e não entram num PDF gerado agora.`}
+        </p>
+      )}
+
       {covers.length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-3">
           {covers.map((path, i) => (
-            <PreviewThumb key={`${path}-${i}`} url={assetUrls[path]} />
+            <PreviewThumb key={i} url={assetUrls[path]} pendente={isPendingImage(path)} />
           ))}
         </div>
       )}
@@ -1853,29 +2089,75 @@ function PreviewSummary({
   );
 }
 
+/**
+ * A foto de uma célula, com a URL a trocar SEM a célula piscar.
+ *
+ * Quando uma foto provisória assenta, o caminho muda e com ele a URL assinada —
+ * mesmos pixéis, morada nova. Pôr a nova no `src` de imediato deixava a célula
+ * branca durante o download: a foto desaparecia para voltar igual, que é o
+ * salto que este ecrã não pode ter. Por isso a nova só entra depois de estar
+ * descarregada; até lá continua a ver-se a que já estava.
+ *
+ * Só quando JÁ há foto desenhada: a primeira nunca espera por nada.
+ */
+function useSrcSemPiscar(url?: string): string | undefined {
+  /** A última URL que já esteve mesmo desenhada nesta célula. */
+  const [pronta, setPronta] = useState<string | undefined>(url);
+  useEffect(() => {
+    if (!url || url === pronta) return;
+    let alive = true;
+    const pre = new window.Image();
+    // Falhar também troca: a célula tem o seu próprio estado de erro, e ficar
+    // presa à foto antiga seria mostrar uma coisa que já não está no documento.
+    const swap = () => {
+      if (alive) setPronta(url);
+    };
+    pre.onload = swap;
+    pre.onerror = swap;
+    pre.decoding = "async";
+    pre.src = url;
+    return () => {
+      alive = false;
+    };
+    // `pronta` é o que já está no ecrã: entrar nas dependências reexecutaria
+    // isto no momento exato em que a troca acabou de acontecer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+  // Sem nada desenhado, a URL nova entra já — a primeira foto nunca espera.
+  return pronta && url ? pronta : url;
+}
+
 function Thumb({
   url,
   onRemove,
   className = "",
   foraDoPdf = false,
+  pendente = false,
 }: {
   url?: string;
   onRemove: () => void;
   className?: string;
   /** Esta foto está no rascunho mas a página do PDF já não a desenha. */
   foraDoPdf?: boolean;
+  /** A foto já ocupa este lugar mas a cópia ainda não confirmou. */
+  pendente?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const src = useSrcSemPiscar(url);
   return (
     <div
-      className={`group relative overflow-hidden rounded-lg border bg-foreground/[0.04] ${
+      // `aria-busy` e não só a opacidade: quem não vê a célula esbatida tem de
+      // saber na mesma que esta foto ainda está a entrar (a pastilha «X a
+      // caminho» diz o total, isto diz QUAL).
+      aria-busy={pendente || undefined}
+      className={`group relative overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-opacity motion-safe:duration-500 ${
         foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-foreground/[0.1]"
-      } ${className}`}
+      } ${pendente ? "opacity-45" : ""} ${className}`}
     >
-      {url && !failed ? (
+      {src && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={url}
+          src={src}
           alt=""
           // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
           // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
@@ -1900,7 +2182,14 @@ function Thumb({
           )}
         </div>
       )}
-      {foraDoPdf && (
+      {/* Sobreposta, nunca no fluxo: a célula tem de ter exatamente o mesmo
+          tamanho antes e depois de a foto assentar. */}
+      {pendente && (
+        <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[8px] tracking-[0.12em] uppercase text-white">
+          a entrar…
+        </span>
+      )}
+      {foraDoPdf && !pendente && (
         <span className="absolute inset-x-0 bottom-0 bg-[#8a2a22]/85 px-1 py-0.5 text-center text-[8px] tracking-[0.12em] uppercase text-white">
           fora do PDF
         </span>

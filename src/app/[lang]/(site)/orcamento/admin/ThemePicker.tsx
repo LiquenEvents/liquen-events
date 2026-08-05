@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { PENDING_IMAGE_PREFIX } from "@/lib/proposal-doc";
 import {
   MAX_IMPORT_BATCH,
   THEME_PAGE_SIZE,
@@ -50,17 +51,30 @@ import { Button } from "./ui";
  * aparece no mood board já leve, no mesmo sítio e com o mesmo aspect-ratio das
  * outras, sem salto de layout e sem um único pedido novo para a VER.
  *
- * O que ficou por fazer, e porquê: as fotos ainda aparecem no estúdio quando a
- * cópia CONFIRMA, não no instante do clique. Pôr lá um cartão provisório antes
- * disso obriga a trocar depois o caminho provisório pelo definitivo dentro do
- * documento — e o documento é do `ProposalStudio`, que tem o seu próprio dono.
- * O contrato `onPicked(imagens)` é de acrescentar, não de substituir; forçá-lo
- * daqui deixaria caminhos do bucket de TEMAS gravados no rascunho, que é
- * precisamente o que a cópia existe para evitar.
+ * ── E agora a foto aparece no INSTANTE do clique ───────────────────────────
+ *
+ * Faltava o último passo: as fotos só apareciam no estúdio quando a cópia
+ * CONFIRMAVA. A objeção da altura era boa — pôr lá um cartão provisório obriga
+ * a trocar depois um caminho pelo outro DENTRO do documento, e o documento é do
+ * `ProposalStudio`; forçá-lo daqui deixaria caminhos do bucket de TEMAS
+ * gravados no rascunho, que é precisamente o que a cópia existe para evitar.
+ *
+ * O que a resolve é o marcador não ser um caminho: `pending:<uuid>` (ver
+ * `PENDING_IMAGE_PREFIX`, em `proposal-doc`) não é morada de coisa nenhuma, em
+ * tema nenhum, e é reconhecível por um `startsWith` em qualquer fronteira. E a
+ * troca continua a ser do dono do documento: daqui só se ANUNCIA — `onReserve`
+ * no instante do clique, o `token` dentro de cada imagem entregue quando a
+ * cópia confirma, `onDropped` quando não há foto para entregar. Quem escreve no
+ * documento é sempre o estúdio, que é também quem filtra os marcadores antes de
+ * gravar ou de enviar.
+ *
+ * Quem não passa `onReserve` continua a receber só o `onPicked` de antes, a
+ * acrescentar — o contrato antigo não se partiu, ganhou um degrau.
  *
  * O estado da cópia mora numa pastilha discreta no canto (ver `ImportChip`),
  * fora do diálogo e fora do documento: nunca bloqueia nada, mostra o que
- * falhou, deixa repetir e deixa parar.
+ * falhou, deixa repetir e deixa parar. O aviso de falha é dela e só dela — o
+ * estúdio limita-se a tirar o marcador do sítio, sem duplicar a mensagem.
  */
 
 /** Último tema usado, para abrir já no sítio certo na proposta seguinte. */
@@ -200,6 +214,37 @@ function mergePage(prev: ThemeImage[], page: ThemeImage[]): ThemeImage[] {
  */
 export interface ImportedImage extends ThemeImage {
   sourcePath?: string;
+  /**
+   * O marcador provisório que esta cópia vem substituir, quando houve um.
+   *
+   * Com ele, o estúdio troca o marcador pelo caminho definitivo NO LUGAR (a
+   * mesma célula, a mesma ordem); sem ele — quem não reservou nada — a imagem
+   * é acrescentada, como sempre foi.
+   */
+  token?: string;
+}
+
+/** Uma foto RESERVADA: o lugar já é dela no documento, o caminho ainda não
+ *  existe. É o que `onReserve` entrega no instante do clique. */
+export interface ReservedImage {
+  /** `pending:<uuid>` — nunca um caminho de Storage. */
+  token: string;
+  /** A miniatura que a grelha JÁ desenhou: mostrá-la não custa pedido nenhum. */
+  thumbUrl?: string;
+  /** A foto da BIBLIOTECA de onde esta vem — é o que deixa marcar "já nesta
+   *  proposta" enquanto a cópia ainda vai a caminho. */
+  sourcePath: string;
+}
+
+/** Um marcador novo. `crypto.randomUUID` onde existe; o resto é a rede de
+ *  segurança para contextos sem ele (não é um segredo, só tem de ser único). */
+let tokenSeq = 0;
+function novoToken(): string {
+  const uuid =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${(++tokenSeq).toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${PENDING_IMAGE_PREFIX}${uuid}`;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -448,6 +493,10 @@ interface JobPhoto {
   /** A imagem que a pastilha mostra — a miniatura que a grelha já desenhou,
    *  portanto já está na cache do browser: vê-la não custa pedido nenhum. */
   thumb?: string;
+  /** O lugar que esta foto já ocupa no documento (`pending:<uuid>`). Uma
+   *  segunda tentativa ganha um marcador NOVO: o anterior já saiu do
+   *  documento quando esta foto falhou. */
+  token: string;
   state: PhotoState;
 }
 
@@ -459,6 +508,11 @@ interface ImportJob {
    *  instante do clique — e é isso que faz as fotos irem parar ao mood board
    *  (ou à capa) de onde o diálogo foi aberto, mesmo já com ele fechado. */
   deliver: (images: ImportedImage[]) => void;
+  /** Guardar o lugar no documento, no instante do clique. Opcional: quem não
+   *  o passa recebe as fotos só quando a cópia confirmar, como antes. */
+  reserve?: (reservas: ReservedImage[]) => void;
+  /** Estes marcadores já não vão ter foto — tira-os do documento. */
+  drop?: (tokens: string[]) => void;
   running: boolean;
   /** Pediram para parar: o que ainda não saiu não sai. */
   stopping: boolean;
@@ -541,6 +595,8 @@ function startImport(opts: {
   quoteId: string;
   images: readonly ThemeImage[];
   deliver: (images: ImportedImage[]) => void;
+  reserve?: (reservas: ReservedImage[]) => void;
+  drop?: (tokens: string[]) => void;
 }): number {
   const photos: JobPhoto[] = [];
   const seen = new Set<string>();
@@ -550,7 +606,12 @@ function startImport(opts: {
     const key = flightKey(opts.quoteId, im.path);
     if (inFlight.has(key)) continue;
     inFlight.add(key);
-    photos.push({ path: im.path, thumb: im.thumbUrl || im.url || undefined, state: "pending" });
+    photos.push({
+      path: im.path,
+      thumb: im.thumbUrl || im.url || undefined,
+      token: novoToken(),
+      state: "pending",
+    });
   }
   if (photos.length === 0) return 0;
 
@@ -559,15 +620,26 @@ function startImport(opts: {
     quoteId: opts.quoteId,
     photos,
     deliver: opts.deliver,
+    reserve: opts.reserve,
+    drop: opts.drop,
     running: true,
     stopping: false,
     stopped: false,
     error: null,
   };
   jobs.push(job);
+  // O lugar é guardado AQUI, antes de qualquer viagem à rede: é isto que faz a
+  // foto aparecer no mood board no mesmo gesto em que o diálogo fecha.
+  reservePhotos(job, photos);
   emit();
   void runJob(job);
   return job.id;
+}
+
+/** Anuncia os lugares destas fotos a quem abriu o seletor. */
+function reservePhotos(job: ImportJob, photos: readonly JobPhoto[]): void {
+  if (!job.reserve || photos.length === 0) return;
+  job.reserve(photos.map((p) => ({ token: p.token, thumbUrl: p.thumb, sourcePath: p.path })));
 }
 
 async function runJob(job: ImportJob): Promise<void> {
@@ -576,6 +648,15 @@ async function runJob(job: ImportJob): Promise<void> {
   job.stopped = false;
 
   const queue = job.photos.filter((p) => p.state === "pending").map((p) => p.path);
+  /** O marcador que uma foto da biblioteca ocupa neste lote. */
+  const tokenOf = (path: string) => job.photos.find((p) => p.path === path)?.token;
+  /** Estes lugares ficaram sem foto: saem do documento (a pastilha é que
+   *  avisa; aqui só se desocupa o sítio). */
+  const largar = (paths: readonly string[]) => {
+    if (!job.drop) return;
+    const tokens = paths.map(tokenOf).filter((t): t is string => !!t);
+    if (tokens.length > 0) job.drop(tokens);
+  };
 
   for (let i = 0; i < queue.length; i += IMPORT_CHUNK) {
     if (job.stopping) {
@@ -599,20 +680,26 @@ async function runJob(job: ImportJob): Promise<void> {
       // nesta proposta" a inventar uma origem errada.
       const sources = chunk.filter((p) => !failedHere.includes(p));
       const aligned = sources.length === copied.length;
+      // Sem emparelhamento seguro não há troca no lugar: as fotos entram na
+      // mesma, pelo caminho de acrescentar, e os lugares reservados saem. Uma
+      // foto no fim do mood board é um contratempo; uma foto trocada com outra
+      // é uma proposta errada.
       const picked: ImportedImage[] = copied.map((im, k) =>
-        aligned ? { ...im, sourcePath: sources[k] } : { ...im },
+        aligned ? { ...im, sourcePath: sources[k], token: tokenOf(sources[k]) } : { ...im },
       );
       for (const p of sources) {
         mark(job, p, "done");
         if (aligned) rememberImported(job.quoteId, p);
       }
       for (const p of failedHere) mark(job, p, "failed");
+      largar(aligned ? failedHere : chunk);
       if (picked.length > 0) job.deliver(picked);
     } catch (err) {
       if (!job.error) {
         job.error = err instanceof Error ? err.message : "Falha ao adicionar as imagens.";
       }
       for (const p of chunk) mark(job, p, "failed");
+      largar(chunk);
     } finally {
       for (const p of chunk) inFlight.delete(flightKey(job.quoteId, p));
     }
@@ -622,11 +709,14 @@ async function runJob(job: ImportJob): Promise<void> {
   // Parar é parar o que FALTA. O lote que já ia a caminho não se aborta: o
   // servidor copia dentro do Storage e uma resposta abortada deixaria ficheiros
   // escritos que ninguém receberia — ficheiros órfãos na pasta da proposta.
+  const abandonadas: string[] = [];
   for (const p of job.photos) {
     if (p.state !== "pending") continue;
     p.state = "failed";
+    abandonadas.push(p.path);
     inFlight.delete(flightKey(job.quoteId, p.path));
   }
+  largar(abandonadas);
 
   job.running = false;
   // O que este lote deixou por entrar junta-se ao que já estava à espera (pode
@@ -657,11 +747,18 @@ function retryJob(id: number): void {
   if (!job || job.running) return;
   job.stopping = false;
   job.stopped = false;
+  const outra_vez: JobPhoto[] = [];
   for (const p of job.photos) {
     if (p.state !== "failed") continue;
     p.state = "pending";
+    // Marcador NOVO: o de que esta foto era dona já saiu do documento quando
+    // ela falhou. Reaproveitá-lo seria pedir ao estúdio para trocar um lugar
+    // que já não existe.
+    p.token = novoToken();
+    outra_vez.push(p);
     inFlight.add(flightKey(job.quoteId, p.path));
   }
+  reservePhotos(job, outra_vez);
   emit();
   void runJob(job);
 }
@@ -845,7 +942,14 @@ interface Props {
    *  permitido (a mesma foto pode estar na capa e num mood board). */
   usedThemePaths?: readonly string[];
   onClose: () => void;
+  /** Uma cópia confirmada. Traz o `token` do lugar que veio ocupar, quando
+   *  houve reserva; sem `token`, é para acrescentar. */
   onPicked: (images: ImportedImage[]) => void;
+  /** No INSTANTE do clique: estas fotos vão a caminho, guardem-lhes o lugar.
+   *  Sem isto o seletor comporta-se como antes (a foto só aparece no fim). */
+  onReserve?: (reservas: ReservedImage[]) => void;
+  /** Estes lugares ficaram sem foto — a pastilha já avisa porquê. */
+  onDropped?: (tokens: string[]) => void;
 }
 
 export default function ThemePicker({
@@ -854,6 +958,8 @@ export default function ThemePicker({
   usedThemePaths,
   onClose,
   onPicked,
+  onReserve,
+  onDropped,
 }: Props) {
   const { toast } = useToast();
   const trapRef = useFocusTrap<HTMLDivElement>(true);
@@ -1350,11 +1456,20 @@ export default function ThemePicker({
    *
    * Nada aqui espera pela rede: o `startImport` é síncrono a arrancar (e a
    * descartar o que já vai a caminho), por isso um duplo clique não chega a
-   * ser dois lotes — o segundo encontra os caminhos em voo e não faz nada.
+   * ser dois lotes — o segundo encontra os caminhos em voo e não faz nada. É
+   * também aí, ainda dentro deste gesto, que o `onReserve` guarda o lugar de
+   * cada foto no documento: quando o diálogo desaparece do ecrã, as fotos já lá
+   * estão.
    */
   function submit(close: boolean) {
     if (selected.length === 0) return;
-    startImport({ quoteId, images: selected.map(imageFor), deliver: onPicked });
+    startImport({
+      quoteId,
+      images: selected.map(imageFor),
+      deliver: onPicked,
+      reserve: onReserve,
+      drop: onDropped,
+    });
     // A seleção é entregue e limpa no MESMO gesto: é isso que desliga já o
     // botão ("desativado durante a submissão") sem o deixar preso ao lote — o
     // "continuar" existe precisamente para se escolher o lote seguinte

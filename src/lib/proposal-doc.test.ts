@@ -5,7 +5,10 @@ import {
   DEFAULT_CONDICOES_GERAIS,
   DEFAULT_NOTAS_IMPORTANTES,
   COVER_SLOTS,
+  countPendingImages,
   detectVatMode,
+  isPendingImage,
+  stripPendingImages,
   normaliseCoverImages,
   parseMoneyText,
   resolveProposalMoney,
@@ -353,5 +356,44 @@ describe("proposal-doc — normaliseCoverImages", () => {
     const out = normaliseCoverImages(input);
     out[0] = "z";
     expect(input[0]).toBe("a");
+  });
+});
+
+describe("proposal-doc — marcadores provisórios de foto", () => {
+  const doc = {
+    coverImages: ["pending:a", "capa/direita.jpg"],
+    moodBoards: [
+      { title: "Cerimónia", images: ["b/1.jpg", "pending:b", "b/2.jpg"] },
+      { title: "Copo", images: ["b/3.jpg"] },
+    ],
+  };
+
+  it("reconhece o marcador e nunca confunde um caminho com ele", () => {
+    expect(isPendingImage("pending:abc")).toBe(true);
+    // Um caminho de Storage é `<uuid>/<ficheiro>` — nunca tem o prefixo.
+    expect(isPendingImage("LQ-001/pending-foto.jpg")).toBe(false);
+    expect(isPendingImage("")).toBe(false);
+    expect(isPendingImage(undefined)).toBe(false);
+  });
+
+  it("conta as fotos que ainda são promessas, nas capas e nos mood boards", () => {
+    expect(countPendingImages(doc)).toBe(2);
+    expect(countPendingImages({})).toBe(0);
+  });
+
+  it("na CAPA o marcador vira vazio e a posição não encolhe", () => {
+    // Compactar aqui mandava a foto da direita imprimir à esquerda.
+    expect(stripPendingImages(doc).coverImages).toEqual(["", "capa/direita.jpg"]);
+  });
+
+  it("no mood board o marcador sai da lista, sem mexer na ordem das outras", () => {
+    expect(stripPendingImages(doc).moodBoards[0].images).toEqual(["b/1.jpg", "b/2.jpg"]);
+    // O board que não tinha nenhum sai intacto (a MESMA referência).
+    expect(stripPendingImages(doc).moodBoards[1]).toBe(doc.moodBoards[1]);
+  });
+
+  it("devolve o MESMO objeto quando não há nada a filtrar", () => {
+    const limpo = { coverImages: ["a", "b"], moodBoards: [{ title: "t", images: ["c"] }] };
+    expect(stripPendingImages(limpo)).toBe(limpo);
   });
 });

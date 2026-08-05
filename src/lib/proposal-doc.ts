@@ -325,6 +325,76 @@ export function normaliseCoverImages(
   });
 }
 
+// ── Marcadores provisórios de foto ─────────────────────────────────────────
+//
+// Quando se escolhem fotos na Biblioteca de Temas, a cópia para a pasta desta
+// proposta demora — e a foto tem de aparecer no sítio certo no INSTANTE do
+// clique, não quando a cópia confirma. O que entra no documento nesse instante
+// é um MARCADOR: `pending:<uuid>`.
+//
+// Um marcador NÃO é um caminho de Storage e não é um valor legítimo de
+// documento: é uma promessa que ainda não tem morada. Por isso tem de ser
+// filtrado em TODAS as fronteiras por onde o documento sai do editor — o
+// rascunho gravado (local e servidor) e o documento que gera a
+// pré-visualização / a proposta enviada. Um marcador que atravesse uma dessas
+// fronteiras é uma foto que o gerador não consegue ir buscar: um buraco
+// silencioso no PDF do cliente, exatamente o que os avisos de conteúdo
+// incompleto existem para evitar.
+//
+// O prefixo vive AQUI, no modelo do documento, e não no seletor que o cria:
+// quem filtra são os dois lados, e uma segunda definição do prefixo seria uma
+// maneira de um deles deixar de filtrar sem ninguém dar por isso.
+
+/** Prefixo dos marcadores provisórios. Os dois pontos garantem que nunca
+ *  colide com um caminho de Storage (`<uuid>/<ficheiro>`). */
+export const PENDING_IMAGE_PREFIX = "pending:";
+
+/** Este caminho é um marcador provisório (uma foto ainda por copiar)? */
+export function isPendingImage(path: string | null | undefined): boolean {
+  return typeof path === "string" && path.startsWith(PENDING_IMAGE_PREFIX);
+}
+
+/** As fotos deste documento que ainda são promessas — o número que decide se
+ *  a proposta já pode seguir para o cliente. */
+export function countPendingImages(
+  doc: Partial<Pick<ProposalDoc, "coverImages" | "moodBoards">>,
+): number {
+  let n = 0;
+  for (const p of doc.coverImages ?? []) if (isPendingImage(p)) n += 1;
+  for (const b of doc.moodBoards ?? [])
+    for (const p of b.images ?? []) if (isPendingImage(p)) n += 1;
+  return n;
+}
+
+/**
+ * O mesmo documento sem um único marcador provisório.
+ *
+ * Nas capas o marcador vira `""` e NÃO desaparece do array: é a posição que
+ * decide o lado onde a foto é impressa (ver {@link normaliseCoverImages}), por
+ * isso compactar aqui mandaria a foto da direita imprimir à esquerda. Nos mood
+ * boards sai mesmo da lista — ali a posição é só ordem.
+ *
+ * Devolve o MESMO objeto quando não há nada a filtrar (o caso normal), para
+ * não sujar as comparações por referência de quem grava o rascunho.
+ */
+export function stripPendingImages<
+  T extends Partial<Pick<ProposalDoc, "coverImages" | "moodBoards">>,
+>(doc: T): T {
+  if (countPendingImages(doc) === 0) return doc;
+  const out: T = { ...doc };
+  if (doc.coverImages) {
+    out.coverImages = doc.coverImages.map((p) => (isPendingImage(p) ? "" : p));
+  }
+  if (doc.moodBoards) {
+    out.moodBoards = doc.moodBoards.map((b) =>
+      (b.images ?? []).some(isPendingImage)
+        ? { ...b, images: b.images.filter((p) => !isPendingImage(p)) }
+        : b,
+    );
+  }
+  return out;
+}
+
 /** Extrai o primeiro número monetário de texto livre pt-PT
  *  ("3.000,00 € + IVA" → 3000; "14.700,00 €" → 14700). Só isto — a
  *  interpretação do IVA fica a cargo de {@link resolveProposalMoney}. */

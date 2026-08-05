@@ -1,19 +1,81 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import ProposalStudio, { avisoDeConteudoIncompleto, cortesDoCabecalho } from "./ProposalStudio";
 import type { Quote } from "@/lib/orcamento/types";
 
-/** A biblioteca de temas, reduzida a um botão que devolve uma foto escolhida —
- *  é o caminho por onde uma foto entra num mood board sem passar por um ficheiro
- *  real (o carregamento verdadeiro precisa de canvas/worker, que o jsdom não tem). */
+/** O runtime de importação do seletor, reduzido aos três momentos que o estúdio
+ *  tem de saber tratar: o lugar é RESERVADO no instante do clique, a cópia
+ *  CONFIRMA (e traz o caminho definitivo), ou FALHA. É por aqui que uma foto
+ *  entra num mood board sem passar por um ficheiro real (o carregamento
+ *  verdadeiro precisa de canvas/worker, que o jsdom não tem). */
+const seletor = vi.hoisted(() => ({ tokens: [] as string[], n: 0 }));
+
+interface FotoImportada {
+  path: string;
+  url: string;
+  thumbUrl?: string;
+  sourcePath?: string;
+  token?: string;
+}
+
 vi.mock("./ThemePicker", () => ({
-  default: ({ onPicked }: { onPicked: (imgs: { path: string; url: string }[]) => void }) => (
-    <button type="button" onClick={() => onPicked([{ path: "board/nova.jpg", url: "u" }])}>
-      escolher-foto-de-teste
-    </button>
+  default: ({
+    onPicked,
+    onReserve,
+    onDropped,
+  }: {
+    onPicked: (imgs: FotoImportada[]) => void;
+    onReserve?: (r: { token: string; thumbUrl?: string; sourcePath: string }[]) => void;
+    onDropped?: (tokens: string[]) => void;
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          const n = ++seletor.n;
+          const token = `pending:tok-${n}`;
+          seletor.tokens.push(token);
+          onReserve?.([{ token, thumbUrl: `tema-thumb-${n}`, sourcePath: `t1/origem-${n}.jpg` }]);
+        }}
+      >
+        reservar-foto-de-teste
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          // Confirma a ÚLTIMA reservada — é o que deixa verificar que a troca é
+          // no lugar dela, e não no fim da lista.
+          const token = seletor.tokens.pop();
+          const n = token?.replace("pending:tok-", "") ?? "0";
+          onPicked([
+            {
+              path: `LQ-001/copia-${n}.jpg`,
+              url: `u-${n}`,
+              thumbUrl: `copia-thumb-${n}`,
+              sourcePath: `t1/origem-${n}.jpg`,
+              token,
+            },
+          ]);
+        }}
+      >
+        confirmar-foto-de-teste
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const token = seletor.tokens.pop();
+          if (token) onDropped?.([token]);
+        }}
+      >
+        falhar-foto-de-teste
+      </button>
+      <button type="button" onClick={() => onPicked([{ path: "board/nova.jpg", url: "u" }])}>
+        escolher-foto-de-teste
+      </button>
+    </>
   ),
 }));
 
@@ -87,15 +149,28 @@ function reply(body: { ok?: boolean; json?: unknown; headers?: Record<string, st
 
 /** O que a rota `proposta-doc` devolve neste teste (pré-visualização e envio). */
 let propostaDoc: Response = reply({ headers: {}, json: { ok: true, emailed: true } });
-const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+/** Tudo o que saiu daqui — é onde se lê o que foi GRAVADO e o que foi ENVIADO. */
+let pedidos: { url: string; init?: RequestInit }[] = [];
+const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
+  pedidos.push({ url, init });
   if (url.includes("proposta-doc")) return propostaDoc;
   if (url.includes("proposta-rascunho")) return reply({ ok: false });
   return reply({ json: { images: [] } });
 });
 
+/** Os corpos enviados a uma rota, pela ordem. */
+function corpos(parte: string, metodo = "PUT"): string[] {
+  return pedidos
+    .filter((p) => p.url.includes(parte) && (p.init?.method ?? "GET") === metodo)
+    .map((p) => String(p.init?.body ?? ""));
+}
+
 beforeEach(() => {
   localStorage.clear();
+  seletor.tokens.length = 0;
+  seletor.n = 0;
+  pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
   fetchMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
@@ -198,6 +273,222 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     const texto = alerta.textContent ?? "";
     expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la\)/);
     expect(texto).toMatch(/Campo «Local»: 1 linha cortada/);
+  });
+});
+
+/**
+ * A FOTO APARECE NO INSTANTE DO CLIQUE — E O MARCADOR NUNCA SAI DAQUI.
+ *
+ * Escolher fotos na Biblioteca de Temas fecha o diálogo já, mas a CÓPIA para a
+ * pasta desta proposta demora. Entre o clique e a confirmação, o que ocupa o
+ * lugar no documento é um marcador `pending:<uuid>` — que não é caminho de
+ * coisa nenhuma. Fixa-se aqui o ciclo inteiro:
+ *
+ *  1. ao clicar, a foto está no mood board, esbatida e anunciada (`aria-busy`);
+ *  2. ao confirmar, o marcador dá lugar ao caminho definitivo NA MESMA CÉLULA —
+ *     nada reordena, nada salta;
+ *  3. ao falhar, o marcador sai (e o aviso é da pastilha, não daqui);
+ *  4. e — o mais importante — um marcador NUNCA é gravado no rascunho nem vai
+ *     dentro do documento que gera o PDF. Gravado, sobrevivia ao recarregar da
+ *     página como uma foto que não existe; enviado, era um buraco silencioso no
+ *     PDF do cliente.
+ */
+describe("fotos da biblioteca em estado provisório", () => {
+  /** As células de foto do documento, por ordem no DOM (cada uma tem o seu «×»). */
+  const celulas = () =>
+    screen.queryAllByRole("button", { name: "Remover imagem" }).map((b) => b.parentElement!);
+  const estados = () => celulas().map((c) => c.getAttribute("aria-busy"));
+
+  async function abrirBiblioteca(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
+    );
+  }
+  const reservar = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole("button", { name: "reservar-foto-de-teste" }));
+  const confirmar = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole("button", { name: "confirmar-foto-de-teste" }));
+
+  /** Esquece o que já foi gravado e espera pela PRÓXIMA gravação do rascunho
+   *  (que é feita com debounce). */
+  async function proximaGravacao() {
+    pedidos = [];
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+  }
+
+  it("a foto entra no mood board no INSTANTE do clique, em estado provisório", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    const antes = pedidos.length;
+    await reservar(user);
+
+    // Sem esperar por rede nenhuma: são duas células, a nova por assentar.
+    expect(estados()).toEqual([null, "true"]);
+    // Percetível por quem não vê o esbatido, e não só por opacidade.
+    expect(screen.getByText("a entrar…")).toBeInTheDocument();
+    // E ZERO pedidos novos: a miniatura é a que o seletor já tinha em memória.
+    expect(pedidos.length).toBe(antes);
+  });
+
+  it("ao confirmar, o marcador dá lugar ao caminho definitivo NA MESMA POSIÇÃO", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+    await reservar(user);
+    expect(estados()).toEqual([null, "true", "true"]);
+
+    // Confirma-se a SEGUNDA das duas. Se a troca fosse um "acrescentar", ela
+    // ia parar ao fim da lista e a primeira descia de posição.
+    await confirmar(user);
+    expect(estados()).toEqual([null, "true", null]);
+
+    await confirmar(user);
+    expect(estados()).toEqual([null, null, null]);
+    await proximaGravacao();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].images).toEqual([
+      "board/foto-0.jpg",
+      "LQ-001/copia-1.jpg",
+      "LQ-001/copia-2.jpg",
+    ]);
+  });
+
+  it("ao falhar, o marcador sai do documento — e o aviso não se repete", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+    expect(estados()).toEqual([null, "true"]);
+
+    await user.click(screen.getByRole("button", { name: "falhar-foto-de-teste" }));
+
+    expect(estados()).toEqual([null]);
+    expect(screen.queryByText("a entrar…")).not.toBeInTheDocument();
+    // A pastilha do seletor é que avisa e oferece "Repetir"; o estúdio cala-se
+    // (a região de avisos existe sempre, mas fica vazia).
+    expect(screen.getByRole("alert").textContent).toBe("");
+  });
+
+  it("um marcador provisório NUNCA é gravado no rascunho", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+    await proximaGravacao();
+
+    // Nem na cópia local (documento e mapas de apoio)…
+    expect(localStorage.getItem(DRAFT_KEY)).not.toContain("pending:");
+    expect(localStorage.getItem(`${DRAFT_KEY}:meta`)).not.toContain("pending:");
+    // …nem na do servidor, que é a que viaja para o outro dispositivo.
+    expect(corpos("proposta-rascunho").join("")).not.toContain("pending:");
+    // E o que já lá estava não se perdeu no caminho.
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].images).toEqual([
+      "board/foto-0.jpg",
+    ]);
+  });
+
+  it("a capa reservada não encolhe a outra posição (a foto da direita sai à direita)", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    // Posição 1 = capa DIREITA. Um array compactado mandava-a imprimir à esquerda.
+    const daBiblioteca = await screen.findAllByRole("button", { name: "Da biblioteca de temas" });
+    await user.click(daBiblioteca[1]);
+    await reservar(user);
+    await proximaGravacao();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).coverImages).toEqual(["", ""]);
+
+    await confirmar(user);
+    await proximaGravacao();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).coverImages).toEqual([
+      "",
+      "LQ-001/copia-1.jpg",
+    ]);
+  });
+
+  it("a pré-visualização sai sem o marcador e diz que a foto ainda não entrou", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+
+    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Descarregar PDF/ }));
+
+    const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
+    expect(corpo).not.toContain("pending:");
+    expect(JSON.parse(corpo).doc.moodBoards[0].images).toEqual(["board/foto-0.jpg"]);
+    // E dito por extenso, senão o PDF que ela acabou de abrir parecia um erro.
+    expect(
+      await screen.findByText(/PDF gerado sem 1 foto que ainda está a entrar/),
+    ).toBeInTheDocument();
+  });
+
+  it("o ENVIO espera pelas fotos por confirmar, e depois leva o caminho definitivo", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    // O gesto irreversível não segue com a proposta a meio: fica travado, com
+    // a razão escrita — e não uma mensagem a mandá-la preencher campos.
+    expect(await screen.findByText(/1 foto ainda está a entrar na proposta/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Gerar e enviar ao cliente/ })).toBeDisabled();
+    expect(corpos("proposta-doc", "POST")).toHaveLength(0);
+
+    // Mal assenta, o envio abre sozinho — e o documento leva o caminho real.
+    await confirmar(user);
+    const enviar = screen.getByRole("button", { name: /Gerar e enviar ao cliente/ });
+    expect(enviar).toBeEnabled();
+    await user.click(enviar);
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
+    expect(corpo).not.toContain("pending:");
+    expect(JSON.parse(corpo).doc.moodBoards[0].images).toEqual([
+      "board/foto-0.jpg",
+      "LQ-001/copia-1.jpg",
+    ]);
+  });
+
+  it("um marcador deixado num rascunho antigo não sobrevive a reabrir o estúdio", async () => {
+    // Uma versão anterior (ou um rascunho corrompido) podia ter gravado um.
+    // Abrir com ele seria pôr no ecrã uma foto que não existe em lado nenhum.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [],
+        moodBoards: [
+          { title: "Cerimónia", annotation: "", images: ["board/foto-0.jpg", "pending:antigo"] },
+        ],
+        budgetItems: [],
+        coverImages: ["pending:capa", "board/capa-1.jpg"],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    renderStudio();
+
+    await screen.findByText("Mood boards");
+    // Uma foto no mood board, uma capa — e nenhuma célula provisória.
+    expect(estados()).toEqual([null, null]);
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    expect(localStorage.getItem(DRAFT_KEY)).not.toContain("pending:");
   });
 });
 
