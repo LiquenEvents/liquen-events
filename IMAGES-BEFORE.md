@@ -151,3 +151,64 @@ Os alvos ficam a valer contra a coluna de 4G desta tabela: **primeiro conteúdo
 visual < 300 ms** (hoje 34 680 ms) e **grelha completa < 1,5 s** (hoje
 132 866 s). O segundo alvo veio cortado na mensagem original; está assumido em
 1,5 s e é para corrigir se era outro.
+
+---
+
+# ADENDA — o trabalho que falta é MENOR do que parecia
+
+Investigado depois de escrever o acima. A conclusão muda o tamanho da correcção,
+e vale a pena ficar registada antes de alguém a começar do zero.
+
+## A máquina das miniaturas JÁ EXISTE, e as propostas recusam-na
+
+`src/app/[lang]/(site)/orcamento/admin/image-prep.ts` fabrica miniaturas **no
+browser**, a partir da mesma descodificação que já faz para redimensionar o
+original — 400 px de lado maior, qualidade 0,72, ~30–60 KB.
+
+Só que expõe DUAS portas:
+
+```ts
+// A que as propostas usam — o `false` é "não faças miniatura".
+export async function prepareImageForUpload(file, kind): Promise<File> {
+  return (await prepare(file, kind, false)).file;
+}
+
+// A irmã, usada só pela Biblioteca de Temas, que devolve também a miniatura.
+```
+
+E o armazenamento acompanha a mesma assimetria: `theme-storage.ts` tem
+`uploadThemeThumb` e um bucket `theme-thumbs`; **`proposal-storage.ts` não tem
+uma única linha sobre miniaturas.**
+
+Ou seja: a foto é descodificada, a miniatura podia sair da mesma descodificação
+por quase nada, e o código escolhe explicitamente não a fazer.
+
+## O desenho a copiar, que já está provado
+
+Os temas guardam a miniatura **num bucket paralelo, com a MESMA chave** do
+original: `theme-assets/<tema>/<uuid>.jpg` → `theme-thumbs/<tema>/<uuid>.jpg`.
+Não há índice para manter, não há coluna nova na base de dados, e uma miniatura
+em falta cai para o original sozinha — que é o que faz as fotos antigas
+continuarem a funcionar sem migração obrigatória.
+
+Para as propostas: `proposal-assets/<pedido>/<uuid>.jpg` →
+`proposal-thumbs/<pedido>/<uuid>.jpg`.
+
+## Os quatro passos, por ordem
+
+1. **`ProposalStudio`** passa a chamar a variante que devolve a miniatura.
+2. **A rota `/api/orcamento/[id]/assets`** aceita a miniatura ao lado do
+   original (hoje recebe um campo `files` só).
+3. **`proposal-storage.ts`** ganha o gémeo do `uploadThemeThumb` e o
+   `listProposalImages` passa a devolver `thumbUrl`.
+4. **A grelha** consome `thumbUrl` com recurso ao original — o mesmo padrão do
+   componente `Photo` de `Temas.tsx`, que já trata de tudo isto.
+
+## E de caminho, uma pista para o mistério do PDF
+
+`image-prep.ts` tem `COVER_MAX_EDGE = 2200`. As capas do PDF verdadeiro dela
+medem **1475×2200** — exactamente esse tecto, no lado maior. Isto diz que a foto
+guardada é a que entrou no PDF **tal e qual**, sem passar pelo `pixelsForBox`
+(que a 160 DPI pediria 1322 px). É a prova mais forte até agora de que o caminho
+de recurso dispara — e desta vez o argumento é um número que só pode vir de um
+sítio, não uma inferência sobre proporções.
