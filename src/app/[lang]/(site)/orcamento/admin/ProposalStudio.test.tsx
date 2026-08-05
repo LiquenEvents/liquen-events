@@ -274,7 +274,9 @@ describe("mood board com mais fotos do que a página desenha", () => {
   it("não marca nada quando as fotos todas cabem", async () => {
     seedDraft(6);
     renderStudio();
-    await screen.findByText("Mood boards");
+    // O título da SECÇÃO. A coluna lateral também diz "Mood boards", e sem
+    // esta distinção o teste apanhava os dois e falhava por ambiguidade.
+    await screen.findByRole("heading", { name: "Mood boards" });
     expect(screen.queryByText("fora do PDF")).toBeNull();
     expect(screen.queryByText(/A página deste mood board mostra/i)).toBeNull();
   });

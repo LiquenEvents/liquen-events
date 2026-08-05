@@ -16,6 +16,9 @@ import {
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
+import NavEstudio from "./NavEstudio";
+import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
+import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
   adicionarLinha,
@@ -1232,9 +1235,13 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }
 
   const isDeco = doc.template !== "organizacao";
-  // Também exige um total > 0: uma proposta a €0 seria enviada e poluiria os
-  // indicadores (total enviado, taxa de aceitação) com um negócio vazio.
-  const canSend = !!doc.ref.trim() && !!doc.clientNames.trim() && money.gross > 0;
+  // O botão e o aviso lateral leem a MESMA lista, de propósito: escritos cada
+  // um à sua maneira, mais cedo ou mais tarde discordavam — o aviso dizia que
+  // faltava o valor e o botão deixava enviar na mesma. A regra (e a razão de
+  // cada exigência) está em `proposal-progress.ts`.
+  const seccoes = estadoDasSeccoes(doc as ProposalDoc);
+  const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross);
+  const canSend = podeEnviar(doc as ProposalDoc, money.gross);
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -1309,743 +1316,746 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           "Título interno" antes desta missão (ficou anotado na Fase 0) e, com
           o total lá dentro, passou a tapar o "Valor (sem IVA)" — logo o campo
           que a barra existe para acompanhar. */}
-      <div hidden={step !== "conteudo"} className="pb-20">
-        {/* Template selector */}
-        <div className="mb-4">
-          <Segmented
-            ariaLabel="Modelo da proposta"
-            value={isDeco ? "decoracao" : "organizacao"}
-            onChange={setTemplate}
-            options={[
-              { value: "decoracao", label: "Decoração" },
-              { value: "organizacao", label: "Organização" },
-            ]}
-          />
-        </div>
-
-        {/* Event fields */}
-        <Section title="Evento" id="evento">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field
-              label="Clientes"
-              value={doc.clientNames}
-              onChange={(e) => {
-                confirmado("clientNames");
-                patch({ clientNames: e.target.value });
-              }}
-              containerClassName={realce("clientNames")}
-              placeholder="Maria & Zé"
-            />
-            <Field
-              label="Tipo de evento"
-              value={doc.eventType}
-              onChange={(e) => patch({ eventType: e.target.value })}
-              placeholder="Casamento"
-            />
-            <Field
-              label="Data"
-              value={doc.eventDate}
-              onChange={(e) => {
-                confirmado("eventDate");
-                patch({ eventDate: e.target.value });
-              }}
-              containerClassName={realce("eventDate")}
-              placeholder="12 de setembro de 2026"
-            />
-            <Field
-              label="Local"
-              value={doc.location}
-              onChange={(e) => {
-                confirmado("location");
-                patch({ location: e.target.value });
-              }}
-              containerClassName={realce("location")}
-              placeholder="Monte da Oliveirinha, Évora"
-            />
-            <Field
-              label="Convidados"
-              value={doc.guests}
-              onChange={(e) => {
-                confirmado("guests");
-                patch({ guests: e.target.value });
-              }}
-              containerClassName={realce("guests")}
-              placeholder="150 pax"
-            />
-            {isDeco && (
-              <>
-                <Field
-                  label="Cerimónia"
-                  value={doc.ceremony ?? ""}
-                  onChange={(e) => patch({ ceremony: e.target.value })}
-                  placeholder="Civil, simbólica"
-                />
-                <Field
-                  label="Hora"
-                  value={doc.time ?? ""}
-                  onChange={(e) => patch({ time: e.target.value })}
-                  placeholder="A definir"
-                />
-                <Field
-                  label="Wedding Planners (opcional)"
-                  value={doc.weddingPlanners ?? ""}
-                  onChange={(e) => patch({ weddingPlanners: e.target.value })}
-                  placeholder="Equipa AMARA"
-                />
-              </>
-            )}
-          </div>
-
-          {/* Reference (advanced) */}
-          <div className="mt-4">
-            {refEdited && (
-              <div className="mb-1.5 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRefEdited(false);
-                    setDoc((d) => ({ ...d, ref: buildRef(d) }));
-                  }}
-                  className={ADD_BTN}
-                >
-                  ↺ Automática
-                </button>
-              </div>
-            )}
-            <Field
-              label="Título interno (opcional)"
-              value={doc.ref}
-              onChange={(e) => {
-                setRefEdited(true);
-                patch({ ref: e.target.value });
-              }}
-              hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
+      <div hidden={step !== "conteudo"} className="flex gap-6 pb-20">
+        <NavEstudio seccoes={seccoes} faltas={faltas} />
+        <div className="min-w-0 flex-1">
+          {/* Template selector */}
+          <div className="mb-4">
+            <Segmented
+              ariaLabel="Modelo da proposta"
+              value={isDeco ? "decoracao" : "organizacao"}
+              onChange={setTemplate}
+              options={[
+                { value: "decoracao", label: "Decoração" },
+                { value: "organizacao", label: "Organização" },
+              ]}
             />
           </div>
-        </Section>
 
-        {/* Cover images */}
-        <Section title="Imagens de capa (2)" id="capas">
-          <div className="grid grid-cols-2 gap-3">
-            {[0, 1].map((idx) => {
-              const path = doc.coverImages?.[idx];
-              return (
-                <div key={idx}>
-                  {path ? (
-                    <Thumb
-                      url={assetUrls[path]}
-                      onRemove={() => removeCoverAt(idx)}
-                      className="aspect-[4/3]"
-                    />
-                  ) : (
-                    <>
-                      <UploadArea
-                        // O lado é fixo: a posição 0 imprime à esquerda do
-                        // painel do logótipo, a 1 à direita.
-                        label={idx === 0 ? "Capa esquerda" : "Capa direita"}
-                        busy={!!uploading[`cover-${idx}`]}
-                        multiple={false}
-                        curto
-                        onFiles={(files) =>
-                          handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
-                            setCoverAt(idx, paths[0]),
-                          )
-                        }
-                      />
-                      <button
-                        type="button"
-                        className={`${ADD_BTN} mt-1.5`}
-                        onClick={() => setPicker({ kind: "cover", idx })}
-                        // Ao passar o rato já se vai buscar o que o diálogo
-                        // precisa. Quando ela carrega, está lá. `focus` para
-                        // quem navega por teclado, e `touchstart` para o
-                        // telemóvel, onde não há hover nenhum — é o instante
-                        // entre pousar o dedo e o levantar.
-                        onPointerEnter={aquecerBiblioteca}
-                        onFocus={aquecerBiblioteca}
-                        onTouchStart={aquecerBiblioteca}
-                      >
-                        Da biblioteca de temas
-                      </button>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Section>
+          {/* Event fields */}
+          <Section title="Evento" id="evento">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Clientes"
+                value={doc.clientNames}
+                onChange={(e) => {
+                  confirmado("clientNames");
+                  patch({ clientNames: e.target.value });
+                }}
+                containerClassName={realce("clientNames")}
+                placeholder="Maria & Zé"
+              />
+              <Field
+                label="Tipo de evento"
+                value={doc.eventType}
+                onChange={(e) => patch({ eventType: e.target.value })}
+                placeholder="Casamento"
+              />
+              <Field
+                label="Data"
+                value={doc.eventDate}
+                onChange={(e) => {
+                  confirmado("eventDate");
+                  patch({ eventDate: e.target.value });
+                }}
+                containerClassName={realce("eventDate")}
+                placeholder="12 de setembro de 2026"
+              />
+              <Field
+                label="Local"
+                value={doc.location}
+                onChange={(e) => {
+                  confirmado("location");
+                  patch({ location: e.target.value });
+                }}
+                containerClassName={realce("location")}
+                placeholder="Monte da Oliveirinha, Évora"
+              />
+              <Field
+                label="Convidados"
+                value={doc.guests}
+                onChange={(e) => {
+                  confirmado("guests");
+                  patch({ guests: e.target.value });
+                }}
+                containerClassName={realce("guests")}
+                placeholder="150 pax"
+              />
+              {isDeco && (
+                <>
+                  <Field
+                    label="Cerimónia"
+                    value={doc.ceremony ?? ""}
+                    onChange={(e) => patch({ ceremony: e.target.value })}
+                    placeholder="Civil, simbólica"
+                  />
+                  <Field
+                    label="Hora"
+                    value={doc.time ?? ""}
+                    onChange={(e) => patch({ time: e.target.value })}
+                    placeholder="A definir"
+                  />
+                  <Field
+                    label="Wedding Planners (opcional)"
+                    value={doc.weddingPlanners ?? ""}
+                    onChange={(e) => patch({ weddingPlanners: e.target.value })}
+                    placeholder="Equipa AMARA"
+                  />
+                </>
+              )}
+            </div>
 
-        {/* Service groups */}
-        <Section title="Serviços" id="servicos">
-          <div className="flex flex-col gap-3">
-            {doc.serviceGroups.map((g, gi) => (
-              <div
-                key={gi}
-                className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-              >
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <input
-                    className="bo-input w-12 shrink-0 px-2 py-2 text-xs text-foreground/70 text-center"
-                    value={g.letter ?? ""}
-                    onChange={(e) => updateGroup(gi, { letter: e.target.value })}
-                    placeholder="a)"
-                    aria-label="Letra do grupo (a, b, c…)"
-                  />
-                  <input
-                    className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                    value={g.title}
-                    onChange={(e) => updateGroup(gi, { title: e.target.value })}
-                    placeholder="Decoração Floral de Casamento"
-                    aria-label="Título do grupo"
-                  />
-                  <MoveBtns
-                    onUp={() => moveGroup(gi, -1)}
-                    onDown={() => moveGroup(gi, 1)}
-                    disUp={gi === 0}
-                    disDown={gi === doc.serviceGroups.length - 1}
-                  />
+            {/* Reference (advanced) */}
+            <div className="mt-4">
+              {refEdited && (
+                <div className="mb-1.5 flex justify-end">
                   <button
                     type="button"
-                    className={REMOVE_BTN}
-                    onClick={() => removeGroup(gi)}
-                    aria-label="Remover grupo"
+                    onClick={() => {
+                      setRefEdited(false);
+                      setDoc((d) => ({ ...d, ref: buildRef(d) }));
+                    }}
+                    className={ADD_BTN}
                   >
-                    ×
+                    ↺ Automática
                   </button>
                 </div>
-                <div className="flex flex-col gap-2 pl-1">
-                  {g.items.map((it, ii) => (
-                    <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
-                      <input
-                        className={INPUT_SM}
-                        value={it.label}
-                        onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
-                        placeholder="Reunião inicial"
-                        aria-label="Item"
+              )}
+              <Field
+                label="Título interno (opcional)"
+                value={doc.ref}
+                onChange={(e) => {
+                  setRefEdited(true);
+                  patch({ ref: e.target.value });
+                }}
+                hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
+              />
+            </div>
+          </Section>
+
+          {/* Cover images */}
+          <Section title="Imagens de capa (2)" id="capas">
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1].map((idx) => {
+                const path = doc.coverImages?.[idx];
+                return (
+                  <div key={idx}>
+                    {path ? (
+                      <Thumb
+                        url={assetUrls[path]}
+                        onRemove={() => removeCoverAt(idx)}
+                        className="aspect-[4/3]"
                       />
-                      {!isDeco && (
+                    ) : (
+                      <>
+                        <UploadArea
+                          // O lado é fixo: a posição 0 imprime à esquerda do
+                          // painel do logótipo, a 1 à direita.
+                          label={idx === 0 ? "Capa esquerda" : "Capa direita"}
+                          busy={!!uploading[`cover-${idx}`]}
+                          multiple={false}
+                          curto
+                          onFiles={(files) =>
+                            handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
+                              setCoverAt(idx, paths[0]),
+                            )
+                          }
+                        />
+                        <button
+                          type="button"
+                          className={`${ADD_BTN} mt-1.5`}
+                          onClick={() => setPicker({ kind: "cover", idx })}
+                          // Ao passar o rato já se vai buscar o que o diálogo
+                          // precisa. Quando ela carrega, está lá. `focus` para
+                          // quem navega por teclado, e `touchstart` para o
+                          // telemóvel, onde não há hover nenhum — é o instante
+                          // entre pousar o dedo e o levantar.
+                          onPointerEnter={aquecerBiblioteca}
+                          onFocus={aquecerBiblioteca}
+                          onTouchStart={aquecerBiblioteca}
+                        >
+                          Da biblioteca de temas
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+
+          {/* Service groups */}
+          <Section title="Serviços" id="servicos">
+            <div className="flex flex-col gap-3">
+              {doc.serviceGroups.map((g, gi) => (
+                <div
+                  key={gi}
+                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                >
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <input
+                      className="bo-input w-12 shrink-0 px-2 py-2 text-xs text-foreground/70 text-center"
+                      value={g.letter ?? ""}
+                      onChange={(e) => updateGroup(gi, { letter: e.target.value })}
+                      placeholder="a)"
+                      aria-label="Letra do grupo (a, b, c…)"
+                    />
+                    <input
+                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                      value={g.title}
+                      onChange={(e) => updateGroup(gi, { title: e.target.value })}
+                      placeholder="Decoração Floral de Casamento"
+                      aria-label="Título do grupo"
+                    />
+                    <MoveBtns
+                      onUp={() => moveGroup(gi, -1)}
+                      onDown={() => moveGroup(gi, 1)}
+                      disUp={gi === 0}
+                      disDown={gi === doc.serviceGroups.length - 1}
+                    />
+                    <button
+                      type="button"
+                      className={REMOVE_BTN}
+                      onClick={() => removeGroup(gi)}
+                      aria-label="Remover grupo"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-2 pl-1">
+                    {g.items.map((it, ii) => (
+                      <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
                         <input
                           className={INPUT_SM}
-                          value={it.desc ?? ""}
-                          onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
-                          placeholder="Descrição"
-                          aria-label="Descrição do item"
+                          value={it.label}
+                          onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
+                          placeholder="Reunião inicial"
+                          aria-label="Item"
                         />
-                      )}
+                        {!isDeco && (
+                          <input
+                            className={INPUT_SM}
+                            value={it.desc ?? ""}
+                            onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
+                            placeholder="Descrição"
+                            aria-label="Descrição do item"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          className={`${REMOVE_BTN} sm:mt-2`}
+                          onClick={() => removeServiceItem(gi, ii)}
+                          aria-label="Remover item"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" className={ADD_BTN} onClick={() => addServiceItem(gi)}>
+                      + Adicionar item
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              <button type="button" className={ADD_BTN} onClick={addGroup}>
+                + Adicionar grupo de serviços
+              </button>
+              <ModelosParciais
+                tipo="grupo"
+                toast={toast}
+                onInserir={(g) =>
+                  setDoc((d) => ({
+                    ...d,
+                    serviceGroups: [
+                      ...d.serviceGroups,
+                      // A letra é a POSIÇÃO na lista, não uma propriedade do
+                      // modelo: inserir um bloco guardado como "b)" no fim de uma
+                      // proposta que já tem três grupos daria dois "b)".
+                      {
+                        ...(g as StudioDoc["serviceGroups"][number]),
+                        letter: `${LETTERS[d.serviceGroups.length] ?? ""})`,
+                      },
+                    ],
+                  }))
+                }
+                paraGuardar={doc.serviceGroups.find((g) => (g.title ?? "").trim())}
+                nomeSugerido={doc.serviceGroups.find((g) => (g.title ?? "").trim())?.title}
+              />
+            </div>
+          </Section>
+
+          {/* Mood boards — decoracao only */}
+          {isDeco && (
+            <Section title="Mood boards" id="moodboards">
+              <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
+                grupos de imagens de inspiração para o cliente
+              </p>
+              <div className="flex flex-col gap-3">
+                {doc.moodBoards.map((b, bi) => (
+                  <div
+                    key={bi}
+                    className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <input
+                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                        value={b.title}
+                        onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                        placeholder="Decoração Cerimónia"
+                        aria-label="Título do mood board"
+                      />
+                      <MoveBtns
+                        onUp={() => moveBoard(bi, -1)}
+                        onDown={() => moveBoard(bi, 1)}
+                        disUp={bi === 0}
+                        disDown={bi === doc.moodBoards.length - 1}
+                      />
                       <button
                         type="button"
-                        className={`${REMOVE_BTN} sm:mt-2`}
-                        onClick={() => removeServiceItem(gi, ii)}
+                        className={REMOVE_BTN}
+                        onClick={() => removeBoard(bi)}
+                        aria-label="Remover mood board"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <textarea
+                      className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
+                      rows={2}
+                      value={b.annotation ?? ""}
+                      onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
+                      placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
+                      aria-label="Descrição do mood board"
+                    />
+                    {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
+                      fotos. As que passam disso ficam marcadas — e ditas por
+                      extenso a seguir — em vez de desaparecerem caladas no PDF. */}
+                    {b.images.length > MOOD_BOARD_MAX_IMAGES && (
+                      <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
+                        A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
+                        {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
+                          ? "a última, marcada «fora do PDF», não é impressa"
+                          : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
+                        . Remova fotos ou crie outro mood board.
+                      </p>
+                    )}
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {b.images.map((path, ii) => (
+                        <Thumb
+                          key={`${path}-${ii}`}
+                          url={assetUrls[path]}
+                          onRemove={() => removeBoardImage(bi, path)}
+                          className="aspect-square"
+                          foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
+                        />
+                      ))}
+                      <UploadArea
+                        label="+ Imagens"
+                        busy={!!uploading[`board-${bi}`]}
+                        multiple
+                        compact
+                        onFiles={(files) =>
+                          handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className={`${ADD_BTN} mt-2`}
+                      onClick={() => setPicker({ kind: "board", bi })}
+                      onPointerEnter={aquecerBiblioteca}
+                      onFocus={aquecerBiblioteca}
+                      onTouchStart={aquecerBiblioteca}
+                    >
+                      Escolher da biblioteca de temas
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-4">
+                <button type="button" className={ADD_BTN} onClick={addBoard}>
+                  + Adicionar mood board
+                </button>
+                <ModelosParciais
+                  tipo="moodboard"
+                  toast={toast}
+                  onInserir={(b) =>
+                    setDoc((d) => ({
+                      ...d,
+                      moodBoards: [...d.moodBoards, b as StudioDoc["moodBoards"][number]],
+                    }))
+                  }
+                  paraGuardar={doc.moodBoards.find((b) => (b.title ?? "").trim())}
+                  nomeSugerido={doc.moodBoards.find((b) => (b.title ?? "").trim())?.title}
+                />
+              </div>
+            </Section>
+          )}
+
+          {/* Cronograma — organizacao only */}
+          {!isDeco && (
+            <Section title="Cronograma de Organização" id="cronograma">
+              <div className="flex flex-col gap-3">
+                {(doc.cronograma ?? []).map((ph, pi) => (
+                  <div
+                    key={pi}
+                    className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <input
+                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                        value={ph.title}
+                        onChange={(e) => updatePhase(pi, { title: e.target.value })}
+                        placeholder="6-12 meses antes do casamento"
+                        aria-label="Título da fase"
+                      />
+                      <MoveBtns
+                        onUp={() => movePhase(pi, -1)}
+                        onDown={() => movePhase(pi, 1)}
+                        disUp={pi === 0}
+                        disDown={pi === (doc.cronograma?.length ?? 0) - 1}
+                      />
+                      <button
+                        type="button"
+                        className={REMOVE_BTN}
+                        onClick={() => removePhase(pi)}
+                        aria-label="Remover fase"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-2 pl-1">
+                      {ph.items.map((it, ii) => (
+                        <div key={ii} className="flex items-center gap-2">
+                          <input
+                            className={INPUT_SM}
+                            value={it}
+                            onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
+                            placeholder="Definição do conceito"
+                            aria-label="Tarefa"
+                          />
+                          <button
+                            type="button"
+                            className={REMOVE_BTN}
+                            onClick={() => removePhaseItem(pi, ii)}
+                            aria-label="Remover tarefa"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
+                        + Adicionar tarefa
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
+                + Adicionar fase
+              </button>
+            </Section>
+          )}
+
+          {/* Budget */}
+          <Section title="Orçamento Proposto" id="orcamento">
+            {isDeco ? (
+              <>
+                <div className="flex flex-col gap-2 mb-3">
+                  <p className="text-xs leading-relaxed text-foreground/50">
+                    Os preços por linha são <strong className="font-semibold">só para si</strong>:
+                    servem para somar e para avisar quando o total já não bate certo. O PDF continua
+                    a mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único,
+                    como nas suas propostas.
+                  </p>
+                  {linhasDe(doc).map((l, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        className={`${INPUT_SM} flex-1`}
+                        value={l.item}
+                        onChange={(e) => updateBudgetItem(i, e.target.value)}
+                        placeholder="Decor Cerimónia"
+                        aria-label="Item de orçamento"
+                      />
+                      {/* A largura vai no invólucro e não no campo: `.bo-input`
+                        tem `width: 100%` escrito em CSS, que ganha a um
+                        `w-28` do Tailwind. Sem isto o preço comia a linha
+                        toda e o nome ficava numa caixa de trinta pixels — foi
+                        o que a captura de ecrã mostrou. */}
+                      <span className="w-28 shrink-0">
+                        <input
+                          className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                          defaultValue={l.preco === null ? "" : String(l.preco)}
+                          // `onBlur` e não `onChange`: normalizar a cada tecla
+                          // apagava o que ela estava a escrever a meio ("1." vira
+                          // 1, e o "500" seguinte já não tinha onde entrar).
+                          onBlur={(e) => updateBudgetPrice(i, e.target.value)}
+                          placeholder="900"
+                          inputMode="decimal"
+                          aria-label={`Preço de ${l.item || "linha sem nome"}`}
+                        />
+                      </span>
+                      <button
+                        type="button"
+                        className={REMOVE_BTN}
+                        onClick={() => removeBudgetItem(i)}
                         aria-label="Remover item"
                       >
                         ×
                       </button>
                     </div>
                   ))}
-                  <button type="button" className={ADD_BTN} onClick={() => addServiceItem(gi)}>
-                    + Adicionar item
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-4">
-            <button type="button" className={ADD_BTN} onClick={addGroup}>
-              + Adicionar grupo de serviços
-            </button>
-            <ModelosParciais
-              tipo="grupo"
-              toast={toast}
-              onInserir={(g) =>
-                setDoc((d) => ({
-                  ...d,
-                  serviceGroups: [
-                    ...d.serviceGroups,
-                    // A letra é a POSIÇÃO na lista, não uma propriedade do
-                    // modelo: inserir um bloco guardado como "b)" no fim de uma
-                    // proposta que já tem três grupos daria dois "b)".
-                    {
-                      ...(g as StudioDoc["serviceGroups"][number]),
-                      letter: `${LETTERS[d.serviceGroups.length] ?? ""})`,
-                    },
-                  ],
-                }))
-              }
-              paraGuardar={doc.serviceGroups.find((g) => (g.title ?? "").trim())}
-              nomeSugerido={doc.serviceGroups.find((g) => (g.title ?? "").trim())?.title}
-            />
-          </div>
-        </Section>
-
-        {/* Mood boards — decoracao only */}
-        {isDeco && (
-          <Section title="Mood boards" id="moodboards">
-            <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
-              grupos de imagens de inspiração para o cliente
-            </p>
-            <div className="flex flex-col gap-3">
-              {doc.moodBoards.map((b, bi) => (
-                <div
-                  key={bi}
-                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <input
-                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                      value={b.title}
-                      onChange={(e) => updateBoard(bi, { title: e.target.value })}
-                      placeholder="Decoração Cerimónia"
-                      aria-label="Título do mood board"
-                    />
-                    <MoveBtns
-                      onUp={() => moveBoard(bi, -1)}
-                      onDown={() => moveBoard(bi, 1)}
-                      disUp={bi === 0}
-                      disDown={bi === doc.moodBoards.length - 1}
-                    />
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removeBoard(bi)}
-                      aria-label="Remover mood board"
-                    >
-                      ×
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
+                      + Adicionar item
                     </button>
+                    {soma !== null && (
+                      <span className="text-xs text-foreground/55">
+                        Soma das linhas: <strong className="font-semibold">{eur(soma)}</strong>
+                      </span>
+                    )}
                   </div>
-                  <textarea
-                    className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
-                    rows={2}
-                    value={b.annotation ?? ""}
-                    onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
-                    placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
-                    aria-label="Descrição do mood board"
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field
+                    label="Rótulo do total"
+                    value={doc.totalLabel}
+                    onChange={(e) => patch({ totalLabel: e.target.value })}
+                    placeholder="Valor Total Decoração"
                   />
-                  {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
-                      fotos. As que passam disso ficam marcadas — e ditas por
-                      extenso a seguir — em vez de desaparecerem caladas no PDF. */}
-                  {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                    <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
-                      A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
-                      {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
-                        ? "a última, marcada «fora do PDF», não é impressa"
-                        : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
-                      . Remova fotos ou crie outro mood board.
-                    </p>
-                  )}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {b.images.map((path, ii) => (
-                      <Thumb
-                        key={`${path}-${ii}`}
-                        url={assetUrls[path]}
-                        onRemove={() => removeBoardImage(bi, path)}
-                        className="aspect-square"
-                        foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
-                      />
-                    ))}
-                    <UploadArea
-                      label="+ Imagens"
-                      busy={!!uploading[`board-${bi}`]}
-                      multiple
-                      compact
-                      onFiles={(files) =>
-                        handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
-                      }
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={`${ADD_BTN} mt-2`}
-                    onClick={() => setPicker({ kind: "board", bi })}
-                    onPointerEnter={aquecerBiblioteca}
-                    onFocus={aquecerBiblioteca}
-                    onTouchStart={aquecerBiblioteca}
-                  >
-                    Escolher da biblioteca de temas
-                  </button>
                 </div>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-4">
-              <button type="button" className={ADD_BTN} onClick={addBoard}>
-                + Adicionar mood board
-              </button>
-              <ModelosParciais
-                tipo="moodboard"
-                toast={toast}
-                onInserir={(b) =>
-                  setDoc((d) => ({
-                    ...d,
-                    moodBoards: [...d.moodBoards, b as StudioDoc["moodBoards"][number]],
-                  }))
-                }
-                paraGuardar={doc.moodBoards.find((b) => (b.title ?? "").trim())}
-                nomeSugerido={doc.moodBoards.find((b) => (b.title ?? "").trim())?.title}
-              />
-            </div>
-          </Section>
-        )}
 
-        {/* Cronograma — organizacao only */}
-        {!isDeco && (
-          <Section title="Cronograma de Organização" id="cronograma">
-            <div className="flex flex-col gap-3">
-              {(doc.cronograma ?? []).map((ph, pi) => (
-                <div
-                  key={pi}
-                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <input
-                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                      value={ph.title}
-                      onChange={(e) => updatePhase(pi, { title: e.target.value })}
-                      placeholder="6-12 meses antes do casamento"
-                      aria-label="Título da fase"
-                    />
-                    <MoveBtns
-                      onUp={() => movePhase(pi, -1)}
-                      onDown={() => movePhase(pi, 1)}
-                      disUp={pi === 0}
-                      disDown={pi === (doc.cronograma?.length ?? 0) - 1}
-                    />
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removePhase(pi)}
-                      aria-label="Remover fase"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div className="flex flex-col gap-2 pl-1">
-                    {ph.items.map((it, ii) => (
-                      <div key={ii} className="flex items-center gap-2">
+                {/* Valores adicionais — linhas mostradas por baixo do total (Deslocação,
+                  Wedding Coordinator, Tecidos, Mobiliário opção A/B, …). Só aparecem no
+                  PDF; o valor faturado e o sinal 30/70 continuam a partir do «Total» abaixo. */}
+                <div className="mt-5">
+                  <span className="bo-eyebrow">Valores adicionais</span>
+                  <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
+                    Linhas mostradas por baixo do total na proposta (ex.: deslocação, coordenação,
+                    tecidos). Só para o PDF — o total faturado e o sinal continuam a partir do
+                    «Total».
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                      <span>Descrição</span>
+                      <span className="text-right">Valor (texto)</span>
+                      <span className="w-5" />
+                    </div>
+                    {(doc.budgetExtras ?? []).map((ex, i) => (
+                      <div
+                        key={i}
+                        className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                      >
                         <input
-                          className={INPUT_SM}
-                          value={it}
-                          onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
-                          placeholder="Definição do conceito"
-                          aria-label="Tarefa"
+                          className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                          value={ex.label}
+                          onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                          placeholder="Deslocação da equipa Líquen"
+                          aria-label="Descrição da linha adicional"
+                        />
+                        <input
+                          className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
+                          value={ex.valueText}
+                          onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
+                          placeholder="896,00 €"
+                          aria-label="Valor da linha adicional"
                         />
                         <button
                           type="button"
                           className={REMOVE_BTN}
-                          onClick={() => removePhaseItem(pi, ii)}
-                          aria-label="Remover tarefa"
+                          onClick={() => removeBudgetExtra(i)}
+                          aria-label="Remover linha adicional"
                         >
                           ×
                         </button>
                       </div>
                     ))}
-                    <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
-                      + Adicionar tarefa
+                    <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
+                      + Adicionar valor adicional
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-            <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
-              + Adicionar fase
-            </button>
-          </Section>
-        )}
-
-        {/* Budget */}
-        <Section title="Orçamento Proposto" id="orcamento">
-          {isDeco ? (
-            <>
-              <div className="flex flex-col gap-2 mb-3">
-                <p className="text-xs leading-relaxed text-foreground/50">
-                  Os preços por linha são <strong className="font-semibold">só para si</strong>:
-                  servem para somar e para avisar quando o total já não bate certo. O PDF continua a
-                  mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único, como
-                  nas suas propostas.
-                </p>
-                {linhasDe(doc).map((l, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      className={`${INPUT_SM} flex-1`}
-                      value={l.item}
-                      onChange={(e) => updateBudgetItem(i, e.target.value)}
-                      placeholder="Decor Cerimónia"
-                      aria-label="Item de orçamento"
-                    />
-                    {/* A largura vai no invólucro e não no campo: `.bo-input`
-                        tem `width: 100%` escrito em CSS, que ganha a um
-                        `w-28` do Tailwind. Sem isto o preço comia a linha
-                        toda e o nome ficava numa caixa de trinta pixels — foi
-                        o que a captura de ecrã mostrou. */}
-                    <span className="w-28 shrink-0">
-                      <input
-                        className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
-                        defaultValue={l.preco === null ? "" : String(l.preco)}
-                        // `onBlur` e não `onChange`: normalizar a cada tecla
-                        // apagava o que ela estava a escrever a meio ("1." vira
-                        // 1, e o "500" seguinte já não tinha onde entrar).
-                        onBlur={(e) => updateBudgetPrice(i, e.target.value)}
-                        placeholder="900"
-                        inputMode="decimal"
-                        aria-label={`Preço de ${l.item || "linha sem nome"}`}
-                      />
-                    </span>
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removeBudgetItem(i)}
-                      aria-label="Remover item"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
-                    + Adicionar item
-                  </button>
-                  {soma !== null && (
-                    <span className="text-xs text-foreground/55">
-                      Soma das linhas: <strong className="font-semibold">{eur(soma)}</strong>
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field
-                  label="Rótulo do total"
-                  value={doc.totalLabel}
-                  onChange={(e) => patch({ totalLabel: e.target.value })}
-                  placeholder="Valor Total Decoração"
-                />
-              </div>
-
-              {/* Valores adicionais — linhas mostradas por baixo do total (Deslocação,
-                  Wedding Coordinator, Tecidos, Mobiliário opção A/B, …). Só aparecem no
-                  PDF; o valor faturado e o sinal 30/70 continuam a partir do «Total» abaixo. */}
-              <div className="mt-5">
-                <span className="bo-eyebrow">Valores adicionais</span>
-                <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
-                  Linhas mostradas por baixo do total na proposta (ex.: deslocação, coordenação,
-                  tecidos). Só para o PDF — o total faturado e o sinal continuam a partir do
-                  «Total».
-                </p>
-                <div className="flex flex-col gap-2">
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2 mb-3">
                   <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                    <span>Descrição</span>
-                    <span className="text-right">Valor (texto)</span>
+                    <span>Item</span>
+                    <span className="text-right">Valor</span>
                     <span className="w-5" />
                   </div>
-                  {(doc.budgetExtras ?? []).map((ex, i) => (
+                  {(doc.budgetRows ?? []).map((r, i) => (
                     <div
                       key={i}
                       className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
                     >
                       <input
                         className="bo-input px-2.5 py-2 text-xs text-foreground/75"
-                        value={ex.label}
-                        onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
-                        placeholder="Deslocação da equipa Líquen"
-                        aria-label="Descrição da linha adicional"
+                        value={r.item}
+                        onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
+                        placeholder="Coordenação do dia"
+                        aria-label="Item"
                       />
                       <input
                         className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
-                        value={ex.valueText}
-                        onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
-                        placeholder="896,00 €"
-                        aria-label="Valor da linha adicional"
+                        value={r.price}
+                        onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
+                        placeholder="1.500,00 €"
+                        aria-label="Valor"
                       />
                       <button
                         type="button"
                         className={REMOVE_BTN}
-                        onClick={() => removeBudgetExtra(i)}
-                        aria-label="Remover linha adicional"
+                        onClick={() => removeBudgetRow(i)}
+                        aria-label="Remover linha"
                       >
                         ×
                       </button>
                     </div>
                   ))}
-                  <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
-                    + Adicionar valor adicional
+                  <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
+                    + Adicionar linha
                   </button>
                 </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2 mb-3">
-                <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                  <span>Item</span>
-                  <span className="text-right">Valor</span>
-                  <span className="w-5" />
+                <div className="flex flex-col gap-3">
+                  <Field
+                    as="textarea"
+                    label="Nota do orçamento"
+                    rows={2}
+                    className="resize-none"
+                    value={doc.budgetNote ?? ""}
+                    onChange={(e) => patch({ budgetNote: e.target.value })}
+                    placeholder="Os valores são estimativas e podem ser ajustados…"
+                  />
                 </div>
-                {(doc.budgetRows ?? []).map((r, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
-                  >
-                    <input
-                      className="bo-input px-2.5 py-2 text-xs text-foreground/75"
-                      value={r.item}
-                      onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
-                      placeholder="Coordenação do dia"
-                      aria-label="Item"
-                    />
-                    <input
-                      className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
-                      value={r.price}
-                      onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
-                      placeholder="1.500,00 €"
-                      aria-label="Valor"
-                    />
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removeBudgetRow(i)}
-                      aria-label="Remover linha"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
-                  + Adicionar linha
-                </button>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Field
-                  as="textarea"
-                  label="Nota do orçamento"
-                  rows={2}
-                  className="resize-none"
-                  value={doc.budgetNote ?? ""}
-                  onChange={(e) => patch({ budgetNote: e.target.value })}
-                  placeholder="Os valores são estimativas e podem ser ajustados…"
-                />
-              </div>
-            </>
-          )}
-        </Section>
+              </>
+            )}
+          </Section>
 
-        {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
+          {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
-        <Section title="Total, IVA e validade" id="total">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
-              É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido —
-              escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número só.
-            </p>
-            <Field
-              // Sempre a base: é o que o pedido guarda, e é o que o rótulo
-              // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o
-              // que o cliente vê, não o significado deste campo.
-              label="Valor (sem IVA)"
-              inputMode="decimal"
-              value={totalInput}
-              onChange={(e) => {
-                confirmado("totalAmount");
-                onTotalInput(e.target.value);
-              }}
-              placeholder="3000"
-              containerClassName={realce("totalAmount")}
-              hint={
-                desvio
-                  ? `Total manual — a soma das linhas é ${eur(desvio.soma)}`
-                  : soma !== null
-                    ? "Bate certo com a soma das linhas."
-                    : undefined
-              }
-            />
-            {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
-                errado sem dar o gesto que o arruma é meio trabalho. */}
-            {desvio && (
-              <div className="sm:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
-                <span className="text-xs text-foreground/70">
-                  O total está escrito à mão e difere da soma das linhas em{" "}
-                  <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
-                </span>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
-                  onClick={() => {
-                    confirmado("totalAmount");
-                    onTotalInput(String(desvio.soma));
-                  }}
-                >
-                  Usar {eur(desvio.soma)}
-                </button>
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5">
-              <span className="bo-eyebrow">IVA</span>
-              <Segmented
-                ariaLabel="Modo de IVA"
-                value={vatMode}
-                onChange={setVatMode}
-                options={[
-                  { value: "incluido", label: "IVA incluído" },
-                  { value: "acrescer", label: "+ IVA (acresce)" },
-                ]}
-              />
-              <p className="text-xs leading-relaxed text-foreground/45">
-                Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
-                «incluído» mostra já a soma. O valor acima é sempre sem IVA.
+          <Section title="Total, IVA e validade" id="total">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
+                É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido
+                — escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número só.
               </p>
-              {/* As duas leituras lado a lado, para ela ver o que o cliente vai
-                  ver antes de decidir. A escolhida fica marcada; a outra está
-                  lá para comparar, não para confundir. */}
-              {money.base > 0 && (
-                <div className="mt-1 grid grid-cols-2 gap-2 text-[11px]">
-                  {(["acrescer", "incluido"] as const).map((modo) => {
-                    const v = duasFormas[modo];
-                    const ativa = vatMode === modo;
-                    return (
-                      <div
-                        key={modo}
-                        className={`rounded-lg border px-2.5 py-2 ${
-                          ativa
-                            ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
-                            : "border-foreground/10 text-foreground/45"
-                        }`}
-                      >
-                        <span className="block font-medium">
-                          {modo === "acrescer" ? "+ IVA" : "IVA incluído"}
-                          {ativa && " · escolhido"}
-                        </span>
-                        <span className="mt-0.5 block">
-                          base {eur(v.base)} · IVA {eur(v.iva)}
-                        </span>
-                        <span className="block">
-                          o cliente paga <strong className="font-semibold">{eur(v.total)}</strong>
-                        </span>
-                      </div>
-                    );
-                  })}
+              <Field
+                // Sempre a base: é o que o pedido guarda, e é o que o rótulo
+                // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o
+                // que o cliente vê, não o significado deste campo.
+                label="Valor (sem IVA)"
+                inputMode="decimal"
+                value={totalInput}
+                onChange={(e) => {
+                  confirmado("totalAmount");
+                  onTotalInput(e.target.value);
+                }}
+                placeholder="3000"
+                containerClassName={realce("totalAmount")}
+                hint={
+                  desvio
+                    ? `Total manual — a soma das linhas é ${eur(desvio.soma)}`
+                    : soma !== null
+                      ? "Bate certo com a soma das linhas."
+                      : undefined
+                }
+              />
+              {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
+                errado sem dar o gesto que o arruma é meio trabalho. */}
+              {desvio && (
+                <div className="sm:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+                  <span className="text-xs text-foreground/70">
+                    O total está escrito à mão e difere da soma das linhas em{" "}
+                    <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
+                  </span>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                    onClick={() => {
+                      confirmado("totalAmount");
+                      onTotalInput(String(desvio.soma));
+                    }}
+                  >
+                    Usar {eur(desvio.soma)}
+                  </button>
                 </div>
               )}
+              <div className="flex flex-col gap-1.5">
+                <span className="bo-eyebrow">IVA</span>
+                <Segmented
+                  ariaLabel="Modo de IVA"
+                  value={vatMode}
+                  onChange={setVatMode}
+                  options={[
+                    { value: "incluido", label: "IVA incluído" },
+                    { value: "acrescer", label: "+ IVA (acresce)" },
+                  ]}
+                />
+                <p className="text-xs leading-relaxed text-foreground/45">
+                  Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
+                  «incluído» mostra já a soma. O valor acima é sempre sem IVA.
+                </p>
+                {/* As duas leituras lado a lado, para ela ver o que o cliente vai
+                  ver antes de decidir. A escolhida fica marcada; a outra está
+                  lá para comparar, não para confundir. */}
+                {money.base > 0 && (
+                  <div className="mt-1 grid grid-cols-2 gap-2 text-[11px]">
+                    {(["acrescer", "incluido"] as const).map((modo) => {
+                      const v = duasFormas[modo];
+                      const ativa = vatMode === modo;
+                      return (
+                        <div
+                          key={modo}
+                          className={`rounded-lg border px-2.5 py-2 ${
+                            ativa
+                              ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
+                              : "border-foreground/10 text-foreground/45"
+                          }`}
+                        >
+                          <span className="block font-medium">
+                            {modo === "acrescer" ? "+ IVA" : "IVA incluído"}
+                            {ativa && " · escolhido"}
+                          </span>
+                          <span className="mt-0.5 block">
+                            base {eur(v.base)} · IVA {eur(v.iva)}
+                          </span>
+                          <span className="block">
+                            o cliente paga <strong className="font-semibold">{eur(v.total)}</strong>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <Field
+                label="Validade (dias)"
+                type="number"
+                min={1}
+                value={doc.validUntilDays ?? ""}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
+                }}
+                placeholder={String(DEFAULT_VALID_DAYS)}
+                aria-label="Dias de validade"
+              />
             </div>
-            <Field
-              label="Validade (dias)"
-              type="number"
-              min={1}
-              value={doc.validUntilDays ?? ""}
-              onChange={(e) => {
-                const n = Number.parseInt(e.target.value, 10);
-                patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
-              }}
-              placeholder={String(DEFAULT_VALID_DAYS)}
-              aria-label="Dias de validade"
-            />
-          </div>
-          {/* Prévia do desdobramento — o que será efetivamente faturado. */}
-          {money.gross > 0 && (
-            <p className="mt-4 text-xs leading-relaxed text-foreground/55">
-              Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
-              <span className="text-foreground/80">Total {eur(money.gross)}</span>
-              <br />
-              Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
-            </p>
-          )}
-        </Section>
+            {/* Prévia do desdobramento — o que será efetivamente faturado. */}
+            {money.gross > 0 && (
+              <p className="mt-4 text-xs leading-relaxed text-foreground/55">
+                Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
+                <span className="text-foreground/80">Total {eur(money.gross)}</span>
+                <br />
+                Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
+              </p>
+            )}
+          </Section>
+        </div>
       </div>
       {/* ══════════ /PASSO 1 ══════════ */}
 
