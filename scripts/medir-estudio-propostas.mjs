@@ -35,6 +35,8 @@ const CAPTURAS = process.argv.includes("--capturas");
 // interface, contando cada clique e cada campo escrito à mão, e mede o
 // resultado. É este o número que a missão quer reduzir.
 const COMPLETA = process.argv.includes("--completa");
+// Lê as cores computadas e assinala o que sai das regras do DESIGN-TOKENS.md.
+const CORES = process.argv.includes("--cores");
 /**
  * De quem é o pedido a medir.
  *
@@ -296,6 +298,63 @@ async function construirPropostaReal(page) {
   return { cliques, escritos };
 }
 
+/**
+ * As cores, contra as regras do DESIGN-TOKENS.md.
+ *
+ * Não é um teste — é uma leitura. Um teste de cores exactas parte-se a cada
+ * ajuste de opacidade e ensina as pessoas a ignorá-lo; esta lista lê-se antes
+ * e depois de uma alteração e diz o que MUDOU.
+ */
+const AUDITOR_CORES = `() => {
+  const visivel = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return s.display !== "none" && s.visibility !== "hidden" && r.height > 0;
+  };
+  const cor = (el) => getComputedStyle(el).color;
+  const fonte = (el) => getComputedStyle(el).fontFamily.split(",")[0].replace(/["']/g, "");
+
+  // Um cinzento neutro tem os três canais iguais (ou quase). Um castanho
+  // quente não — é assim que se distingue sem depender de valores exactos.
+  // SEM EXPRESSÕES REGULARES. Este auditor viaja dentro de um template
+  // literal, e ali dentro "\\d" não é um dígito — é a letra d. A primeira
+  // versão disto media com um regex partido e dizia "0 etiquetas não
+  // neutras" sobre uma etiqueta castanha que estava mesmo à frente.
+  const neutra = (c) => {
+    const dentro = c.split("(")[1];
+    if (!dentro) return true; // oklab/color-mix: não se avalia, não se acusa
+    const [r, g, b] = dentro.split(")")[0].split(",").map((n) => Number(n.trim()));
+    if (![r, g, b].every((n) => Number.isFinite(n))) return true;
+    return Math.max(r, g, b) - Math.min(r, g, b) <= 6;
+  };
+
+  const etiquetas = [...document.querySelectorAll(".bo-eyebrow")].filter(visivel);
+  const titulos = [...document.querySelectorAll("h2, h3")].filter(visivel);
+
+  return {
+    etiquetasNaoNeutras: etiquetas
+      .filter((el) => !neutra(cor(el)))
+      .map((el) => ({ texto: el.textContent.trim().slice(0, 24), cor: cor(el) })),
+    etiquetasEmSerifa: etiquetas
+      .filter((el) => /Playfair|serif/i.test(fonte(el)))
+      .map((el) => el.textContent.trim().slice(0, 24)),
+    titulosSemSerifa: titulos
+      .filter((el) => !/Playfair|serif/i.test(fonte(el)))
+      .map((el) => el.textContent.trim().slice(0, 24)),
+    // Quantos botões de acção afirmativa (verde cheio) existem à vista. A
+    // regra é «uma por secção»; mais do que isso obriga a escolher.
+    botoesVerdes: [...document.querySelectorAll("button")]
+      .filter(visivel)
+      .filter((el) => {
+        const f = getComputedStyle(el).backgroundColor.replace(/ /g, "");
+        return f.includes("77,99,80") || f.includes("76,99,80");
+      })
+      .map((el) => el.textContent.trim().slice(0, 24)),
+    amostraEtiqueta: etiquetas[0] ? cor(etiquetas[0]) : null,
+    amostraTitulo: titulos[0] ? fonte(titulos[0]) : null,
+  };
+}`;
+
 async function medir() {
   const browser = await chromium.launch();
   const resultados = [];
@@ -363,7 +422,8 @@ async function medir() {
       throw new Error(`estava a medir a vista "${titulo}", não "Fazer proposta"`);
     }
     const censo = await page.evaluate(eval(`(${CENSO})`));
-    resultados.push({ ecra: ecra.nome, ...ecra, ...censo, trabalho });
+    const cores = CORES ? await page.evaluate(eval(`(${AUDITOR_CORES})`)) : null;
+    resultados.push({ ecra: ecra.nome, ...ecra, ...censo, trabalho, cores });
 
     if (CAPTURAS) {
       await page.screenshot({
@@ -409,6 +469,19 @@ if (JSON_OUT) {
     if (r.nomeRepetido) {
       console.log(
         `  nome "${r.nomeRepetido.nome}" também em: ${JSON.stringify(r.nomeRepetido.tambemEm)}`,
+      );
+    }
+    if (r.cores) {
+      const c = r.cores;
+      console.log(`\n  CORES (regras em DESIGN-TOKENS.md):`);
+      console.log(`  etiqueta:            ${c.amostraEtiqueta}`);
+      console.log(`  título de secção:    ${c.amostraTitulo}`);
+      console.log(`  etiquetas não neutras: ${c.etiquetasNaoNeutras.length}`);
+      for (const e of c.etiquetasNaoNeutras.slice(0, 5)) console.log(`    · "${e.texto}" ${e.cor}`);
+      console.log(`  etiquetas em serifa:   ${c.etiquetasEmSerifa.length}`);
+      console.log(`  títulos sem serifa:    ${c.titulosSemSerifa.length}`);
+      console.log(
+        `  botões verdes à vista: ${c.botoesVerdes.length} — ${c.botoesVerdes.join(" · ")}`,
       );
     }
     if (r.trabalho) {

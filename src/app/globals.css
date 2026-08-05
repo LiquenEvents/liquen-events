@@ -1216,9 +1216,19 @@ body[data-menu-open] .whatsapp-fixed {
 }
 /* Eyebrow label used atop panels and as the Field <label> — bumped to ~5:1 on
    white (0.66 alpha) so it clears AA as a real label, with a calmer, more
-   contemporary tracking than the old wide-spaced micro-caps (WCAG 1.4.3). */
+   contemporary tracking than the old wide-spaced micro-caps (WCAG 1.4.3).
+
+   O CINZENTO É NEUTRO, e não o castanho quente que aqui estava
+   (rgba(42, 38, 32, .66)). O back office foi todo passado para o neutro
+   `rgba(13, 13, 13, …)` — a navegação, o texto de apoio, os `--bo-*` — e esta
+   regra ficou para trás. Numa página com fundo creme, um castanho quente ao
+   lado de cinzentos neutros lê-se como uma cor com significado, e as etiquetas
+   não têm significado nenhum: são o andaime. Ver DESIGN-TOKENS.md.
+
+   O contraste MELHORA com a troca (#0d0d0d a 64% é mais escuro do que
+   #2a2620 a 66% sobre branco), por isso a garantia de AA mantém-se. */
 .bo-eyebrow {
-  color: rgba(42, 38, 32, 0.66);
+  color: rgba(13, 13, 13, 0.64);
   font-size: 0.6875rem; /* 11px — a touch more legible than 10px */
   letter-spacing: 0.14em;
   text-transform: uppercase;
