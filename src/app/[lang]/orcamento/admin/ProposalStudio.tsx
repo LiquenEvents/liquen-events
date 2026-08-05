@@ -630,7 +630,7 @@ export default function ProposalStudio({ quote, onSent }: Props) {
             label="Local"
             value={doc.location}
             onChange={(e) => patch({ location: e.target.value })}
-            placeholder="Monte da Oliveirinha, Évora"
+            placeholder="Monte da Oliveirinha"
           />
           <Field
             label="Convidados"

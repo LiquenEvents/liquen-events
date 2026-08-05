@@ -160,16 +160,13 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
       thickness: 0.7,
       color: LINE,
     });
-    p.drawText(
-      `${SITE.name}   ·   ${SITE.email}   ·   ${SITE.phoneDisplay}   ·   ${SITE.region}, Portugal`,
-      {
-        x: MARGIN,
-        y: MARGIN - 16,
-        font,
-        size: 7.5,
-        color: MUTED,
-      },
-    );
+    p.drawText(`${SITE.name}   ·   ${SITE.email}   ·   ${SITE.phoneDisplay}   ·   Portugal`, {
+      x: MARGIN,
+      y: MARGIN - 16,
+      font,
+      size: 7.5,
+      color: MUTED,
+    });
   };
 
   // Abre uma nova página de continuação (logótipo discreto + referência),

@@ -12,9 +12,11 @@ export const SITE = {
   email: "liquen.alentejo@gmail.com",
   phone: "+351919259820",
   phoneDisplay: "+351 919 259 820",
-  // Physical base — a specific municipality (not just the region) sharpens the
-  // LocalBusiness signal for "… em Évora" searches. Service area stays national
-  // (see AREAS_SERVED + areaServed in StructuredData).
+  // Registered address. Used ONLY where an address of record is required — the
+  // schema.org PostalAddress (a LocalBusiness node needs one) and the contract
+  // letterhead. It is deliberately NOT used in marketing copy, metadata or
+  // keywords: the studio works all over the country and must not read as a
+  // local, single-region vendor. Service area is national — see AREAS_SERVED.
   city: "Évora",
   region: "Alentejo",
   country: "PT",
@@ -40,44 +42,40 @@ export const SITE = {
   ogImage: "/og-liquen.jpg",
 } as const;
 
-/** Cities/areas served — ordered by SEO priority (home city Évora first,
- *  then the region and the rest of the country). */
+/** Areas served — the studio decorates events all over the country, so the
+ *  country itself leads and the cities below are illustrative of that national
+ *  reach rather than a home-region cluster. Deliberately NOT ordered around a
+ *  single home city: the business is not positioned as a local vendor. */
 export const AREAS_SERVED = [
-  "Évora",
-  "Alentejo",
-  "Lisboa",
   "Portugal",
-  "Estremoz",
-  "Beja",
+  "Lisboa",
+  "Porto",
   "Setúbal",
   "Cascais",
   "Sintra",
   "Comporta",
 ] as const;
 
-/** Default keyword set, location-weighted toward Alentejo. */
+/** Default keyword set. National only — no region-locked terms: the studio
+ *  decorates events all over the country and must not be indexed as a
+ *  single-region vendor. */
 export const SITE_KEYWORDS = [
-  "decoração de eventos Évora",
-  "decoração de eventos Alentejo",
-  "decoração de casamentos Alentejo",
-  "casamentos Évora",
-  "casamentos Alentejo",
-  "coordenação de casamentos Alentejo",
-  "decoração de eventos corporativos",
-  "empresa de decoração de eventos",
-  "decoração de eventos Lisboa",
+  "decoração de casamentos Portugal",
   "decoração de eventos Portugal",
-  "empresa de eventos Alentejo",
+  "coordenação de casamentos",
+  "empresa de decoração de eventos",
+  "decoração de eventos corporativos",
+  "decoração de casamentos",
+  "decoração de eventos de empresa",
+  "empresa de eventos Portugal",
   "Líquen Events",
 ] as const;
 
 /** schema.org `areaServed` array with each place correctly typed — Portugal is
- *  a Country, the Alentejo an AdministrativeArea (region), the rest Cities.
- *  Shared by the Organization node and per-Service JSON-LD so both stay
- *  consistent and Évora-first. */
+ *  a Country, the rest Cities. Shared by the Organization node and per-Service
+ *  JSON-LD so both declare the same nationwide service area. */
 export function areaServedSchema(): { "@type": string; name: string }[] {
-  const areaType = (name: string) =>
-    name === "Portugal" ? "Country" : name === "Alentejo" ? "AdministrativeArea" : "City";
+  const areaType = (name: string) => (name === "Portugal" ? "Country" : "City");
   return AREAS_SERVED.map((name) => ({ "@type": areaType(name), name }));
 }
 

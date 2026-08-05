@@ -78,26 +78,26 @@ export const en: Dict = {
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
-      homeHero: "Líquen Events — aerial view of an event in the Alentejo",
-      homeWedding: "Wedding at sunset on an estate in the Alentejo",
-      contactoHero: "Aerial view of an estate set up for an event in the Alentejo",
-      sobrePortrait: "A wedding moment decorated by Líquen Events in the Alentejo",
-      sobreGolden: "Wedding celebration in golden light in the Alentejo",
-      sobreOutdoor: "Outdoor wedding decorated by Líquen Events in the Alentejo",
+      homeHero: "Líquen Events — aerial view of an event",
+      homeWedding: "Wedding at sunset on a country estate",
+      contactoHero: "Aerial view of an estate set up for an event",
+      sobrePortrait: "A wedding moment decorated by Líquen Events",
+      sobreGolden: "Wedding celebration in golden light",
+      sobreOutdoor: "Outdoor wedding decorated by Líquen Events",
       clientesAerial: "Aerial view of a Líquen Events event",
-      servicosCeremony: "Outdoor ceremony planned by Líquen Events in the Alentejo",
-      servicosEvening: "Wedding celebrated at dusk on an estate in the Alentejo",
+      servicosCeremony: "Outdoor ceremony planned by Líquen Events",
+      servicosEvening: "Wedding celebrated at dusk on a country estate",
       orcamentoPanel: "Celebration dinner with a set table and candlelit décor",
-      galeriaHeader: "Gallery of weddings and events decorated by Líquen Events in the Alentejo",
+      galeriaHeader: "Gallery of weddings and events decorated by Líquen Events across Portugal",
       galeriaInstagram: "Events decorated by Líquen Events on Instagram",
-      sobreCelebration: "Wedding celebration decorated by Líquen Events in the Alentejo",
+      sobreCelebration: "Wedding celebration decorated by Líquen Events",
       sobreFounder: "Catarina Gaspar — Founder & CEO of Líquen Events",
-      clientesCorporate: "Corporate event decorated by Líquen Events in Évora",
+      clientesCorporate: "Corporate event decorated by Líquen Events",
       clientesDinner: "Event dinner decorated by Líquen Events",
       servicosEndOfDay: "Event decorated by Líquen Events at the end of the day",
       contactoBand: [
-        "Outdoor wedding ceremony in the Alentejo",
-        "Wedding at sunset on an Alentejo estate",
+        "Outdoor wedding ceremony",
+        "Wedding at sunset on an estate",
         "Wedding dinner table setting with floral decoration",
       ],
     },
@@ -105,24 +105,24 @@ export const en: Dict = {
 
   meta: {
     ogLocale: "en_GB",
-    homeTitle: "Event & Wedding Decoration in Évora | Líquen Events",
+    homeTitle: "Wedding & Event Decoration in Portugal | Líquen Events",
     homeDescription:
-      "Wedding decoration, corporate events and celebrations in Évora, the Alentejo and across Portugal. From concept to the last detail — request a quote.",
-    sobreTitle: "Event Decoration Company in the Alentejo",
+      "Decoration and coordination for weddings, corporate events and private celebrations across Portugal. From concept to the last detail — request a quote.",
+    sobreTitle: "Event Decoration Company in Portugal",
     sobreDescription:
-      "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
-    servicosTitle: "Wedding & Event Decoration in the Alentejo",
+      "Líquen Events, an event decoration and coordination company working across Portugal. Over 100 weddings and celebrations since 2018.",
+    servicosTitle: "Wedding & Event Decoration in Portugal",
     servicosDescription:
-      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties in Évora, the Alentejo and Portugal.",
-    galeriaTitle: "Wedding & Event Gallery — Alentejo",
+      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties across mainland Portugal and the islands.",
+    galeriaTitle: "Wedding & Event Gallery — Portugal",
     galeriaDescription:
-      "Photo gallery of events decorated by Líquen Events in the Alentejo and Portugal — weddings, corporate events, conferences and celebrations.",
+      "Photo gallery of events decorated by Líquen Events across Portugal — weddings, corporate events, conferences and celebrations.",
     clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
       "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
     contactoTitle: "Contact — Request Your Event Quote",
     contactoDescription:
-      "Contact Líquen Events to plan your event in Évora, the Alentejo or across Portugal. We reply within 24 business hours with a tailored proposal.",
+      "Contact Líquen Events to decorate your event anywhere in the country. We reply within 24 business hours with a tailored proposal.",
     orcamentoTitle: "Request a Quote — Weddings & Events",
     orcamentoDescription:
       "Request your quote from Líquen Events. Tell us the event type, date and number of guests — we'll reply with a tailored proposal in under 24 business hours.",
@@ -140,7 +140,7 @@ export const en: Dict = {
     ],
     servicosServiceName: "Event decoration and wedding coordination",
     servicosServiceDescription:
-      "Wedding decoration and coordination, plus decoration of corporate events, conferences and celebrations. Based in Évora, the Alentejo, for all of Portugal.",
+      "Wedding decoration and coordination, plus decoration of corporate events, conferences and celebrations, anywhere in Portugal.",
   },
 
   home: {
@@ -172,7 +172,7 @@ export const en: Dict = {
     manifestoTitleLine2: "We make memories last.",
     manifestoText: "Since 2018 we've turned spaces into experiences — across Portugal.",
     // Corner caption (chapter idiom) over the manifesto photograph.
-    manifestoImageCaption: "Évora · Alentejo",
+    manifestoImageCaption: "Across Portugal",
     statementLead: "We don't just decorate spaces.",
     statementRest: " We design experiences that last forever.",
     founderEyebrow: "The people",
@@ -185,12 +185,12 @@ export const en: Dict = {
     ctaTitleMoss: "together?",
     ctaText: "From the first conversation to the last toast, we handle every detail of your event.",
     galleryAlt: [
-      "Outdoor wedding ceremony on an Alentejo estate",
+      "Outdoor wedding ceremony on a country estate",
       "Wedding party under hanging lights at dusk",
       "Newlyweds embracing during the wedding celebration",
       "Wedding table setting with flowers and candles",
-      "Wedding at dusk outdoors in the Alentejo",
-      "Floral decoration of a wedding ceremony in the Alentejo",
+      "Wedding at dusk outdoors",
+      "Floral decoration of a wedding ceremony",
     ],
   },
 
@@ -212,7 +212,7 @@ export const en: Dict = {
       Evento: "Event",
     },
     alt: {
-      Casamento: "Wedding decorated by Líquen Events in the Alentejo",
+      Casamento: "Wedding decorated by Líquen Events",
       Corporativo: "Corporate event organised by Líquen Events",
       Conferência: "Conference organised by Líquen Events",
       Aéreo: "Aerial view of a Líquen Events event",
@@ -283,10 +283,10 @@ export const en: Dict = {
     ctaTitleLine2: "clients",
     ctaText: "Tell us your idea and we'll show you how we can turn it into a memorable event.",
     galleryAlt: [
-      "Corporate event reception in a courtyard in Évora",
-      "Wedding with floral decoration on an Alentejo estate",
-      "Candlelit gala dinner at an event in the Alentejo",
-      "Outdoor wedding with table setting and floral arrangements in the Alentejo",
+      "Corporate event reception in a courtyard",
+      "Wedding with floral decoration on a country estate",
+      "Candlelit gala dinner at an event",
+      "Outdoor wedding with table setting and floral arrangements",
       "Gala dinner with table setting and candles",
       "Corporate gala in a decorated hall at night",
       "Institutional event with stage and audience",
@@ -331,7 +331,7 @@ export const en: Dict = {
       phoneLabel: "Phone",
       phoneSub: "Call or message us",
       locationLabel: "Location",
-      locationValue: "Évora, Alentejo — across Portugal",
+      locationValue: "Across Portugal",
       locationSub: "In-person meetings available",
       quoteLink: "Request a quote for your event",
       whatsappLink: "Chat on WhatsApp",
@@ -403,7 +403,7 @@ export const en: Dict = {
       },
       {
         q: "Can you handle only part of the organisation?",
-        a: "Absolutely. We can take care of everything — from concept to execution — or just specific areas such as décor, day-of coordination, catering or audiovisual. We tailor the service to what you need.",
+        a: "Absolutely. What we do is decoration and coordination: we can design and deliver the whole décor and coordinate the day, or take on just one part — concept only, floral decoration only, coordination only. We tailor the service to what you need.",
       },
       {
         q: "How does the quoting process work?",
@@ -445,7 +445,7 @@ export const en: Dict = {
     labelTelefone: "Phone",
     labelMensagem: "Message",
     phPessoas: "e.g. 120",
-    phLocal: "e.g. Évora, Alentejo…",
+    phLocal: "e.g. city or venue…",
     phNome: "Your name",
     phEmail: "email@example.com",
     phTelefone: "+351 9XX XXX XXX",
@@ -472,7 +472,7 @@ export const en: Dict = {
       "Specialised in weddings, corporate events and private celebrations — bespoke solutions adapted to your style, taste and budget.",
     nav: ["Celebrations", "Companies"],
     interludeEyebrow: "Líquen Events",
-    interludeTitle: "From Évora to all of Portugal — over 100 events since 2018.",
+    interludeTitle: "All over Portugal — over 100 events since 2018.",
     verMais: "View more",
     verDetalhes: "View details",
     philoEyebrow: "Our signature",
@@ -499,7 +499,7 @@ export const en: Dict = {
         services: [
           {
             title: "Weddings",
-            desc: "Your most special day — coordination, decoration, photography and catering. We handle it all so you can simply live it.",
+            desc: "Your most special day — concept, floral decoration, scenography and day-of coordination. We handle every detail so you can simply live it.",
           },
           {
             title: "Classic Car Rental",
@@ -528,9 +528,9 @@ export const en: Dict = {
       },
     ],
     seoEyebrow: "Where we work",
-    seoTitle: "From Évora to Portugal",
+    seoTitle: "All over Portugal",
     seoText:
-      "Weddings, corporate events and celebrations — from concept to execution. Based in Évora, in the heart of the Alentejo, we bring our team and our network of suppliers to the entire country.",
+      "Weddings, corporate events and celebrations — from concept to execution. Wherever the event is, we bring our team and our network of suppliers to every corner of the country.",
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Shall we bring",
     ctaTitleMoss: "your idea to life?",
@@ -538,12 +538,12 @@ export const en: Dict = {
       "Talk to us. No commitment, no cost. We listen to your idea and present a proposal tailored to you.",
     ctaGaleria: "View the gallery",
     galleryAlt: [
-      "Outdoor wedding decorated by Líquen Events in the Alentejo",
+      "Outdoor wedding decorated by Líquen Events",
       "Celebration dinner with elegant candlelit decoration",
-      "Aerial view of an event on an Alentejo estate",
-      "Event reception in the late afternoon in the Alentejo",
-      "Outdoor wedding reception at sunset in the Alentejo",
-      "Portrait of the newlyweds during a wedding in the Alentejo",
+      "Aerial view of an event on a country estate",
+      "Event reception in the late afternoon",
+      "Outdoor wedding reception at sunset",
+      "Portrait of the newlyweds during a wedding",
     ],
   },
 
@@ -767,7 +767,7 @@ export const en: Dict = {
       "Parties & Celebrations",
     ],
     contacto: "Contact",
-    country: "Évora, Alentejo, Portugal",
+    country: "Portugal",
     pedirOrcamento: "Request a quote",
     rights: "All rights reserved",
     legal: "Legal",

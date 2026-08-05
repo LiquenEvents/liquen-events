@@ -78,26 +78,26 @@ export const pt = {
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
-      homeHero: "Líquen Events — evento aéreo no Alentejo",
-      homeWedding: "Casamento ao pôr do sol numa herdade no Alentejo",
-      contactoHero: "Vista aérea de uma herdade preparada para um evento no Alentejo",
-      sobrePortrait: "Momento de casamento decorado pela Líquen Events no Alentejo",
-      sobreGolden: "Celebração de casamento à luz dourada no Alentejo",
-      sobreOutdoor: "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
+      homeHero: "Líquen Events — vista aérea de um evento",
+      homeWedding: "Casamento ao pôr do sol numa herdade",
+      contactoHero: "Vista aérea de uma herdade preparada para um evento",
+      sobrePortrait: "Momento de casamento decorado pela Líquen Events",
+      sobreGolden: "Celebração de casamento à luz dourada",
+      sobreOutdoor: "Casamento ao ar livre decorado pela Líquen Events",
       clientesAerial: "Vista aérea de evento Líquen Events",
-      servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events no Alentejo",
-      servicosEvening: "Casamento celebrado ao anoitecer numa quinta no Alentejo",
+      servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events",
+      servicosEvening: "Casamento celebrado ao anoitecer numa quinta",
       orcamentoPanel: "Jantar de festa com mesa posta e decoração à luz de velas",
-      galeriaHeader: "Galeria de casamentos e eventos decorados pela Líquen Events no Alentejo",
+      galeriaHeader: "Galeria de casamentos e eventos decorados pela Líquen Events",
       galeriaInstagram: "Eventos decorados pela Líquen Events no Instagram",
-      sobreCelebration: "Celebração de casamento decorada pela Líquen Events no Alentejo",
+      sobreCelebration: "Celebração de casamento decorada pela Líquen Events",
       sobreFounder: "Catarina Gaspar — Fundadora & CEO da Líquen Events",
-      clientesCorporate: "Evento corporativo decorado pela Líquen Events em Évora",
+      clientesCorporate: "Evento corporativo decorado pela Líquen Events",
       clientesDinner: "Jantar de evento decorado pela Líquen Events",
       servicosEndOfDay: "Evento decorado pela Líquen Events ao final do dia",
       contactoBand: [
-        "Cerimónia de casamento ao ar livre no Alentejo",
-        "Casamento ao pôr do sol numa herdade alentejana",
+        "Cerimónia de casamento ao ar livre",
+        "Casamento ao pôr do sol numa herdade",
         "Mesa posta de jantar de casamento com decoração floral",
       ],
     },
@@ -105,24 +105,24 @@ export const pt = {
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
+    homeTitle: "Decoração de Casamentos e Eventos em Portugal | Líquen Events",
     homeDescription:
-      "Decoração de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em Portugal. Do conceito ao último detalhe — peça orçamento.",
-    sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
+      "Decoração e coordenação de casamentos, eventos de empresa e celebrações privadas em todo o Portugal. Do conceito ao último detalhe — peça orçamento.",
+    sobreTitle: "Empresa de Decoração de Eventos em Portugal",
     sobreDescription:
-      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
-    servicosTitle: "Decoração de Casamentos e Eventos no Alentejo",
+      "Líquen Events, empresa de decoração e coordenação de eventos com serviço em todo o Portugal. Mais de 100 casamentos e celebrações desde 2018.",
+    servicosTitle: "Decoração de Casamentos e Eventos em Portugal",
     servicosDescription:
-      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em Évora, no Alentejo e em Portugal.",
-    galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
+      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em todo o Portugal continental e ilhas.",
+    galeriaTitle: "Galeria de Casamentos e Eventos em Portugal",
     galeriaDescription:
-      "Galeria de fotografias de eventos decorados pela Líquen Events no Alentejo e em Portugal — casamentos, eventos corporativos, conferências e celebrações.",
+      "Galeria de fotografias de eventos decorados pela Líquen Events em todo o Portugal — casamentos, eventos corporativos, conferências e celebrações.",
     clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
       "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
+      "Contacte a Líquen Events para decorar o seu evento em qualquer ponto do país. Resposta em menos de 24 horas úteis com uma proposta à medida.",
     orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
     orcamentoDescription:
       "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em 24 horas úteis.",
@@ -140,7 +140,7 @@ export const pt = {
     ],
     servicosServiceName: "Decoração de eventos e coordenação de casamentos",
     servicosServiceDescription:
-      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal.",
+      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações. Em todo o Portugal, de norte a sul do país.",
   },
 
   home: {
@@ -175,7 +175,7 @@ export const pt = {
     manifestoTitleLine2: "Eternizamos memórias.",
     manifestoText: "Desde 2018 que transformamos espaços em experiências — em todo o Portugal.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
-    manifestoImageCaption: "Évora · Alentejo",
+    manifestoImageCaption: "Portugal · de norte a sul",
     statementLead: "Não decoramos apenas espaços.",
     statementRest: " Desenhamos experiências que ficam para sempre.",
     founderEyebrow: "As pessoas",
@@ -187,12 +187,12 @@ export const pt = {
     ctaTitleMoss: "juntos?",
     ctaText: "Da primeira conversa ao último brinde, tratamos de cada detalhe do seu evento.",
     galleryAlt: [
-      "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
+      "Cerimónia de casamento ao ar livre numa herdade",
       "Festa de casamento sob luzes suspensas ao anoitecer",
       "Noivos abraçados durante a celebração do casamento",
       "Mesa posta de casamento com flores e velas",
-      "Casamento ao entardecer ao ar livre no Alentejo",
-      "Decoração floral de cerimónia de casamento no Alentejo",
+      "Casamento ao entardecer ao ar livre",
+      "Decoração floral de cerimónia de casamento",
     ],
   },
 
@@ -214,7 +214,7 @@ export const pt = {
       Evento: "Evento",
     },
     alt: {
-      Casamento: "Casamento decorado pela Líquen Events no Alentejo",
+      Casamento: "Casamento decorado pela Líquen Events",
       Corporativo: "Evento corporativo organizado pela Líquen Events",
       Conferência: "Conferência organizada pela Líquen Events",
       Aéreo: "Vista aérea de evento da Líquen Events",
@@ -294,10 +294,10 @@ export const pt = {
     ctaText:
       "Conte-nos a sua ideia e mostramos-lhe como a podemos transformar num evento memorável.",
     galleryAlt: [
-      "Receção de evento corporativo num pátio em Évora",
-      "Casamento com decoração floral numa herdade do Alentejo",
-      "Jantar de gala à luz de velas num evento no Alentejo",
-      "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
+      "Receção de evento corporativo num pátio",
+      "Casamento com decoração floral numa herdade",
+      "Jantar de gala à luz de velas",
+      "Casamento ao ar livre com mesa posta e arranjos florais",
       "Jantar de gala com mesa posta e velas",
       "Gala corporativa num salão decorado à noite",
       "Evento institucional com palco e plateia",
@@ -342,7 +342,7 @@ export const pt = {
       phoneLabel: "Telefone",
       phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
-      locationValue: "Évora, Alentejo — em todo o Portugal",
+      locationValue: "Em todo o Portugal",
       locationSub: "Reuniões presenciais disponíveis",
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
@@ -415,7 +415,7 @@ export const pt = {
       },
       {
         q: "Podem assumir apenas parte da organização?",
-        a: "Absolutamente. Podemos tratar de tudo — da conceção à execução — ou assumir apenas áreas específicas como decoração, coordenação do dia, catering ou audiovisual. Adaptamos o serviço ao que precisa.",
+        a: "Absolutamente. O que fazemos é decoração e coordenação: podemos desenhar e executar toda a decoração do evento e coordenar o dia, ou entrar apenas numa parte — só o conceito, só a decoração floral, só a coordenação. Adaptamos o serviço ao que precisa.",
       },
       {
         q: "Como funciona o processo de orçamentação?",
@@ -457,7 +457,7 @@ export const pt = {
     labelTelefone: "Telefone",
     labelMensagem: "Mensagem",
     phPessoas: "Ex.: 120",
-    phLocal: "Ex.: Évora, Alentejo…",
+    phLocal: "Ex.: cidade ou espaço do evento…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",
     phTelefone: "+351 9XX XXX XXX",
@@ -483,7 +483,7 @@ export const pt = {
       "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
     nav: ["Celebrações", "Empresas"],
     interludeEyebrow: "Líquen Events",
-    interludeTitle: "De Évora para todo o Portugal — mais de 100 eventos desde 2018.",
+    interludeTitle: "Em todo o Portugal — mais de 100 eventos desde 2018.",
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
     philoEyebrow: "A nossa assinatura",
@@ -510,7 +510,7 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial — coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
+            desc: "O vosso dia mais especial — conceito, decoração floral, cenografia e coordenação no dia. Tratamos de cada detalhe para só terem de o viver.",
           },
           {
             title: "Aluguer de Viaturas Clássicas",
@@ -539,9 +539,9 @@ export const pt = {
       },
     ],
     seoEyebrow: "Onde atuamos",
-    seoTitle: "De Évora para Portugal",
+    seoTitle: "De norte a sul do país",
     seoText:
-      "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
+      "Casamentos, eventos corporativos e celebrações — do conceito à execução. Onde quer que seja o seu evento, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Vamos dar vida",
     ctaTitleMoss: "à sua ideia?",
@@ -549,12 +549,12 @@ export const pt = {
       "Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
     ctaGaleria: "Ver a galeria",
     galleryAlt: [
-      "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
+      "Casamento ao ar livre decorado pela Líquen Events",
       "Jantar de celebração com decoração elegante à luz de velas",
-      "Vista aérea de um evento numa herdade do Alentejo",
-      "Receção de evento ao final da tarde no Alentejo",
-      "Receção de casamento ao ar livre ao pôr do sol no Alentejo",
-      "Retrato dos noivos durante um casamento no Alentejo",
+      "Vista aérea de um evento numa herdade",
+      "Receção de evento ao final da tarde",
+      "Receção de casamento ao ar livre ao pôr do sol",
+      "Retrato dos noivos durante um casamento",
     ],
   },
 
@@ -779,7 +779,7 @@ export const pt = {
       "Festas e Aniversários",
     ],
     contacto: "Contacto",
-    country: "Évora, Alentejo, Portugal",
+    country: "Portugal",
     pedirOrcamento: "Pedir orçamento",
     rights: "Todos os direitos reservados",
     legal: "Legal",

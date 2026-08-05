@@ -28,7 +28,7 @@ export async function generateMetadata({
     description: t.meta.clientesDescription,
     path: "/clientes",
     image: "/imagens/EW1_1393.jpg",
-    keywords: ["clientes Líquen Events", "empresas de eventos Alentejo"],
+    keywords: ["clientes Líquen Events", "empresa de decoração de eventos Portugal"],
     ogLocale: t.meta.ogLocale,
   });
 }

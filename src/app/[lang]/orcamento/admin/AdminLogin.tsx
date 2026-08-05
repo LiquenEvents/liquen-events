@@ -141,7 +141,7 @@ export default function AdminLogin() {
         </Card>
 
         <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
-          Líquen Events · Évora
+          Líquen Events · Portugal
         </p>
       </div>
     </div>

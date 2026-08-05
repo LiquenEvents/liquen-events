@@ -23,9 +23,11 @@ describe("SITE identity invariants", () => {
     expect(SITE.locale).toBe("pt_PT");
   });
 
-  it("leads the areas served with the home city, then the region (SEO priority)", () => {
-    expect(AREAS_SERVED[0]).toBe("Évora");
-    expect(AREAS_SERVED).toContain("Alentejo");
-    expect(AREAS_SERVED[0]).toBe(SITE.city);
+  it("declares a national service area, not a single home region", () => {
+    // The studio decorates events all over the country, so the country leads
+    // and no single region is allowed to dominate the list.
+    expect(AREAS_SERVED[0]).toBe("Portugal");
+    expect(AREAS_SERVED).not.toContain("Alentejo");
+    expect(AREAS_SERVED).not.toContain("Évora");
   });
 });

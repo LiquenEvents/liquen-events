@@ -31,10 +31,10 @@ const GALLERY_SPANS = [
   "lg:col-span-4",
 ];
 
-// Highlight brand/location keywords without dangerouslySetInnerHTML: split the
+// Highlight brand/national keywords without dangerouslySetInnerHTML: split the
 // text on the keywords and render the matches as <strong>. Safe by construction
 // (no HTML is ever injected), even if the source copy changes.
-const EMPHASIS = /(Líquen Events|Alentejo|Lisboa|Portugal)/g;
+const EMPHASIS = /(Líquen Events|Portugal)/g;
 function emphasize(text: string) {
   return text.split(EMPHASIS).map((part, i) =>
     i % 2 === 1 ? (

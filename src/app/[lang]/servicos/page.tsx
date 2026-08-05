@@ -25,10 +25,10 @@ export async function generateMetadata({
     path: "/servicos",
     image: "/imagens/EW1_1330.jpg",
     keywords: [
-      "decoração de casamentos Alentejo",
-      "coordenação de casamentos Alentejo",
-      "eventos corporativos Lisboa",
-      "decoração de eventos Alentejo",
+      "decoração de casamentos Portugal",
+      "coordenação de casamentos",
+      "eventos corporativos Portugal",
+      "decoração de eventos Portugal",
     ],
     ogLocale: t.meta.ogLocale,
   });

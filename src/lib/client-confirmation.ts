@@ -26,7 +26,7 @@ const COPY = {
     bodyContact:
       "Obrigado pela sua mensagem. Já a recebemos — respondemos em menos de 24 horas (dias úteis).",
     reference: "A sua referência",
-    footer: "Líquen Events · Évora, Alentejo",
+    footer: "Líquen Events · Portugal",
     noreply: "Se precisar de acrescentar algo, basta responder a este email.",
   },
   en: {
@@ -38,7 +38,7 @@ const COPY = {
     bodyContact:
       "Thank you for your message. We've received it and will reply within 24 hours (business days).",
     reference: "Your reference",
-    footer: "Líquen Events · Évora, Alentejo, Portugal",
+    footer: "Líquen Events · Portugal",
     noreply: "If you'd like to add anything, simply reply to this email.",
   },
 } as const;
