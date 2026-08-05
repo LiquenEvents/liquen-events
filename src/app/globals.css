@@ -367,14 +367,36 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
-/* Stop iOS Safari from auto-zooming when a form field is focused (it zooms
-   whenever the font is < 16px). Only bump on small screens so the desktop
-   look is untouched. */
-@media (max-width: 640px) {
+/* Impede o Safari do iOS de AMPLIAR a página quando um campo recebe o foco —
+   coisa que ele faz sempre que a letra do campo é menor que 16px, e que depois
+   não desfaz: fica-se com o ecrã descentrado a meio de preencher um
+   formulário.
+
+   ── Porque é que a condição é `(pointer: coarse)` e não uma largura ───────
+   Estava em `max-width: 640px`, e isso deixava o iPad de FORA. Medido: num
+   iPad em retrato (768px), a lista de pedidos serve o campo de procurar a
+   14px e os dois menus de filtro a 12px — os três ampliam ao serem tocados.
+   A largura nunca foi a pergunta certa: o zoom depende de o aparelho ter um
+   ecrã táctil, não de o ecrã ser estreito.
+
+   `(pointer: coarse)` é exactamente essa pergunta. Apanha o iPad, apanha um
+   telemóvel deitado (que passa dos 640px e também estava de fora), e deixa
+   de fora uma janela de portátil encolhida para 500px — que estava a levar
+   com o aumento sem precisar, porque com rato não há zoom nenhum. */
+@media (pointer: coarse) {
   input,
   textarea,
   select {
     font-size: 16px;
+  }
+  /* E a mesma altura mínima dos outros alvos. Um campo de texto é uma coisa em
+     que se TOCA para começar a escrever, e os do back office ficavam em 37–40 px
+     — abaixo dos 44. Fora os que não são caixas de escrever: um checkbox tem o
+     seu quadrado desenhado e quem cresce é o rótulo à volta (ver `.alvo-toque`
+     no rótulo da lista de pedidos), e um campo escondido não tem tamanho. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select {
+    min-height: 44px;
   }
 }
 /* Safe-area helper for fixed / edge elements (notch). */
@@ -407,6 +429,16 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+  /* Rede contra o efeito secundário do `display` acima: um elemento com
+     `hidden` do Tailwind está escondido POR `display: none`, e juntar-lhe
+     `.alvo-toque` fá-lo-ia REAPARECER no telemóvel — exactamente onde estava
+     escondido de propósito. Aconteceu-me a pensar no atalho de pesquisa da
+     barra de topo (`hidden sm:flex`), que se resolveu com `min-h` em vez desta
+     classe. Isto garante que, se alguém as juntar por engano, o `hidden`
+     ganha. */
+  .alvo-toque.hidden {
+    display: none;
   }
 }
 /* Subtle scrim behind white text that sits over the near-transparent MIDDLE of

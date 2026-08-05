@@ -206,6 +206,10 @@ async function percursoVerPedido(page, ap, medicoes) {
  * campo com letra pequena arruína a tarefa toda com um zoom que não desfaz.
  */
 async function percursoDialogos(page, ap, medicoes) {
+  // A gaveta de detalhe pode ter ficado aberta e tapa a barra de topo, que é
+  // onde estão os botões que se vão carregar a seguir.
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.waitForTimeout(600);
   const dialogos = [
     { abrir: /Novo pedido/i, nome: "novo-pedido" },
     { abrir: /Ajuda e glossário/i, nome: "ajuda" },
@@ -213,7 +217,7 @@ async function percursoDialogos(page, ap, medicoes) {
   for (const d of dialogos) {
     const botao = page.getByRole("button", { name: d.abrir }).first();
     if ((await botao.count()) === 0) continue;
-    await botao.click();
+    await botao.click({ timeout: 8000 });
     await page.waitForTimeout(1000);
     medicoes.push(await medir(page, ap.nome, d.nome));
     await capturar(page, ap.nome, d.nome);
@@ -288,13 +292,33 @@ async function main() {
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
 
     const medicoes = [];
+    // Cada percurso é isolado. Um passo que falha (um botão que mudou de nome,
+    // um diálogo que não abriu) não pode levar atrás os percursos seguintes —
+    // senão um engano do guião passa por "sem achados" nos que ficaram por
+    // correr, que é a pior maneira de um relatório mentir.
     try {
       await entrar(ctx, page);
-      await percursoVerPedido(page, ap, medicoes);
-      await percursoDialogos(page, ap, medicoes);
-      await percursoVistasDensas(page, ap, medicoes);
     } catch (e) {
-      achado("ERRO", ap.nome, "percurso", e.message.split("\n")[0]);
+      achado("ERRO", ap.nome, "entrar", e.message.split("\n")[0]);
+      await ctx.close();
+      continue;
+    }
+    for (const [nome, fn] of [
+      ["ver-pedido", percursoVerPedido],
+      ["dialogos", percursoDialogos],
+      ["vistas-densas", percursoVistasDensas],
+    ]) {
+      try {
+        await fn(page, ap, medicoes);
+      } catch (e) {
+        achado("ERRO", ap.nome, nome, e.message.split("\n")[0]);
+        // Voltar a um estado conhecido antes do percurso seguinte.
+        await page.keyboard.press("Escape").catch(() => {});
+        await page
+          .goto(`${BASE}/orcamento/admin`, { waitUntil: "domcontentloaded" })
+          .catch(() => {});
+        await page.waitForTimeout(1500);
+      }
     }
     relatorio.push({ aparelho: ap.nome, largura: ap.largura, medicoes });
     await ctx.close();

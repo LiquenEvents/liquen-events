@@ -1765,7 +1765,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <NotificationBell />
                 <button
                   onClick={() => setPaletteOpen(true)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-2 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                  className="hidden sm:flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
                   title="Pesquisar (Ctrl K)"
                 >
                   <svg
@@ -2311,7 +2311,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               unifies proposta/contrato/faturas/produção. Primary. */}
                           <Link
                             href={`/${lang}/orcamento/admin/evento/${selected.id}`}
-                            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16]"
+                            className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
                             title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                           >
                             <svg
@@ -2515,7 +2515,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             size="sm"
                             onClick={closeDetail}
                             aria-label="Fechar"
-                            className="px-2"
+                            className="px-2 pointer-coarse:min-w-11"
                           >
                             <svg
                               width="18"
@@ -2858,7 +2858,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <div className="flex items-center gap-2">
                             <a
                               href={`mailto:${selected.email}`}
-                              className="truncate text-xs text-[#4d6350] hover:underline"
+                              className="alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline"
                             >
                               {selected.email}
                             </a>
@@ -2867,7 +2867,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 navigator.clipboard?.writeText(selected.email);
                                 toast("Email copiado", "success");
                               }}
-                              className="shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
+                              className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
                               title="Copiar email"
                               aria-label="Copiar email"
                             >
@@ -2887,7 +2887,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <div className="flex items-center gap-2">
                             <a
                               href={`tel:${selected.phone}`}
-                              className="text-xs text-foreground/70 hover:text-foreground/90"
+                              className="alvo-toque text-xs text-foreground/70 hover:text-foreground/90"
                             >
                               {selected.phone}
                             </a>
@@ -2896,7 +2896,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80"
+                                className="alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80 inline-flex items-center"
                                 title="Abrir conversa no WhatsApp"
                               >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

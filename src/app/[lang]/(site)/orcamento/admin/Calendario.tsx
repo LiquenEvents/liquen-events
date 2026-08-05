@@ -170,7 +170,7 @@ function AddEventModal({
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
+            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
           >
             ×
           </button>
@@ -602,7 +602,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         e.stopPropagation();
                         openAdd(key);
                       }}
-                      className="hidden sm:block text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none px-0.5 motion-safe:transition-colors"
+                      className="hidden sm:block pointer-coarse:!hidden text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none px-0.5 motion-safe:transition-colors"
                     >
                       +
                     </button>

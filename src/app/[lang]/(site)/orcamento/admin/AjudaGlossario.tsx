@@ -46,7 +46,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
           <p className="bo-eyebrow">Ajuda e glossário</p>
           <button
             onClick={onClose}
-            className="text-foreground/30 hover:text-foreground/60 transition-colors text-lg leading-none"
+            className="alvo-toque text-foreground/30 hover:text-foreground/60 transition-colors text-lg leading-none"
             aria-label="Fechar"
           >
             ×
