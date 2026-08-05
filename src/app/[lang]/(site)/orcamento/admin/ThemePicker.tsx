@@ -351,6 +351,15 @@ async function getThemes(): Promise<ThemeSummary[]> {
   return run;
 }
 
+/** O tema pedido não existe (404). Tem nome próprio porque quem pede pode
+ *  estar a adivinhar — ver o efeito da primeira página. */
+class TemaInexistenteError extends Error {
+  constructor(themeId: string) {
+    super(`tema inexistente: ${themeId}`);
+    this.name = "TemaInexistenteError";
+  }
+}
+
 const pagesInFlight = new Map<string, Promise<CachedTheme & { unreadable: boolean }>>();
 
 /** A primeira página de um tema — da cache, do pedido em voo, ou da rede. Uma
@@ -364,6 +373,9 @@ async function getFirstPage(themeId: string): Promise<CachedTheme & { unreadable
     const res = await fetch(`/api/temas/${themeId}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`, {
       cache: "no-store",
     });
+    // O 404 sai distinguido porque quem chama pode estar a pedir um tema
+    // ADIVINHADO, que já não existe — e isso não é uma avaria que se mostre.
+    if (res.status === 404) throw new TemaInexistenteError(themeId);
     if (!res.ok) throw new Error("falhou");
     const data = await res.json();
     const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
@@ -970,9 +982,39 @@ export default function ThemePicker({
   // pedido — e sem um instante de "este tema não tem fotos".
   const [themes, setThemes] = useState<ThemeSummary[]>(() => cachedThemes() ?? []);
   const [loadingThemes, setLoadingThemes] = useState(() => cachedThemes() === null);
+  /**
+   * Começa JÁ num tema, sem esperar por rede nenhuma.
+   *
+   * Com a lista em cache, é o tema PREFERIDO — o desta sessão, o da sessão
+   * passada, ou o primeiro —, validado contra a lista e portanto certo.
+   *
+   * ── Sem cache: um palpite, e o bloqueio que ele tira ──────────────────
+   * Antes o `themeId` só era decidido DEPOIS de `/api/temas` responder, e o
+   * efeito das imagens depende dele. Ou seja: enquanto a lista de temas não
+   * chegasse, não se pedia UMA ÚNICA imagem. Era exactamente isso que se via —
+   * os separadores com as contagens apareciam logo e a grelha ficava em
+   * cinzento durante segundos. Quatro idas ao servidor antes do primeiro pixel.
+   *
+   * Mas o id do último tema já está aqui (a memória curta desta sessão) ou no
+   * `localStorage`: não é preciso perguntar a ninguém. Assim as imagens e a
+   * lista passam a ser pedidas EM PARALELO. É um PALPITE — pode apontar para um
+   * tema entretanto apagado —, e é o efeito da lista, mais abaixo, que o
+   * corrige quando estiver errado.
+   *
+   * Ler `localStorage` no desenho é seguro AQUI, e não seria em qualquer sítio:
+   * este diálogo vive atrás de `{picker && …}` no estúdio, portanto só monta
+   * depois de um clique e nunca faz parte do HTML do servidor — não há
+   * hidratação com que discordar.
+   */
   const [themeId, setThemeId] = useState<string | null>(() => {
     const list = cachedThemes();
-    return list ? preferredThemeId(list) : null;
+    if (list) return preferredThemeId(list);
+    if (lastThemeId) return lastThemeId;
+    try {
+      return localStorage.getItem(LAST_THEME_KEY);
+    } catch {
+      return null; // localStorage indisponível — espera-se pela lista
+    }
   });
 
   /** As fotos JÁ CARREGADAS, mais recentes primeiro — sempre um PREFIXO da
@@ -1014,6 +1056,25 @@ export default function ThemePicker({
       alive.current = false;
     };
   }, []);
+
+  /** A memória curta desta sessão acompanha o tema que está no ecrã: reabrir o
+   *  diálogo volta a este, mesmo que ela nunca tenha trocado de separador. */
+  useEffect(() => {
+    if (themeId) lastThemeId = themeId;
+  }, [themeId]);
+
+  /** A lista de temas, para LEITURA dentro de efeitos que não se devem repetir
+   *  quando ela chega.
+   *
+   *  Pô-la nas dependências do efeito das imagens custava um pedido inteiro a
+   *  mais: as imagens partiam a +72 ms (bem), a lista respondia a +1500 ms, e
+   *  o efeito corria OUTRA VEZ a pedir exactamente as mesmas imagens. Medido, e
+   *  visível no terceiro pedido do varrimento. Com a ref lê-se o valor mais
+   *  recente sem que a mudança dispare nada. */
+  const themesRef = useRef<ThemeSummary[]>(cachedThemes() ?? []);
+  useEffect(() => {
+    themesRef.current = themes;
+  }, [themes]);
 
   // O `tick` do runtime entra nestas memórias porque é ele que diz que algo
   // mudou lá fora (um lote arrancou, chegou ou falhou) — o valor em si não
@@ -1083,8 +1144,15 @@ export default function ThemePicker({
         const list = await getThemes();
         if (!active) return;
         setThemes(list);
-        const id = preferredThemeId(list);
-        if (id) showTheme(id);
+        // A lista chega DEPOIS de já se estarem a pedir as imagens do tema
+        // adivinhado. Aqui só se corrige o palpite quando ele estava errado: o
+        // tema guardado foi apagado, ou nunca houve nenhum. Quando estava
+        // certo — o caso normal — não se mexe em nada, e mexer seria voltar a
+        // pedir as mesmas imagens e perder o rolo.
+        setThemeId((atual) => {
+          if (atual && list.some((t) => t.id === atual)) return atual;
+          return preferredThemeId(list);
+        });
       } catch {
         if (active) toast("Não foi possível carregar os temas.", "error");
       } finally {
@@ -1094,7 +1162,7 @@ export default function ThemePicker({
     return () => {
       active = false;
     };
-  }, [toast, showTheme]);
+  }, [toast]);
 
   // ── Primeira página de fotos do tema selecionado ──
   // Só esta página é assinada pelo servidor; o resto vem em "Mostrar mais".
@@ -1104,6 +1172,10 @@ export default function ThemePicker({
     if (cachedTheme(themeId)) return;
     let active = true;
     (async () => {
+      // Vai haver pedido: a grelha está a CARREGAR, não vazia. Sem isto, o
+      // tema corrigido depois de um palpite errado passava um instante pela
+      // mensagem de "este tema não tem fotos".
+      setLoadingImages(true);
       try {
         const entry = await getFirstPage(themeId);
         if (!active) return;
@@ -1112,8 +1184,16 @@ export default function ThemePicker({
         setTruncated(entry.truncated);
         setPageFull(entry.full);
         setUnreadable(entry.unreadable);
-      } catch {
-        if (active) toast("Não foi possível carregar as fotos deste tema.", "error");
+      } catch (err) {
+        if (!active) return;
+        // O tema pode ter vindo do palpite e já não existir — foi apagado desde
+        // a última vez. Isso é um 404 ESPERADO, e não uma avaria: a lista de
+        // temas está a chegar e vai corrigir a escolha sozinha, o que faz este
+        // efeito correr outra vez no tema certo. Queixar-se aqui era mostrar um
+        // erro por causa de um palpite nosso.
+        if (err instanceof TemaInexistenteError && !themesRef.current.some((t) => t.id === themeId))
+          return;
+        toast("Não foi possível carregar as fotos deste tema.", "error");
       } finally {
         if (active) setLoadingImages(false);
       }
@@ -1121,6 +1201,9 @@ export default function ThemePicker({
     return () => {
       active = false;
     };
+    // `themes` NÃO entra aqui de propósito — é lido pela ref. Pô-lo nas
+    // dependências fazia o efeito correr outra vez quando a lista chegasse, a
+    // repedir as mesmas imagens que já estavam a caminho.
   }, [themeId, toast]);
 
   // O que a grelha tem passa a ser o que a cache tem — incluindo as páginas

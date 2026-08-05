@@ -101,6 +101,7 @@ export const Overview = dynamic(() => import("./Overview"), { loading: ViewLoadi
 const kanban = splitView(() => import("./Kanban"));
 const clientes = splitView(() => import("./Clientes"));
 const calendario = splitView(() => import("./Calendario"));
+const fazerProposta = splitView(() => import("./FazerProposta"));
 const propostas = splitView(() => import("./Propostas"));
 const tarefas = splitView(() => import("./Tarefas"));
 const fornecedores = splitView(() => import("./Fornecedores"));
@@ -114,6 +115,7 @@ const temas = splitView(() => import("./Temas"));
 export const Kanban = kanban.View;
 export const Clientes = clientes.View;
 export const Calendario = calendario.View;
+export const FazerProposta = fazerProposta.View;
 export const Propostas = propostas.View;
 export const Tarefas = tarefas.View;
 export const Fornecedores = fornecedores.View;
@@ -177,6 +179,7 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   kanban: kanban.warm,
   clientes: clientes.warm,
   calendario: calendario.warm,
+  "fazer-proposta": fazerProposta.warm,
   propostas: propostas.warm,
   tarefas: tarefas.warm,
   fornecedores: fornecedores.warm,

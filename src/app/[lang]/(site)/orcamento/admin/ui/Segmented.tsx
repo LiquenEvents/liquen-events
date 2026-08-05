@@ -56,7 +56,14 @@ export function Segmented<T extends string>({
   size = "md",
   className,
 }: SegmentedProps<T>) {
-  const pad = size === "sm" ? "h-8 px-3 text-xs" : "h-9 px-3.5 text-sm";
+  // 44 px de altura onde se toca com o dedo, a densidade de sempre com rato —
+  // a mesma regra e a mesma razão que estão escritas em `Button.tsx`. Estes
+  // segmentos são filtros ("Todas · 0", "Últimos 3 meses"), e são dos alvos em
+  // que mais se toca no telemóvel.
+  const pad =
+    size === "sm"
+      ? "h-8 pointer-coarse:h-11 px-3 text-xs"
+      : "h-9 pointer-coarse:h-11 px-3.5 text-sm";
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;

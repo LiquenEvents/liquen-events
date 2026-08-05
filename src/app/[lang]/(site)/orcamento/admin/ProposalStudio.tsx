@@ -40,9 +40,9 @@ const UPLOAD_CONCURRENCY = 4;
 
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-foreground/85";
 const ADD_BTN =
-  "inline-flex items-center gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors";
+  "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors inline-flex items-center";
 const REMOVE_BTN =
-  "text-foreground/30 hover:text-[#8a2a22] transition-colors text-base leading-none shrink-0";
+  "alvo-toque text-foreground/30 hover:text-[#8a2a22] transition-colors text-base leading-none shrink-0";
 
 const PT_MONTHS = [
   "janeiro",
@@ -1326,9 +1326,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   key={bi}
                   className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
                 >
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     <input
-                      className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
                       value={b.title}
                       onChange={(e) => updateBoard(bi, { title: e.target.value })}
                       placeholder="Decoração Cerimónia"
@@ -1421,9 +1421,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                   key={pi}
                   className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
                 >
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     <input
-                      className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
+                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
                       value={ph.title}
                       onChange={(e) => updatePhase(pi, { title: e.target.value })}
                       placeholder="6-12 meses antes do casamento"
@@ -1899,7 +1899,7 @@ function StepNav({
               type="button"
               onClick={() => onSelect(s.id)}
               aria-current={active ? "step" : undefined}
-              className={`inline-flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium motion-safe:transition-colors ${
+              className={`alvo-toque gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium motion-safe:transition-colors inline-flex items-center ${
                 active
                   ? "bg-[#4d6350] text-white"
                   : "text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground/80"

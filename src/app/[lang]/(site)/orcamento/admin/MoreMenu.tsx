@@ -95,6 +95,11 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
         ref={triggerRef}
         variant="ghost"
         size="sm"
+        // No telemóvel o rótulo esconde-se (`hidden sm:inline` abaixo) e sobra
+        // só o glifo "⋯": o botão fica com 39 px de largura, três abaixo do
+        // mínimo. A altura já vem dos 44 px do `ui/Button.tsx`; falta a
+        // largura, e só onde há dedo.
+        className="pointer-coarse:min-w-11"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

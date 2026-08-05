@@ -112,7 +112,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="-mt-3 -mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/35 motion-safe:transition-colors hover:text-foreground/70"
+            className="alvo-toque -mt-3 -mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/35 motion-safe:transition-colors hover:text-foreground/70"
           >
             <svg
               width="18"

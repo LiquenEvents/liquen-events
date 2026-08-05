@@ -70,7 +70,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
         {value && (
           <button
             onClick={() => persist(undefined)}
-            className="px-3 py-2 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-foreground/65 transition-colors"
+            className="alvo-toque px-3 py-2 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-foreground/65 transition-colors"
           >
             Limpar
           </button>
@@ -85,7 +85,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
           <button
             key={p.label}
             onClick={() => persist(plusDays(p.days))}
-            className="px-2.5 py-1 rounded-full bg-foreground/[0.05] text-foreground/45 text-[11px] hover:bg-foreground/[0.09] hover:text-foreground/70 transition-colors"
+            className="alvo-toque px-2.5 py-1 rounded-full bg-foreground/[0.05] text-foreground/45 text-[11px] hover:bg-foreground/[0.09] hover:text-foreground/70 transition-colors"
           >
             {p.label}
           </button>

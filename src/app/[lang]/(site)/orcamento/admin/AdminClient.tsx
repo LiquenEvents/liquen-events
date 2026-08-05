@@ -54,6 +54,7 @@ import {
   StatsDashboard,
   ProposalBuilder,
   ProposalStudio,
+  FazerProposta,
   ProductionPlan,
   EmailTemplates,
   Faturas,
@@ -288,8 +289,12 @@ const QuoteCard = memo(function QuoteCard({
     daysSince >= 14;
   return (
     <div className="relative">
+      {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
+          toque no rótulo activar o controlo. 24 px chegavam para o rato e não
+          para o dedo; `alvo-toque` leva-o a 44 px no telemóvel sem mexer no
+          quadrado desenhado, que continua a ser o de 16 px. */}
       <label
-        className="absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
+        className="alvo-toque absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
         onClick={(e) => e.stopPropagation()}
       >
         <input
@@ -460,6 +465,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const quotesEtag = useRef<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
+  /** Pedido escolhido na vista "Fazer proposta".
+   *
+   *  Vive aqui e não dentro da vista porque a vista desmonta ao mudar de
+   *  ecrã: sem isto, ir ver o calendário a meio de escrever uma proposta
+   *  devolvia-a à lista de clientes ao voltar. (O conteúdo da proposta em si
+   *  não se perde — o estúdio grava rascunho —, mas ter de reescolher a
+   *  pessoa a cada volta era atrito puro.) */
+  const [propostaPara, setPropostaPara] = useState<string | null>(null);
   // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
   const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -475,6 +488,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // is an inline sticky column. Only the overlay should behave as a dialog (focus
   // trap, aria-modal, scroll lock) — the inline panel must not trap focus.
   const [isDetailOverlay, setIsDetailOverlay] = useState(false);
+  /**
+   * A barra lateral está fora do ecrã (gaveta), e não encostada como coluna?
+   *
+   * Abaixo de `lg` a barra é uma gaveta que vive em `-translate-x-full` quando
+   * fechada: continua no DOM, com tamanho, apenas empurrada para fora. A partir
+   * de `lg` é uma coluna sempre visível. Sem saber em qual dos dois estamos não
+   * há como marcá-la inerte só no caso certo.
+   */
+  const [navEhGaveta, setNavEhGaveta] = useState(false);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
   // Focus trap for the mobile detail drawer — active only while it's the overlay.
@@ -690,6 +712,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       document.body.style.overflow = prev;
     };
   }, [navOpen]);
+
+  // A barra lateral é gaveta abaixo de `lg` (1024px) — o mesmo ponto de corte
+  // do `lg:sticky` / `lg:translate-x-0` que a desenha. Mesmo guarda do efeito
+  // abaixo: sem `matchMedia` (SSR / jsdom) fica em `false`, que é o estado
+  // seguro — nunca marca inerte uma barra que possa estar visível.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setNavEhGaveta(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // Track whether the detail panel is currently a modal overlay (below xl) so the
   // dialog/focus-trap behaviour is gated to that state. matchMedia may be absent
@@ -1265,7 +1300,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
+        className={`alvo-toque !justify-start group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
           active
             ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
             : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
@@ -1303,6 +1338,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Clientes",
     calendario: "Calendário",
     propostas: "Propostas",
+    "fazer-proposta": "Fazer proposta",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
@@ -1322,6 +1358,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Histórico por cliente",
     calendario: "Os seus eventos no tempo",
     propostas: "Todas as propostas enviadas",
+    "fazer-proposta": "Escolha o cliente e escreva a proposta",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
@@ -1357,7 +1394,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           }}
         />
         {/* ── Sidebar ── */}
+        {/* `inert` quando é gaveta E está fechada.
+            Sem isto, os 20 botões da gaveta fechada continuavam alcançáveis: o
+            `-translate-x-full` empurra-os para `x = -244` mas não os tira do
+            DOM, portanto o TAB de um teclado externo e o varrimento do
+            VoiceOver entravam lá dentro e o foco desaparecia do ecrã — ficava-se
+            a carregar em Tab às cegas. `inert` tira-os da ordem de foco e da
+            árvore de acessibilidade de uma vez.
+            As duas condições são precisas: a partir de `lg` a barra é uma
+            coluna sempre visível, e marcá-la inerte ali desligava a navegação
+            no portátil. */}
         <aside
+          inert={navEhGaveta && !navOpen}
           className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
             navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
@@ -1423,7 +1471,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     type="button"
                     onClick={() => setMoreNavOpen((o) => !o)}
                     aria-expanded={expanded}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                    className="alvo-toque !justify-start group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
                   >
                     <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
                       <svg
@@ -1478,7 +1526,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 logo debaixo de quem está com a sessão aberta. */}
             <button
               onClick={() => setPasskeysOpen(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+              className="alvo-toque w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
               title="Entrar sem palavra-passe neste aparelho"
             >
               <svg
@@ -1494,10 +1542,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </svg>
               Os meus dispositivos
             </button>
-            <div className="flex gap-1">
+            <div className="flex gap-1 pointer-coarse:gap-2">
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Atalhos de teclado"
               >
                 <svg
@@ -1518,7 +1566,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a
                 href="/api/backup"
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Exportar backup"
               >
                 <svg
@@ -1542,7 +1590,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   uma cópia sem forma de a repor nunca foi uma cópia. */}
               <button
                 onClick={() => setRestoreOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Repor cópia de segurança"
               >
                 <svg
@@ -1563,7 +1611,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </button>
               <button
                 onClick={logout}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Terminar sessão"
               >
                 <svg
@@ -1702,12 +1750,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   {VIEW_TITLES[view]}
                 </h1>
               </div>
-              <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className="ml-auto flex items-center gap-1.5 pointer-coarse:gap-2.5 sm:gap-2 shrink-0">
                 <button
                   onClick={() => setAjudaOpen(true)}
                   aria-label="Ajuda e glossário"
                   title="Ajuda e glossário"
-                  className="w-10 h-10 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
+                  className="alvo-toque w-10 h-10 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
                   <svg
                     width="16"
@@ -1728,7 +1776,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <NotificationBell />
                 <button
                   onClick={() => setPaletteOpen(true)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-2 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                  className="hidden sm:flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
                   title="Pesquisar (Ctrl K)"
                 >
                   <svg
@@ -1751,7 +1799,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   onClick={refresh}
                   disabled={refreshing}
                   aria-label="Atualizar pedidos"
-                  className="group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
+                  className="alvo-toque group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
                 >
                   <svg
                     width="13"
@@ -1779,7 +1827,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <button
                   onClick={() => setNewQuoteOpen(true)}
                   aria-label="Novo pedido"
-                  className="flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
+                  className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
                   title="Criar pedido manualmente"
                 >
                   <svg
@@ -1838,6 +1886,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "calendario" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Calendario quotes={activeQuotes} onOpen={openQuote} />
+            </div>
+          )}
+
+          {/* ── Fazer proposta ── */}
+          {view === "fazer-proposta" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <FazerProposta
+                quotes={activeQuotes}
+                selectedId={propostaPara}
+                onSelect={setPropostaPara}
+                onNovoPedido={() => setNewQuoteOpen(true)}
+                onSent={(q) => {
+                  setQuotes((prev) =>
+                    prev.map((x) => (x.id === q.id ? { ...x, status: "cotado" } : x)),
+                  );
+                  setSelected((prev) => (prev?.id === q.id ? { ...prev, status: "cotado" } : prev));
+                }}
+              />
             </div>
           )}
 
@@ -1941,7 +2007,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <button
                   onClick={() => setMineOnly((v) => !v)}
                   title={`Mostrar apenas pedidos atribuídos a ${userName}`}
-                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border shadow-sm transition-all ${
+                  className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border shadow-sm transition-all ${
                     mineOnly
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
                       : "bg-white border-foreground/[0.09] text-foreground/45 hover:text-foreground/65"
@@ -2022,7 +2088,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                    className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -2032,7 +2098,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                        className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -2046,7 +2112,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
+                  className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -2274,7 +2340,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               unifies proposta/contrato/faturas/produção. Primary. */}
                           <Link
                             href={`/${lang}/orcamento/admin/evento/${selected.id}`}
-                            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16]"
+                            className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
                             title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                           >
                             <svg
@@ -2478,7 +2544,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             size="sm"
                             onClick={closeDetail}
                             aria-label="Fechar"
-                            className="px-2"
+                            className="px-2 pointer-coarse:min-w-11"
                           >
                             <svg
                               width="18"
@@ -2821,7 +2887,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <div className="flex items-center gap-2">
                             <a
                               href={`mailto:${selected.email}`}
-                              className="truncate text-xs text-[#4d6350] hover:underline"
+                              className="alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline"
                             >
                               {selected.email}
                             </a>
@@ -2830,7 +2896,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 navigator.clipboard?.writeText(selected.email);
                                 toast("Email copiado", "success");
                               }}
-                              className="shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
+                              className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
                               title="Copiar email"
                               aria-label="Copiar email"
                             >
@@ -2850,7 +2916,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <div className="flex items-center gap-2">
                             <a
                               href={`tel:${selected.phone}`}
-                              className="text-xs text-foreground/70 hover:text-foreground/90"
+                              className="alvo-toque text-xs text-foreground/70 hover:text-foreground/90"
                             >
                               {selected.phone}
                             </a>
@@ -2859,7 +2925,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80"
+                                className="alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80 inline-flex items-center"
                                 title="Abrir conversa no WhatsApp"
                               >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

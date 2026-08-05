@@ -16,6 +16,35 @@ import sharp, { type JpegOptions } from "sharp";
  * foto vai mesmo ser desenhada, quantos pixéis valem a pena e com que encode.
  */
 
+/**
+ * O `sharp` em ambiente serverless: uma operação de cada vez, sem cache.
+ *
+ * ── Porquê ────────────────────────────────────────────────────────────────
+ * Por omissão o libvips abre tantas linhas de trabalho quantos os núcleos e
+ * guarda bitmaps descomprimidos em cache. Numa função serverless isso é a
+ * receita para bater no tecto de memória: uma foto de 2200×1475 ocupa ~10 MB
+ * já descodificada, e uma proposta traz catorze. Com várias em paralelo mais a
+ * cache, sobe depressa acima do que a função tem.
+ *
+ * E quando o `sharp` fica sem memória, ATIRA — e o gerador de PDF apanha, usa o
+ * ORIGINAL, e o documento sai com as fotos em tamanho de armazenamento. Foi
+ * exactamente o que aconteceu a um PDF verdadeiro: 3,31 MB com fotos a
+ * 266–576 DPI quando o código manda 130–160 (ver PDF-BEFORE.md).
+ *
+ * Uma de cada vez é mais lento em teoria e não na prática: a função tem 1 ou 2
+ * núcleos, portanto o paralelismo do libvips estava sobretudo a multiplicar
+ * memória, não a poupar tempo.
+ *
+ * Corre uma vez por processo, no carregamento do módulo. Se a plataforma não
+ * expuser estes controlos, segue sem eles em vez de rebentar.
+ */
+try {
+  sharp.concurrency(1);
+  sharp.cache(false);
+} catch {
+  /* sem controlo de concorrência nesta plataforma — segue com o que houver */
+}
+
 /** Onde a foto é desenhada — cada sítio tem o seu orçamento de resolução. */
 export type ImagePlacement = "cover" | "collage";
 

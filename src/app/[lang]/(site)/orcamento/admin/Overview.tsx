@@ -502,7 +502,7 @@ const MetaReceita = memo(function MetaReceita({
               setGoalInput(goal > 0 ? String(goal) : "");
               setEditingGoal(true);
             }}
-            className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+            className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
           >
             {goal > 0 ? "Editar meta" : "Definir meta"}
           </button>
@@ -688,7 +688,7 @@ const NotasEquipa = memo(function NotasEquipa({
         {!editingNotes && carga !== "erro" && (
           <button
             onClick={() => setEditingNotes(true)}
-            className={`text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+            className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
           >
             {teamNotes ? "Editar" : "Adicionar nota"}
           </button>
@@ -1097,7 +1097,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             <button
               key={a.label}
               onClick={a.onClick}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
+              className={`alvo-toque flex items-center gap-2 px-3.5 py-2 rounded-xl text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm"
                   : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 shadow-sm"
@@ -1266,7 +1266,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             <h3 className="bo-eyebrow">Fases dos pedidos</h3>
             <button
               onClick={() => onGo("kanban")}
-              className={`text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+              className={`alvo-toque text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               Abrir →
             </button>
@@ -1318,7 +1318,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
             <button
               onClick={onGoStats}
-              className={`text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+              className={`alvo-toque text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               Ver tudo →
             </button>
@@ -1456,7 +1456,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className={`w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
               >
                 <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
                 <span className="text-foreground/30 text-[10px] shrink-0">

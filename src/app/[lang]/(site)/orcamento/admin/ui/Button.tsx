@@ -65,9 +65,30 @@ const VARIANTS: Record<ButtonVariant, string> = {
   danger: "bg-[#8a2a22] text-white shadow-sm hover:bg-[#73211b]",
 };
 
+/**
+ * Alturas por tamanho, com um mínimo de 44 px onde se toca com o dedo.
+ *
+ * ── Porquê 44, e porquê só no dedo ────────────────────────────────────────
+ * 44×44 px é o mínimo das Human Interface Guidelines da Apple (o Material
+ * Design pede 48 dp). Não é gosto: a polpa do dedo cobre ~10 mm e o ecrã não
+ * sabe onde está o centro dela, portanto abaixo disto a taxa de toques errados
+ * sobe depressa. Com rato é outra história — o ponteiro tem um pixel de
+ * precisão, e alturas de 32/40 px são o que dá a densidade calma que este back
+ * office quer no portátil.
+ *
+ * `pointer-coarse:` resolve para `@media (pointer: coarse)`, que é verdade num
+ * telemóvel ou tablet e falso com rato. Portanto: o portátil fica EXACTAMENTE
+ * como estava, e o telemóvel — onde a dona trabalha a sério — passa a ter
+ * alvos em que se acerta.
+ *
+ * `lg` já tem 48 px e não precisa de nada.
+ *
+ * Isto sozinho trata de 175 botões espalhados pelo back office: era a razão
+ * pela qual quase todos os alvos medidos a 375 px davam 32 ou 40 px de altura.
+ */
 const SIZES: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-xs",
-  md: "h-10 px-4 text-sm",
+  sm: "h-8 pointer-coarse:h-11 px-3 text-xs",
+  md: "h-10 pointer-coarse:h-11 px-4 text-sm",
   lg: "h-12 px-6 text-[15px]",
 };
 

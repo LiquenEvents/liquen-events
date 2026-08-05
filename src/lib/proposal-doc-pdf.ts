@@ -37,6 +37,7 @@ import {
   CARLITO_ITALIC_TTF_B64,
 } from "@/lib/proposal-fonts";
 import { winAnsiSafe } from "@/lib/pdf-text";
+import { log } from "@/lib/logger";
 
 const PT_MONTHS_SHORT = [
   "jan.",
@@ -267,7 +268,12 @@ function once(cache: EmbedCache, key: string, make: () => Promise<PDFImage | nul
  *  collage só pode ser desenhada por cima de uma foto que exista, e uma foto que
  *  não se consegue desenhar tem de ser contada como foto em falta. Um rectângulo
  *  de contorno vazio num PDF que vai para o cliente é pior do que não haver
- *  caixa nenhuma — foi assim que uma proposta seguiu com 6 molduras e 2 fotos. */
+ *  caixa nenhuma — foi assim que uma proposta seguiu com 6 molduras e 2 fotos.
+ *
+ *  As duas coisas são distintas e ambas contam: uma foto que sai pelo CAMINHO
+ *  DE RECURSO foi desenhada (devolve `true`, leva moldura) e avisa
+ *  `aoUsarRecurso` — saiu, apenas saiu pesada; só a foto que não se consegue
+ *  desenhar de todo devolve `false`, e essa não avisa ninguém por aqui. */
 async function drawCoverImage(
   doc: PDFDocument,
   page: PDFPage,
@@ -278,6 +284,8 @@ async function drawCoverImage(
   h: number,
   placement: ImagePlacement,
   cache: EmbedCache,
+  /** Chamado quando esta foto entra pelo caminho de recurso (sem redimensionar). */
+  aoUsarRecurso?: () => void,
 ): Promise<boolean> {
   const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
   let input: Buffer;
@@ -306,6 +314,18 @@ async function drawCoverImage(
   // Recurso: embutir o ORIGINAL e ajustar por recorte (nunca esticar). Também
   // vai a cache — sem isto, uma foto que o sharp não consiga tratar era escrita
   // por inteiro no ficheiro tantas vezes quantas fosse desenhada.
+  //
+  // ── ISTO TEM DE SE VER ────────────────────────────────────────────────────
+  // Este caminho foi desenhado para o PDF sair sempre, e cumpre — cumpre até
+  // demais: um PDF verdadeiro de 3,31 MB chegou com as fotos a 266–576 DPI
+  // quando o `PLACEMENT_DPI` manda 130–160, porque TODAS entraram por aqui e
+  // ninguém deu por nada. Medido: com este código, as caixas produzem
+  // exactamente 130 e 160 (ver PDF-BEFORE.md).
+  //
+  // Falhar em silêncio é o defeito. Contar não corrige a causa, mas põe-na à
+  // vista: quem gerar uma proposta passa a saber que ela saiu pesada, e o
+  // registo diz porquê.
+  aoUsarRecurso?.();
   const orig = await once(cache, `${content}@original`, () => embedImage(doc, input));
   if (orig) {
     drawImageCover(page, orig, x, y, w, h);
@@ -352,6 +372,12 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
  * - `undrawnImages` — fotos distintas que chegaram e que não foi possível
  *   desenhar (ver {@link NoteUndrawn}). São fotos EM FALTA, e quem chama
  *   soma-as à contagem que já existe.
+ * - `semRedimensionar` — fotos que FORAM desenhadas, mas pelo caminho de
+ *   recurso, com o original embutido. Não faltam ao cliente; o PDF é que sai
+ *   pesado a abrir e a percorrer.
+ *
+ * As duas últimas não se confundem: uma foto ou não sai (`undrawnImages`) ou
+ * sai pesada (`semRedimensionar`) — nunca as duas.
  *
  * O relatório sai daqui, e não de uma contagem feita por fora, porque só aqui
  * se sabe: as linhas dependem das métricas da fonte embutida e da largura da
@@ -359,10 +385,24 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
  * consegue embutir. Calculá-lo noutro sítio era garantir que um dia deixava de
  * coincidir com o que sai impresso.
  */
-export async function renderProposalDocPdfWithReport(
-  doc: ProposalDoc,
-): Promise<{ bytes: Uint8Array; truncations: DocTruncation[]; undrawnImages: number }> {
+export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<{
+  bytes: Uint8Array;
+  truncations: DocTruncation[];
+  undrawnImages: number;
+  semRedimensionar: number;
+}> {
   const truncations: DocTruncation[] = [];
+  /**
+   * Quantas fotos entraram SEM serem redimensionadas.
+   *
+   * Zero é o normal. Qualquer outro número quer dizer que o `sharp` falhou e
+   * que o PDF saiu com as fotos em tamanho de armazenamento — pesado a abrir e
+   * a percorrer. Era exactamente isto que estava a acontecer sem ninguém saber.
+   */
+  let semRedimensionar = 0;
+  const contarRecurso = () => {
+    semRedimensionar++;
+  };
   const note: NoteTruncation = (where, dropped, unit) => {
     if (dropped > 0) truncations.push({ where, dropped, unit });
   };
@@ -383,9 +423,12 @@ export async function renderProposalDocPdfWithReport(
   // Uma foto = um redimensionamento e um objeto no ficheiro, por muitas vezes
   // que seja desenhada (ver EmbedCache). Vive só durante este documento.
   const images: EmbedCache = new Map();
-  /** Desenha uma foto do documento E conta-a quando não sai. Usar sempre isto
-   *  em vez de `drawCoverImage` direto: é o que garante que uma foto que não se
-   *  desenha nunca fica invisível para quem vai enviar a proposta. */
+  /** Desenha uma foto do documento E conta-a nas duas contagens: quando não sai
+   *  de todo (`noteUndrawn`) e quando sai pelo caminho de recurso, sem
+   *  redimensionar (`contarRecurso`). Usar sempre isto em vez de
+   *  `drawCoverImage` direto: é o que garante que uma foto que não se desenha
+   *  nunca fica invisível para quem vai enviar a proposta, e que um PDF que
+   *  saiu pesado o diz. */
   const photo = async (
     p: PDFPage,
     b64: string,
@@ -395,7 +438,7 @@ export async function renderProposalDocPdfWithReport(
     h: number,
     placement: ImagePlacement,
   ): Promise<boolean> => {
-    const drawn = await drawCoverImage(pdf, p, b64, x, y, w, h, placement, images);
+    const drawn = await drawCoverImage(pdf, p, b64, x, y, w, h, placement, images, contarRecurso);
     if (!drawn) noteUndrawn(b64);
     return drawn;
   };
@@ -589,7 +632,9 @@ export async function renderProposalDocPdfWithReport(
       const right = doc.coverImages[1];
       // A capa não leva moldura (foi retirada a pedido), por isso uma foto que
       // não saia não deixa cá rectângulo nenhum — mas continua a ser uma foto
-      // que o cliente devia ter visto e não vê, logo é contada.
+      // que o cliente devia ter visto e não vê, logo é contada. E o `photo`
+      // encaminha também a contagem do caminho de recurso: a capa é a maior
+      // caixa do documento, é a que mais pesa quando entra sem redimensionar.
       if (left) await photo(p, left, 0, 0, sideW, H, "cover");
       if (right) await photo(p, right, sideW + panelW, 0, sideW, H, "cover");
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
@@ -807,6 +852,7 @@ export async function renderProposalDocPdfWithReport(
       boardName,
       note,
       noteUndrawn,
+      contarRecurso,
     );
   }
 
@@ -1088,7 +1134,9 @@ export async function renderProposalDocPdfWithReport(
       const right = doc.coverImages[1];
       // A capa não leva moldura (foi retirada a pedido), por isso uma foto que
       // não saia não deixa cá rectângulo nenhum — mas continua a ser uma foto
-      // que o cliente devia ter visto e não vê, logo é contada.
+      // que o cliente devia ter visto e não vê, logo é contada. E o `photo`
+      // encaminha também a contagem do caminho de recurso: a capa é a maior
+      // caixa do documento, é a que mais pesa quando entra sem redimensionar.
       if (left) await photo(p, left, 0, 0, sideW, H, "cover");
       if (right) await photo(p, right, sideW + panelW, 0, sideW, H, "cover");
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
@@ -1121,7 +1169,18 @@ export async function renderProposalDocPdfWithReport(
     }
   }
 
-  return { bytes: await pdf.save(), truncations, undrawnImages: undrawn.size };
+  if (semRedimensionar > 0) {
+    // ERRO e não aviso: o PDF sai, mas sai pesado a abrir e a percorrer, e até
+    // aqui isso acontecia sem deixar rasto nenhum. Um PDF verdadeiro de
+    // 3,31 MB chegou com as fotos a 266–576 DPI por este caminho.
+    log.error("proposal-doc-pdf: fotos embutidas SEM redimensionar", null, {
+      quantas: semRedimensionar,
+      ref: doc.ref,
+      porque:
+        "o sharp falhou e usou-se o original. O PDF fica pesado a abrir. " + "Ver PDF-BEFORE.md.",
+    });
+  }
+  return { bytes: await pdf.save(), truncations, undrawnImages: undrawn.size, semRedimensionar };
 }
 
 // Small helper factory so the collage function can reuse the closures.
@@ -1143,6 +1202,9 @@ async function drawCollage(
   boardName: string,
   note: NoteTruncation,
   noteUndrawn: NoteUndrawn,
+  /** Ver `renderProposalDocPdfWithReport`: conta as fotos que entram sem
+   *  serem redimensionadas, para a proposta poder dizer que saiu pesada. */
+  contarRecurso: () => void,
 ) {
   // Wrap the annotation (description + optional flower list) to the page measure
   // up front so the collage reserves exactly the height the caption needs. Capped
@@ -1174,7 +1236,18 @@ async function drawCollage(
   // das fotos ocupa a página na mesma. E a foto que não saiu é CONTADA, para o
   // estúdio ser avisado antes de enviar.
   const place = async (b64: string, x: number, yBottom: number, w: number, h: number) => {
-    const drawn = await drawCoverImage(pdf, p, b64, x, yBottom, w, h, "collage", cache);
+    const drawn = await drawCoverImage(
+      pdf,
+      p,
+      b64,
+      x,
+      yBottom,
+      w,
+      h,
+      "collage",
+      cache,
+      contarRecurso,
+    );
     if (!drawn) {
       noteUndrawn(b64);
       return;

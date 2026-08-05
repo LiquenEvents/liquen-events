@@ -71,16 +71,22 @@ const ROW_INPUT =
   "min-w-0 rounded-md border border-[var(--bo-control-border,rgba(42,38,32,0.5))] " +
   "bg-[var(--bo-surface,#ffffff)] px-2 py-1.5 text-xs leading-5 text-foreground/85 " +
   "transition-colors focus:border-[var(--bo-accent,#4c6350)] focus:outline-none";
+/** `alvo-toque`: 44 px no dedo, sem mexer no aspeto com rato (ver globals.css).
+ *  `!justify-start` porque a classe centra o conteúdo e este botão é uma linha
+ *  de texto que tem de ficar alinhada à esquerda com o resto da coluna. */
 const ADD_BTN =
-  "inline-flex items-center gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors";
+  "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors inline-flex items-center";
 /** Ações da linha: presentes SEMPRE no layout (nunca há salto), visíveis só em
  *  hover/foco — e sempre visíveis onde não há hover nenhum (tablet). */
 const ROW_ACTIONS =
   "flex items-center gap-0.5 shrink-0 opacity-0 transition-opacity " +
   "group-hover/row:opacity-100 group-focus-within/row:opacity-100 " +
   "[@media(hover:none)]:opacity-100";
+/** 24 px com rato — a densidade calma que este editor quer — e 44 px no dedo,
+ *  pelo `alvo-toque`. Estes ícones estão encostados uns aos outros, e é aqui
+ *  que acertar ao lado custa uma remoção que não se queria. */
 const ICON_BTN =
-  "inline-flex h-6 w-6 items-center justify-center rounded-md text-foreground/60 " +
+  "alvo-toque inline-flex h-6 w-6 items-center justify-center rounded-md text-foreground/60 " +
   "hover:bg-foreground/[0.07] hover:text-foreground/90 disabled:opacity-30 " +
   "disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors";
 
@@ -563,7 +569,12 @@ export default function ServicesEditor({
                 >
                   {({ handleProps }) => (
                     <>
-                      <div className="group/row flex items-center gap-1">
+                      {/* `flex-wrap`: a 375 px (o iPhone SE) os campos crescem
+                          para os 44 px de altura e 16 px de letra que o dedo
+                          pede, e esta fila deixava de caber — o título ficava
+                          espremido e as ações saíam da margem. A quebrar,
+                          descem para a linha de baixo inteiras. */}
+                      <div className="group/row flex flex-wrap items-center gap-1">
                         <DragHandle {...handleProps} label={`Arrastar grupo ${gi + 1}`} />
                         <input
                           {...fieldProps(groupKey(gid) + ":letter")}
@@ -579,7 +590,7 @@ export default function ServicesEditor({
                         <input
                           {...fieldProps(groupKey(gid))}
                           ref={register(groupKey(gid))}
-                          className={`${ROW_INPUT} flex-1 font-medium`}
+                          className={`${ROW_INPUT} min-w-[12rem] flex-1 font-medium`}
                           value={g.title}
                           onChange={(e) => updateGroup(gi, { title: e.target.value })}
                           onKeyDown={(e) => onGroupKeyDown(e, gi, "title")}

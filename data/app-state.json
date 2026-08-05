@@ -1,3 +1,40 @@
 {
-  "proposal-draft:LIQ-MPXCSMFV-AJ7R": null
+  "proposal-draft:LIQ-MPXCSMFV-AJ7R": {
+    "doc": {
+      "template": "decoracao",
+      "ref": "Decoração Casamento Maria Teste · 12 de setembro de 2026",
+      "clientNames": "Maria Teste",
+      "eventType": "Casamento",
+      "eventDate": "12 de setembro de 2026",
+      "location": "",
+      "guests": "120 pax",
+      "ceremony": "",
+      "time": "",
+      "weddingPlanners": "",
+      "serviceGroups": [
+        {
+          "letter": "a)",
+          "title": "",
+          "items": [
+            {
+              "label": "",
+              "desc": ""
+            }
+          ]
+        }
+      ],
+      "moodBoards": [],
+      "cronograma": [],
+      "budgetItems": [],
+      "budgetExtras": [],
+      "totalLabel": "Valor Total Decoração",
+      "totalText": "",
+      "budgetRows": [],
+      "totalEstimatedText": "",
+      "budgetNote": "",
+      "coverImages": ["", ""]
+    },
+    "updatedAt": "2026-08-05T15:15:14.287Z",
+    "savedBy": "Catarina"
+  }
 }

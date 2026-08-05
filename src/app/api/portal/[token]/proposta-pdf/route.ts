@@ -3,7 +3,8 @@ import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
-import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
+import { pdfDaPropostaEmCache } from "@/lib/proposal-pdf-cache";
+import { respostaPdf } from "@/lib/pdf-resposta";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
 
@@ -68,13 +69,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       return new NextResponse(null, { status: 404 });
     }
 
-    const pdf = await renderStoredProposalDocPdf(proposal.doc);
-    return new NextResponse(pdf, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="Proposta-Liquen-${quote.id}.pdf"`,
-      },
-    });
+    const pdf = await pdfDaPropostaEmCache(proposal.doc);
+    // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
+    const ref = quote.id.replace(/[^A-Za-z0-9_-]/g, "");
+    return respostaPdf(request, pdf, { nome: `Proposta-Liquen-${ref}.pdf` });
   } catch (err) {
     log.error("portal proposta-pdf GET falhou", err, { quoteId: claim.quoteId });
     return new NextResponse(null, { status: 500 });
