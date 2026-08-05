@@ -64,6 +64,9 @@ export interface MoodBoard {
 }
 
 export interface ServiceItem {
+  /** IDENTIDADE ESTÁVEL da linha, para o editor (chave de React, arrasto,
+   *  foco). Não é impressa: o PDF só lê `label`/`desc`. Ver {@link withServiceIds}. */
+  id?: string;
   /** Bold label, e.g. "Reunião inicial" or "Decoração Cerimónia". */
   label: string;
   /** Optional description shown after the label (Organização template). */
@@ -71,12 +74,68 @@ export interface ServiceItem {
 }
 
 export interface ServiceGroup {
+  /** Identidade estável do grupo — ver {@link ServiceItem.id}. */
+  id?: string;
   /** Ordinal marker, e.g. "a)". */
   letter?: string;
   /** Group title, e.g. "Decoração Floral de Casamento". */
   title: string;
   /** Sub-items (bullets); each is a label with an optional description. */
   items: ServiceItem[];
+}
+
+/**
+ * Id de recurso para um grupo/item que ainda não tem nenhum — DERIVADO DA
+ * POSIÇÃO, nunca sorteado.
+ *
+ * O editor usa o mesmo par de funções para desenhar as chaves de React antes de
+ * o preenchimento chegar ao documento, por isso a linha nunca troca de
+ * identidade a meio (que é exatamente o que fazia o cursor saltar).
+ */
+export function fallbackServiceGroupId(index: number): string {
+  return `g${index}`;
+}
+export function fallbackServiceItemId(groupId: string, index: number): string {
+  return `${groupId}~i${index}`;
+}
+
+/**
+ * Devolve os grupos com `id` em todos os grupos e itens, preenchendo os que
+ * faltam a partir da POSIÇÃO.
+ *
+ * Determinístico de propósito: isto corre a cada chamada de
+ * {@link withProposalDefaults} — do lado do servidor, a cada pré-visualização e
+ * a cada envio — e um id sorteado faria o MESMO documento serializar diferente
+ * de cada vez (rascunho a "mudar" sozinho, gravações e comparações inúteis).
+ *
+ * Ids já existentes são respeitados; um id repetido (rascunho estragado) é
+ * desempatado com um sufixo, também ele determinístico. Quando não há nada a
+ * preencher devolve o MESMO array, para o editor poder comparar por identidade.
+ */
+export function withServiceIds(groups: readonly ServiceGroup[]): ServiceGroup[] {
+  const used = new Set<string>();
+  /** O `base`, ou `base_2`, `base_3`… até sair um id livre. */
+  const free = (base: string): string => {
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}_${n}`;
+    used.add(id);
+    return id;
+  };
+  let changed = false;
+  const next = groups.map((g, gi) => {
+    const groupId = free(g.id || fallbackServiceGroupId(gi));
+    let itemsChanged = false;
+    const items = (g.items ?? []).map((it, ii) => {
+      const itemId = free(it.id || fallbackServiceItemId(groupId, ii));
+      if (itemId === it.id) return it;
+      itemsChanged = true;
+      return { ...it, id: itemId };
+    });
+    if (groupId === g.id && !itemsChanged) return g;
+    changed = true;
+    return { ...g, id: groupId, items };
+  });
+  return changed ? next : (groups as ServiceGroup[]);
 }
 
 /** A timeline phase in the "Cronograma de Organização" (Organização template). */
@@ -393,7 +452,10 @@ export function withProposalDefaults(
     // draft (merged in the studio on mount) could omit them, and the PDF
     // renderer iterates serviceGroups/budgetItems/… directly. A missing array
     // would throw "undefined is not iterable" → generic 500 "erro ao gerar".
-    serviceGroups: doc.serviceGroups ?? [],
+    // Com `id` em cada grupo/item — preenchido pela POSIÇÃO quando falta (ver
+    // {@link withServiceIds}), para o editor ter uma identidade estável por
+    // linha sem que o documento serialize diferente a cada chamada.
+    serviceGroups: withServiceIds(doc.serviceGroups ?? []),
     moodBoards: doc.moodBoards ?? [],
     cronograma: doc.cronograma ?? [],
     budgetItems: doc.budgetItems ?? [],

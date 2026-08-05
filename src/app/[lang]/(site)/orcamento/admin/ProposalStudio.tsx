@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import {
   withProposalDefaults,
@@ -16,6 +16,7 @@ import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage } from "./ThemePicker";
+import ServicesEditor, { MoveBtns } from "./ServicesEditor";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -141,8 +142,6 @@ function seedDefaults(d: StudioDoc, quotedPrice?: number): StudioDoc {
   }
   return next;
 }
-
-const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 
 function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const j = i + dir;
@@ -405,9 +404,14 @@ export default function ProposalStudio({ quote, onSent }: Props) {
   }, [doc.template, doc.eventType, doc.clientNames, doc.eventDate, refEdited]);
 
   // ── Debounced draft persistence ──
+  //
+  // `flushDraft` guarda a MESMA gravação que o debounce ia fazer, para o
+  // Ctrl/Cmd+Enter dos Serviços a poder disparar já (sem duplicar a lógica nem
+  // encurtar o debounce, que é o que segura a escrita durante a escrita).
+  const flushDraft = useRef<() => void>(() => {});
   useEffect(() => {
     if (!hydrated.current) return;
-    const t = setTimeout(() => {
+    const save = () => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
         localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
@@ -447,9 +451,17 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           /* offline — a cópia local guarda o trabalho até haver rede */
         }
       })();
-    }, 800);
+    };
+    flushDraft.current = save;
+    const t = setTimeout(save, 800);
     return () => clearTimeout(t);
   }, [doc, assetUrls, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY, quote.id, toast]);
+
+  /** Ctrl/Cmd+Enter nos Serviços — grava agora e diz que gravou. */
+  const saveNow = useCallback(() => {
+    flushDraft.current();
+    toast("Rascunho guardado", "success");
+  }, [toast]);
 
   const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
 
@@ -684,52 +696,18 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     }
   }
 
-  // ── Service groups ──
-  function addGroup() {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: [
-        ...d.serviceGroups,
-        { letter: `${LETTERS[d.serviceGroups.length] ?? ""})`, title: "", items: [] },
-      ],
-    }));
-  }
-  function updateGroup(gi: number, p: Partial<StudioDoc["serviceGroups"][number]>) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) => (i === gi ? { ...g, ...p } : g)),
-    }));
-  }
-  function removeGroup(gi: number) {
-    setDoc((d) => ({ ...d, serviceGroups: d.serviceGroups.filter((_, i) => i !== gi) }));
-  }
-  function moveGroup(gi: number, dir: -1 | 1) {
-    setDoc((d) => ({ ...d, serviceGroups: move(d.serviceGroups, gi, dir) }));
-  }
-  function addServiceItem(gi: number) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) =>
-        i === gi ? { ...g, items: [...g.items, { label: "", desc: "" }] } : g,
-      ),
-    }));
-  }
-  function updateServiceItem(gi: number, ii: number, p: Partial<{ label: string; desc: string }>) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) =>
-        i === gi ? { ...g, items: g.items.map((it, j) => (j === ii ? { ...it, ...p } : it)) } : g,
-      ),
-    }));
-  }
-  function removeServiceItem(gi: number, ii: number) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) =>
-        i === gi ? { ...g, items: g.items.filter((_, j) => j !== ii) } : g,
-      ),
-    }));
-  }
+  // ── Serviços ──
+  // O editor da secção vive em `ServicesEditor.tsx` (teclado, arrasto, anular).
+  // Aqui fica só a ponte para o documento.
+  const setServiceGroups = useCallback(
+    (update: (prev: StudioDoc["serviceGroups"]) => StudioDoc["serviceGroups"]) => {
+      setDoc((d) => {
+        const next = update(d.serviceGroups);
+        return next === d.serviceGroups ? d : { ...d, serviceGroups: next };
+      });
+    },
+    [],
+  );
 
   // ── Mood boards (decoracao) ──
   function addBoard() {
@@ -1130,83 +1108,14 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           </div>
         </Section>
 
-        {/* Service groups */}
+        {/* Serviços — o editor com teclado, arrasto e anular vive em ServicesEditor. */}
         <Section title="Serviços">
-          <div className="flex flex-col gap-3">
-            {doc.serviceGroups.map((g, gi) => (
-              <div
-                key={gi}
-                className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    className="bo-input w-12 px-2 py-2 text-xs text-foreground/70 text-center"
-                    value={g.letter ?? ""}
-                    onChange={(e) => updateGroup(gi, { letter: e.target.value })}
-                    placeholder="a)"
-                    aria-label="Letra do grupo (a, b, c…)"
-                  />
-                  <input
-                    className="bo-input flex-1 min-w-0 px-2.5 py-2 text-xs text-foreground/75"
-                    value={g.title}
-                    onChange={(e) => updateGroup(gi, { title: e.target.value })}
-                    placeholder="Decoração Floral de Casamento"
-                    aria-label="Título do grupo"
-                  />
-                  <MoveBtns
-                    onUp={() => moveGroup(gi, -1)}
-                    onDown={() => moveGroup(gi, 1)}
-                    disUp={gi === 0}
-                    disDown={gi === doc.serviceGroups.length - 1}
-                  />
-                  <button
-                    type="button"
-                    className={REMOVE_BTN}
-                    onClick={() => removeGroup(gi)}
-                    aria-label="Remover grupo"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2 pl-1">
-                  {g.items.map((it, ii) => (
-                    <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
-                      <input
-                        className={INPUT_SM}
-                        value={it.label}
-                        onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
-                        placeholder="Reunião inicial"
-                        aria-label="Item"
-                      />
-                      {!isDeco && (
-                        <input
-                          className={INPUT_SM}
-                          value={it.desc ?? ""}
-                          onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
-                          placeholder="Descrição"
-                          aria-label="Descrição do item"
-                        />
-                      )}
-                      <button
-                        type="button"
-                        className={`${REMOVE_BTN} sm:mt-2`}
-                        onClick={() => removeServiceItem(gi, ii)}
-                        aria-label="Remover item"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <button type="button" className={ADD_BTN} onClick={() => addServiceItem(gi)}>
-                    + Adicionar item
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button type="button" className={`${ADD_BTN} mt-3`} onClick={addGroup}>
-            + Adicionar grupo de serviços
-          </button>
+          <ServicesEditor
+            groups={doc.serviceGroups}
+            onGroupsChange={setServiceGroups}
+            showDesc={!isDeco}
+            onSave={saveNow}
+          />
         </Section>
 
         {/* Mood boards — decoracao only */}
@@ -1939,43 +1848,6 @@ function PreviewSummary({
         )}
       </div>
     </Section>
-  );
-}
-
-function MoveBtns({
-  onUp,
-  onDown,
-  disUp,
-  disDown,
-}: {
-  onUp: () => void;
-  onDown: () => void;
-  disUp: boolean;
-  disDown: boolean;
-}) {
-  const base =
-    "w-6 h-6 rounded-md text-foreground/35 hover:text-foreground/65 hover:bg-foreground/[0.06] disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-xs leading-none";
-  return (
-    <div className="flex items-center gap-0.5 shrink-0">
-      <button
-        type="button"
-        className={base}
-        onClick={onUp}
-        disabled={disUp}
-        aria-label="Mover para cima"
-      >
-        ↑
-      </button>
-      <button
-        type="button"
-        className={base}
-        onClick={onDown}
-        disabled={disDown}
-        aria-label="Mover para baixo"
-      >
-        ↓
-      </button>
-    </div>
   );
 }
 
