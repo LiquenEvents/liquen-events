@@ -81,15 +81,24 @@ union all
 -- O trabalho que sobra para a revisão em lote. É esperado que não seja zero:
 -- a pasta nunca soube dizer se uma foto de "Terracotta" é um bouquet ou um
 -- centro de mesa.
-select 'A. fotos sem TIPO (a rever)', '—', count(*)::text
-  from public.biblioteca_fotos f
- where not exists (select 1 from public.biblioteca_foto_etiquetas fe
-                    where fe.path = f.path and fe.etiqueta_id like 'tipo:%')
+--
+-- ARMADILHA que estas duas linhas evitam: com a tabela de fotos vazia, um
+-- `count(*)` dá 0 — e "0 fotos sem tipo" lê-se como boa notícia quando é
+-- exactamente o contrário (não há fotos nenhumas). Antes da migração dizem-no
+-- por palavras, em vez de um zero que engana.
+select 'A. fotos sem TIPO (a rever)', '—',
+       case when (select count(*) from public.biblioteca_fotos) = 0
+            then 'sem fotos na tabela — a migração ainda não correu'
+            else (select count(*)::text from public.biblioteca_fotos f
+                   where not exists (select 1 from public.biblioteca_foto_etiquetas fe
+                                      where fe.path = f.path and fe.etiqueta_id like 'tipo:%')) end
 union all
-select 'B. fotos sem PALETA (a rever)', '—', count(*)::text
-  from public.biblioteca_fotos f
- where not exists (select 1 from public.biblioteca_foto_etiquetas fe
-                    where fe.path = f.path and fe.etiqueta_id like 'paleta:%')
+select 'B. fotos sem PALETA (a rever)', '—',
+       case when (select count(*) from public.biblioteca_fotos) = 0
+            then 'sem fotos na tabela — a migração ainda não correu'
+            else (select count(*)::text from public.biblioteca_fotos f
+                   where not exists (select 1 from public.biblioteca_foto_etiquetas fe
+                                      where fe.path = f.path and fe.etiqueta_id like 'paleta:%')) end
 union all
 select 'C. nome corrigido?', '—',
        (select coalesce(string_agg(name, ', '), 'nenhum tema com "seating"')
