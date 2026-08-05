@@ -167,3 +167,50 @@ explicações, e não consigo distinguir entre elas daqui:
 sério. Guarde-o e dê-mo, e em minutos digo qual das três é. Sem isso, corrigir
 os três defeitos acima melhora o ficheiro, mas posso estar a tratar o sintoma
 errado.
+
+---
+
+# ADENDA — o PDF verdadeiro dela (3,31 MB, 10 páginas)
+
+Ela enviou um PDF real. Ele separa as três hipóteses: **é a segunda.**
+
+## A prova
+
+| | Amostra gerada por este código | **PDF verdadeiro dela** |
+| --- | --- | --- |
+| Peso | 0,95 MB / 11 pág. | **3,31 MB** / 10 pág. |
+| Capas | 617×1323 @ **160 DPI**, 260 KB | 1475×2200 @ **266 DPI**, **995 KB** |
+| Fotos de mood board | 266×299 @ **130 DPI**, 10–21 KB | 736×1308 … 1179×1598 @ **360–576 DPI**, 73–403 KB |
+| Proporções das fotos pequenas | **todas iguais** (0,89) | **todas diferentes** (0,56 / 0,66 / 0,74 / 0,80) |
+
+A última linha é a que fecha o caso. `resizeToBox` recorta ao aspecto **exacto
+da caixa**, portanto todas as fotos de uma mesma grelha têm de sair com a mesma
+proporção. **As dela têm proporções diferentes entre si** — logo não passaram
+por lá. Foram embutidas como estavam, pelo caminho de **RECURSO** do
+`drawCoverImage` (`proposal-doc-pdf.ts:264`), que embute o ORIGINAL e ajusta por
+recorte no desenho.
+
+Ou seja: o `sharp` está a falhar em produção, e ninguém dá por isso — o recurso
+foi desenhado para nunca lançar, e cumpre. O PDF sai sempre; sai é com as fotos
+inteiras lá dentro, a 360–576 DPI.
+
+## O que isto muda
+
+1. **A correcção principal deixa de ser "redimensionar as imagens"** — esse
+   código existe e está certo. Passa a ser **descobrir porque é que o `sharp`
+   falha em produção e fazê-lo falhar RUIDOSAMENTE** em vez de em silêncio.
+2. `renderProposalDocPdfWithReport` já existe e devolve um relatório. Se ele
+   distinguir "redimensionada" de "recurso", basta ligá-lo a um aviso — e o
+   back office passa a dizer quando uma proposta saiu pelo caminho mau.
+3. Os três defeitos da autópsia (logótipo com SMask nas 10 páginas a 720 DPI,
+   fontes sem subconjunto, ficheiro não linearizado) **mantêm-se todos**, e são
+   independentes deste. O logótipo, em particular, continua a ser a única
+   transparência do ficheiro — e é composto em todas as páginas.
+
+## Ainda por explicar
+
+Porque é que o `sharp` falha. Hipóteses a testar, por ordem: o binário não estar
+disponível no ambiente serverless da Vercel para a arquitectura em uso; um
+tecto de memória na função a matar o redimensionamento de ficheiros grandes; ou
+`failOn` a rejeitar ficheiros que as câmaras dela produzem. Nenhuma se confirma
+sem os registos de produção.
