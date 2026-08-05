@@ -27,6 +27,21 @@ import type { WorkerRequest, WorkerResponse } from "./image-worker";
 const SUPPORTED = /^image\/(jpe?g|png|webp)$/i;
 
 /**
+ * Os formatos que o PDF da proposta sabe IMPRIMIR — que não são os mesmos que
+ * carregamos.
+ *
+ * O gerador embute com o `pdf-lib`, que só sabe JPEG e PNG. Um WebP guardado
+ * tal e qual chegava ao mood board e não era desenhado: foi assim que uma
+ * proposta seguiu para uma cliente com seis molduras e duas fotos, e as fotos
+ * eram do Pinterest, que serve tudo em WebP.
+ *
+ * O WebP continua a ser ACEITE (recusá-lo fechava a porta à forma como o
+ * estúdio recolhe inspiração). O que muda é que deixa de poder ser GUARDADO
+ * como está — ver `keepOriginal`.
+ */
+const IMPRIMIVEL = /^image\/(jpe?g|png)$/i;
+
+/**
  * Per-use-case encode targets. Cover photos are printed LARGE in the proposal
  * (up to ~half the landscape A4 ≈ 300 DPI wants ~2500–3000 px) and are the hero
  * of the document, so they keep more pixels and a higher JPEG quality. Mood-board
@@ -100,9 +115,16 @@ export function fitWithin(w: number, h: number, maxEdge: number): { w: number; h
  *  A supported file that is BOTH small in bytes and already within the kind's
  *  pixel cap is sent untouched (no re-encode, no quality loss). We can't read
  *  pixels here, so this is the byte-size gate; oversize-dimension files fall
- *  through to the canvas path which enforces the cap. */
+ *  through to the canvas path which enforces the cap.
+ *
+ *  Só vale para os formatos que o PDF sabe imprimir (`IMPRIMIVEL`), e não para
+ *  todos os que aceitamos. Um WebP pequeno passava por aqui intacto — era
+ *  exatamente esta a porta por onde os WebP do Pinterest entravam na biblioteca
+ *  e acabavam como moldura vazia na proposta. Agora um WebP vai sempre ao
+ *  canvas, que devolve JPEG; ser pequeno deixa de ser desculpa para o guardar
+ *  num formato que não se imprime. */
 export function keepOriginal(type: string, size: number, kind: ImageKind = "cover"): boolean {
-  return SUPPORTED.test(type) && size <= PRESETS[kind].keepBytes;
+  return IMPRIMIVEL.test(type) && size <= PRESETS[kind].keepBytes;
 }
 
 /**
@@ -373,7 +395,9 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     source = await decode(file);
   } catch {
     // Formato suportado que este browser não descodifica: sobe tal e qual e
-    // fica sem miniatura (a grelha usa o original).
+    // fica sem miniatura (a grelha usa o original). Se não for imprimível, é o
+    // servidor que o converte antes de guardar — a porta fecha-se lá, e não
+    // aqui, precisamente para casos como este.
     if (SUPPORTED.test(file.type)) return { file, thumb: null };
     throw new Error(
       `"${file.name}" não é suportada neste navegador. Converta para JPG e tente de novo.`,

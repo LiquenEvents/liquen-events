@@ -11,6 +11,14 @@ const st = vi.hoisted(() => ({
   dbConfigured: true,
   upload: vi.fn(async (id: string) => ({ path: `${id}/x.jpg`, url: "https://signed/x.jpg" })),
   list: vi.fn(async (id: string) => [{ path: `${id}/x.jpg`, url: "https://signed/x.jpg" }]),
+  /** A conversão à porta: o que não é JPEG/PNG sai daqui já em JPEG. A real usa
+   *  sharp (que este ficheiro mocka), por isso mocka-se a FRONTEIRA — o que
+   *  interessa aqui é o que a rota GUARDA. */
+  converter: vi.fn(async (bytes: Buffer, contentType: string) =>
+    /^image\/(jpe?g|png)$/i.test(contentType)
+      ? { bytes, contentType }
+      : { bytes: Buffer.from("convertida"), contentType: "image/jpeg" },
+  ),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
@@ -19,6 +27,7 @@ vi.mock("@/lib/proposal-storage", () => ({
   uploadProposalImage: st.upload,
   listProposalImages: st.list,
 }));
+vi.mock("@/lib/proposal-image", () => ({ garantirFormatoImprimivel: st.converter }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 // The route reads image dimensions via sharp to reject decompression bombs.
 // Test fixtures are dummy bytes, so mock sharp to report a normal-sized image
@@ -113,6 +122,30 @@ describe("POST /api/orcamento/[id]/assets", () => {
     expect(body.images).toHaveLength(3);
     expect(st.upload).toHaveBeenCalledTimes(3);
     expect(st.upload).toHaveBeenCalledWith("q-1", expect.any(Buffer), "image/jpeg");
+  });
+
+  it("um WEBP é aceite mas GUARDADO em JPEG (o PDF não sabe imprimir WebP)", async () => {
+    // A porta que faltava fechar: o Pinterest serve WebP, o `pdf-lib` só embute
+    // JPEG/PNG, e um WebP guardado tal e qual acabava como moldura vazia na
+    // proposta do cliente. Recusar o formato fecharia o fluxo de trabalho do
+    // estúdio — converte-se à entrada.
+    const [req, ctx] = uploadReq([file("pinterest.webp", "image/webp")]);
+    expect((await POST(req, ctx)).status).toBe(200);
+    expect(st.upload).toHaveBeenCalledWith("q-1", expect.any(Buffer), "image/jpeg");
+    expect(st.upload).not.toHaveBeenCalledWith("q-1", expect.any(Buffer), "image/webp");
+  });
+
+  it("o PNG e o JPEG passam intactos — não se reencoda o que já é imprimível", async () => {
+    const [req, ctx] = uploadReq([file("b.png", "image/png")]);
+    expect((await POST(req, ctx)).status).toBe(200);
+    expect(st.upload).toHaveBeenCalledWith("q-1", expect.any(Buffer), "image/png");
+  });
+
+  it("415 quando nem o sharp consegue converter os bytes, sem guardar nada", async () => {
+    st.converter.mockResolvedValueOnce(null as unknown as { bytes: Buffer; contentType: string });
+    const [req, ctx] = uploadReq([file("estranha.webp", "image/webp")]);
+    expect((await POST(req, ctx)).status).toBe(415);
+    expect(st.upload).not.toHaveBeenCalled();
   });
 
   it("rejects the whole batch (415) as soon as one file has a bad type, before uploading the good one", async () => {

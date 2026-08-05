@@ -271,7 +271,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
 
     const alerta = await screen.findByRole("alert");
     const texto = alerta.textContent ?? "";
-    expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la\)/);
+    expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la ou desenhá-la\)/);
     expect(texto).toMatch(/Campo «Local»: 1 linha cortada/);
   });
 });
@@ -500,7 +500,7 @@ describe("a frase do aviso", () => {
         { where: "Nome na capa", dropped: 1, unit: "linhas" },
       ]),
     ).toBe(
-      "2 fotos não entraram (não foi possível ir buscá-las); " +
+      "2 fotos não entraram (não foi possível ir buscá-las ou desenhá-las); " +
         "Mood board «Cerimónia»: 3 fotos não entram no PDF; " +
         "Nome na capa: 1 linha cortada",
     );

@@ -261,10 +261,14 @@ function fraseDeCorte(c: Corte): string {
 export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): string | null {
   const partes: string[] = [];
   if (emFalta > 0) {
+    // "buscá-la OU desenhá-la": a contagem cobre as duas avarias — a foto que
+    // não se conseguiu ir buscar ao armazenamento e a que se foi buscar e não
+    // se conseguiu imprimir (um WebP antigo da biblioteca, bytes corrompidos).
+    // Para quem envia é a mesma perda e a mesma correcção: recarregar a foto.
     partes.push(
       emFalta === 1
-        ? "1 foto não entrou (não foi possível ir buscá-la)"
-        : `${emFalta} fotos não entraram (não foi possível ir buscá-las)`,
+        ? "1 foto não entrou (não foi possível ir buscá-la ou desenhá-la)"
+        : `${emFalta} fotos não entraram (não foi possível ir buscá-las ou desenhá-las)`,
     );
   }
   for (const c of cortes) partes.push(fraseDeCorte(c));

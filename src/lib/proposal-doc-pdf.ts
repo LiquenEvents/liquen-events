@@ -19,6 +19,7 @@ import {
   achatarLogotipo,
   imageContentKey,
   resizeToBox,
+  transcodificarParaJpeg,
   type ImagePlacement,
 } from "@/lib/proposal-image";
 import {
@@ -129,6 +130,23 @@ export interface DocTruncation {
 /** Regista uma truncagem (ignora `dropped <= 0`, que é o caso normal). */
 type NoteTruncation = (where: string, dropped: number, unit: DocTruncation["unit"]) => void;
 
+/**
+ * Regista uma foto que CHEGOU inteira ao gerador e que não foi possível
+ * DESENHAR (bytes corrompidos, ou um formato que nem o sharp nem o `pdf-lib`
+ * aceitam).
+ *
+ * Não é uma truncagem: não há aqui escolha de composição nenhuma a morder o
+ * conteúdo — é uma AVARIA, exactamente da mesma família da foto que não resolve
+ * do armazenamento, e a correcção é a mesma (voltar a tentar, ou recarregar a
+ * foto). Por isso soma-se às FOTOS EM FALTA e não ao conteúdo cortado.
+ *
+ * Recebe o base64 da foto para as contar por CONTEÚDO: a mesma foto escolhida
+ * para os dois lados da capa é desenhada quatro vezes (capa + contracapa) e
+ * falharia quatro vezes — dizer "4 fotos em falta" quando é uma só seria mandar
+ * o estúdio procurar fotos que não existem.
+ */
+type NoteUndrawn = (b64: string) => void;
+
 // ── Refined palette additions for the redesign ──
 const CREAM = rgb(0.968, 0.957, 0.933); // #f7f4ee — warm off-white on the dark cover
 const GOLD = rgb(0.541, 0.416, 0.114); // #8a6a1d — accent hairlines / eyebrows on light
@@ -137,7 +155,13 @@ const CREAM_DIM = rgb(0.72, 0.74, 0.71); // muted cream/sage for sub-text on dar
 /** Embed image bytes into the PDF, trying JPEG then PNG by their magic bytes and
  *  never throwing. Returns null when the bytes are neither (so a bad image is
  *  simply omitted instead of failing the whole document). `embedJpg`/`embedPng`
- *  are awaited so a rejection (e.g. "SOI not found in JPEG") is caught here. */
+ *  are awaited so a rejection (e.g. "SOI not found in JPEG") is caught here.
+ *
+ *  Último recurso: bytes que não são JPEG nem PNG são CONVERTIDOS para JPEG
+ *  pelo sharp e embutidos assim. O `pdf-lib` só sabe embutir estes dois
+ *  formatos, e a biblioteca do estúdio tem WebP a sério lá dentro (as fotos do
+ *  Pinterest) — sem esta conversão, essas fotos não eram desenhadas de todo e
+ *  ficava um buraco na página de inspiração. */
 async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | null> {
   const isJpg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8;
   const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e;
@@ -159,12 +183,23 @@ async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | n
   try {
     return await doc.embedJpg(bytes);
   } catch {
-    try {
-      return await doc.embedPng(bytes);
-    } catch {
-      return null;
-    }
+    /* fall through */
   }
+  try {
+    return await doc.embedPng(bytes);
+  } catch {
+    /* fall through */
+  }
+  // Nem JPEG nem PNG: o sharp lê WebP, AVIF, TIFF, GIF… — converte-se para
+  // JPEG baseline e embute-se isso. Guardado como tudo o resto: uma foto que
+  // nem assim entra é omitida, nunca deita abaixo o documento.
+  try {
+    const jpeg = await transcodificarParaJpeg(bytes);
+    if (jpeg) return await doc.embedJpg(jpeg);
+  } catch {
+    /* segue para o `null` */
+  }
+  return null;
 }
 
 /** Draw `img` to COVER the box (x,y,w,h) — the same visual result as CSS
@@ -226,8 +261,13 @@ function once(cache: EmbedCache, key: string, make: () => Promise<PDFImage | nul
  *  desenhar isso às medidas da caixa não pode distorcer. Recurso (sharp
  *  indisponível/falhado): embute-se o ORIGINAL e desenha-se com `drawImageCover`,
  *  que preserva o aspeto por recorte — parece igual e continua a não poder
- *  esticar (era o bug das "fotos esticadas"). Se nem isso resultar não desenha
- *  nada: fica a moldura fina de quem chamou e o PDF sai sempre. Nunca lança. */
+ *  esticar (era o bug das "fotos esticadas"). Nunca lança.
+ *
+ *  DEVOLVE se desenhou mesmo. Quem chama TEM de usar isto: a moldura fina do
+ *  collage só pode ser desenhada por cima de uma foto que exista, e uma foto que
+ *  não se consegue desenhar tem de ser contada como foto em falta. Um rectângulo
+ *  de contorno vazio num PDF que vai para o cliente é pior do que não haver
+ *  caixa nenhuma — foi assim que uma proposta seguiu com 6 molduras e 2 fotos. */
 async function drawCoverImage(
   doc: PDFDocument,
   page: PDFPage,
@@ -238,15 +278,15 @@ async function drawCoverImage(
   h: number,
   placement: ImagePlacement,
   cache: EmbedCache,
-): Promise<void> {
+): Promise<boolean> {
   const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
   let input: Buffer;
   try {
     input = Buffer.from(raw, "base64");
   } catch {
-    return;
+    return false;
   }
-  if (input.length < 32) return;
+  if (input.length < 32) return false;
 
   // A chave inclui a caixa: a mesma foto na capa e numa célula de mood board
   // são embutidas com resoluções diferentes, logo são objetos diferentes.
@@ -260,15 +300,20 @@ async function drawCoverImage(
   if (img) {
     // Recortada ao aspeto exato da caixa — desenhar às medidas dela não estica.
     page.drawImage(img, { x, y, width: w, height: h });
-    return;
+    return true;
   }
 
   // Recurso: embutir o ORIGINAL e ajustar por recorte (nunca esticar). Também
   // vai a cache — sem isto, uma foto que o sharp não consiga tratar era escrita
   // por inteiro no ficheiro tantas vezes quantas fosse desenhada.
   const orig = await once(cache, `${content}@original`, () => embedImage(doc, input));
-  if (orig) drawImageCover(page, orig, x, y, w, h);
-  // senão: não desenha nada — a moldura fina de quem chamou continua lá.
+  if (orig) {
+    drawImageCover(page, orig, x, y, w, h);
+    return true;
+  }
+  // Não há foto nenhuma para esta caixa. Quem chamou não desenha a moldura e
+  // conta-a como em falta.
+  return false;
 }
 
 function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
@@ -300,19 +345,32 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
 }
 
 /**
- * Gera o PDF E diz o que o desenho deixou de fora (ver {@link DocTruncation}).
+ * Gera o PDF E diz o que o desenho deixou de fora:
+ *
+ * - `truncations` — conteúdo que chegou inteiro e que a COMPOSIÇÃO não mostra
+ *   todo (ver {@link DocTruncation}).
+ * - `undrawnImages` — fotos distintas que chegaram e que não foi possível
+ *   desenhar (ver {@link NoteUndrawn}). São fotos EM FALTA, e quem chama
+ *   soma-as à contagem que já existe.
  *
  * O relatório sai daqui, e não de uma contagem feita por fora, porque só aqui
  * se sabe: as linhas dependem das métricas da fonte embutida e da largura da
- * caixa onde o texto é desenhado. Calculá-lo noutro sítio era garantir que um
- * dia deixava de coincidir com o que sai impresso.
+ * caixa onde o texto é desenhado, e só aqui se descobre que uma foto não se
+ * consegue embutir. Calculá-lo noutro sítio era garantir que um dia deixava de
+ * coincidir com o que sai impresso.
  */
 export async function renderProposalDocPdfWithReport(
   doc: ProposalDoc,
-): Promise<{ bytes: Uint8Array; truncations: DocTruncation[] }> {
+): Promise<{ bytes: Uint8Array; truncations: DocTruncation[]; undrawnImages: number }> {
   const truncations: DocTruncation[] = [];
   const note: NoteTruncation = (where, dropped, unit) => {
     if (dropped > 0) truncations.push({ where, dropped, unit });
+  };
+  // Por CONTEÚDO: a mesma foto que falha em vários sítios é uma foto, não
+  // várias (ver NoteUndrawn).
+  const undrawn = new Set<string>();
+  const noteUndrawn: NoteUndrawn = (b64) => {
+    undrawn.add(b64);
   };
   /** Corta a `max` linhas E DIZ quantas ficaram de fora. Usar sempre isto em
    *  vez de `.slice(0, max)`: o `.slice` é mudo, este não. */
@@ -325,6 +383,22 @@ export async function renderProposalDocPdfWithReport(
   // Uma foto = um redimensionamento e um objeto no ficheiro, por muitas vezes
   // que seja desenhada (ver EmbedCache). Vive só durante este documento.
   const images: EmbedCache = new Map();
+  /** Desenha uma foto do documento E conta-a quando não sai. Usar sempre isto
+   *  em vez de `drawCoverImage` direto: é o que garante que uma foto que não se
+   *  desenha nunca fica invisível para quem vai enviar a proposta. */
+  const photo = async (
+    p: PDFPage,
+    b64: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    placement: ImagePlacement,
+  ): Promise<boolean> => {
+    const drawn = await drawCoverImage(pdf, p, b64, x, y, w, h, placement, images);
+    if (!drawn) noteUndrawn(b64);
+    return drawn;
+  };
   pdf.registerFontkit(fontkit);
   // Carlito — a free, metric-compatible twin of Microsoft Calibri, the font the
   // studio's real "PO Decoração" sample proposals are set in. Embedding it (from
@@ -513,8 +587,11 @@ export async function renderProposalDocPdfWithReport(
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, "cover", images);
+      // A capa não leva moldura (foi retirada a pedido), por isso uma foto que
+      // não saia não deixa cá rectângulo nenhum — mas continua a ser uma foto
+      // que o cliente devia ter visto e não vê, logo é contada.
+      if (left) await photo(p, left, 0, 0, sideW, H, "cover");
+      if (right) await photo(p, right, sideW + panelW, 0, sideW, H, "cover");
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
@@ -720,7 +797,17 @@ export async function renderProposalDocPdfWithReport(
     // Como o mood board se chama num aviso. Sem título, vale a posição — é
     // assim que ele aparece no estúdio, contado a partir de 1.
     const boardName = mb.title.trim() ? `«${mb.title.trim()}»` : `${bi + 1}`;
-    await drawCollage(pdf, p, mb, f, textFns(text, textRight), images, boardName, note);
+    await drawCollage(
+      pdf,
+      p,
+      mb,
+      f,
+      textFns(text, textRight),
+      images,
+      boardName,
+      note,
+      noteUndrawn,
+    );
   }
 
   // ── Orçamento ──
@@ -999,8 +1086,11 @@ export async function renderProposalDocPdfWithReport(
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, "cover", images);
+      // A capa não leva moldura (foi retirada a pedido), por isso uma foto que
+      // não saia não deixa cá rectângulo nenhum — mas continua a ser uma foto
+      // que o cliente devia ter visto e não vê, logo é contada.
+      if (left) await photo(p, left, 0, 0, sideW, H, "cover");
+      if (right) await photo(p, right, sideW + panelW, 0, sideW, H, "cover");
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
@@ -1031,7 +1121,7 @@ export async function renderProposalDocPdfWithReport(
     }
   }
 
-  return { bytes: await pdf.save(), truncations };
+  return { bytes: await pdf.save(), truncations, undrawnImages: undrawn.size };
 }
 
 // Small helper factory so the collage function can reuse the closures.
@@ -1052,6 +1142,7 @@ async function drawCollage(
   cache: EmbedCache,
   boardName: string,
   note: NoteTruncation,
+  noteUndrawn: NoteUndrawn,
 ) {
   // Wrap the annotation (description + optional flower list) to the page measure
   // up front so the collage reserves exactly the height the caption needs. Capped
@@ -1074,8 +1165,20 @@ async function drawCollage(
   const gap = 8;
 
   // Draw one framed image into a box (cover-cropped, thin hairline frame).
+  //
+  // A MOLDURA SÓ EXISTE SE A FOTO EXISTIR. Era isto que faltava: o contorno era
+  // desenhado sempre, mesmo quando o desenho da foto falhava, e a página saía
+  // com rectângulos vazios (seis molduras, duas fotos, numa proposta que já
+  // tinha seguido para o cliente). Uma caixa vazia num documento que o cliente
+  // vê é pior do que não haver caixa — o collage não tem lugares fixos, o resto
+  // das fotos ocupa a página na mesma. E a foto que não saiu é CONTADA, para o
+  // estúdio ser avisado antes de enviar.
   const place = async (b64: string, x: number, yBottom: number, w: number, h: number) => {
-    await drawCoverImage(pdf, p, b64, x, yBottom, w, h, "collage", cache);
+    const drawn = await drawCoverImage(pdf, p, b64, x, yBottom, w, h, "collage", cache);
+    if (!drawn) {
+      noteUndrawn(b64);
+      return;
+    }
     p.drawRectangle({ x, y: yBottom, width: w, height: h, borderColor: LINE, borderWidth: 0.5 });
   };
 

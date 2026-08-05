@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import sharp from "sharp";
 import type { NextRequest } from "next/server";
 import { THEME_PAGE_SIZE, MAX_THEME_PAGE_SIZE, type ProposalTheme } from "@/lib/theme-types";
 
@@ -234,6 +235,28 @@ describe("POST /api/temas/[id]/imagens", () => {
     const gif = new File([new Uint8Array(4)], "a.gif", { type: "image/gif" });
     expect((await POST(...post([gif]))).status).toBe(415);
     expect(st.upload).not.toHaveBeenCalled();
+  });
+
+  it("um WEBP é aceite mas GUARDADO em JPEG (o PDF não sabe imprimir WebP)", async () => {
+    // As fotos desta biblioteca são copiadas tal e qual para a proposta e vão
+    // direitas ao mood board. O `pdf-lib` só embute JPEG/PNG, por isso um WebP
+    // guardado como está saía como MOLDURA VAZIA no PDF do cliente — foi assim
+    // que uma proposta seguiu com seis molduras e duas fotos. O formato continua
+    // a ser aceite (o Pinterest, que é de onde vêm as fotos, serve WebP): o que
+    // muda é o que fica guardado.
+    const bytes = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: { r: 120, g: 140, b: 110 } },
+    })
+      .webp()
+      .toBuffer();
+    const foto = new File([new Uint8Array(bytes)], "pinterest.webp", { type: "image/webp" });
+    const res = await POST(...post([foto]));
+    expect(res.status).toBe(200);
+    const [, guardados, tipo] = st.upload.mock.calls[0] as unknown as [string, Buffer, string];
+    expect(tipo).toBe("image/jpeg");
+    // E o que se guardou é MESMO um JPEG (marcador SOI), não o WebP original.
+    expect(guardados[0]).toBe(0xff);
+    expect(guardados[1]).toBe(0xd8);
   });
 
   it("carrega as fotos recebidas", async () => {

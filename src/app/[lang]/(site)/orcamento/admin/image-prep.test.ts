@@ -37,7 +37,15 @@ describe("keepOriginal", () => {
   it("keeps small already-supported files untouched", () => {
     expect(keepOriginal("image/jpeg", 500_000)).toBe(true);
     expect(keepOriginal("image/png", 1_500_000)).toBe(true);
-    expect(keepOriginal("image/webp", 100)).toBe(true);
+  });
+
+  it("um WEBP pequeno NÃO é guardado como está — o PDF não sabe imprimi-lo", () => {
+    // O `pdf-lib` só embute JPEG e PNG. Um WebP pequeno passava por aqui
+    // intacto e ia parar à biblioteca; no mood board ficava uma moldura vazia.
+    // Continua a ser aceite — o que muda é que vai sempre ao canvas, que
+    // devolve JPEG.
+    expect(keepOriginal("image/webp", 100)).toBe(false);
+    expect(keepOriginal("image/webp", 100, "board")).toBe(false);
   });
 
   it("re-encodes big files even when the format is supported", () => {
