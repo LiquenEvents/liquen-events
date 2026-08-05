@@ -282,7 +282,14 @@ export const DEFAULT_CONDICOES_GERAIS: string[] = [
   "Aos valores acresce o IVA à taxa legal em vigor como descrito.",
   "Os orçamentos enviados pela Líquen Events terão de ser validados pela mesma, aquando da sua confirmação por parte dos clientes, sendo o critério aplicado, a disponibilidade para a realização do evento.",
   "A pré-reserva do evento deve ser efetuada por escrito através de email. A confirmação do evento só será concluída após pagamento da adjudicação.",
+  // A sede é em Évora e os casamentos são em todo o país: a deslocação é
+  // cobrada pela distância até ao sítio onde o evento acontece. A isenção do
+  // distrito de Évora fica: aí não há deslocação a cobrar.
   "Será cobrado o valor de deslocação da equipa Líquen de acordo com os quilómetros relativos à distância de Évora ao local do evento, sempre que o evento se realize fora do distrito de Évora.",
+  // Trabalhar longe é mais do que combustível: um casamento a quatro horas de
+  // Évora obriga a equipa a dormir lá, e isso era um custo que a proposta não
+  // dizia e a Líquen absorvia.
+  "Sempre que a distância ao local ou o horário do evento obriguem a equipa Líquen a pernoitar, será cobrado o valor do alojamento.",
   "Deve estar contemplada a refeição para os elementos da equipa Líquen que ficam durante todo o evento.",
   "Esta proposta só é válida para o evento a realizar no dia {DATA}.",
   "O orçamento é válido para o número de {CONVIDADOS} convidados; abaixo ou acima deste número o valor da proposta terá de ser revisto.",

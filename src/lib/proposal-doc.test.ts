@@ -319,6 +319,26 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(DEFAULT_CONDICOES_GERAIS.some((s) => s.includes("{DATA}"))).toBe(true);
   });
 
+  it("as condições cobram deslocação E alojamento — são custos diferentes", () => {
+    // A deslocação já lá estava. O ALOJAMENTO não: um casamento a quatro horas
+    // de Évora obriga a equipa a dormir lá, e esse custo não era dito ao
+    // cliente nem cobrado — ficava com a Líquen.
+    const doc = withProposalDefaults(base());
+    const texto = doc.condicoesGerais.join("\n");
+    expect(texto).toMatch(/deslocação/i);
+    expect(texto).toMatch(/pernoitar/i);
+    expect(texto).toMatch(/alojamento/i);
+  });
+
+  it("uma proposta já gravada NÃO é reescrita pelas condições novas", () => {
+    // A regra que torna seguro afinar os textos: mudar o modelo não pode
+    // alterar o que já foi enviado a um cliente, porque isso mudava um
+    // documento que ele já tem na mão.
+    const proprias = ["Só isto foi acordado com este cliente."];
+    const doc = withProposalDefaults(base({ condicoesGerais: proprias }));
+    expect(doc.condicoesGerais).toEqual(proprias);
+  });
+
   it("BUG-GUARD: normalises the cover to two POSITIONS so a right-slot photo stays right", () => {
     // Draft antigo com um buraco à esquerda: a foto tem de continuar na posição 1.
     const doc = withProposalDefaults(
