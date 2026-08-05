@@ -35,6 +35,9 @@ function resumir(p: Awaited<ReturnType<typeof listAllProposals>>[number]) {
     eventDate: doc?.eventDate ?? "",
     location: doc?.location ?? "",
     guests: doc?.guests ?? "",
+    // Para as sugestões de "Local" e "Wedding Planners": o que ela já usou
+    // antes é a melhor lista possível, e não obriga a manter um catálogo.
+    weddingPlanners: doc?.weddingPlanners ?? "",
     // O «tamanho» da proposta, que é o que diz se vale a pena partir dela.
     grupos: doc?.serviceGroups?.length ?? 0,
     moodBoards: doc?.moodBoards?.length ?? 0,

@@ -330,6 +330,17 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   const [porConfirmar, setPorConfirmar] = useState<Set<CampoAMudar>>(() => new Set());
   /** Caixa do nome, aberta pelo "Guardar como modelo" do cabeçalho. */
   const [nomeModelo, setNomeModelo] = useState<string | null>(null);
+  /**
+   * O que ela já escreveu antes, para não voltar a escrever.
+   *
+   * Sai das propostas anteriores em vez de um catálogo à parte: um catálogo
+   * precisava de ser mantido, e um catálogo que ninguém mantém fica pior do
+   * que não existir. O que ela usou é, por definição, o que ela usa.
+   */
+  const [sugestoes, setSugestoes] = useState<{ locais: string[]; planners: string[] }>({
+    locais: [],
+    planners: [],
+  });
   // Free-typed mirror of the structured total, so pt-PT formatting ("3.000,00")
   // survives keystrokes. Parsed into `doc.totalAmount` (the money source of truth).
   const [totalInput, setTotalInput] = useState<string>("");
@@ -1172,6 +1183,40 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     }
   }
 
+  // Sugestões e a validade por omissão. Uma leitura só, ao abrir; se falhar,
+  // o estúdio funciona como antes — nenhuma destas coisas é indispensável.
+  useEffect(() => {
+    let vivo = true;
+    Promise.all([
+      fetch("/api/propostas?resumo=1").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/propostas/preferencias").then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([lista, prefs]) => {
+        if (!vivo) return;
+        const unicos = (vals: unknown[]) =>
+          [...new Set(vals.map((v) => String(v ?? "").trim()).filter(Boolean))].sort();
+        if (Array.isArray(lista)) {
+          setSugestoes({
+            locais: unicos(lista.map((p: { location?: string }) => p.location)),
+            planners: unicos(lista.map((p: { weddingPlanners?: string }) => p.weddingPlanners)),
+          });
+        }
+        // A validade só se aplica a um documento que ainda NÃO tem uma: mexer
+        // numa proposta já escrita porque a política mudou seria alterar-lhe
+        // as condições nas costas de quem a escreveu.
+        const dias = Number(prefs?.validUntilDays);
+        if (Number.isFinite(dias) && dias > 0) {
+          setDoc((d) => (d.validUntilDays ? d : { ...d, validUntilDays: dias }));
+        }
+      })
+      .catch(() => {
+        /* sem sugestões e com a validade de sempre */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
   function aplicarCopia(e: Escolha) {
     setDoc(e.doc as StudioDoc);
@@ -1209,6 +1254,28 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       return proximo;
     });
   };
+
+  /**
+   * A validade desta proposta passa a ser a de todas as novas.
+   *
+   * A missão pede um valor por omissão «configurável», e a forma mais barata
+   * de o configurar é a partir do sítio onde ela já está a decidir o número —
+   * em vez de um ecrã de definições que é preciso ir procurar.
+   */
+  async function guardarValidadePadrao(dias: number) {
+    try {
+      const r = await fetch("/api/propostas/preferencias", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ validUntilDays: dias }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error ?? "Não deu para guardar.");
+      toast(`As propostas novas passam a valer ${dias} dias.`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não deu para guardar.", "error");
+    }
+  }
 
   /** Guarda ESTA proposta como modelo reutilizável, com o nome que ela der. */
   async function guardarComoModelo(nome: string) {
@@ -1363,6 +1430,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
               />
               <Field
                 label="Local"
+                list="sug-locais"
                 value={doc.location}
                 onChange={(e) => {
                   confirmado("location");
@@ -1397,6 +1465,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                   />
                   <Field
                     label="Wedding Planners (opcional)"
+                    list="sug-planners"
                     value={doc.weddingPlanners ?? ""}
                     onChange={(e) => patch({ weddingPlanners: e.target.value })}
                     placeholder="Equipa AMARA"
@@ -1404,6 +1473,19 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 </>
               )}
             </div>
+
+            {/* As sugestões. `datalist` e não um `select`: ela TEM de poder
+                escrever um espaço novo — a lista ajuda, não fecha a porta. */}
+            <datalist id="sug-locais">
+              {sugestoes.locais.map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
+            <datalist id="sug-planners">
+              {sugestoes.planners.map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
 
             {/* Reference (advanced) */}
             <div className="mt-4">
@@ -2043,6 +2125,17 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 }}
                 placeholder={String(DEFAULT_VALID_DAYS)}
                 aria-label="Dias de validade"
+                hint={
+                  doc.validUntilDays ? (
+                    <button
+                      type="button"
+                      className="text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
+                      onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
+                    >
+                      Passar a usar {doc.validUntilDays} dias em todas as propostas novas
+                    </button>
+                  ) : undefined
+                }
               />
             </div>
             {/* Prévia do desdobramento — o que será efetivamente faturado. */}
