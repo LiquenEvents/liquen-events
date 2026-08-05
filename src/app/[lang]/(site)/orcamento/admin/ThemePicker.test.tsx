@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MAX_IMPORT_BATCH, THEME_PAGE_SIZE, type ThemeSummary } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
 import ThemePicker from "./ThemePicker";
+import { esquecerBiblioteca } from "./theme-picker-cache";
 
 /**
  * Rede de segurança do seletor da Biblioteca de Temas.
@@ -77,7 +78,7 @@ const onPicked = vi.fn();
 
 /** Abre o seletor e espera pela grelha de fotos. */
 async function openPicker(multiple: boolean, usedThemePaths?: string[]) {
-  render(
+  const montado = render(
     <ToastProvider>
       <ThemePicker
         quoteId="LQ-001"
@@ -89,6 +90,9 @@ async function openPicker(multiple: boolean, usedThemePaths?: string[]) {
     </ToastProvider>,
   );
   await screen.findByRole("button", { name: `Foto 1 de ${visible()}` });
+  // Devolvido para os testes que precisam de FECHAR e reabrir — é aí que se vê
+  // se a cache entre aberturas funciona.
+  return montado;
 }
 
 /** Quantas fotos a grelha mostra: uma página, ou a pasta toda se for menor. */
@@ -106,6 +110,10 @@ function cells() {
 }
 
 beforeEach(() => {
+  // A cache do seletor vive no MÓDULO, de propósito — é o que a faz
+  // sobreviver ao diálogo fechar. Sem a limpar aqui, cada teste herdava as
+  // fotos do anterior e a rede nem chegava a ser chamada.
+  esquecerBiblioteca();
   onClose.mockReset();
   onPicked.mockReset();
   localStorage.clear();
@@ -387,6 +395,42 @@ describe("ThemePicker", () => {
       path: "LQ-001/copia-foto-1.jpg",
       sourcePath: "t1/foto-1.jpg",
     });
+  });
+
+  it("reabrir na mesma sessão não gasta um único pedido", async () => {
+    // O seletor abre-se uma vez por mood board. Antes, cada abertura repetia
+    // os dois pedidos do zero — incluindo a lista de temas, que não muda de um
+    // minuto para o outro.
+    const { unmount } = await openPicker(true);
+    const naPrimeira = calls.length;
+    expect(naPrimeira).toBeGreaterThan(0);
+
+    unmount();
+    await openPicker(true);
+
+    expect(
+      calls.length,
+      `A reabertura gastou ${calls.length - naPrimeira} pedido(s): ` +
+        calls.slice(naPrimeira).join(", "),
+    ).toBe(naPrimeira);
+    // E não é um ecrã vazio: as fotos estão lá, sem terem sido pedidas.
+    expect(photo(1)).toBeInTheDocument();
+  });
+
+  it("mexer na Biblioteca faz a abertura seguinte ir buscar de novo", async () => {
+    // A contrapartida de guardar: o que ela acabou de carregar TEM de
+    // aparecer. `esquecerBiblioteca` é o que o ecrã da Biblioteca chama à
+    // saída, e é isto que prova que funciona.
+    const { unmount } = await openPicker(true);
+    const naPrimeira = calls.length;
+    unmount();
+
+    esquecerBiblioteca();
+    await openPicker(true);
+
+    expect(calls.length, "a abertura seguinte reaproveitou dados velhos").toBeGreaterThan(
+      naPrimeira,
+    );
   });
 
   it("com UMA foto não mostra barra de progresso — 0% parecia avariado", async () => {

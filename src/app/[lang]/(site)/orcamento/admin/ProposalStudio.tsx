@@ -16,6 +16,7 @@ import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage } from "./ThemePicker";
+import { aquecerBiblioteca } from "./theme-picker-cache";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -1119,6 +1120,14 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                         type="button"
                         className={`${ADD_BTN} mt-1.5`}
                         onClick={() => setPicker({ kind: "cover", idx })}
+                        // Ao passar o rato já se vai buscar o que o diálogo
+                        // precisa. Quando ela carrega, está lá. `focus` para
+                        // quem navega por teclado, e `touchstart` para o
+                        // telemóvel, onde não há hover nenhum — é o instante
+                        // entre pousar o dedo e o levantar.
+                        onPointerEnter={aquecerBiblioteca}
+                        onFocus={aquecerBiblioteca}
+                        onTouchStart={aquecerBiblioteca}
                       >
                         Da biblioteca de temas
                       </button>
@@ -1288,6 +1297,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                     type="button"
                     className={`${ADD_BTN} mt-2`}
                     onClick={() => setPicker({ kind: "board", bi })}
+                    onPointerEnter={aquecerBiblioteca}
+                    onFocus={aquecerBiblioteca}
+                    onTouchStart={aquecerBiblioteca}
                   >
                     Escolher da biblioteca de temas
                   </button>

@@ -10,6 +10,14 @@ import {
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { Button } from "./ui";
+import {
+  type PaginaTema,
+  buscarPrimeiraPagina,
+  buscarTemas,
+  paginaEmCache,
+  temasEmCache,
+  vaiRevalidar,
+} from "./theme-picker-cache";
 
 /**
  * Escolher fotos da Biblioteca de Temas para uma proposta.
@@ -185,8 +193,9 @@ export default function ThemePicker({
   const { toast } = useToast();
   const trapRef = useFocusTrap<HTMLDivElement>(true);
 
-  const [themes, setThemes] = useState<ThemeSummary[]>([]);
-  const [loadingThemes, setLoadingThemes] = useState(true);
+  // Já se foi buscar nesta sessão? Então a lista aparece sem esperar por nada.
+  const [themes, setThemes] = useState<ThemeSummary[]>(() => temasEmCache() ?? []);
+  const [loadingThemes, setLoadingThemes] = useState(() => temasEmCache() === null);
   /**
    * Começa JÁ no último tema usado, sem esperar por rede nenhuma.
    *
@@ -282,9 +291,7 @@ export default function ThemePicker({
     let active = true;
     (async () => {
       try {
-        const res = await fetch("/api/temas", { cache: "no-store" });
-        if (!res.ok) throw new Error("falhou");
-        const list: ThemeSummary[] = await res.json();
+        const list = await buscarTemas();
         if (!active) return;
         setThemes(list);
         // A lista chega DEPOIS de já se estar a pedir as imagens do último
@@ -314,39 +321,61 @@ export default function ThemePicker({
     // nada a limpar quando ainda não há seleção.
     if (!themeId) return;
     let active = true;
+
+    /** Põe uma página no ecrã. Serve tanto para a que veio da cache como para a
+     *  que veio da rede — é o mesmo desenho, e é isso que faz a revalidação
+     *  passar despercebida quando nada mudou. */
+    const mostrar = (pagina: PaginaTema) => {
+      setImages(pagina.images);
+      setTotal(pagina.total);
+      setTruncated(pagina.truncated);
+      setPageFull(pagina.pageFull);
+      setUnreadable(pagina.unreadable);
+    };
+
+    setFocusIndex(0);
+    anchor.current = null;
+
+    // ── Já cá está? Então aparece JÁ, sem skeleton e sem pedido nenhum ────
+    const guardada = paginaEmCache(themeId);
+    if (guardada) {
+      mostrar(guardada);
+      setLoadingImages(false);
+      // Se tiver alguma idade, confirma-se por trás — sem skeleton, sem
+      // mexer no que está no ecrã até haver resposta. Reabrir de seguida (o
+      // caso real, entre dois mood boards) não gasta pedido nenhum.
+      if (vaiRevalidar(guardada.at)) {
+        void buscarPrimeiraPagina(themeId, true)
+          .then((fresca) => {
+            if (active) mostrar(fresca);
+          })
+          .catch(() => {
+            /* a confirmação falhou — fica o que já estava, que é melhor do que
+               um erro por uma coisa que ela nem pediu */
+          });
+      }
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoadingImages(true);
+    setImages([]);
+    setTotal(null);
+    setTruncated(false);
+    setPageFull(false);
+    setUnreadable(false);
     (async () => {
-      setLoadingImages(true);
-      setImages([]);
-      setTotal(null);
-      setTruncated(false);
-      setPageFull(false);
-      setUnreadable(false);
-      setFocusIndex(0);
-      anchor.current = null;
       try {
-        const res = await fetch(`/api/temas/${themeId}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`, {
-          cache: "no-store",
-        });
+        mostrar(await buscarPrimeiraPagina(themeId));
+      } catch (err) {
         // O tema que veio do `localStorage` pode já não existir — foi apagado
         // desde a última vez. Isso é um 404 ESPERADO, e não uma avaria: a lista
         // de temas está a chegar e vai corrigir a escolha sozinha, o que faz
         // este efeito correr outra vez no tema certo. Queixar-se aqui era
         // mostrar um erro por causa de um palpite nosso.
-        if (res.status === 404 && !themesRef.current.some((t) => t.id === themeId)) {
-          if (active) setLoadingImages(false);
-          return;
-        }
-        if (!res.ok) throw new Error("falhou");
-        const data = await res.json();
-        if (!active) return;
-        const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
-        setImages(page);
-        setTotal(typeof data?.total === "number" ? data.total : page.length);
-        setTruncated(Boolean(data?.truncated));
-        setPageFull(page.length >= THEME_PAGE_SIZE);
-        // `ok: false` (com 200) é "a pasta não pôde ser lida agora".
-        setUnreadable(data?.ok === false);
-      } catch {
+        const foi404 = err instanceof Error && err.message === "404";
+        if (foi404 && !themesRef.current.some((t) => t.id === themeId)) return;
         if (active) toast("Não foi possível carregar as fotos deste tema.", "error");
       } finally {
         if (active) setLoadingImages(false);

@@ -29,6 +29,22 @@ const TEMAS = [
   { id: "tema-b", name: "Tema B", count: 20 },
 ];
 
+/**
+ * Fora do CI, uma máquina sem `ADMIN_PASSWORD_HASH` não entra e o teste
+ * salta-se — é o que permite corrê-lo à mão sem montar nada. No CI o segredo
+ * ESTÁ definido (ver ci.yml), portanto não entrar é uma avaria e não uma
+ * condição do ambiente. Saltar em silêncio ali transformava isto num passo
+ * verde que nunca mede nada — foi o que aconteceu numa corrida local, e sem
+ * esta distinção teria passado despercebido.
+ */
+function exigirLogin(entrou: boolean): void {
+  if (process.env.CI) {
+    expect(entrou, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(true);
+  } else {
+    test.skip(!entrou, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+  }
+}
+
 async function login(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin", { waitUntil: "domcontentloaded" });
   const nome = page.getByLabel(/O teu nome/i);
@@ -64,7 +80,7 @@ test.describe("Biblioteca de temas — abrir", () => {
     });
 
     const entrou = await login(page);
-    test.skip(!entrou, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    exigirLogin(entrou);
 
     const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
     await nav
@@ -127,7 +143,7 @@ test.describe("Biblioteca de temas — abrir", () => {
     });
 
     const entrou = await login(page);
-    test.skip(!entrou, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    exigirLogin(entrou);
 
     const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
     await nav

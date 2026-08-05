@@ -19,6 +19,7 @@ import { fingerprintBlob } from "@/lib/theme-fingerprint";
 import { useToast } from "./Toast";
 import { prepareImageWithThumb } from "./image-prep";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { esquecerBiblioteca } from "./theme-picker-cache";
 
 /**
  * Biblioteca de Temas — o sítio onde o estúdio guarda, uma vez, as fotos de
@@ -350,6 +351,18 @@ async function expandDropEntries(entries: FileSystemEntry[]): Promise<{
 
 export default function Temas() {
   const { toast } = useToast();
+  // Sair da Biblioteca esquece o que o SELETOR de temas tinha guardado.
+  //
+  // Este ecrã é o único sítio onde a biblioteca muda — carregar, apagar,
+  // reordenar, gerar miniaturas. Em vez de pendurar uma invalidação em cada um
+  // desses nove sítios (e no décimo que alguém acrescenta daqui a um mês sem
+  // saber que isto existe), esquece-se UMA vez, à saída. Não há como falhar:
+  // se ela mexeu em alguma coisa, mexeu aqui, e passou por esta linha.
+  //
+  // A cache tem revalidação própria e portanto isto não é o que a mantém
+  // correcta — é o que faz o que ela acabou de carregar aparecer JÁ na
+  // proposta seguinte, em vez de daqui a meio minuto.
+  useEffect(() => esquecerBiblioteca, []);
   const [themes, setThemes] = useState<ThemeSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
