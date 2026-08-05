@@ -1794,6 +1794,14 @@ function PreviewThumb({ url }: { url?: string }) {
         <img
           src={url}
           alt=""
+          // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
+          // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
+          // tiverem miniaturas próprias, `lazy` é o que impede as células fora
+          // do ecrã de disputarem a ligação com as que estão à vista: sem isto
+          // a primeira imagem só terminava aos 35 s em 4G, porque esperava
+          // pelas outras vinte e três.
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
           onError={() => setFailed(true)}
         />
@@ -1978,6 +1986,14 @@ function Thumb({
         <img
           src={url}
           alt=""
+          // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
+          // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
+          // tiverem miniaturas próprias, `lazy` é o que impede as células fora
+          // do ecrã de disputarem a ligação com as que estão à vista: sem isto
+          // a primeira imagem só terminava aos 35 s em 4G, porque esperava
+          // pelas outras vinte e três.
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
           onError={() => setFailed(true)}
         />
