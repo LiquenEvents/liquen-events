@@ -251,3 +251,43 @@ certo, o problema não está no gerador e está no que está publicado.
 **O que NÃO muda com esta correcção:** os três defeitos da autópsia — logótipo
 com SMask em todas as páginas a 720 DPI, fontes sem subconjunto, ficheiro não
 linearizado. Esses foram medidos directamente e mantêm-se todos.
+
+---
+
+# SEGUNDA CORRECÇÃO — as fontes não são um defeito
+
+O ponto 6 da autópsia diz que as fontes estão embebidas mas **não** em
+subconjunto, com base na coluna `sub: no` do `pdffonts`. **Está errado.**
+
+O `pdffonts` marca `sub: yes` apenas quando o nome da fonte traz o prefixo
+convencional de seis letras (`ABCDEF+Carlito`). A pdf-lib faz o subconjunto mas
+não acrescenta esse prefixo, por isso a coluna diz `no` mesmo com o trabalho
+feito — e `subset: true` já estava no código (`proposal-doc-pdf.ts:334`).
+
+Medido, que é o que conta: os ficheiros de origem são **48, 50 e 46 KB** —
+Carlito já reduzido, contra os ~700 KB de um Carlito completo. No pior caso as
+três faces somam **144 KB de um ficheiro de 940 KB**, e a pdf-lib ainda reduz
+mais a partir daí.
+
+**Nada a fazer aqui.** Fica escrito porque a lição é geral: uma coluna de uma
+ferramenta não é uma medição.
+
+## E a linearização, que é real, não se resolve daqui
+
+O ficheiro continua sem *fast web view*, e isso é verdade. Mas a pdf-lib não
+sabe linearizar, e o `qpdf` — que sabe — é um binário nativo que não existe no
+ambiente serverless onde o PDF é gerado. Acrescentá-lo é uma decisão de
+infraestrutura, não uma linha de código.
+
+Alternativas, por ordem de custo:
+
+1. **Não linearizar** e resolver a lentidão de abertura no PORTAL: servir o PDF
+   com `Content-Length` e suporte a *Range requests*, em vez de o entregar
+   dentro de um iframe de uma vez só. É onde o sintoma se sente e não precisa de
+   binário nenhum.
+2. Linearizar **fora** do pedido — num passo de segundo plano, com o ficheiro já
+   gerado, onde um binário é aceitável.
+3. Acrescentar o `qpdf` ao ambiente de execução. É o mais directo e o mais caro.
+
+Fica por decidir, e a recomendação é a 1 — resolve o que se sente, sem
+infraestrutura nova.
