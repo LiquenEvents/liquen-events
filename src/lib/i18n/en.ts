@@ -445,6 +445,8 @@ export const en: Dict = {
     labelData: "Event date",
     dateFlexibleLabel: "Date still to be decided",
     guestsFlexibleLabel: "Still to be decided",
+    hintPessoasAprox:
+      "Roughly how many? An estimate is enough, and it helps us prepare the proposal.",
     labelPessoas: "No. of people",
     labelLocal: "Location / region",
     labelNome: "Name",

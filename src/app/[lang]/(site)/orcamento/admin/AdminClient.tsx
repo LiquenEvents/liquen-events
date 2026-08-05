@@ -19,6 +19,7 @@ import { formatPrice } from "@/lib/orcamento/pricing";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
+import { guestRangeLabel } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
@@ -2668,6 +2669,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   v: selected.addons?.length
                                     ? `${selected.addons.length} serviços`
                                     : null,
+                                },
+                                {
+                                  // Sem número exacto, a ordem de grandeza. Um
+                                  // pedido a dizer só "por definir" não deixa
+                                  // decidir nada; "~ 100 a 150" deixa.
+                                  l: "Convidados",
+                                  v: selected.guests
+                                    ? null
+                                    : guestRangeLabel(selected.guestsRange)
+                                      ? `~ ${guestRangeLabel(selected.guestsRange)}`
+                                      : null,
                                 },
                                 {
                                   // O que o casal marcou no pedido. Aparece

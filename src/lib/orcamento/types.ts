@@ -71,6 +71,12 @@ export interface QuoteFormData {
    * campo existir — por isso é opcional e nunca se pode assumir presente.
    */
   decorPoints?: string[];
+  /**
+   * Ordem de grandeza dos convidados, quando o número exacto ainda não existe
+   * (ver `GUEST_RANGES`). Vazio quando `guests` traz um número a sério — os
+   * dois nunca convivem, e é o número que manda.
+   */
+  guestsRange?: string;
   budgetRange: BudgetRange | null;
   urgency: Urgency;
   notes: string;

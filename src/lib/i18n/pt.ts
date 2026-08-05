@@ -457,6 +457,8 @@ export const pt = {
     labelData: "Data do evento",
     dateFlexibleLabel: "Data ainda a definir",
     guestsFlexibleLabel: "Ainda a definir",
+    hintPessoasAprox:
+      "Mais ou menos quantas? Uma estimativa chega, e ajuda-nos a preparar a proposta.",
     labelPessoas: "Nº de pessoas",
     labelLocal: "Local / região",
     labelNome: "Nome",

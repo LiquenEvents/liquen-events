@@ -168,6 +168,42 @@ describe("POST /api/orcamento", () => {
     });
   });
 
+  /**
+   * "AINDA A DEFINIR" NÃO PODE SER TUDO O QUE A EQUIPA SABE.
+   *
+   * Um casamento de 40 pessoas e um de 300 não são o mesmo trabalho nem o
+   * mesmo orçamento. Quem ainda não fechou a lista sabe quase sempre a ordem
+   * de grandeza, e é isso que o intervalo guarda.
+   */
+  describe("estimativa de convidados", () => {
+    const semNumero = { ...validForm, guests: 0, guestsRange: "100-150" };
+
+    it("aparece no email à equipa quando não há número", async () => {
+      await POST(req("POST", { form: semNumero }));
+      expect(sendMailMock.mock.calls[0][0].text ?? "").toContain("Convidados: ~ 100 a 150");
+    });
+
+    it("é devolvida ao cliente na confirmação", async () => {
+      await POST(req("POST", { form: semNumero }));
+      expect(sendMailMock.mock.calls[1][0].text ?? "").toContain("100 a 150");
+    });
+
+    it("o NÚMERO manda quando existe — os dois nunca convivem", async () => {
+      // Enviar os dois deixava a equipa sem saber qual acreditar.
+      await POST(req("POST", { form: { ...validForm, guests: 250, guestsRange: "100-150" } }));
+      const equipa = sendMailMock.mock.calls[0][0].text ?? "";
+      expect(equipa).toContain("Convidados: 250");
+      expect(equipa).not.toContain("100 a 150");
+    });
+
+    it("um intervalo inventado não passa para o email", async () => {
+      await POST(req("POST", { form: { ...validForm, guests: 0, guestsRange: "<script>" } }));
+      for (const [args] of sendMailMock.mock.calls) {
+        expect(args.text ?? "").not.toContain("<script>");
+      }
+    });
+  });
+
   it("não mete o 'Como nos conheceu' no email", async () => {
     // Ela fotografou a linha `Como nos conheceu  ref:www.google.com` e pediu
     // para a tirar. O campo não é escrito por ninguém — é apanhado pelo

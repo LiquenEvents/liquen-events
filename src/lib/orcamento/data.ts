@@ -637,6 +637,33 @@ export const LOCATION_LABELS: Record<LocationType, string> = {
   internacional: "Internacional / Destino",
 };
 
+/**
+ * ORDENS DE GRANDEZA PARA QUEM AINDA NÃO SABE O NÚMERO EXACTO.
+ *
+ * Marcar «ainda a definir» dizia à equipa apenas que não havia número — e um
+ * casamento de 40 pessoas e um de 300 não são o mesmo trabalho nem o mesmo
+ * orçamento. Quase toda a gente que ainda não fechou a lista sabe a ordem de
+ * grandeza, e é isso que estes intervalos pedem.
+ *
+ * Os cortes seguem os limites reais dos eventos dela (`minGuests`/`maxGuests`
+ * em EVENT_TYPES_BY_CATEGORY): os casamentos vão de 30 a 500.
+ */
+export const GUEST_RANGES: { id: string; label: string; en: string }[] = [
+  { id: "ate-50", label: "Até 50", en: "Up to 50" },
+  { id: "50-100", label: "50 a 100", en: "50 to 100" },
+  { id: "100-150", label: "100 a 150", en: "100 to 150" },
+  { id: "150-200", label: "150 a 200", en: "150 to 200" },
+  { id: "200-300", label: "200 a 300", en: "200 to 300" },
+  { id: "mais-300", label: "Mais de 300", en: "More than 300" },
+];
+
+/** O rótulo de um intervalo, na língua do pedido. Vazio se não o conhecermos. */
+export function guestRangeLabel(id: unknown, locale = "pt"): string {
+  const r = GUEST_RANGES.find((x) => x.id === id);
+  if (!r) return "";
+  return locale.startsWith("en") ? r.en : r.label;
+}
+
 export const BUDGET_RANGES: { id: string; label: string }[] = [
   { id: "ate_5k", label: "Até €5.000" },
   { id: "5k_15k", label: "€5.000 – €15.000" },
