@@ -214,3 +214,40 @@ disponível no ambiente serverless da Vercel para a arquitectura em uso; um
 tecto de memória na função a matar o redimensionamento de ficheiros grandes; ou
 `failOn` a rejeitar ficheiros que as câmaras dela produzem. Nenhuma se confirma
 sem os registos de produção.
+
+---
+
+# CORRECÇÃO À ADENDA
+
+A adenda acima conclui que o caminho de recurso do `sharp` está a disparar. **O
+raciocínio estava errado e a conclusão não se sustenta.** Fica aqui em vez de
+ser apagada, porque o erro é instrutivo.
+
+**O que estava mal.** Argumentei que fotos com proporções diferentes provavam
+que não tinham sido redimensionadas. Não provam: numa colagem as caixas têm
+tamanhos diferentes por desenho, e cada caixa dá uma proporção diferente. O
+argumento não vale nada.
+
+**O que os números dizem mesmo.** Os DPI do ficheiro dela são uma mistura: 117 e
+134 (perto dos 130 que o código manda nas colagens) ao lado de 360, 417, 489 e
+576. E as capas saem a 1475×**2200** — 2200 é exactamente o `MAX_IMAGE_EDGE_PX`,
+o que só acontece se alguém tiver pedido MAIS de 2200 px e o tecto ter cortado.
+
+**Porque é que isso é decisivo.** Com `cover: 160` e uma caixa de 595 pt de
+altura, `pixelsForBox` pede 1322 px — muito abaixo do tecto. Para o tecto ser
+atingido, o DPI pedido teria de ser ~266 ou mais. A tabela `PLACEMENT_DPI`
+entrou a 28 de Julho (b042159) com 160/130 e nunca mudou desde então.
+
+**Logo: o que gerou aquele PDF não foi esta versão do código.** Fica por
+determinar qual foi — e é isso que a próxima medição tem de responder, em vez de
+mais uma hipótese.
+
+**O passo seguinte, concreto.** Gerar um PDF com o MESMO template que ela usa
+(o dela tem um painel central estreito, ~44 pt, contra ~286 pt no template
+`decoracao` que serviu de amostra), e registar por imagem: a caixa em pontos, os
+píxeis pedidos por `pixelsForBox`, e os píxeis que saíram. Se os três baterem
+certo, o problema não está no gerador e está no que está publicado.
+
+**O que NÃO muda com esta correcção:** os três defeitos da autópsia — logótipo
+com SMask em todas as páginas a 720 DPI, fontes sem subconjunto, ficheiro não
+linearizado. Esses foram medidos directamente e mantêm-se todos.
