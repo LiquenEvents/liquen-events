@@ -963,6 +963,15 @@ export default function ThemePicker({
     const carried = failedFor(quoteId);
     return multiple ? carried.slice(0, MAX_IMPORT_BATCH) : carried.slice(0, 1);
   });
+  /**
+   * Filtro dos temas, por nome e pela nota interna.
+   *
+   * A nota é o campo onde já vivem as etiquetas na prática — «tons quentes,
+   * para espaços de pedra». Não há um campo de etiquetas a sério, e inventar
+   * um exigia um sítio para as gerir, uma migração e um hábito novo; procurar
+   * na nota dá o mesmo resultado com o que já existe.
+   */
+  const [procuraTema, setProcuraTema] = useState("");
   /** Qual a célula que responde ao Tab (roving tabindex). */
   const [focusIndex, setFocusIndex] = useState(0);
   /** Foto aberta em grande, por índice na grelha. */
@@ -1329,11 +1338,40 @@ export default function ThemePicker({
     return () => document.removeEventListener("keydown", onKey, true);
   }, [dismiss, previewIndex]);
 
+  /** Os temas a mostrar, já filtrados. Sem acentos nem maiúsculas: «terracota»
+   *  tem de encontrar «Terracotta». */
+  const temasVisiveis = (() => {
+    const q = procuraTema
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    if (!q) return themes;
+    const limpo = (t: string) =>
+      (t ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    return themes.filter((t) => limpo(t.name).includes(q) || limpo(t.notes ?? "").includes(q));
+  })();
+
   function pickTheme(id: string) {
     if (id === themeId) return;
-    // A SELEÇÃO NÃO SE LIMPA: escolher três fotos de "Itália" e duas de
-    // "Terracotta" é um gesto normal, e limpar aqui obrigava a duas viagens ao
-    // estúdio para o fazer. O rodapé diz quantas estão escolhidas ao todo.
+    // A SELEÇÃO FICA.
+    //
+    // Antes, mudar de tema esvaziava-a — o que obrigava a fazer uma importação
+    // por tema, e tornava impossível montar um mood board com fotos de dois
+    // sítios sem repetir o percurso todo. Como a seleção é um conjunto de
+    // CAMINHOS (e não de índices da grelha), guardá-la entre temas não custa
+    // nada: a grelha marca as do tema à vista, e o rodapé conta todas.
+    //
+    // O `showTheme` trata do resto dos estados (imagens, foco, pré-visualização,
+    // rolo) num sítio só.
+    //
+    // O que ficou por entrar NÃO se limpa aqui, ao contrário do que o ramo base
+    // fazia: nesta arquitectura essa lista é do PEDIDO e não do tema (vive no
+    // runtime de importação, ver `failedFor`), e limpá-la ao mudar de separador
+    // apagava o que estava à espera de uma segunda tentativa noutro tema.
     showTheme(id);
     try {
       localStorage.setItem(LAST_THEME_KEY, id);
@@ -1605,23 +1643,39 @@ export default function ThemePicker({
               carregue lá as fotos de inspiração.
             </p>
           ) : (
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Temas">
-              {themes.map((t) => (
-                <Button
-                  key={t.id}
-                  size="sm"
-                  variant={t.id === themeId ? "subtle" : "ghost"}
-                  aria-pressed={t.id === themeId}
-                  onClick={() => pickTheme(t.id)}
-                  // O rato a passar (ou o Tab a chegar) já manda vir as
-                  // miniaturas deste tema: quando ela clica, está desenhado.
-                  onPointerEnter={() => prefetchTheme(t.id)}
-                  onFocus={() => prefetchTheme(t.id)}
-                >
-                  {t.name}
-                  <span className="bo-text-muted">{themeCountLabel(t)}</span>
-                </Button>
-              ))}
+            <div className="flex flex-col gap-2">
+              {/* Só aparece quando há temas que cheguem para valer a pena
+                  filtrar. Com três, a caixa era mais uma coisa a ler. */}
+              {themes.length > 3 && (
+                <input
+                  value={procuraTema}
+                  onChange={(e) => setProcuraTema(e.target.value)}
+                  placeholder="Procurar tema por nome ou etiqueta…"
+                  aria-label="Procurar tema"
+                  className="bo-input w-full max-w-xs px-3 py-1.5 text-xs"
+                />
+              )}
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Temas">
+                {temasVisiveis.map((t) => (
+                  <Button
+                    key={t.id}
+                    size="sm"
+                    variant={t.id === themeId ? "subtle" : "ghost"}
+                    aria-pressed={t.id === themeId}
+                    onClick={() => pickTheme(t.id)}
+                    // O rato a passar (ou o Tab a chegar) já manda vir as
+                    // miniaturas deste tema: quando ela clica, está desenhado.
+                    onPointerEnter={() => prefetchTheme(t.id)}
+                    onFocus={() => prefetchTheme(t.id)}
+                  >
+                    {t.name}
+                    <span className="bo-text-muted">{themeCountLabel(t)}</span>
+                  </Button>
+                ))}
+                {temasVisiveis.length === 0 && (
+                  <p className="bo-text-muted text-xs">Nenhum tema com esse nome.</p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1866,7 +1920,15 @@ export default function ThemePicker({
                   : "Adicionar e continuar"}
               </Button>
             )}
-            <Button size="sm" onClick={() => submit(true)} disabled={selected.length === 0}>
+            {/* `primary`, a cor cheia da marca: sem variante, aqui ao lado do
+                "Cancelar", lia-se como desactivado mesmo com fotos escolhidas
+                — e um botão que parece morto não se carrega. */}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => submit(true)}
+              disabled={selected.length === 0}
+            >
               {selected.length > 0 ? `Adicionar ${selected.length} e fechar` : "Adicionar e fechar"}
             </Button>
           </div>

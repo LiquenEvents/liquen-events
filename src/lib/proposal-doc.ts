@@ -203,6 +203,17 @@ export interface ProposalDoc {
   // ── 3./4. Orçamento Proposto ──
   // Decoração template: grouped total.
   budgetItems: string[]; // item NAMES only, e.g. "Decor Cerimónia"
+  /**
+   * Preços por linha, SÓ INTERNOS — o índice `i` corresponde a
+   * `budgetItems[i]`. Servem para somar e para avisar quando a soma e o total
+   * não batem certo; o PDF continua a imprimir a coluna de preço em branco e
+   * um único «Valor Total», como nas propostas reais.
+   *
+   * Ninguém mexe neste array à mão: as alterações passam pelos ajudantes de
+   * `proposal-budget.ts`, que mexem nos dois ao mesmo tempo. Ver lá o porquê
+   * de ser um array paralelo e não um campo dentro de `budgetItems`.
+   */
+  budgetAmounts?: (number | null)[];
   totalLabel: string; // "Valor Total Decoração"
   totalText: string; // "3000,00 € + IVA" — kept as text to match the studio's format
   /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding

@@ -131,12 +131,17 @@ export default function FazerProposta({
         <Card padding="md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
+              {/* O EVENTO, A DATA E O LOCAL SAÍRAM DAQUI.
+                  Estavam escritos aqui e outra vez, duzentos pixels abaixo, nos
+                  campos "Data" e "Local" da secção Evento — e eram esses que
+                  saem na proposta. Duas cópias adjacentes do mesmo dado, sem
+                  nada a dizer qual manda, é pior do que uma: quando divergem
+                  (porque a data da proposta se escreve por extenso, ou porque o
+                  espaço mudou), não há maneira de saber qual está certa. Fica o
+                  nome, que é a âncora do "para quem é isto", e o botão de
+                  trocar. */}
               <p className="bo-eyebrow mb-1">Proposta para</p>
               <p className="truncate text-base font-medium text-foreground/85">{escolhido.name}</p>
-              <p className="mt-0.5 truncate text-xs text-foreground/50">
-                {tipoDeEvento(escolhido)} · {dataLegivel(escolhido.date)}
-                {escolhido.location ? ` · ${escolhido.location}` : ""}
-              </p>
             </div>
             <Button variant="secondary" size="sm" onClick={() => onSelect(null)}>
               Trocar de cliente

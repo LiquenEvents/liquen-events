@@ -447,6 +447,12 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./orcamento/manual/route", methods: ["POST"] },
   { path: "./propostas/route", methods: ["GET"] },
   { path: "./propostas/[id]/route", methods: ["PATCH", "DELETE"] },
+  // Copiar uma proposta lê o documento de OUTRA e escreve fotos no Storage.
+  { path: "./propostas/copiar/route", methods: ["POST"] },
+  // Os modelos guardam a estrutura e os preços das propostas dela.
+  { path: "./propostas/modelos/route", methods: ["GET", "POST", "DELETE"] },
+  // As preferências do estúdio (validade por omissão).
+  { path: "./propostas/preferencias/route", methods: ["GET", "PUT"] },
   { path: "./push/subscribe/route", methods: ["GET", "POST", "DELETE"] },
   { path: "./tarefas/route", methods: ["GET", "POST"] },
   { path: "./tarefas/[id]/route", methods: ["PATCH", "DELETE"] },

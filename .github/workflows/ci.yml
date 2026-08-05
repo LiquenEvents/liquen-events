@@ -106,7 +106,10 @@ jobs:
       # passo bloqueante, uma falha nas imagens saltava-o por completo.
       - name: Run E2E tests (informational)
         continue-on-error: true
-        run: npx playwright test --grep-invert "@imagens|@movel"
+        # `@propostas` corre no seu próprio passo bloqueante, com config e
+        # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
+        # este servidor é o de produção e recusa escritas sem Supabase.
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas"
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
@@ -133,6 +136,22 @@ jobs:
       # pára nada.
       - name: Ergonomia táctil no telemóvel (bloqueante)
         run: npx playwright test --grep "@movel"
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. Os dois fluxos de fazer uma proposta: do zero, e a partir
+      # de outra. Config própria porque estes passeios CRIAM dados e o servidor
+      # de produção do CI recusa escritas sem Supabase — a razão está escrita
+      # em playwright.propostas.config.ts.
+      #
+      # Bloqueante porque o que o segundo passeio protege é a única forma de a
+      # duplicação de propostas fazer mal em vez de bem: uma proposta enviada
+      # com o nome ou a data do casamento de outro casal. Um passo que avisa e
+      # deixa passar é um passo que se ignora.
+      - name: Propostas — do zero, e a partir de outra
+        run: npm run test:e2e:propostas
         env:
           CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"

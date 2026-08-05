@@ -1,0 +1,341 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusTrap } from "./useFocusTrap";
+import { Button } from "./ui";
+import type { ProposalDoc } from "@/lib/proposal-doc";
+import type { ModeloProposta } from "@/lib/proposal-templates";
+import type { CampoAMudar } from "@/lib/proposal-copy";
+
+/**
+ * CRIAR A PARTIR DE… — escolher a proposta (ou o modelo) de onde partir.
+ *
+ * ── O problema que resolve ────────────────────────────────────────────────
+ * Medido em `PROPOSTA-BEFORE.md`: montar do zero a proposta média custa 16
+ * cliques e 23 campos escritos à mão, sem contar as fotos. E, palavras dela,
+ * «a maioria é uma variação de uma proposta anterior». Este ecrã é a diferença
+ * entre reescrever e ajustar.
+ *
+ * ── Porque é que a sugestão está em cima ──────────────────────────────────
+ * Quando o cliente já teve propostas, a mais recente é quase sempre a resposta
+ * certa. Aparece destacada e em primeiro lugar para o caso comum ser um clique
+ * — sem procurar, sem ler a lista.
+ *
+ * ── Teclado ──────────────────────────────────────────────────────────────
+ * Escrever filtra, ↑/↓ percorre, Enter escolhe, Esc fecha. Ela usa isto com o
+ * cliente ao telefone; tirar a mão do teclado para ir buscar o rato é tempo
+ * que se ouve do outro lado.
+ */
+
+/** O que a lista precisa de saber sobre uma proposta anterior. */
+export interface ResumoProposta {
+  id: string;
+  quoteId: string;
+  clientName: string;
+  createdAt: string;
+  status: string;
+  temDoc: boolean;
+  eventType: string;
+  eventDate: string;
+  location: string;
+  guests: string;
+  grupos: number;
+  moodBoards: number;
+  linhas: number;
+  fotos: number;
+}
+
+export interface Escolha {
+  doc: ProposalDoc;
+  camposAMudar: CampoAMudar[];
+  nomeDaOrigem: string;
+  fotosCopiadas: number;
+  fotosPartilhadas: number;
+}
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  /** O pedido para quem a proposta nova vai ser feita. */
+  quoteId: string;
+  /** Nome do cliente do pedido, para reconhecer propostas anteriores dele. */
+  clienteAtual: string;
+  onEscolhido: (e: Escolha) => void;
+  toast?: (mensagem: string, tipo?: "success" | "error") => void;
+}
+
+type Linha =
+  | { tipo: "modelo"; id: string; modelo: ModeloProposta }
+  | { tipo: "proposta"; id: string; proposta: ResumoProposta; sugerida: boolean };
+
+function dataCurta(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(+d)
+    ? ""
+    : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/** Comparação sem acentos nem maiúsculas — «Évora» tem de encontrar «evora». */
+function normalizar(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+export default function CriarAPartirDe({
+  open,
+  onClose,
+  quoteId,
+  clienteAtual,
+  onEscolhido,
+  toast,
+}: Props) {
+  const [modelos, setModelos] = useState<ModeloProposta[]>([]);
+  const [propostas, setPropostas] = useState<ResumoProposta[]>([]);
+  const [aCarregar, setACarregar] = useState(false);
+  const [aCopiar, setACopiar] = useState<string | null>(null);
+  const [procura, setProcura] = useState("");
+  const [ativo, setAtivo] = useState(0);
+  // O gancho devolve o `ref` e trata do ciclo do foco; o Esc é aqui em baixo,
+  // no `onKeyDown`, junto das outras teclas.
+  const caixa = useFocusTrap<HTMLDivElement>(open);
+  const campoProcura = useRef<HTMLInputElement>(null);
+
+  // ── Carregar as duas listas ao abrir ──────────────────────────────────
+  useEffect(() => {
+    if (!open) return;
+    let vivo = true;
+    setACarregar(true);
+    Promise.all([
+      fetch("/api/propostas/modelos").then((r) => (r.ok ? r.json() : { modelos: [] })),
+      fetch("/api/propostas?resumo=1").then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([m, p]) => {
+        if (!vivo) return;
+        setModelos(Array.isArray(m?.modelos) ? m.modelos : []);
+        // Uma proposta sem documento do estúdio não tem nada para copiar. Não
+        // aparece de todo: uma linha que não faz nada ao ser clicada lê-se como
+        // uma avaria do botão.
+        setPropostas((Array.isArray(p) ? p : []).filter((x: ResumoProposta) => x.temDoc));
+      })
+      .catch(() => {
+        if (vivo) toast?.("Não deu para ler as propostas anteriores.", "error");
+      })
+      .finally(() => vivo && setACarregar(false));
+    return () => {
+      vivo = false;
+    };
+  }, [open, toast]);
+
+  useEffect(() => {
+    if (open) campoProcura.current?.focus();
+  }, [open]);
+
+  // ── A lista, já ordenada e filtrada ───────────────────────────────────
+  const linhas = useMemo<Linha[]>(() => {
+    const q = normalizar(procura.trim());
+    const combina = (...campos: string[]) =>
+      !q || campos.some((c) => normalizar(c ?? "").includes(q));
+
+    const doCliente = normalizar(clienteAtual ?? "");
+    const ordenadas = [...propostas].sort(
+      (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+    );
+    // A mais recente DESTE cliente, se houver. É a sugestão.
+    const sugerida = doCliente
+      ? ordenadas.find((p) => normalizar(p.clientName) === doCliente)
+      : undefined;
+
+    const mods: Linha[] = modelos
+      .filter((m) => m.tipo === "completo")
+      .filter((m) => combina(m.nome, m.origem ?? ""))
+      .map((m) => ({ tipo: "modelo", id: `m:${m.id}`, modelo: m }));
+
+    const props: Linha[] = ordenadas
+      .filter((p) => combina(p.clientName, p.location, p.eventDate, p.eventType))
+      .map((p) => ({
+        tipo: "proposta",
+        id: `p:${p.id}`,
+        proposta: p,
+        sugerida: !!sugerida && p.id === sugerida.id,
+      }));
+
+    // A sugestão sobe ao topo de tudo — modelos incluídos.
+    const suger = props.filter((l) => l.tipo === "proposta" && l.sugerida);
+    const resto = props.filter((l) => !(l.tipo === "proposta" && l.sugerida));
+    return [...suger, ...mods, ...resto];
+  }, [modelos, propostas, procura, clienteAtual]);
+
+  const escolher = useCallback(
+    async (linha: Linha) => {
+      if (aCopiar) return;
+      setACopiar(linha.id);
+      try {
+        const corpo =
+          linha.tipo === "modelo"
+            ? { quoteId, modeloId: linha.modelo.id }
+            : { quoteId, propostaId: linha.proposta.id };
+        const r = await fetch("/api/propostas/copiar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(corpo),
+        });
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j?.doc) throw new Error(j?.error ?? "Não deu para copiar.");
+        onEscolhido(j as Escolha);
+        onClose();
+      } catch (e) {
+        toast?.(e instanceof Error ? e.message : "Não deu para copiar.", "error");
+      } finally {
+        setACopiar(null);
+      }
+    },
+    [aCopiar, quoteId, onEscolhido, onClose, toast],
+  );
+
+  const teclas = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setAtivo((i) => Math.min(i + 1, linhas.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setAtivo((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" && linhas[ativo]) {
+      e.preventDefault();
+      void escolher(linhas[ativo]);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[8vh] backdrop-blur-sm"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        ref={caixa}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cad-titulo"
+        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-xl"
+        onKeyDown={teclas}
+      >
+        <div className="border-b border-foreground/10 px-5 py-4">
+          <h2 id="cad-titulo" className="font-serif text-lg text-foreground/85">
+            Criar a partir de…
+          </h2>
+          <p className="mt-1 text-xs text-foreground/50">
+            Copia os serviços, os mood boards, o orçamento e as condições. O nome, a data, o local,
+            os convidados e o valor passam a ser os deste pedido.
+          </p>
+          <input
+            ref={campoProcura}
+            value={procura}
+            onChange={(e) => {
+              setProcura(e.target.value);
+              // Voltar ao topo da lista faz parte de filtrar, por isso é aqui
+              // e não num efeito: o que o efeito fazia era reagir a uma coisa
+              // que este mesmo gesto já sabe.
+              setAtivo(0);
+            }}
+            placeholder="Procurar por cliente, local ou data…"
+            aria-label="Procurar propostas anteriores"
+            className="bo-input mt-3 w-full px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          {aCarregar && <p className="p-4 text-sm text-foreground/50">A carregar…</p>}
+          {!aCarregar && linhas.length === 0 && (
+            <p className="p-4 text-sm text-foreground/50">
+              {procura
+                ? "Nada encontrado. Experimente outro nome ou local."
+                : "Ainda não há propostas anteriores nem modelos guardados. A primeira faz-se do zero; a partir daí é copiar."}
+            </p>
+          )}
+          <ul className="flex flex-col gap-1">
+            {linhas.map((linha, i) => {
+              const aTrabalhar = aCopiar === linha.id;
+              const sugerida = linha.tipo === "proposta" && linha.sugerida;
+              return (
+                <li key={linha.id}>
+                  <button
+                    type="button"
+                    onClick={() => void escolher(linha)}
+                    onMouseEnter={() => setAtivo(i)}
+                    disabled={!!aCopiar}
+                    aria-current={i === ativo}
+                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-50 ${
+                      i === ativo
+                        ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
+                        : "border-transparent hover:border-foreground/10"
+                    }`}
+                  >
+                    <span className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground/85">
+                        {linha.tipo === "modelo" ? linha.modelo.nome : linha.proposta.clientName}
+                      </span>
+                      <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em]">
+                        {sugerida && (
+                          <span className="rounded-full bg-[#4d6350] px-2 py-0.5 text-white">
+                            já foi seu cliente
+                          </span>
+                        )}
+                        <span className="text-foreground/40">
+                          {linha.tipo === "modelo" ? "modelo" : dataCurta(linha.proposta.createdAt)}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-foreground/50">
+                      {linha.tipo === "modelo"
+                        ? resumirModelo(linha.modelo)
+                        : resumirProposta(linha.proposta)}
+                    </span>
+                    {aTrabalhar && (
+                      <span className="mt-1 block text-xs text-foreground/50">
+                        A copiar as fotos…
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-foreground/10 px-5 py-3">
+          <p className="text-[11px] text-foreground/40">↑ ↓ percorre · Enter escolhe · Esc fecha</p>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** O «tamanho» da proposta — é isto que diz se vale a pena partir dela. */
+function resumirProposta(p: ResumoProposta): string {
+  const partes = [p.eventDate || p.eventType, p.location].filter(Boolean);
+  const conta = [
+    p.grupos ? `${p.grupos} grupo${p.grupos > 1 ? "s" : ""}` : "",
+    p.moodBoards ? `${p.moodBoards} mood board${p.moodBoards > 1 ? "s" : ""}` : "",
+    p.fotos ? `${p.fotos} fotos` : "",
+  ].filter(Boolean);
+  return [partes.join(" · "), conta.join(" · ")].filter(Boolean).join("  —  ");
+}
+
+function resumirModelo(m: ModeloProposta): string {
+  const d = m.doc;
+  if (!d) return "modelo vazio";
+  const conta = [
+    d.serviceGroups?.length ? `${d.serviceGroups.length} grupos` : "",
+    d.moodBoards?.length ? `${d.moodBoards.length} mood boards` : "",
+    d.budgetItems?.length ? `${d.budgetItems.length} linhas` : "",
+  ].filter(Boolean);
+  return [m.origem ? `a partir de ${m.origem}` : "", conta.join(" · ")]
+    .filter(Boolean)
+    .join("  —  ");
+}

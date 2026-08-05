@@ -221,6 +221,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * O botão de adicionar.
+ *
+ * O rótulo passou a trazer a CONTAGEM ("Adicionar 5 fotos") — antes dizia
+ * sempre "Adicionar à proposta" e, ao lado do "Cancelar", lia-se como
+ * desactivado mesmo com fotos escolhidas. Os testes procuram os dois.
+ */
+const botaoAdicionar = () =>
+  screen.getByRole("button", { name: /^Adicionar (à proposta|\d+ fotos?)$/ });
+
 describe("ThemePicker", () => {
   it("trava a seleção nas 40 fotos e explica o limite", async () => {
     await openPicker(true);

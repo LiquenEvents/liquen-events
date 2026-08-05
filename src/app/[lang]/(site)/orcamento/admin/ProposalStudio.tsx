@@ -17,6 +17,23 @@ import {
   type VatMode,
 } from "@/lib/proposal-doc";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
+import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
+import ModelosParciais from "./ModelosParciais";
+import NavEstudio from "./NavEstudio";
+import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
+import type { ProposalDoc } from "@/lib/proposal-doc";
+import type { CampoAMudar } from "@/lib/proposal-copy";
+import {
+  adicionarLinha,
+  definirItem,
+  definirPreco,
+  desalinhamento,
+  linhasDe,
+  normalizarValor,
+  removerLinha,
+  somaDosItens,
+  asDuasFormas,
+} from "@/lib/proposal-budget";
 import { eur, splitThirtySeventy } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -216,6 +233,18 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
   return next;
 }
 
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * Quantos passos atrás o Cmd+Z consegue ir.
+ *
+ * Cada passo é um documento inteiro em memória. Cinquenta chegam de sobra
+ * para desfazer um engano — ninguém carrega em Cmd+Z cinquenta vezes seguidas
+ * — e mantêm a conta de memória modesta mesmo numa proposta com muitos mood
+ * boards (os documentos guardam caminhos de fotos, não bytes).
+ */
+const MAX_HISTORICO = 50;
+
 function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const j = i + dir;
   if (j < 0 || j >= arr.length) return arr;
@@ -362,6 +391,49 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
 
   const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
+  const [copiarAberto, setCopiarAberto] = useState(false);
+  /**
+   * Os campos que vieram de OUTRA proposta e ainda não foram confirmados.
+   *
+   * Depois de copiar, estes cinco são os únicos que mudam de casamento para
+   * casamento — e são exactamente aqueles cujo erro só se descobre com o PDF
+   * já enviado. Ficam marcados até ela lhes tocar.
+   */
+  const [porConfirmar, setPorConfirmar] = useState<Set<CampoAMudar>>(() => new Set());
+  /** Caixa do nome, aberta pelo "Guardar como modelo" do cabeçalho. */
+  const [nomeModelo, setNomeModelo] = useState<string | null>(null);
+  /** Quando foi gravado — para o indicador discreto "Guardado às 14:32". */
+  const [gravadoEm, setGravadoEm] = useState<Date | null>(null);
+  /** Há alterações à espera do debounce? É o que o aviso de saída lê. */
+  const [porGravar, setPorGravar] = useState(false);
+  /**
+   * O rascunho que o "Limpar" deitou fora, à espera de ser resgatado.
+   *
+   * Dez segundos e um botão, em vez de uma caixa de confirmação. A caixa
+   * pergunta ANTES, quando ela ainda não viu o que ia perder, e a resposta
+   * certa é quase sempre "sim" — por isso carrega-se sem ler. A anulação
+   * pergunta DEPOIS, quando o ecrã já mostra o estrago.
+   */
+  const [limpo, setLimpo] = useState<{ doc: StudioDoc; total: string; segundos: number } | null>(
+    null,
+  );
+  /**
+   * Histórico para o Cmd+Z. Guardado num `ref` e não em estado: crescer o
+   * histórico não pode redesenhar a página, ou escrever numa caixa de texto
+   * passava a redesenhar o formulário inteiro a cada tecla.
+   */
+  const historico = useRef<StudioDoc[]>([]);
+  /**
+   * O que ela já escreveu antes, para não voltar a escrever.
+   *
+   * Sai das propostas anteriores em vez de um catálogo à parte: um catálogo
+   * precisava de ser mantido, e um catálogo que ninguém mantém fica pior do
+   * que não existir. O que ela usou é, por definição, o que ela usa.
+   */
+  const [sugestoes, setSugestoes] = useState<{ locais: string[]; planners: string[] }>({
+    locais: [],
+    planners: [],
+  });
   // Free-typed mirror of the structured total, so pt-PT formatting ("3.000,00")
   // survives keystrokes. Parsed into `doc.totalAmount` (the money source of truth).
   const [totalInput, setTotalInput] = useState<string>("");
@@ -558,9 +630,24 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   // Ctrl/Cmd+Enter dos Serviços a poder disparar já (sem duplicar a lógica nem
   // encurtar o debounce, que é o que segura a escrita durante a escrita).
   const flushDraft = useRef<() => void>(() => {});
+
+  // Assim que o documento muda há trabalho por gravar. Volta a false quando a
+  // gravação local acontece, oitocentos milissegundos depois.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    setPorGravar(true);
+  }, [doc, assetUrls, themeOrigins, refEdited]);
+
   useEffect(() => {
     if (!hydrated.current) return;
     const save = () => {
+      // Uma fotografia para o Cmd+Z, tirada quando ela pára de escrever. Se
+      // fosse a cada tecla, desfazer andava letra a letra e não servia para
+      // nada; se fosse só nas remoções, não desfazia um texto trocado.
+      const ultimo = historico.current[historico.current.length - 1];
+      if (!ultimo || JSON.stringify(ultimo) !== JSON.stringify(doc)) {
+        historico.current = [...historico.current, doc].slice(-MAX_HISTORICO);
+      }
       // NADA DE MARCADORES PROVISÓRIOS NO RASCUNHO GRAVADO.
       //
       // Um `pending:<uuid>` é uma promessa viva na memória desta aba: a cópia
@@ -586,6 +673,8 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
             refEdited,
           }),
         );
+        setGravadoEm(new Date());
+        setPorGravar(false);
       } catch {
         /* quota / unavailable — non-fatal */
       }
@@ -729,6 +818,12 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   // Split 30/70 sobre o BRUTO — o que o estúdio vê é o que será faturado.
   const money = resolveProposalMoney(doc);
   const split = splitThirtySeventy(money.gross);
+  // A soma das linhas e o desvio do total escrito à mão. Os dois vivem aqui em
+  // cima porque são lidos em três sítios: ao lado das linhas, no aviso junto ao
+  // total, e na barra fixa do fundo.
+  const soma = somaDosItens(doc);
+  const desvio = desalinhamento(doc, money.base);
+  const duasFormas = asDuasFormas(money.base, doc.vatRate ?? DEFAULT_VAT_RATE);
 
   // ── O preço mudou na Gestão do pedido: aparece aqui ─────────────────────
   // O outro sentido do mesmo número. Sem isto voltava a haver duas verdades:
@@ -774,8 +869,82 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     });
   }
 
+  /**
+   * Cmd/Ctrl+Z — volta ao documento anterior.
+   *
+   * O último elemento do histórico É o documento actual (foi lá posto pela
+   * gravação); por isso desfazer tira DOIS e usa o penúltimo.
+   */
+  function desfazer(): boolean {
+    if (historico.current.length < 2) return false;
+    const anterior = historico.current[historico.current.length - 2];
+    historico.current = historico.current.slice(0, -1);
+    setDoc(anterior);
+    // O campo do total é estado à parte (aceita texto a meio de ser escrito),
+    // por isso tem de acompanhar — senão desfazer devolvia o documento antigo
+    // e deixava o valor novo na caixa.
+    const base = baseDoDoc(anterior);
+    setTotalInput(base === undefined ? "" : String(base));
+    return true;
+  }
+
+  useEffect(() => {
+    function aoTeclar(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta || e.key.toLowerCase() !== "z" || e.shiftKey) return;
+      // Dentro de uma caixa de texto, o Cmd+Z do browser desfaz a escrita —
+      // que é o que ela espera. Só se assume o comando fora dos campos, ou
+      // quando o browser já não tem nada para desfazer nesse campo.
+      const alvo = e.target as HTMLElement | null;
+      const aEscrever =
+        alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.isContentEditable);
+      if (aEscrever) return;
+      if (desfazer()) {
+        e.preventDefault();
+        toast("Desfeito.", "info");
+      }
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  });
+
+  // ── Aviso ao sair com trabalho por gravar ─────────────────────────────
+  // A janela é estreita (a gravação é a 800ms), mas existe: fechar o
+  // separador logo a seguir a escrever perdia essas últimas palavras.
+  useEffect(() => {
+    if (!porGravar) return;
+    const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [porGravar]);
+
+  // ── A contagem dos dez segundos para anular a limpeza ─────────────────
+  useEffect(() => {
+    if (!limpo) return;
+    if (limpo.segundos <= 0) {
+      setLimpo(null);
+      return;
+    }
+    const t = setTimeout(
+      () => setLimpo((l) => (l ? { ...l, segundos: l.segundos - 1 } : null)),
+      1000,
+    );
+    return () => clearTimeout(t);
+  }, [limpo]);
+
+  /** Devolve o rascunho que o "Limpar" deitou fora. */
+  function anularLimpeza() {
+    if (!limpo) return;
+    setDoc(limpo.doc);
+    setTotalInput(limpo.total);
+    setLimpo(null);
+    toast("Rascunho reposto.", "success");
+  }
+
   function clearDraft() {
-    if (!window.confirm("Limpar todo o rascunho da proposta? Não pode ser anulado.")) return;
+    // Sem caixa de confirmação: guarda-se o que estava e dá-se dez segundos
+    // para o trazer de volta. Ver a razão em `limpo`, mais acima.
+    setLimpo({ doc, total: totalInput, segundos: 10 });
     try {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(`${DRAFT_KEY}:at`);
@@ -1151,14 +1320,21 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }
 
   // ── Budget: decoracao (grouped) ──
+  // Tudo passa pelos ajudantes de `proposal-budget`: os nomes e os preços são
+  // dois arrays paralelos, e mexer num sem mexer no outro faz os preços
+  // deslizarem uma posição — o preço da cerimónia acabaria no ramo da noiva,
+  // sem nada a assinalar.
   function addBudgetItem() {
-    setDoc((d) => ({ ...d, budgetItems: [...d.budgetItems, ""] }));
+    setDoc((d) => adicionarLinha(d));
   }
   function updateBudgetItem(i: number, value: string) {
-    setDoc((d) => ({ ...d, budgetItems: d.budgetItems.map((v, j) => (j === i ? value : v)) }));
+    setDoc((d) => definirItem(d, i, value));
   }
   function removeBudgetItem(i: number) {
-    setDoc((d) => ({ ...d, budgetItems: d.budgetItems.filter((_, j) => j !== i) }));
+    setDoc((d) => removerLinha(d, i));
+  }
+  function updateBudgetPrice(i: number, texto: string) {
+    setDoc((d) => definirPreco(d, i, normalizarValor(texto)));
   }
 
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
@@ -1245,11 +1421,11 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       const aviso = avisoDeConteudoIncompleto(emFalta, cortes);
       if (aviso) {
         toast(`PDF gerado, mas ${aviso}. Verifique antes de enviar.`, "error");
-      } else if (porConfirmar > 0) {
+      } else if (fotosPorConfirmar > 0) {
         toast(
-          porConfirmar === 1
+          fotosPorConfirmar === 1
             ? "PDF gerado sem 1 foto que ainda está a entrar na proposta. Gere outra vez daqui a pouco."
-            : `PDF gerado sem ${porConfirmar} fotos que ainda estão a entrar na proposta. Gere outra vez daqui a pouco.`,
+            : `PDF gerado sem ${fotosPorConfirmar} fotos que ainda estão a entrar na proposta. Gere outra vez daqui a pouco.`,
           "info",
         );
       } else {
@@ -1268,11 +1444,11 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     // repete-se aqui: entre carregar em "Enviar" e carregar em "Confirmar" pode
     // ter entrado outro lote de fotos, e o segundo clique não pode ser o que
     // manda a proposta sem elas.
-    if (porConfirmar > 0) {
+    if (fotosPorConfirmar > 0) {
       toast(
-        porConfirmar === 1
+        fotosPorConfirmar === 1
           ? "Ainda há 1 foto a entrar na proposta. Assim que assentar, o envio fica disponível."
-          : `Ainda há ${porConfirmar} fotos a entrar na proposta. Assim que assentarem, o envio fica disponível.`,
+          : `Ainda há ${fotosPorConfirmar} fotos a entrar na proposta. Assim que assentarem, o envio fica disponível.`,
         "info",
       );
       setConfirmSend(false);
@@ -1314,14 +1490,140 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     }
   }
 
+  // Sugestões e a validade por omissão. Uma leitura só, ao abrir; se falhar,
+  // o estúdio funciona como antes — nenhuma destas coisas é indispensável.
+  useEffect(() => {
+    let vivo = true;
+    Promise.all([
+      fetch("/api/propostas?resumo=1").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/propostas/preferencias").then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([lista, prefs]) => {
+        if (!vivo) return;
+        const unicos = (vals: unknown[]) =>
+          [...new Set(vals.map((v) => String(v ?? "").trim()).filter(Boolean))].sort();
+        if (Array.isArray(lista)) {
+          setSugestoes({
+            locais: unicos(lista.map((p: { location?: string }) => p.location)),
+            planners: unicos(lista.map((p: { weddingPlanners?: string }) => p.weddingPlanners)),
+          });
+        }
+        // A validade só se aplica a um documento que ainda NÃO tem uma: mexer
+        // numa proposta já escrita porque a política mudou seria alterar-lhe
+        // as condições nas costas de quem a escreveu.
+        const dias = Number(prefs?.validUntilDays);
+        if (Number.isFinite(dias) && dias > 0) {
+          setDoc((d) => (d.validUntilDays ? d : { ...d, validUntilDays: dias }));
+        }
+      })
+      .catch(() => {
+        /* sem sugestões e com a validade de sempre */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
+  function aplicarCopia(e: Escolha) {
+    setDoc(e.doc as StudioDoc);
+    setPorConfirmar(new Set(e.camposAMudar));
+    // O título interno volta a gerar-se sozinho: a cópia esvaziou-o de
+    // propósito para não ficar com o nome do casal anterior no cabeçalho.
+    setRefEdited(false);
+    const partilha =
+      e.fotosPartilhadas > 0
+        ? ` ${e.fotosPartilhadas} foto(s) ficaram na pasta da proposta antiga.`
+        : "";
+    toast(
+      `Copiado de ${e.nomeDaOrigem}. Confirme o que está marcado.${partilha}`,
+      e.fotosPartilhadas > 0 ? "error" : "success",
+    );
+  }
+
+  /**
+   * O realce de um campo por confirmar, e a forma de o desmarcar.
+   *
+   * Laranja e não verde: é um AVISO de coisa por rever, não uma acção. O
+   * `DESIGN-TOKENS.md` fixa esta regra para a página toda.
+   */
+  const realce = (campo: CampoAMudar) =>
+    porConfirmar.has(campo)
+      ? "rounded-lg ring-2 ring-[#c98a2e]/45 ring-offset-2 ring-offset-background"
+      : undefined;
+  const confirmado = (campo: CampoAMudar) => {
+    // Tocar-lhe É a confirmação. Um botão "confirmar" ao lado de cada campo
+    // seria mais um clique para dizer o que o gesto já disse.
+    setPorConfirmar((atual) => {
+      if (!atual.has(campo)) return atual;
+      const proximo = new Set(atual);
+      proximo.delete(campo);
+      return proximo;
+    });
+  };
+
+  /**
+   * A validade desta proposta passa a ser a de todas as novas.
+   *
+   * A missão pede um valor por omissão «configurável», e a forma mais barata
+   * de o configurar é a partir do sítio onde ela já está a decidir o número —
+   * em vez de um ecrã de definições que é preciso ir procurar.
+   */
+  async function guardarValidadePadrao(dias: number) {
+    try {
+      const r = await fetch("/api/propostas/preferencias", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ validUntilDays: dias }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error ?? "Não deu para guardar.");
+      toast(`As propostas novas passam a valer ${dias} dias.`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não deu para guardar.", "error");
+    }
+  }
+
+  /** Guarda ESTA proposta como modelo reutilizável, com o nome que ela der. */
+  async function guardarComoModelo(nome: string) {
+    const limpo = nome.trim();
+    if (!limpo) return;
+    try {
+      const r = await fetch("/api/propostas/modelos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // O documento vai TAL COMO ESTÁ, com o nome e a data deste casal lá
+        // dentro. Não faz mal: quem o usar passa pelo `copiarParaPedido`, que
+        // é o mesmo caminho de qualquer proposta anterior e substitui tudo o
+        // que é de outra pessoa. Limpar aqui seria uma segunda regra a poder
+        // discordar da primeira.
+        body: JSON.stringify({ nome: limpo, tipo: "completo", doc, origem: doc.clientNames }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(j?.error ?? "Não deu para guardar o modelo.");
+      setNomeModelo(null);
+      toast(`Modelo «${limpo}» guardado.`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não deu para guardar o modelo.", "error");
+    }
+  }
+
   const isDeco = doc.template !== "organizacao";
-  /** Fotos que ocupam já o seu lugar no documento mas ainda não têm caminho. */
-  const porConfirmar = countPendingImages(doc);
-  // Também exige um total > 0: uma proposta a €0 seria enviada e poluiria os
-  // indicadores (total enviado, taxa de aceitação) com um negócio vazio.
-  // E exige que não haja fotos a caminho: ver a nota em «FOTOS POR CONFIRMAR».
-  const canSend =
-    !!doc.ref.trim() && !!doc.clientNames.trim() && money.gross > 0 && porConfirmar === 0;
+  /** Fotos que ocupam já o seu lugar no documento mas ainda não têm caminho.
+   *  Nome distinto do `porConfirmar` dos CAMPOS (acima): são coisas diferentes
+   *  e partilhar o nome era o caminho para uma delas passar a mentir. */
+  const fotosPorConfirmar = countPendingImages(doc);
+  // O botão e o aviso lateral leem a MESMA lista, de propósito: escritos cada
+  // um à sua maneira, mais cedo ou mais tarde discordavam — o aviso dizia que
+  // faltava o valor e o botão deixava enviar na mesma. A regra (e a razão de
+  // cada exigência) está em `proposal-progress.ts`.
+  const seccoes = estadoDasSeccoes(doc as ProposalDoc);
+  const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross);
+  // A regra das FOTOS POR CONFIRMAR fica aqui e não em `proposal-progress`:
+  // esse olha para o DOCUMENTO, e isto é um estado desta aba — a cópia que
+  // ainda vai a caminho só esta sessão a conhece. O email sai uma vez, e um
+  // PDF sem a foto escolhida dura para sempre.
+  const canSend = podeEnviar(doc as ProposalDoc, money.gross) && fotosPorConfirmar === 0;
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -1333,545 +1635,765 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
             pré-visualizar antes de enviar.
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={clearDraft} className="shrink-0">
-          Limpar rascunho
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* A acção principal desta secção: quase todas as propostas são uma
+              variação de uma anterior. É a única aqui a verde. */}
+          <Button size="sm" onClick={() => setCopiarAberto(true)}>
+            Criar a partir de…
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setNomeModelo(doc.eventType || "")}>
+            Guardar como modelo
+          </Button>
+          <Button variant="ghost" size="sm" onClick={clearDraft}>
+            Limpar rascunho
+          </Button>
+        </div>
       </div>
+
+      {limpo && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+          <span className="text-xs text-foreground/70">
+            Rascunho limpo. Pode anular durante {limpo.segundos}s.
+          </span>
+          <button
+            type="button"
+            className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            onClick={anularLimpeza}
+          >
+            Anular
+          </button>
+        </div>
+      )}
+
+      {nomeModelo !== null && (
+        <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-3">
+          <label className="flex-1 min-w-[14rem]">
+            <span className="bo-eyebrow">Nome do modelo</span>
+            <input
+              autoFocus
+              value={nomeModelo}
+              onChange={(e) => setNomeModelo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void guardarComoModelo(nomeModelo);
+                if (e.key === "Escape") setNomeModelo(null);
+              }}
+              placeholder="Casamento standard"
+              className="bo-input mt-1 w-full px-3 py-2 text-sm"
+            />
+          </label>
+          <Button
+            size="sm"
+            disabled={!nomeModelo.trim()}
+            onClick={() => void guardarComoModelo(nomeModelo)}
+          >
+            Guardar
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setNomeModelo(null)}>
+            Cancelar
+          </Button>
+        </div>
+      )}
+
+      <CriarAPartirDe
+        open={copiarAberto}
+        onClose={() => setCopiarAberto(false)}
+        quoteId={quote.id}
+        clienteAtual={quote.name ?? ""}
+        onEscolhido={aplicarCopia}
+        toast={toast}
+      />
 
       {/* Passos do fluxo — sempre visível, dá o sentido de "onde estou / o que
           fazer a seguir". Clicável para saltar entre passos. */}
       <StepNav step={step} onSelect={setStep} sent={sent} />
 
       {/* ══════════ PASSO 1 · Conteúdo ══════════ */}
-      <div hidden={step !== "conteudo"}>
-        {/* Template selector */}
-        <div className="mb-4">
-          <Segmented
-            ariaLabel="Modelo da proposta"
-            value={isDeco ? "decoracao" : "organizacao"}
-            onChange={setTemplate}
-            options={[
-              { value: "decoracao", label: "Decoração" },
-              { value: "organizacao", label: "Organização" },
-            ]}
-          />
-        </div>
-
-        {/* Event fields */}
-        <Section title="Evento">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field
-              label="Clientes"
-              value={doc.clientNames}
-              onChange={(e) => patch({ clientNames: e.target.value })}
-              placeholder="Maria & Zé"
-            />
-            <Field
-              label="Tipo de evento"
-              value={doc.eventType}
-              onChange={(e) => patch({ eventType: e.target.value })}
-              placeholder="Casamento"
-            />
-            <Field
-              label="Data"
-              value={doc.eventDate}
-              onChange={(e) => patch({ eventDate: e.target.value })}
-              placeholder="12 de setembro de 2026"
-            />
-            <Field
-              label="Local"
-              value={doc.location}
-              onChange={(e) => patch({ location: e.target.value })}
-              placeholder="Monte da Oliveirinha, Évora"
-            />
-            <Field
-              label="Convidados"
-              value={doc.guests}
-              onChange={(e) => patch({ guests: e.target.value })}
-              placeholder="150 pax"
-            />
-            {isDeco && (
-              <>
-                <Field
-                  label="Cerimónia"
-                  value={doc.ceremony ?? ""}
-                  onChange={(e) => patch({ ceremony: e.target.value })}
-                  placeholder="Civil, simbólica"
-                />
-                <Field
-                  label="Hora"
-                  value={doc.time ?? ""}
-                  onChange={(e) => patch({ time: e.target.value })}
-                  placeholder="A definir"
-                />
-                <Field
-                  label="Wedding Planners (opcional)"
-                  value={doc.weddingPlanners ?? ""}
-                  onChange={(e) => patch({ weddingPlanners: e.target.value })}
-                  placeholder="Equipa AMARA"
-                />
-              </>
-            )}
-          </div>
-
-          {/* Reference (advanced) */}
-          <div className="mt-4">
-            {refEdited && (
-              <div className="mb-1.5 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRefEdited(false);
-                    setDoc((d) => ({ ...d, ref: buildRef(d) }));
-                  }}
-                  className={ADD_BTN}
-                >
-                  ↺ Automática
-                </button>
-              </div>
-            )}
-            <Field
-              label="Título interno (opcional)"
-              value={doc.ref}
-              onChange={(e) => {
-                setRefEdited(true);
-                patch({ ref: e.target.value });
-              }}
-              hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
+      {/* `pb-20`: a barra do fundo é `sticky`, e sem folga por baixo do
+          conteúdo ela desenha-se POR CIMA do último campo. Estava a tapar o
+          "Título interno" antes desta missão (ficou anotado na Fase 0) e, com
+          o total lá dentro, passou a tapar o "Valor (sem IVA)" — logo o campo
+          que a barra existe para acompanhar. */}
+      <div hidden={step !== "conteudo"} className="flex gap-6 pb-20">
+        <NavEstudio seccoes={seccoes} faltas={faltas} />
+        <div className="min-w-0 flex-1">
+          {/* Template selector */}
+          <div className="mb-4">
+            <Segmented
+              ariaLabel="Modelo da proposta"
+              value={isDeco ? "decoracao" : "organizacao"}
+              onChange={setTemplate}
+              options={[
+                { value: "decoracao", label: "Decoração" },
+                { value: "organizacao", label: "Organização" },
+              ]}
             />
           </div>
-        </Section>
 
-        {/* Cover images */}
-        <Section title="Imagens de capa (2)">
-          <div className="grid grid-cols-2 gap-3">
-            {[0, 1].map((idx) => {
-              const path = doc.coverImages?.[idx];
-              return (
-                <div key={idx}>
-                  {path ? (
-                    <Thumb
-                      url={assetUrls[path]}
-                      onRemove={() => removeCoverAt(idx)}
-                      className="aspect-[4/3]"
-                      pendente={isPendingImage(path)}
-                    />
-                  ) : (
-                    <>
-                      <UploadArea
-                        // O lado é fixo: a posição 0 imprime à esquerda do
-                        // painel do logótipo, a 1 à direita.
-                        label={idx === 0 ? "Capa esquerda" : "Capa direita"}
-                        busy={!!uploading[`cover-${idx}`]}
-                        multiple={false}
-                        onFiles={(files) =>
-                          handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
-                            setCoverAt(idx, paths[0]),
-                          )
-                        }
+          {/* Event fields */}
+          <Section title="Evento" id="evento">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Clientes"
+                value={doc.clientNames}
+                onChange={(e) => {
+                  confirmado("clientNames");
+                  patch({ clientNames: e.target.value });
+                }}
+                containerClassName={realce("clientNames")}
+                placeholder="Maria & Zé"
+              />
+              <Field
+                label="Tipo de evento"
+                value={doc.eventType}
+                onChange={(e) => patch({ eventType: e.target.value })}
+                placeholder="Casamento"
+              />
+              <Field
+                label="Data"
+                value={doc.eventDate}
+                onChange={(e) => {
+                  confirmado("eventDate");
+                  patch({ eventDate: e.target.value });
+                }}
+                containerClassName={realce("eventDate")}
+                placeholder="12 de setembro de 2026"
+              />
+              <Field
+                label="Local"
+                list="sug-locais"
+                value={doc.location}
+                onChange={(e) => {
+                  confirmado("location");
+                  patch({ location: e.target.value });
+                }}
+                containerClassName={realce("location")}
+                placeholder="Monte da Oliveirinha, Évora"
+              />
+              <Field
+                label="Convidados"
+                value={doc.guests}
+                onChange={(e) => {
+                  confirmado("guests");
+                  patch({ guests: e.target.value });
+                }}
+                containerClassName={realce("guests")}
+                placeholder="150 pax"
+              />
+              {isDeco && (
+                <>
+                  <Field
+                    label="Cerimónia"
+                    value={doc.ceremony ?? ""}
+                    onChange={(e) => patch({ ceremony: e.target.value })}
+                    placeholder="Civil, simbólica"
+                  />
+                  <Field
+                    label="Hora"
+                    value={doc.time ?? ""}
+                    onChange={(e) => patch({ time: e.target.value })}
+                    placeholder="A definir"
+                  />
+                  <Field
+                    label="Wedding Planners (opcional)"
+                    list="sug-planners"
+                    value={doc.weddingPlanners ?? ""}
+                    onChange={(e) => patch({ weddingPlanners: e.target.value })}
+                    placeholder="Equipa AMARA"
+                  />
+                </>
+              )}
+            </div>
+
+            {/* As sugestões. `datalist` e não um `select`: ela TEM de poder
+                escrever um espaço novo — a lista ajuda, não fecha a porta. */}
+            <datalist id="sug-locais">
+              {sugestoes.locais.map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
+            <datalist id="sug-planners">
+              {sugestoes.planners.map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
+
+            {/* Reference (advanced) */}
+            <div className="mt-4">
+              {refEdited && (
+                <div className="mb-1.5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefEdited(false);
+                      setDoc((d) => ({ ...d, ref: buildRef(d) }));
+                    }}
+                    className={ADD_BTN}
+                  >
+                    ↺ Automática
+                  </button>
+                </div>
+              )}
+              <Field
+                label="Título interno (opcional)"
+                value={doc.ref}
+                onChange={(e) => {
+                  setRefEdited(true);
+                  patch({ ref: e.target.value });
+                }}
+                hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
+              />
+            </div>
+          </Section>
+
+          {/* Cover images */}
+          <Section title="Imagens de capa (2)" id="capas">
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1].map((idx) => {
+                const path = doc.coverImages?.[idx];
+                return (
+                  <div key={idx}>
+                    {path ? (
+                      <Thumb
+                        url={assetUrls[path]}
+                        onRemove={() => removeCoverAt(idx)}
+                        className="aspect-[4/3]"
+                        pendente={isPendingImage(path)}
+                      />
+                    ) : (
+                      <>
+                        <UploadArea
+                          // O lado é fixo: a posição 0 imprime à esquerda do
+                          // painel do logótipo, a 1 à direita.
+                          label={idx === 0 ? "Capa esquerda" : "Capa direita"}
+                          busy={!!uploading[`cover-${idx}`]}
+                          multiple={false}
+                          curto
+                          onFiles={(files) =>
+                            handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
+                              setCoverAt(idx, paths[0]),
+                            )
+                          }
+                        />
+                        <button
+                          type="button"
+                          className={`${ADD_BTN} mt-1.5`}
+                          onClick={() => setPicker({ kind: "cover", idx })}
+                          // Ao passar o rato já se vai buscar o que o diálogo
+                          // precisa. Quando ela carrega, está lá. `focus` para
+                          // quem navega por teclado, e `touchstart` para o
+                          // telemóvel, onde não há hover nenhum — é o instante
+                          // entre pousar o dedo e o levantar.
+                          onPointerEnter={aquecerBiblioteca}
+                          onFocus={aquecerBiblioteca}
+                          onTouchStart={aquecerBiblioteca}
+                        >
+                          Da biblioteca de temas
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+
+          {/* Service groups */}
+          <Section title="Serviços" id="servicos">
+            {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
+            <ServicesEditor
+              groups={doc.serviceGroups}
+              onGroupsChange={setServiceGroups}
+              showDesc={!isDeco}
+              onSave={saveNow}
+            />
+          </Section>
+
+          {/* Mood boards — decoracao only */}
+          {isDeco && (
+            <Section title="Mood boards" id="moodboards">
+              <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
+                grupos de imagens de inspiração para o cliente
+              </p>
+              <div className="flex flex-col gap-3">
+                {doc.moodBoards.map((b, bi) => (
+                  <div
+                    key={bi}
+                    className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <input
+                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                        value={b.title}
+                        onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                        placeholder="Decoração Cerimónia"
+                        aria-label="Título do mood board"
+                      />
+                      <MoveBtns
+                        onUp={() => moveBoard(bi, -1)}
+                        onDown={() => moveBoard(bi, 1)}
+                        disUp={bi === 0}
+                        disDown={bi === doc.moodBoards.length - 1}
                       />
                       <button
                         type="button"
-                        className={`${ADD_BTN} mt-1.5`}
-                        onClick={() => setPicker({ kind: "cover", idx })}
-                        // Ao passar o rato já se vai buscar o que o diálogo
-                        // precisa. Quando ela carrega, está lá. `focus` para
-                        // quem navega por teclado, e `touchstart` para o
-                        // telemóvel, onde não há hover nenhum — é o instante
-                        // entre pousar o dedo e o levantar.
-                        onPointerEnter={aquecerBiblioteca}
-                        onFocus={aquecerBiblioteca}
-                        onTouchStart={aquecerBiblioteca}
+                        className={REMOVE_BTN}
+                        onClick={() => removeBoard(bi)}
+                        aria-label="Remover mood board"
                       >
-                        Da biblioteca de temas
+                        ×
                       </button>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Section>
-
-        {/* Serviços — o editor com teclado, arrasto e anular vive em ServicesEditor. */}
-        <Section title="Serviços">
-          <ServicesEditor
-            groups={doc.serviceGroups}
-            onGroupsChange={setServiceGroups}
-            showDesc={!isDeco}
-            onSave={saveNow}
-          />
-        </Section>
-
-        {/* Mood boards — decoracao only */}
-        {isDeco && (
-          <Section title="Mood boards">
-            <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
-              grupos de imagens de inspiração para o cliente
-            </p>
-            <div className="flex flex-col gap-3">
-              {doc.moodBoards.map((b, bi) => (
-                <div
-                  key={bi}
-                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <input
-                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                      value={b.title}
-                      onChange={(e) => updateBoard(bi, { title: e.target.value })}
-                      placeholder="Decoração Cerimónia"
-                      aria-label="Título do mood board"
+                    </div>
+                    <textarea
+                      className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
+                      rows={2}
+                      value={b.annotation ?? ""}
+                      onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
+                      placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
+                      aria-label="Descrição do mood board"
                     />
-                    <MoveBtns
-                      onUp={() => moveBoard(bi, -1)}
-                      onDown={() => moveBoard(bi, 1)}
-                      disUp={bi === 0}
-                      disDown={bi === doc.moodBoards.length - 1}
-                      what="mood board"
-                    />
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removeBoard(bi)}
-                      aria-label="Remover mood board"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <textarea
-                    className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
-                    rows={2}
-                    value={b.annotation ?? ""}
-                    onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
-                    placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
-                    aria-label="Descrição do mood board"
-                  />
-                  {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
+                    {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
                       fotos. As que passam disso ficam marcadas — e ditas por
                       extenso a seguir — em vez de desaparecerem caladas no PDF. */}
-                  {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                    <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
-                      A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
-                      {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
-                        ? "a última, marcada «fora do PDF», não é impressa"
-                        : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
-                      . Remova fotos ou crie outro mood board.
-                    </p>
-                  )}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {b.images.map((path, ii) => (
-                      <Thumb
-                        // A chave é a POSIÇÃO na colagem, não o caminho: quando
-                        // uma foto provisória assenta, o caminho muda e a chave
-                        // pelo caminho desmontava a célula para montar outra
-                        // igual — a foto piscava e o lugar chegava a saltar. A
-                        // célula é o lugar; o que muda lá dentro é a morada.
-                        key={ii}
-                        url={assetUrls[path]}
-                        onRemove={() => removeBoardImage(bi, path)}
-                        className="aspect-square"
-                        foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
-                        pendente={isPendingImage(path)}
+                    {b.images.length > MOOD_BOARD_MAX_IMAGES && (
+                      <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
+                        A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
+                        {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
+                          ? "a última, marcada «fora do PDF», não é impressa"
+                          : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
+                        . Remova fotos ou crie outro mood board.
+                      </p>
+                    )}
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {b.images.map((path, ii) => (
+                        <Thumb
+                          // A chave é a POSIÇÃO, não o caminho: quando o
+                          // marcador provisório dá lugar ao caminho definitivo,
+                          // uma chave com o caminho faria o React desmontar a
+                          // célula e a foto piscava a meio da troca.
+                          key={ii}
+                          url={assetUrls[path]}
+                          onRemove={() => removeBoardImage(bi, path)}
+                          className="aspect-square"
+                          foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
+                          pendente={isPendingImage(path)}
+                        />
+                      ))}
+                      <UploadArea
+                        label="+ Imagens"
+                        busy={!!uploading[`board-${bi}`]}
+                        multiple
+                        compact
+                        onFiles={(files) =>
+                          handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
+                        }
                       />
-                    ))}
-                    <UploadArea
-                      label="+ Imagens"
-                      busy={!!uploading[`board-${bi}`]}
-                      multiple
-                      compact
-                      onFiles={(files) =>
-                        handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
-                      }
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={`${ADD_BTN} mt-2`}
-                    onClick={() => setPicker({ kind: "board", bi })}
-                    onPointerEnter={aquecerBiblioteca}
-                    onFocus={aquecerBiblioteca}
-                    onTouchStart={aquecerBiblioteca}
-                  >
-                    Escolher da biblioteca de temas
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button type="button" className={`${ADD_BTN} mt-3`} onClick={addBoard}>
-              + Adicionar mood board
-            </button>
-          </Section>
-        )}
-
-        {/* Cronograma — organizacao only */}
-        {!isDeco && (
-          <Section title="Cronograma de Organização">
-            <div className="flex flex-col gap-3">
-              {(doc.cronograma ?? []).map((ph, pi) => (
-                <div
-                  key={pi}
-                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <input
-                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                      value={ph.title}
-                      onChange={(e) => updatePhase(pi, { title: e.target.value })}
-                      placeholder="6-12 meses antes do casamento"
-                      aria-label="Título da fase"
-                    />
-                    <MoveBtns
-                      onUp={() => movePhase(pi, -1)}
-                      onDown={() => movePhase(pi, 1)}
-                      disUp={pi === 0}
-                      disDown={pi === (doc.cronograma?.length ?? 0) - 1}
-                      what="fase"
-                    />
+                    </div>
                     <button
                       type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removePhase(pi)}
-                      aria-label="Remover fase"
+                      className={`${ADD_BTN} mt-2`}
+                      onClick={() => setPicker({ kind: "board", bi })}
+                      onPointerEnter={aquecerBiblioteca}
+                      onFocus={aquecerBiblioteca}
+                      onTouchStart={aquecerBiblioteca}
                     >
-                      ×
+                      Escolher da biblioteca de temas
                     </button>
                   </div>
-                  <div className="flex flex-col gap-2 pl-1">
-                    {ph.items.map((it, ii) => (
-                      <div key={ii} className="flex items-center gap-2">
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-4">
+                <button type="button" className={ADD_BTN} onClick={addBoard}>
+                  + Adicionar mood board
+                </button>
+                <ModelosParciais
+                  tipo="moodboard"
+                  toast={toast}
+                  onInserir={(b) =>
+                    setDoc((d) => ({
+                      ...d,
+                      moodBoards: [...d.moodBoards, b as StudioDoc["moodBoards"][number]],
+                    }))
+                  }
+                  paraGuardar={doc.moodBoards.find((b) => (b.title ?? "").trim())}
+                  nomeSugerido={doc.moodBoards.find((b) => (b.title ?? "").trim())?.title}
+                />
+              </div>
+            </Section>
+          )}
+
+          {/* Cronograma — organizacao only */}
+          {!isDeco && (
+            <Section title="Cronograma de Organização" id="cronograma">
+              <div className="flex flex-col gap-3">
+                {(doc.cronograma ?? []).map((ph, pi) => (
+                  <div
+                    key={pi}
+                    className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <input
+                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                        value={ph.title}
+                        onChange={(e) => updatePhase(pi, { title: e.target.value })}
+                        placeholder="6-12 meses antes do casamento"
+                        aria-label="Título da fase"
+                      />
+                      <MoveBtns
+                        onUp={() => movePhase(pi, -1)}
+                        onDown={() => movePhase(pi, 1)}
+                        disUp={pi === 0}
+                        disDown={pi === (doc.cronograma?.length ?? 0) - 1}
+                      />
+                      <button
+                        type="button"
+                        className={REMOVE_BTN}
+                        onClick={() => removePhase(pi)}
+                        aria-label="Remover fase"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-2 pl-1">
+                      {ph.items.map((it, ii) => (
+                        <div key={ii} className="flex items-center gap-2">
+                          <input
+                            className={INPUT_SM}
+                            value={it}
+                            onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
+                            placeholder="Definição do conceito"
+                            aria-label="Tarefa"
+                          />
+                          <button
+                            type="button"
+                            className={REMOVE_BTN}
+                            onClick={() => removePhaseItem(pi, ii)}
+                            aria-label="Remover tarefa"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
+                        + Adicionar tarefa
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
+                + Adicionar fase
+              </button>
+            </Section>
+          )}
+
+          {/* Budget */}
+          <Section title="Orçamento Proposto" id="orcamento">
+            {isDeco ? (
+              <>
+                <div className="flex flex-col gap-2 mb-3">
+                  <p className="text-xs leading-relaxed text-foreground/50">
+                    Os preços por linha são <strong className="font-semibold">só para si</strong>:
+                    servem para somar e para avisar quando o total já não bate certo. O PDF continua
+                    a mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único,
+                    como nas suas propostas.
+                  </p>
+                  {linhasDe(doc).map((l, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        className={`${INPUT_SM} flex-1`}
+                        value={l.item}
+                        onChange={(e) => updateBudgetItem(i, e.target.value)}
+                        placeholder="Decor Cerimónia"
+                        aria-label="Item de orçamento"
+                      />
+                      {/* A largura vai no invólucro e não no campo: `.bo-input`
+                        tem `width: 100%` escrito em CSS, que ganha a um
+                        `w-28` do Tailwind. Sem isto o preço comia a linha
+                        toda e o nome ficava numa caixa de trinta pixels — foi
+                        o que a captura de ecrã mostrou. */}
+                      <span className="w-28 shrink-0">
                         <input
-                          className={INPUT_SM}
-                          value={it}
-                          onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
-                          placeholder="Definição do conceito"
-                          aria-label="Tarefa"
+                          className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                          defaultValue={l.preco === null ? "" : String(l.preco)}
+                          // `onBlur` e não `onChange`: normalizar a cada tecla
+                          // apagava o que ela estava a escrever a meio ("1." vira
+                          // 1, e o "500" seguinte já não tinha onde entrar).
+                          onBlur={(e) => updateBudgetPrice(i, e.target.value)}
+                          placeholder="900"
+                          inputMode="decimal"
+                          aria-label={`Preço de ${l.item || "linha sem nome"}`}
+                        />
+                      </span>
+                      <button
+                        type="button"
+                        className={REMOVE_BTN}
+                        onClick={() => removeBudgetItem(i)}
+                        aria-label="Remover item"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
+                      + Adicionar item
+                    </button>
+                    {soma !== null && (
+                      <span className="text-xs text-foreground/55">
+                        Soma das linhas: <strong className="font-semibold">{eur(soma)}</strong>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field
+                    label="Rótulo do total"
+                    value={doc.totalLabel}
+                    onChange={(e) => patch({ totalLabel: e.target.value })}
+                    placeholder="Valor Total Decoração"
+                  />
+                </div>
+
+                {/* Valores adicionais — linhas mostradas por baixo do total (Deslocação,
+                  Wedding Coordinator, Tecidos, Mobiliário opção A/B, …). Só aparecem no
+                  PDF; o valor faturado e o sinal 30/70 continuam a partir do «Total» abaixo. */}
+                <div className="mt-5">
+                  <span className="bo-eyebrow">Valores adicionais</span>
+                  <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
+                    Linhas mostradas por baixo do total na proposta (ex.: deslocação, coordenação,
+                    tecidos). Só para o PDF — o total faturado e o sinal continuam a partir do
+                    «Total».
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                      <span>Descrição</span>
+                      <span className="text-right">Valor (texto)</span>
+                      <span className="w-5" />
+                    </div>
+                    {(doc.budgetExtras ?? []).map((ex, i) => (
+                      <div
+                        key={i}
+                        className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                      >
+                        <input
+                          className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                          value={ex.label}
+                          onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                          placeholder="Deslocação da equipa Líquen"
+                          aria-label="Descrição da linha adicional"
+                        />
+                        <input
+                          className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
+                          value={ex.valueText}
+                          onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
+                          placeholder="896,00 €"
+                          aria-label="Valor da linha adicional"
                         />
                         <button
                           type="button"
                           className={REMOVE_BTN}
-                          onClick={() => removePhaseItem(pi, ii)}
-                          aria-label="Remover tarefa"
+                          onClick={() => removeBudgetExtra(i)}
+                          aria-label="Remover linha adicional"
                         >
                           ×
                         </button>
                       </div>
                     ))}
-                    <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
-                      + Adicionar tarefa
+                    <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
+                      + Adicionar valor adicional
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-            <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
-              + Adicionar fase
-            </button>
-          </Section>
-        )}
-
-        {/* Budget */}
-        <Section title="Orçamento Proposto">
-          {isDeco ? (
-            <>
-              <div className="flex flex-col gap-2 mb-3">
-                {doc.budgetItems.map((it, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      className={INPUT_SM}
-                      value={it}
-                      onChange={(e) => updateBudgetItem(i, e.target.value)}
-                      placeholder="Decor Cerimónia"
-                      aria-label="Item de orçamento"
-                    />
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removeBudgetItem(i)}
-                      aria-label="Remover item"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
-                  + Adicionar item
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field
-                  label="Rótulo do total"
-                  value={doc.totalLabel}
-                  onChange={(e) => patch({ totalLabel: e.target.value })}
-                  placeholder="Valor Total Decoração"
-                />
-              </div>
-
-              {/* Valores adicionais — linhas mostradas por baixo do total (Deslocação,
-                  Wedding Coordinator, Tecidos, Mobiliário opção A/B, …). Só aparecem no
-                  PDF; o valor faturado e o sinal 30/70 continuam a partir do «Total» abaixo. */}
-              <div className="mt-5">
-                <span className="bo-eyebrow">Valores adicionais</span>
-                <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
-                  Linhas mostradas por baixo do total na proposta (ex.: deslocação, coordenação,
-                  tecidos). Só para o PDF — o total faturado e o sinal continuam a partir do
-                  «Total».
-                </p>
-                <div className="flex flex-col gap-2">
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2 mb-3">
                   <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                    <span>Descrição</span>
-                    <span className="text-right">Valor (texto)</span>
+                    <span>Item</span>
+                    <span className="text-right">Valor</span>
                     <span className="w-5" />
                   </div>
-                  {(doc.budgetExtras ?? []).map((ex, i) => (
+                  {(doc.budgetRows ?? []).map((r, i) => (
                     <div
                       key={i}
                       className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
                     >
                       <input
                         className="bo-input px-2.5 py-2 text-xs text-foreground/75"
-                        value={ex.label}
-                        onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
-                        placeholder="Deslocação da equipa Líquen"
-                        aria-label="Descrição da linha adicional"
+                        value={r.item}
+                        onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
+                        placeholder="Coordenação do dia"
+                        aria-label="Item"
                       />
                       <input
                         className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
-                        value={ex.valueText}
-                        onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
-                        placeholder="896,00 €"
-                        aria-label="Valor da linha adicional"
+                        value={r.price}
+                        onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
+                        placeholder="1.500,00 €"
+                        aria-label="Valor"
                       />
                       <button
                         type="button"
                         className={REMOVE_BTN}
-                        onClick={() => removeBudgetExtra(i)}
-                        aria-label="Remover linha adicional"
+                        onClick={() => removeBudgetRow(i)}
+                        aria-label="Remover linha"
                       >
                         ×
                       </button>
                     </div>
                   ))}
-                  <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
-                    + Adicionar valor adicional
+                  <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
+                    + Adicionar linha
                   </button>
                 </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2 mb-3">
-                <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                  <span>Item</span>
-                  <span className="text-right">Valor</span>
-                  <span className="w-5" />
+                <div className="flex flex-col gap-3">
+                  <Field
+                    as="textarea"
+                    label="Nota do orçamento"
+                    rows={2}
+                    className="resize-none"
+                    value={doc.budgetNote ?? ""}
+                    onChange={(e) => patch({ budgetNote: e.target.value })}
+                    placeholder="Os valores são estimativas e podem ser ajustados…"
+                  />
                 </div>
-                {(doc.budgetRows ?? []).map((r, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
-                  >
-                    <input
-                      className="bo-input px-2.5 py-2 text-xs text-foreground/75"
-                      value={r.item}
-                      onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
-                      placeholder="Coordenação do dia"
-                      aria-label="Item"
-                    />
-                    <input
-                      className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
-                      value={r.price}
-                      onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
-                      placeholder="1.500,00 €"
-                      aria-label="Valor"
-                    />
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removeBudgetRow(i)}
-                      aria-label="Remover linha"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
-                  + Adicionar linha
-                </button>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Field
-                  as="textarea"
-                  label="Nota do orçamento"
-                  rows={2}
-                  className="resize-none"
-                  value={doc.budgetNote ?? ""}
-                  onChange={(e) => patch({ budgetNote: e.target.value })}
-                  placeholder="Os valores são estimativas e podem ser ajustados…"
-                />
-              </div>
-            </>
-          )}
-        </Section>
+              </>
+            )}
+          </Section>
 
-        {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
+          {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
-        <Section title="Total, IVA e validade">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
-              É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido —
-              escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número só.
-            </p>
-            <Field
-              // Sempre a base: é o que o pedido guarda, e é o que o rótulo
-              // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o
-              // que o cliente vê, não o significado deste campo.
-              label="Valor (sem IVA)"
-              inputMode="decimal"
-              value={totalInput}
-              onChange={(e) => onTotalInput(e.target.value)}
-              placeholder="3000"
-            />
-            <div className="flex flex-col gap-1.5">
-              <span className="bo-eyebrow">IVA</span>
-              <Segmented
-                ariaLabel="Modo de IVA"
-                value={vatMode}
-                onChange={setVatMode}
-                options={[
-                  { value: "incluido", label: "IVA incluído" },
-                  { value: "acrescer", label: "+ IVA (acresce)" },
-                ]}
-              />
-              <p className="text-xs leading-relaxed text-foreground/45">
-                Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
-                «incluído» mostra já a soma. O valor acima é sempre sem IVA.
+          <Section title="Total, IVA e validade" id="total">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
+                É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido
+                — escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número só.
               </p>
+              <Field
+                // Sempre a base: é o que o pedido guarda, e é o que o rótulo
+                // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o
+                // que o cliente vê, não o significado deste campo.
+                label="Valor (sem IVA)"
+                inputMode="decimal"
+                value={totalInput}
+                onChange={(e) => {
+                  confirmado("totalAmount");
+                  onTotalInput(e.target.value);
+                }}
+                placeholder="3000"
+                containerClassName={realce("totalAmount")}
+                hint={
+                  desvio
+                    ? `Total manual — a soma das linhas é ${eur(desvio.soma)}`
+                    : soma !== null
+                      ? "Bate certo com a soma das linhas."
+                      : undefined
+                }
+              />
+              {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
+                errado sem dar o gesto que o arruma é meio trabalho. */}
+              {desvio && (
+                <div className="sm:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+                  <span className="text-xs text-foreground/70">
+                    O total está escrito à mão e difere da soma das linhas em{" "}
+                    <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
+                  </span>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                    onClick={() => {
+                      confirmado("totalAmount");
+                      onTotalInput(String(desvio.soma));
+                    }}
+                  >
+                    Usar {eur(desvio.soma)}
+                  </button>
+                </div>
+              )}
+              <div className="flex flex-col gap-1.5">
+                <span className="bo-eyebrow">IVA</span>
+                <Segmented
+                  ariaLabel="Modo de IVA"
+                  value={vatMode}
+                  onChange={setVatMode}
+                  options={[
+                    { value: "incluido", label: "IVA incluído" },
+                    { value: "acrescer", label: "+ IVA (acresce)" },
+                  ]}
+                />
+                <p className="text-xs leading-relaxed text-foreground/45">
+                  Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
+                  «incluído» mostra já a soma. O valor acima é sempre sem IVA.
+                </p>
+                {/* As duas leituras lado a lado, para ela ver o que o cliente vai
+                  ver antes de decidir. A escolhida fica marcada; a outra está
+                  lá para comparar, não para confundir. */}
+                {money.base > 0 && (
+                  <div className="mt-1 grid grid-cols-2 gap-2 text-[11px]">
+                    {(["acrescer", "incluido"] as const).map((modo) => {
+                      const v = duasFormas[modo];
+                      const ativa = vatMode === modo;
+                      return (
+                        <div
+                          key={modo}
+                          className={`rounded-lg border px-2.5 py-2 ${
+                            ativa
+                              ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
+                              : "border-foreground/10 text-foreground/45"
+                          }`}
+                        >
+                          <span className="block font-medium">
+                            {modo === "acrescer" ? "+ IVA" : "IVA incluído"}
+                            {ativa && " · escolhido"}
+                          </span>
+                          <span className="mt-0.5 block">
+                            base {eur(v.base)} · IVA {eur(v.iva)}
+                          </span>
+                          <span className="block">
+                            o cliente paga <strong className="font-semibold">{eur(v.total)}</strong>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <Field
+                label="Validade (dias)"
+                type="number"
+                min={1}
+                value={doc.validUntilDays ?? ""}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
+                }}
+                placeholder={String(DEFAULT_VALID_DAYS)}
+                aria-label="Dias de validade"
+                hint={
+                  doc.validUntilDays ? (
+                    <button
+                      type="button"
+                      className="text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
+                      onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
+                    >
+                      Passar a usar {doc.validUntilDays} dias em todas as propostas novas
+                    </button>
+                  ) : undefined
+                }
+              />
             </div>
-            <Field
-              label="Validade (dias)"
-              type="number"
-              min={1}
-              value={doc.validUntilDays ?? ""}
-              onChange={(e) => {
-                const n = Number.parseInt(e.target.value, 10);
-                patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
-              }}
-              placeholder={String(DEFAULT_VALID_DAYS)}
-              aria-label="Dias de validade"
-            />
-          </div>
-          {/* Prévia do desdobramento — o que será efetivamente faturado. */}
-          {money.gross > 0 && (
-            <p className="mt-4 text-xs leading-relaxed text-foreground/55">
-              Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
-              <span className="text-foreground/80">Total {eur(money.gross)}</span>
-              <br />
-              Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
-            </p>
-          )}
-        </Section>
+            {/* Prévia do desdobramento — o que será efetivamente faturado. */}
+            {money.gross > 0 && (
+              <p className="mt-4 text-xs leading-relaxed text-foreground/55">
+                Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
+                <span className="text-foreground/80">Total {eur(money.gross)}</span>
+                <br />
+                Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
+              </p>
+            )}
+          </Section>
+        </div>
       </div>
       {/* ══════════ /PASSO 1 ══════════ */}
 
@@ -1927,21 +2449,21 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                   dos campos por preencher: aqui não há nada a fazer senão
                   esperar uns segundos — dizer-lhe para "preencher" seria
                   mandá-la procurar um campo que está bem. */}
-              {porConfirmar > 0 && (
+              {fotosPorConfirmar > 0 && (
                 <p
                   aria-live="polite"
                   className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]"
                 >
                   <span aria-hidden="true">⏳</span>
                   <span>
-                    {porConfirmar === 1
+                    {fotosPorConfirmar === 1
                       ? "1 foto ainda está a entrar na proposta."
-                      : `${porConfirmar} fotos ainda estão a entrar na proposta.`}{" "}
+                      : `${fotosPorConfirmar} fotos ainda estão a entrar na proposta.`}{" "}
                     O envio fica disponível mal ela assente — assim a proposta segue completa.
                   </span>
                 </p>
               )}
-              {!canSend && porConfirmar === 0 && (
+              {!canSend && fotosPorConfirmar === 0 && (
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
                   <span aria-hidden="true">⚠</span>
                   <span>
@@ -1957,11 +2479,48 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
       {/* Ação principal — muda conforme o passo, para haver sempre UMA próxima
           ação óbvia. */}
-      <div className="sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-background/95 px-1 py-3">
+      <div // `z-20` não é enfeite: sem ele os cartões das secções — que criam o seu
+        // próprio contexto de empilhamento — desenham-se POR CIMA desta barra, e o
+        // texto do total aparecia misturado com o do campo por baixo. Vê-se na
+        // captura de ecrã antes desta linha existir; nenhum teste apanhava.
+        className="sticky bottom-0 z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-3 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)]"
+      >
         {step === "conteudo" && (
           <>
-            <p className="mr-auto text-xs text-foreground/45">
-              Preencha o conteúdo e avance para pré-visualizar.
+            {/* O TOTAL SEMPRE À VISTA.
+                Palavras dela: «não quero fazer scroll para saber quanto vai a
+                proposta». O valor vive cinco ecrãs abaixo do sítio onde ela
+                está a escrever os serviços; aqui acompanha-a por toda a
+                página, e muda enquanto ela escreve. */}
+            <p className="mr-auto text-xs text-foreground/55">
+              {money.base > 0 ? (
+                <>
+                  <span className="text-foreground/45">Total</span>{" "}
+                  <strong className="font-semibold text-foreground/85">{eur(money.base)}</strong>{" "}
+                  <span className="text-foreground/45">
+                    sem IVA · o cliente paga {eur(money.gross)}
+                  </span>
+                  {desvio && (
+                    <span className="ml-2 rounded-full bg-[#c98a2e]/15 px-2 py-0.5 text-[10px] text-[#8a5d13]">
+                      soma das linhas: {eur(desvio.soma)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Preencha o conteúdo e avance para pré-visualizar."
+              )}
+              {/* Discreto de propósito: é uma confirmação, não um aviso. Quem
+                  precisa dela procura-a; quem não precisa não tem de a ler. */}
+              {(gravadoEm || porGravar) && (
+                <span className="ml-2 text-[11px] text-foreground/35">
+                  {porGravar
+                    ? "a guardar…"
+                    : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}`}
+                </span>
+              )}
             </p>
             <Button
               variant="primary"
@@ -2027,7 +2586,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 title={
                   canSend
                     ? undefined
-                    : porConfirmar > 0
+                    : fotosPorConfirmar > 0
                       ? "Há fotos ainda a entrar na proposta. Falta pouco."
                       : "Preencha clientes, referência e um total maior que 0 antes de enviar."
                 }
@@ -2064,11 +2623,91 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
 // ── Small presentational helpers ──
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * Onde ficam guardadas as secções fechadas.
+ *
+ * Por DISPOSITIVO e não no documento: fechar o «Cronograma» é uma preferência
+ * de quem está a trabalhar, não uma propriedade da proposta. Guardá-la no
+ * documento fazia com que abrir a proposta noutro computador herdasse as
+ * dobras de outra pessoa — e, pior, fazia uma alteração de disposição contar
+ * como alteração por gravar.
+ */
+const SECOES_KEY = "liquen-estudio-secoes";
+
+function lerFechadas(): Record<string, boolean> {
+  try {
+    const cru = localStorage.getItem(SECOES_KEY);
+    const v = cru ? JSON.parse(cru) : null;
+    return v && typeof v === "object" ? (v as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function Section({
+  title,
+  children,
+  /** Chave estável para lembrar a dobra. Sem ela a secção não colapsa. */
+  id,
+  /** Marca à direita do título — "3 linhas", "por preencher". */
+  nota,
+}: {
+  title: string;
+  children: React.ReactNode;
+  id?: string;
+  nota?: string;
+}) {
+  const [fechada, setFechada] = useState(false);
+  // Ler no efeito e não no `useState` inicial: o servidor não tem
+  // `localStorage`, e uma diferença entre o que o servidor desenha e o que o
+  // browser desenha dá um erro de hidratação.
+  useEffect(() => {
+    if (id) setFechada(!!lerFechadas()[id]);
+  }, [id]);
+
+  function alternar() {
+    if (!id) return;
+    const proxima = !fechada;
+    setFechada(proxima);
+    try {
+      localStorage.setItem(SECOES_KEY, JSON.stringify({ ...lerFechadas(), [id]: proxima }));
+    } catch {
+      /* sem localStorage a dobra não sobrevive à sessão; o resto funciona */
+    }
+  }
+
+  const corpoId = id ? `sec-${id}` : undefined;
   return (
-    <Card className="mb-4">
-      <h3 className="font-display text-base leading-tight text-foreground/90 mb-4">{title}</h3>
-      {children}
+    <Card className="mb-4" id={id ? `seccao-${id}` : undefined}>
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        {id ? (
+          <button
+            type="button"
+            onClick={alternar}
+            aria-expanded={!fechada}
+            aria-controls={corpoId}
+            className="group flex items-baseline gap-2 text-left"
+          >
+            <span
+              aria-hidden
+              className={`text-[10px] text-foreground/35 transition-transform ${fechada ? "" : "rotate-90"}`}
+            >
+              ▶
+            </span>
+            <h3 className="font-display text-base leading-tight text-foreground/90 group-hover:text-foreground">
+              {title}
+            </h3>
+          </button>
+        ) : (
+          <h3 className="font-display text-base leading-tight text-foreground/90">{title}</h3>
+        )}
+        {nota && <span className="shrink-0 text-xs text-foreground/45">{nota}</span>}
+      </div>
+      {/* `hidden` e não desmontar: uma secção fechada continua a ter os campos
+          no formulário, e fechá-la não pode apagar o que lá está escrito. */}
+      <div id={corpoId} hidden={fechada}>
+        {children}
+      </div>
     </Card>
   );
 }
@@ -2184,6 +2823,8 @@ function PreviewSummary({
   const extras = (doc.budgetExtras ?? []).filter(
     (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
   );
+  /** Calculado aqui e não recebido: este resumo só conhece o documento. */
+  const fotosPorConfirmar = countPendingImages(doc);
   return (
     <Section title="Resumo da proposta">
       <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
@@ -2193,11 +2834,11 @@ function PreviewSummary({
 
       {/* O resumo mostra as fotos a caminho esbatidas; dizer quantas são evita
           que um PDF gerado agora — que não as leva — pareça um erro. */}
-      {porConfirmar > 0 && (
+      {fotosPorConfirmar > 0 && (
         <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[#b5654a]">
-          {porConfirmar === 1
+          {fotosPorConfirmar === 1
             ? "1 foto ainda está a entrar na proposta e não entra num PDF gerado agora."
-            : `${porConfirmar} fotos ainda estão a entrar na proposta e não entram num PDF gerado agora.`}
+            : `${fotosPorConfirmar} fotos ainda estão a entrar na proposta e não entram num PDF gerado agora.`}
         </p>
       )}
 
@@ -2409,12 +3050,22 @@ function UploadArea({
   busy,
   multiple,
   compact = false,
+  curto = false,
   onFiles,
 }: {
   label: string;
   busy: boolean;
   multiple: boolean;
   compact?: boolean;
+  /**
+   * Caixa BAIXA em vez de proporcional.
+   *
+   * Uma zona de largar com `aspect-[4/3]` numa coluna de 520px fica com 391px
+   * de altura — medido. Duas dessas, lado a lado, são metade da janela de
+   * trabalho gasta a não mostrar nada. Vazia é uma faixa; ao ganhar uma foto,
+   * a miniatura é que traz a proporção de volta.
+   */
+  curto?: boolean;
   onFiles: (files: File[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -2446,7 +3097,7 @@ function UploadArea({
         pick(e.dataTransfer.files);
       }}
       className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
-        compact ? "aspect-square p-2" : "aspect-[4/3] p-3"
+        curto ? "h-24 p-2" : compact ? "aspect-square p-2" : "aspect-[4/3] p-3"
       } ${
         drag
           ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"

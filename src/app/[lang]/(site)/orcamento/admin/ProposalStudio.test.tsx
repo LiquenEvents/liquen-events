@@ -204,6 +204,130 @@ const renderStudio = () =>
  * escolheu nada continua a ver o estúdio de sempre, em vez de uma proposta
  * inventada por mim.
  */
+/**
+ * O ORÇAMENTO QUE SE SOMA SOZINHO.
+ *
+ * Palavras dela: «altero um item e esqueço-me de atualizar o total». O aviso
+ * existe para esse esquecimento ter voz.
+ */
+/**
+ * LIMPAR O RASCUNHO — a única acção destrutiva da página.
+ *
+ * Tinha uma caixa de confirmação. A caixa pergunta ANTES, quando ela ainda
+ * não viu o que ia perder, e a resposta certa é quase sempre "sim" — por isso
+ * carrega-se sem ler. A anulação pergunta DEPOIS, com o estrago à vista.
+ */
+describe("limpar o rascunho pode ser anulado", () => {
+  function seedComConteudo() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [{ label: "Igreja" }] }],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia"],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+  }
+
+  it("não pergunta antes — limpa e oferece anular", async () => {
+    seedComConteudo();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Limpar rascunho/ }));
+    expect(await screen.findByText(/Pode anular durante/i)).toBeTruthy();
+    // E limpou mesmo: o grupo que lá estava desapareceu.
+    expect(screen.queryByDisplayValue("Decoração Floral")).toBeNull();
+  });
+
+  it("anular devolve o que lá estava", async () => {
+    seedComConteudo();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Limpar rascunho/ }));
+    await user.click(await screen.findByRole("button", { name: /^Anular$/ }));
+    expect(await screen.findByDisplayValue("Decoração Floral")).toBeTruthy();
+    expect(screen.getByDisplayValue("Igreja")).toBeTruthy();
+    // E a oferta desaparece — anulada uma vez, não fica lá a pedir de novo.
+    expect(screen.queryByText(/Pode anular durante/i)).toBeNull();
+  });
+});
+
+describe("total desalinhado da soma das linhas", () => {
+  function seedComPrecos(total: number) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia", "Decor Jantar"],
+        budgetAmounts: [900, 2350],
+        coverImages: ["", ""],
+        totalAmount: total,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+  }
+
+  it("mostra a soma das linhas ao lado do botão de acrescentar", async () => {
+    seedComPrecos(3250);
+    renderStudio();
+    // O `^` não é preciosismo: "Bate certo com a soma das linhas" também
+    // contém a frase, e sem a âncora o teste apanhava as duas.
+    expect(await screen.findByText(/^Soma das linhas:/)).toBeTruthy();
+  });
+
+  it("avisa quando o total escrito à mão já não bate certo", async () => {
+    seedComPrecos(4000);
+    renderStudio();
+    const aviso = await screen.findByText(/difere da soma das linhas/i);
+    expect(aviso.textContent).toMatch(/750/);
+  });
+
+  it("cala-se quando o total bate certo", async () => {
+    seedComPrecos(3250);
+    renderStudio();
+    await screen.findByText(/^Soma das linhas:/);
+    expect(screen.queryByText(/difere da soma das linhas/i)).toBeNull();
+  });
+
+  it("o botão do aviso arruma o total", async () => {
+    // Dizer que está errado sem dar o gesto que o corrige é meio trabalho.
+    seedComPrecos(4000);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Usar/ }));
+    expect(screen.queryByText(/difere da soma das linhas/i)).toBeNull();
+  });
+
+  it("mostra as duas leituras do IVA lado a lado", async () => {
+    // Para ela ver o que o cliente vai ver, antes de decidir.
+    seedComPrecos(3250);
+    renderStudio();
+    // A barra fixa do fundo também diz "o cliente paga", precedida de
+    // "sem IVA ·" — daí a âncora no início.
+    expect(await screen.findAllByText(/^o cliente paga/)).toHaveLength(2);
+  });
+});
+
 describe("pontos de decoração escolhidos no pedido", () => {
   const comEscolhas = {
     ...quote,
@@ -277,7 +401,9 @@ describe("mood board com mais fotos do que a página desenha", () => {
   it("não marca nada quando as fotos todas cabem", async () => {
     seedDraft(6);
     renderStudio();
-    await screen.findByText("Mood boards");
+    // O título da SECÇÃO. A coluna lateral também diz "Mood boards", e sem
+    // esta distinção o teste apanhava os dois e falhava por ambiguidade.
+    await screen.findByRole("heading", { name: "Mood boards" });
     expect(screen.queryByText("fora do PDF")).toBeNull();
     expect(screen.queryByText(/A página deste mood board mostra/i)).toBeNull();
   });
@@ -535,7 +661,9 @@ describe("fotos da biblioteca em estado provisório", () => {
     );
     renderStudio();
 
-    await screen.findByText("Mood boards");
+    // O TÍTULO da secção: a coluna lateral (NavEstudio) também diz "Mood
+    // boards", e um `findByText` solto passou a encontrar os dois.
+    await screen.findByRole("heading", { name: "Mood boards" });
     // Uma foto no mood board, uma capa — e nenhuma célula provisória.
     expect(estados()).toEqual([null, null]);
     await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
