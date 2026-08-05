@@ -83,10 +83,10 @@ export async function etiquetar(
   path: string,
   etiquetaId: string,
   origem: OrigemEtiqueta = "manual",
-): Promise<FotoEtiqueta> {
+): Promise<{ ligacao: FotoEtiqueta; criada: boolean }> {
   const id = idDaLigacao(path, etiquetaId);
   const existente = await repo.get(id);
-  if (existente) return existente;
+  if (existente) return { ligacao: existente, criada: false };
   const ligacao: FotoEtiqueta = {
     id,
     path,
@@ -95,9 +95,20 @@ export async function etiquetar(
     createdAt: new Date().toISOString(),
   };
   await repo.create(ligacao);
-  return ligacao;
+  return { ligacao, criada: true };
 }
 
-/** Tira uma etiqueta de uma foto. Tirar o que já não estava é um sucesso. */
-export const desetiquetar = (path: string, etiquetaId: string): Promise<void> =>
-  repo.remove(idDaLigacao(path, etiquetaId));
+/**
+ * Tira uma etiqueta de uma foto. Tirar o que já não estava é um sucesso — o
+ * `false` diz só que não havia nada para tirar.
+ *
+ * O `criada`/`removida` existe para a mensagem poder ser honesta: aplicar uma
+ * etiqueta a 30 fotos das quais 8 já a tinham deve dizer "22 fotos
+ * etiquetadas", não 30.
+ */
+export async function desetiquetar(path: string, etiquetaId: string): Promise<boolean> {
+  const id = idDaLigacao(path, etiquetaId);
+  if (!(await repo.get(id))) return false;
+  await repo.remove(id);
+  return true;
+}
