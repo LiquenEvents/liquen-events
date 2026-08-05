@@ -9,6 +9,7 @@ import {
 } from "@/lib/orcamento/data";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
+import { guestRangeLabel } from "@/lib/orcamento/data";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { SITE } from "@/lib/site";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
@@ -247,10 +248,15 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     .map((n) => n?.trim())
     .filter(Boolean)
     .join(" & ");
+  // Quando não há número exacto, a ordem de grandeza vale mais do que um vazio
+  // — um casamento de 40 e um de 300 não são o mesmo trabalho.
+  const convidados = form.guests
+    ? String(form.guests)
+    : guestRangeLabel(form.guestsRange)
+      ? `~ ${guestRangeLabel(form.guestsRange)}`
+      : "";
   const eventRows =
-    // Sem número exacto vale a estimativa. A linha nunca fica vazia por causa
-    // de um `guests: 0` que só quer dizer "ainda não sabem".
-    row("Convidados", form.guests ? String(form.guests) : esc(form.guestsEstimate?.trim() ?? "")) +
+    row("Convidados", esc(convidados)) +
     row("Local", esc(local)) +
     (noivos ? row("Noivos", esc(noivos)) : "") +
     (decor ? row("Decoração", esc(decor)) : "") +
@@ -433,7 +439,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     "O EVENTO",
     subtitle ? `Evento: ${subtitle}` : null,
     dateHero ? `Data: ${dateHero}${isWeekend ? " (fim de semana)" : ""}` : null,
-    form.guests ? `Convidados: ${form.guests}` : null,
+    convidados ? `Convidados: ${convidados}` : null,
     local ? `Local: ${local}` : null,
     decor ? `Decoração: ${decor}` : null,
     budgetLabel ? `Orçamento: ${budgetLabel}` : null,
@@ -614,6 +620,9 @@ export async function POST(request: NextRequest) {
             undefined,
           date: form.date,
           guests: form.guests || undefined,
+          // Sem número, devolve-se a ordem de grandeza que ELA escolheu — em
+          // vez de calar a linha e deixá-la a pensar que não ficou registada.
+          guestsRange: form.guests ? undefined : guestRangeLabel(form.guestsRange, locale),
           location: form.location?.trim() || undefined,
           plural: form.eventType === "casamentos" || form.eventType === "batizados",
           // Na língua do email, não na da equipa: quem escreveu em inglês

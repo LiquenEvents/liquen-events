@@ -13,7 +13,7 @@ import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 import { lerClique, serializar } from "@/lib/ads/click-id";
-import { QUOTE_EVENT_OPTIONS } from "@/lib/orcamento/data";
+import { QUOTE_EVENT_OPTIONS, GUEST_RANGES } from "@/lib/orcamento/data";
 import { PONTOS_DECORACAO } from "@/lib/orcamento/decoracao";
 
 /**
@@ -146,10 +146,6 @@ export default function OrcamentoForm({
   const [dateFlexible, setDateFlexible] = useState(false);
   const [pessoas, setPessoas] = useState("");
   const [guestsFlexible, setGuestsFlexible] = useState(false);
-  /** A estimativa que substitui o número exacto quando ele ainda não existe.
-   *  Texto livre de propósito: quem não sabe o número sabe o intervalo, e
-   *  "entre 100 e 150" não cabe num campo numérico. */
-  const [pessoasEstimativa, setPessoasEstimativa] = useState("");
   const [local, setLocal] = useState("");
   const [mensagem, setMensagem] = useState("");
   // Pontos de decoração — só existem no casamento, e são sempre OPCIONAIS.
@@ -161,6 +157,14 @@ export default function OrcamentoForm({
    *  formulário com quatro campos de nome à espera, que é o que faz desistir. */
   const [noivo, setNoivo] = useState("");
   const [noiva, setNoiva] = useState("");
+  /**
+   * A ordem de grandeza dos convidados, para quem marca «ainda a definir».
+   *
+   * Sem isto, «ainda a definir» dizia à equipa só que não havia número — e um
+   * casamento de 40 pessoas e um de 300 não são o mesmo trabalho nem o mesmo
+   * orçamento. Continua opcional: quem não faz mesmo ideia deixa em branco.
+   */
+  const [pessoasAprox, setPessoasAprox] = useState("");
   const alternarDecor = (id: string) =>
     setDecor((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
@@ -223,6 +227,7 @@ export default function OrcamentoForm({
       if (d.local) setLocal(d.local);
       if (d.mensagem) setMensagem(d.mensagem);
       if (d.decor) setDecor(d.decor.split(",").filter(Boolean));
+      if (d.pessoasAprox) setPessoasAprox(d.pessoasAprox);
     } catch {
       /* localStorage indisponível — segue sem rascunho */
     }
@@ -272,6 +277,7 @@ export default function OrcamentoForm({
       // um `Record<string, string>` — e os identificadores do catálogo não
       // têm vírgulas.
       decor: decor.join(","),
+      pessoasAprox,
     };
   }, [
     eventType,
@@ -285,6 +291,7 @@ export default function OrcamentoForm({
     local,
     mensagem,
     decor,
+    pessoasAprox,
   ]);
   // Once the quote is submitted the draft is intentionally cleared; block any
   // later lifecycle flush (the router.push unmount below) from resurrecting it.
@@ -319,6 +326,7 @@ export default function OrcamentoForm({
     local,
     mensagem,
     decor,
+    pessoasAprox,
     flushDraft,
   ]);
 
@@ -353,11 +361,10 @@ export default function OrcamentoForm({
   const okTelefone = telefone.replace(/\D/g, "").length >= 9;
   // "Ainda a definir" IS an answer — the field is satisfied either way.
   const okData = dateFlexible || data !== "";
-  // "Ainda a definir" deixou de ser uma saída sem resposta: passa a pedir uma
-  // ESTIMATIVA. Continua a não forçar um número exacto — que é o que perdia o
-  // contacto ou convidava a um número inventado — mas uma proposta precisa de
-  // uma ordem de grandeza, e "entre 100 e 150" é uma resposta verdadeira.
-  const okPessoas = guestsFlexible ? pessoasEstimativa.trim().length > 0 : Number(pessoas) > 0;
+  // "Ainda a definir" IS an answer here too: a ordem de grandeza que ela pode
+  // escolher a seguir fica OPCIONAL de propósito — quem não faz mesmo ideia
+  // segue em frente, que é melhor do que inventar um número ou desistir.
+  const okPessoas = guestsFlexible || Number(pessoas) > 0;
   const okLocal = local.trim().length >= 2;
   const okMensagem = mensagem.trim().length > 0;
 
@@ -366,13 +373,7 @@ export default function OrcamentoForm({
   const emailErr = show(touched.email) && !okEmail ? to.errEmail : "";
   const telefoneErr = show(touched.telefone) && !okTelefone ? to.errTelefone : "";
   const dataErr = show(touched.data) && !okData ? to.errData : "";
-  // Dois campos, dois erros. Com "ainda a definir" marcado, o campo numérico
-  // está desativado e a falta é da ESTIMATIVA: pôr a mesma mensagem nos dois
-  // mostrava-a a dobrar, uma delas debaixo de um campo que ela nem pode
-  // preencher.
-  const pessoasErr = show(touched.pessoas) && !guestsFlexible && !okPessoas ? to.errPessoas : "";
-  const estimativaErr =
-    show(touched.pessoas) && guestsFlexible && !okPessoas ? to.errPessoasEstimativa : "";
+  const pessoasErr = show(touched.pessoas) && !okPessoas ? to.errPessoas : "";
   const localErr = show(touched.local) && !okLocal ? to.errLocal : "";
   const mensagemErr = show(touched.mensagem) && !okMensagem ? to.errMensagem : "";
   const tipoErr = attemptedSubmit && !okTipo ? to.errTipo : "";
@@ -439,7 +440,9 @@ export default function OrcamentoForm({
       // agarrado a uma festa que não é um casamento.
       partnerA: opt?.eventType === "casamentos" ? noivo.trim() || undefined : undefined,
       partnerB: opt?.eventType === "casamentos" ? noiva.trim() || undefined : undefined,
-      guestsEstimate: guestsFlexible ? pessoasEstimativa.trim() || undefined : undefined,
+      // Só quando NÃO há número: os dois nunca convivem, e é o número que
+      // manda. Enviar os dois deixava a equipa sem saber qual acreditar.
+      guestsRange: guestsFlexible ? pessoasAprox : "",
       // Capture the "no fixed date yet" signal for the team (a high-value
       // early-stage lead segment) by folding it into the notes.
       notes: [
@@ -534,8 +537,12 @@ export default function OrcamentoForm({
     if (tipoLabel) lines.push(`${to.labelTipo}: ${tipoLabel}`);
     if (dateFlexible) lines.push(to.dateFlexibleLabel);
     else if (data) lines.push(`${to.labelData}: ${data}`);
-    if (guestsFlexible) lines.push(`${to.labelPessoas}: ${to.guestsFlexibleLabel}`);
-    else if (pessoas) lines.push(`${to.labelPessoas}: ${pessoas}`);
+    if (guestsFlexible) {
+      const aprox = GUEST_RANGES.find((r) => r.id === pessoasAprox);
+      lines.push(
+        `${to.labelPessoas}: ${aprox ? `~${locale.startsWith("en") ? aprox.en : aprox.label}` : to.guestsFlexibleLabel}`,
+      );
+    } else if (pessoas) lines.push(`${to.labelPessoas}: ${pessoas}`);
     if (local.trim()) lines.push(`${to.labelLocal}: ${local.trim()}`);
     if (nome.trim()) lines.push(`${to.labelNome}: ${nome.trim()}`);
     return lines.join("\n");
@@ -850,36 +857,44 @@ export default function OrcamentoForm({
                   />
                   <span className="text-[11px] tracking-wide">{to.guestsFlexibleLabel}</span>
                 </label>
-                {/* A estimativa só existe depois de ela dizer que não sabe o
-                    número. Aparecer antes seria um campo a mais para quem já
-                    sabe — e são a maioria. */}
+                {/* A ordem de grandeza. Só aparece depois de ela dizer que não
+                    sabe o número — antes disso seria uma pergunta a mais num
+                    formulário cuja força é ser curto. */}
                 {guestsFlexible && (
-                  <div className="mt-4">
-                    <FloatingField
-                      htmlFor="of-pessoas-est"
-                      label={to.labelPessoasEstimativa}
-                      error={estimativaErr}
-                      errorId="of-pessoas-est-err"
-                    >
-                      <input
-                        id="of-pessoas-est"
-                        type="text"
-                        maxLength={60}
-                        value={pessoasEstimativa}
-                        onBlur={() => markTouched("pessoas")}
-                        aria-required="true"
-                        aria-invalid={estimativaErr ? true : undefined}
-                        aria-describedby={
-                          estimativaErr ? "of-pessoas-est-err" : "of-pessoas-est-hint"
-                        }
-                        onChange={(e) => setPessoasEstimativa(e.target.value)}
-                        className={ffInputCls}
-                        placeholder={to.phPessoasEstimativa}
-                      />
-                    </FloatingField>
-                    <p id="of-pessoas-est-hint" className="mt-1.5 text-[11px] text-foreground/55">
-                      {to.hintPessoasEstimativa}
+                  <div className="mt-2">
+                    <p className="mb-2 text-[11px] leading-relaxed text-foreground/50">
+                      {to.hintPessoasAprox}
                     </p>
+                    <div
+                      role="group"
+                      aria-label={to.hintPessoasAprox}
+                      className="flex flex-wrap gap-2"
+                    >
+                      {GUEST_RANGES.map((r) => {
+                        const active = pessoasAprox === r.id;
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => {
+                              markStart();
+                              // Voltar a carregar no mesmo desmarca: é uma
+                              // estimativa opcional, e ter de recarregar a
+                              // página para a tirar seria absurdo.
+                              setPessoasAprox(active ? "" : r.id);
+                            }}
+                            className={`px-3 py-1.5 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.1em] uppercase border transition-[background-color,border-color,color] duration-200 ${
+                              active
+                                ? "bg-moss border-moss text-white"
+                                : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
+                            }`}
+                          >
+                            {locale.startsWith("en") ? r.en : r.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

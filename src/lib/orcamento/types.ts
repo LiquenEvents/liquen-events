@@ -85,11 +85,11 @@ export interface QuoteFormData {
   partnerA?: string;
   partnerB?: string;
   /**
-   * A estimativa de convidados, quando o número exacto ainda não existe —
-   * texto livre ("entre 100 e 150"), porque um intervalo não cabe num inteiro.
-   * Só é escrita quando `guests` é 0 por a pessoa ter dito que ainda não sabe.
+   * Ordem de grandeza dos convidados, quando o número exacto ainda não existe
+   * (ver `GUEST_RANGES`). Vazio quando `guests` traz um número a sério — os
+   * dois nunca convivem, e é o número que manda.
    */
-  guestsEstimate?: string;
+  guestsRange?: string;
   budgetRange: BudgetRange | null;
   urgency: Urgency;
   notes: string;

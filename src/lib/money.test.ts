@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitThirtySeventy, eur, eur0, round2 } from "./money";
+import { splitThirtySeventy, eur, eur0, round2, splitSinal, saldoAPartirDoSinal } from "./money";
 
 describe("round2", () => {
   it("rounds to two decimals (half-up on exact .xx5 representable values)", () => {
@@ -186,5 +186,55 @@ describe("eur / eur0 formatters", () => {
   it("both coerce falsy/NaN to 0", () => {
     expect(norm(eur(NaN))).toMatch(/^0,00\s€$/);
     expect(norm(eur0(NaN))).toMatch(/^0\s€$/);
+  });
+});
+
+describe("sinal com percentagem configurável", () => {
+  /**
+   * A GENERALIZAÇÃO NÃO PODE MUDAR O QUE JÁ ESTÁ FACTURADO.
+   *
+   * Todas as propostas existentes são 30/70. Se `splitSinal(total, 30)` desse
+   * um cêntimo diferente de `splitThirtySeventy(total)`, uma reemissão de
+   * saldo passava a fechar noutro número — e isso é uma correcção fiscal, não
+   * uma melhoria de interface.
+   */
+  it("com 30% dá exactamente o mesmo que dava antes", () => {
+    for (const total of [0, 0.01, 1000, 1000.01, 6875, 8456.25, 12500.33]) {
+      expect(splitSinal(total, 30)).toEqual(splitThirtySeventy(total));
+    }
+  });
+
+  it("as duas parcelas fecham sempre o total", () => {
+    for (const total of [6875, 3333.33, 1000.01, 0.05, 99999.99]) {
+      for (const pct of [10, 30, 40, 50, 70, 99]) {
+        const { sinal, saldo } = splitSinal(total, pct);
+        expect(round2(sinal + saldo)).toBe(round2(Math.max(0, total)));
+      }
+    }
+  });
+
+  it("uma percentagem impossível fica dentro dos limites", () => {
+    expect(splitSinal(1000, 150).sinal).toBe(1000);
+    expect(splitSinal(1000, -20).sinal).toBe(0);
+  });
+
+  describe("saldoAPartirDoSinal", () => {
+    it("com 30% é o mesmo que o `sinal / 3 × 7` que estava escrito à mão", () => {
+      for (const sinal of [300, 2062.5, 1500, 0]) {
+        expect(saldoAPartirDoSinal(sinal, 30)).toBe(round2((sinal / 3) * 7));
+      }
+    });
+
+    it("acompanha a percentagem", () => {
+      // 40% de 10.000 são 4.000; o saldo tem de ser 6.000.
+      expect(saldoAPartirDoSinal(4000, 40)).toBe(6000);
+      expect(saldoAPartirDoSinal(5000, 50)).toBe(5000);
+    });
+
+    it("uma percentagem de zero não faz uma divisão por zero", () => {
+      // Não devia acontecer (o esquema limita), mas um Infinity numa factura
+      // seria muito pior do que um número grande.
+      expect(Number.isFinite(saldoAPartirDoSinal(1000, 0))).toBe(true);
+    });
   });
 });

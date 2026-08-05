@@ -57,7 +57,12 @@ vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: vi.fn(async (quoteId: string) => proposalsDb.store.get(quoteId) ?? null),
 }));
 
-vi.mock("@/lib/money", () => ({ round2: (n: number) => Math.round(n * 100) / 100 }));
+// A matemática do dinheiro é REAL aqui. O duplo antigo trazia só `round2`, e
+// as rotas passaram a usar `splitSinal`/`saldoAPartirDoSinal` — um duplo
+// incompleto dá um 500 que se lê como avaria da rota. E, mais a sério: este
+// ficheiro testa GUARDAS de facturação; falsear as contas por baixo delas
+// tirava-lhes o sentido.
+vi.mock("@/lib/money", async () => await vi.importActual("@/lib/money"));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { POST } from "@/app/api/faturas/route";

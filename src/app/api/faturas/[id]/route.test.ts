@@ -39,7 +39,10 @@ vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: vi.fn(async (quoteId: string) => proposalsDb.store.get(quoteId) ?? null),
 }));
 
-vi.mock("@/lib/money", () => ({ round2: (n: number) => Math.round(n * 100) / 100 }));
+// A matemática do dinheiro é REAL: este ficheiro testa o VALOR do saldo, e
+// um duplo que só traz `round2` deixa `splitSinal`/`saldoAPartirDoSinal`
+// indefinidos — a rota rebenta e o teste lê-se como "não emitiu saldo".
+vi.mock("@/lib/money", async () => await vi.importActual("@/lib/money"));
 
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
@@ -102,6 +105,33 @@ beforeEach(() => {
 });
 
 describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
+  /**
+   * A PERCENTAGEM DO SINAL VEM DA PROPOSTA.
+   *
+   * Era 30% escrito em dois sítios: `splitThirtySeventy` e um `sinal / 3 × 7`
+   * à mão, aqui nesta rota. Uma proposta a dizer 40% com uma factura a sair a
+   * 30% é pior do que não poder mudar a percentagem de todo — e o erro só se
+   * descobre quando o cliente recebe o saldo errado.
+   */
+  it("o saldo segue a percentagem da proposta, não os 30% de sempre", async () => {
+    // 40% de 12.500 são 5.000; o saldo tem de ser 7.500.
+    seedSinal("s40", { amount: 5000 });
+    proposalsDb.store.set("q-s40", { total: 12500, doc: { depositPercent: 40 } });
+
+    const { req, params } = patchReq("s40", { status: "paga" });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect((await res.json()).saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 7500 });
+  });
+
+  it("sem proposta, deriva do sinal pela percentagem da casa", async () => {
+    // É o caminho que antes estava escrito como `sinal / 3 × 7`.
+    seedSinal("s-sem", { amount: 3750 });
+    const { req, params } = patchReq("s-sem", { status: "paga" });
+    const res = await PATCH(req, { params });
+    expect((await res.json()).saldoAutoIssued).toMatchObject({ amount: 8750 });
+  });
+
   it("marking a sinal paga auto-issues a saldo (kind + amount from the proposal total)", async () => {
     seedSinal("s1");
     proposalsDb.store.set("q-s1", { total: 12500 });

@@ -6,11 +6,13 @@ import {
   createInvoice,
   nextInvoiceNumber,
   newInvoiceId,
-  splitThirtySeventy,
   isUniqueViolation,
   type Invoice,
 } from "@/lib/invoices-store";
 import { jsonWithEtag } from "@/lib/api-cache";
+import { splitSinal } from "@/lib/money";
+import { getProposalByQuote } from "@/lib/proposals-store";
+import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceCreateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
 
@@ -117,7 +119,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const { sinal, saldo } = splitThirtySeventy(total);
+      // A percentagem vem da PROPOSTA, não de uma constante. É a mesma que o
+      // estúdio mostra; ver `depositPercentOf`.
+      const pctSinal = depositPercentOf(
+        (await getProposalByQuote(quoteId).catch(() => null))?.doc as ProposalDoc | undefined,
+      );
+      const { sinal, saldo } = splitSinal(total, pctSinal);
       const sinalInv = await build("sinal", sinal);
       const saldoInv = await build("saldo", saldo);
       try {

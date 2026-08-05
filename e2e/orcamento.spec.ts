@@ -11,9 +11,6 @@ async function fillAll(page: Page, name = "Ana Teste") {
   await page.getByRole("radio", { name: "Casamento", exact: true }).click();
   await page.getByLabel("Data ainda a definir").check();
   await page.getByLabel("Ainda a definir", { exact: true }).check();
-  // Dizer "ainda não sabemos" deixou de bastar: pede-se uma estimativa, porque
-  // uma proposta precisa de uma ordem de grandeza para poder existir.
-  await page.getByPlaceholder("Ex.: entre 100 e 150").fill("entre 100 e 150");
   await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
   await page.getByPlaceholder("O seu nome").fill(name);
   await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
@@ -81,20 +78,37 @@ test.describe("Pedido de orçamento", () => {
     await expect(page).toHaveURL(/\/orcamento\/confirmacao\/LIQ-E2E-OPEN$/);
   });
 
-  test("“ainda a definir” pede uma estimativa, e sem ela não avança", async ({ page }) => {
+  test("“ainda a definir” oferece a ordem de grandeza, sem a exigir", async ({ page }) => {
     await page.goto("/orcamento");
     await page.getByRole("radio", { name: "Casamento", exact: true }).click();
 
-    // Antes de marcar a caixa, o campo da estimativa não existe: quem sabe o
-    // número não tem de ver um campo a mais.
-    const estimativa = page.getByPlaceholder("Ex.: entre 100 e 150");
-    await expect(estimativa).toHaveCount(0);
+    // Antes de marcar a caixa os intervalos não existem: quem sabe o número não
+    // tem de ver uma pergunta a mais.
+    const intervalos = page.getByRole("group", { name: /Mais ou menos quantas/ });
+    await expect(intervalos).toHaveCount(0);
 
     await page.getByLabel("Ainda a definir", { exact: true }).check();
-    await expect(estimativa).toBeVisible();
+    await expect(intervalos).toBeVisible();
 
-    // Deixá-la em branco trava o envio, com a razão certa — não a mensagem de
-    // "indique quantas pessoas", que já não se aplica.
+    // Carregar marca; voltar a carregar no mesmo desmarca — é uma estimativa
+    // opcional, e ter de recarregar a página para a tirar seria absurdo.
+    const cem = intervalos.getByRole("button", { name: "100 a 150" });
+    await cem.click();
+    await expect(cem).toHaveAttribute("aria-pressed", "true");
+    await cem.click();
+    await expect(cem).toHaveAttribute("aria-pressed", "false");
+
+    // E sem intervalo nenhum o envio passa à mesma: quem não faz mesmo ideia
+    // segue em frente em vez de inventar um número.
+    let enviado: { form?: Record<string, unknown> } | undefined;
+    await page.route("**/api/orcamento", (route) => {
+      enviado = route.request().postDataJSON();
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "LIQ-E2E-EST", status: "ok" }),
+      });
+    });
     await page.getByLabel("Data ainda a definir").check();
     await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
     await page.getByPlaceholder("O seu nome").fill("Rita Sem Numero");
@@ -104,20 +118,8 @@ test.describe("Pedido de orçamento", () => {
       .getByPlaceholder("Estilo, cores, ambiente, inspirações que guardou…")
       .fill("Simples e com muita luz.");
     await page.getByRole("button", { name: /Enviar pedido/ }).click();
-    await expect(page.getByText("Dê-nos uma estimativa, nem que seja um intervalo.")).toBeVisible();
-    await expect(page).not.toHaveURL(/confirmacao/);
-
-    // Com o intervalo escrito, segue.
-    await estimativa.fill("entre 100 e 150");
-    await page.route("**/api/orcamento", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ id: "LIQ-E2E-EST", status: "ok" }),
-      }),
-    );
-    await page.getByRole("button", { name: /Enviar pedido/ }).click();
     await expect(page).toHaveURL(/\/orcamento\/confirmacao\/LIQ-E2E-EST$/);
+    expect(enviado?.form?.guestsRange).toBe("");
   });
 
   test("os nomes dos noivos só aparecem no casamento, e só ao escrever o nome", async ({
