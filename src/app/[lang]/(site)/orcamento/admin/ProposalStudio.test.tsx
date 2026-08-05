@@ -519,3 +519,75 @@ describe("a frase do aviso", () => {
     expect(cortesDoCabecalho(Buffer.from('[{"where":1}]').toString("base64"))).toEqual([]);
   });
 });
+
+describe("O valor é UM só — o do pedido", () => {
+  /**
+   * O defeito: havia duas caixas com o mesmo número (aqui e na Gestão do
+   * pedido) e elas podiam DISCORDAR. O estúdio só copiava o preço quando ainda
+   * não havia rascunho; a partir daí, alterar o "Preço final" no pedido não
+   * mexia aqui, e o PDF seguia para o cliente com o valor antigo — sem nada no
+   * ecrã a dizê-lo.
+   */
+  const comPreco = (preco?: number) => ({ ...quote, quotedPrice: preco }) as Quote;
+
+  function desenhar(q: Quote, onQuoteUpdated?: (q: Quote) => void) {
+    return render(
+      <ToastProvider>
+        <ProposalStudio quote={q} onQuoteUpdated={onQuoteUpdated} />
+      </ToastProvider>,
+    );
+  }
+
+  it("abre com o preço do pedido, mesmo havendo já um rascunho com outro valor", async () => {
+    // Este é o caso que se partia: o rascunho tem 3000, o pedido passou a 4500.
+    seedDraft(2);
+    desenhar(comPreco(4500));
+    const campo = await screen.findByLabelText(/Valor \(sem IVA\)/i);
+    expect(campo).toHaveValue("4500");
+  });
+
+  it("escrever aqui GRAVA no preço do pedido", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const atualizado = vi.fn();
+    desenhar(comPreco(3000), atualizado);
+
+    const campo = await screen.findByLabelText(/Valor \(sem IVA\)/i);
+    await user.clear(campo);
+    await user.type(campo, "4200");
+    // A gravação tem a mão travada — quatro teclas não podem ser quatro
+    // gravações.
+    await vi.advanceTimersByTimeAsync(800);
+
+    const gravacoes = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+    expect(gravacoes.length, "escreveu uma vez por tecla").toBe(1);
+    expect(JSON.parse(String(gravacoes[0][1]?.body))).toMatchObject({ quotedPrice: 4200 });
+    vi.useRealTimers();
+  });
+
+  it("apagar o valor grava NULL — senão o pedido ficava com o preço antigo", async () => {
+    // `undefined` desaparece no JSON e o merge parcial do servidor mantinha o
+    // valor velho: apagar nunca chegava a gravar.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    desenhar(comPreco(3000));
+    await user.clear(await screen.findByLabelText(/Valor \(sem IVA\)/i));
+    await vi.advanceTimersByTimeAsync(800);
+
+    const gravacoes = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+    expect(JSON.parse(String(gravacoes.at(-1)?.[1]?.body))).toMatchObject({ quotedPrice: null });
+    vi.useRealTimers();
+  });
+
+  it("trocar o modo de IVA não mexe na base — muda o que o cliente vê", async () => {
+    const user = userEvent.setup();
+    desenhar(comPreco(3000));
+    const campo = await screen.findByLabelText(/Valor \(sem IVA\)/i);
+    expect(campo).toHaveValue("3000");
+
+    await user.click(screen.getByRole("radio", { name: /IVA incluído/i }));
+    // O número do pedido é a BASE, e continua a ser 3000 — o rótulo "(sem IVA)"
+    // da Gestão do pedido tem de continuar verdadeiro nos dois modos.
+    expect(campo).toHaveValue("3000");
+  });
+});

@@ -73,6 +73,9 @@ interface Props {
   onNovoPedido: () => void;
   /** A proposta seguiu — o pai actualiza o estado do pedido para "cotado". */
   onSent: (quote: Quote) => void;
+  /** O valor mudou no estúdio, que o grava no pedido — o pai actualiza a sua
+   *  cópia para o cartão do cliente aqui em cima mostrar o mesmo. */
+  onQuoteUpdated: (quote: Quote) => void;
 }
 
 export default function FazerProposta({
@@ -81,6 +84,7 @@ export default function FazerProposta({
   onSelect,
   onNovoPedido,
   onSent,
+  onQuoteUpdated,
 }: Props) {
   const [procura, setProcura] = useState("");
   // O mesmo padrão do resto do back office: a escrita responde já, e o
@@ -146,6 +150,7 @@ export default function FazerProposta({
         <ProposalStudio
           key={`fazer-proposta-${escolhido.id}`}
           quote={escolhido}
+          onQuoteUpdated={onQuoteUpdated}
           onSent={() => onSent(escolhido)}
         />
       </div>
