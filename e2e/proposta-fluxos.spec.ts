@@ -95,7 +95,10 @@ async function abrirEstudio(page: Page, nomeCliente: string): Promise<void> {
   await page.waitForTimeout(1500);
 }
 
-test.describe("Fazer uma proposta", () => {
+// `@propostas` é a etiqueta que tira estes passeios do passo informativo do
+// CI: correm num passo bloqueante próprio, contra o servidor de
+// desenvolvimento (ver playwright.propostas.config.ts).
+test.describe("Fazer uma proposta @propostas", () => {
   test("do zero: a coluna diz o que falta, e deixa de dizer quando se preenche", async ({
     page,
   }) => {
