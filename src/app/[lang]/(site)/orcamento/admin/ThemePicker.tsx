@@ -242,11 +242,22 @@ export default function ThemePicker({
   const anchor = useRef<number | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const stopRequested = useRef(false);
+  /** O pedido de importação que está em voo AGORA.
+   *
+   *  Sem isto, o "Parar" só era lido ENTRE lotes: com 8 fotos ou menos há um
+   *  lote só, portanto a verificação já tinha passado quando o botão ficava
+   *  disponível e carregar nele não fazia rigorosamente nada. Era decorativo
+   *  exactamente no caso mais comum. */
+  const emVoo = useRef<AbortController | null>(null);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
+      // Fechar o diálogo a meio de uma importação não pode deixar um pedido
+      // pendurado a escrever para um ecrã que já não existe.
+      emVoo.current?.abort();
+      emVoo.current = null;
     };
   }, []);
 
@@ -669,11 +680,15 @@ export default function ThemePicker({
       }
       const chunk = paths.slice(i, i + IMPORT_CHUNK);
       try {
+        const controlador = new AbortController();
+        emVoo.current = controlador;
         const res = await fetch(`/api/orcamento/${quoteId}/assets/importar`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ paths: chunk }),
+          signal: controlador.signal,
         });
+        emVoo.current = null;
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error || "Falha ao adicionar as imagens.");
         const copied: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
@@ -693,6 +708,15 @@ export default function ThemePicker({
         }
         stillFailed.push(...failedHere);
       } catch (err) {
+        emVoo.current = null;
+        // Ela carregou em "Parar". Isso não é uma avaria e não pode aparecer
+        // como tal: as fotos deste lote voltam para a selecção, como as que
+        // ficaram por enviar, e sai-se do ciclo.
+        if (err instanceof DOMException && err.name === "AbortError") {
+          stopped = true;
+          stillFailed.push(...paths.slice(i));
+          break;
+        }
         if (!firstError) {
           firstError = err instanceof Error ? err.message : "Falha ao adicionar as imagens.";
         }
@@ -971,8 +995,14 @@ export default function ThemePicker({
           )}
         </div>
 
-        {/* Progresso da importação */}
-        {progress && (
+        {/* Progresso da importação.
+            SÓ com mais de um lote. Com 8 fotos ou menos há UM lote, e a barra
+            tinha exactamente dois estados: 0% durante toda a operação, e 100%
+            quando acabava. "A adicionar 0 de 1 foto… 0%" está tecnicamente
+            certo e lê-se como avariado — era a queixa dela. Abaixo do lote
+            mostra-se só que está a acontecer, sem fingir uma medida que não
+            existe. */}
+        {progress && progress.total > IMPORT_CHUNK && (
           <div className="border-t border-foreground/[0.06] px-5 py-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm text-foreground/80">
@@ -1050,6 +1080,12 @@ export default function ThemePicker({
                 importing
                   ? () => {
                       stopRequested.current = true;
+                      // Corta o pedido que está a decorrer, não só o lote
+                      // seguinte. O servidor pode já ter copiado alguma coisa —
+                      // essas fotos ficam no bucket sem entrar na proposta, que
+                      // é o mesmo que acontece a qualquer falha, e é preferível
+                      // a deixá-la à espera de um pedido que ela mandou parar.
+                      emVoo.current?.abort();
                     }
                   : dismiss
               }

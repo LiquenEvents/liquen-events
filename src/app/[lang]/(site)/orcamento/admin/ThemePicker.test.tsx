@@ -389,6 +389,68 @@ describe("ThemePicker", () => {
     });
   });
 
+  it("com UMA foto não mostra barra de progresso — 0% parecia avariado", async () => {
+    // A queixa concreta: "A adicionar 0 de 1 foto… 0%". A barra conta LOTES,
+    // e com 8 fotos ou menos há um lote só — logo tinha exactamente dois
+    // estados, 0% e acabou. Está tecnicamente certo e lê-se como encravado.
+    photos = folder(20);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const real = routes.get("POST /api/orcamento/LQ-001/assets/importar")!;
+    route("POST /api/orcamento/LQ-001/assets/importar", async (url, init) => {
+      await gate;
+      return real(url, init);
+    });
+
+    await openPicker(true);
+    fireEvent.click(photo(1));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar à proposta" }));
+
+    // Continua a dizer que está a acontecer — o "Parar" só aparece a importar.
+    expect(await screen.findByRole("button", { name: "Parar" })).toBeInTheDocument();
+    // Mas sem inventar uma medida que não existe.
+    expect(
+      screen.queryByRole("progressbar", { name: "Progresso da importação" }),
+      "com um lote só, a barra não tem nada para mostrar",
+    ).not.toBeInTheDocument();
+
+    release();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("o 'Parar' corta mesmo o pedido em voo, e não é tratado como avaria", async () => {
+    // Antes, o pedido de paragem só era lido ENTRE lotes: com um lote só, a
+    // verificação já tinha passado e carregar no botão não fazia nada.
+    photos = folder(20);
+    let abortado = false;
+    route(
+      "POST /api/orcamento/LQ-001/assets/importar",
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            abortado = true;
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        }),
+    );
+
+    await openPicker(true);
+    fireEvent.click(photo(1));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar à proposta" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Parar" }));
+
+    await waitFor(() => expect(abortado, "o pedido em voo não foi cortado").toBe(true));
+    // Uma paragem pedida por ela não é um erro: o diálogo fica aberto e a foto
+    // volta para a selecção, para se poder tentar outra vez sem a reescolher.
+    await waitFor(() =>
+      expect(screen.getByText("1 foto não entrou na proposta.")).toBeInTheDocument(),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("depois de uma falha parcial só volta a tentar o que falhou", async () => {
     photos = folder(20);
     flaky = new Set(["t1/foto-3.jpg"]);
