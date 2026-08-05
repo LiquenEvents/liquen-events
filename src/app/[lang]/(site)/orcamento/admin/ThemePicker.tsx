@@ -12,6 +12,17 @@ import {
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { Button } from "./ui";
+import {
+  type PaginaTema,
+  buscarPrimeiraPagina,
+  buscarTemas,
+  esquecerBiblioteca,
+  fotoEmCache,
+  guardarPagina,
+  paginaEmCache,
+  temasEmCache,
+  vaiRevalidar,
+} from "./theme-picker-cache";
 
 /**
  * Escolher fotos da Biblioteca de Temas para uma proposta.
@@ -251,32 +262,11 @@ function novoToken(): string {
 // Cache da biblioteca (vive no módulo, sobrevive a fechar o diálogo)
 // ───────────────────────────────────────────────────────────────────────────
 
-/**
- * Quanto tempo uma leitura serve para reabrir o diálogo sem ir à rede.
- *
- * Não é uma política de frescura — a política é a invalidação explícita
- * (`invalidateThemeLibraryCache`, disparada quando uma foto é ADICIONADA ou
- * REMOVIDA na biblioteca). Isto é só o prazo de validade das ASSINATURAS: os
- * URLs vêm assinados por 6 h (`SIGNED_TTL`), e servir um URL expirado seria
- * mostrar uma grelha de células partidas. Cinco horas deixa margem de sobra.
- */
-const CACHE_TTL_MS = 5 * 60 * 60 * 1000;
+/** A página guardada de um tema, tolerando "ainda não há tema escolhido" — que
+ *  é o estado do diálogo antes de a lista chegar. */
+const cachedTheme = (themeId: string | null): PaginaTema | null =>
+  themeId ? paginaEmCache(themeId) : null;
 
-/** O que se guarda de um tema: exatamente o que a grelha precisa para desenhar
- *  sem pedir nada, incluindo as páginas que ela já mandou vir com "Mostrar
- *  mais" — reabrir devolve o rolo onde ele ficou, não o princípio. */
-interface CachedTheme {
-  images: ThemeImage[];
-  total: number | null;
-  truncated: boolean;
-  /** A última página veio cheia → é provável que haja mais. */
-  full: boolean;
-  /** Quando foi a PRIMEIRA leitura (o relógio das assinaturas). */
-  at: number;
-}
-
-const themePages = new Map<string, CachedTheme>();
-let themeList: { list: ThemeSummary[]; at: number } | null = null;
 /** Onde o rolo ficou, por tema. */
 const themeScroll = new Map<string, number>();
 /** O tema em que o diálogo estava quando fechou (a memória curta; o
@@ -289,118 +279,26 @@ const failedByQuote = new Map<string, string[]>();
  *  sessão — a marca "já nesta proposta" aparece sem esperar pelo estúdio. */
 const importedByQuote = new Map<string, Set<string>>();
 
-function fresh<T extends { at: number }>(entry: T | null | undefined): T | null {
-  if (!entry) return null;
-  return Date.now() - entry.at < CACHE_TTL_MS ? entry : null;
-}
-
-function cachedThemes(): ThemeSummary[] | null {
-  return fresh(themeList)?.list ?? null;
-}
-
-function cachedTheme(themeId: string | null): CachedTheme | null {
-  if (!themeId) return null;
-  return fresh(themePages.get(themeId) ?? null);
-}
-
-/** Guarda (ou atualiza) o que a grelha tem de um tema, mantendo o relógio da
- *  primeira leitura — senão a cache renovava-se sozinha para lá da assinatura. */
-function rememberTheme(themeId: string, next: Omit<CachedTheme, "at">): void {
-  const at = themePages.get(themeId)?.at ?? Date.now();
-  themePages.set(themeId, { ...next, at });
-}
-
 /**
  * Deita fora o que está guardado da biblioteca.
  *
- * Só há uma razão para isto: uma foto foi ADICIONADA ou REMOVIDA num tema (o
- * que acontece no ecrã `Temas`, não aqui). Fica exportada — e à escuta do
- * evento `liquen:biblioteca-alterada` — para esse ecrã poder avisar sem que
- * este módulo precise de o conhecer.
+ * O `theme-picker-cache` já se defende do que é velho sozinho, revalidando por
+ * trás. Isto é para o caso em que esperar não serve: uma foto foi ADICIONADA
+ * ou REMOVIDA num tema (o que acontece no ecrã `Temas`, não aqui) e a abertura
+ * seguinte tem de ver isso já, não daqui a meio minuto.
+ *
+ * Fica à escuta do evento `liquen:biblioteca-alterada` para esse ecrã poder
+ * avisar sem que este módulo precise de o conhecer. O que se limpa aqui a mais
+ * do que lá é o rolo: a grelha vai mudar de tamanho, e devolver o scroll a uma
+ * posição que já não existe deixava-a a olhar para o meio do nada.
  */
 export function invalidateThemeLibraryCache(): void {
-  themeList = null;
-  themePages.clear();
+  esquecerBiblioteca();
   themeScroll.clear();
 }
 
 if (typeof window !== "undefined") {
   window.addEventListener("liquen:biblioteca-alterada", invalidateThemeLibraryCache);
-}
-
-let themesInFlight: Promise<ThemeSummary[]> | null = null;
-
-/** Os temas — da cache, do pedido que já vai a caminho, ou da rede. */
-async function getThemes(): Promise<ThemeSummary[]> {
-  const have = cachedThemes();
-  if (have) return have;
-  if (themesInFlight) return themesInFlight;
-  const run = (async () => {
-    const res = await fetch("/api/temas", { cache: "no-store" });
-    if (!res.ok) throw new Error("falhou");
-    const list: ThemeSummary[] = await res.json();
-    themeList = { list, at: Date.now() };
-    return list;
-  })();
-  themesInFlight = run;
-  void run
-    .catch(() => {})
-    .finally(() => {
-      if (themesInFlight === run) themesInFlight = null;
-    });
-  return run;
-}
-
-/** O tema pedido não existe (404). Tem nome próprio porque quem pede pode
- *  estar a adivinhar — ver o efeito da primeira página. */
-class TemaInexistenteError extends Error {
-  constructor(themeId: string) {
-    super(`tema inexistente: ${themeId}`);
-    this.name = "TemaInexistenteError";
-  }
-}
-
-const pagesInFlight = new Map<string, Promise<CachedTheme & { unreadable: boolean }>>();
-
-/** A primeira página de um tema — da cache, do pedido em voo, ou da rede. Uma
- *  viagem por tema, mesmo que o adivinhar e o abrir peçam ao mesmo tempo. */
-async function getFirstPage(themeId: string): Promise<CachedTheme & { unreadable: boolean }> {
-  const have = cachedTheme(themeId);
-  if (have) return { ...have, unreadable: false };
-  const running = pagesInFlight.get(themeId);
-  if (running) return running;
-  const run = (async () => {
-    const res = await fetch(`/api/temas/${themeId}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`, {
-      cache: "no-store",
-    });
-    // O 404 sai distinguido porque quem chama pode estar a pedir um tema
-    // ADIVINHADO, que já não existe — e isso não é uma avaria que se mostre.
-    if (res.status === 404) throw new TemaInexistenteError(themeId);
-    if (!res.ok) throw new Error("falhou");
-    const data = await res.json();
-    const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
-    // `ok: false` (com 200) é "a pasta não pôde ser lida agora".
-    const unreadable = data?.ok === false;
-    const entry: CachedTheme & { unreadable: boolean } = {
-      images: page,
-      total: typeof data?.total === "number" ? data.total : page.length,
-      truncated: Boolean(data?.truncated),
-      full: page.length >= THEME_PAGE_SIZE,
-      at: Date.now(),
-      unreadable,
-    };
-    // Uma falha de LEITURA não se guarda: seria congelar cinco horas de "não
-    // foi possível ler a pasta" por causa de um soluço do Storage.
-    if (!unreadable) rememberTheme(themeId, entry);
-    return entry;
-  })();
-  pagesInFlight.set(themeId, run);
-  void run
-    .catch(() => {})
-    .finally(() => {
-      if (pagesInFlight.get(themeId) === run) pagesInFlight.delete(themeId);
-    });
-  return run;
 }
 
 /** Põe as miniaturas na cache do browser antes de a grelha as pedir. */
@@ -437,7 +335,7 @@ export function prefetchTheme(themeId: string): void {
     warmThumbs(have.images);
     return;
   }
-  void getFirstPage(themeId)
+  void buscarPrimeiraPagina(themeId)
     .then((entry) => warmThumbs(entry.images))
     .catch(() => {
       /* adivinhar e falhar não é um erro que se mostre: quem abrir pede outra vez */
@@ -454,7 +352,7 @@ export function prefetchTheme(themeId: string): void {
  * delegação. Idempotente e barata: com cache, não faz nada.
  */
 export function prefetchThemeLibrary(): void {
-  void getThemes()
+  void buscarTemas()
     .then((list) => {
       const id = preferredThemeId(list);
       if (id) prefetchTheme(id);
@@ -529,6 +427,13 @@ interface ImportJob {
   /** Pediram para parar: o que ainda não saiu não sai. */
   stopping: boolean;
   stopped: boolean;
+  /** O pedido que está em voo AGORA, para o "Parar" o poder cortar.
+   *
+   *  Verificar `stopping` só ENTRE lotes não chegava: com `IMPORT_CHUNK` fotos
+   *  ou menos há um lote só, portanto a verificação já tinha passado quando o
+   *  botão aparecia, e carregar nele não fazia rigorosamente nada. Era
+   *  decorativo exactamente no caso mais comum. */
+  emVoo: AbortController | null;
   /** A primeira mensagem de erro do servidor, para se poder dizer porquê. */
   error: string | null;
 }
@@ -637,6 +542,7 @@ function startImport(opts: {
     running: true,
     stopping: false,
     stopped: false,
+    emVoo: null,
     error: null,
   };
   jobs.push(job);
@@ -677,10 +583,12 @@ async function runJob(job: ImportJob): Promise<void> {
     }
     const chunk = queue.slice(i, i + IMPORT_CHUNK);
     try {
+      job.emVoo = new AbortController();
       const res = await fetch(`/api/orcamento/${job.quoteId}/assets/importar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paths: chunk }),
+        signal: job.emVoo.signal,
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Falha ao adicionar as imagens.");
@@ -707,20 +615,31 @@ async function runJob(job: ImportJob): Promise<void> {
       largar(aligned ? failedHere : chunk);
       if (picked.length > 0) job.deliver(picked);
     } catch (err) {
-      if (!job.error) {
+      // Um lote cortado pelo "Parar" não é uma avaria: ela mandou-o parar. Sem
+      // esta distinção a pastilha mostrava "The user aborted a request" como se
+      // fosse o servidor a queixar-se.
+      const abortado = err instanceof DOMException && err.name === "AbortError";
+      if (!job.error && !abortado) {
         job.error = err instanceof Error ? err.message : "Falha ao adicionar as imagens.";
       }
       for (const p of chunk) mark(job, p, "failed");
       largar(chunk);
+      // O `finally` faz a limpeza à mesma — sair daqui não a salta.
+      if (abortado) {
+        job.stopped = true;
+        break;
+      }
     } finally {
       for (const p of chunk) inFlight.delete(flightKey(job.quoteId, p));
+      job.emVoo = null;
     }
     emit();
   }
 
-  // Parar é parar o que FALTA. O lote que já ia a caminho não se aborta: o
-  // servidor copia dentro do Storage e uma resposta abortada deixaria ficheiros
-  // escritos que ninguém receberia — ficheiros órfãos na pasta da proposta.
+  // Parar é parar o que falta E o que ia a caminho (ver `stopJob`). O que aqui
+  // sobra são as fotos que nunca chegaram a sair: saem do documento pelo
+  // `largar`, senão ficavam lugares reservados à espera de uma foto que já
+  // ninguém foi buscar.
   const abandonadas: string[] = [];
   for (const p of job.photos) {
     if (p.state !== "pending") continue;
@@ -751,6 +670,12 @@ function stopJob(id: number): void {
   const job = jobs.find((j) => j.id === id);
   if (!job) return;
   job.stopping = true;
+  // Corta o pedido que está a decorrer, não só o lote seguinte — senão, no caso
+  // de um lote único, o "Parar" não parava nada. O servidor pode já ter copiado
+  // alguma coisa: essas fotos ficam no bucket sem entrar na proposta, que é
+  // exactamente o que acontece a qualquer falha de rede, e é preferível a
+  // deixá-la a olhar para um pedido que ela mandou parar.
+  job.emVoo?.abort();
   emit();
 }
 
@@ -980,8 +905,8 @@ export default function ThemePicker({
   // O que já está em cache entra no estado LOGO no primeiro desenho: reabrir o
   // diálogo na mesma sessão mostra a grelha desenhada, sem esqueleto nem
   // pedido — e sem um instante de "este tema não tem fotos".
-  const [themes, setThemes] = useState<ThemeSummary[]>(() => cachedThemes() ?? []);
-  const [loadingThemes, setLoadingThemes] = useState(() => cachedThemes() === null);
+  const [themes, setThemes] = useState<ThemeSummary[]>(() => temasEmCache() ?? []);
+  const [loadingThemes, setLoadingThemes] = useState(() => temasEmCache() === null);
   /**
    * Começa JÁ num tema, sem esperar por rede nenhuma.
    *
@@ -1007,7 +932,7 @@ export default function ThemePicker({
    * hidratação com que discordar.
    */
   const [themeId, setThemeId] = useState<string | null>(() => {
-    const list = cachedThemes();
+    const list = temasEmCache();
     if (list) return preferredThemeId(list);
     if (lastThemeId) return lastThemeId;
     try {
@@ -1023,7 +948,7 @@ export default function ThemePicker({
   const [total, setTotal] = useState<number | null>(() => cachedTheme(themeId)?.total ?? null);
   const [truncated, setTruncated] = useState(() => cachedTheme(themeId)?.truncated ?? false);
   /** A última página veio cheia → é provável que haja mais. */
-  const [pageFull, setPageFull] = useState(() => cachedTheme(themeId)?.full ?? false);
+  const [pageFull, setPageFull] = useState(() => cachedTheme(themeId)?.pageFull ?? false);
   /** A pasta não pôde ser LIDA. Não é o mesmo que "tema sem fotos". */
   const [unreadable, setUnreadable] = useState(false);
   const [loadingImages, setLoadingImages] = useState(() => cachedTheme(themeId) === null);
@@ -1049,11 +974,23 @@ export default function ThemePicker({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   /** O rolo volta ao sítio uma vez por tema, não a cada renderização. */
   const restoreScroll = useRef(true);
+  const stopRequested = useRef(false);
+  /** O pedido de importação que está em voo AGORA.
+   *
+   *  Sem isto, o "Parar" só era lido ENTRE lotes: com 8 fotos ou menos há um
+   *  lote só, portanto a verificação já tinha passado quando o botão ficava
+   *  disponível e carregar nele não fazia rigorosamente nada. Era decorativo
+   *  exactamente no caso mais comum. */
+  const emVoo = useRef<AbortController | null>(null);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
+      // Fechar o diálogo a meio de uma importação não pode deixar um pedido
+      // pendurado a escrever para um ecrã que já não existe.
+      emVoo.current?.abort();
+      emVoo.current = null;
     };
   }, []);
 
@@ -1071,7 +1008,7 @@ export default function ThemePicker({
    *  o efeito corria OUTRA VEZ a pedir exactamente as mesmas imagens. Medido, e
    *  visível no terceiro pedido do varrimento. Com a ref lê-se o valor mais
    *  recente sem que a mudança dispare nada. */
-  const themesRef = useRef<ThemeSummary[]>(cachedThemes() ?? []);
+  const themesRef = useRef<ThemeSummary[]>(temasEmCache() ?? []);
   useEffect(() => {
     themesRef.current = themes;
   }, [themes]);
@@ -1124,7 +1061,7 @@ export default function ThemePicker({
     setImages(cached?.images ?? []);
     setTotal(cached?.total ?? null);
     setTruncated(cached?.truncated ?? false);
-    setPageFull(cached?.full ?? false);
+    setPageFull(cached?.pageFull ?? false);
     setUnreadable(false);
     setLoadingImages(cached === null);
     setFocusIndex(0);
@@ -1137,11 +1074,11 @@ export default function ThemePicker({
   // ── Temas disponíveis ──
   useEffect(() => {
     // Já vieram da cache no primeiro desenho: reabrir não custa um pedido.
-    if (cachedThemes()) return;
+    if (temasEmCache()) return;
     let active = true;
     (async () => {
       try {
-        const list = await getThemes();
+        const list = await buscarTemas();
         if (!active) return;
         setThemes(list);
         // A lista chega DEPOIS de já se estarem a pedir as imagens do tema
@@ -1171,29 +1108,66 @@ export default function ThemePicker({
     // Em cache: o `showTheme` já a pôs no ecrã.
     if (cachedTheme(themeId)) return;
     let active = true;
+
+    /** Põe uma página no ecrã. Serve tanto para a que veio da cache como para a
+     *  que veio da rede — é o mesmo desenho, e é isso que faz a revalidação
+     *  passar despercebida quando nada mudou. */
+    const mostrar = (pagina: PaginaTema) => {
+      setImages(pagina.images);
+      setTotal(pagina.total);
+      setTruncated(pagina.truncated);
+      setPageFull(pagina.pageFull);
+      setUnreadable(pagina.unreadable);
+    };
+
+    setFocusIndex(0);
+    anchor.current = null;
+
+    // ── Já cá está? Então aparece JÁ, sem skeleton e sem pedido nenhum ────
+    const guardada = paginaEmCache(themeId);
+    if (guardada) {
+      mostrar(guardada);
+      setLoadingImages(false);
+      // Se tiver alguma idade, confirma-se por trás — sem skeleton, sem
+      // mexer no que está no ecrã até haver resposta. Reabrir de seguida (o
+      // caso real, entre dois mood boards) não gasta pedido nenhum.
+      if (vaiRevalidar(guardada.at)) {
+        void buscarPrimeiraPagina(themeId, true)
+          .then((fresca) => {
+            if (active) mostrar(fresca);
+          })
+          .catch(() => {
+            /* a confirmação falhou — fica o que já estava, que é melhor do que
+               um erro por uma coisa que ela nem pediu */
+          });
+      }
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoadingImages(true);
+    setImages([]);
+    setTotal(null);
+    setTruncated(false);
+    setPageFull(false);
+    setUnreadable(false);
     (async () => {
       // Vai haver pedido: a grelha está a CARREGAR, não vazia. Sem isto, o
       // tema corrigido depois de um palpite errado passava um instante pela
       // mensagem de "este tema não tem fotos".
       setLoadingImages(true);
       try {
-        const entry = await getFirstPage(themeId);
-        if (!active) return;
-        setImages(entry.images);
-        setTotal(entry.total);
-        setTruncated(entry.truncated);
-        setPageFull(entry.full);
-        setUnreadable(entry.unreadable);
+        mostrar(await buscarPrimeiraPagina(themeId));
       } catch (err) {
-        if (!active) return;
-        // O tema pode ter vindo do palpite e já não existir — foi apagado desde
-        // a última vez. Isso é um 404 ESPERADO, e não uma avaria: a lista de
-        // temas está a chegar e vai corrigir a escolha sozinha, o que faz este
-        // efeito correr outra vez no tema certo. Queixar-se aqui era mostrar um
-        // erro por causa de um palpite nosso.
-        if (err instanceof TemaInexistenteError && !themesRef.current.some((t) => t.id === themeId))
-          return;
-        toast("Não foi possível carregar as fotos deste tema.", "error");
+        // O tema que veio do `localStorage` pode já não existir — foi apagado
+        // desde a última vez. Isso é um 404 ESPERADO, e não uma avaria: a lista
+        // de temas está a chegar e vai corrigir a escolha sozinha, o que faz
+        // este efeito correr outra vez no tema certo. Queixar-se aqui era
+        // mostrar um erro por causa de um palpite nosso.
+        const foi404 = err instanceof Error && err.message === "404";
+        if (foi404 && !themesRef.current.some((t) => t.id === themeId)) return;
+        if (active) toast("Não foi possível carregar as fotos deste tema.", "error");
       } finally {
         if (active) setLoadingImages(false);
       }
@@ -1210,7 +1184,13 @@ export default function ThemePicker({
   // que ela mandou vir com "Mostrar mais". Reabrir devolve o rolo inteiro.
   useEffect(() => {
     if (!themeId || loadingImages || unreadable || images.length === 0) return;
-    rememberTheme(themeId, { images, total, truncated, full: pageFull });
+    guardarPagina(themeId, {
+      images,
+      total: total ?? images.length,
+      truncated,
+      pageFull,
+      unreadable: false,
+    });
   }, [themeId, images, total, truncated, pageFull, loadingImages, unreadable]);
 
   // O rolo volta ao sítio onde ficou neste tema (uma vez, quando há fotos).
@@ -1527,11 +1507,7 @@ export default function ThemePicker({
   function imageFor(path: string): ThemeImage {
     const here = images.find((i) => i.path === path);
     if (here) return here;
-    for (const entry of themePages.values()) {
-      const hit = entry.images.find((i) => i.path === path);
-      if (hit) return hit;
-    }
-    return { path, url: "" };
+    return fotoEmCache(path) ?? { path, url: "" };
   }
 
   /**
@@ -2092,8 +2068,6 @@ export function __resetThemePickerState(): void {
   importedByQuote.clear();
   jobs.length = 0;
   inFlight.clear();
-  themesInFlight = null;
-  pagesInFlight.clear();
   if (overlayTeardown) {
     clearTimeout(overlayTeardown);
     overlayTeardown = 0;

@@ -115,12 +115,15 @@ function Host({ multiple, usedThemePaths }: { multiple: boolean; usedThemePaths?
 
 /** Abre o seletor e espera pela grelha de fotos. */
 async function openPicker(multiple: boolean, usedThemePaths?: string[]) {
-  render(
+  const montado = render(
     <ToastProvider>
       <Host multiple={multiple} usedThemePaths={usedThemePaths} />
     </ToastProvider>,
   );
   await screen.findByRole("button", { name: `Foto 1 de ${visible()}` });
+  // Devolvido para os testes que precisam de FECHAR e reabrir — é aí que se vê
+  // se a cache entre aberturas funciona.
+  return montado;
 }
 
 /** Quantas fotos a grelha mostra: uma página, ou a pasta toda se for menor. */
@@ -194,7 +197,20 @@ beforeEach(() => {
       const handler = routes.get(key);
       if (!handler) return Promise.reject(new Error(`rota não simulada: ${key}`));
       calls.push(url);
-      return Promise.resolve(handler(url, init));
+      // O `signal` é honrado de propósito. Um duplo que o ignora deixa passar
+      // um "Parar" que na realidade não corta nada: a promessa resolve à mesma
+      // e o teste conclui que a foto entrou. Aqui, abortar rejeita — como no
+      // browser.
+      const sinal = init?.signal;
+      const resposta = Promise.resolve(handler(url, init));
+      if (!sinal) return resposta;
+      if (sinal.aborted) {
+        return Promise.reject(new DOMException("Aborted", "AbortError"));
+      }
+      return new Promise((resolve, reject) => {
+        sinal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        resposta.then(resolve, reject);
+      });
     }),
   );
 });
@@ -481,12 +497,46 @@ describe("ThemePicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Parar" }));
     release();
 
-    // As 8 do lote que já ia a caminho entram; as outras 12 largam o lugar —
-    // um marcador que ninguém vai trocar não pode ficar no documento.
+    // Parar corta TAMBÉM o lote que ia a caminho — senão, com um lote só (o
+    // caso comum, 8 fotos ou menos), o botão não parava rigorosamente nada.
+    // Portanto os 20 lugares saem todos: nenhum vai receber foto, e um
+    // marcador que ninguém vai trocar não pode ficar no documento.
     await waitFor(() => expect(onDropped).toHaveBeenCalled());
-    const largados = onDropped.mock.calls.flatMap((c) => c[0]);
-    await waitFor(() => expect(largados.length + onPicked.mock.calls[0][0].length).toBe(20));
-    expect(largados).toEqual(lugares.slice(8).map((r) => r.token));
+    await waitFor(() => expect(onDropped.mock.calls.flatMap((c) => c[0])).toHaveLength(20));
+    expect(onDropped.mock.calls.flatMap((c) => c[0]).sort()).toEqual(
+      lugares.map((r) => r.token).sort(),
+    );
+    expect(onPicked).not.toHaveBeenCalled();
+  });
+
+  it("o Parar funciona com UM lote — o caso em que ele era decorativo", async () => {
+    // A regressão que este teste fixa: a paragem era lida só ENTRE lotes. Com
+    // 5 fotos há um lote só, portanto a verificação já tinha passado quando o
+    // botão aparecia e carregar nele não fazia nada — decorativo exactamente
+    // no caso mais comum. Só falha se o pedido em voo deixar de ser cortado.
+    photos = folder(5);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const real = routes.get("POST /api/orcamento/LQ-001/assets/importar")!;
+    route("POST /api/orcamento/LQ-001/assets/importar", async (url, init) => {
+      await gate;
+      return real(url, init);
+    });
+
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: "Selecionar todas as visíveis" }));
+    fireEvent.click(addAndClose(5));
+    expect(reservados()).toHaveLength(5);
+
+    fireEvent.click(screen.getByRole("button", { name: "Parar" }));
+    release();
+
+    const chip = screen.getByRole("group", { name: "Fotos a caminho da proposta" });
+    await waitFor(() => expect(chip).toHaveTextContent("Parou — 5 fotos ficaram por adicionar."));
+    expect(onPicked).not.toHaveBeenCalled();
+    await waitFor(() => expect(onDropped.mock.calls.flatMap((c) => c[0])).toHaveLength(5));
   });
 
   it("num lote grande a pastilha mostra progresso — e o Parar guarda o que já entrou", async () => {
@@ -511,14 +561,14 @@ describe("ThemePicker", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "0");
     expect(bar).toHaveAttribute("aria-valuemax", "30");
 
-    // Parar cancela o que FALTA; o lote que já ia a caminho ainda entra.
+    // Parar corta o que falta E o que ia a caminho: nenhuma das 30 entra, e a
+    // pastilha guarda-as todas para o "Repetir" — nada se perde, só não entrou.
     fireEvent.click(screen.getByRole("button", { name: "Parar" }));
     release();
     const chip = screen.getByRole("group", { name: "Fotos a caminho da proposta" });
-    await waitFor(() => expect(chip).toHaveTextContent("Parou — 22 fotos ficaram por adicionar."));
-    expect(onPicked).toHaveBeenCalledTimes(1);
-    expect(onPicked.mock.calls[0][0]).toHaveLength(8);
-    expect(imported).toHaveLength(1);
+    await waitFor(() => expect(chip).toHaveTextContent("Parou — 30 fotos ficaram por adicionar."));
+    expect(onPicked).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Repetir" })).toBeInTheDocument();
   });
 
   it("depois de uma falha parcial o Repetir só volta a tentar o que falhou", async () => {

@@ -584,6 +584,32 @@ export async function uploadProposalThumb(
  * Nunca cria o bucket e nunca lança: numa instalação sem miniatura nenhuma
  * devolve um mapa vazio, e a grelha comporta-se como hoje.
  */
+/**
+ * Assina VÁRIOS originais da pasta de uma proposta num só pedido.
+ *
+ * O gémeo de `signProposalThumbs`, para o bucket dos originais. Existe pela
+ * mesma razão: assinar um a um é uma ida ao servidor POR FOTO, e a importação
+ * da Biblioteca de Temas fazia exactamente isso — quatro idas por foto, das
+ * quais duas eram assinaturas.
+ */
+export async function signProposalPaths(paths: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const sb = getSupabase();
+  if (!sb || paths.length === 0) return out;
+  try {
+    const { data, error } = await sb.storage
+      .from(PROPOSAL_BUCKET)
+      .createSignedUrls(paths, SIGNED_TTL);
+    if (error) log.error("proposal-storage: assinatura em lote falhou", error, { n: paths.length });
+    for (const row of data ?? []) {
+      if (row?.path && row.signedUrl) out.set(row.path, row.signedUrl);
+    }
+  } catch (e) {
+    log.error("proposal-storage: assinatura em lote falhou", e, { n: paths.length });
+  }
+  return out;
+}
+
 export async function signProposalThumbs(paths: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const sb = getSupabase();
