@@ -60,9 +60,12 @@ describe("teclado", () => {
     await user.click(linha(2));
     await user.keyboard("{Enter}");
 
-    // A linha vazia não fica para trás, e o grupo novo já está a ser escrito.
-    expect(screen.getAllByLabelText(/^Linha 1 do grupo \d+$/)).toHaveLength(2);
+    // A linha vazia não fica para trás. O grupo novo nasce SEM linhas — a
+    // primeira aparece quando for pedida, com Enter no título ou no botão —,
+    // por isso continua a haver uma única "Linha 1", a do grupo que ficou.
+    expect(screen.getAllByLabelText(/^Linha 1 do grupo \d+$/)).toHaveLength(1);
     expect(screen.queryByLabelText("Linha 2 do grupo 1")).toBeNull();
+    expect(screen.queryByLabelText("Linha 1 do grupo 2")).toBeNull();
     expect(document.activeElement).toBe(screen.getByLabelText("Título do grupo 2"));
     // …e o marcador do grupo novo numera-se sozinho.
     expect((screen.getByLabelText(/^Marcador do grupo 2/) as HTMLInputElement).value).toBe("b)");

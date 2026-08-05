@@ -119,11 +119,21 @@ let uidSeq = 0;
 const newId = () => `s${Date.now().toString(36)}${(uidSeq++).toString(36)}`;
 
 const emptyItem = (): ServiceItem => ({ id: newId(), label: "", desc: "" });
+/**
+ * Um grupo novo nasce SEM linhas.
+ *
+ * Nascer já com uma linha vazia enchia o ecrã de um campo por preencher antes
+ * de alguém o ter pedido, e a sugestão cinzenta dessa linha lia-se como se o
+ * grupo já tivesse conteúdo. A linha aparece quando for pedida: Enter no
+ * título cria-a e leva lá o cursor (ver `onGroupKeyDown`), tal como o botão de
+ * acrescentar linha — por isso escrever o grupo todo sem tocar no rato
+ * continua a funcionar exatamente na mesma.
+ */
 const emptyGroup = (i: number): ServiceGroup => ({
   id: newId(),
   letter: autoLetter(i),
   title: "",
-  items: [emptyItem()],
+  items: [],
 });
 
 const isBlank = (it: ServiceItem) => !it.label.trim() && !(it.desc ?? "").trim();
