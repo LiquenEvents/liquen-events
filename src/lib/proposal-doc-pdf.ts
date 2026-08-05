@@ -36,6 +36,7 @@ import {
   CARLITO_ITALIC_TTF_B64,
 } from "@/lib/proposal-fonts";
 import { winAnsiSafe } from "@/lib/pdf-text";
+import { log } from "@/lib/logger";
 
 const PT_MONTHS_SHORT = [
   "jan.",
@@ -238,6 +239,8 @@ async function drawCoverImage(
   h: number,
   placement: ImagePlacement,
   cache: EmbedCache,
+  /** Chamado quando esta foto entra pelo caminho de recurso (sem redimensionar). */
+  aoUsarRecurso?: () => void,
 ): Promise<void> {
   const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
   let input: Buffer;
@@ -266,6 +269,18 @@ async function drawCoverImage(
   // Recurso: embutir o ORIGINAL e ajustar por recorte (nunca esticar). Também
   // vai a cache — sem isto, uma foto que o sharp não consiga tratar era escrita
   // por inteiro no ficheiro tantas vezes quantas fosse desenhada.
+  //
+  // ── ISTO TEM DE SE VER ────────────────────────────────────────────────────
+  // Este caminho foi desenhado para o PDF sair sempre, e cumpre — cumpre até
+  // demais: um PDF verdadeiro de 3,31 MB chegou com as fotos a 266–576 DPI
+  // quando o `PLACEMENT_DPI` manda 130–160, porque TODAS entraram por aqui e
+  // ninguém deu por nada. Medido: com este código, as caixas produzem
+  // exactamente 130 e 160 (ver PDF-BEFORE.md).
+  //
+  // Falhar em silêncio é o defeito. Contar não corrige a causa, mas põe-na à
+  // vista: quem gerar uma proposta passa a saber que ela saiu pesada, e o
+  // registo diz porquê.
+  aoUsarRecurso?.();
   const orig = await once(cache, `${content}@original`, () => embedImage(doc, input));
   if (orig) drawImageCover(page, orig, x, y, w, h);
   // senão: não desenha nada — a moldura fina de quem chamou continua lá.
@@ -309,8 +324,19 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
  */
 export async function renderProposalDocPdfWithReport(
   doc: ProposalDoc,
-): Promise<{ bytes: Uint8Array; truncations: DocTruncation[] }> {
+): Promise<{ bytes: Uint8Array; truncations: DocTruncation[]; semRedimensionar: number }> {
   const truncations: DocTruncation[] = [];
+  /**
+   * Quantas fotos entraram SEM serem redimensionadas.
+   *
+   * Zero é o normal. Qualquer outro número quer dizer que o `sharp` falhou e
+   * que o PDF saiu com as fotos em tamanho de armazenamento — pesado a abrir e
+   * a percorrer. Era exactamente isto que estava a acontecer sem ninguém saber.
+   */
+  let semRedimensionar = 0;
+  const contarRecurso = () => {
+    semRedimensionar++;
+  };
   const note: NoteTruncation = (where, dropped, unit) => {
     if (dropped > 0) truncations.push({ where, dropped, unit });
   };
@@ -513,8 +539,20 @@ export async function renderProposalDocPdfWithReport(
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, "cover", images);
+      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images, contarRecurso);
+      if (right)
+        await drawCoverImage(
+          pdf,
+          p,
+          right,
+          sideW + panelW,
+          0,
+          sideW,
+          H,
+          "cover",
+          images,
+          contarRecurso,
+        );
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
@@ -720,7 +758,17 @@ export async function renderProposalDocPdfWithReport(
     // Como o mood board se chama num aviso. Sem título, vale a posição — é
     // assim que ele aparece no estúdio, contado a partir de 1.
     const boardName = mb.title.trim() ? `«${mb.title.trim()}»` : `${bi + 1}`;
-    await drawCollage(pdf, p, mb, f, textFns(text, textRight), images, boardName, note);
+    await drawCollage(
+      pdf,
+      p,
+      mb,
+      f,
+      textFns(text, textRight),
+      images,
+      boardName,
+      note,
+      contarRecurso,
+    );
   }
 
   // ── Orçamento ──
@@ -999,8 +1047,20 @@ export async function renderProposalDocPdfWithReport(
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, "cover", images);
+      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, "cover", images, contarRecurso);
+      if (right)
+        await drawCoverImage(
+          pdf,
+          p,
+          right,
+          sideW + panelW,
+          0,
+          sideW,
+          H,
+          "cover",
+          images,
+          contarRecurso,
+        );
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
@@ -1031,7 +1091,18 @@ export async function renderProposalDocPdfWithReport(
     }
   }
 
-  return { bytes: await pdf.save(), truncations };
+  if (semRedimensionar > 0) {
+    // ERRO e não aviso: o PDF sai, mas sai pesado a abrir e a percorrer, e até
+    // aqui isso acontecia sem deixar rasto nenhum. Um PDF verdadeiro de
+    // 3,31 MB chegou com as fotos a 266–576 DPI por este caminho.
+    log.error("proposal-doc-pdf: fotos embutidas SEM redimensionar", null, {
+      quantas: semRedimensionar,
+      ref: doc.ref,
+      porque:
+        "o sharp falhou e usou-se o original. O PDF fica pesado a abrir. " + "Ver PDF-BEFORE.md.",
+    });
+  }
+  return { bytes: await pdf.save(), truncations, semRedimensionar };
 }
 
 // Small helper factory so the collage function can reuse the closures.
@@ -1052,6 +1123,9 @@ async function drawCollage(
   cache: EmbedCache,
   boardName: string,
   note: NoteTruncation,
+  /** Ver `renderProposalDocPdfWithReport`: conta as fotos que entram sem
+   *  serem redimensionadas, para a proposta poder dizer que saiu pesada. */
+  contarRecurso: () => void,
 ) {
   // Wrap the annotation (description + optional flower list) to the page measure
   // up front so the collage reserves exactly the height the caption needs. Capped
@@ -1075,7 +1149,7 @@ async function drawCollage(
 
   // Draw one framed image into a box (cover-cropped, thin hairline frame).
   const place = async (b64: string, x: number, yBottom: number, w: number, h: number) => {
-    await drawCoverImage(pdf, p, b64, x, yBottom, w, h, "collage", cache);
+    await drawCoverImage(pdf, p, b64, x, yBottom, w, h, "collage", cache, contarRecurso);
     p.drawRectangle({ x, y: yBottom, width: w, height: h, borderColor: LINE, borderWidth: 0.5 });
   };
 
