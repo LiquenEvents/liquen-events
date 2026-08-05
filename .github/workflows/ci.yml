@@ -18,7 +18,18 @@ jobs:
   quality:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Este job faz install + audit + lint + typecheck + ~2900 testes + um build
+    # completo do Next (que inclui a pré-geração de 172 imagens). Em 2026-08-05
+    # levou 15m14s e o GitHub matou-o a meio do build — e um esgotamento de
+    # tempo aparece como "cancelled", que se lê como "alguém cancelou" e não
+    # como "avaria". Custou-me uma diagnose inteira a perceber que não era
+    # código nenhum.
+    #
+    # A corrida anterior tinha levado 11m37s. Ou seja: o tecto estava a três
+    # minutos e meio do trabalho real, e a variação normal de velocidade dos
+    # runners chega para o ultrapassar. 25 minutos volta a dar folga sem
+    # deixar um job encravado a arder durante meia hora.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
