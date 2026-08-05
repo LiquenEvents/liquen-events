@@ -175,6 +175,65 @@ const SearchIcon = (
 );
 
 /** "1 foto" / "7 fotos" — o plural aparece em meia dúzia de frases. */
+/** Quão apertada é a grelha de temas. */
+export type Densidade = "confortavel" | "compacto";
+
+const DENSIDADE_KEY = "liquen-temas-densidade";
+
+/** Lê a preferência guardada. Nunca lança — um `localStorage` indisponível
+ *  (janela privada, política do browser) vale como "não há preferência". */
+export function lerDensidade(): Densidade | null {
+  try {
+    const v = window.localStorage.getItem(DENSIDADE_KEY);
+    return v === "confortavel" || v === "compacto" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarDensidade(d: Densidade): void {
+  try {
+    window.localStorage.setItem(DENSIDADE_KEY, d);
+  } catch {
+    // Perder a preferência é um incómodo; deitar o ecrã abaixo por causa dela
+    // não tem desculpa nenhuma.
+  }
+}
+
+/**
+ * As colunas de cada densidade.
+ *
+ * DUAS no telemóvel nas duas: uma coluna com cartões enormes obrigava a
+ * percorrer a biblioteca inteira de baixo para cima.
+ *
+ * "Compacto" chega a seis colunas porque é exactamente o número de temas de
+ * hoje — o pedido era vê-los todos de uma vez, sem scroll.
+ */
+export const COLUNAS: Record<Densidade, string> = {
+  confortavel: "grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4",
+  compacto: "grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6",
+};
+
+/**
+ * "há 3 dias", "hoje" — a data como se fala, para o cartão poder dizer o que
+ * está vivo e o que está parado sem gastar uma linha inteira com um formato
+ * completo. Datas futuras (relógios trocados) contam como hoje, em vez de
+ * dizerem "há -2 dias".
+ */
+export function desdeQuando(iso: string | undefined, agora = Date.now()): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const dias = Math.floor((agora - t) / 86_400_000);
+  if (dias <= 0) return "hoje";
+  if (dias === 1) return "ontem";
+  if (dias < 30) return `há ${dias} dias`;
+  const meses = Math.floor(dias / 30);
+  if (meses < 12) return `há ${meses} ${meses === 1 ? "mês" : "meses"}`;
+  const anos = Math.floor(meses / 12);
+  return `há ${anos} ${anos === 1 ? "ano" : "anos"}`;
+}
+
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -371,6 +430,14 @@ export default function Temas() {
   const [saving, setSaving] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // Guardada entre sessões: quem trabalha com a biblioteca todos os dias escolhe
+  // uma vez e não quer voltar a escolher. Começa em "compacto" porque com seis
+  // temas é o que os põe todos no ecrã sem scroll — que é o pedido de origem.
+  const [densidade, setDensidade] = useState<Densidade>("compacto");
+  useEffect(() => {
+    const guardada = lerDensidade();
+    if (guardada) setDensidade(guardada);
+  }, []);
   // Filtrar fora da tecla: com poucos temas é imperceptível, e mantém o campo
   // instantâneo quando a lista cresce (é o mesmo padrão do Inventário).
   const deferredSearch = useDeferredValue(search);
@@ -580,14 +647,47 @@ export default function Temas() {
           )
         }
         end={
-          <Button
-            variant={adding ? "secondary" : "primary"}
-            size="sm"
-            iconLeft={adding ? undefined : PlusIcon}
-            onClick={() => setAdding(!adding)}
-          >
-            {adding ? "Cancelar" : "Novo tema"}
-          </Button>
+          <div className="flex items-center gap-2">
+            {themes.length > 2 && (
+              <div
+                role="group"
+                aria-label="Tamanho dos cartões"
+                className="flex overflow-hidden rounded-lg border border-foreground/[0.1]"
+              >
+                {(
+                  [
+                    ["compacto", "Compacto"],
+                    ["confortavel", "Confortável"],
+                  ] as const
+                ).map(([valor, rotulo]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    aria-pressed={densidade === valor}
+                    onClick={() => {
+                      setDensidade(valor);
+                      guardarDensidade(valor);
+                    }}
+                    className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                      densidade === valor
+                        ? "bg-foreground/[0.06] text-foreground/70"
+                        : "text-foreground/40 hover:text-foreground/60"
+                    }`}
+                  >
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button
+              variant={adding ? "secondary" : "primary"}
+              size="sm"
+              iconLeft={adding ? undefined : PlusIcon}
+              onClick={() => setAdding(!adding)}
+            >
+              {adding ? "Cancelar" : "Novo tema"}
+            </Button>
+          </div>
         }
       />
 
@@ -623,8 +723,8 @@ export default function Temas() {
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className={`grid ${COLUNAS[densidade]}`}>
+          {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bo-skeleton aspect-[4/3] rounded-2xl" aria-hidden />
           ))}
           <p className="sr-only">A carregar temas…</p>
@@ -647,7 +747,7 @@ export default function Temas() {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className={`grid ${COLUNAS[densidade]}`}>
           {visible.map((t) => (
             <button
               key={t.id}
@@ -655,7 +755,10 @@ export default function Temas() {
               onClick={() => setOpenId(t.id)}
               className="group overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors hover:border-[#4d6350]/40"
             >
-              <div className="aspect-[4/3] w-full overflow-hidden bg-foreground/[0.04]">
+              {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
+                  ela que mantém a primeira linha alinhada quando as fotos têm
+                  proporções diferentes umas das outras. */}
+              <div className="flex aspect-[4/3] w-full gap-px overflow-hidden bg-foreground/[0.04]">
                 {t.coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -663,20 +766,50 @@ export default function Temas() {
                     alt=""
                     loading="lazy"
                     decoding="async"
-                    className="h-full w-full object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
+                    className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-foreground/40">
                     {FolderIcon}
                   </div>
                 )}
+                {/* Uma capa só diz o que é a foto de capa; três fotos dizem o que
+                    é o TEMA. Só aparecem quando existem mesmo — um tema com uma
+                    foto continua a ser uma imagem inteira, e não uma tira com
+                    dois buracos. */}
+                {t.coverUrl && t.previewUrls && t.previewUrls.length > 0 && (
+                  <div className="flex w-1/4 shrink-0 flex-col gap-px">
+                    {t.previewUrls.slice(0, 3).map((u) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={u}
+                        src={u}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="min-h-0 w-full flex-1 object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="px-4 py-3">
-                <p className="font-display text-[15px] text-foreground/85">{t.name}</p>
-                <p className="bo-text-muted mt-0.5 text-xs">
+              <div className="px-3 py-2.5">
+                <p className="font-display truncate text-[14px] text-foreground/85">{t.name}</p>
+                <p className="bo-text-muted mt-0.5 truncate text-xs">
                   {photoCountLabel(t.imageCount, t.truncated)}
-                  {t.notes ? ` · ${t.notes}` : ""}
+                  {/* Quando foi mexido pela última vez: é o que separa um tema
+                      vivo de um que ficou para trás, e cabe onde já havia
+                      espaço.
+                      NÃO aparece quando a pasta não pôde ser lida — "Fotos
+                      indisponíveis · há 2 meses" mistura um aviso com uma
+                      informação de rotina, e é o aviso que tem de se ler. */}
+                  {t.imageCount !== null && desdeQuando(t.updatedAt)
+                    ? ` · ${desdeQuando(t.updatedAt)}`
+                    : ""}
                 </p>
+                {t.notes ? (
+                  <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
+                ) : null}
               </div>
             </button>
           ))}

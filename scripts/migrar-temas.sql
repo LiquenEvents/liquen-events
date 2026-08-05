@@ -15,6 +15,23 @@
 -- O QUE ISTO NUNCA FAZ: apagar uma foto, mover um ficheiro, mexer numa capa ou
 -- numa ordem manual. Só acrescenta linhas. Por isso reverter, mesmo depois do
 -- commit, são duas linhas — estão no fim do ficheiro.
+--
+-- ── O AVISO DO SUPABASE ("Potential issue detected") ───────────────────────
+-- Ao correr isto, o SQL Editor avisa que "esta consulta cria tabelas sem RLS".
+-- A resposta certa é "Run without RLS", e não é um atalho:
+--
+-- As únicas tabelas que este ficheiro cria são TEMPORÁRIAS (`opcoes` e
+-- `regras`, mais abaixo). Uma tabela temporária vive na sessão que a criou, é
+-- destruída no fim da transacção (`on commit drop`) e nunca é exposta pela API
+-- — nenhuma chave anon ou authenticated a consegue ver, porque não há nada
+-- para ver depois de a transacção acabar. Guardam um booleano e nove linhas de
+-- regras.
+--
+-- As tabelas a sério — biblioteca_fotos, biblioteca_etiquetas e
+-- biblioteca_foto_etiquetas — são criadas no `db/schema.sql`, e esse ficheiro
+-- LIGA o RLS nas três, como faz a todas as outras tabelas do sistema. O aviso
+-- é uma regra geral do editor a ver a palavra "create table"; não distingue as
+-- temporárias.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 

@@ -448,9 +448,11 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
 
     renderTemas();
 
+    // "Fotos indisponíveis" é um AVISO e vai sozinho; os outros trazem também
+    // a data da última alteração ("1 foto · há 3 dias"), daí o começo.
     expect(await screen.findByText("Fotos indisponíveis")).toBeInTheDocument();
-    expect(screen.getByText("500+ fotos")).toBeInTheDocument();
-    expect(screen.getByText("1 foto")).toBeInTheDocument();
+    expect(screen.getByText(/^500\+ fotos\b/)).toBeInTheDocument();
+    expect(screen.getByText(/^1 foto\b/)).toBeInTheDocument();
   });
 });
 
@@ -1457,9 +1459,10 @@ describe("Biblioteca de Temas — copiar e mover fotos entre temas", () => {
     // Copiar não tira nada daqui.
     expect(photos()).toHaveLength(5);
 
-    // O cartão do destino já conta com elas.
+    // O cartão do destino já conta com elas. A linha traz também a data da
+    // última alteração ("9 fotos · há 3 dias"), por isso compara-se o começo.
     fireEvent.click(screen.getByRole("button", { name: "← Temas" }));
-    expect(await screen.findByText("9 fotos")).toBeInTheDocument();
+    expect(await screen.findByText(/^9 fotos\b/)).toBeInTheDocument();
   });
 
   it("mover tira da grelha SÓ as que o servidor confirmou", async () => {

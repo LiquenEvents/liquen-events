@@ -30,6 +30,10 @@ const SEM_BASE_DE_DADOS =
   "A base de dados não está ligada nesta instalação, por isso os temas não podem ser guardados. " +
   "Faltam as chaves do Supabase (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).";
 
+/** Quantas fotos, além da capa, o cartão de um tema mostra empilhadas. Três
+ *  chegam para dar uma ideia do conjunto sem transformar o cartão numa grelha. */
+const PREVIEWS_POR_CARTAO = 3;
+
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
@@ -70,15 +74,33 @@ export async function GET(request: NextRequest) {
     const newest = listings.map(({ names }, i) =>
       names[0] ? `${themeFolder(themes[i].id)}/${names[0]}` : "",
     );
-    const urls = await signThemePaths([...new Set([...chosen, ...newest].filter(Boolean))]);
+    // Mais algumas fotos por tema, para o cartão poder mostrar o CONJUNTO.
+    // Continua a ser UMA assinatura em bloco para todos os temas — só com mais
+    // caminhos lá dentro —, e os nomes já vinham na listagem que se fez acima:
+    // não há aqui nem mais uma ida ao Storage.
+    const extras = listings.map(({ names }, i) =>
+      names.slice(0, PREVIEWS_POR_CARTAO + 1).map((n) => `${themeFolder(themes[i].id)}/${n}`),
+    );
+    const urls = await signThemePaths([
+      ...new Set([...chosen, ...newest, ...extras.flat()].filter(Boolean)),
+    ]);
 
     const summaries: ThemeSummary[] = themes.map((t, i) => {
       const { names, ok, truncated } = listings[i];
+      const coverUrl = urls.get(chosen[i]) ?? urls.get(newest[i]);
+      // A capa nunca se repete nas pré-visualizações: no cartão ela já está
+      // à frente, e vê-la outra vez na pilha lê-se como um tema com fotos
+      // repetidas.
+      const previewUrls = extras[i]
+        .map((p) => urls.get(p))
+        .filter((u): u is string => Boolean(u) && u !== coverUrl)
+        .slice(0, PREVIEWS_POR_CARTAO);
       return {
         ...t,
         imageCount: ok ? names.length : null,
         ...(ok && truncated ? { truncated: true } : {}),
-        coverUrl: urls.get(chosen[i]) ?? urls.get(newest[i]),
+        coverUrl,
+        ...(previewUrls.length ? { previewUrls } : {}),
       };
     });
     return NextResponse.json(summaries);

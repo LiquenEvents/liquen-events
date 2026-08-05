@@ -83,6 +83,16 @@ export interface ThemeSummary extends ProposalTheme {
   /** URL assinado da foto do cartão: a escolhida (`coverPath`) ou, sem
    *  escolha — ou se a escolhida já não existir —, a foto mais recente. */
   coverUrl?: string;
+  /**
+   * Mais duas ou três fotos do tema, para o cartão dar uma ideia do CONJUNTO em
+   * vez de uma imagem só. A capa vem sempre à frente; estas são as seguintes.
+   *
+   * Não custam uma ida a mais ao Storage: os nomes já vinham na listagem que a
+   * rota faz por tema, e a assinatura de todos os temas continua a ser um único
+   * pedido — só com mais caminhos lá dentro. Podem faltar (tema com uma foto
+   * só, ou assinatura falhada), e nesse caso o cartão mostra o que tiver.
+   */
+  previewUrls?: string[];
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */
