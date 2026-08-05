@@ -20,6 +20,7 @@ import { useToast } from "./Toast";
 import { prepareImageWithThumb } from "./image-prep";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
+import BibliotecaRevisao from "./BibliotecaRevisao";
 
 /**
  * Biblioteca de Temas — o sítio onde o estúdio guarda, uma vez, as fotos de
@@ -489,6 +490,7 @@ export default function Temas() {
   const [densidade, setDensidade] = useState<Densidade>("compacto");
   const [ordem, setOrdem] = useState<Ordem>("alfabetica");
   const [verArquivados, setVerArquivados] = useState(false);
+  const [revendo, setRevendo] = useState(false);
   // Lidas depois do primeiro desenho, e não durante: o servidor não tem
   // `localStorage`, e ler ali daria um HTML diferente do que o browser desenha.
   useEffect(() => {
@@ -670,6 +672,10 @@ export default function Temas() {
     return ordenarTemas(filtrados, ordem);
   }, [themes, deferredSearch, ordem, verArquivados]);
 
+  // A revisão em lote trabalha sobre a biblioteca TODA, não sobre um tema — é
+  // um ecrã irmão da lista, não um separador dentro dela.
+  if (revendo) return <BibliotecaRevisao onBack={() => setRevendo(false)} />;
+
   if (open) {
     return (
       <ThemeFolder
@@ -763,6 +769,9 @@ export default function Temas() {
                 </select>
               </label>
             )}
+            <Button variant="secondary" size="sm" onClick={() => setRevendo(true)}>
+              Rever etiquetas
+            </Button>
             {/* Só aparece quando há mesmo alguma coisa arquivada — senão seria
                 um interruptor a explicar uma funcionalidade que ninguém usou. */}
             {arquivados > 0 && (
