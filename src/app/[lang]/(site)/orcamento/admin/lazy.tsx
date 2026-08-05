@@ -110,6 +110,7 @@ const modelosEmail = splitView(() => import("./EmailTemplates"));
 const faturas = splitView(() => import("./Faturas"));
 const contratos = splitView(() => import("./Contratos"));
 const inventario = splitView(() => import("./Inventario"));
+const material = splitView(() => import("./Material"));
 const temas = splitView(() => import("./Temas"));
 
 export const Kanban = kanban.View;
@@ -124,6 +125,7 @@ export const EmailTemplates = modelosEmail.View;
 export const Faturas = faturas.View;
 export const Contratos = contratos.View;
 export const Inventario = inventario.View;
+export const Material = material.View;
 export const Temas = temas.View;
 
 // ── Detail-panel tools (only needed once a quote is opened) ──
@@ -184,6 +186,7 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   tarefas: tarefas.warm,
   fornecedores: fornecedores.warm,
   inventario: inventario.warm,
+  material: material.warm,
   temas: temas.warm,
   estatisticas: estatisticas.warm,
   faturas: faturas.warm,

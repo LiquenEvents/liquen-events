@@ -16,6 +16,7 @@ import { mapper as calendarMapper, listCalendarEvents } from "./calendar-store";
 import { mapper as invoicesMapper, listInvoices } from "./invoices-store";
 import { mapper as contractsMapper, listContracts } from "./contracts-store";
 import { mapper as inventoryMapper, listItems } from "./inventory-store";
+import { mapper as materialMapper, listMaterial } from "./material-store";
 import { mapper as templatesMapper, listTemplates } from "./email-templates-store";
 import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
@@ -235,6 +236,19 @@ const inventorySchema = z.looseObject({
   updatedAt: z.string().max(64),
 });
 
+const materialSchema = z.looseObject({
+  id,
+  name: z.string().max(300),
+  category: z.string().max(120).default("Ferramentas"),
+  kind: z.enum(["consumivel", "reutilizavel"]),
+  stock: z.number().min(0).max(1_000_000),
+  // Opcional a sério: ausente quer dizer "não vigiar este item", e é diferente
+  // de zero. Um `.default(0)` aqui repunha a cópia com a reposição desligada em
+  // silêncio para todos os itens que não a tinham.
+  minStock: z.number().min(0).max(1_000_000).optional(),
+  updatedAt: z.string().max(64),
+});
+
 const templateSchema = z.looseObject({
   key: z.string().trim().min(1).max(120),
   name: z.string().max(300).default(""),
@@ -438,6 +452,15 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     mapper: inventoryMapper,
     schema: inventorySchema,
     current: listItems,
+    stamp: (i) => i.updatedAt,
+  }),
+  asTarget({
+    key: "materialItems",
+    label: "Material de logística",
+    table: materialMapper.table,
+    mapper: materialMapper,
+    schema: materialSchema,
+    current: listMaterial,
     stamp: (i) => i.updatedAt,
   }),
   asTarget({

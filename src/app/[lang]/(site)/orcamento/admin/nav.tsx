@@ -17,6 +17,7 @@ export type View =
   | "tarefas"
   | "fornecedores"
   | "inventario"
+  | "material"
   | "temas"
   | "estatisticas"
   | "faturas"
@@ -48,7 +49,14 @@ export const CORE_NAV: View[] = [
   "tarefas",
 ];
 
-export const MORE_NAV: View[] = ["faturas", "contratos", "temas", "kanban", "estatisticas"];
+export const MORE_NAV: View[] = [
+  "faturas",
+  "contratos",
+  "material",
+  "temas",
+  "kanban",
+  "estatisticas",
+];
 
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
@@ -172,6 +180,25 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "material",
+    label: "Material",
+    // Caixa de ferramentas: a pega e o corpo. É o que vai na carrinha.
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <rect x="3" y="8" width="18" height="12" rx="2" />
+        <path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" strokeLinecap="round" />
+        <path d="M3 13h18" />
       </svg>
     ),
   },

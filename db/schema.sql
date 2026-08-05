@@ -242,6 +242,42 @@ create table if not exists public.inventory_items (
 
 create index if not exists inventory_category_idx on public.inventory_items (category);
 
+-- ── Catálogo de material de LOGÍSTICA ───────────────────────────
+-- O que faz a montagem acontecer: escadote, extensões, ferramentas, fita-cola,
+-- sacos do lixo, luvas. NÃO são adereços — esses vivem em `inventory_items`,
+-- acima, e são outra coisa: um berbequim e um vaso não se gerem da mesma
+-- maneira, não se compram pelas mesmas razões e não interessam às mesmas
+-- pessoas. As duas tabelas são deliberadamente separadas (ver MATERIAL.md §0.1).
+--
+-- `kind` é a coluna que decide o comportamento todo:
+--   consumivel   → desconta do stock quando é usado, e dispara reposição;
+--   reutilizavel → não desconta, mas TEM de voltar, e é isso que o regresso
+--                  controla. Esquecer um escadote a 200 km custa horas.
+create table if not exists public.material_items (
+  id          text primary key,
+  name        text not null,
+  category    text not null default 'Ferramentas',
+  kind        text not null default 'reutilizavel',
+  unit        text,                              -- unidade | metro | rolo | par | caixa
+  stock       numeric not null default 0,
+  -- Abaixo disto entra na lista de compras. Nulo = não vigiar este item.
+  min_stock   numeric,
+  notes       text,
+  photo_path  text,
+  updated_at  timestamptz not null default now()
+);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'material_items_kind_ck') then
+    alter table public.material_items
+      add constraint material_items_kind_ck check (kind in ('consumivel', 'reutilizavel'));
+  end if;
+end $$;
+
+create index if not exists material_items_category_idx on public.material_items (category);
+create index if not exists material_items_kind_idx     on public.material_items (kind);
+
 -- ── Biblioteca de temas (fotos de inspiração reutilizáveis) ─────
 -- Só os METADADOS de cada tema ("Itália", "Terracotta"). As fotos vivem no
 -- bucket privado de Storage `theme-assets`, uma pasta por id de tema — a
@@ -458,6 +494,7 @@ alter table public.overview_settings enable row level security;
 alter table public.invoices    enable row level security;
 alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
+alter table public.material_items  enable row level security;
 alter table public.proposal_themes enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;

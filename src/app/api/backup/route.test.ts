@@ -18,6 +18,7 @@ const stores = vi.hoisted(() => ({
   invoices: vi.fn(async () => [] as unknown[]),
   contracts: vi.fn(async () => [] as unknown[]),
   inventoryItems: vi.fn(async () => [] as unknown[]),
+  materialItems: vi.fn(async () => [] as unknown[]),
   emailTemplates: vi.fn(async () => [] as unknown[]),
   themes: vi.fn(async () => [] as unknown[]),
   messageLinks: vi.fn(async () => [] as unknown[]),
@@ -37,6 +38,7 @@ vi.mock("@/lib/calendar-store", () => ({ listCalendarEvents: stores.calendarEven
 vi.mock("@/lib/invoices-store", () => ({ listInvoices: stores.invoices }));
 vi.mock("@/lib/contracts-store", () => ({ listContracts: stores.contracts }));
 vi.mock("@/lib/inventory-store", () => ({ listItems: stores.inventoryItems }));
+vi.mock("@/lib/material-store", () => ({ listMaterial: stores.materialItems }));
 vi.mock("@/lib/email-templates-store", () => ({
   listTemplatesWithDefaults: stores.emailTemplates,
 }));

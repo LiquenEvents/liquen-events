@@ -347,6 +347,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./inbox/reply/route", methods: ["POST"] },
   { path: "./inventario/route", methods: ["GET", "POST"] },
   { path: "./inventario/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./material/route", methods: ["GET", "POST"] },
+  { path: "./material/[id]/route", methods: ["PATCH", "DELETE"] },
+  // Escreve o catálogo todo de uma vez a partir de um CSV. Sem sessão, um
+  // pedido só podia apagar meio inventário.
+  { path: "./material/importar/route", methods: ["POST"] },
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
   { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },

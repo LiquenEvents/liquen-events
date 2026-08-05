@@ -8,6 +8,7 @@ import { listCalendarEvents } from "@/lib/calendar-store";
 import { listInvoices } from "@/lib/invoices-store";
 import { listContracts } from "@/lib/contracts-store";
 import { listItems } from "@/lib/inventory-store";
+import { listMaterial } from "@/lib/material-store";
 import { listTemplatesWithDefaults } from "@/lib/email-templates-store";
 import { listThemes } from "@/lib/themes-store";
 import { listLinks } from "@/lib/message-links-store";
@@ -85,6 +86,9 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
   { key: "invoiceCounters", table: "invoice_counters", list: listInvoiceCounters },
   { key: "contracts", table: "contracts", list: listContracts },
   { key: "inventoryItems", table: "inventory_items", list: listItems },
+  // O catálogo de logística: é o inventário físico da empresa, escrito à mão
+  // ou importado de uma folha de cálculo que pode já não existir.
+  { key: "materialItems", table: "material_items", list: listMaterial },
   // `...WithDefaults` de propósito: interessa guardar os modelos TAL COMO a
   // equipa os vê, incluindo os que ainda estão na versão de origem.
   { key: "emailTemplates", table: "email_templates", list: listTemplatesWithDefaults },

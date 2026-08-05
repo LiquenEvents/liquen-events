@@ -61,6 +61,7 @@ import {
   Faturas,
   Contratos,
   Inventario,
+  Material,
   Temas,
   ClientMessenger,
   EventChecklist,
@@ -1343,6 +1344,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
+    material: "Material",
     temas: "Temas",
     estatisticas: "Estatísticas",
     faturas: "Faturas",
@@ -1363,6 +1365,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
+    material: "O que vai nas carrinhas: ferramentas, consumíveis, escadotes",
     temas: "Fotos de inspiração por tema, prontas para as propostas",
     estatisticas: "Métricas e desempenho",
     faturas: "Livro de faturação e pagamentos",
@@ -1952,6 +1955,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "inventario" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Inventario />
+            </div>
+          )}
+
+          {/* ── Material de logística ── */}
+          {view === "material" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Material />
             </div>
           )}
 
