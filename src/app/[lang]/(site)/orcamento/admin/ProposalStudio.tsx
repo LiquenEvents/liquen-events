@@ -217,6 +217,16 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 
+/**
+ * Quantos passos atrás o Cmd+Z consegue ir.
+ *
+ * Cada passo é um documento inteiro em memória. Cinquenta chegam de sobra
+ * para desfazer um engano — ninguém carrega em Cmd+Z cinquenta vezes seguidas
+ * — e mantêm a conta de memória modesta mesmo numa proposta com muitos mood
+ * boards (os documentos guardam caminhos de fotos, não bytes).
+ */
+const MAX_HISTORICO = 50;
+
 function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const j = i + dir;
   if (j < 0 || j >= arr.length) return arr;
@@ -330,6 +340,27 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   const [porConfirmar, setPorConfirmar] = useState<Set<CampoAMudar>>(() => new Set());
   /** Caixa do nome, aberta pelo "Guardar como modelo" do cabeçalho. */
   const [nomeModelo, setNomeModelo] = useState<string | null>(null);
+  /** Quando foi gravado — para o indicador discreto "Guardado às 14:32". */
+  const [gravadoEm, setGravadoEm] = useState<Date | null>(null);
+  /** Há alterações à espera do debounce? É o que o aviso de saída lê. */
+  const [porGravar, setPorGravar] = useState(false);
+  /**
+   * O rascunho que o "Limpar" deitou fora, à espera de ser resgatado.
+   *
+   * Dez segundos e um botão, em vez de uma caixa de confirmação. A caixa
+   * pergunta ANTES, quando ela ainda não viu o que ia perder, e a resposta
+   * certa é quase sempre "sim" — por isso carrega-se sem ler. A anulação
+   * pergunta DEPOIS, quando o ecrã já mostra o estrago.
+   */
+  const [limpo, setLimpo] = useState<{ doc: StudioDoc; total: string; segundos: number } | null>(
+    null,
+  );
+  /**
+   * Histórico para o Cmd+Z. Guardado num `ref` e não em estado: crescer o
+   * histórico não pode redesenhar a página, ou escrever numa caixa de texto
+   * passava a redesenhar o formulário inteiro a cada tecla.
+   */
+  const historico = useRef<StudioDoc[]>([]);
   /**
    * O que ela já escreveu antes, para não voltar a escrever.
    *
@@ -523,9 +554,23 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }, [doc.template, doc.eventType, doc.clientNames, doc.eventDate, refEdited]);
 
   // ── Debounced draft persistence ──
+  // Assim que o documento muda há trabalho por gravar. Volta a false quando a
+  // gravação local acontece, oitocentos milissegundos depois.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    setPorGravar(true);
+  }, [doc, assetUrls, themeOrigins, refEdited]);
+
   useEffect(() => {
     if (!hydrated.current) return;
     const t = setTimeout(() => {
+      // Uma fotografia para o Cmd+Z, tirada quando ela pára de escrever. Se
+      // fosse a cada tecla, desfazer andava letra a letra e não servia para
+      // nada; se fosse só nas remoções, não desfazia um texto trocado.
+      const ultimo = historico.current[historico.current.length - 1];
+      if (!ultimo || JSON.stringify(ultimo) !== JSON.stringify(doc)) {
+        historico.current = [...historico.current, doc].slice(-MAX_HISTORICO);
+      }
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
         localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
@@ -533,6 +578,8 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           SIDE_KEY,
           JSON.stringify({ urls: assetUrls, themeOrigins, refEdited }),
         );
+        setGravadoEm(new Date());
+        setPorGravar(false);
       } catch {
         /* quota / unavailable — non-fatal */
       }
@@ -719,8 +766,82 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     });
   }
 
+  /**
+   * Cmd/Ctrl+Z — volta ao documento anterior.
+   *
+   * O último elemento do histórico É o documento actual (foi lá posto pela
+   * gravação); por isso desfazer tira DOIS e usa o penúltimo.
+   */
+  function desfazer(): boolean {
+    if (historico.current.length < 2) return false;
+    const anterior = historico.current[historico.current.length - 2];
+    historico.current = historico.current.slice(0, -1);
+    setDoc(anterior);
+    // O campo do total é estado à parte (aceita texto a meio de ser escrito),
+    // por isso tem de acompanhar — senão desfazer devolvia o documento antigo
+    // e deixava o valor novo na caixa.
+    const base = baseDoDoc(anterior);
+    setTotalInput(base === undefined ? "" : String(base));
+    return true;
+  }
+
+  useEffect(() => {
+    function aoTeclar(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta || e.key.toLowerCase() !== "z" || e.shiftKey) return;
+      // Dentro de uma caixa de texto, o Cmd+Z do browser desfaz a escrita —
+      // que é o que ela espera. Só se assume o comando fora dos campos, ou
+      // quando o browser já não tem nada para desfazer nesse campo.
+      const alvo = e.target as HTMLElement | null;
+      const aEscrever =
+        alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.isContentEditable);
+      if (aEscrever) return;
+      if (desfazer()) {
+        e.preventDefault();
+        toast("Desfeito.", "info");
+      }
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  });
+
+  // ── Aviso ao sair com trabalho por gravar ─────────────────────────────
+  // A janela é estreita (a gravação é a 800ms), mas existe: fechar o
+  // separador logo a seguir a escrever perdia essas últimas palavras.
+  useEffect(() => {
+    if (!porGravar) return;
+    const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [porGravar]);
+
+  // ── A contagem dos dez segundos para anular a limpeza ─────────────────
+  useEffect(() => {
+    if (!limpo) return;
+    if (limpo.segundos <= 0) {
+      setLimpo(null);
+      return;
+    }
+    const t = setTimeout(
+      () => setLimpo((l) => (l ? { ...l, segundos: l.segundos - 1 } : null)),
+      1000,
+    );
+    return () => clearTimeout(t);
+  }, [limpo]);
+
+  /** Devolve o rascunho que o "Limpar" deitou fora. */
+  function anularLimpeza() {
+    if (!limpo) return;
+    setDoc(limpo.doc);
+    setTotalInput(limpo.total);
+    setLimpo(null);
+    toast("Rascunho reposto.", "success");
+  }
+
   function clearDraft() {
-    if (!window.confirm("Limpar todo o rascunho da proposta? Não pode ser anulado.")) return;
+    // Sem caixa de confirmação: guarda-se o que estava e dá-se dez segundos
+    // para o trazer de volta. Ver a razão em `limpo`, mais acima.
+    setLimpo({ doc, total: totalInput, segundos: 10 });
     try {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(`${DRAFT_KEY}:at`);
@@ -1334,6 +1455,21 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           </Button>
         </div>
       </div>
+
+      {limpo && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+          <span className="text-xs text-foreground/70">
+            Rascunho limpo. Pode anular durante {limpo.segundos}s.
+          </span>
+          <button
+            type="button"
+            className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            onClick={anularLimpeza}
+          >
+            Anular
+          </button>
+        </div>
+      )}
 
       {nomeModelo !== null && (
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-3">
@@ -2245,6 +2381,18 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 </>
               ) : (
                 "Preencha o conteúdo e avance para pré-visualizar."
+              )}
+              {/* Discreto de propósito: é uma confirmação, não um aviso. Quem
+                  precisa dela procura-a; quem não precisa não tem de a ler. */}
+              {(gravadoEm || porGravar) && (
+                <span className="ml-2 text-[11px] text-foreground/35">
+                  {porGravar
+                    ? "a guardar…"
+                    : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}`}
+                </span>
               )}
             </p>
             <Button

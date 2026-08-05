@@ -136,6 +136,59 @@ const renderStudio = () =>
  * Palavras dela: «altero um item e esqueço-me de atualizar o total». O aviso
  * existe para esse esquecimento ter voz.
  */
+/**
+ * LIMPAR O RASCUNHO — a única acção destrutiva da página.
+ *
+ * Tinha uma caixa de confirmação. A caixa pergunta ANTES, quando ela ainda
+ * não viu o que ia perder, e a resposta certa é quase sempre "sim" — por isso
+ * carrega-se sem ler. A anulação pergunta DEPOIS, com o estrago à vista.
+ */
+describe("limpar o rascunho pode ser anulado", () => {
+  function seedComConteudo() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [{ label: "Igreja" }] }],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia"],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+  }
+
+  it("não pergunta antes — limpa e oferece anular", async () => {
+    seedComConteudo();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Limpar rascunho/ }));
+    expect(await screen.findByText(/Pode anular durante/i)).toBeTruthy();
+    // E limpou mesmo: o grupo que lá estava desapareceu.
+    expect(screen.queryByDisplayValue("Decoração Floral")).toBeNull();
+  });
+
+  it("anular devolve o que lá estava", async () => {
+    seedComConteudo();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Limpar rascunho/ }));
+    await user.click(await screen.findByRole("button", { name: /^Anular$/ }));
+    expect(await screen.findByDisplayValue("Decoração Floral")).toBeTruthy();
+    expect(screen.getByDisplayValue("Igreja")).toBeTruthy();
+    // E a oferta desaparece — anulada uma vez, não fica lá a pedir de novo.
+    expect(screen.queryByText(/Pode anular durante/i)).toBeNull();
+  });
+});
+
 describe("total desalinhado da soma das linhas", () => {
   function seedComPrecos(total: number) {
     localStorage.setItem(
