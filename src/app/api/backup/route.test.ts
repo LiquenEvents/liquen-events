@@ -21,6 +21,9 @@ const stores = vi.hoisted(() => ({
   materialItems: vi.fn(async () => [] as unknown[]),
   materialLists: vi.fn(async () => [] as unknown[]),
   materialListItems: vi.fn(async () => [] as unknown[]),
+  materialRules: vi.fn(async () => [] as unknown[]),
+  eventMaterial: vi.fn(async () => [] as unknown[]),
+  eventMaterialItems: vi.fn(async () => [] as unknown[]),
   emailTemplates: vi.fn(async () => [] as unknown[]),
   themes: vi.fn(async () => [] as unknown[]),
   messageLinks: vi.fn(async () => [] as unknown[]),
@@ -44,6 +47,11 @@ vi.mock("@/lib/material-store", () => ({ listMaterial: stores.materialItems }));
 vi.mock("@/lib/material-lists-store", () => ({ listLists: stores.materialLists }));
 vi.mock("@/lib/material-list-items-store", () => ({
   listAllListItems: stores.materialListItems,
+}));
+vi.mock("@/lib/material-rules-store", () => ({ listRules: stores.materialRules }));
+vi.mock("@/lib/event-material-store", () => ({ listEventMaterial: stores.eventMaterial }));
+vi.mock("@/lib/event-material-items-store", () => ({
+  listAllEventItems: stores.eventMaterialItems,
 }));
 vi.mock("@/lib/email-templates-store", () => ({
   listTemplatesWithDefaults: stores.emailTemplates,

@@ -65,6 +65,7 @@ import {
   Temas,
   ClientMessenger,
   EventChecklist,
+  EventMaterial,
   EventTimeline,
   PaymentsPanel,
   EventCosts,
@@ -3133,6 +3134,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 setSelected((prev) => (prev ? { ...prev, checklist } : prev));
                               }}
                             />
+
+                            {/* Material que vai na carrinha */}
+                            <EventMaterial key={`mat-${selected.id}`} quote={selected} />
 
                             {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child

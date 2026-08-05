@@ -119,6 +119,44 @@ vi.mock("@/lib/material-store", () =>
     listMaterial: H.afn("material-store.listMaterial", async () => []),
   }),
 );
+vi.mock("@/lib/material-rules-store", () =>
+  H.build("material-rules-store", ["createRule", "updateRule", "deleteRule"], {
+    listRules: H.afn("material-rules-store.listRules", async () => []),
+  }),
+);
+vi.mock("@/lib/material-list-items-store", () =>
+  H.build(
+    "material-list-items-store",
+    ["addListItem", "updateListItem", "removeListItem", "listItemsOf", "removeItemsOf"],
+    { listAllListItems: H.afn("material-list-items-store.listAllListItems", async () => []) },
+  ),
+);
+vi.mock("@/lib/event-material-store", () =>
+  H.build(
+    "event-material-store",
+    [
+      "getForQuote",
+      "createEventMaterial",
+      "updateEventMaterial",
+      "deleteEventMaterial",
+      "getEventMaterial",
+    ],
+    { listEventMaterial: H.afn("event-material-store.listEventMaterial", async () => []) },
+  ),
+);
+vi.mock("@/lib/event-material-items-store", () =>
+  H.build(
+    "event-material-items-store",
+    [
+      "addEventItem",
+      "updateEventItem",
+      "removeEventItem",
+      "listItemsOfEvent",
+      "removeItemsOfEvent",
+    ],
+    { listAllEventItems: H.afn("event-material-items-store.listAllEventItems", async () => []) },
+  ),
+);
 vi.mock("@/lib/material-lists-store", () =>
   H.build(
     "material-lists-store",
@@ -382,6 +420,9 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./material/importar/route", methods: ["POST"] },
   { path: "./material/listas/route", methods: ["GET", "POST"] },
   { path: "./material/listas/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./material/regras/route", methods: ["GET", "POST"] },
+  { path: "./material/regras/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./orcamento/[id]/material/route", methods: ["GET", "POST"] },
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
   { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },

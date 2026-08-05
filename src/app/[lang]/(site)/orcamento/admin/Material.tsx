@@ -13,6 +13,7 @@ import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Field, Segmented, Toolbar } from "./ui";
 import MaterialListas from "./MaterialListas";
+import MaterialRegras from "./MaterialRegras";
 import { useCachedList } from "./useCachedList";
 
 /**
@@ -113,19 +114,28 @@ export default function Material() {
   // Catálogo e listas são a mesma matéria vista de dois ângulos — o que existe,
   // e o que costuma ir junto — por isso vivem no mesmo sítio em vez de
   // ocuparem duas entradas do menu.
-  const [aba, setAba] = useState<"catalogo" | "listas">("catalogo");
+  const [aba, setAba] = useState<"catalogo" | "listas" | "regras">("catalogo");
   return (
     <Card>
       <Segmented
-        ariaLabel="Catálogo ou listas base"
+        ariaLabel="Catálogo, listas base ou regras"
         value={aba}
-        onChange={(v) => setAba(v as "catalogo" | "listas")}
+        onChange={(v) => setAba(v as "catalogo" | "listas" | "regras")}
         options={[
           { value: "catalogo", label: "Catálogo" },
           { value: "listas", label: "Listas base" },
+          { value: "regras", label: "Regras" },
         ]}
       />
-      <div className="mt-5">{aba === "catalogo" ? <Catalogo /> : <MaterialListas />}</div>
+      <div className="mt-5">
+        {aba === "catalogo" ? (
+          <Catalogo />
+        ) : aba === "listas" ? (
+          <MaterialListas />
+        ) : (
+          <MaterialRegras />
+        )}
+      </div>
     </Card>
   );
 }

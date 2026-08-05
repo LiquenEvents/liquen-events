@@ -11,6 +11,9 @@ import { listItems } from "@/lib/inventory-store";
 import { listMaterial } from "@/lib/material-store";
 import { listLists } from "@/lib/material-lists-store";
 import { listAllListItems } from "@/lib/material-list-items-store";
+import { listRules } from "@/lib/material-rules-store";
+import { listEventMaterial } from "@/lib/event-material-store";
+import { listAllEventItems } from "@/lib/event-material-items-store";
 import { listTemplatesWithDefaults } from "@/lib/email-templates-store";
 import { listThemes } from "@/lib/themes-store";
 import { listLinks } from "@/lib/message-links-store";
@@ -95,6 +98,12 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
   // custa mais do que perder o catálogo, que se reimporta de um CSV.
   { key: "materialLists", table: "material_lists", list: listLists },
   { key: "materialListItems", table: "material_list_items", list: listAllListItems },
+  // As regras são meses de afinação escritos à mão; as checklists dos eventos
+  // são o registo de quem marcou o quê e quando, que é o que resolve uma
+  // discussão sobre material perdido.
+  { key: "materialRules", table: "material_rules", list: listRules },
+  { key: "eventMaterial", table: "event_material", list: listEventMaterial },
+  { key: "eventMaterialItems", table: "event_material_items", list: listAllEventItems },
   // `...WithDefaults` de propósito: interessa guardar os modelos TAL COMO a
   // equipa os vê, incluindo os que ainda estão na versão de origem.
   { key: "emailTemplates", table: "email_templates", list: listTemplatesWithDefaults },

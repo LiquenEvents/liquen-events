@@ -43,6 +43,7 @@ vi.mock("./lazy", () => {
     ProductionPlan: stub("production-plan"),
     ClientMessenger: stub("client-messenger"),
     EventChecklist: stub("event-checklist"),
+    EventMaterial: stub("event-material"),
     EventTimeline: stub("event-timeline"),
     PaymentsPanel: stub("payments-panel"),
     EventCosts: stub("event-costs"),

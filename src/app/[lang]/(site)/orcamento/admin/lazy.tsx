@@ -139,6 +139,7 @@ export const ClientMessenger = dynamic(() => import("./ClientMessenger"), {
   loading: PanelLoading,
 });
 export const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
+export const EventMaterial = dynamic(() => import("./EventMaterial"), { loading: PanelLoading });
 export const ProductionPlan = dynamic(() => import("./ProductionPlan"), { loading: PanelLoading });
 export const EventTimeline = dynamic(() => import("./EventTimeline"), { loading: PanelLoading });
 export const PaymentsPanel = dynamic(() => import("./PaymentsPanel"), { loading: PanelLoading });

@@ -307,6 +307,75 @@ create table if not exists public.material_list_items (
 create index if not exists material_list_items_list_idx
   on public.material_list_items (list_id);
 
+-- ── Regras: o que a PROPOSTA implica em material ────────────────
+-- Editáveis pela equipa, de propósito. Uma condição por regra, sem E/OU:
+-- condições compostas são uma linguagem de programação com outro nome, e o
+-- sítio onde isto deixa de ser depurável. Duas condições fazem-se com duas
+-- regras, e a checklist mostra qual delas disparou.
+create table if not exists public.material_rules (
+  id          text primary key,
+  name        text not null,
+  enabled     boolean not null default true,
+  match_kind  text not null,          -- sempre | servico | texto | pax
+  match_value text,
+  action      text not null default 'add_list',   -- add_list | add_item
+  list_id     text references public.material_lists(id) on delete cascade,
+  item_id     text references public.material_items(id) on delete cascade,
+  qty         numeric,
+  qty_per_pax numeric,
+  position    integer not null default 0,
+  updated_at  timestamptz not null default now()
+);
+
+-- ── Checklist de material POR EVENTO ────────────────────────────
+-- É uma CÓPIA das listas base, não uma referência: mudar uma lista base não
+-- pode mexer na checklist de um evento já preparado.
+create table if not exists public.event_material (
+  id           text primary key,
+  quote_id     text not null references public.quotes(id) on delete cascade,
+  status       text not null default 'preparada',  -- preparada|carregada|devolvida
+  generated_at timestamptz not null default now(),
+  vehicles     jsonb not null default '[]',
+  notes        text,
+  updated_at   timestamptz not null default now()
+);
+
+create index if not exists event_material_quote_idx on public.event_material (quote_id);
+
+create table if not exists public.event_material_items (
+  id          text primary key,
+  event_id    text not null references public.event_material(id) on delete cascade,
+  -- Sem chave estrangeira apertada: a checklist do dia não pode depender de o
+  -- item continuar a existir no catálogo. Serve para descontar stock e para
+  -- relatórios; o NOME copiado é que faz a lista sobreviver a tudo.
+  item_id     text,
+  name        text not null,
+  category    text not null,
+  unit        text,
+  kind        text not null,
+  qty         numeric not null,
+  critical    boolean not null default false,
+  -- Para o ecrã poder responder a "porque é que isto está aqui?". Sem isto,
+  -- uma lista gerada por regras é uma lista que ninguém percebe e toda a gente
+  -- começa a ignorar.
+  origin      text not null,          -- base | regra | manual
+  origin_ref  text,                   -- id da lista ou da regra
+  -- O rótulo legível, copiado como o nome e pela mesma razão: a regra pode ser
+  -- renomeada ou apagada, e a checklist do dia tem de continuar a explicar-se.
+  origin_label text not null default '',
+  vehicle_id  text,
+  loaded_at   timestamptz,
+  loaded_by   text,
+  returned_at timestamptz,
+  returned_by text,
+  missing     boolean not null default false,
+  used_qty    numeric,
+  note        text
+);
+
+create index if not exists event_material_items_event_idx
+  on public.event_material_items (event_id);
+
 -- ── Biblioteca de temas (fotos de inspiração reutilizáveis) ─────
 -- Só os METADADOS de cada tema ("Itália", "Terracotta"). As fotos vivem no
 -- bucket privado de Storage `theme-assets`, uma pasta por id de tema — a
@@ -526,6 +595,9 @@ alter table public.inventory_items enable row level security;
 alter table public.material_items  enable row level security;
 alter table public.material_lists      enable row level security;
 alter table public.material_list_items enable row level security;
+alter table public.material_rules        enable row level security;
+alter table public.event_material        enable row level security;
+alter table public.event_material_items  enable row level security;
 alter table public.proposal_themes enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;

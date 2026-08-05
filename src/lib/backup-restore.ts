@@ -19,6 +19,9 @@ import { mapper as inventoryMapper, listItems } from "./inventory-store";
 import { mapper as materialMapper, listMaterial } from "./material-store";
 import { mapper as materialListMapper, listLists } from "./material-lists-store";
 import { mapper as materialListItemMapper, listAllListItems } from "./material-list-items-store";
+import { mapper as materialRuleMapper, listRules } from "./material-rules-store";
+import { mapper as eventMaterialMapper, listEventMaterial } from "./event-material-store";
+import { mapper as eventMaterialItemMapper, listAllEventItems } from "./event-material-items-store";
 import { mapper as templatesMapper, listTemplates } from "./email-templates-store";
 import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
@@ -271,6 +274,36 @@ const materialListItemSchema = z.looseObject({
   position: z.number().default(0),
 });
 
+const materialRuleSchema = z.looseObject({
+  id,
+  name: z.string().max(300),
+  enabled: z.boolean().default(true),
+  matchKind: z.enum(["sempre", "servico", "texto", "pax"]),
+  action: z.enum(["add_list", "add_item"]),
+  position: z.number().default(0),
+  updatedAt: z.string().max(64),
+});
+
+const eventMaterialSchema = z.looseObject({
+  id,
+  quoteId: z.string().max(120),
+  status: z.enum(["preparada", "carregada", "devolvida"]),
+  generatedAt: z.string().max(64),
+  updatedAt: z.string().max(64),
+});
+
+const eventMaterialItemSchema = z.looseObject({
+  id,
+  eventId: z.string().max(120),
+  name: z.string().max(300),
+  category: z.string().max(120),
+  kind: z.enum(["consumivel", "reutilizavel"]),
+  qty: z.number().min(0).max(1_000_000),
+  critical: z.boolean().default(false),
+  origin: z.enum(["base", "regra", "manual"]),
+  missing: z.boolean().default(false),
+});
+
 const templateSchema = z.looseObject({
   key: z.string().trim().min(1).max(120),
   name: z.string().max(300).default(""),
@@ -504,6 +537,36 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     current: listAllListItems,
     // As linhas não têm relógio próprio: pertencem à lista e vivem e morrem
     // com ela. O carimbo da lista é o que interessa.
+    stamp: () => "",
+  }),
+  asTarget({
+    key: "materialRules",
+    label: "Regras de material",
+    table: materialRuleMapper.table,
+    mapper: materialRuleMapper,
+    schema: materialRuleSchema,
+    current: listRules,
+    stamp: (r) => r.updatedAt,
+  }),
+  asTarget({
+    key: "eventMaterial",
+    label: "Checklists de material",
+    table: eventMaterialMapper.table,
+    mapper: eventMaterialMapper,
+    schema: eventMaterialSchema,
+    current: listEventMaterial,
+    stamp: (e) => e.updatedAt,
+    extraColumns: (e) => ({ generated_at: e.generatedAt }),
+  }),
+  asTarget({
+    key: "eventMaterialItems",
+    label: "Linhas das checklists de material",
+    table: eventMaterialItemMapper.table,
+    mapper: eventMaterialItemMapper,
+    schema: eventMaterialItemSchema,
+    current: listAllEventItems,
+    // Sem relógio próprio: as linhas pertencem à checklist e o carimbo dela
+    // é que conta.
     stamp: () => "",
   }),
   asTarget({
