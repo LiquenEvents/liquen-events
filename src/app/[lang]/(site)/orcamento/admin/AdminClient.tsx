@@ -1897,6 +1897,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 selectedId={propostaPara}
                 onSelect={setPropostaPara}
                 onNovoPedido={() => setNewQuoteOpen(true)}
+                onQuoteUpdated={(q) => {
+                  setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+                  setSelected((prev) => (prev?.id === q.id ? q : prev));
+                  setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
+                }}
                 onSent={(q) => {
                   setQuotes((prev) =>
                     prev.map((x) => (x.id === q.id ? { ...x, status: "cotado" } : x)),
@@ -3263,6 +3268,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 <ProposalStudio
                                   key={`studio-${selected.id}`}
                                   quote={selected}
+                                  // O valor é um só: o estúdio grava-o no
+                                  // pedido, e o "Preço final" aqui ao lado tem
+                                  // de mostrar o mesmo número sem ser preciso
+                                  // recarregar nada.
+                                  onQuoteUpdated={(q) => {
+                                    setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+                                    setSelected((prev) => (prev?.id === q.id ? q : prev));
+                                    setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
+                                  }}
                                   onSent={() => {
                                     setQuotes((prev) =>
                                       prev.map((q) =>

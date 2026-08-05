@@ -25,6 +25,10 @@ export default function CommsZone({ quote, userName, onQuoteChange, onAddEntry }
       <ProposalStudio
         key={`studio-${quote.id}`}
         quote={quote}
+        // O valor da proposta é o "Preço final" do pedido — um número só. O
+        // estúdio já o gravou no servidor; aqui só se actualiza a cópia local
+        // para o resto do Dossier (financeiro, faturas) mostrar o mesmo.
+        onQuoteUpdated={(q) => onQuoteChange({ quotedPrice: q.quotedPrice })}
         onSent={() => {
           onQuoteChange({ status: "cotado" });
           onAddEntry({

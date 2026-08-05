@@ -9,6 +9,7 @@ import {
   parseMoneyText,
   normaliseCoverImages,
   DEFAULT_VALID_DAYS,
+  DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
   type VatMode,
 } from "@/lib/proposal-doc";
@@ -127,6 +128,37 @@ const STEPS: { id: Step; n: string; label: string }[] = [
 /** Numa proposta nova/vazia, semeia um grupo de serviços com um item — para que
  *  o estúdio não abra como uma parede de botões "+ Adicionar" vazios. Nunca
  *  toca num rascunho que já tenha conteúdo. */
+/**
+ * Põe a BASE (o "Preço final (sem IVA)" do pedido) no documento, respeitando o
+ * modo de IVA em vigor.
+ *
+ * `resolveProposalMoney` lê `totalAmount` como a base em "acrescer" e como o
+ * BRUTO em "incluído" — por isso o valor guardado tem de ser derivado, para a
+ * base ser sempre o número do pedido nos dois modos.
+ */
+function aplicarBase(d: StudioDoc, base: number): StudioDoc {
+  const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
+  const rate = d.vatRate ?? DEFAULT_VAT_RATE;
+  const amount = mode === "acrescer" ? base : Math.round(base * (1 + rate) * 100) / 100;
+  const text = mode === "acrescer" ? `${eur(amount)} + IVA` : eur(amount);
+  return d.template === "organizacao"
+    ? { ...d, totalAmount: amount, totalVatMode: mode, totalEstimatedText: text }
+    : { ...d, totalAmount: amount, totalVatMode: mode, totalText: text };
+}
+
+/**
+ * A BASE (sem IVA) de um documento, seja qual for o modo.
+ *
+ * O campo do estúdio mostra SEMPRE a base — é o número que o pedido guarda e o
+ * que o rótulo "(sem IVA)" promete. Mas `totalAmount` só é a base em modo
+ * "acrescer"; em "incluído" é o BRUTO. Encher o campo com o valor cru mostrava
+ * 9963 onde o pedido dizia 8100. Medido.
+ */
+function baseDoDoc(d: Partial<StudioDoc>): number | undefined {
+  const m = resolveProposalMoney(d as StudioDoc);
+  return m.base > 0 ? m.base : undefined;
+}
+
 function seedDefaults(d: StudioDoc, quotedPrice?: number): StudioDoc {
   let next = d;
   if (next.serviceGroups.length === 0) {
@@ -135,10 +167,13 @@ function seedDefaults(d: StudioDoc, quotedPrice?: number): StudioDoc {
       serviceGroups: [{ letter: "a)", title: "", items: [{ label: "", desc: "" }] }],
     };
   }
-  // Preço único: a proposta parte do "Preço final (sem IVA)" do pedido — o valor
-  // não se escreve outra vez aqui. Como esse preço é SEM IVA, o modo é "acrescer".
-  if (next.totalAmount == null && typeof quotedPrice === "number" && quotedPrice > 0) {
-    next = { ...next, totalAmount: quotedPrice, totalVatMode: "acrescer" };
+  // O valor vem do "Preço final (sem IVA)" do pedido, e é o mesmo número —
+  // não há aqui um segundo. A condição `== null` que aqui estava era a origem
+  // do defeito: uma vez semeado, o estúdio deixava de acompanhar o pedido e os
+  // dois números separavam-se em silêncio. Agora semeia-se SEMPRE, e o efeito
+  // de sincronização trata das alterações posteriores.
+  if (typeof quotedPrice === "number" && quotedPrice > 0) {
+    next = { ...next, totalAmount: quotedPrice, totalVatMode: next.totalVatMode ?? "acrescer" };
   }
   return next;
 }
@@ -233,9 +268,15 @@ export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): str
 interface Props {
   quote: Quote;
   onSent?: () => void;
+  /**
+   * O valor mudou aqui. O pai actualiza a sua cópia do pedido para o "Preço
+   * final" da Gestão do pedido mostrar o mesmo número — porque é o MESMO
+   * número: o estúdio grava-o no pedido, não guarda um segundo.
+   */
+  onQuoteUpdated?: (quote: Quote) => void;
 }
 
-export default function ProposalStudio({ quote, onSent }: Props) {
+export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props) {
   const { toast } = useToast();
   const DRAFT_KEY = `liquen-proposal-studio-${quote.id}`;
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
@@ -292,7 +333,9 @@ export default function ProposalStudio({ quote, onSent }: Props) {
             const merged = { ...d, ...parsed };
             return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
           });
-          if (typeof parsed.totalAmount === "number") setTotalInput(String(parsed.totalAmount));
+          // A BASE, não o `totalAmount` cru — ver `baseDoDoc`.
+          const base = baseDoDoc(parsed);
+          if (base != null) setTotalInput(String(base));
         }
       }
       const rawMeta = localStorage.getItem(SIDE_KEY);
@@ -313,9 +356,24 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     // existente (mesmo sem grupos) nunca é sobrescrito.
     if (!hadDraft) {
       setDoc((d) => seedDefaults(d, quote.quotedPrice));
-      if (typeof quote.quotedPrice === "number" && quote.quotedPrice > 0) {
-        setTotalInput(String(quote.quotedPrice));
-      }
+    }
+
+    // O VALOR é a excepção, e de propósito: vem SEMPRE do pedido, haja rascunho
+    // ou não. Era aqui que os dois números se separavam — com rascunho, o
+    // estúdio nunca mais olhava para o "Preço final", e uma alteração feita na
+    // Gestão do pedido não chegava ao PDF.
+    const doPedido = quote.quotedPrice;
+    if (typeof doPedido === "number" && doPedido > 0) {
+      precoEnviado.current = doPedido;
+      setTotalInput(String(doPedido));
+      setDoc((d) => aplicarBase(d, doPedido));
+    } else if (hadDraft) {
+      // O pedido ainda não tem preço mas o rascunho tem um valor escrito antes
+      // de isto existir. Não se deita fora: adopta-se, e GRAVA-SE no pedido —
+      // é o que faz os dois convergirem numa verdade só, em vez de escolher
+      // uma e perder a outra.
+      const daProposta = parseMoneyText(totalInput) || undefined;
+      if (daProposta && daProposta > 0) persistirPreco(daProposta);
     }
     hydrated.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -352,8 +410,8 @@ export default function ProposalStudio({ quote, onSent }: Props) {
           const merged = { ...d, ...(draft.doc as Partial<StudioDoc>) };
           return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
         });
-        const amount = (draft.doc as { totalAmount?: unknown }).totalAmount;
-        if (typeof amount === "number") setTotalInput(String(amount));
+        const base = baseDoDoc(draft.doc as Partial<StudioDoc>);
+        if (base != null) setTotalInput(String(base));
       } catch {
         /* sem rede: continua-se com a cópia local, como antes */
       }
@@ -478,19 +536,108 @@ export default function ProposalStudio({ quote, onSent }: Props) {
     );
   }
 
+  /**
+   * O VALOR É UM SÓ, e é o "Preço final (sem IVA)" do pedido.
+   *
+   * ── O que estava errado ─────────────────────────────────────────────────
+   * Havia duas caixas com o mesmo número: aqui e na Gestão do pedido. Pior do
+   * que duplicado — podiam DISCORDAR. O estúdio só copiava o preço do pedido
+   * quando ainda não havia rascunho (ver `seedDefaults`), e a partir daí
+   * alterar o preço na Gestão do pedido não mexia aqui. O PDF seguia para o
+   * cliente com o valor antigo, e nada no ecrã o dizia.
+   *
+   * Agora escrever aqui GRAVA no pedido, e uma alteração feita na Gestão do
+   * pedido aparece aqui. É o mesmo número, visto de dois sítios.
+   *
+   * ── E o IVA ─────────────────────────────────────────────────────────────
+   * O número partilhado é sempre a BASE, sem IVA — é o que o pedido diz que é.
+   * O modo de IVA muda o que o PDF MOSTRA (e portanto o que o cliente paga),
+   * e o `totalAmount` do documento é derivado da base: em "acrescer" é a
+   * própria base, em "incluído" é a base já com o IVA somado, porque é assim
+   * que `resolveProposalMoney` o lê. Em qualquer dos modos a base continua a
+   * ser o número do pedido, que é o que o rótulo "(sem IVA)" promete.
+   */
+  function amountParaBase(base: number, mode: VatMode): number {
+    return mode === "acrescer" ? base : Math.round(base * (1 + money.vatRate) * 100) / 100;
+  }
+
+  /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro
+   *  teclas e não podem ser quatro gravações. */
+  const gravarPreco = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** O último valor que ESTE ecrã mandou gravar — para a resposta que volta do
+   *  servidor não disparar outra vez a sincronização e entrar em ciclo. */
+  const precoEnviado = useRef<number | undefined>(quote.quotedPrice);
+
+  function persistirPreco(base: number | undefined) {
+    precoEnviado.current = base;
+    if (gravarPreco.current) clearTimeout(gravarPreco.current);
+    gravarPreco.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/orcamento/${quote.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          // `null` e não `undefined`: apagar o preço tem de chegar ao servidor,
+          // e `undefined` desaparece no JSON (o merge parcial mantinha o
+          // valor antigo). É a mesma razão que está escrita na Gestão do pedido.
+          body: JSON.stringify({ quotedPrice: base ?? null }),
+        });
+        if (!res.ok) throw new Error("falhou");
+        const atualizado: Quote = await res.json();
+        onQuoteUpdated?.(atualizado);
+      } catch {
+        // Não interrompe a escrita da proposta: o valor fica no ecrã e no
+        // rascunho, e a gravação seguinte volta a tentar. Avisar a cada tecla
+        // seria pior do que o problema.
+      }
+    }, 600);
+  }
+
   function onTotalInput(raw: string) {
     setTotalInput(raw);
-    const n = parseMoneyText(raw);
-    writeTotal(raw.trim() === "" ? undefined : n, vatMode);
+    const base = raw.trim() === "" ? undefined : parseMoneyText(raw);
+    writeTotal(base == null ? undefined : amountParaBase(base, vatMode), vatMode);
+    persistirPreco(base);
   }
 
   function setVatMode(mode: VatMode) {
-    writeTotal(doc.totalAmount, mode);
+    // A base não muda ao trocar de modo — muda o que o cliente vê. O valor do
+    // documento é recalculado a partir da mesma base.
+    const base = parseMoneyText(totalInput);
+    writeTotal(base > 0 ? amountParaBase(base, mode) : undefined, mode);
   }
 
   // Split 30/70 sobre o BRUTO — o que o estúdio vê é o que será faturado.
   const money = resolveProposalMoney(doc);
   const split = splitThirtySeventy(money.gross);
+
+  // ── O preço mudou na Gestão do pedido: aparece aqui ─────────────────────
+  // O outro sentido do mesmo número. Sem isto voltava a haver duas verdades:
+  // alterar o "Preço final" no pedido não mexia no estúdio, e o PDF saía com o
+  // valor antigo.
+  //
+  // `precoEnviado` evita o ciclo: quando a mudança veio DAQUI, o valor que
+  // volta é o que acabámos de mandar e não há nada a fazer.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    const doPedido = quote.quotedPrice;
+    if (doPedido === precoEnviado.current) return;
+    precoEnviado.current = doPedido;
+    setTotalInput(typeof doPedido === "number" && doPedido > 0 ? String(doPedido) : "");
+    setDoc((d) => {
+      const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
+      const amount =
+        typeof doPedido === "number" && doPedido > 0
+          ? mode === "acrescer"
+            ? doPedido
+            : Math.round(doPedido * (1 + (d.vatRate ?? DEFAULT_VAT_RATE)) * 100) / 100
+          : undefined;
+      const text = amount == null ? "" : mode === "acrescer" ? `${eur(amount)} + IVA` : eur(amount);
+      return d.template === "organizacao"
+        ? { ...d, totalAmount: amount, totalVatMode: mode, totalEstimatedText: text }
+        : { ...d, totalAmount: amount, totalVatMode: mode, totalText: text };
+    });
+     
+  }, [quote.quotedPrice]);
 
   function setTemplate(t: "decoracao" | "organizacao") {
     setDoc((d) => {
@@ -1527,17 +1674,18 @@ export default function ProposalStudio({ quote, onSent }: Props) {
         <Section title="Total, IVA e validade">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
-              O valor parte do <strong className="font-semibold">Preço final</strong> do pedido —
-              não é preciso escrevê-lo outra vez. Altere aqui só se esta proposta tiver um valor
-              diferente.
+              É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido —
+              escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número só.
             </p>
             <Field
-              label={vatMode === "acrescer" ? "Valor (base, sem IVA)" : "Valor total (com IVA)"}
+              // Sempre a base: é o que o pedido guarda, e é o que o rótulo
+              // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o
+              // que o cliente vê, não o significado deste campo.
+              label="Valor (sem IVA)"
               inputMode="decimal"
               value={totalInput}
               onChange={(e) => onTotalInput(e.target.value)}
               placeholder="3000"
-              aria-label="Valor total"
             />
             <div className="flex flex-col gap-1.5">
               <span className="bo-eyebrow">IVA</span>
@@ -1551,7 +1699,8 @@ export default function ProposalStudio({ quote, onSent }: Props) {
                 ]}
               />
               <p className="text-xs leading-relaxed text-foreground/45">
-                «+ IVA» soma o IVA ao valor; «incluído» já o contém.
+                Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
+                «incluído» mostra já a soma. O valor acima é sempre sem IVA.
               </p>
             </div>
             <Field
