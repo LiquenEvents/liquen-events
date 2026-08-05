@@ -37,12 +37,17 @@ vi.mock("@/lib/proposal-doc-render", () => ({
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
+import { esvaziarCachePdf } from "@/lib/proposal-pdf-cache";
 
 function call(token = "good") {
   return GET(new Request("http://x"), { params: Promise.resolve({ token }) });
 }
 
 beforeEach(() => {
+  // A rota serve de uma cache por processo (`proposal-pdf-cache`): sem
+  // esvaziar, o segundo caso deste ficheiro receberia o PDF que o primeiro
+  // desenhou e nunca chegaria a exercitar o que diz exercitar.
+  esvaziarCachePdf();
   db.quotes.clear();
   db.proposalsById.clear();
   db.newestByQuote.clear();

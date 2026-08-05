@@ -289,5 +289,28 @@ Alternativas, por ordem de custo:
    gerado, onde um binário é aceitável.
 3. Acrescentar o `qpdf` ao ambiente de execução. É o mais directo e o mais caro.
 
-Fica por decidir, e a recomendação é a 1 — resolve o que se sente, sem
-infraestrutura nova.
+### Feito: a 1
+
+As duas rotas que servem o PDF ao cliente — `/api/proposta/[token]/pdf` (o link
+do email) e `/api/portal/[token]/proposta-pdf` (o portal) — passam a responder
+com `Content-Length`, `Accept-Ranges: bytes`, `ETag` e `Cache-Control`, e a
+servir pedidos parciais (206), incluindo `bytes=-500` — que é o **primeiro**
+pedido de um leitor de PDF, à procura da tabela de referências que num ficheiro
+não linearizado está no fim. `If-None-Match` fecha-se com 304; `If-Range` que
+não bate certo devolve o ficheiro inteiro em vez de costurar pedaços de duas
+versões. Está em `src/lib/pdf-resposta.ts`, com testes das pontas.
+
+**E não veio sozinho.** Desenhar esta proposta não é ler um ficheiro: vai buscar
+até 80 fotos ao Storage e reencoda cada uma com o sharp. Anunciar
+`Accept-Ranges` sem mais nada seria um tiro no pé — o leitor passaria a fazer
+cinco ou seis pedidos e cada um voltava a desenhar o documento inteiro. Por isso
+entrou ao lado uma cache por conteúdo (`src/lib/proposal-pdf-cache.ts`), com
+tecto por bytes e não por número de entradas. A chave é o documento guardado,
+portanto uma proposta revista muda de chave sozinha e não há nada a invalidar à
+mão.
+
+Falta **medir** o depois, e isso precisa de uma proposta a sério num servidor a
+sério: o ganho verdadeiro é o tempo até a primeira página aparecer no portal, e
+aqui não há Storage nem documento com fotos.
+
+As opções 2 e 3 continuam por decidir, e continuam a não ser urgentes.

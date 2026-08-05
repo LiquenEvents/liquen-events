@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal } from "@/lib/proposals-store";
-import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
+import { pdfDaPropostaEmCache } from "@/lib/proposal-pdf-cache";
+import { respostaPdf } from "@/lib/pdf-resposta";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
 
@@ -55,16 +56,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // caso; isto fecha a mesma porta do lado do servidor.
     if (!proposal?.doc) return new NextResponse(null, { status: 404 });
 
-    const pdf = await renderStoredProposalDocPdf(proposal.doc);
+    const pdf = await pdfDaPropostaEmCache(proposal.doc);
     // O nome do ficheiro vai dentro de um cabeçalho: saneia-se a referência
     // (aspas, espaços, acentos) em vez de a confiar tal como está gravada.
     const ref = (proposal.quoteId || proposal.id).replace(/[^A-Za-z0-9_-]/g, "");
-    return new NextResponse(pdf, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="Proposta-Liquen-${ref}.pdf"`,
-      },
-    });
+    // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
+    return respostaPdf(request, pdf, { nome: `Proposta-Liquen-${ref}.pdf` });
   } catch (err) {
     log.error("proposta pdf GET falhou", err, { proposalId: claim.proposalId });
     return new NextResponse(null, { status: 500 });

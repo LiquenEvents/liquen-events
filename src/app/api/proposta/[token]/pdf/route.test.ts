@@ -32,6 +32,7 @@ vi.mock("@/lib/proposal-doc-render", () => ({
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
+import { esvaziarCachePdf } from "@/lib/proposal-pdf-cache";
 import { getProposal } from "@/lib/proposals-store";
 import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
 
@@ -45,12 +46,44 @@ function call(token = "bom-p1") {
 }
 
 beforeEach(() => {
+  // A rota serve de uma cache por processo (`proposal-pdf-cache`): sem
+  // esvaziar, o segundo caso deste ficheiro receberia o PDF que o primeiro
+  // desenhou e nunca chegaria a exercitar o que diz exercitar.
+  esvaziarCachePdf();
   db.proposals.clear();
   db.rendered = [];
   vi.clearAllMocks();
 });
 
 describe("GET /api/proposta/[token]/pdf", () => {
+  it("serve com Content-Length, ETag e a promessa de pedaços", async () => {
+    // O que o portal precisa para abrir um PDF não linearizado sem arrastar o
+    // ficheiro todo. A razão está em `pdf-resposta.ts`.
+    db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Length")).toBe("4");
+    expect(res.headers.get("Accept-Ranges")).toBe("bytes");
+    expect(res.headers.get("ETag")).toBeTruthy();
+  });
+
+  it("um pedido de pedaço devolve 206 e NÃO volta a desenhar", async () => {
+    // O ponto da cache: um leitor de PDF faz vários pedidos parciais para abrir
+    // um ficheiro. Se cada um voltasse a desenhar, anunciar `Accept-Ranges`
+    // seria uma degradação de cinco ou seis vezes em vez de uma melhoria.
+    db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
+    await call();
+    expect(renderStoredProposalDocPdf).toHaveBeenCalledTimes(1);
+
+    const req = new Request("http://x", {
+      headers: { "x-real-ip": `10.0.1.${++n % 250}`, range: "bytes=0-1" },
+    });
+    const res = await GET(req, { params: Promise.resolve({ token: "bom-p1" }) });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("Content-Range")).toBe("bytes 0-1/4");
+    expect(renderStoredProposalDocPdf).toHaveBeenCalledTimes(1);
+  });
+
   it("serve o documento guardado NA proposta do token", async () => {
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO Decoração" } });
     const res = await call();
