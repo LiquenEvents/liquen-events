@@ -105,6 +105,18 @@ jobs:
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
+      # BLOQUEANTE. A entrada por passkey, com um autenticador virtual do
+      # Chrome: assinaturas a sério, verificadas pelo servidor a sério. Corre
+      # com config própria porque precisa de GRAVAR, e o servidor de produção
+      # que os outros passos usam recusa escritas sem Supabase — a razão está
+      # escrita em playwright.passkeys.config.ts. Bloqueante porque isto é
+      # autenticação: um caminho de entrada partido não pode passar em silêncio.
+      - name: Passkeys — registar, entrar sem palavra-passe, e remover
+        run: npm run test:e2e:passkeys
+        env:
+          CI: "true"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
       # BLOQUEANTE. Uma imagem que não pinte em qualquer página, em telemóvel ou
       # em computador, com o menu fechado ou aberto, põe o PR vermelho. Corre em
       # último para o relatório HTML que fica no artefacto ser o desta rede.

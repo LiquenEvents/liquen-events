@@ -1,0 +1,278 @@
+"use client";
+
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useFocusTrap } from "./useFocusTrap";
+import { Button, Field } from "./ui";
+import { mensagemDeErro, registarDispositivo, suportaPasskeys } from "@/lib/passkeys-cliente";
+
+/**
+ * OS MEUS DISPOSITIVOS — registar este aparelho como chave de entrada, ver os
+ * que já estão registados, e remover os que já não existem.
+ *
+ * Só mostra os dispositivos de quem está a ver. Não é um ecrã de administração
+ * de equipa: a lista de aparelhos de uma pessoa diz onde ela trabalha, e não há
+ * razão para a mostrar aos outros.
+ *
+ * Duas coisas ficam ditas no ecrã, e não num manual que ninguém abre:
+ *
+ *  • a passkey fica presa a ESTE aparelho e a ESTE endereço. Trocar de telemóvel
+ *    obriga a registar outra vez, e é isso que a torna impossível de dar por
+ *    engano num site cópia;
+ *  • remover o último dispositivo não tranca ninguém fora — a palavra-passe
+ *    continua a funcionar. Se um dia deixar de funcionar, esta frase deixa de
+ *    ser verdade e tem de mudar com ela.
+ */
+
+interface Dispositivo {
+  id: string;
+  deviceLabel: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  toast?: (message: string, kind?: "success" | "error") => void;
+}
+
+/** "há 3 dias", "hoje" — datas absolutas não dizem nada num ecrã destes. */
+function quando(iso: string | null): string {
+  if (!iso) return "ainda não foi usado";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const dias = Math.floor(ms / 86_400_000);
+  if (dias === 0) return "hoje";
+  if (dias === 1) return "ontem";
+  if (dias < 30) return `há ${dias} dias`;
+  const meses = Math.floor(dias / 30);
+  return meses === 1 ? "há um mês" : `há ${meses} meses`;
+}
+
+/** Um palpite decente para o nome, para não obrigar a inventar um. */
+function nomeSugerido(): string {
+  if (typeof navigator === "undefined") return "Dispositivo";
+  const ua = navigator.userAgent;
+  if (/iPhone/i.test(ua)) return "iPhone";
+  if (/iPad/i.test(ua)) return "iPad";
+  if (/Android/i.test(ua)) return "Telemóvel Android";
+  if (/Macintosh/i.test(ua)) return "Mac";
+  if (/Windows/i.test(ua)) return "Computador Windows";
+  return "Dispositivo";
+}
+
+export default function PasskeysDialog({ open, onClose, toast }: Props) {
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
+  const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
+  const [aCarregar, setACarregar] = useState(false);
+  const [aRegistar, setARegistar] = useState(false);
+  const [indisponivel, setIndisponivel] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  // Vazio de propósito: o palpite vai no `placeholder`, não escrito no campo.
+  // Assim quem não quer pensar no nome carrega em Registar e fica com o palpite,
+  // e quem quer escrever não tem de apagar texto primeiro.
+  const [nome, setNome] = useState("");
+  // Capacidades do ambiente, não estado: ver a nota igual no AdminLogin.
+  const suportado = useSyncExternalStore(
+    () => () => {},
+    suportaPasskeys,
+    () => false,
+  );
+  const sugestao = useSyncExternalStore(
+    () => () => {},
+    nomeSugerido,
+    () => "Dispositivo",
+  );
+
+  const carregar = useCallback(async () => {
+    setACarregar(true);
+    setErro(null);
+    try {
+      const res = await fetch("/api/admin/passkeys");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Não foi possível ler os dispositivos.");
+      setDispositivos(Array.isArray(data.dispositivos) ? data.dispositivos : []);
+      setIndisponivel(Boolean(data.indisponivel));
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível ler os dispositivos.");
+    } finally {
+      setACarregar(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    // Ir buscar a lista ao abrir é o que este efeito é. O `carregar` liga o
+    // indicador de espera antes do pedido, e é isso que a regra vê.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void carregar();
+  }, [open, carregar]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !aRegistar) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose, aRegistar]);
+
+  if (!open) return null;
+
+  async function registar() {
+    if (aRegistar) return;
+    setARegistar(true);
+    setErro(null);
+    try {
+      await registarDispositivo(nome.trim() || nomeSugerido());
+      toast?.("Dispositivo registado.", "success");
+      await carregar();
+    } catch (err) {
+      const msg = mensagemDeErro(err);
+      if (msg) setErro(msg);
+    } finally {
+      setARegistar(false);
+    }
+  }
+
+  async function remover(d: Dispositivo) {
+    // Uma confirmação, e não duas: remover um dispositivo não apaga dados nem
+    // tranca ninguém — a palavra-passe continua lá. O gesto destrutivo desta
+    // casa é a reposição da cópia, e é esse que pede uma frase escrita.
+    if (!confirm(`Remover "${d.deviceLabel}"? Este aparelho deixa de poder entrar.`)) return;
+    setErro(null);
+    try {
+      const res = await fetch(`/api/admin/passkeys/${encodeURIComponent(d.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Não foi possível remover.");
+      toast?.("Dispositivo removido.", "success");
+      await carregar();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível remover.");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Os meus dispositivos"
+        className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-2xl"
+      >
+        <div className="flex items-start justify-between border-b border-foreground/[0.07] px-6 py-4">
+          <div>
+            <p className="bo-eyebrow">Os meus dispositivos</p>
+            <p className="bo-text-muted mt-0.5 text-xs">
+              Entrar sem palavra-passe, com o rosto ou a impressão digital do aparelho.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-lg leading-none text-foreground/30 transition-colors hover:text-foreground/60"
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+          {erro && (
+            <p
+              role="alert"
+              className="mb-4 flex items-start gap-1.5 rounded-lg bg-[#fdf1ef] px-3 py-2 text-sm leading-relaxed text-[#8a2a22]"
+            >
+              <span aria-hidden="true">⚠</span>
+              <span>{erro}</span>
+            </p>
+          )}
+
+          {indisponivel && (
+            <p className="mb-4 rounded-lg bg-[#fbf7ec] px-3 py-2 text-sm leading-relaxed text-[#6b5720]">
+              A tabela das passkeys ainda não existe na base de dados. Corra o{" "}
+              <code className="text-xs">db/schema.sql</code> no Supabase e volte aqui.
+            </p>
+          )}
+
+          {!suportado ? (
+            <p className="text-sm leading-relaxed text-foreground/60">
+              Este browser não sabe trabalhar com passkeys. Continue a entrar com a palavra-passe,
+              ou abra o back office no Safari ou no Chrome do seu telemóvel.
+            </p>
+          ) : (
+            <>
+              {/* ── Registar este aparelho ── */}
+              <div className="rounded-xl border border-foreground/10 p-4">
+                <p className="text-sm font-medium text-foreground/80">Registar este aparelho</p>
+                <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+                  A chave fica guardada dentro deste aparelho e nunca sai de lá. Num site que imite
+                  o nosso, ela simplesmente não existe — é isso que impede um engano.
+                </p>
+                <div className="mt-3 flex items-end gap-2">
+                  <div className="flex-1">
+                    <Field
+                      label="Nome"
+                      name="deviceLabel"
+                      type="text"
+                      value={nome}
+                      maxLength={60}
+                      onChange={(e) => setNome(e.target.value)}
+                      placeholder={sugestao}
+                    />
+                  </div>
+                  <Button type="button" onClick={registar} loading={aRegistar} className="mb-[2px]">
+                    {aRegistar ? "A confirmar…" : "Registar"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* ── Os que já estão registados ── */}
+              <div className="mt-5">
+                <p className="bo-eyebrow mb-2">Registados</p>
+                {aCarregar && dispositivos.length === 0 ? (
+                  <div className="bo-skeleton h-12 w-full" aria-hidden />
+                ) : dispositivos.length === 0 ? (
+                  <p className="text-sm leading-relaxed text-foreground/50">
+                    Ainda não há nenhum. Enquanto não houver, entra-se só com a palavra-passe.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {dispositivos.map((d) => (
+                      <li
+                        key={d.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-foreground/10 px-3 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-foreground/80">{d.deviceLabel}</p>
+                          <p className="text-xs text-foreground/45">
+                            Última entrada: {quando(d.lastUsedAt)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => remover(d)}
+                          className="shrink-0 rounded-md px-2 py-1 text-xs text-[#8a2a22] transition-colors hover:bg-[#fdf1ef]"
+                        >
+                          Remover
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <p className="mt-5 text-xs leading-relaxed text-foreground/45">
+                Remover o último dispositivo não o tranca fora: a palavra-passe continua a
+                funcionar. As passkeys registadas noutro endereço — numa pré-visualização, por
+                exemplo — não funcionam aqui, e é assim de propósito.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

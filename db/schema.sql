@@ -342,6 +342,33 @@ create table if not exists public.message_links (
 
 create index if not exists message_links_quote_id_idx on public.message_links (quote_id);
 
+-- ── Passkeys (WebAuthn) ─────────────────────────────────────────
+-- Uma linha por DISPOSITIVO registado, não por pessoa: quem tem telemóvel e
+-- portátil regista os dois, e perder um não fecha a porta ao outro.
+--
+-- `public_key` é a chave PÚBLICA — não é um segredo. A privada nunca sai do
+-- aparelho (fica no Secure Enclave / TEE), e é por isso que uma cópia desta
+-- tabela não deixa ninguém entrar.
+--
+-- `rp_id` é guardado com a credencial e verificado à entrada: uma passkey
+-- registada num domínio não serve noutro, nem que a linha seja copiada.
+--
+-- `counter` é o contador de assinaturas do autenticador. Se um dia vier igual
+-- ou menor do que o guardado, é sinal de credencial clonada (ver o store).
+create table if not exists public.passkeys (
+  id            text primary key,          -- credential ID em base64url
+  user_name     text not null,             -- a conta a que o dispositivo pertence
+  public_key    text not null,             -- COSE em base64url (não é segredo)
+  counter       bigint not null default 0,
+  transports    jsonb not null default '[]'::jsonb,
+  rp_id         text not null,
+  device_label  text not null default '',  -- nome dado por quem registou
+  created_at    timestamptz not null default now(),
+  last_used_at  timestamptz
+);
+
+create index if not exists passkeys_user_name_idx on public.passkeys (lower(user_name));
+
 -- ── Restrições de integridade (CHECK) ───────────────────────────
 -- Garantem, na própria base de dados, que os campos de estado/tipo só
 -- aceitam os valores que a aplicação conhece e que os montantes não são
@@ -409,6 +436,11 @@ do $$ begin
     alter table public.contracts add constraint contracts_status_chk
       check (status in ('pendente','aceite')) not valid;
   end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'passkeys_counter_chk') then
+    alter table public.passkeys add constraint passkeys_counter_chk
+      check (counter >= 0) not valid;
+  end if;
 end $$;
 
 -- ── Segurança ───────────────────────────────────────────────────
@@ -429,3 +461,4 @@ alter table public.inventory_items enable row level security;
 alter table public.proposal_themes enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;
+alter table public.passkeys enable row level security;

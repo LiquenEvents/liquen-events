@@ -24,6 +24,7 @@ import ShortcutsModal from "./ShortcutsModal";
 import AjudaGlossario from "./AjudaGlossario";
 import NewQuoteModal from "./NewQuoteModal";
 import RestoreDialog from "./RestoreDialog";
+import PasskeysDialog from "./PasskeysDialog";
 import NotificationBell from "./NotificationBell";
 import {
   downloadCsv,
@@ -465,6 +466,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  const [passkeysOpen, setPasskeysOpen] = useState(false);
   const [ajudaOpen, setAjudaOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -1335,6 +1337,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       <div className="min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
         <RestoreDialog open={restoreOpen} onClose={() => setRestoreOpen(false)} toast={toast} />
+        <PasskeysDialog open={passkeysOpen} onClose={() => setPasskeysOpen(false)} toast={toast} />
         <AjudaGlossario open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
         <CommandPalette
           open={paletteOpen}
@@ -1470,6 +1473,27 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <p className="text-[var(--bo-text-faint)] text-[10px] truncate">Administração</p>
               </div>
             </div>
+            {/* Linha própria, e não um quinto botão na fila de baixo: com cinco
+                não cabia o rótulo de nenhum. É também o sítio onde se procura —
+                logo debaixo de quem está com a sessão aberta. */}
+            <button
+              onClick={() => setPasskeysOpen(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+              title="Entrar sem palavra-passe neste aparelho"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <rect x="5" y="11" width="14" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" strokeLinecap="round" />
+              </svg>
+              Os meus dispositivos
+            </button>
             <div className="flex gap-1">
               <button
                 onClick={() => setShortcutsOpen(true)}

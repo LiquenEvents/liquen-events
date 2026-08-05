@@ -12,6 +12,10 @@ const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // As passkeys correm à parte, em `playwright.passkeys.config.ts`. A razão
+  // está lá escrita: precisam de GRAVAR, e o servidor de produção que este
+  // ficheiro arranca recusa escritas sem Supabase — de propósito.
+  testIgnore: ["**/passkeys.spec.ts"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

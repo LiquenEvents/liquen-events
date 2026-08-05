@@ -181,3 +181,35 @@ describe("sessions — signed and expiring", () => {
     expect(readSession(`${forged}.anything`)).toBeNull();
   });
 });
+
+/**
+ * `contaExiste` — a regra que faz a saída de alguém valer alguma coisa.
+ *
+ * Uma passkey não passa por `verifyCredentials`: é uma chave presa a um
+ * aparelho. Sem esta verificação, tirar uma pessoa do `ADMIN_USERS` mudava-lhe
+ * a palavra-passe e deixava-lhe a porta do telemóvel aberta para sempre.
+ */
+describe("contaExiste", () => {
+  it("com ADMIN_USERS, só as contas listadas contam", async () => {
+    const { contaExiste } = await import("./admin-auth");
+    process.env.ADMIN_USERS = JSON.stringify([
+      { name: "Catarina", passwordHash: bcrypt.hashSync("x", 4) },
+    ]);
+    expect(contaExiste("Catarina")).toBe(true);
+    expect(contaExiste("  catarina ")).toBe(true);
+    expect(contaExiste("Rui")).toBe(false);
+  });
+
+  it("sem ADMIN_USERS (palavra-passe partilhada) qualquer nome conta", async () => {
+    // Não há lista de contas para consultar; a alavanca nesse modo é o
+    // SESSION_VERSION mais a remoção do dispositivo.
+    const { contaExiste } = await import("./admin-auth");
+    expect(contaExiste("Quem Quer Que Seja")).toBe(true);
+  });
+
+  it("ADMIN_USERS malformado não tranca toda a gente fora", async () => {
+    const { contaExiste } = await import("./admin-auth");
+    process.env.ADMIN_USERS = "{isto não é json";
+    expect(contaExiste("Catarina")).toBe(true);
+  });
+});

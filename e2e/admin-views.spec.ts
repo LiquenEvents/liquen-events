@@ -66,7 +66,7 @@ async function login(page: Page): Promise<boolean> {
   await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
   await page.getByLabel(/O teu nome/i).fill("Catarina");
   await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
-  await page.getByRole("button", { name: /Entrar/i }).click();
+  await page.getByRole("button", { name: /^Entrar$/ }).click();
   // The back-office landmark only exists once authenticated.
   try {
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({

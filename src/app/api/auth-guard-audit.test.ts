@@ -241,6 +241,18 @@ vi.mock("@/lib/overview-settings-store", async (orig) => ({
   readOverviewSettings: H.afn("overview-settings-store.readOverviewSettings", async () => ({})),
   saveOverviewField: H.afn("overview-settings-store.saveOverviewField", async () => ({})),
 }));
+// Passkeys. As funções puras (`mesmaConta`, `contadorRetrocedeu`) ficam reais —
+// não tocam em dados; só as que leem ou escrevem viram espias, para a asserção
+// "não chegou ao store" ter mesmo o que apanhar se um dia a guarda cair.
+vi.mock("@/lib/passkeys-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/passkeys-store")>()),
+  listPasskeys: H.afn("passkeys-store.listPasskeys", async () => []),
+  listPasskeysFor: H.afn("passkeys-store.listPasskeysFor", async () => []),
+  getPasskey: H.afn("passkeys-store.getPasskey", async () => null),
+  createPasskey: H.afn("passkeys-store.createPasskey"),
+  removePasskeyOwnedBy: H.afn("passkeys-store.removePasskeyOwnedBy", async () => false),
+  marcarUso: H.afn("passkeys-store.marcarUso"),
+}));
 // `sharp` é importado no topo da rota das miniaturas; fica de fora da auditoria
 // pela mesma razão que o pdf-lib.
 vi.mock("sharp", () => ({ default: () => ({ metadata: async () => ({}) }) }));
@@ -369,6 +381,13 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./temas/[id]/repetidas/route", methods: ["POST"] },
   // Notas da equipa e meta de receita — texto interno, e uma escrita.
   { path: "./visao-geral/route", methods: ["GET", "PUT"] },
+  // Passkeys. A LISTA e a REMOÇÃO são de sessão, como tudo o resto. O REGISTO
+  // também, e é o ponto todo do desenho: transformar um aparelho numa chave só
+  // pode ser feito por quem já provou ser quem diz. Sem esta guarda, um estranho
+  // registava o aparelho dele e passava a ter porta própria.
+  { path: "./admin/passkeys/route", methods: ["GET"] },
+  { path: "./admin/passkeys/[id]/route", methods: ["DELETE"] },
+  { path: "./admin/passkeys/registo/route", methods: ["GET", "POST"] },
 ];
 
 describe("ADMIN-SESSION routes reject the unauthenticated before touching the store", () => {
@@ -463,6 +482,12 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       // evento, a recusa do `Purchase` (que só o back office pode enviar, por
       // `./meta/fechos`), e o limite de 20 pedidos por minuto por IP.
       "./meta/route",
+      // A entrada por passkey. É um CAMINHO DE ENTRADA, como o login por
+      // palavra-passe: exigir sessão para entrar não faria sentido nenhum. O
+      // que a protege é a assinatura do aparelho, verificada contra a chave
+      // pública guardada, a origem e o domínio — mais o tecto de 20 tentativas
+      // por minuto por IP.
+      "./admin/passkeys/entrada/route",
       "./portal/[token]/proposta-pdf/route",
       "./portal/[token]/contrato-pdf/route",
       "./proposta/[token]/pdf/route",
@@ -485,6 +510,25 @@ describe("PUBLIC routes stay reachable without a session", () => {
     const fn = await handler("./health/route", "GET");
     const res = await fn(req("GET"), ctx());
     expect(res.status).toBe(200);
+  });
+
+  it("GET /api/admin/passkeys/entrada dá o desafio sem sessão nenhuma", async () => {
+    // É um caminho de ENTRADA: se exigisse sessão, ninguém entrava por aqui.
+    const fn = await handler("./admin/passkeys/entrada/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+  });
+
+  it("POST /api/admin/passkeys/entrada recusa uma assinatura inventada — sem 401 por falta de sessão", async () => {
+    // O que a fecha não é a sessão: é a criptografia. Sem desafio selado no
+    // cookie, o pedido morre em 400 — e nunca chega a ler credencial nenhuma.
+    const fn = await handler("./admin/passkeys/entrada/route", "POST");
+    const res = await fn(
+      req("POST", "/api/admin/passkeys/entrada", { response: { id: "credencial-inventada" } }),
+      ctx(),
+    );
+    expect([400, 401, 429]).toContain(res.status);
+    expect(calls, "leu a credencial sem sequer ter um desafio válido").toEqual([]);
   });
 
   it("POST /api/security/csp-report accepts a report unauthenticated", async () => {

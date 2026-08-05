@@ -121,6 +121,27 @@ function sharedHash(): string | null {
   return DEV_SHARED_HASH;
 }
 
+/**
+ * A conta ainda existe?
+ *
+ * Com `ADMIN_USERS` configurado, só as contas listadas contam. É isto que faz
+ * com que tirar alguém de lá revogue TAMBÉM as passkeys dessa pessoa: uma
+ * chave presa a um aparelho não passa por `verifyCredentials`, portanto sem
+ * esta verificação um aparelho registado continuava a abrir a porta muito
+ * depois de a conta ter deixado de existir.
+ *
+ * Sem `ADMIN_USERS` (palavra-passe partilhada) não há lista de contas para
+ * consultar, e qualquer nome é aceite — como já acontece na entrada normal.
+ * Nesse modo, a alavanca para pôr alguém fora é o `SESSION_VERSION` mais a
+ * remoção do dispositivo na lista.
+ */
+export function contaExiste(name: string): boolean {
+  const users = configuredUsers();
+  if (!users) return true;
+  const alvo = name.trim().toLowerCase();
+  return users.some((u) => u.name.toLowerCase() === alvo);
+}
+
 // ── Two-factor (TOTP) ──────────────────────────────────────────────────────
 function totpSecretFor(name: string): string | null {
   const users = configuredUsers();
@@ -214,7 +235,21 @@ export async function verifyCredentials(
 // payload shape. (Proposal tokens keep signing with the raw base secret, so
 // already-sent accept links keep working; only the session key moves.)
 function sessionKey(): Buffer {
-  return createHmac("sha256", sessionSecret()).update("liquen.admin-session.v1").digest();
+  return subKey("liquen.admin-session.v1");
+}
+
+/**
+ * Sub-chave HMAC para um fim NOMEADO, derivada do mesmo segredo base.
+ *
+ * Existe para que cada uso tenha a sua chave: uma assinatura feita para um fim
+ * não pode satisfazer a verificação de outro, mesmo que o corpo assinado
+ * calhasse ser idêntico. Foi a separação que fechou o caso em que um token de
+ * proposta pública era aceite como cookie de sessão de admin.
+ *
+ * Quem acrescentar um fim novo escolhe um rótulo novo — nunca reutiliza um.
+ */
+export function subKey(label: string): Buffer {
+  return createHmac("sha256", sessionSecret()).update(label).digest();
 }
 
 function sign(body: string): string {

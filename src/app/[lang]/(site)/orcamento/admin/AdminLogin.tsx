@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, Field, Button } from "@/app/[lang]/(site)/orcamento/admin/ui";
+import { entrarComDispositivo, mensagemDeErro, suportaPasskeys } from "@/lib/passkeys-cliente";
 
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
@@ -12,12 +13,45 @@ export default function AdminLogin() {
   const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [aEntrarComDispositivo, setAEntrarComDispositivo] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     document.body.classList.add("admin-mode");
     return () => document.body.classList.remove("admin-mode");
   }, []);
+
+  /**
+   * A entrada por dispositivo só aparece onde o browser a percebe — um botão
+   * que falha ao ser tocado é pior do que um botão que não existe.
+   *
+   * `useSyncExternalStore` e não um efeito com `setState`: isto é uma
+   * capacidade do ambiente, não um estado que muda. O servidor devolve `false`
+   * (não há `window`), o browser devolve o que sabe, e o React trata da
+   * diferença sem um segundo desenho pedido à mão. A subscrição não faz nada
+   * de propósito: a resposta nunca muda durante a vida da página.
+   */
+  const temPasskeys = useSyncExternalStore(
+    () => () => {},
+    suportaPasskeys,
+    () => false,
+  );
+
+  async function entrarPorDispositivo() {
+    if (aEntrarComDispositivo || loading) return;
+    setAEntrarComDispositivo(true);
+    setError(null);
+    try {
+      await entrarComDispositivo();
+      router.refresh();
+    } catch (err) {
+      // Cancelar não é falhar: `mensagemDeErro` devolve null e o ecrã fica
+      // como estava, sem aviso vermelho por a pessoa ter mudado de ideias.
+      const msg = mensagemDeErro(err);
+      if (msg) setError(msg);
+      setAEntrarComDispositivo(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -138,6 +172,48 @@ export default function AdminLogin() {
               {loading ? "A verificar…" : needs2fa ? "Verificar" : "Entrar"}
             </Button>
           </form>
+
+          {temPasskeys && (
+            <>
+              <div className="my-5 flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-foreground/10" />
+                <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35">
+                  ou
+                </span>
+                <span className="h-px flex-1 bg-foreground/10" />
+              </div>
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                fullWidth
+                loading={aEntrarComDispositivo}
+                onClick={entrarPorDispositivo}
+                iconLeft={
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    aria-hidden="true"
+                  >
+                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" strokeLinecap="round" />
+                  </svg>
+                }
+              >
+                {aEntrarComDispositivo ? "A confirmar…" : "Entrar com este dispositivo"}
+              </Button>
+
+              <p className="mt-3 text-center text-xs leading-relaxed text-foreground/45">
+                Usa o rosto, a impressão digital ou o PIN deste aparelho. Só funciona em
+                dispositivos que já tenha registado aqui dentro.
+              </p>
+            </>
+          )}
         </Card>
 
         <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">

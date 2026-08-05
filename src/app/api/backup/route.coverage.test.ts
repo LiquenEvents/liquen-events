@@ -59,7 +59,14 @@ describe("cobertura do backup", () => {
         table,
         `${name}.ts não expõe \`mapper.table\` — o backup não o consegue seguir`,
       ).toBeTruthy();
-      if (!backedUpTables.has(table!)) missing.push(`${name}.ts → tabela "${table}"`);
+      // A saída é NOT_BACKED_UP, e é a mesma que a mensagem de erro sempre
+      // prometeu — até aqui não estava implementada, e o primeiro store
+      // legitimamente excluído (as passkeys) mostrou-o. Continua a não haver
+      // silêncio: um store novo falha na mesma até alguém decidir, e a decisão
+      // "não vai" custa uma razão por escrito, verificada mais abaixo.
+      if (!backedUpTables.has(table!) && !(table! in NOT_BACKED_UP)) {
+        missing.push(`${name}.ts → tabela "${table}"`);
+      }
     }
     expect(
       missing,
