@@ -1324,7 +1324,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         </div>
 
         {/* Event fields */}
-        <Section title="Evento">
+        <Section title="Evento" id="evento">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field
               label="Clientes"
@@ -1425,7 +1425,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         </Section>
 
         {/* Cover images */}
-        <Section title="Imagens de capa (2)">
+        <Section title="Imagens de capa (2)" id="capas">
           <div className="grid grid-cols-2 gap-3">
             {[0, 1].map((idx) => {
               const path = doc.coverImages?.[idx];
@@ -1445,6 +1445,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                         label={idx === 0 ? "Capa esquerda" : "Capa direita"}
                         busy={!!uploading[`cover-${idx}`]}
                         multiple={false}
+                        curto
                         onFiles={(files) =>
                           handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
                             setCoverAt(idx, paths[0]),
@@ -1475,7 +1476,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         </Section>
 
         {/* Service groups */}
-        <Section title="Serviços">
+        <Section title="Serviços" id="servicos">
           <div className="flex flex-col gap-3">
             {doc.serviceGroups.map((g, gi) => (
               <div
@@ -1578,7 +1579,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
         {/* Mood boards — decoracao only */}
         {isDeco && (
-          <Section title="Mood boards">
+          <Section title="Mood boards" id="moodboards">
             <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
               grupos de imagens de inspiração para o cliente
             </p>
@@ -1686,7 +1687,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
         {/* Cronograma — organizacao only */}
         {!isDeco && (
-          <Section title="Cronograma de Organização">
+          <Section title="Cronograma de Organização" id="cronograma">
             <div className="flex flex-col gap-3">
               {(doc.cronograma ?? []).map((ph, pi) => (
                 <div
@@ -1750,7 +1751,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         )}
 
         {/* Budget */}
-        <Section title="Orçamento Proposto">
+        <Section title="Orçamento Proposto" id="orcamento">
           {isDeco ? (
             <>
               <div className="flex flex-col gap-2 mb-3">
@@ -1927,7 +1928,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
-        <Section title="Total, IVA e validade">
+        <Section title="Total, IVA e validade" id="total">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
               É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido —
@@ -2240,11 +2241,91 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
 // ── Small presentational helpers ──
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * Onde ficam guardadas as secções fechadas.
+ *
+ * Por DISPOSITIVO e não no documento: fechar o «Cronograma» é uma preferência
+ * de quem está a trabalhar, não uma propriedade da proposta. Guardá-la no
+ * documento fazia com que abrir a proposta noutro computador herdasse as
+ * dobras de outra pessoa — e, pior, fazia uma alteração de disposição contar
+ * como alteração por gravar.
+ */
+const SECOES_KEY = "liquen-estudio-secoes";
+
+function lerFechadas(): Record<string, boolean> {
+  try {
+    const cru = localStorage.getItem(SECOES_KEY);
+    const v = cru ? JSON.parse(cru) : null;
+    return v && typeof v === "object" ? (v as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function Section({
+  title,
+  children,
+  /** Chave estável para lembrar a dobra. Sem ela a secção não colapsa. */
+  id,
+  /** Marca à direita do título — "3 linhas", "por preencher". */
+  nota,
+}: {
+  title: string;
+  children: React.ReactNode;
+  id?: string;
+  nota?: string;
+}) {
+  const [fechada, setFechada] = useState(false);
+  // Ler no efeito e não no `useState` inicial: o servidor não tem
+  // `localStorage`, e uma diferença entre o que o servidor desenha e o que o
+  // browser desenha dá um erro de hidratação.
+  useEffect(() => {
+    if (id) setFechada(!!lerFechadas()[id]);
+  }, [id]);
+
+  function alternar() {
+    if (!id) return;
+    const proxima = !fechada;
+    setFechada(proxima);
+    try {
+      localStorage.setItem(SECOES_KEY, JSON.stringify({ ...lerFechadas(), [id]: proxima }));
+    } catch {
+      /* sem localStorage a dobra não sobrevive à sessão; o resto funciona */
+    }
+  }
+
+  const corpoId = id ? `sec-${id}` : undefined;
   return (
-    <Card className="mb-4">
-      <h3 className="font-display text-base leading-tight text-foreground/90 mb-4">{title}</h3>
-      {children}
+    <Card className="mb-4" id={id ? `seccao-${id}` : undefined}>
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        {id ? (
+          <button
+            type="button"
+            onClick={alternar}
+            aria-expanded={!fechada}
+            aria-controls={corpoId}
+            className="group flex items-baseline gap-2 text-left"
+          >
+            <span
+              aria-hidden
+              className={`text-[10px] text-foreground/35 transition-transform ${fechada ? "" : "rotate-90"}`}
+            >
+              ▶
+            </span>
+            <h3 className="font-display text-base leading-tight text-foreground/90 group-hover:text-foreground">
+              {title}
+            </h3>
+          </button>
+        ) : (
+          <h3 className="font-display text-base leading-tight text-foreground/90">{title}</h3>
+        )}
+        {nota && <span className="shrink-0 text-xs text-foreground/45">{nota}</span>}
+      </div>
+      {/* `hidden` e não desmontar: uma secção fechada continua a ter os campos
+          no formulário, e fechá-la não pode apagar o que lá está escrito. */}
+      <div id={corpoId} hidden={fechada}>
+        {children}
+      </div>
     </Card>
   );
 }
@@ -2553,12 +2634,22 @@ function UploadArea({
   busy,
   multiple,
   compact = false,
+  curto = false,
   onFiles,
 }: {
   label: string;
   busy: boolean;
   multiple: boolean;
   compact?: boolean;
+  /**
+   * Caixa BAIXA em vez de proporcional.
+   *
+   * Uma zona de largar com `aspect-[4/3]` numa coluna de 520px fica com 391px
+   * de altura — medido. Duas dessas, lado a lado, são metade da janela de
+   * trabalho gasta a não mostrar nada. Vazia é uma faixa; ao ganhar uma foto,
+   * a miniatura é que traz a proporção de volta.
+   */
+  curto?: boolean;
   onFiles: (files: File[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -2590,7 +2681,7 @@ function UploadArea({
         pick(e.dataTransfer.files);
       }}
       className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
-        compact ? "aspect-square p-2" : "aspect-[4/3] p-3"
+        curto ? "h-24 p-2" : compact ? "aspect-square p-2" : "aspect-[4/3] p-3"
       } ${
         drag
           ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
