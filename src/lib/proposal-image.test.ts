@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
-import { MAX_IMAGE_EDGE_PX, imageContentKey, pixelsForBox, resizeToBox } from "./proposal-image";
+import {
+  MAX_IMAGE_EDGE_PX,
+  imageContentKey,
+  pixelsForBox,
+  resizeToBox,
+  achatarLogotipo,
+} from "./proposal-image";
 
 /**
  * O peso (e a fluidez) do PDF da proposta decide-se aqui: quantos pixéis é que
@@ -112,5 +118,57 @@ describe("resizeToBox", () => {
     const out = await resizeToBox(truncated, 200, 140, "collage");
     expect(out).not.toBeNull();
     expect(jpegKind(out!)).toBe("baseline");
+  });
+});
+
+describe("achatarLogotipo", () => {
+  /** PNG 4×4 com canal alfa: metade opaca a verde, metade transparente. */
+  async function pngComAlfa(): Promise<Buffer> {
+    const sharp = (await import("sharp")).default;
+    return sharp({
+      create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 128, b: 0, alpha: 0.5 } },
+    })
+      .png()
+      .toBuffer();
+  }
+
+  it("devolve um PNG SEM canal alfa", async () => {
+    // É o ponto todo: a máscara alfa do logótipo era composta em cada página, e
+    // compor transparência é das operações mais caras num visualizador de PDF.
+    const sharp = (await import("sharp")).default;
+    const saida = await achatarLogotipo(await pngComAlfa(), { r: 255, g: 255, b: 255 }, 72);
+    expect(saida).not.toBeNull();
+    const meta = await sharp(saida!).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.hasAlpha, "o logótipo voltou a trazer canal alfa").toBe(false);
+  });
+
+  it("um pixel TOTALMENTE transparente fica exactamente com a cor de fundo", async () => {
+    // A garantia que interessa: onde o logótipo não tem tinta, fica o fundo tal
+    // e qual. Se isto derivar, desenha-se um rectângulo visível à volta da marca
+    // — foi o que aconteceu ao tentar achatar a marca da capa contra o
+    // verde-escuro, medido no PDF a 11,13,10 onde o painel dava 12,14,11. Por
+    // isso só a das páginas de conteúdo é achatada, e contra BRANCO.
+    const sharp = (await import("sharp")).default;
+    const vazio = await sharp({
+      create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const saida = await achatarLogotipo(vazio, { r: 255, g: 255, b: 255 }, 72);
+    const { data } = await sharp(saida!).raw().toBuffer({ resolveWithObject: true });
+    expect([data[0], data[1], data[2]]).toEqual([255, 255, 255]);
+  });
+
+  it("não amplia um logótipo já mais pequeno do que o pedido", async () => {
+    const sharp = (await import("sharp")).default;
+    const saida = await achatarLogotipo(await pngComAlfa(), { r: 255, g: 255, b: 255 }, 72);
+    const meta = await sharp(saida!).metadata();
+    expect(meta.width).toBe(4);
+  });
+
+  it("bytes que não são imagem devolvem null em vez de lançar", async () => {
+    // Quem chama volta ao PNG original: o documento sai sempre.
+    expect(await achatarLogotipo(Buffer.from("nada"), { r: 0, g: 0, b: 0 }, 72)).toBeNull();
   });
 });

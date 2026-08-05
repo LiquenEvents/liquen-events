@@ -15,7 +15,12 @@ import {
 } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { SITE } from "@/lib/site";
-import { imageContentKey, resizeToBox, type ImagePlacement } from "@/lib/proposal-image";
+import {
+  achatarLogotipo,
+  imageContentKey,
+  resizeToBox,
+  type ImagePlacement,
+} from "@/lib/proposal-image";
 import {
   type ProposalDoc,
   type MoodBoard,
@@ -334,7 +339,35 @@ export async function renderProposalDocPdfWithReport(
   // moments; in the sample proposals those are simply Calibri regular/bold/
   // italic, so every slot now resolves to Carlito — one consistent typeface.
   const f: Fonts = { reg, bold, serif: reg, serifB: bold, serifIt: italic };
-  const logoDark = await pdf.embedPng(Buffer.from(LOGO_DARK_PNG_B64, "base64"));
+  /**
+   * O logótipo das PÁGINAS DE CONTEÚDO entra achatado contra branco, sem canal
+   * alfa, e à resolução a que é desenhado.
+   *
+   * Antes disto ia como PNG com máscara alfa, composto em todas as páginas e a
+   * 720 DPI — a única transparência do documento e a única coisa em resolução
+   * absurda (as fotografias vão a 130–160). Compor transparência é das
+   * operações mais caras num visualizador de PDF, e estava a ser paga uma vez
+   * por página para desenhar uma marca que assenta sobre branco chapado.
+   *
+   * ── Porque é que só esta, e não a da capa ────────────────────────────────
+   * O `sharp` compõe em luz linear, e o resultado sai um nível abaixo da cor
+   * pedida: medido no ficheiro, a caixa do logótipo dava 11,13,10 onde o painel
+   * escuro da capa dá 12,14,11. Contra o verde-escuro isso desenhava um
+   * RECTÂNGULO visível à volta da marca; contra BRANCO PURO não há desvio
+   * nenhum, porque 255 não tem para onde subir.
+   *
+   * Por isso achata-se a das páginas de conteúdo — que são 10 das 12
+   * utilizações, e portanto quase todo o ganho — e deixa-se a da capa com o
+   * canal alfa. Duas composições de transparência em vez de doze, e a capa
+   * continua exactamente com o aspecto que ela aprovou.
+   *
+   * Se o `sharp` falhar, volta-se ao PNG original: o documento sai na mesma,
+   * apenas sem esta melhoria.
+   */
+  const logoDarkPng = Buffer.from(LOGO_DARK_PNG_B64, "base64");
+  const logoDarkChato = await achatarLogotipo(logoDarkPng, { r: 255, g: 255, b: 255 }, 72);
+  const logoDark = await pdf.embedPng(logoDarkChato ?? logoDarkPng);
+  // A da capa mantém a transparência, pela razão acima.
   const logoWhite = await pdf.embedPng(Buffer.from(LOGO_WHITE_PNG_B64, "base64"));
 
   // Sanitiza no ponto de desenho: campos do documento (nomes, descrições…) podem

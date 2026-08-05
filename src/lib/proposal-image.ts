@@ -146,3 +146,70 @@ export async function resizeToBox(
     return null;
   }
 }
+
+/**
+ * DPI a que o logótipo é embutido no PDF.
+ *
+ * Medido no ficheiro que saía antes disto: o logótipo ia a 720×430 px para ser
+ * desenhado com 72 pt de largura — **720 DPI**, quatro vezes e meia acima dos
+ * 160 a que as FOTOGRAFIAS são tratadas. Era a única coisa em resolução absurda
+ * no documento inteiro, e não era sequer uma foto.
+ *
+ * 300 é o padrão de impressão, e é o que esta marca precisa: tem ramos de traço
+ * fino e a palavra "EVENTS" em corpo pequeno. Experimentei 200 e, comparado
+ * lado a lado com o original, o traço perdia definição — o mesmo que já se
+ * aprendeu com o favicon, onde os ramos exteriores desapareciam ao encolher.
+ *
+ * O ganho desta função não era poupar bytes num objecto de 12 KB: era tirar a
+ * TRANSPARÊNCIA de todas as páginas. A 300 DPI continuam a sair 2,4× menos
+ * pixéis do que os 720 que lá estavam, e a máscara alfa desaparece à mesma.
+ */
+const LOGO_DPI = 300;
+
+/**
+ * Prepara o logótipo para ir ao PDF: **sem canal alfa** e à resolução a que vai
+ * ser desenhado.
+ *
+ * ── Porque é que a transparência sai ──────────────────────────────────────
+ * O logótipo era um PNG com máscara alfa (SMask) composto em TODAS as páginas —
+ * a única transparência do documento. Num visualizador de PDF, compor
+ * transparência é das operações mais caras que há, e estava a ser paga uma vez
+ * por página para desenhar uma marca que assenta sempre sobre uma cor CHAPADA e
+ * conhecida: branco nas páginas de conteúdo, o verde-escuro da marca nas capas.
+ *
+ * Achatar contra essa cor dá exactamente o mesmo resultado visual — o olho não
+ * distingue um pixel composto na hora de um pixel já composto — e deixa um JPEG
+ * simples, que o visualizador desenha sem tocar no motor de transparência.
+ *
+ * `flatten` ANTES de `resize`, e não depois: reduzir primeiro deixaria os
+ * pixéis das bordas meio-transparentes a misturar-se entre si antes de saberem
+ * contra que cor vão assentar, e o contorno da marca ficaria com um halo.
+ *
+ * ── PNG, e não JPEG ───────────────────────────────────────────────────────
+ * A regra das FOTOGRAFIAS é JPEG, e está certa. Para uma marca de cor chapada é
+ * ao contrário: o JPEG inventa artefactos à volta do traço e desvia a cor dos
+ * tons quase pretos, o que na capa desenhava um RECTÂNGULO visível à volta do
+ * logótipo — o fundo achatado deixava de bater certo com o painel escuro por
+ * baixo. Medido a olho na primeira tentativa, e é por isso que sai PNG: sem
+ * perdas, cor exacta, e ainda assim uns poucos KB por ser cor chapada.
+ *
+ * @param fundo cor sobre a qual o logótipo assenta, em 0–255.
+ * @param larguraPt largura em pontos a que vai ser desenhado no PDF.
+ * @returns PNG SEM canal alfa, ou `null` se o `sharp` falhar (quem chama decide).
+ */
+export async function achatarLogotipo(
+  png: Buffer,
+  fundo: { r: number; g: number; b: number },
+  larguraPt: number,
+): Promise<Buffer | null> {
+  try {
+    const largura = Math.max(1, Math.round((larguraPt * LOGO_DPI) / 72));
+    return await sharp(png)
+      .flatten({ background: fundo })
+      .resize({ width: largura, kernel: "lanczos3", withoutEnlargement: true })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
