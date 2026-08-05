@@ -18,6 +18,7 @@ import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
+import { depositPercentOf } from "@/lib/proposal-doc";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
@@ -31,7 +32,7 @@ import {
   somaDosItens,
   asDuasFormas,
 } from "@/lib/proposal-budget";
-import { eur, splitThirtySeventy } from "@/lib/money";
+import { eur, splitSinal } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage } from "./ThemePicker";
@@ -714,7 +715,12 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
   // Split 30/70 sobre o BRUTO — o que o estúdio vê é o que será faturado.
   const money = resolveProposalMoney(doc);
-  const split = splitThirtySeventy(money.gross);
+  // A percentagem do sinal é do DOCUMENTO, e é a mesma que as rotas de
+  // facturação leem quando emitem o sinal e o saldo (ver `depositPercentOf`).
+  // Sem isso, a proposta dizia 40% e a factura saía a 30% — que é pior do que
+  // não a poder mudar de todo.
+  const pctSinal = depositPercentOf(doc as ProposalDoc);
+  const split = splitSinal(money.gross, pctSinal);
   // A soma das linhas e o desvio do total escrito à mão. Os dois vivem aqui em
   // cima porque são lidos em três sítios: ao lado das linhas, no aviso junto ao
   // total, e na barra fixa do fundo.
@@ -2280,7 +2286,20 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
                 <span className="text-foreground/80">Total {eur(money.gross)}</span>
                 <br />
-                Sinal 30%: {eur(split.sinal)} · Saldo 70%: {eur(split.saldo)}
+                Sinal{" "}
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={pctSinal}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    patch({ depositPercent: Number.isFinite(n) ? n : undefined });
+                  }}
+                  aria-label="Percentagem do sinal"
+                  className="bo-input mx-0.5 w-14 px-1.5 py-0.5 text-center text-xs"
+                />
+                %: {eur(split.sinal)} · Saldo {100 - pctSinal}%: {eur(split.saldo)}
               </p>
             )}
           </Section>
@@ -2679,7 +2698,7 @@ function PreviewSummary({
   doc: StudioDoc;
   assetUrls: Record<string, string>;
   money: ReturnType<typeof resolveProposalMoney>;
-  split: ReturnType<typeof splitThirtySeventy>;
+  split: ReturnType<typeof splitSinal>;
 }) {
   const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
   const groups = doc.serviceGroups.filter((g) => (g.title ?? "").trim() || g.items.length > 0);

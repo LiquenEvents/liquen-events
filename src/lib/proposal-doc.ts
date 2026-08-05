@@ -8,6 +8,8 @@
  * standard wording; the back office overrides only what changes per event.
  */
 
+import { SINAL_POR_OMISSAO } from "./money";
+
 import { round2 } from "@/lib/money";
 
 /** A single reference image in a mood board (base64-encoded JPEG or PNG bytes,
@@ -175,6 +177,15 @@ export interface ProposalDoc {
   totalVatMode?: VatMode;
   /** Taxa de IVA aplicável (por omissão {@link DEFAULT_VAT_RATE}). */
   vatRate?: number;
+  /**
+   * Percentagem do sinal, de 1 a 99 (por omissão {@link SINAL_POR_OMISSAO}).
+   *
+   * NÃO é só do PDF: é lida pelas rotas que EMITEM as facturas do sinal e do
+   * saldo. Foi essa a razão de não bastar acrescentar um campo ao estúdio —
+   * uma proposta a dizer 40% com uma factura a sair a 30% é pior do que não
+   * poder mudar a percentagem de todo.
+   */
+  depositPercent?: number;
 
   // ── Validade da proposta ──
   /** Data explícita de validade (yyyy-mm-dd). Tem prioridade sobre `validUntilDays`. */
@@ -196,6 +207,21 @@ export interface ProposalDoc {
   observacoesGerais: string[];
   faseamento: string[];
   cancelamento: string[];
+}
+
+/**
+ * A percentagem de sinal de um documento, já validada.
+ *
+ * Um sítio só, lido pelo estúdio E pelas três rotas de facturação, para não
+ * poderem discordar. Um valor absurdo (0, 150, NaN, texto) cai na percentagem
+ * da casa em vez de emitir uma factura estranha.
+ */
+export function depositPercentOf(
+  doc: Pick<ProposalDoc, "depositPercent"> | null | undefined,
+): number {
+  const p = doc?.depositPercent;
+  if (typeof p !== "number" || !Number.isFinite(p) || p < 1 || p > 99) return SINAL_POR_OMISSAO;
+  return Math.round(p);
 }
 
 /** The studio's standard "Notas Importantes" (Orçamento page). */

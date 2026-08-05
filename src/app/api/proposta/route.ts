@@ -13,7 +13,6 @@ import {
   createInvoice,
   newInvoiceId,
   nextInvoiceNumber,
-  splitThirtySeventy,
   isUniqueViolation,
 } from "@/lib/invoices-store";
 import { buildProductionPlanItems } from "@/lib/production-templates";
@@ -22,7 +21,8 @@ import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
-import { eur } from "@/lib/money";
+import { eur, splitSinal } from "@/lib/money";
+import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
 
@@ -231,8 +231,13 @@ export async function POST(request: NextRequest) {
           acceptedIp: clientIp(request),
         });
         if (created) {
-          // 30% sinal — confirms the reservation of the date.
-          const { sinal } = splitThirtySeventy(proposal.total);
+          // O sinal confirma a reserva da data. A percentagem é a da PROPOSTA
+          // que o cliente acabou de aceitar — se dissesse 40% no PDF e saísse
+          // uma factura de 30%, era pior do que não a poder mudar.
+          const { sinal } = splitSinal(
+            proposal.total,
+            depositPercentOf(proposal.doc as ProposalDoc | undefined),
+          );
           const invoiceNumber = await nextInvoiceNumber();
           try {
             await createInvoice({
