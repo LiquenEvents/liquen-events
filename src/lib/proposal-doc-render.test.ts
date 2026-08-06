@@ -13,6 +13,9 @@ import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
 const fetchProposalImageBytes = vi.fn<(ref: string) => Promise<Buffer | null>>();
 vi.mock("@/lib/proposal-storage", () => ({
   fetchProposalImageBytes: (ref: string) => fetchProposalImageBytes(ref),
+  // Sem miniaturas nesta instalação: o resolvedor cai para o original, que é
+  // exactamente o caminho que estes testes exercitam.
+  fetchProposalThumbBytes: async () => null,
 }));
 
 // Import DEPOIS do mock (a factory acima é elevada pelo Vitest).

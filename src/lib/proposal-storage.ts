@@ -521,6 +521,38 @@ async function fetchProposalImageBytesInner(ref: string): Promise<Buffer | null>
   }
 }
 
+/**
+ * Os bytes da MINIATURA de 400 px de uma referência, ou `null` se não houver.
+ *
+ * Existe para o gerador de PDF poder pedir o tamanho de que precisa em vez do
+ * tamanho de arquivo: uma célula pequena de mood board é desenhada com ~266 px
+ * e recebia um ficheiro de 2200 px e 576 KB — 28× os bytes e ~30× os pixéis a
+ * descodificar, para o `sharp` deitar fora quase tudo a seguir.
+ *
+ * `null` quer dizer "não há miniatura", e isso não é erro: as fotos anteriores
+ * às miniaturas não têm nenhuma, e uma imagem embutida (`data:`) ou um URL
+ * externo não têm derivada nenhuma por definição. Quem chama cai para o
+ * original, que é o comportamento de sempre.
+ *
+ * Nunca lança.
+ */
+export async function fetchProposalThumbBytes(ref: string): Promise<Buffer | null> {
+  if (!ref || ref.startsWith("data:") || /^https?:\/\//i.test(ref)) return null;
+  const sb = getSupabase();
+  if (!sb) return null;
+  const daBiblioteca = ehRefDeTema(ref);
+  const bucket = daBiblioteca ? THEME_THUMB_BUCKET : PROPOSAL_THUMB_BUCKET;
+  const caminho = daBiblioteca ? caminhoDoRefDeTema(ref) : ref;
+  if (!caminho) return null;
+  try {
+    const { data, error } = await sb.storage.from(bucket).download(caminho);
+    if (error || !data) return null;
+    return Buffer.from(await data.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
 // ── Miniaturas ─────────────────────────────────────────────────────────────
 /**
  * Bucket das miniaturas das fotos das propostas.

@@ -21,8 +21,14 @@ const pdfMock = vi.hoisted(() => ({
   truncations: [] as { where: string; dropped: number; unit: "fotos" | "linhas" }[],
 }));
 
-vi.mock("@/lib/proposal-storage", () => ({ fetchProposalImageBytes: fetchMock }));
-vi.mock("@/lib/proposal-doc-pdf", () => ({
+vi.mock("@/lib/proposal-storage", () => ({
+  fetchProposalImageBytes: fetchMock,
+  fetchProposalThumbBytes: async () => null,
+}));
+vi.mock("@/lib/proposal-doc-pdf", async (importOriginal) => ({
+  // A GEOMETRIA é real. É ela que o resolvedor usa para decidir o tamanho de
+  // cada ficheiro; substituí-la por um duplo mediria outra coisa qualquer.
+  caixasDoCollage: (await importOriginal<typeof import("./proposal-doc-pdf")>()).caixasDoCollage,
   renderProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
     pdfMock.docs.push(doc);
     return { bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]), truncations: pdfMock.truncations };

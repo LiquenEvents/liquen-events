@@ -112,6 +112,94 @@ interface Fonts {
 // correcção são outras: em falta = avaria, tenta-se de novo; cortado = escolha
 // editorial, tira-se uma foto ou encurta-se o texto.
 const MAX_ANNOTATION_LINES = 5; // descrição sob o collage
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A GEOMETRIA DO COLLAGE, SEPARADA DO DESENHO
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Estas duas funções não desenham nada: dizem apenas ONDE, e com que tamanho,
+   cada fotografia vai ser posta na página. Estavam dentro do `drawCollage`, em
+   linha com o desenho.
+
+   Saíram de lá por uma razão concreta. Quem vai BUSCAR as fotos ao
+   armazenamento (`proposal-doc-render.ts`) precisa de saber o tamanho da caixa
+   ANTES de descarregar seja o que for — é isso que lhe permite pedir a
+   miniatura de 400 px para uma célula de 266 px em vez do original de 2200 px
+   e 576 KB. Sem isto, a única forma de saber o tamanho era desenhar, e a
+   única forma de desenhar era já ter descarregado tudo.
+
+   Ter a geometria em DOIS sítios (uma cópia aqui, outra no resolvedor) seria
+   pior do que não a ter: divergiriam, e o sintoma seria uma fotografia
+   ampliada e desfocada numa proposta, meses depois, sem ninguém perceber
+   porquê. Por isso é uma função só, e é esta que o desenho usa.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Uma caixa na página, em pontos PDF. `y` é a base (o PDF conta de baixo). */
+export interface CaixaPdf {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * As duas caixas da capa: duas fotos a toda a altura, a ladear o painel
+ * escuro central. É a mesma geometria na capa e na contracapa, de propósito —
+ * uma faz de eco da outra.
+ */
+export function caixasDaCapa(): CaixaPdf[] {
+  const panelW = W * 0.34;
+  const sideW = (W - panelW) / 2;
+  return [
+    { x: 0, y: 0, w: sideW, h: H },
+    { x: sideW + panelW, y: 0, w: sideW, h: H },
+  ];
+}
+
+/**
+ * Onde é desenhada cada uma das `n` fotos de um mood board, pela ordem em que
+ * aparecem no documento.
+ *
+ * `alturaAnotacao` é o espaço reservado em baixo para a descrição. Quem desenha
+ * sabe-o ao certo (mediu as linhas); quem vai buscar as fotos não tem fontes
+ * para o medir e passa o mínimo — o que dá as caixas MAIORES e, portanto, um
+ * pedido de resolução por excesso. Errar para o lado de descarregar um ficheiro
+ * grande de mais é invisível; errar para o outro é uma foto desfocada no PDF.
+ */
+export function caixasDoCollage(n: number, alturaAnotacao = 8): CaixaPdf[] {
+  if (n <= 0) return [];
+  const top = H - M - 112;
+  const bottom = M + alturaAnotacao;
+  const areaW = W - 2 * M;
+  const areaH = top - bottom;
+  const gap = 8;
+
+  if (n === 1) return [{ x: M, y: bottom, w: areaW, h: areaH }];
+  if (n === 2) {
+    const cw = (areaW - gap) / 2;
+    return [
+      { x: M, y: bottom, w: cw, h: areaH },
+      { x: M + cw + gap, y: bottom, w: cw, h: areaH },
+    ];
+  }
+  // Disposição em destaque: uma foto grande à esquerda + as restantes numa
+  // grelha à direita.
+  const featW = areaW * 0.56;
+  const caixas: CaixaPdf[] = [{ x: M, y: bottom, w: featW, h: areaH }];
+  const restantes = n - 1;
+  const rx = M + featW + gap;
+  const rW = areaW - featW - gap;
+  const rCols = restantes <= 2 ? 1 : 2;
+  const rRows = Math.ceil(restantes / rCols);
+  const cw = (rW - gap * (rCols - 1)) / rCols;
+  const ch = (areaH - gap * (rRows - 1)) / rRows;
+  for (let i = 0; i < restantes; i++) {
+    const r = Math.floor(i / rCols);
+    const c = i % rCols;
+    caixas.push({ x: rx + c * (cw + gap), y: top - r * (ch + gap) - ch, w: cw, h: ch });
+  }
+  return caixas;
+}
 const MAX_EVENT_FIELD_LINES = 2; // cada campo da faixa de detalhes
 const MAX_COVER_NAME_LINES = 2; // nome do casal na capa
 
@@ -1135,17 +1223,13 @@ async function drawCollage(
   note(`Descrição do mood board ${boardName}`, annAll.length - MAX_ANNOTATION_LINES, "linhas");
   const annLines = annAll.slice(0, MAX_ANNOTATION_LINES);
   const annH = annLines.length ? annLines.length * 15 + 12 : 8;
-  const top = H - M - 112;
   const bottom = M + annH;
-  const areaW = W - 2 * M;
-  const areaH = top - bottom;
   // O collage tem lugar para MOOD_BOARD_MAX_IMAGES fotos. As restantes JÁ
   // FORAM descarregadas do armazenamento com sucesso e mesmo assim não são
   // desenhadas — é a perda que este aviso existe para tornar visível.
   const imgs = mb.images.slice(0, MOOD_BOARD_MAX_IMAGES);
   note(`Mood board ${boardName}`, mb.images.length - MOOD_BOARD_MAX_IMAGES, "fotos");
   const n = imgs.length;
-  const gap = 8;
 
   // Draw one framed image into a box (cover-cropped, thin hairline frame).
   const place = async (b64: string, x: number, yBottom: number, w: number, h: number) => {
@@ -1153,30 +1237,12 @@ async function drawCollage(
     p.drawRectangle({ x, y: yBottom, width: w, height: h, borderColor: LINE, borderWidth: 0.5 });
   };
 
-  if (n === 1) {
-    await place(imgs[0], M, bottom, areaW, areaH);
-  } else if (n === 2) {
-    const cw = (areaW - gap) / 2;
-    await place(imgs[0], M, bottom, cw, areaH);
-    await place(imgs[1], M + cw + gap, bottom, cw, areaH);
-  } else {
-    // Feature layout: a large left image + the rest as a grid on the right.
-    const featW = areaW * 0.56;
-    await place(imgs[0], M, bottom, featW, areaH);
-    const rest = imgs.slice(1);
-    const rx = M + featW + gap;
-    const rW = areaW - featW - gap;
-    const rCols = rest.length <= 2 ? 1 : 2;
-    const rRows = Math.ceil(rest.length / rCols);
-    const cw = (rW - gap * (rCols - 1)) / rCols;
-    const ch = (areaH - gap * (rRows - 1)) / rRows;
-    for (let i = 0; i < rest.length; i++) {
-      const r = Math.floor(i / rCols);
-      const c = i % rCols;
-      const x = rx + c * (cw + gap);
-      const yTop = top - r * (ch + gap);
-      await place(rest[i], x, yTop - ch, cw, ch);
-    }
+  // A geometria vem de `caixasDoCollage` — a MESMA função que o resolvedor usa
+  // para decidir que tamanho de ficheiro descarregar. Ver o cabeçalho dela.
+  const caixas = caixasDoCollage(n, annH);
+  for (let i = 0; i < n; i++) {
+    const c = caixas[i];
+    await place(imgs[i], c.x, c.y, c.w, c.h);
   }
 
   if (annLines.length) {

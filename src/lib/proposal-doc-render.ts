@@ -1,8 +1,57 @@
 import "server-only";
-import { type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
-import { renderProposalDocPdfWithReport, type DocTruncation } from "@/lib/proposal-doc-pdf";
-import { fetchProposalImageBytes } from "@/lib/proposal-storage";
+import sharp from "sharp";
+import { MOOD_BOARD_MAX_IMAGES, type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
+import {
+  caixasDoCollage,
+  renderProposalDocPdfWithReport,
+  type CaixaPdf,
+  type DocTruncation,
+} from "@/lib/proposal-doc-pdf";
+import { fetchProposalImageBytes, fetchProposalThumbBytes } from "@/lib/proposal-storage";
+import { pixelsForBox, type TargetPixels } from "@/lib/proposal-image";
 import { log } from "@/lib/logger";
+
+/**
+ * Lado maior das miniaturas que o navegador fabrica no carregamento
+ * (`THUMB_EDGE`, em `image-prep.ts`).
+ *
+ * Está aqui repetido em vez de importado porque o `image-prep.ts` é código de
+ * NAVEGADOR e não pode ser puxado para dentro de um módulo `server-only`. Serve
+ * só para uma coisa: não ir buscar uma miniatura que de certeza não chega. Se
+ * um dia divergir, o pior que acontece é uma ida ao Storage desperdiçada — a
+ * decisão final é sempre tomada com as dimensões REAIS do ficheiro, em
+ * {@link cobre}, nunca com este número.
+ */
+const MINIATURA_LADO = 400;
+
+/**
+ * A miniatura chega para preencher a caixa, ou ia ser AMPLIADA?
+ *
+ * Mede-se, não se presume. Uma miniatura tem 400 px no lado maior, mas o lado
+ * menor depende da fotografia: numa foto 3:2 são 267 px, numa panorâmica 3:1
+ * são 133. A célula precisa dos dois lados — o recorte é `cover` —, por isso
+ * uma regra sobre o lado maior deixaria passar exactamente as fotos mais
+ * compridas, ampliadas e moles.
+ *
+ * O `sharp` lê isto do CABEÇALHO, sem descodificar a imagem: são microssegundos
+ * sobre um buffer de 20 KB.
+ *
+ * A orientação EXIF conta: o `resizeToBox` chama `.rotate()`, portanto uma foto
+ * de telemóvel deitada sai com os lados TROCADOS face ao que o cabeçalho diz.
+ * Comparar sem isso rejeitaria (ou aceitaria) a miniatura pela razão errada.
+ */
+async function cobre(bytes: Buffer, alvo: TargetPixels): Promise<boolean> {
+  try {
+    const m = await sharp(bytes).metadata();
+    let largura = m.width ?? 0;
+    let altura = m.height ?? 0;
+    if ((m.orientation ?? 1) >= 5) [largura, altura] = [altura, largura];
+    return largura >= alvo.width && altura >= alvo.height;
+  } catch {
+    // Ilegível: não se arrisca: segue o original.
+    return false;
+  }
+}
 
 // Bounds on image resolution, so a doc with a huge number of image refs can't
 // fan out unbounded concurrent fetches (memory/CPU DoS during render) or embed
@@ -31,18 +80,81 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
   return out;
 }
 
-/** Replace every image reference (cover + mood boards) with inline base64 so the
- *  storage-agnostic generator can embed them. A missing mood-board image is
- *  dropped (the collage has no fixed slots); a missing COVER image keeps its
- *  position, because the two cover slots are left and right. Resolution is
- *  concurrency-bounded and capped at MAX_IMAGES_PER_DOC total. */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CADA FOTO À MEDIDA DA CAIXA ONDE VAI SER DESENHADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Substitui cada referência de imagem (capa + mood boards) por base64, para o
+ * gerador — que não sabe o que é armazenamento — a poder embutir.
+ *
+ * ── O que isto arruma ─────────────────────────────────────────────────────
+ * Até aqui descarregava sempre o ORIGINAL: 2200 px, ~576 KB. Uma célula
+ * pequena de mood board é desenhada com ~266 px. Eram 28× os bytes pela rede e
+ * ~30× os pixéis a descodificar, para o `sharp` deitar fora 97% deles logo a
+ * seguir — e ainda a segurar tudo isso em memória ao mesmo tempo, que é a
+ * razão pela qual uma proposta cheia chegava a ficar sem memória e a cair para
+ * o caminho de recurso (o PDF de 3,31 MB do PDF-BEFORE.md).
+ *
+ * Agora pergunta-se primeiro ONDE a foto vai ser desenhada — `caixasDaCapa` e
+ * `caixasDoCollage`, as mesmas funções que o desenho usa — e pede-se o
+ * tamanho que essa caixa justifica.
+ *
+ * ── Porquê duas passagens ─────────────────────────────────────────────────
+ * A disposição de um mood board depende de QUANTAS fotos ele tem, e só se sabe
+ * quais entraram depois de as tentar buscar: uma foto que falhe faz as
+ * restantes crescer. Adivinhar a disposição antes disso daria, nesse caso, uma
+ * miniatura ampliada — uma foto desfocada numa proposta que vai para um casal.
+ *
+ * Por isso:
+ *   1.ª  busca-se o que se acha que chega (a miniatura onde é plausível, o
+ *        original onde de certeza não chega). Isto diz quais existem.
+ *   2.ª  com as sobreviventes, calcula-se a disposição VERDADEIRA e verifica-se
+ *        cada uma contra a sua caixa. A que ficar curta é rebuscada em
+ *        original.
+ *
+ * A 2.ª passagem quase nunca busca nada: no caso normal ninguém falha e as
+ * caixas são as previstas.
+ */
 async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; missing: number }> {
   let remaining = MAX_IMAGES_PER_DOC;
   // Quantas fotos foram PEDIDAS e não entraram. Uma proposta com fotos a menos
   // seguia para o cliente sem ninguém dar por isso; agora quem chama fica a
   // saber e pode dizê-lo. Ver o cabeçalho `X-Fotos-Em-Falta` na rota.
   let missing = 0;
-  const toB64 = async (ref: string): Promise<string | null> => {
+
+  /** Uma foto já resolvida, e se o que temos é o ORIGINAL ou uma miniatura. */
+  interface Resolvida {
+    ref: string;
+    bytes: Buffer;
+    /** `true` quando não há mais nada maior para onde subir. */
+    original: boolean;
+  }
+
+  /**
+   * Busca uma foto, preferindo a miniatura quando ela chega para `caixa`.
+   *
+   * `caixa` a `null` quer dizer "vai direito ao original" — é o caso da capa,
+   * cujas tiras correm de topo a fundo da A4 e pedem ~617×1323 px. Nenhuma
+   * miniatura de 400 px lá chega, e tentar seria uma ida ao Storage
+   * desperdiçada por fotografia.
+   */
+  const buscar = async (ref: string, caixa: CaixaPdf | null): Promise<Resolvida | null> => {
+    if (caixa) {
+      const alvo = pixelsForBox(caixa.w, caixa.h, "collage");
+      // Só se vai buscar a miniatura quando ela PODE servir. Acima do lado dela
+      // não há sequer hipótese, e a ida seria deitada fora.
+      if (Math.max(alvo.width, alvo.height) <= MINIATURA_LADO) {
+        const mini = await fetchProposalThumbBytes(ref);
+        if (mini && (await cobre(mini, alvo))) return { ref, bytes: mini, original: false };
+      }
+    }
+    const bytes = await fetchProposalImageBytes(ref);
+    return bytes ? { ref, bytes, original: true } : null;
+  };
+
+  /** `buscar` com o tecto de imagens por documento e a contagem das que faltam. */
+  const buscarComTecto = async (ref: string, caixa: CaixaPdf | null): Promise<Resolvida | null> => {
     if (remaining <= 0) {
       // O tecto também é uma perda silenciosa: uma proposta com mais de
       // MAX_IMAGES_PER_DOC fotos perdia as últimas sem aviso.
@@ -50,28 +162,65 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
       return null;
     }
     remaining--;
-    const bytes = await fetchProposalImageBytes(ref);
-    if (!bytes) missing++;
-    return bytes ? bytes.toString("base64") : null;
+    const r = await buscar(ref, caixa);
+    if (!r) missing++;
+    return r;
   };
+
   // A capa tem 2 POSIÇÕES fixas. Uma referência vazia — ou que não resolve —
   // fica "" NA SUA POSIÇÃO em vez de desaparecer: compactar a lista fazia a
   // foto escolhida para a DIREITA sair impressa à esquerda. Um lugar vazio não
-  // gasta orçamento de imagens (nem sequer chega a `toB64`).
+  // gasta orçamento de imagens (nem sequer chega a ser buscado).
   const cover = (
     await mapLimit(doc.coverImages ?? [], FETCH_CONCURRENCY, async (ref) =>
-      ref ? await toB64(ref) : null,
+      ref ? await buscarComTecto(ref, null) : null,
     )
-  ).map((s) => s ?? "");
+  ).map((r) => (r ? r.bytes.toString("base64") : ""));
+
   // Mood boards resolved one board at a time (inner concurrency bounded), so
   // total in-flight fetches stay ≤ FETCH_CONCURRENCY across the whole doc.
   const moodBoards: NonNullable<ProposalDoc["moodBoards"]> = [];
   for (const mb of doc.moodBoards ?? []) {
-    const images = (await mapLimit(mb.images, FETCH_CONCURRENCY, toB64)).filter(
-      (s): s is string => !!s,
+    // TODAS são buscadas, mesmo as que passam da lotação do collage.
+    //
+    // Cortá-las aqui pouparia downloads, e foi a primeira coisa que escrevi —
+    // mas mudava duas contas em silêncio: o tecto de imagens por documento
+    // deixava de as contar, e o gerador deixava de poder dizer QUAL o mood
+    // board que ficou com fotos de fora (`Mood board Cerimónia — 4 fotos`).
+    // A poupança seria de um caso que o estúdio não deixa acontecer; a perda
+    // de aviso seria real. Só o TAMANHO de cada ficheiro muda aqui.
+    const previstas = caixasDoCollage(Math.min(mb.images.length, MOOD_BOARD_MAX_IMAGES));
+    const obtidas = await mapLimit(
+      mb.images.map((ref, i) => ({ ref, caixa: previstas[i] ?? null })),
+      FETCH_CONCURRENCY,
+      ({ ref, caixa }) => buscarComTecto(ref, caixa),
     );
-    moodBoards.push({ ...mb, images });
+
+    // ── 2.ª passagem: com as sobreviventes, a disposição VERDADEIRA ──
+    // Uma foto que falhou faz as restantes CRESCER, e uma miniatura escolhida
+    // para a caixa pequena passaria a ser ampliada. Aqui isso é apanhado e
+    // corrigido — é a diferença entre uma foto nítida e uma mole no documento
+    // que vai para o casal.
+    const vivas = obtidas.filter((r): r is Resolvida => !!r);
+    const reais = caixasDoCollage(Math.min(vivas.length, MOOD_BOARD_MAX_IMAGES));
+    const finais = await mapLimit(
+      vivas.map((r, i) => ({ r, caixa: reais[i] ?? null })),
+      FETCH_CONCURRENCY,
+      async ({ r, caixa }) => {
+        // Já é o original, ou a caixa não mudou de tamanho: nada a fazer.
+        if (r.original || !caixa) return r.bytes;
+        const alvo = pixelsForBox(caixa.w, caixa.h, "collage");
+        if (await cobre(r.bytes, alvo)) return r.bytes;
+        // Ficou curta. Sobe-se ao original; se ELE falhar agora, fica-se com a
+        // miniatura — uma foto mole é melhor do que uma foto que desaparece de
+        // uma proposta.
+        return (await fetchProposalImageBytes(r.ref)) ?? r.bytes;
+      },
+    );
+
+    moodBoards.push({ ...mb, images: finais.map((b) => b.toString("base64")) });
   }
+
   return { doc: { ...doc, coverImages: cover, moodBoards }, missing };
 }
 
