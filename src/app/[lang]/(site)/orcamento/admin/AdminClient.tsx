@@ -42,7 +42,7 @@ import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
-import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
+import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, type View } from "./nav";
 import { Button, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
@@ -1417,6 +1417,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   function renderNavItem(id: View) {
     const item = NAV.find((n) => n.id === id)!;
     const active = view === id;
+    // O QUE JÁ ESTÁ NA BARRA DE BAIXO NÃO SE REPETE NA GAVETA.
+    // A regra e a razão estão em `nav.tsx`, ao lado do `BARRA_INFERIOR`. Aqui
+    // faz-se por CSS e não por JavaScript de propósito: a mesma árvore serve a
+    // gaveta do telemóvel e a coluna do computador, e no computador — onde não
+    // há barra de baixo nenhuma — a lista tem de continuar completa. Uma
+    // condição em JS obrigava a saber a largura antes de desenhar, que é
+    // exactamente o que dá saltos ao hidratar.
+    const soNoComputador = BARRA_INFERIOR.includes(id) ? "hidden lg:flex" : "flex";
     return (
       <button
         key={item.id}
@@ -1425,7 +1433,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`alvo-toque !justify-start group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
+        className={`alvo-toque !justify-start group ${soNoComputador} items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
           active
             ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
             : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
@@ -1613,7 +1621,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           >
             {CORE_NAV.map((id) => renderNavItem(id))}
 
-            {/* "Mais" — secondary destinations, collapsed by default. */}
+            {/* "Mais" — secondary destinations, collapsed by default.
+                NO TELEMÓVEL NÃO SE DOBRA. Ali esta gaveta já É "o resto" (os
+                quatro do dia estão na barra de baixo), portanto uma dobra
+                chamada "Mais" dentro de um menu que se abriu para ver mais era
+                a terceira camada da mesma escolha — e, fechada, deixava a
+                gaveta com dois destinos à vista num ecrã inteiro.
+                Na coluna do computador a lista está completa e a dobra continua
+                a fazer o seu trabalho: manter a vista curta. */}
             {(() => {
               const activeInMore = MORE_NAV.includes(view);
               const expanded = moreNavOpen || activeInMore;
@@ -1623,7 +1638,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     type="button"
                     onClick={() => setMoreNavOpen((o) => !o)}
                     aria-expanded={expanded}
-                    className="alvo-toque !justify-start group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                    className="alvo-toque !justify-start group hidden lg:flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
                   >
                     <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
                       <svg
@@ -1654,9 +1669,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
-                  {expanded && (
-                    <div className="flex flex-col gap-1">{MORE_NAV.map(renderNavItem)}</div>
-                  )}
+                  {/* Sempre no DOM, e sempre visível no telemóvel; no
+                      computador é a dobra que decide. */}
+                  <div className={`flex flex-col gap-1 ${expanded ? "" : "lg:hidden"}`}>
+                    {MORE_NAV.map(renderNavItem)}
+                  </div>
                 </div>
               );
             })()}
@@ -1804,30 +1821,37 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             Hidden while a quote detail drawer is open: it's a focused, modal
             surface, so the tab bar would only overlap its footer and distract. */}
         <nav
+          // Duas navegações no mesmo ecrã precisam de dois nomes: sem isto,
+          // um leitor de ecrã anuncia "navegação" duas vezes e não há como
+          // saber qual é qual — nem para quem ouve, nem para um teste.
+          aria-label="Destinos principais"
           className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--bo-surface)] border-t border-[var(--bo-hairline)] transition-transform duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
+          {/* OS QUATRO DO DIA, E MAIS NADA.
+              Estavam aqui três destinos e um botão "Mais" que abria a gaveta —
+              a mesma gaveta que o hambúrguer do cabeçalho já abria, dois
+              cantos ao lado. Dois abridores para a mesma coisa, e os três
+              destinos escritos outra vez lá dentro.
+              Agora a barra leva os quatro destinos do dia (a lista e a razão
+              estão em `nav.tsx`), e a gaveta leva exactamente o resto. O
+              "Fazer proposta" — que é a tarefa que dá o dinheiro — estava a
+              dois toques e passa a um. */}
           <div className="flex items-stretch">
-            {(
-              [
-                { id: "overview", label: "Visão Geral" },
-                { id: "pedidos", label: "Pedidos" },
-                { id: "propostas", label: "Propostas" },
-              ] as const
-            ).map((item) => {
-              const navItem = NAV.find((n) => n.id === item.id)!;
-              const isActive = view === item.id;
+            {BARRA_INFERIOR.map((id) => {
+              const navItem = NAV.find((n) => n.id === id)!;
+              const isActive = view === id;
               return (
                 <button
-                  key={item.id}
-                  onClick={() => setView(item.id)}
+                  key={id}
+                  onClick={() => setView(id)}
                   className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
                     isActive ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-faint)]"
                   }`}
                 >
-                  {item.id === "pedidos" && pendingCount > 0 && (
+                  {id === "pedidos" && pendingCount > 0 && (
                     <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
                   )}
                   <span
@@ -1835,35 +1859,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   >
                     {navItem.icon}
                   </span>
-                  <span className="text-[8px] tracking-wide uppercase font-medium">
-                    {item.label}
+                  {/* `text-center` e `leading-tight`: com quatro destinos cada
+                      um fica com ~93 px, e "Fazer proposta" precisa de partir
+                      em duas linhas em vez de ser cortado a meio. */}
+                  <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center">
+                    {navItem.label}
                   </span>
                 </button>
               );
             })}
-            <button
-              onClick={() => setNavOpen(true)}
-              aria-label="Mais destinos"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
-                !["overview", "pedidos", "propostas"].includes(view)
-                  ? "text-[var(--bo-accent)]"
-                  : "text-[var(--bo-text-faint)]"
-              }`}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-              </svg>
-              <span className="text-[8px] tracking-wide uppercase font-medium">Mais</span>
-            </button>
           </div>
         </nav>
 
@@ -1892,8 +1896,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               aqui não há nada a ganhar com o efeito. */}
           <header className="sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b border-[var(--bo-hairline)] pt-safe">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
-              {/* Mobile menu — opens the full nav drawer without depending on the
-                  bottom-nav "Mais" (which is hidden while a quote drawer is open). */}
+              {/* O ÚNICO ABRIDOR DA GAVETA no telemóvel. Era um de dois — o
+                  outro era o botão "Mais" da barra de baixo, que abria
+                  exactamente a mesma coisa a partir do canto oposto. Ficou
+                  este: a barra de baixo desaparece enquanto uma proposta está
+                  aberta em detalhe, e uma navegação que às vezes não está lá
+                  não pode ser a única. */}
               <button
                 onClick={() => setNavOpen(true)}
                 aria-label="Abrir menu"

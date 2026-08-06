@@ -2,6 +2,14 @@ import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
 
 const nextConfig: NextConfig = {
+  // O SELO DE DESENVOLVIMENTO DO NEXT TAPA A NAVEGAÇÃO DO TELEMÓVEL.
+  // É um botão fixo no canto inferior esquerdo — exactamente onde vive a barra
+  // de baixo do back office. Em `next dev` a 375 px fica por cima do primeiro
+  // destino: um toque ali abre o painel do Next em vez de mudar de vista, e o
+  // passeio de ergonomia táctil vê o mesmo que um dedo veria (`<nextjs-portal>
+  // intercepts pointer events`). Só existe em desenvolvimento — em produção
+  // nunca esteve lá —, portanto desligá-lo não muda nada do que é servido.
+  devIndicators: false,
   // Self-contained server bundle so the app can run in any container/cloud
   // (Vercel ignores this and uses its own build).
   output: "standalone",

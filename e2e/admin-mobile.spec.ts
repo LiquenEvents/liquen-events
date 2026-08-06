@@ -179,6 +179,14 @@ async function expectErgonomiaTactil(page: Page, label: string) {
   );
 }
 
+/**
+ * Os quatro destinos que vivem na barra de baixo do telemóvel — os mesmos que
+ * o `BARRA_INFERIOR` de `nav.tsx`, aqui pelos RÓTULOS porque é por eles que um
+ * passeio encontra um botão. Se as duas listas divergirem, o passeio procura na
+ * barra um destino que está na gaveta (ou o contrário) e falha a dizer qual.
+ */
+const NA_BARRA = new Set(["Visão Geral", "Pedidos", "Fazer proposta", "Propostas"]);
+
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
@@ -217,22 +225,34 @@ test.describe("Back office — mobile", () => {
     const errorBoundary = page.getByRole("heading", { name: /Ocorreu um erro inesperado/i });
 
     for (const view of VIEWS) {
-      // Sidebar is off-canvas on mobile — open it via the top-bar menu button.
-      await page.getByRole("button", { name: /Abrir menu/i }).click();
-      const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
-      await expect(sidebar).toBeVisible();
-      // Reveal the "Mais" group if the destination isn't a core item.
-      const item = sidebar.getByRole("button", { name: view.nav });
-      if ((await item.count()) === 0) {
-        await sidebar.getByRole("button", { name: /^Mais$/ }).click();
+      // COMO SE NAVEGA MESMO, num telemóvel: os quatro do dia estão na barra de
+      // baixo, e nunca na gaveta; tudo o resto está na gaveta, e nunca na
+      // barra. Se este passeio fosse sempre pela gaveta, deixava de tocar na
+      // barra de baixo — que é a navegação que ela usa mais — e não notava se
+      // um destino estivesse escrito nos dois sítios.
+      const naBarra = NA_BARRA.has(view.nav.source.replace(/[$^]/g, ""));
+      if (naBarra) {
+        const barra = page.getByRole("navigation", { name: /Destinos principais/i });
+        const item = barra.getByRole("button", { name: view.nav });
+        await expect(
+          item,
+          `A barra de baixo não tem "${view.nav.source}" — continua no BARRA_INFERIOR de nav.tsx?`,
+        ).toHaveCount(1);
+        await item.click();
+      } else {
+        // A gaveta abre no hambúrguer do cabeçalho — o único abridor.
+        await page.getByRole("button", { name: /Abrir menu/i }).click();
+        const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
+        await expect(sidebar).toBeVisible();
+        const item = sidebar.getByRole("button", { name: view.nav });
+        // Diz qual é a etiqueta que falta em vez de esperar 30s pelo clique:
+        // quando um destino sai da navegação, esse diagnóstico deve ser grátis.
+        await expect(
+          item,
+          `A gaveta não tem "${view.nav.source}" — continua em nav.tsx?`,
+        ).toHaveCount(1);
+        await item.first().click();
       }
-      // Say which label is missing instead of waiting out the 30s click timeout:
-      // when a destination leaves the sidebar, that diagnosis should be free.
-      await expect(
-        item,
-        `Sidebar has no "${view.nav.source}" button — is it still in nav.tsx?`,
-      ).toHaveCount(1);
-      await item.first().click();
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
       await expectErgonomiaTactil(page, view.nav.source);
@@ -349,9 +369,12 @@ test.describe("Back office — mobile", () => {
     ).toHaveCount(0);
 
     // ── Desfazer, no estúdio ─────────────────────────────────────────────
-    await sidebar
-      .getByRole("button", { name: /^Fazer proposta$/ })
-      .first()
+    // Pela barra de baixo: "Fazer proposta" é um dos quatro do dia e, desde a
+    // arrumação das duas navegações, já não está na gaveta.
+    await page.getByRole("button", { name: /Fechar menu/i }).tap();
+    await page
+      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("button", { name: /Fazer proposta/i })
       .tap();
     await expect(page.getByRole("heading", { level: 1, name: /^Fazer proposta$/ })).toBeVisible();
     const estudio = page.getByText(/Estúdio de propostas/i).first();
@@ -369,5 +392,62 @@ test.describe("Back office — mobile", () => {
       "Desfazer só existia como Cmd+Z — num telemóvel, um engano passava a ser definitivo.",
     ).toHaveCount(1);
     await teclasAVista("estúdio de propostas");
+  });
+
+  /**
+   * UMA NAVEGAÇÃO, NÃO DUAS.
+   *
+   * A barra de baixo leva os quatro destinos do dia; a gaveta leva o resto.
+   * Nenhum destino nos dois sítios, e um só botão a abrir a gaveta.
+   *
+   * O que isto apanha é a regressão fácil: alguém acrescenta um destino à barra
+   * de baixo (ou volta a pôr um "Mais" lá) e o telemóvel fica outra vez com
+   * duas navegações a dizer o mesmo — que é o estado de que esta correcção
+   * partiu, e que ninguém repara a olhar para uma vista de cada vez.
+   */
+  test("@movel phone: a barra de baixo e a gaveta não repetem destinos", async ({ page }) => {
+    const loggedIn = await login(page);
+    if (process.env.CI) {
+      expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
+        true,
+      );
+    } else {
+      test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    }
+
+    const barra = page.getByRole("navigation", { name: /Destinos principais/i });
+    const naBarra = (await barra.getByRole("button").allInnerTexts()).map((t) => t.trim());
+    expect(
+      naBarra,
+      "A barra de baixo deixou de ser exactamente os quatro destinos do dia. " +
+        "Ver BARRA_INFERIOR em nav.tsx — e, se mudou de propósito, mudar também o NA_BARRA deste ficheiro.",
+    ).toEqual([...NA_BARRA]);
+
+    await page.getByRole("button", { name: /Abrir menu/i }).click();
+    const gaveta = page.getByRole("navigation", { name: /Navegação do back office/i });
+    await expect(gaveta).toBeVisible();
+    const naGaveta = (await gaveta.getByRole("button").allInnerTexts()).map((t) => t.trim());
+
+    const repetidos = naGaveta.filter((t) => NA_BARRA.has(t));
+    expect(
+      repetidos,
+      `${repetidos.length} destino(s) escritos nos DOIS sítios — a barra de baixo e a gaveta. ` +
+        `Num ecrã de 375 px passam a ser duas navegações a competir, e nenhuma é "a" navegação.`,
+    ).toEqual([]);
+
+    // E a gaveta tem mesmo de levar o resto: se ficasse vazia, o teste acima
+    // passava por não haver lá nada, que é o pior verde possível.
+    expect(
+      naGaveta,
+      "A gaveta ficou sem destinos nenhuns — o resto da navegação desapareceu.",
+    ).toContain("Calendário");
+    expect(naGaveta).toContain("Temas");
+
+    // O "Mais" da barra de baixo abria a mesma gaveta que o hambúrguer. Dois
+    // botões para a mesma coisa, em cantos opostos.
+    expect(
+      naBarra.filter((t) => /^Mais$/i.test(t)),
+      "Voltou a haver um segundo abridor da gaveta na barra de baixo.",
+    ).toEqual([]);
   });
 });

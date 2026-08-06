@@ -50,6 +50,40 @@ export const CORE_NAV: View[] = [
 
 export const MORE_NAV: View[] = ["faturas", "contratos", "temas", "kanban", "estatisticas"];
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A BARRA DE BAIXO DO TELEMÓVEL — e a regra que a mantém honesta
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * **A barra de baixo leva os quatro destinos do dia. A gaveta leva O RESTO.**
+ * Nenhum destino aparece nos dois sítios.
+ *
+ * PORQUE PRECISOU DE SER ESCRITO. Havia duas navegações a competir no mesmo
+ * ecrã de 375 px: a gaveta (que abre no hambúrguer, ao canto) e a barra de
+ * baixo — e a barra repetia três destinos que a gaveta já tinha, com um quarto
+ * botão "Mais" que abria... a mesma gaveta. Dois botões para a mesma coisa, em
+ * cantos opostos, e três destinos escritos duas vezes. Quem chega a este back
+ * office pela primeira vez não sabe qual dos dois é "a" navegação, porque não
+ * há resposta: são a mesma.
+ *
+ * PORQUE ESTES QUATRO. São o dia de trabalho, por esta ordem: ver o que há
+ * (Visão Geral), ler o que entrou (Pedidos), escrever a proposta (Fazer
+ * proposta), ver as que já saíram (Propostas). O "Fazer proposta" estava a
+ * DOIS toques — abrir a gaveta, escolher — e é a tarefa que dá o dinheiro.
+ *
+ * O QUE ISTO CUSTA, dito com todas as letras: chegar ao Calendário, às Tarefas
+ * ou aos Temas passa a ser sempre pelo hambúrguer, que fica no canto superior
+ * esquerdo — o pior canto para um polegar. Continua a ser UM toque, e são
+ * destinos de semana, não de hora. A alternativa (um quinto botão "Mais" na
+ * barra) dava cinco alvos de 75 px numa barra onde 44 é o mínimo, e voltava a
+ * pôr dois abridores para a mesma gaveta.
+ *
+ * NO COMPUTADOR não há barra de baixo nenhuma: a coluna da esquerda mostra
+ * tudo, e esta lista não se aplica. É a mesma navegação com duas formas — não
+ * a mesma forma esticada.
+ */
+export const BARRA_INFERIOR: View[] = ["overview", "pedidos", "fazer-proposta", "propostas"];
+
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
     id: "overview",
