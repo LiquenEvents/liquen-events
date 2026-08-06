@@ -105,6 +105,7 @@ const fazerProposta = splitView(() => import("./FazerProposta"));
 const propostas = splitView(() => import("./Propostas"));
 const acompanhamento = splitView(() => import("./Acompanhamento"));
 const definicoes = splitView(() => import("./DefinicoesProposta"));
+const servicos = splitView(() => import("./Servicos"));
 const tarefas = splitView(() => import("./Tarefas"));
 const fornecedores = splitView(() => import("./Fornecedores"));
 const estatisticas = splitView(() => import("./StatsDashboard"));
@@ -122,6 +123,7 @@ export const FazerProposta = fazerProposta.View;
 export const Propostas = propostas.View;
 export const Acompanhamento = acompanhamento.View;
 export const DefinicoesProposta = definicoes.View;
+export const Servicos = servicos.View;
 export const Tarefas = tarefas.View;
 export const Fornecedores = fornecedores.View;
 export const StatsDashboard = estatisticas.View;
@@ -190,6 +192,7 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   propostas: propostas.warm,
   acompanhamento: acompanhamento.warm,
   definicoes: definicoes.warm,
+  servicos: servicos.warm,
   tarefas: tarefas.warm,
   fornecedores: fornecedores.warm,
   inventario: inventario.warm,

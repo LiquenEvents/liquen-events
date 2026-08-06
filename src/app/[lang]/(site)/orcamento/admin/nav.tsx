@@ -24,7 +24,8 @@ export type View =
   | "faturas"
   | "contratos"
   | "modelos-email"
-  | "definicoes";
+  | "definicoes"
+  | "servicos";
 
 /**
  * Sidebar split for the calm, ChatGPT-like rail. Only the owner's DAILY CORE
@@ -61,6 +62,7 @@ export const MORE_NAV: View[] = [
   "temas",
   "kanban",
   "estatisticas",
+  "servicos",
   "definicoes",
 ];
 
@@ -169,6 +171,23 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "servicos",
+    label: "Biblioteca de serviços",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M4 19.5V5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-1.5z" />
+        <path d="M8 7h8M8 11h5" strokeLinecap="round" />
       </svg>
     ),
   },

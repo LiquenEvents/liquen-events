@@ -63,6 +63,7 @@ import {
   Propostas,
   Acompanhamento,
   DefinicoesProposta,
+  Servicos,
   Tarefas,
   Fornecedores,
   StatsDashboard,
@@ -1532,6 +1533,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     propostas: "Propostas",
     acompanhamento: "Acompanhamento",
     definicoes: "Definições",
+    servicos: "Biblioteca de serviços",
     "fazer-proposta": "Fazer proposta",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
@@ -1555,6 +1557,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     propostas: "Todas as propostas enviadas",
     acompanhamento: "O que está à espera de resposta, por ordem de urgência",
     definicoes: "Os números com que o estúdio faz contas",
+    servicos: "As palavras que vão nas propostas, escritas com tempo",
     "fazer-proposta": "Escolha o cliente e escreva a proposta",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
@@ -2112,6 +2115,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   setSelected((prev) => (prev?.id === q.id ? q : prev));
                 }}
               />
+            </div>
+          )}
+
+          {/* ── Biblioteca de serviços ── */}
+          {view === "servicos" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Servicos />
             </div>
           )}
 
