@@ -878,6 +878,15 @@ interface Props {
    *  esta proposta. Só serve para marcar a grelha — escolher outra vez é
    *  permitido (a mesma foto pode estar na capa e num mood board). */
   usedThemePaths?: readonly string[];
+  /**
+   * As fotos que já foram para OUTROS casamentos, e para onde.
+   *
+   * Chave: o caminho na biblioteca. Valor: a frase já escrita ("Ana e Rui,
+   * 12 set 2026"). Não impede nada — repetir pode ser a decisão certa quando os
+   * dois casamentos estão em pontas opostas do país. O que faz a repetição doer
+   * é a proximidade, e por isso o que se mostra é ONDE foi, não um "não".
+   */
+  usadasNoutras?: Readonly<Record<string, string>>;
   onClose: () => void;
   /** Uma cópia confirmada. Traz o `token` do lugar que veio ocupar, quando
    *  houve reserva; sem `token`, é para acrescentar. */
@@ -893,6 +902,7 @@ export default function ThemePicker({
   quoteId,
   multiple,
   usedThemePaths,
+  usadasNoutras,
   onClose,
   onPicked,
   onReserve,
@@ -1738,6 +1748,10 @@ export default function ThemePicker({
                   const on = selectedSet.has(im.path);
                   const going = pendingSet.has(im.path);
                   const used = !going && usedSet.has(im.path);
+                  // "Já noutra proposta" só aparece quando NÃO está nesta: as
+                  // duas marcas no mesmo sítio tapavam-se uma à outra, e a que
+                  // interessa primeiro é a desta proposta.
+                  const noutra = !going && !used ? usadasNoutras?.[im.path] : undefined;
                   const failed = failedPaths.includes(im.path);
                   // No teto, as fotos por escolher ficam apagadas e anunciadas
                   // como indisponíveis (aria-disabled, não `disabled`: o botão
@@ -1757,7 +1771,13 @@ export default function ThemePicker({
                         // porque é a única forma de a marca visual chegar a
                         // quem não vê a grelha.
                         aria-label={`Foto ${i + 1} de ${images.length}${
-                          going ? " (a adicionar)" : used ? " (já nesta proposta)" : ""
+                          going
+                            ? " (a adicionar)"
+                            : used
+                              ? " (já nesta proposta)"
+                              : noutra
+                                ? ` (já usada em ${noutra})`
+                                : ""
                         }${failed ? " (não entrou)" : ""}`}
                         onClick={(e) => toggleAt(i, e.shiftKey)}
                         onFocus={() => setFocusIndex(i)}
@@ -1793,6 +1813,15 @@ export default function ThemePicker({
                             className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-black/65 px-1.5 py-0.5 text-center text-[10px] uppercase tracking-[0.06em] text-white"
                           >
                             {going ? "A adicionar…" : "Já nesta proposta"}
+                          </span>
+                        )}
+                        {noutra && (
+                          <span
+                            aria-hidden
+                            title={`Já usada em ${noutra}`}
+                            className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-[#8a6420]/85 px-1.5 py-0.5 text-center text-[10px] tracking-[0.04em] text-white"
+                          >
+                            {noutra}
                           </span>
                         )}
                       </button>

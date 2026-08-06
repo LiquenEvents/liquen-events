@@ -22,6 +22,7 @@ import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import NotasInternas from "./NotasInternas";
 import Versoes from "./Versoes";
+import { comoSeDiz, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { custosDe } from "@/lib/orcamento/margem";
 import {
@@ -1187,6 +1188,52 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *  marcar. Sai do DOCUMENTO (capas + mood boards) e não do mapa de origens:
    *  uma foto removida do rascunho deixa de contar no instante em que é
    *  removida, mesmo que a origem fique lá guardada. */
+  /**
+   * Os caminhos de ORIGEM das fotos de biblioteca que estão neste documento.
+   *
+   * Origem e não caminho da proposta: as fotos da proposta são cópias com
+   * caminho próprio, e comparar cópias nunca diria que duas propostas mostraram
+   * a mesma imagem.
+   */
+  function origensNoDocumento(): string[] {
+    const noDoc = new Set<string>();
+    for (const p of doc.coverImages ?? []) if (p) noDoc.add(p);
+    for (const b of doc.moodBoards ?? []) for (const p of b.images) if (p) noDoc.add(p);
+    const origens = new Set<string>();
+    for (const p of noDoc) {
+      const de = themeOrigins[p];
+      if (de) origens.add(de);
+    }
+    return [...origens];
+  }
+
+  /**
+   * As fotos da biblioteca que já foram para OUTROS casamentos, e para onde.
+   *
+   * Lê-se uma vez por pedido: o que já foi enviado não muda enquanto se escreve
+   * esta proposta. Falhar não impede nada — sem a resposta a grelha é a de
+   * antes, e escolher uma foto repetida continua a ser possível, que é como
+   * deve ser.
+   */
+  const [usadasNoutras, setUsadasNoutras] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/orcamento/${quote.id}/fotos-repetidas`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { fotos?: FotoRepetida[] };
+        if (!vivo || !Array.isArray(data.fotos)) return;
+        setUsadasNoutras(Object.fromEntries(data.fotos.map((f) => [f.origem, comoSeDiz(f)])));
+      } catch {
+        /* a grelha fica a de antes */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [quote.id]);
+
   const usedThemePaths = useMemo(() => {
     if (!picker) return [];
     const inDoc = new Set<string>();
@@ -1583,7 +1630,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "send", doc: stripPendingImages(doc) }),
+        // As ORIGENS das fotos entram no documento no envio, e só no envio:
+        // é a partir daqui que a proposta seguinte pode saber que esta já usou
+        // aquele arco. Enquanto é rascunho, o mapa vive ao lado (SIDE_KEY) e
+        // não tem de viajar.
+        body: JSON.stringify({
+          mode: "send",
+          doc: { ...stripPendingImages(doc), fotosDeBiblioteca: origensNoDocumento() },
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
@@ -2911,6 +2965,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           quoteId={quote.id}
           multiple={picker.kind === "board"}
           usedThemePaths={usedThemePaths}
+          usadasNoutras={usadasNoutras}
           onClose={() => setPicker(null)}
           onPicked={onPickedFromLibrary}
           onReserve={onReservedFromLibrary}

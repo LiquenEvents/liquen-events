@@ -255,6 +255,24 @@ export interface ProposalDoc {
   budgetOpcional?: boolean[];
 
   /**
+   * De que fotos da BIBLIOTECA saíram as fotos desta proposta.
+   *
+   * Guarda os caminhos de ORIGEM (o ficheiro no bucket dos temas), não os da
+   * proposta: as fotos da proposta são cópias, com caminho próprio, e comparar
+   * cópias nunca diria que duas propostas mostraram a mesma imagem.
+   *
+   * Serve uma coisa só, e não sai daqui para lado nenhum: avisar que uma foto
+   * já foi para outro casamento. Duas noivas com o mesmo Pinterest é uma
+   * coincidência; duas propostas da Líquen com o mesmo arco é um descuido que
+   * se vê de longe quando as duas se encontram no Instagram.
+   *
+   * NÃO É DESENHADA. O PDF não a lê — e o teste que compara os desenhos com e
+   * sem custos/notas cobre a mesma garantia por construção: só entra no
+   * documento o que alguém mandou desenhar.
+   */
+  fotosDeBiblioteca?: string[];
+
+  /**
    * NOTAS INTERNAS — o que se sabe sobre este negócio e nunca se escreve ao
    * cliente. "Cliente da AMARA, cuidado com o prazo." "Já recusaram uma
    * proposta em 2025 por preço."

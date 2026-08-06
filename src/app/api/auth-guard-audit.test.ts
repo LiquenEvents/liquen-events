@@ -465,6 +465,9 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa
   // resposta JSON.
   { path: "./orcamento/[id]/memoria/route", methods: ["GET"] },
+  // Diz para que casamentos é que cada foto da biblioteca já foi — nomes de
+  // clientes, datas e locais de OUTROS pedidos, numa resposta só.
+  { path: "./orcamento/[id]/fotos-repetidas/route", methods: ["GET"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
   // A biblioteca visual: o vocabulário de etiquetas, a procura por etiquetas e
   // o etiquetar em lote. Tudo isto lê e escreve o trabalho de arrumação da

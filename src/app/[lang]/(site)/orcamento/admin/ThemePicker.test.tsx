@@ -94,7 +94,15 @@ function reservados(): { token: string; thumbUrl?: string; sourcePath: string }[
  * quando fecha. É o que torna verificável a promessa nova — o lote continua a
  * caminho mesmo sem diálogo nenhum na árvore.
  */
-function Host({ multiple, usedThemePaths }: { multiple: boolean; usedThemePaths?: string[] }) {
+function Host({
+  multiple,
+  usedThemePaths,
+  usadasNoutras,
+}: {
+  multiple: boolean;
+  usedThemePaths?: string[];
+  usadasNoutras?: Record<string, string>;
+}) {
   const [open, setOpen] = useState(true);
   if (!open) return null;
   return (
@@ -102,6 +110,7 @@ function Host({ multiple, usedThemePaths }: { multiple: boolean; usedThemePaths?
       quoteId="LQ-001"
       multiple={multiple}
       usedThemePaths={usedThemePaths}
+      usadasNoutras={usadasNoutras}
       onClose={() => {
         onClose();
         setOpen(false);
@@ -114,10 +123,14 @@ function Host({ multiple, usedThemePaths }: { multiple: boolean; usedThemePaths?
 }
 
 /** Abre o seletor e espera pela grelha de fotos. */
-async function openPicker(multiple: boolean, usedThemePaths?: string[]) {
+async function openPicker(
+  multiple: boolean,
+  usedThemePaths?: string[],
+  usadasNoutras?: Record<string, string>,
+) {
   const montado = render(
     <ToastProvider>
-      <Host multiple={multiple} usedThemePaths={usedThemePaths} />
+      <Host multiple={multiple} usedThemePaths={usedThemePaths} usadasNoutras={usadasNoutras} />
     </ToastProvider>,
   );
   await screen.findByRole("button", { name: `Foto 1 de ${visible()}` });
@@ -869,5 +882,39 @@ describe("ThemePicker", () => {
     // O Esc fechou a pré-visualização, NÃO o seletor.
     expect(onClose).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(photo(2));
+  });
+});
+
+describe("fotos que já foram para outro casamento", () => {
+  it("diz para onde foram, no nome e na marca", async () => {
+    photos = folder(4);
+    await openPicker(true, undefined, { "t1/foto-2.jpg": "Ana e Rui, 12 set 2026" });
+
+    // No NOME acessível, porque a marca visual não chega a quem não vê a
+    // grelha — e é aqui que a decisão de repetir se toma.
+    expect(
+      screen.getByRole("button", { name: /Foto 2 de 4 \(já usada em Ana e Rui, 12 set 2026\)/ }),
+    ).toBeTruthy();
+    expect(screen.getAllByTitle("Já usada em Ana e Rui, 12 set 2026").length).toBeGreaterThan(0);
+  });
+
+  it("não impede nada — a foto continua a poder ser escolhida", async () => {
+    // Repetir pode ser a decisão certa: é a melhor que há daquele arco, e os
+    // dois casamentos estão em pontas opostas do país.
+    photos = folder(4);
+    await openPicker(true, undefined, { "t1/foto-2.jpg": "Ana e Rui" });
+    fireEvent.click(screen.getByRole("button", { name: /Foto 2 de 4/ }));
+    expect(screen.getByRole("button", { name: /Foto 2 de 4/ }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  it("uma foto que já está NESTA proposta não leva as duas marcas", async () => {
+    // As duas legendas caem no mesmo sítio e tapavam-se uma à outra; a que
+    // interessa primeiro é a desta proposta.
+    photos = folder(4);
+    await openPicker(true, ["t1/foto-2.jpg"], { "t1/foto-2.jpg": "Ana e Rui" });
+    expect(screen.getByRole("button", { name: /Foto 2 de 4 \(já nesta proposta\)/ })).toBeTruthy();
+    expect(screen.queryByTitle("Já usada em Ana e Rui")).toBeNull();
   });
 });
