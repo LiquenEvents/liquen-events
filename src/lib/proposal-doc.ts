@@ -216,6 +216,19 @@ export interface ProposalDoc {
    * de ser um array paralelo e não um campo dentro de `budgetItems`.
    */
   budgetAmounts?: (number | null)[];
+  /**
+   * O que cada linha CUSTA à Líquen — flores, aluguer, horas de equipa.
+   *
+   * Mesmo array paralelo que `budgetAmounts`, e pelas mesmas razões (ver
+   * `proposal-budget.ts`). Opcional linha a linha: preencher o custo de duas
+   * linhas em dez já dá uma margem parcial útil, e exigir todos garantia que
+   * não se preenchia nenhum.
+   *
+   * NUNCA SAI DAQUI. Não é lido pelo desenhador do PDF, não vai no email, não
+   * existe no portal do cliente. Um número destes numa proposta é o fim de uma
+   * negociação — e há um teste em `proposal-doc-pdf` a garanti-lo.
+   */
+  budgetCosts?: (number | null)[];
   totalLabel: string; // "Valor Total Decoração"
   totalText: string; // "3000,00 € + IVA" — kept as text to match the studio's format
   /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding

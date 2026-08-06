@@ -653,3 +653,40 @@ describe("uma foto que não se desenha não deixa moldura (e conta como em falta
     expect(undrawnImages).toBe(0);
   }, 30_000);
 });
+
+describe("os números internos nunca saem no PDF", () => {
+  /**
+   * O custo por linha e a margem existem para ela decidir se o negócio se faz.
+   * Um deles impresso na proposta é o fim da negociação antes de ela começar —
+   * e ao contrário de quase tudo o resto, isto não se corrige depois: o email
+   * sai uma vez.
+   *
+   * ── PORQUE É UMA COMPARAÇÃO E NÃO UMA PROCURA ────────────────────────────
+   * Procurar "1357" no ficheiro não serve: o texto vai como códigos de glifo
+   * hexadecimais (a fonte é subconjunto), e os dígitos que se encontram em
+   * texto cru são coordenadas — "0.2468" dava um falso positivo e um teste que
+   * falha por engano acaba apagado.
+   *
+   * O que se compara é o que fica DESENHADO: as duas versões do mesmo
+   * documento, uma com custos e outra sem, têm de produzir exactamente as
+   * mesmas instruções de desenho. Se um dia alguém puser a margem "só no
+   * rodapé para conferir", os fluxos deixam de bater certo e isto acusa.
+   */
+  it("um documento com custos desenha exactamente o mesmo que um sem custos", async () => {
+    const semCustos = {
+      ...decoracaoDoc(),
+      budgetItems: ["Decoração de cerimónia", "Arranjos de mesa"],
+      budgetAmounts: [4321, 8765],
+    };
+    const comCustos = { ...semCustos, budgetCosts: [1357, 2468] };
+
+    const fluxos = async (doc: Parameters<typeof renderProposalDocPdf>[0]) => {
+      const pdf = await PDFDocument.load(await renderProposalDocPdf(doc));
+      let texto = "";
+      for (let i = 0; i < pdf.getPageCount(); i += 1) texto += pageContent(pdf, i);
+      return texto;
+    };
+
+    expect(await fluxos(comCustos)).toBe(await fluxos(semCustos));
+  });
+});

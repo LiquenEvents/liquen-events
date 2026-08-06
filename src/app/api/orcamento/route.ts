@@ -525,6 +525,11 @@ export async function POST(request: NextRequest) {
       submittedAt: new Date().toISOString(),
       status: "pendente",
       priceBreakdown: breakdown,
+      // A língua em que esta pessoa escreveu. Já se lia do cookie para escolher
+      // a língua do email de confirmação e deitava-se fora a seguir; guardada,
+      // permite meses depois saber que aquele casal escreveu em inglês — e a
+      // proposta do estúdio sai em português.
+      locale: normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value),
     };
 
     // ── Durable delivery FIRST ──────────────────────────────────────────────

@@ -283,6 +283,16 @@ export interface Quote extends QuoteFormData {
   assignedTo?: string;
   /** Reason the deal was lost — filled when status → rejeitado. */
   lostReason?: string;
+  /**
+   * O idioma em que a pessoa fez o pedido ("pt" ou "en"), lido do site no
+   * momento em que o formulário foi submetido.
+   *
+   * Já se usava para escolher a língua do email de confirmação, mas era
+   * deitado fora a seguir. Guardá-lo permite, meses depois, saber que aquele
+   * casal escreveu em inglês — e a proposta do estúdio é escrita em português.
+   * Ausente em todos os pedidos anteriores a este campo: nunca assumir "pt".
+   */
+  locale?: string;
 }
 
 /** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */
