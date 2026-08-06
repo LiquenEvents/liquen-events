@@ -29,6 +29,7 @@ const stores = vi.hoisted(() => ({
   themes: vi.fn(async () => [] as unknown[]),
   messageLinks: vi.fn(async () => [] as unknown[]),
   overviewSettings: vi.fn(async () => [] as unknown[]),
+  propostaDefinicoes: vi.fn(async () => [] as unknown[]),
 }));
 
 /** Estado do cliente Supabase falso que serve os contadores de numeração. */
@@ -63,6 +64,9 @@ vi.mock("@/lib/message-links-store", () => ({ listLinks: stores.messageLinks }))
 // `readOverviewSettings` devolve os campos indexados; a rota faz-lhes
 // `Object.values`, que sobre um array devolve o próprio conteúdo — por isso o
 // mock pode servir uma lista como todos os outros.
+vi.mock("@/lib/proposta-definicoes-store", () => ({
+  listarDefinicoes: stores.propostaDefinicoes,
+}));
 vi.mock("@/lib/overview-settings-store", () => ({
   readOverviewSettings: stores.overviewSettings,
 }));

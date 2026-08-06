@@ -307,6 +307,12 @@ vi.mock("@/lib/proposal-drafts", () =>
 // Parcial: o esquema Zod da rota lê OVERVIEW_FIELDS/MAX_* no topo do módulo e o
 // 409 depende da classe StaleWriteError real — só as duas funções de I/O é que
 // passam a espias.
+vi.mock("@/lib/proposta-definicoes-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/proposta-definicoes-store")>()),
+  listarDefinicoes: H.afn("proposta-definicoes-store.listarDefinicoes", async () => []),
+  gravarDefinicao: H.afn("proposta-definicoes-store.gravarDefinicao", async () => ({})),
+}));
+
 vi.mock("@/lib/overview-settings-store", async (orig) => ({
   ...(await orig<typeof import("@/lib/overview-settings-store")>()),
   readOverviewSettings: H.afn("overview-settings-store.readOverviewSettings", async () => ({})),
@@ -469,6 +475,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./temas/[id]/repetidas/route", methods: ["POST"] },
   // Notas da equipa e meta de receita — texto interno, e uma escrita.
   { path: "./visao-geral/route", methods: ["GET", "PUT"] },
+  // Os números com que o estúdio faz contas (combustível, margem mínima). Ler
+  // não expõe dados de clientes, mas ESCREVER muda o que todas as propostas
+  // seguintes cobram de deslocação — é tão de sessão como o resto.
+  { path: "./proposta-definicoes/route", methods: ["GET", "PUT"] },
   // Passkeys. A LISTA e a REMOÇÃO são de sessão, como tudo o resto. O REGISTO
   // também, e é o ponto todo do desenho: transformar um aparelho numa chave só
   // pode ser feito por quem já provou ser quem diz. Sem esta guarda, um estranho
@@ -522,6 +532,14 @@ describe("ADMIN-SESSION routes reject the unauthenticated before touching the st
     const res = await fn(req("GET"), ctx());
     expect(res.status).not.toBe(401);
     expect(calls).toContain("themes-store.listThemes");
+  });
+
+  it("GET /api/proposta-definicoes passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./proposta-definicoes/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("proposta-definicoes-store.listarDefinicoes");
   });
 
   it("GET /api/visao-geral passes the guard for an authenticated admin (reaches the store)", async () => {

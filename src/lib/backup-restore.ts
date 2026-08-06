@@ -27,6 +27,7 @@ import { mapper as templatesMapper, listTemplates } from "./email-templates-stor
 import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
 import { mapper as overviewMapper, type OverviewField } from "./overview-settings-store";
+import { mapper as definicoesMapper, listarDefinicoes } from "./proposta-definicoes-store";
 import {
   BACKUP_SCHEMA_MIN_VERSION,
   BACKUP_SCHEMA_VERSION,
@@ -123,6 +124,18 @@ const id = z.string().trim().min(1).max(300);
 const text = (max: number) => z.string().max(max).nullish();
 const stamp = z.string().max(64).nullish();
 const money = z.number().finite().min(0).max(1_000_000_000);
+
+/**
+ * As definições da proposta. O `value` é um objecto e não se valida por dentro:
+ * são meia dúzia de números com limites que a ROTA já impõe, e duplicá-los aqui
+ * criava uma segunda verdade a envelhecer ao lado da primeira. Uma cópia de uma
+ * versão anterior, com menos campos, tem de continuar a poder ser reposta.
+ */
+const definicaoSchema = z.looseObject({
+  id,
+  valor: z.looseObject({}).default({}),
+  updatedAt: stamp,
+});
 
 const quoteSchema = z.looseObject({
   id,
@@ -621,6 +634,15 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     schema: themeSchema,
     current: listThemes,
     stamp: (t) => t.updatedAt,
+  }),
+  asTarget({
+    key: "propostaDefinicoes",
+    label: "Definições da proposta (combustível, margem)",
+    table: definicoesMapper.table,
+    mapper: definicoesMapper,
+    schema: definicaoSchema,
+    current: listarDefinicoes,
+    stamp: (d) => d.updatedAt,
   }),
   asTarget({
     key: "overviewSettings",

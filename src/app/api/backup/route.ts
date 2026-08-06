@@ -19,6 +19,7 @@ import { listTemplatesWithDefaults } from "@/lib/email-templates-store";
 import { listThemes } from "@/lib/themes-store";
 import { listLinks } from "@/lib/message-links-store";
 import { readOverviewSettings } from "@/lib/overview-settings-store";
+import { listarDefinicoes } from "@/lib/proposta-definicoes-store";
 import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -120,6 +121,15 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
     key: "overviewSettings",
     table: "overview_settings",
     list: async () => Object.values(await readOverviewSettings()),
+  },
+  // Os números com que o estúdio faz contas — o preço do combustível, o resto
+  // do custo por quilómetro, a margem mínima. Entram na cópia porque são
+  // trabalho dela e não um derivado: perdidos, as propostas seguintes voltam a
+  // calcular com os valores de partida sem nada a assinalá-lo.
+  {
+    key: "propostaDefinicoes",
+    table: "proposal_settings",
+    list: listarDefinicoes,
   },
 ] as const;
 

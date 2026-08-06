@@ -179,6 +179,24 @@ create table if not exists public.overview_settings (
   updated_at  timestamptz not null default now()
 );
 
+-- ── Os números com que o estúdio faz contas ──
+-- O preço do combustível, o resto do custo por quilómetro, e a margem mínima
+-- abaixo da qual o estúdio avisa.
+--
+-- Vivem aqui e não no código pela razão que ela deu: "depende também de que
+-- valor está a gasolina". O gasóleo muda todas as semanas e o código muda
+-- quando alguém se lembra — um número de 2026 a calcular deslocações de 2027
+-- não dá erro nenhum, dá um preço silenciosamente errado, para menos, em todas
+-- as propostas.
+--
+-- `updated_at` é metade do ponto: é o que permite ao ecrã dizer "o preço do
+-- gasóleo foi definido há quatro meses" em vez de calcular em silêncio.
+create table if not exists public.proposal_settings (
+  id          text primary key,          -- deslocacao | margem
+  value       jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+
 -- ── Modelos de email (transacionais, editáveis no back office) ──
 create table if not exists public.email_templates (
   id          text primary key,          -- slug: proposta-enviada, sinal-recebido…
@@ -638,6 +656,8 @@ end $$;
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.
 alter table public.quotes    enable row level security;
 alter table public.proposals enable row level security;
+-- Sem políticas: só a service_role lá chega, como em todas as outras.
+alter table public.proposal_settings enable row level security;
 alter table public.tasks     enable row level security;
 alter table public.suppliers enable row level security;
 alter table public.calendar_events enable row level security;
