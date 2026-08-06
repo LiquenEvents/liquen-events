@@ -253,6 +253,70 @@ describe("AdminClient shell", () => {
     expect(screen.queryByText("Gabriel Antigo")).not.toBeInTheDocument();
   });
 
+  /**
+   * A lista mostrava tudo igual, com a mesma etiqueta "Novo" num pedido de
+   * ontem e num de há nove dias. Estes testes prendem o que substitui isso.
+   */
+  describe("urgência e contexto na lista de pedidos", () => {
+    /** Um pedido entrado há N dias, ainda sem resposta. */
+    const hAtras = (dias: number) => new Date(Date.now() - dias * 86400000).toISOString();
+
+    it("põe à cabeça quem espera há mais tempo, sem ser preciso mexer na ordem", () => {
+      renderAdmin([
+        makeQuote({ name: "Recente", submittedAt: hAtras(1) }),
+        makeQuote({ name: "Antigo", submittedAt: hAtras(12) }),
+      ]);
+      navTo(/Pedidos/);
+
+      const nomes = screen.getAllByText(/^(Recente|Antigo)$/).map((n) => n.textContent);
+      expect(nomes[0]).toBe("Antigo");
+    });
+
+    it("diz há quantos dias cada um espera", () => {
+      renderAdmin([makeQuote({ name: "Ana", submittedAt: hAtras(4) })]);
+      navTo(/Pedidos/);
+      expect(screen.getByText("há 4 dias")).toBeInTheDocument();
+    });
+
+    it("não conta dias a quem já teve resposta — esse espera por eles", () => {
+      renderAdmin([makeQuote({ name: "Com proposta", status: "cotado", submittedAt: hAtras(30) })]);
+      navTo(/Pedidos/);
+      expect(screen.queryByText(/há 30 dias/)).not.toBeInTheDocument();
+    });
+
+    it("marca o provável casamento à distância: sem data E sem local concreto", () => {
+      renderAdmin([makeQuote({ name: "Longe", date: "", location: "Portugal" })]);
+      navTo(/Pedidos/);
+      expect(screen.getByText("Provável casamento à distância")).toBeInTheDocument();
+    });
+
+    it("uma ausência sozinha não faz um casamento à distância", () => {
+      renderAdmin([makeQuote({ name: "Perto sem data", date: "", location: "Évora" })]);
+      navTo(/Pedidos/);
+      expect(screen.queryByText("Provável casamento à distância")).not.toBeInTheDocument();
+    });
+
+    it("mostra a região e a distância a Évora", () => {
+      renderAdmin([makeQuote({ name: "Palmela", location: "Quinta X, Palmela" })]);
+      navTo(/Pedidos/);
+      expect(screen.getByText(/Palmela · ≈ \d+ km/)).toBeInTheDocument();
+    });
+
+    it("o filtro da espera esconde quem ainda não esperou o suficiente", () => {
+      renderAdmin([
+        makeQuote({ name: "Ontem", submittedAt: hAtras(1) }),
+        makeQuote({ name: "Ha Muito", submittedAt: hAtras(9) }),
+      ]);
+      navTo(/Pedidos/);
+
+      fireEvent.change(screen.getByLabelText("Filtrar por tempo de espera"), {
+        target: { value: "7" },
+      });
+      expect(screen.getByText("Ha Muito")).toBeInTheDocument();
+      expect(screen.queryByText("Ontem")).not.toBeInTheDocument();
+    });
+  });
+
   it("tracks bulk selection via the row checkboxes", () => {
     renderAdmin([makeQuote({ name: "Diogo Reis" }), makeQuote({ name: "Eva Lopes" })]);
     navTo(/Pedidos/);
