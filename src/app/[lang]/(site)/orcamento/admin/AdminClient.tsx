@@ -2331,7 +2331,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       "success",
                     );
                   }}
-                  className="flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm whitespace-nowrap"
+                  // `alvo-toque`: 44 px no dedo sem mexer no aspeto com rato.
+                  // Media 85x38 e passava despercebido porque, a 375 px, ficava
+                  // fora da margem — os filtros novos mudaram a dobra da barra
+                  // e trouxeram-no para dentro do ecrã, onde a régua o apanhou.
+                  className="alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm whitespace-nowrap"
                   title="Exportar a lista atual para CSV (Excel)"
                 >
                   <svg
