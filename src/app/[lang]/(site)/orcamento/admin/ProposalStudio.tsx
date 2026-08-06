@@ -20,7 +20,6 @@ import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel } from "@/lib/orcamento/data";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
-import NotasInternas from "./NotasInternas";
 import Versoes from "./Versoes";
 import { comoSeDiz, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
@@ -2009,13 +2008,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Event fields */}
           <Section title="Evento" id="evento">
-            {/* A nota geral fica no princípio, que é onde se olha ao abrir uma
-                proposta seis meses depois. */}
-            <NotasInternas
-              valor={doc.notasInternas ?? ""}
-              onChange={(notasInternas) => setDoc((d) => ({ ...d, notasInternas }))}
-              placeholder="Ex.: cliente da AMARA, cuidado com o prazo. Recusaram em 2025 por preço."
-            />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
                 label="Clientes"
@@ -2642,19 +2634,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
-          <NotasInternas
-            compacta
-            titulo="Nota sobre o orçamento"
-            placeholder="Ex.: margem apertada, não descer mais."
-            valor={doc.notasPorSeccao?.orcamento ?? ""}
-            onChange={(nota) =>
-              setDoc((d) => ({
-                ...d,
-                notasPorSeccao: { ...(d.notasPorSeccao ?? {}), orcamento: nota },
-              }))
-            }
-          />
-
           {/* ── O painel que o cliente nunca vê ────────────────────────────
               Custos, margem, deslocação calculada e o aviso de valor fora do
               habitual. Vive AQUI, no fim do orçamento, porque é aqui que os

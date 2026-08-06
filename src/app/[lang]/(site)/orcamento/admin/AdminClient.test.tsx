@@ -184,10 +184,13 @@ describe("AdminClient shell", () => {
 
   it("persists the chosen view to localStorage", () => {
     renderAdmin([makeQuote()]);
-    navTo(/Organização de propostas/);
-    expect(localStorage.getItem("liquen-admin-view")).toBe("kanban");
-    // And the kanban surface is now mounted.
-    expect(screen.getByTestId("view-kanban")).toBeInTheDocument();
+    // As Faturas e não a Organização de propostas: esta prova é sobre GRAVAR a
+    // vista escolhida, e serve com qualquer destino do menu. O kanban saiu do
+    // menu a pedido dela (continua a abrir por link directo, ver `nav.tsx`).
+    navTo(/Faturas/);
+    expect(localStorage.getItem("liquen-admin-view")).toBe("faturas");
+    // And the chosen surface is now mounted.
+    expect(screen.getByTestId("view-faturas")).toBeInTheDocument();
   });
 
   it("opens a quote's detail panel and closes it", () => {

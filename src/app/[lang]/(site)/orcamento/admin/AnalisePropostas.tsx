@@ -128,9 +128,13 @@ export default function AnalisePropostas() {
           </p>
           {a.extras.porRegistar > 0 && (
             <p className="mt-1 text-[11px] leading-relaxed text-foreground/45">
+              {/* Sem mandar ninguém a lado nenhum: o Acompanhamento saiu do
+                  menu a pedido dela, e uma indicação para um ecrã que já não
+                  está lá é pior do que indicação nenhuma. O número continua a
+                  dizer o que falta. */}
               {a.extras.porRegistar === 1
-                ? "Falta registar uma. Está no Acompanhamento."
-                : `Faltam registar ${a.extras.porRegistar}. Estão no Acompanhamento.`}
+                ? "Falta registar uma."
+                : `Faltam registar ${a.extras.porRegistar}.`}
             </p>
           )}
         </section>

@@ -37,19 +37,23 @@ export type View =
  * other consumer (command palette, mobile bar); these arrays only decide what
  * the rail shows up-front vs. behind the disclosure.
  *
- * Note: several `View` ids (`clientes`, `fornecedores`, `inventario`,
- * `modelos-email`) exist in the type and still render if reached by a direct
- * link, but are intentionally left out of `NAV` so they don't clutter the menu
- * — the owner asked to hide them. Nothing about them was deleted: add an id
- * back to `NAV` (and to one of the arrays above) to surface it again.
+ * Note: several `View` ids exist in the type and still render if reached by a
+ * direct link, but are intentionally left out of `NAV` so they don't clutter
+ * the menu — the owner asked to hide them. Nothing about them was deleted:
+ * add an id back to `NAV` (and to one of the arrays above) to surface it again.
+ *
+ * Escondidos a pedido dela, por ordem em que o pediu:
+ *   · `clientes`, `fornecedores`, `inventario`, `modelos-email`
+ *   · `kanban` (Organização de propostas), `servicos` (Biblioteca de
+ *     serviços) e `acompanhamento` — "não quero estas opções".
+ *
+ * Os ecrãs continuam todos escritos e a funcionar. Se algum dia voltarem, é
+ * uma linha em cada sítio — não é preciso reescrever nada.
  */
 export const CORE_NAV: View[] = [
   "overview",
   "pedidos",
   "fazer-proposta",
-  // O acompanhamento fica no núcleo, a seguir a fazer a proposta, porque é a
-  // outra metade do mesmo trabalho: enviar é metade, e a que se esquece.
-  "acompanhamento",
   "propostas",
   "calendario",
   "tarefas",
@@ -60,9 +64,7 @@ export const MORE_NAV: View[] = [
   "contratos",
   "material",
   "temas",
-  "kanban",
   "estatisticas",
-  "servicos",
   "definicoes",
 ];
 
@@ -139,24 +141,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    id: "kanban",
-    label: "Organização de propostas",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <rect x="3" y="4" width="4" height="16" rx="1" />
-        <rect x="10" y="4" width="4" height="11" rx="1" />
-        <rect x="17" y="4" width="4" height="7" rx="1" />
-      </svg>
-    ),
-  },
-  {
     id: "calendario",
     label: "Calendário",
     icon: (
@@ -209,23 +193,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    id: "servicos",
-    label: "Biblioteca de serviços",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <path d="M4 19.5V5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-1.5z" />
-        <path d="M8 7h8M8 11h5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
     id: "definicoes",
     label: "Definições",
     icon: (
@@ -239,23 +206,6 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <circle cx="12" cy="12" r="3" />
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    ),
-  },
-  {
-    id: "acompanhamento",
-    label: "Acompanhamento",
-    icon: (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      >
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
