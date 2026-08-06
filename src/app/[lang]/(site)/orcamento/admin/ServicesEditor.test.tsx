@@ -264,3 +264,20 @@ describe("guardar na biblioteca", () => {
     expect(screen.getByLabelText("Guardar «Arco floral» na biblioteca")).not.toBeDisabled();
   });
 });
+
+describe("ergonomia táctil", () => {
+  it("as pegas de arrasto são alvos de toque a sério", () => {
+    // Mediam 16×24. Com o dedo, agarrar uma linha para a reordenar era acertar
+    // num alvo mais estreito do que a própria unha — e falhar punha o cursor a
+    // piscar no campo ao lado. O guarda de ergonomia do `admin-mobile.spec.ts`
+    // apanhou-o em CI; este teste apanha-o antes.
+    render(<Host initial={grupo(["Uma linha"])} />);
+
+    for (const pega of screen.getAllByRole("button", { name: /Arrastar (grupo|linha)/ })) {
+      expect(
+        pega.className,
+        `A pega «${pega.getAttribute("aria-label")}» não cresce em ecrã táctil`,
+      ).toContain("alvo-toque");
+    }
+  });
+});

@@ -921,12 +921,19 @@ function DragHandle({
   ref?: (el: HTMLElement | null) => void;
 }) {
   return (
+    // `alvo-toque` cresce a pega para 44×44 em ecrã táctil e deixa o rato como
+    // estava. A pega media 16×24: com o dedo, agarrar uma linha para a
+    // reordenar era acertar num alvo mais estreito do que a própria unha, e
+    // falhar significava tocar no campo ao lado e pôr o cursor a piscar onde
+    // não se queria. Em telemóvel o arrasto já é o mais difícil dos três
+    // caminhos para reordenar (há também as setas e o teclado); não pode ser
+    // também o mais pequeno.
     <button
       type="button"
       {...rest}
       aria-label={`${label} (ou use as setas)`}
       title="Arrastar para reordenar"
-      className="inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-foreground/80 focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
+      className="alvo-toque inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-foreground/80 focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
     >
       <span aria-hidden="true" className="text-[13px] leading-none">
         ⠿
