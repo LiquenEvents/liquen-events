@@ -24,7 +24,7 @@ export const EXAMPLE_VARS: Record<string, string> = {
   link: "https://liquenevents.pt/proposta/exemplo",
   valor: "14.500 €",
   data_evento: "12 de setembro de 2026",
-  local: "Herdade da Malhadinha, Alentejo",
+  local: "Herdade da Malhadinha",
   empresa: "Líquen Events",
 };
 
@@ -127,7 +127,7 @@ export function buildSimpleEmailHtml(text: string): string {
     `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#2a2620">`,
     paragraphs,
     `  <hr style="border:none;border-top:1px solid #eee;margin:20px 0 12px">`,
-    `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
+    `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Portugal</p>`,
     `</div>`,
   ]
     .filter((line) => line.length > 0)

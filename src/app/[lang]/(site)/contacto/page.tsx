@@ -30,7 +30,7 @@ export async function generateMetadata({
     description: t.meta.contactoDescription,
     path: "/contacto",
     image: "/imagens/DJI_20250913190635_0120_D.jpg",
-    keywords: ["contacto Líquen Events", "decoração de eventos Alentejo"],
+    keywords: ["contacto Líquen Events", "decoração de eventos Portugal"],
     ogLocale: t.meta.ogLocale,
   });
 }
@@ -301,11 +301,11 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
             {[
               {
                 src: "/imagens/Natalia e Jonathan-315.jpg",
-                alt: "Cerimónia de casamento ao ar livre no Alentejo",
+                alt: "Cerimónia de casamento ao ar livre",
               },
               {
                 src: "/imagens/JOAO_E_PEDRO_1Y1A3450.jpg",
-                alt: "Casamento ao pôr do sol numa herdade alentejana",
+                alt: "Casamento ao pôr do sol numa herdade",
               },
               {
                 src: "/imagens/M&F0658.jpg",

@@ -70,7 +70,7 @@ export const SITE_KEYWORDS = [
   "empresa de decoração de eventos",
   "decoração de eventos corporativos",
   "decoração de casamentos",
-  "decoração de eventos Lisboa",
+  "decoração de eventos de empresa",
   "empresa de eventos Portugal",
   "Líquen Events",
 ] as const;

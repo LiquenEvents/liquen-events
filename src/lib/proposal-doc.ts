@@ -186,7 +186,7 @@ export interface ProposalDoc {
   clientNames: string;
   eventType: string; // "Casamento"
   eventDate: string; // "3 de julho de 2027"
-  location: string; // "Monte da Oliveirinha, Évora"
+  location: string; // "Monte da Oliveirinha"
   guests: string; // "150 pax"
   ceremony?: string; // "Civil, simbólica"
   time?: string; // "A definir"

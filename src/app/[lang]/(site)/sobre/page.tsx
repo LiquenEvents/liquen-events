@@ -30,7 +30,7 @@ export async function generateMetadata({
     // Landscape (2560×1707) — the page's own hero. The previous OG image was a
     // portrait crop, which social platforms render as a broken sliver.
     image: "/imagens/hd-edited.jpg",
-    keywords: ["decoração de eventos Alentejo", "sobre Líquen Events"],
+    keywords: ["decoração de eventos Portugal", "sobre Líquen Events"],
     ogLocale: t.meta.ogLocale,
   });
 }

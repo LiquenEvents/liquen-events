@@ -2014,7 +2014,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ location: e.target.value });
                 }}
                 containerClassName={realce("location")}
-                placeholder="Monte da Oliveirinha, Évora"
+                placeholder="Monte da Oliveirinha"
               />
               <Field
                 label="Convidados"

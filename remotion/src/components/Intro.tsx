@@ -187,7 +187,7 @@ export const Intro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
             textShadow: "0 1px 8px rgba(0,0,0,0.8)",
           }}
         >
-          Évora · Portugal
+          Portugal
         </p>
       </AbsoluteFill>
     </AbsoluteFill>

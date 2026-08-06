@@ -311,7 +311,7 @@ export function buildRichEmailHtml(doc: RichDoc): string {
     `<div style="${S.container}">`,
     body,
     `  <hr style="border:none;border-top:1px solid #eee;margin:20px 0 12px">`,
-    `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
+    `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Portugal</p>`,
     `</div>`,
   ]
     .filter((line) => line.length > 0)

@@ -20,7 +20,7 @@ export interface TermsSection {
 
 /**
  * Boilerplate profissional para um estúdio de decoração de eventos premium
- * (Líquen Events, Évora / Alentejo). Conciso mas completo — pensado para ser
+ * (Líquen Events, Portugal). Conciso mas completo — pensado para ser
  * lido, não para intimidar.
  */
 export const DEFAULT_TERMS: TermsSection[] = [

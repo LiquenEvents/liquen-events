@@ -83,7 +83,7 @@ export async function generateMetadata({
     description: t.meta.galeriaDescription,
     path: "/galeria",
     image: "/imagens/DaniGui_Preview20.jpg",
-    keywords: ["galeria de eventos", "fotografias de casamentos Alentejo"],
+    keywords: ["galeria de eventos", "fotografias de casamentos Portugal"],
     ogLocale: t.meta.ogLocale,
   });
 }

@@ -961,7 +961,7 @@ export default function GaleriaClient({
   // Per-photo alt text. The category template (dict.alt) alone would make
   // hundreds of photos share one identical string (bad for image SEO + a11y),
   // so when the shoot/couple is known we append it — every photo then reads
-  // uniquely and descriptively (e.g. "Casamento … no Alentejo — Daniela &
+  // uniquely and descriptively (e.g. "Casamento ao ar livre — Daniela &
   // Guilherme") while keeping the localized, keyword-rich base.
   /** Descrição da foto sem posição nenhuma (o tronco comum ao alt e ao nome
       acessível do botão). */
