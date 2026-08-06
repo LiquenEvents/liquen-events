@@ -11,7 +11,6 @@ import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel } from "@/lib/orcamento/data";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
-import { SITE } from "@/lib/site";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
 import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";

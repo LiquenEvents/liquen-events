@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { idCurto } from "@/lib/id-unico";
 
 /**
  * O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE.
@@ -38,7 +39,7 @@ export default function NotasInternas({
   // O textarea cresce com o texto: uma nota de três linhas dentro de uma caixa
   // de uma linha lê-se por uma frincha, e o que não se relê não serve.
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [id] = useState(() => `notas-${Math.random().toString(36).slice(2, 8)}`);
+  const [id] = useState(() => `notas-${idCurto()}`);
 
   useEffect(() => {
     const el = ref.current;

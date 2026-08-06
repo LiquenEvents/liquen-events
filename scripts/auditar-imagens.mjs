@@ -14,7 +14,7 @@
  */
 import { chromium } from "@playwright/test";
 import { createServer } from "node:http";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const FX =

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
+import { idCurto } from "@/lib/id-unico";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -112,7 +113,7 @@ function historyPosKey(): { key: string; returning: boolean } | null {
     const state = (window.history.state ?? {}) as Record<string, unknown>;
     const existing = state.galeriaPos;
     if (typeof existing === "string") return { key: POS_PREFIX + existing, returning: true };
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const id = idCurto();
     window.history.replaceState({ ...state, galeriaPos: id }, "");
     return { key: POS_PREFIX + id, returning: false };
   } catch {

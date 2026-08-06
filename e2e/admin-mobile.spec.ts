@@ -189,6 +189,11 @@ async function expectErgonomiaTactil(page: Page, label: string) {
  */
 const NA_BARRA = new Set(NA_BARRA_DE_BAIXO);
 
+// A "Organização de propostas", a "Biblioteca de serviços" e o
+// "Acompanhamento" saíram desta lista porque saíram do MENU, a pedido dela
+// (ver a nota em `nav.tsx`). Os ecrãs continuam a existir e a abrir por link
+// directo; o que este passeio verifica é a NAVEGAÇÃO, e um destino que já não
+// está na gaveta não pode ser visitado por ela.
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
@@ -197,13 +202,6 @@ const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
-  {
-    nav: /^Organização de propostas$/,
-    // O único destino com nome curto no telemóvel: o comprido precisa de 240px
-    // no cabeçalho e há 179. O botão da gaveta continua a dizer o nome inteiro;
-    // o título da vista diz "Organização". Ver VIEW_TITLES_CURTOS.
-    heading: /^Organização( de propostas)?$/,
-  },
   { nav: /^Temas$/, heading: /^Temas$/ },
   { nav: /^Tarefas$/, heading: /^Tarefas$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },

@@ -6,7 +6,7 @@ import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
  * A companion to admin-smoke: that spec covers the always-visible CORE sidebar
  * items, this one opens the collapsed "Mais" disclosure and walks the SECONDARY
  * destinations tucked behind it (Faturas, Propostas Aceites, Temas,
- * Organização de propostas, Estatísticas — labels from nav.tsx's
+ * Estatísticas — labels from nav.tsx's
  * MORE_NAV).
  * For each it asserts:
  *   1. its page heading (H1) renders, so the lazy chunk mounted (not a skeleton),
@@ -86,7 +86,6 @@ const SECONDARY_VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },
   { nav: /^Temas$/, heading: /^Temas$/ },
-  { nav: /^Organização de propostas$/, heading: /^Organização de propostas$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
 ];
 

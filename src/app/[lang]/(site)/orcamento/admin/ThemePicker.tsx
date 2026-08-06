@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { idUnico } from "@/lib/id-unico";
 import { PENDING_IMAGE_PREFIX } from "@/lib/proposal-doc";
 import {
   MAX_IMPORT_BATCH,
@@ -247,15 +248,10 @@ export interface ReservedImage {
   sourcePath: string;
 }
 
-/** Um marcador novo. `crypto.randomUUID` onde existe; o resto é a rede de
- *  segurança para contextos sem ele (não é um segredo, só tem de ser único). */
-let tokenSeq = 0;
+/** Um marcador novo. Não é um segredo, só tem de ser único — mas o gerador
+ *  vive em `id-unico.ts` e não tem `Math.random()` nenhum lá dentro. */
 function novoToken(): string {
-  const uuid =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${(++tokenSeq).toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${PENDING_IMAGE_PREFIX}${uuid}`;
+  return `${PENDING_IMAGE_PREFIX}${idUnico()}`;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1000,7 +996,6 @@ export default function ThemePicker({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   /** O rolo volta ao sítio uma vez por tema, não a cada renderização. */
   const restoreScroll = useRef(true);
-  const stopRequested = useRef(false);
   /** O pedido de importação que está em voo AGORA.
    *
    *  Sem isto, o "Parar" só era lido ENTRE lotes: com 8 fotos ou menos há um

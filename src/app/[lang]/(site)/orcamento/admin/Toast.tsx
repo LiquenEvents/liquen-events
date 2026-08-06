@@ -1,10 +1,11 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { idUnico } from "@/lib/id-unico";
 
 type ToastKind = "success" | "error" | "info";
 interface Toast {
-  id: number;
+  id: string;
   kind: ToastKind;
   message: string;
 }
@@ -24,14 +25,14 @@ const TOAST_DURATION = 4000;
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const remove = useCallback((id: number) => {
+  const remove = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   // The auto-dismiss timer now lives in each ToastItem so it can be paused on
   // hover/focus — the provider just enqueues.
   const toast = useCallback((message: string, kind: ToastKind = "info") => {
-    const id = Date.now() + Math.random();
+    const id = idUnico();
     setToasts((prev) => [...prev, { id, kind, message }]);
   }, []);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { idUnico } from "@/lib/id-unico";
 import type { EventMaterialItem } from "@/lib/event-material-types";
 import { progresso } from "@/lib/event-material-types";
 import {
@@ -38,7 +39,7 @@ interface Props {
 const idMarca = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    : idUnico();
 
 export default function Carregamento({ quoteId, eventId, titulo, actor }: Props) {
   const [itens, setItens] = useState<EventMaterialItem[]>([]);

@@ -15,47 +15,59 @@ import { randomId, eur, eur2, eventCountdown, isDateKey, parseMoney, todayKey } 
 const norm = (s: string): string => s.replace(/\s/g, " ");
 
 describe("randomId", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("returns a base36 string of at most 8 chars", () => {
-    for (let i = 0; i < 200; i++) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O DEFEITO QUE ESTES TESTES DOCUMENTAVAM ESTÁ RESOLVIDO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este bloco fixava a implementação antiga —
+   * `Math.random().toString(36).slice(2, 10)` — e um dos testes chamava-se
+   * «PINNED (edge): Math.random() === 0 yields an EMPTY id», com a nota de que
+   * ficava assim "to avoid altering the id algorithm".
+   *
+   * O algoritmo foi alterado, por outra razão: o CodeQL assinalou o
+   * `Math.random()` a gerar identificadores. O `randomId` passou a chamar o
+   * `idCurto()` (ver `src/lib/id-unico.ts`), e com isso **os dois defeitos que
+   * estavam pendentes desapareceram**: já não há id vazio, nem ids de
+   * comprimento variável conforme a sorte da fracção.
+   *
+   * Por isso estes testes deixaram de fixar a aritmética do `Math.random` e
+   * passaram a fixar o que a função PROMETE a quem a usa.
+   */
+  it("devolve sempre uma string não vazia", () => {
+    for (let i = 0; i < 500; i++) {
       const id = randomId();
       expect(typeof id).toBe("string");
-      expect(id.length).toBeLessThanOrEqual(8);
-      // only base36 alphabet (digits + lowercase letters), never uppercase/punctuation
-      expect(id).toMatch(/^[0-9a-z]*$/);
+      expect(id, "um id vazio colide com todos os outros ids vazios").not.toBe("");
     }
   });
 
-  it("is deterministic for a fixed Math.random and slices chars [2,10)", () => {
-    // 0.5 -> "0.i" in base36; slice(2,10) drops "0." leaving "i".
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    expect(randomId()).toBe((0.5).toString(36).slice(2, 10));
+  it("é curto e usa só o alfabeto seguro para um `id` de HTML", () => {
+    for (let i = 0; i < 200; i++) {
+      const id = randomId();
+      expect(id.length).toBeLessThanOrEqual(10);
+      expect(id).toMatch(/^[0-9a-z]+$/);
+    }
   });
 
-  it("produces different ids when the RNG advances", () => {
-    const seq = [0.111111, 0.999999];
-    let i = 0;
-    vi.spyOn(Math, "random").mockImplementation(() => seq[i++]);
-    expect(randomId()).not.toBe(randomId());
+  /** É para isto que serve: distinguir itens de uma lista uns dos outros. */
+  it("não se repete", () => {
+    const vistos = new Set<string>();
+    for (let i = 0; i < 2000; i++) vistos.add(randomId());
+    expect(vistos.size).toBe(2000);
   });
 
-  it("PINNED (edge): Math.random() === 0 yields an EMPTY id", () => {
-    // (0).toString(36) === "0"; slice(2,10) === "". Astronomically rare
-    // (p ~ 2^-53) but documents that randomId can collide on "". See NEEDS
-    // DECISION — not changed here to avoid altering the id algorithm.
+  /**
+   * A prova de que o defeito antigo não pode voltar por uma porta lateral: nem
+   * com o `Math.random` preso a zero — que era o caso que dava "" — o id sai
+   * vazio, porque o `Math.random` deixou de estar no caminho.
+   */
+  it("não depende do Math.random", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
-    expect(randomId()).toBe("");
-  });
-
-  it("can return fewer than 8 chars when the fraction is short", () => {
-    // 0.25 -> "0.9" in base36 -> slice(2,10) -> "9" (single char).
-    vi.spyOn(Math, "random").mockReturnValue(0.25);
-    const id = randomId();
-    expect(id.length).toBeLessThan(8);
-    expect(id).toBe("9");
+    const a = randomId();
+    const b = randomId();
+    expect(a).not.toBe("");
+    expect(a).not.toBe(b);
   });
 });
 
