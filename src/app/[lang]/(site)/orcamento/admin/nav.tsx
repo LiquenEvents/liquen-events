@@ -13,6 +13,7 @@ export type View =
   | "clientes"
   | "calendario"
   | "propostas"
+  | "acompanhamento"
   | "fazer-proposta"
   | "tarefas"
   | "fornecedores"
@@ -44,6 +45,9 @@ export const CORE_NAV: View[] = [
   "overview",
   "pedidos",
   "fazer-proposta",
+  // O acompanhamento fica no núcleo, a seguir a fazer a proposta, porque é a
+  // outra metade do mesmo trabalho: enviar é metade, e a que se esquece.
+  "acompanhamento",
   "propostas",
   "calendario",
   "tarefas",
@@ -163,6 +167,23 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "acompanhamento",
+    label: "Acompanhamento",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

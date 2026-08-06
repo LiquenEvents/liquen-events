@@ -20,6 +20,7 @@ const eur = (n: number) =>
 const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "#8a8a82" },
   enviada: { label: "Enviada", color: "#9aa36a" },
+  em_negociacao: { label: "Em negociação", color: "#7d8a55" },
   aceite: { label: "Aceite", color: "#525a2f" },
   rejeitada: { label: "Recusada", color: "#5a5a55" },
 };

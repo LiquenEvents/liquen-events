@@ -72,6 +72,36 @@ alter table public.proposals add column if not exists responded_at timestamptz;
 -- apenas sem o botão do PDF.
 alter table public.proposals add column if not exists doc jsonb;
 
+-- ── O acompanhamento depois de a proposta seguir ───────────────────────────
+-- Quando voltar a falar com esta pessoa, e porque é que se perdeu. São dados
+-- dela, não derivados: o motivo de recusa de um casamento de 2026 não se
+-- reconstrói de mais lado nenhum.
+--
+-- `follow_up_at` é uma DATE e não um timestamptz de propósito. É "quinta-feira",
+-- não "quinta-feira às 14:07 UTC" — guardar hora obrigava a escolher um fuso
+-- para a mostrar, e ao pé da meia-noite mostrava o dia errado.
+alter table public.proposals add column if not exists follow_up_at date;
+alter table public.proposals add column if not exists follow_up_note text;
+alter table public.proposals add column if not exists lost_reason text;
+alter table public.proposals add column if not exists lost_note text;
+
+-- O estado "em_negociacao" nasceu depois da restrição de estados. Numa base já
+-- instalada, o `if not exists` mais abaixo não a substitui — é preciso deixá-la
+-- cair e voltar a criá-la, senão marcar "em negociação" rebenta com um 23514.
+alter table public.proposals drop constraint if exists proposals_status_chk;
+alter table public.proposals add constraint proposals_status_chk
+  check (status in ('rascunho','enviada','em_negociacao','aceite','rejeitada')) not valid;
+
+-- A mesma lista fechada do lado da aplicação (`MotivoDeRecusa`). Está aqui
+-- porque o objetivo é poder CONTAR — "perdi seis por preço" — e texto livre
+-- numa coluna que se conta é a maneira de nunca mais se poder contar.
+alter table public.proposals drop constraint if exists proposals_lost_reason_chk;
+alter table public.proposals add constraint proposals_lost_reason_chk
+  check (
+    lost_reason is null
+    or lost_reason in ('preco','data','escolheram-outro','sem-resposta','outro')
+  ) not valid;
+
 create index if not exists proposals_quote_id_idx on public.proposals (quote_id);
 create index if not exists proposals_created_at_idx on public.proposals (created_at desc);
 
@@ -544,7 +574,7 @@ do $$ begin
 
   if not exists (select 1 from pg_constraint where conname = 'proposals_status_chk') then
     alter table public.proposals add constraint proposals_status_chk
-      check (status in ('rascunho','enviada','aceite','rejeitada')) not valid;
+      check (status in ('rascunho','enviada','em_negociacao','aceite','rejeitada')) not valid;
   end if;
 
   if not exists (select 1 from pg_constraint where conname = 'proposals_amounts_chk') then

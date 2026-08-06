@@ -171,12 +171,19 @@ const proposalSchema = z.looseObject({
   subtotal: money,
   vat: money,
   total: money,
-  status: z.enum(["rascunho", "enviada", "aceite", "rejeitada"]),
+  status: z.enum(["rascunho", "enviada", "em_negociacao", "aceite", "rejeitada"]),
   createdAt: z.string().max(64),
   validUntil: text(64),
   notes: text(20_000),
   sentAt: stamp,
   respondedAt: stamp,
+  // O acompanhamento: quando voltar a falar, e porque é que se perdeu. Entra
+  // na cópia porque é trabalho dela, não um derivado — o motivo de recusa de
+  // um casamento de 2026 não se recupera de mais lado nenhum.
+  followUpAt: text(64),
+  followUpNote: text(2_000),
+  lostReason: text(40),
+  lostNote: text(2_000),
 });
 
 const supplierSchema = z.looseObject({

@@ -314,7 +314,30 @@ export interface Supplier {
 }
 
 // ── Propostas (criadas internamente, enviadas em PDF ao cliente) ──
-export type ProposalStatus = "rascunho" | "enviada" | "aceite" | "rejeitada";
+/**
+ * O estado interno de uma proposta, marcado por ela.
+ *
+ * "em_negociacao" é o estado que faltava e que descreve a maior parte do tempo
+ * real: a proposta seguiu, houve resposta, e está a discutir-se. Sem ele, uma
+ * proposta em terceira ronda de conversa era indistinguível de uma que ninguém
+ * abriu — e é justamente essa distinção que decide quem se contacta amanhã.
+ *
+ * NÃO existe aqui um estado "expirada". A validade é uma data; um estado
+ * gravado que diga "expirou" fica errado no minuto seguinte ao da gravação, e
+ * corrigi-lo exigiria alguém (ou algo) a passar por todas as propostas todos os
+ * dias. Deriva-se de `validUntil` — ver `estaExpirada` em proposta-estado.ts.
+ */
+export type ProposalStatus = "rascunho" | "enviada" | "em_negociacao" | "aceite" | "rejeitada";
+
+/**
+ * Porque é que se perdeu.
+ *
+ * Uma lista curta e fechada, porque o objetivo é poder CONTAR: "perdi seis por
+ * preço este semestre" é uma frase que muda decisões, e não se chega lá com
+ * texto livre. O `outro` existe para quem não cabe na lista não ser forçado a
+ * mentir numa das quatro — e leva nota à parte.
+ */
+export type MotivoDeRecusa = "preco" | "data" | "escolheram-outro" | "sem-resposta" | "outro";
 
 export interface ProposalLineItem {
   description: string;
@@ -340,6 +363,20 @@ export interface Proposal {
   sentAt?: string;
   /** When the client accepted/declined via the public link. */
   respondedAt?: string;
+  /**
+   * Quando voltar a falar com esta pessoa (yyyy-mm-dd), escolhido por ela.
+   *
+   * Não dispara nada para o cliente — não há email automático, não há aviso do
+   * lado de lá. É um lembrete do lado de cá, e é isso que o painel de
+   * acompanhamento ordena.
+   */
+  followUpAt?: string;
+  /** O que fica por dizer no próximo contacto ("mandar fotos do arco"). */
+  followUpNote?: string;
+  /** Porque é que se perdeu — preenchido ao marcar como recusada. */
+  lostReason?: MotivoDeRecusa;
+  /** O detalhe, quando o motivo sozinho não chega. */
+  lostNote?: string;
   /** Rich multi-page proposal document (Proposal Studio). Stored so the studio
    *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
    *  not bytes. Optional — legacy line-item proposals don't set it. */

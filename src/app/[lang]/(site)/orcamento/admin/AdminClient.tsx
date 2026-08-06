@@ -51,6 +51,7 @@ import {
   Clientes,
   Calendario,
   Propostas,
+  Acompanhamento,
   Tarefas,
   Fornecedores,
   StatsDashboard,
@@ -1385,6 +1386,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Clientes",
     calendario: "Calendário",
     propostas: "Propostas",
+    acompanhamento: "Acompanhamento",
     "fazer-proposta": "Fazer proposta",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
@@ -1406,6 +1408,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Histórico por cliente",
     calendario: "Os seus eventos no tempo",
     propostas: "Todas as propostas enviadas",
+    acompanhamento: "O que está à espera de resposta, por ordem de urgência",
     "fazer-proposta": "Escolha o cliente e escreva a proposta",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
@@ -1954,6 +1957,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   setSelected((prev) => (prev?.id === q.id ? q : prev));
                 }}
               />
+            </div>
+          )}
+
+          {/* ── Acompanhamento: o que ficou à espera de resposta ── */}
+          {view === "acompanhamento" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Acompanhamento quotes={quotes} onOpenQuote={openQuote} />
             </div>
           )}
 
