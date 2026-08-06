@@ -1555,7 +1555,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   return (
     <>
-      <div className="min-h-screen bg-surface flex">
+      {/* `-mt-24` CANCELA O `pt-24` DO `<main>` GLOBAL, NO PRIMEIRO DESENHO.
+          Isto era feito por CSS (`body.admin-mode main { padding-top: 0 }`), e
+          a classe `admin-mode` só entra num `useEffect` — ou seja, DEPOIS de o
+          browser já ter desenhado os 96 px de padding. O resultado era o back
+          office inteiro a saltar 96 px para cima assim que o React montava:
+          **0,128 de CLS**, medido, o maior salto de todos os ecrãs auditados, e
+          em todas as entradas.
+          Em `className` vai no HTML que o servidor manda, portanto não há
+          instante nenhum em que a página esteja na posição errada. */}
+      <div className="-mt-24 min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
         <RestoreDialog open={restoreOpen} onClose={() => setRestoreOpen(false)} toast={toast} />
         <PasskeysDialog open={passkeysOpen} onClose={() => setPasskeysOpen(false)} toast={toast} />

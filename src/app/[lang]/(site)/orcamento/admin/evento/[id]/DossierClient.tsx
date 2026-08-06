@@ -93,7 +93,7 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
   }, []);
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
+    <div className="-mt-24 min-h-screen bg-surface flex flex-col">
       <DossierHeader
         data={live}
         stage={stage}

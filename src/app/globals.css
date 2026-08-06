@@ -951,9 +951,12 @@ body:has([data-orcamento-mode]) .scroll-progress {
 body.admin-mode nav[data-public-nav] {
   display: none !important;
 }
-body.admin-mode main {
-  padding-top: 0 !important;
-}
+/* O `padding-top: 0` do `<main>` VIVIA AQUI, e era um salto de 0,128 de CLS.
+   A classe `admin-mode` só entra num `useEffect`, portanto o browser desenhava
+   primeiro os 96 px de padding do `<main>` público e só depois os tirava — o
+   back office inteiro saltava para cima, medido, em todas as entradas.
+   Passou para o `className` de cada raiz do back office (`-mt-24`), que vai no
+   HTML do servidor. O que fica nesta classe é só o que NÃO mexe no layout. */
 /* Drop the film grain inside the tool for a crisper, calmer surface */
 body.admin-mode::before {
   display: none !important;
