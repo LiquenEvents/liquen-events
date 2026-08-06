@@ -893,6 +893,22 @@ export default function ThemePicker({
                     variant={t.id === themeId ? "subtle" : "ghost"}
                     aria-pressed={t.id === themeId}
                     onClick={() => pickTheme(t.id)}
+                    /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar.
+                       Entre o rato chegar ao separador e o clique passam
+                       ~150–300 ms — que é praticamente o que a rota demora
+                       (uma listagem + duas assinaturas). Buscar aí faz o tema
+                       estar pronto no instante do clique, em vez de começar
+                       nele.
+                       Não custa um pedido a mais: se ela carregar antes de a
+                       resposta voltar, o `emVoo` do cache faz o clique esperar
+                       pelo MESMO pedido em vez de abrir outro. E se não
+                       carregar, fica guardado para a próxima.
+                       `focus` para quem navega por teclado; `touchstart` para
+                       o telemóvel, onde não há hover nenhum — é o instante
+                       entre pousar o dedo e o levantar. */
+                    onPointerEnter={() => void buscarPrimeiraPagina(t.id).catch(() => {})}
+                    onFocus={() => void buscarPrimeiraPagina(t.id).catch(() => {})}
+                    onTouchStart={() => void buscarPrimeiraPagina(t.id).catch(() => {})}
                   >
                     {t.name}
                     <span className="bo-text-muted">{themeCountLabel(t)}</span>

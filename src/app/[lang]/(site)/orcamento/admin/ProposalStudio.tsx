@@ -38,7 +38,7 @@ import { eur, splitSinal } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage } from "./ThemePicker";
-import { aquecerBiblioteca } from "./theme-picker-cache";
+import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
 import { Button, Card, Field, Segmented } from "./ui";
 
 /**
@@ -833,6 +833,19 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     document.addEventListener("keydown", aoTeclar);
     return () => document.removeEventListener("keydown", aoTeclar);
   });
+
+  /**
+   * Depois de o estúdio assentar, vai buscando as miniaturas da biblioteca em
+   * segundo plano. É neste ecrã que o seletor de temas se abre — uma vez por
+   * mood board —, e é aqui que faz sentido pagar esse trabalho adiantado.
+   *
+   * Os travões (dados poupados, ligação lenta) estão no próprio
+   * `aquecerFotosEmSegundoPlano`, não aqui: quem decide se vale a pena gastar
+   * bytes é quem sabe como está a rede, não quem sabe que ecrã é este.
+   */
+  useEffect(() => {
+    aquecerFotosEmSegundoPlano();
+  }, []);
 
   // ── Aviso ao sair com trabalho por gravar ─────────────────────────────
   // A janela é estreita (a gravação é a 800ms), mas existe: fechar o

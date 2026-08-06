@@ -174,6 +174,77 @@ export function aquecerBiblioteca(): void {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CARREGAR AS MINIATURAS EM SEGUNDO PLANO, ENQUANTO ELA TRABALHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `aquecerBiblioteca` acima trata do JSON quando o rato se aproxima do botão.
+ * Isto trata dos BYTES, e mais cedo: depois de a página assentar, vai buscando
+ * as miniaturas do tema mais provável com prioridade baixa. Quando ela abre o
+ * seletor, as fotos já estão no disco — e, com o service worker a guardá-las
+ * pela chave sem token, continuam lá na sessão seguinte.
+ *
+ * ── E porque é que isto NÃO corre sempre ───────────────────────────────────
+ * Porque são bytes que ela não pediu. Uma página de 60 miniaturas são ~1,2 MB;
+ * num plano de dados limitado, gastá-los para o caso de ela querer abrir o
+ * seletor é uma decisão que não nos compete tomar sozinhos.
+ *
+ * Por isso há três travões, e todos falham para o lado de NÃO carregar:
+ *  · `saveData` — o browser diz que quem manda pediu para poupar dados;
+ *  · ligação lenta (`2g`/`3g`) — aí a largura de banda é para o que está a ser
+ *    feito agora, não para o que talvez venha a ser;
+ *  · sem `requestIdleCallback` não se agenda nada — não vale a pena inventar um
+ *    `setTimeout` que compete com o desenho da página.
+ *
+ * `fetchPriority: "low"` diz ao browser para pôr isto atrás de tudo o resto.
+ * É o que impede este trabalho de atrasar aquilo que ela está mesmo a fazer.
+ */
+export function aquecerFotosEmSegundoPlano(): void {
+  if (typeof window === "undefined") return;
+  const rede = (
+    navigator as unknown as {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }
+  ).connection;
+  if (rede?.saveData) return;
+  if (rede?.effectiveType && /^(slow-)?2g$|^3g$/.test(rede.effectiveType)) return;
+  const agendar = (window as unknown as { requestIdleCallback?: (cb: () => void) => number })
+    .requestIdleCallback;
+  if (typeof agendar !== "function") return;
+
+  agendar(() => {
+    void (async () => {
+      try {
+        let alvo: string | null = null;
+        try {
+          alvo = localStorage.getItem("liquen-tema-recente");
+        } catch {
+          /* sem palpite */
+        }
+        if (!alvo) {
+          const lista = await buscarTemas();
+          alvo = lista[0]?.id ?? null;
+        }
+        if (!alvo) return;
+        const pagina = await buscarPrimeiraPagina(alvo);
+        for (const im of pagina.images) {
+          // A micro primeiro (1,8 KB) e a miniatura a seguir: se a ligação
+          // morrer a meio, o que ficou em cache é o mais barato e o mais útil.
+          for (const url of [im.microUrl, im.thumbUrl]) {
+            if (!url) continue;
+            // `no-store` na cache do FETCH, não na do service worker: o que
+            // interessa guardar é o que o SW guarda, pela chave sem token.
+            await fetch(url, { priority: "low" } as RequestInit).catch(() => {});
+          }
+        }
+      } catch {
+        /* trabalho que ninguém pediu não pode aparecer no ecrã */
+      }
+    })();
+  });
+}
+
+/**
  * Esquecer tudo. Para quem MEXE na biblioteca (carregar, apagar, mudar de
  * tema) poder garantir que a abertura seguinte vê o que acabou de fazer, em
  * vez de esperar pela revalidação.
