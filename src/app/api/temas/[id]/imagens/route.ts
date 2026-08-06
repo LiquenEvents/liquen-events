@@ -140,6 +140,20 @@ function pairThumbs(files: File[], form: FormData): (File | null)[] {
  * Cada valor passa pelo guarda do `lqip.ts`: um `data:` URI que vem do cliente
  * e vai parar a um `src` não entra sem lista de permitidos.
  */
+/** As MICRO (96 px), emparelhadas pela ordem — mesma regra do `pairThumbs`. */
+function pairMicros(files: File[], form: FormData): (File | null)[] {
+  const micros = form.getAll("micros").filter((f): f is File => f instanceof File);
+  if (micros.length === 0) return files.map(() => null);
+  if (micros.length !== files.length) {
+    log.warn("temas: micros ignoradas (não correspondem aos ficheiros)", {
+      files: files.length,
+      micros: micros.length,
+    });
+    return files.map(() => null);
+  }
+  return micros.map((m) => (m.size === 0 ? null : m));
+}
+
 function pairLqips(files: File[], form: FormData): (string | null)[] {
   const raw = form.getAll("lqips").filter((v): v is string => typeof v === "string");
   if (raw.length === 0) return files.map(() => null);
@@ -219,6 +233,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const thumbs = pairThumbs(files, form);
   const hashes = pairHashes(files, form);
   const lqips = pairLqips(files, form);
+  const micros = pairMicros(files, form);
   const force = form.get("force") === "1";
 
   const uploaded: ThemeImage[] = [];
@@ -252,10 +267,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const thumbInput: ThemeThumbInput | undefined = thumb
       ? { bytes: Buffer.from(await thumb.arrayBuffer()), contentType: thumb.type }
       : undefined;
-    const res = await uploadThemeImage(id, bytes, file.type, thumbInput, {
-      fingerprint: hashes[i],
-      force,
-    });
+    const micro = micros[i];
+    const microInput: ThemeThumbInput | undefined = micro
+      ? { bytes: Buffer.from(await micro.arrayBuffer()), contentType: micro.type }
+      : undefined;
+    const res = await uploadThemeImage(
+      id,
+      bytes,
+      file.type,
+      thumbInput,
+      { fingerprint: hashes[i], force },
+      microInput,
+    );
     if (!res) {
       log.error("temas: upload falhou", null, { id, name: file.name });
       return NextResponse.json({ error: "Falha ao guardar a imagem." }, { status: 502 });

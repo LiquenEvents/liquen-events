@@ -247,6 +247,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
   });
 
@@ -262,6 +263,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       { bytes: expect.any(Buffer), contentType: "image/jpeg" },
       naming(null),
+      undefined,
     );
     expect(st.upload).toHaveBeenCalledTimes(2);
   });
@@ -276,6 +278,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -284,6 +287,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       expect.objectContaining({ contentType: "image/jpeg" }),
       naming(null),
+      undefined,
     );
   });
 
@@ -299,6 +303,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -307,6 +312,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
   });
 
@@ -320,6 +326,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
   });
 });
@@ -335,6 +342,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(H1),
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -343,6 +351,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(H2),
+      undefined,
     );
   });
 
@@ -357,6 +366,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -365,6 +375,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
   });
 
@@ -383,6 +394,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -391,6 +403,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(H2),
+      undefined,
     );
   });
 
@@ -452,6 +465,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(H1, true),
+      undefined,
     );
   });
 

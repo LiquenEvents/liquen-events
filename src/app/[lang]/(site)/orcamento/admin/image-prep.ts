@@ -23,7 +23,7 @@
  */
 
 import type { WorkerRequest, WorkerResponse } from "./image-worker";
-import { LQIP_EDGE, LQIP_MAX_CHARS, LQIP_QUALITY } from "./image-worker";
+import { LQIP_EDGE, LQIP_MAX_CHARS, LQIP_QUALITY, MICRO_EDGE, MICRO_QUALITY } from "./image-worker";
 
 const SUPPORTED = /^image\/(jpe?g|png|webp)$/i;
 
@@ -122,6 +122,10 @@ export function needsThumb(w: number, h: number): boolean {
 /** Nome do ficheiro da miniatura (puro — testado). Só para leitura humana nos
  *  registos: o servidor guarda a miniatura com a MESMA chave do original, no
  *  bucket das miniaturas. */
+export function microFileName(name: string): string {
+  return jpegName(name).replace(/\.jpg$/i, ".micro.jpg");
+}
+
 export function thumbFileName(name: string): string {
   return jpegName(name).replace(/\.jpg$/i, ".thumb.jpg");
 }
@@ -139,6 +143,12 @@ export interface PreparedImage {
    *  Nunca é motivo para falhar o carregamento: sem miniatura a grelha usa o
    *  original, exatamente como faz com as fotos anteriores a esta funcionalidade. */
   thumb: File | null;
+  /**
+   * A derivada de 96 px, para as tiras do cartão de tema (43 px). `null`
+   * quando não se justifica ou não foi possível criar — e aí o cartão usa a
+   * miniatura de 400 px, exactamente como faz hoje.
+   */
+  micro: File | null;
   /**
    * A imagem de 16 px em `data:` URI — o que a grelha desenha a 0 ms, antes de
    * haver rede (ver `LQIP_EDGE` em `image-worker.ts`).
@@ -265,7 +275,12 @@ async function prepareViaWorker(
   preset: { maxEdge: number; quality: number },
   skipOriginal: boolean,
   wantThumb: boolean,
-): Promise<{ blob: Blob | null; thumb: Blob | null; lqip: string | null } | null> {
+): Promise<{
+  blob: Blob | null;
+  thumb: Blob | null;
+  micro: Blob | null;
+  lqip: string | null;
+} | null> {
   const lane = await acquire();
   if (!lane) return null;
   const id = nextJobId++;
@@ -294,7 +309,7 @@ async function prepareViaWorker(
     }
   });
   if (!res || !res.ok) return null;
-  return { blob: res.blob, thumb: res.thumb, lqip: res.lqip };
+  return { blob: res.blob, thumb: res.thumb, micro: res.micro, lqip: res.lqip };
 }
 
 type Source = ImageBitmap | HTMLImageElement;
@@ -394,7 +409,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
   const keep = keepOriginal(file.type, file.size, kind);
   // Sem miniatura a pedir, um ficheiro já pequeno e suportado nem sequer é
   // descodificado — é o caminho barato que o estúdio de propostas já usava.
-  if (keep && !wantThumb) return { file, thumb: null, lqip: null };
+  if (keep && !wantThumb) return { file, thumb: null, micro: null, lqip: null };
 
   // 1ª tentativa: fora do fio principal. Devolve `null` quando este browser não
   // tem `OffscreenCanvas` ou quando o trabalhador não consegue descodificar o
@@ -407,7 +422,10 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     const thumb = viaWorker.thumb
       ? new File([viaWorker.thumb], thumbFileName(file.name), { type: "image/jpeg" })
       : null;
-    return { file: out, thumb, lqip: viaWorker.lqip };
+    const micro = viaWorker.micro
+      ? new File([viaWorker.micro], microFileName(file.name), { type: "image/jpeg" })
+      : null;
+    return { file: out, thumb, micro, lqip: viaWorker.lqip };
   }
 
   let source: Source;
@@ -416,7 +434,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
   } catch {
     // Formato suportado que este browser não descodifica: sobe tal e qual e
     // fica sem miniatura (a grelha usa o original).
-    if (SUPPORTED.test(file.type)) return { file, thumb: null, lqip: null };
+    if (SUPPORTED.test(file.type)) return { file, thumb: null, micro: null, lqip: null };
     throw new Error(
       `"${file.name}" não é suportada neste navegador. Converta para JPG e tente de novo.`,
     );
@@ -459,11 +477,20 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
       if (blob) thumb = new File([blob], thumbFileName(file.name), { type: "image/jpeg" });
     }
 
-    // 3) O LQIP, do MESMO canvas — a imagem que a grelha desenha a 0 ms.
+    // 3) A micro, do mesmo canvas. Silenciosa como a miniatura.
+    let micro: File | null = null;
+    if (wantThumb && needsThumb(bw, bh)) {
+      const m = fitWithin(bw, bh, MICRO_EDGE);
+      const canvas = drawTo(base, m.w, m.h);
+      const blob = canvas ? await encode(canvas, MICRO_QUALITY) : null;
+      if (blob) micro = new File([blob], microFileName(file.name), { type: "image/jpeg" });
+    }
+
+    // 4) O LQIP, do MESMO canvas — a imagem que a grelha desenha a 0 ms.
     //    Silencioso como a miniatura: sem ele fica a caixa de hoje.
     const lqip = await lqipNoFioPrincipal(base, bw, bh);
 
-    return { file: out, thumb, lqip };
+    return { file: out, thumb, micro, lqip };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.

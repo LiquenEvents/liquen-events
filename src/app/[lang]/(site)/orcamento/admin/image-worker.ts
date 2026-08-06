@@ -35,7 +35,14 @@ export interface WorkerRequest {
  *  do fio principal, que sabe descodificar coisas que o trabalhador não sabe
  *  (HEIC no Safari, via `<img>`, que aqui não existe). */
 export type WorkerResponse =
-  | { id: number; ok: true; blob: Blob | null; thumb: Blob | null; lqip: string | null }
+  | {
+      id: number;
+      ok: true;
+      blob: Blob | null;
+      thumb: Blob | null;
+      micro: Blob | null;
+      lqip: string | null;
+    }
   | { id: number; ok: false; reason: string };
 
 /**
@@ -81,6 +88,36 @@ export const LQIP_QUALITY = 0.4;
  * um que custa mais do que a miniatura que substitui.
  */
 export const LQIP_MAX_CHARS = 1200;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MICRO — 96 px, para as tiras do cartão de tema
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO: as três pré-visualizações de cada cartão de tema são desenhadas com
+ * **43 × 42 px** e recebem o ficheiro de 400 px. Num ecrã normal são **9,3×**
+ * mais píxeis do que os que se pintam; numa retina, 4,9×. São 18 dos 24 pedidos
+ * da vista Temas e ~360 KB dos 415 KB — para tiras do tamanho de uma unha.
+ *
+ * 96 px cobre os 43 px CSS a 2× de densidade com folga, e é o mais pequeno que
+ * ainda serve uma retina. A 43 px de largura o detalhe não existe: o que uma
+ * tira destas transmite é a COR e a forma geral, e isso sobrevive a q65.
+ *
+ * ── Porque não se resolveu com o LQIP ──────────────────────────────────────
+ * Porque o LQIP tem 16 px e a tira tem 43: ampliá-lo é 2,7× de desfoque, e
+ * essa tira é uma fotografia, não um placeholder. O LQIP continua a ser o que
+ * aparece a 0 ms; a micro é o que fica.
+ *
+ * ── E porque não uma escada de quatro tamanhos ─────────────────────────────
+ * Porque a medição não a pede. A miniatura de 400 px está BEM dimensionada para
+ * as células de 137 px do seletor numa retina (1,5×). Acrescentar 900 e 1600
+ * seria trabalho no carregamento e ficheiros no Storage para servir ecrãs que
+ * ninguém tem. Se um ecrã novo os pedir, a medição di-lo-á — e o mecanismo fica
+ * pronto para os receber.
+ */
+export const MICRO_EDGE = 96;
+/** Qualidade da micro. Mais baixa do que a miniatura: a 43 px não se vê. */
+export const MICRO_QUALITY = 0.65;
 
 /** Cópia de `fitWithin` da image-prep (ver nota no cabeçalho). */
 export function planResize(w: number, h: number, maxEdge: number): { w: number; h: number } {
@@ -152,7 +189,7 @@ export async function lqipDe(
  */
 export async function prepareInWorker(
   req: WorkerRequest,
-): Promise<{ blob: Blob | null; thumb: Blob | null; lqip: string | null }> {
+): Promise<{ blob: Blob | null; thumb: Blob | null; micro: Blob | null; lqip: string | null }> {
   const bitmap = await createImageBitmap(req.blob);
   try {
     let blob: Blob | null = null;
@@ -187,12 +224,26 @@ export async function prepareInWorker(
       }
     }
 
+    // A MICRO, do mesmo canvas. Derivada e dispensável como a miniatura:
+    // falhar aqui deixa o cartão a usar a miniatura de 400 px, que é
+    // exactamente o que ele faz hoje.
+    let micro: Blob | null = null;
+    if (req.wantThumb && planThumb(bw, bh, MICRO_EDGE)) {
+      const m = planResize(bw, bh, MICRO_EDGE);
+      const canvas = drawTo(base, m.w, m.h);
+      if (canvas) {
+        micro = await canvas
+          .convertToBlob({ type: "image/jpeg", quality: MICRO_QUALITY })
+          .catch(() => null);
+      }
+    }
+
     // Do MESMO canvas já reduzido, como a miniatura. Sempre — uma foto sem
     // miniatura (já pequena) é precisamente uma que continua a precisar de
     // alguma coisa para mostrar enquanto chega.
     const lqip = await lqipDe(base, bw, bh);
 
-    return { blob, thumb, lqip };
+    return { blob, thumb, micro, lqip };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.
@@ -228,8 +279,8 @@ if (
   self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     const req = e.data;
     try {
-      const { blob, thumb, lqip } = await prepareInWorker(req);
-      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb, lqip };
+      const { blob, thumb, micro, lqip } = await prepareInWorker(req);
+      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb, micro, lqip };
       self.postMessage(res);
     } catch (err) {
       const res: WorkerResponse = {

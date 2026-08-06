@@ -1745,7 +1745,7 @@ function ThemeFolder({
             // CAPA, impressa em grande. Guardá-la com 1600 px degradava-a para
             // sempre (o original nunca mais existe). A miniatura sai da MESMA
             // descodificação, para um lote de 300 fotos não custar o dobro.
-            const { file, thumb, lqip } = await prepareImageWithThumb(f, "cover");
+            const { file, thumb, micro, lqip } = await prepareImageWithThumb(f, "cover");
             // A miniatura acabada de fazer é a melhor pré-visualização que há:
             // 400 px, ~25 KB, e já está em memória. As células que ainda não
             // tinham imagem ganham-na aqui; as que já tinham ficam com a que
@@ -1764,6 +1764,9 @@ function ThemeFolder({
             const form = new FormData();
             form.append("files", file);
             if (thumb) form.append("thumbs", thumb);
+            // A micro de 96 px, para as tiras do cartão de tema. Vai no mesmo
+            // pedido — já está feita, do mesmo canvas.
+            if (micro) form.append("micros", micro);
             // O LQIP viaja no MESMO pedido que a foto — é trabalho do
             // carregamento, e o carregamento já está a falar com o servidor.
             // Emparelhado pela ORDEM, como o `thumbs` e o `hashes`.

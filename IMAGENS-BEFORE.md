@@ -22,6 +22,23 @@ A biblioteca sintética tem **os tamanhos reais dos seis temas dela** — 14, 16
 **O estrangulamento entra depois do login**, de propósito: o que se está a medir
 é o pipeline de imagens, não o formulário de entrada.
 
+### O erro mais grave desta auditoria, e é meu
+
+A tabela da vista Temas diz **415 KB**. Está errada, e por uma razão que só
+apareceu ao ir corrigir o desperdício: as fixtures serviam a MINIATURA de
+400 px, e o código real não serve isso.
+
+`GET /api/temas` assina **`theme-assets`** — o bucket dos **originais**,
+2200 px, ~576 KB por fotografia. A capa do cartão e as três tiras saem todas de
+lá. Por cartão: 4 × 576 KB = **2,3 MB**. Seis cartões: **~13,8 MB** para
+desenhar uma lista de temas.
+
+Em píxeis do ecrã: a capa recebe **17×** os que pinta; as tiras, **51×**.
+
+Os tempos e o CLS medidos continuam válidos (foram medidos com o cliente real);
+o que estava errado era o PESO, e estava errado por um factor de ~33. A tabela
+abaixo mantém-se com a nota, para não apagar o que foi publicado.
+
 ### Uma correcção a esta auditoria, feita depois de a publicar
 
 A primeira versão desta tabela dividia os píxeis do ficheiro pelos píxeis **CSS**
@@ -73,7 +90,7 @@ seletor numa retina está certo; para a tira do cartão é 9,3× a mais.
 | --- | --- | --- | --- |
 | Pedidos JSON | 2 | 2 | — |
 | Pedidos de imagem | 19 | 19 | — |
-| Bytes | 415 KB | 415 KB | — |
+| Bytes | 415 KB ⚠️ | 415 KB ⚠️ | — |
 | **1.ª foto da biblioteca visível** | **1845 ms** | **2192 ms** | < 300 ms ❌ |
 | **Grelha completa** (24 fotos) | **3821 ms** | **4156 ms** | < 1 s ❌ |
 | **CLS** | **0,170** | **0,168** | 0 ❌ |
@@ -84,6 +101,9 @@ Cada cartão mostra a capa mais três pré-visualizações. As pré-visualizaç�
 medem **43 × 42 px** no ecrã e o ficheiro tem 400 px de lado maior — é o mesmo
 ficheiro de 20 KB da capa, servido para uma tira do tamanho de uma unha. São
 **18 dos 24 pedidos** e ~360 KB dos 415 KB desta vista.
+
+⚠️ **Os 415 KB são das fixtures, não do código real.** Ver acima: a rota assina
+os originais, e a vista custa na verdade **~13,8 MB**.
 
 ### 2. **Seletor de temas** — o modal do estúdio
 

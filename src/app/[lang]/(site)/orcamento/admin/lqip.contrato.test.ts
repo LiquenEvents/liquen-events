@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { LQIP_EDGE, LQIP_MAX_CHARS, LQIP_QUALITY, planResize } from "./image-worker";
+import {
+  LQIP_EDGE,
+  LQIP_MAX_CHARS,
+  LQIP_QUALITY,
+  MICRO_EDGE,
+  MICRO_QUALITY,
+  planResize,
+} from "./image-worker";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -130,6 +137,45 @@ describe("LQIP — a imagem que viaja dentro do JSON", () => {
       Math.round(LQIP_QUALITY * 100),
     );
     expect(numero("LQIP_MAX_CHARS"), "a migração aceita um tecto diferente").toBe(LQIP_MAX_CHARS);
+    // A micro corre o MESMO risco: gerada com `sharp` na migração e com canvas
+    // no navegador. Um tamanho diferente dava tiras nítidas numas fotos e
+    // desfocadas noutras, na mesma lista.
+    expect(numero("MICRO_EDGE"), "a migração gera a micro noutro tamanho").toBe(MICRO_EDGE);
+    expect(numero("MICRO_QUALITY"), "a migração encoda a micro com outra qualidade").toBe(
+      Math.round(MICRO_QUALITY * 100),
+    );
+  });
+
+  /**
+   * A MICRO TEM DE SER MUITO MAIS BARATA DO QUE A MINIATURA, senão não há
+   * razão para existir uma terceira derivada — só mais trabalho no
+   * carregamento e mais ficheiros no Storage.
+   */
+  it("a micro custa uma fracção da miniatura, medido em fotografias reais", async () => {
+    const ficheiros = amostra(8);
+    const bytes = async (largura: number, q: number, f: string) =>
+      (
+        await sharp(join(FOTOS, f))
+          .rotate()
+          .resize({ width: largura, height: largura, fit: "inside" })
+          .jpeg({ quality: q })
+          .toBuffer()
+      ).length;
+
+    const micros = await Promise.all(
+      ficheiros.map((f) => bytes(MICRO_EDGE, Math.round(MICRO_QUALITY * 100), f)),
+    );
+    const minis = await Promise.all(ficheiros.map((f) => bytes(400, 72, f)));
+    const somaMicro = micros.reduce((a, b) => a + b, 0);
+    const somaMini = minis.reduce((a, b) => a + b, 0);
+    const reducao = Math.round((1 - somaMicro / somaMini) * 100);
+
+    expect(
+      reducao,
+      `A micro poupa ${reducao}% face à miniatura (${Math.round(somaMicro / ficheiros.length)} B ` +
+        `contra ${Math.round(somaMini / ficheiros.length)} B por foto). Abaixo de 80% deixa de ` +
+        `compensar ter uma terceira derivada.`,
+    ).toBeGreaterThanOrEqual(80);
   });
 
   it("16 px é do LADO MAIOR, e a proporção mantém-se", () => {

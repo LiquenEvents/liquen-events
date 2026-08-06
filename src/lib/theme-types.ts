@@ -78,6 +78,15 @@ export interface ThemeImage {
    *  miniaturas existirem não têm nenhuma — nesse caso mostra-se `url`. */
   thumbUrl?: string;
   /**
+   * URL assinado da MICRO (96 px), quando existe.
+   *
+   * Para as tiras de pré-visualização do cartão de tema, que são desenhadas
+   * com 43 px e recebiam o ficheiro de 400 — 9,3× mais píxeis do que os que se
+   * pintam. Ausente nas fotos anteriores a esta derivada existir; nesse caso
+   * mostra-se a `thumbUrl`, como sempre.
+   */
+  microUrl?: string;
+  /**
    * A fotografia em 16 px, em `data:` URI — desenhada a **0 ms**, antes de
    * haver rede, enquanto a `thumbUrl` viaja.
    *

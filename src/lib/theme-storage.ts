@@ -62,6 +62,20 @@ export const THEME_BUCKET = "theme-assets";
 export const THEME_THUMB_BUCKET = "theme-thumbs";
 
 /**
+ * Bucket das MICRO — 96 px, mesma chave dos outros dois.
+ *
+ * Existe por uma medição: as três tiras de pré-visualização de cada cartão de
+ * tema são desenhadas com 43 × 42 px e recebiam o ficheiro de 400 px. Eram 18
+ * dos 24 pedidos da vista Temas e ~360 KB dos 415 KB. A 96 px são 1,8 KB por
+ * foto — **91% menos bytes** para a mesma tira, medido sobre fotografias reais.
+ *
+ * Tal como as miniaturas: derivada, descartável, e a sua ausência nunca é um
+ * erro. Sem micro o cartão usa a miniatura de 400 px, que é exactamente o que
+ * ele faz hoje.
+ */
+export const THEME_MICRO_BUCKET = "theme-micro";
+
+/**
  * Validade dos URLs assinados da biblioteca: 6 horas.
  *
  * Eram 10 anos. Num bucket com milhares de fotos isso é um empréstimo
@@ -274,25 +288,37 @@ export interface ThemeThumbInput {
  * chave tem de ser idêntica à do original para se poder derivar uma da outra
  * sem índice, e quem serve o ficheiro vai pelo content-type, não pelo nome.
  */
-async function uploadThemeThumb(path: string, thumb: ThemeThumbInput): Promise<string> {
+async function uploadThemeDerivada(
+  bucket: string,
+  path: string,
+  thumb: ThemeThumbInput,
+): Promise<string> {
   const sb = getSupabase();
   if (!sb || !isThemePath(path)) return "";
   try {
-    if (!(await ensureBucket(THEME_THUMB_BUCKET))) return "";
+    if (!(await ensureBucket(bucket))) return "";
     const { error } = await sb.storage
-      .from(THEME_THUMB_BUCKET)
+      .from(bucket)
       .upload(path, thumb.bytes, { contentType: thumb.contentType, upsert: true });
     if (error) {
-      log.warn("theme-storage: miniatura não guardada", { path, erro: error.message });
+      log.warn("theme-storage: derivada não guardada", { bucket, path, erro: error.message });
       return "";
     }
-    const { data } = await sb.storage.from(THEME_THUMB_BUCKET).createSignedUrl(path, SIGNED_TTL);
+    const { data } = await sb.storage.from(bucket).createSignedUrl(path, SIGNED_TTL);
     return data?.signedUrl ?? "";
   } catch (e) {
-    log.warn("theme-storage: miniatura não guardada", { path, erro: String(e) });
+    log.warn("theme-storage: derivada não guardada", { bucket, path, erro: String(e) });
     return "";
   }
 }
+
+/** A miniatura de 400 px (ver `uploadThemeDerivada`). */
+const uploadThemeThumb = (path: string, thumb: ThemeThumbInput) =>
+  uploadThemeDerivada(THEME_THUMB_BUCKET, path, thumb);
+
+/** A micro de 96 px. */
+const uploadThemeMicro = (path: string, micro: ThemeThumbInput) =>
+  uploadThemeDerivada(THEME_MICRO_BUCKET, path, micro);
 
 /**
  * O que aconteceu a uma foto que se tentou guardar.
@@ -331,6 +357,7 @@ export async function uploadThemeImage(
   contentType: string,
   thumb?: ThemeThumbInput,
   options?: ThemeUploadOptions,
+  micro?: ThemeThumbInput,
 ): Promise<ThemeUploadResult | null> {
   const sb = getSupabase();
   if (!sb || !(await ensureBucket(THEME_BUCKET))) return null;
@@ -357,13 +384,22 @@ export async function uploadThemeImage(
   // O índice acompanha o que acabámos de escrever, em vez de ser reconstruído
   // (ver a armadilha em `FINGERPRINT_TTL_MS`).
   noteThemeFingerprint(themeId, { hash: fingerprint, md5: md5Of(bytes), path });
-  const [{ data }, thumbUrl] = await Promise.all([
+  // As três em paralelo: a assinatura do original e as duas derivadas não
+  // dependem uma da outra, e em série somavam-se três idas ao Storage por foto
+  // num lote que pode ter 300.
+  const [{ data }, thumbUrl, microUrl] = await Promise.all([
     sb.storage.from(THEME_BUCKET).createSignedUrl(path, SIGNED_TTL),
     thumb ? uploadThemeThumb(path, thumb) : Promise.resolve(""),
+    micro ? uploadThemeMicro(path, micro) : Promise.resolve(""),
   ]);
   return {
     kind: "created",
-    image: { path, url: data?.signedUrl ?? "", ...(thumbUrl ? { thumbUrl } : {}) },
+    image: {
+      path,
+      url: data?.signedUrl ?? "",
+      ...(thumbUrl ? { thumbUrl } : {}),
+      ...(microUrl ? { microUrl } : {}),
+    },
   };
 }
 
@@ -956,6 +992,12 @@ export async function signThemePaths(
  */
 export function signThemeThumbs(paths: string[]): Promise<Map<string, string>> {
   return signThemePaths(paths, THEME_THUMB_BUCKET);
+}
+
+/** Assina as MICRO (96 px). Mesmas regras das miniaturas: o que não existe
+ *  simplesmente não entra no mapa, e quem chama cai para a miniatura. */
+export function signThemeMicros(paths: string[]): Promise<Map<string, string>> {
+  return signThemePaths(paths, THEME_MICRO_BUCKET);
 }
 
 /**

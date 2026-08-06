@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listThemes, createTheme } from "@/lib/themes-store";
-import { listThemeFiles, signThemePaths, themeFolder, isThemePath } from "@/lib/theme-storage";
+import {
+  listThemeFiles,
+  signThemePaths,
+  signThemeThumbs,
+  signThemeMicros,
+  themeFolder,
+  isThemePath,
+} from "@/lib/theme-storage";
 import { isUniqueViolation } from "@/lib/invoices-store";
 import { isMissingTable, isPersistenceUnavailable } from "@/lib/repository";
 import {
@@ -82,18 +89,47 @@ export async function GET(request: NextRequest) {
     const extras = listings.map(({ names }, i) =>
       names.slice(0, PREVIEWS_POR_CARTAO + 1).map((n) => `${themeFolder(themes[i].id)}/${n}`),
     );
-    const urls = await signThemePaths([
-      ...new Set([...chosen, ...newest, ...extras.flat()].filter(Boolean)),
+    /**
+     * ════════════════════════════════════════════════════════════════════
+     * O CARTÃO NÃO PODE SERVIR ORIGINAIS. Servia.
+     * ════════════════════════════════════════════════════════════════════
+     *
+     * Isto assinava só `theme-assets` — o bucket dos ORIGINAIS, 2200 px e
+     * ~576 KB por fotografia. Para uma capa desenhada com 128 px e três tiras
+     * de 43 px. Por cartão: 4 × 576 KB = 2,3 MB. Seis cartões: **~13,8 MB**
+     * para desenhar uma lista de temas.
+     *
+     * Em píxeis: a capa recebia 17× os que pinta, as tiras 51×.
+     *
+     * Agora assina os TRÊS buckets, em paralelo e em bloco (uma chamada por
+     * bucket, como já era), e escolhe por ordem de adequação:
+     *
+     *   capa  → miniatura 400 px  →  original
+     *   tiras → micro 96 px  →  miniatura 400 px  →  original
+     *
+     * O original continua a ser assinado porque é o único que existe SEMPRE:
+     * as fotos anteriores às derivadas não têm miniatura nenhuma, e um cartão
+     * vazio seria pior do que um cartão pesado. É plano B, não caminho.
+     */
+    const todos = [...new Set([...chosen, ...newest, ...extras.flat()].filter(Boolean))];
+    const [urls, thumbs, micros] = await Promise.all([
+      signThemePaths(todos),
+      signThemeThumbs(todos),
+      signThemeMicros(todos),
     ]);
+    /** O melhor que existe para uma tira de 43 px. */
+    const paraTira = (p: string) => micros.get(p) ?? thumbs.get(p) ?? urls.get(p);
+    /** O melhor que existe para a capa do cartão (~128 px). */
+    const paraCapa = (p: string) => thumbs.get(p) ?? urls.get(p);
 
     const summaries: ThemeSummary[] = themes.map((t, i) => {
       const { names, ok, truncated } = listings[i];
-      const coverUrl = urls.get(chosen[i]) ?? urls.get(newest[i]);
+      const coverUrl = paraCapa(chosen[i]) ?? paraCapa(newest[i]);
       // A capa nunca se repete nas pré-visualizações: no cartão ela já está
       // à frente, e vê-la outra vez na pilha lê-se como um tema com fotos
       // repetidas.
       const previewUrls = extras[i]
-        .map((p) => urls.get(p))
+        .map((p) => paraTira(p))
         .filter((u): u is string => Boolean(u) && u !== coverUrl)
         .slice(0, PREVIEWS_POR_CARTAO);
       return {

@@ -1,5 +1,5 @@
 /**
- * O LQIP DAS FOTOS QUE JÁ LÁ ESTÃO — migração, uma vez.
+ * O LQIP E A MICRO DAS FOTOS QUE JÁ LÁ ESTÃO — migração, uma vez.
  *
  * As fotos carregadas DEPOIS desta funcionalidade já trazem o seu placeholder,
  * gerado no navegador (ver `image-worker.ts`). Este guião trata das que ficaram
@@ -51,8 +51,14 @@ const LQIP_QUALITY = 40;
 /** O mesmo tecto de `src/lib/lqip.ts`. Acima disto não se grava. */
 const LQIP_MAX_CHARS = 1200;
 
+/** A derivada de 96 px para as tiras do cartão de tema. Mesmos valores que o
+ *  navegador usa em `image-worker.ts` (MICRO_EDGE / MICRO_QUALITY). */
+const MICRO_EDGE = 96;
+const MICRO_QUALITY = 65;
+
 const ORIGINAIS = "theme-assets";
 const MINIATURAS = "theme-thumbs";
+const MICRO = "theme-micro";
 
 if (!URL || !KEY) {
   console.error(
@@ -88,6 +94,22 @@ async function ficheiros(pasta) {
   return nomes;
 }
 
+/** Os caminhos que já têm MICRO no bucket. */
+async function jaTemMicro(pasta, nomes) {
+  const feitos = new Set();
+  for (let pagina = 0; pagina < 40; pagina++) {
+    const { data, error } = await sb.storage
+      .from(MICRO)
+      .list(pasta, { limit: 500, offset: pagina * 500 });
+    // Um bucket que ainda não existe não é um erro: quer dizer "nenhuma feita".
+    if (error) return feitos;
+    for (const o of data ?? []) if (o.id) feitos.add(`${pasta}/${o.name}`);
+    if ((data ?? []).length < 500) break;
+  }
+  void nomes;
+  return feitos;
+}
+
 /** Os caminhos que JÁ têm LQIP — para não voltar a fazer o trabalho. */
 async function jaTem(caminhos) {
   const feitos = new Set();
@@ -110,6 +132,19 @@ async function bytesDe(caminho) {
     if (!error && data) return Buffer.from(await data.arrayBuffer());
   }
   return null;
+}
+
+/** A micro de uns bytes — 96 px. `null` quando não dá; nunca lança. */
+async function microDe(bytes) {
+  try {
+    return await sharp(bytes)
+      .rotate()
+      .resize({ width: MICRO_EDGE, height: MICRO_EDGE, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: MICRO_QUALITY })
+      .toBuffer();
+  } catch {
+    return null;
+  }
 }
 
 /** O LQIP de uns bytes. `null` quando não dá — nunca lança. */
@@ -137,6 +172,14 @@ async function gravar(caminho, lqip) {
   if (error) throw new Error(error.message);
 }
 
+/** Guarda a micro no bucket, com a MESMA chave do original. */
+async function gravarMicro(caminho, bytes) {
+  const { error } = await sb.storage
+    .from(MICRO)
+    .upload(caminho, bytes, { contentType: "image/jpeg", upsert: true });
+  if (error) throw new Error(error.message);
+}
+
 async function main() {
   console.log(APLICAR ? "A APLICAR — escreve mesmo.\n" : "ENSAIO — não escreve nada.\n");
 
@@ -152,8 +195,9 @@ async function main() {
     const caminhos = nomes.map((n) => `${pasta}/${n}`);
     total += caminhos.length;
 
-    const comLqip = await jaTem(caminhos);
-    const porFazer = caminhos.filter((c) => !comLqip.has(c));
+    const [comLqip, comMicro] = await Promise.all([jaTem(caminhos), jaTemMicro(pasta, nomes)]);
+    // Uma foto entra no trabalho se lhe faltar QUALQUER uma das duas.
+    const porFazer = caminhos.filter((c) => !comLqip.has(c) || !comMicro.has(c));
     saltados += caminhos.length - porFazer.length;
 
     process.stdout.write(`${pasta}: ${caminhos.length} fotos, ${porFazer.length} por fazer... `);
@@ -168,14 +212,16 @@ async function main() {
         falhados.push({ caminho, motivo: "não deu para descarregar" });
         continue;
       }
-      const lqip = await lqipDe(bytes);
-      if (!lqip) {
+      // As duas do MESMO descarregamento — os bytes já cá estão.
+      const [lqip, micro] = await Promise.all([lqipDe(bytes), microDe(bytes)]);
+      if (!lqip && !micro) {
         falhados.push({ caminho, motivo: "não deu para gerar" });
         continue;
       }
       if (APLICAR) {
         try {
-          await gravar(caminho, lqip);
+          if (lqip && !comLqip.has(caminho)) await gravar(caminho, lqip);
+          if (micro && !comMicro.has(caminho)) await gravarMicro(caminho, micro);
         } catch (e) {
           falhados.push({ caminho, motivo: `não deu para gravar: ${e.message}` });
           continue;
