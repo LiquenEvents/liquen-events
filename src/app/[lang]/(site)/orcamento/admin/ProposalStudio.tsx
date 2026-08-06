@@ -21,6 +21,7 @@ import { guestRangeLabel } from "@/lib/orcamento/data";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import NotasInternas from "./NotasInternas";
+import Versoes from "./Versoes";
 import { custosDe } from "@/lib/orcamento/margem";
 import {
   CONVIDADOS_POR_MESA_OMISSAO,
@@ -436,9 +437,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * certa é quase sempre "sim" — por isso carrega-se sem ler. A anulação
    * pergunta DEPOIS, quando o ecrã já mostra o estrago.
    */
-  const [limpo, setLimpo] = useState<{ doc: StudioDoc; total: string; segundos: number } | null>(
-    null,
-  );
+  const [limpo, setLimpo] = useState<{
+    doc: StudioDoc;
+    total: string;
+    segundos: number;
+    /** O que aconteceu, para o aviso poder dizê-lo. O "Limpar" não é o único
+     *  gesto que deita fora o que estava no ecrã: repor uma versão antiga
+     *  também, e um aviso a dizer "rascunho limpo" depois de um restauro
+     *  mandava procurar um problema que não houve. */
+    motivo: string;
+  } | null>(null);
   /**
    * Histórico para o Cmd+Z. Guardado num `ref` e não em estado: crescer o
    * histórico não pode redesenhar a página, ou escrever numa caixa de texto
@@ -1008,10 +1016,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     toast("Rascunho reposto.", "success");
   }
 
+  /**
+   * Repõe no estúdio uma versão que já tinha sido enviada.
+   *
+   * Passa pela MESMA anulação de dez segundos do "Limpar", e pela mesma razão:
+   * o gesto deita fora o que estava no ecrã, e quem carrega só vê o que perdeu
+   * depois de carregar. Uma caixa a perguntar "tem a certeza?" seria respondida
+   * sem ser lida.
+   *
+   * Não envia nada. Fica um rascunho igual ao que seguiu naquele dia, para se
+   * mexer e voltar a passar pelo Enviar.
+   */
+  function restaurarVersao(antiga: ProposalDoc) {
+    setLimpo({
+      doc,
+      total: totalInput,
+      segundos: 10,
+      motivo: "Versão anterior reposta no rascunho.",
+    });
+    const reposto = antiga as StudioDoc;
+    setDoc(reposto);
+    // O campo do total é texto (aceita "1.500" e "1 500 €"), por isso não sai de
+    // graça do documento: deriva-se a base do que foi reposto, senão ficava com
+    // o número da versão que se acabou de substituir.
+    const base = baseDoDoc(reposto);
+    setTotalInput(typeof base === "number" && base > 0 ? String(base) : "");
+    // A referência é composta a partir dos campos ATÉ alguém lhe mexer. Uma
+    // versão reposta traz a referência com que seguiu, e recompô-la por cima
+    // trocava o número da proposta que o cliente tem em mãos.
+    setRefEdited(true);
+    setConfirmSend(false);
+    setSent(false);
+    setStep("conteudo");
+    toast("Versão reposta. Pode anular durante 10 segundos.", "info");
+  }
+
   function clearDraft() {
     // Sem caixa de confirmação: guarda-se o que estava e dá-se dez segundos
     // para o trazer de volta. Ver a razão em `limpo`, mais acima.
-    setLimpo({ doc, total: totalInput, segundos: 10 });
+    setLimpo({ doc, total: totalInput, segundos: 10, motivo: "Rascunho limpo." });
     try {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(`${DRAFT_KEY}:at`);
@@ -1720,11 +1763,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       {limpo && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
           <span className="text-xs text-foreground/70">
-            Rascunho limpo. Pode anular durante {limpo.segundos}s.
+            {limpo.motivo} Pode anular durante {limpo.segundos}s.
           </span>
           <button
             type="button"
-            className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            className="alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
             onClick={anularLimpeza}
           >
             Anular
@@ -2649,6 +2692,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 quote={quote}
                 quotes={quotes}
                 totalBruto={money.gross}
+              />
+              {/* ── O QUE JÁ SEGUIU ────────────────────────────────────────
+                  Depois da conferência (que olha para ESTA proposta) e antes
+                  do botão: é aqui que a pergunta "o que é que eles vão ver de
+                  diferente?" se faz, com o dedo já a caminho do Enviar.
+
+                  O `key` muda quando se envia — assim o painel volta a ler o
+                  histórico e a proposta que acabou de sair aparece nele, em vez
+                  de ficar com a lista de antes do envio. */}
+              <Versoes
+                key={String(sent)}
+                quoteId={quote.id}
+                doc={doc as ProposalDoc}
+                onRestaurar={restaurarVersao}
               />
               {!canSend && fotosPorConfirmar === 0 && (
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">

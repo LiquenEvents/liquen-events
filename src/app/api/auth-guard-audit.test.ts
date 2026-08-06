@@ -458,6 +458,9 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // O rascunho é trabalho comercial por publicar (preços, notas internas): ler
   // conta tanto como escrever.
   { path: "./orcamento/[id]/proposta-rascunho/route", methods: ["GET", "PUT", "DELETE"] },
+  // O histórico devolve o que se cobrou em cada ronda de negociação, e com
+  // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
+  { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
   // A biblioteca visual: o vocabulário de etiquetas, a procura por etiquetas e
   // o etiquetar em lote. Tudo isto lê e escreve o trabalho de arrumação da
