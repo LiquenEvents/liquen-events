@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -235,4 +235,80 @@ export function useDesceu(limiar = 24, voltaAos = 8): boolean {
     return () => window.removeEventListener("scroll", ver);
   }, [limiar, voltaAos]);
   return desceu;
+}
+
+/**
+ * TOQUE LONGO — o "botão direito" de quem não tem rato.
+ *
+ * Num computador, as acções de uma linha vivem num menu que aparece ao passar
+ * o rato ou ao carregar com o botão direito. Num telemóvel não há nem uma coisa
+ * nem outra, e a saída habitual é encher a linha de ícones — que foi
+ * exactamente o que fez o cabeçalho de cada grupo de serviços ocupar três
+ * linhas num ecrã de 375 px.
+ *
+ * Devolve o que se espalha por um elemento para lhe dar um toque longo. O que
+ * está aqui e não é óbvio:
+ *
+ * · **550 ms.** É o que o iOS usa para o menu de contexto. Menos e dispara a
+ *   quem só estava a pousar o dedo para rolar; mais e parece que não responde.
+ * · **Um dedo a mover-se cancela.** Sem isto, começar a rolar a lista com o
+ *   dedo pousado num cabeçalho abria o menu a meio do gesto. Dez píxeis de
+ *   folga porque um dedo nunca está completamente parado.
+ * · **Só quando há toque a sério.** Com rato, `pointerdown` também dispara, e
+ *   manter o botão carregado num campo de texto passaria a abrir um menu em
+ *   vez de seleccionar texto.
+ * · **Não substitui nada.** O toque longo é um atalho; a acção tem sempre outro
+ *   caminho visível (ver NO-KEYBOARD.md — a mesma regra, outro dispositivo).
+ */
+export function useToqueLongo(aoDisparar: () => void, ms = 550) {
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const origem = useRef<{ x: number; y: number } | null>(null);
+
+  const cancelar = useCallback(() => {
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = null;
+    origem.current = null;
+  }, []);
+
+  // Um `ref` para o callback: sem isto, um `aoDisparar` novo a cada desenho
+  // (que é o caso normal, é sempre uma arrow function) recriava os handlers e
+  // o temporizador era limpo a meio da contagem.
+  // Actualizado num efeito e não a meio do desenho: escrever num `ref` durante
+  // o render é o que parte o modo concorrente do React (o desenho pode ser
+  // deitado fora e refeito, e a escrita fica lá).
+  const guardado = useRef(aoDisparar);
+  useEffect(() => {
+    guardado.current = aoDisparar;
+  });
+
+  useEffect(() => cancelar, [cancelar]);
+
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      // Pousar o dedo num campo de texto e não largar é como se põe o cursor a
+      // meio de uma palavra no iOS. Abrir aqui um menu tirava-lhe isso — e o
+      // gesto seria disparado sempre que ela hesitasse a escrever.
+      if (
+        (e.target as HTMLElement | null)?.closest("input, textarea, [contenteditable], button, a")
+      )
+        return;
+      origem.current = { x: e.clientX, y: e.clientY };
+      temporizador.current = setTimeout(() => {
+        temporizador.current = null;
+        guardado.current();
+      }, ms);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const o = origem.current;
+      if (!o) return;
+      if (Math.abs(e.clientX - o.x) > 10 || Math.abs(e.clientY - o.y) > 10) cancelar();
+    },
+    onPointerUp: cancelar,
+    onPointerCancel: cancelar,
+    // O menu de contexto do browser abriria por cima do nosso.
+    onContextMenu: (e: React.MouseEvent) => {
+      if (temporizador.current || origem.current) e.preventDefault();
+    },
+  };
 }

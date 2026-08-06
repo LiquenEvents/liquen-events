@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import ProposalStudio, { avisoDeConteudoIncompleto, cortesDoCabecalho } from "./ProposalStudio";
@@ -478,5 +478,191 @@ describe("O valor é UM só — o do pedido", () => {
     // O número do pedido é a BASE, e continua a ser 3000 — o rótulo "(sem IVA)"
     // da Gestão do pedido tem de continuar verdadeiro nos dois modos.
     expect(campo).toHaveValue("3000");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS ACÇÕES DE UM GRUPO DE SERVIÇOS, NUM TELEMÓVEL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O cabeçalho de cada grupo tinha quatro coisas na mesma linha: a letra, o
+ * título, duas setas e o ×. Num ecrã de 375 px são três alvos de 44 px a
+ * competir com o campo do título, presentes o tempo todo para acções que se
+ * fazem uma vez por proposta.
+ *
+ * Passaram a ter dois caminhos, e o que estes testes guardam é que são MESMO
+ * dois — porque um gesto escondido sem alternativa visível é o defeito, não a
+ * correcção:
+ *
+ *  1. TOQUE LONGO no cabeçalho → uma folha com mover e remover;
+ *  2. o botão "Reordenar" ao lado do título da secção, para quem nunca
+ *     descobrir o gesto.
+ */
+describe("grupos de serviços — mover e remover sem encher a linha", () => {
+  /** Um rascunho com três grupos, que é onde a ordem passa a interessar. */
+  function seedGrupos(quantos = 3) {
+    const nomes = ["Cerimónia", "Copo de água", "Festa"];
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: nomes
+          .slice(0, quantos)
+          .map((title, i) => ({ letter: `${"abc"[i]})`, title, items: [] })),
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  /** O rascunho é restaurado num efeito; sem esperar por ele mede-se o estúdio
+   *  vazio. */
+  const desenharComGrupos = async (quantos = 3) => {
+    seedGrupos(quantos);
+    renderStudio();
+    await screen.findAllByLabelText("Título do grupo");
+  };
+
+  const titulos = () =>
+    screen.getAllByLabelText("Título do grupo").map((i) => (i as HTMLInputElement).value);
+
+  /** O cabeçalho do grupo `i` — a caixa que ouve o toque longo. */
+  const cabecalhoDoGrupo = (i: number) =>
+    screen.getAllByLabelText("Título do grupo")[i].parentElement!.parentElement!;
+
+  /**
+   * O toque longo do `useToqueLongo`: dedo pousado, 550 ms parado, sem sair de
+   * cima. Um `click` não serve — o gesto é outro, e é o gesto que se testa.
+   *
+   * Os temporizadores falsos ficam ligados só durante o gesto: com eles ligados
+   * o `findBy*` da testing-library nunca resolve, porque espera em temporizador
+   * real. Foi o que fez a primeira versão destes testes esgotar o tempo toda.
+   */
+  async function toqueLongo(el: Element, { mover }: { mover?: { x: number; y: number } } = {}) {
+    vi.useFakeTimers();
+    try {
+      el.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          pointerType: "touch",
+          clientX: 100,
+          clientY: 100,
+          bubbles: true,
+        }),
+      );
+      if (mover) {
+        el.dispatchEvent(
+          new PointerEvent("pointermove", {
+            pointerType: "touch",
+            clientX: mover.x,
+            clientY: mover.y,
+            bubbles: true,
+          }),
+        );
+      }
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  /**
+   * As acções DENTRO da folha.
+   *
+   * Procurar `screen.getByRole("button", { name: /Mover para cima/ })` no
+   * documento inteiro encontra também as setas que cada grupo tem na linha —
+   * no browser estão escondidas por CSS abaixo de `sm`, mas o jsdom não corre
+   * CSS nenhum e vê-as todas. A pergunta certa é sempre "dentro da folha".
+   */
+  const naFolha = async () => within(await screen.findByRole("dialog"));
+
+  it("o toque longo abre as acções do grupo, com o nome dele à vista", async () => {
+    await desenharComGrupos();
+    await toqueLongo(cabecalhoDoGrupo(1));
+
+    // O nome do grupo no título da folha: um menu que diz só "Remover" depois
+    // de um toque longo é a forma fácil de apagar o grupo errado.
+    const folha = await naFolha();
+    expect(folha.getByRole("heading", { name: "Copo de água" })).toBeInTheDocument();
+    expect(folha.getByRole("button", { name: /Mover para cima/ })).toBeInTheDocument();
+    expect(folha.getByRole("button", { name: /Remover grupo/ })).toBeInTheDocument();
+  });
+
+  it("mover para cima pela folha muda mesmo a ordem", async () => {
+    const user = userEvent.setup();
+    await desenharComGrupos();
+    expect(titulos()).toEqual(["Cerimónia", "Copo de água", "Festa"]);
+
+    await toqueLongo(cabecalhoDoGrupo(1));
+    await user.click((await naFolha()).getByRole("button", { name: /Mover para cima/ }));
+
+    expect(titulos()).toEqual(["Copo de água", "Cerimónia", "Festa"]);
+  });
+
+  it("remover pela folha tira o grupo certo", async () => {
+    const user = userEvent.setup();
+    await desenharComGrupos();
+
+    await toqueLongo(cabecalhoDoGrupo(2));
+    await user.click((await naFolha()).getByRole("button", { name: /Remover grupo/ }));
+
+    expect(titulos()).toEqual(["Cerimónia", "Copo de água"]);
+  });
+
+  /**
+   * A metade que impede isto de ser um gesto escondido. Se o "Reordenar"
+   * desaparecesse, mover um grupo passava a depender de adivinhar um toque
+   * longo — e quem não o adivinhasse ficava sem forma nenhuma de o fazer.
+   */
+  it("há um caminho visível que não depende de adivinhar o gesto", async () => {
+    await desenharComGrupos();
+    expect(screen.getByRole("button", { name: "Reordenar" })).toBeInTheDocument();
+    expect(screen.getByText(/Toque sem largar num grupo/)).toBeInTheDocument();
+  });
+
+  it("o modo de reordenar diz que está ligado, e sai", async () => {
+    const user = userEvent.setup();
+    await desenharComGrupos();
+
+    await user.click(screen.getByRole("button", { name: "Reordenar" }));
+    expect(screen.getByText(/A arrumar a ordem dos grupos/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Concluir" }));
+    expect(screen.queryByText(/A arrumar a ordem dos grupos/)).not.toBeInTheDocument();
+  });
+
+  /** Com um grupo só não há ordem nenhuma para arrumar, e o botão seria ruído. */
+  it("sem grupos que cheguem, o botão de reordenar não aparece", async () => {
+    await desenharComGrupos(1);
+    expect(screen.queryByRole("button", { name: "Reordenar" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * O gesto NÃO pode disparar em cima de um campo de texto: pousar o dedo e
+   * não largar é como se põe o cursor a meio de uma palavra no iOS, e abrir
+   * aqui um menu tirava-lhe isso a cada hesitação a escrever.
+   */
+  it("pousar o dedo no campo do título não abre menu nenhum", async () => {
+    await desenharComGrupos();
+    await toqueLongo(screen.getAllByLabelText("Título do grupo")[1]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  /** Um dedo que se move está a rolar a lista, não a pedir um menu. */
+  it("começar a rolar com o dedo pousado cancela o gesto", async () => {
+    await desenharComGrupos();
+    await toqueLongo(cabecalhoDoGrupo(1), { mover: { x: 100, y: 160 } });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

@@ -17,6 +17,8 @@ import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
+import { FolhaOuDialogo } from "./ui/FolhaOuDialogo";
+import { useToqueLongo } from "./ui/adaptativo";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { depositPercentOf } from "@/lib/proposal-doc";
 import type { ProposalDoc } from "@/lib/proposal-doc";
@@ -373,6 +375,11 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
    * tecla, que é a razão de o histórico continuar num `ref`.
    */
   const [podeDesfazer, setPodeDesfazer] = useState(false);
+  /** O modo de arrumar a ordem dos grupos de serviços. Só existe no telemóvel
+   *  — a razão está escrita ao lado do botão "Reordenar". */
+  const [reordenarGrupos, setReordenarGrupos] = useState(false);
+  /** Qual o grupo cujo menu de acções está aberto (por toque longo). */
+  const [accoesDoGrupo, setAccoesDoGrupo] = useState<number | null>(null);
   /**
    * O que ela já escreveu antes, para não voltar a escrever.
    *
@@ -1753,7 +1760,55 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           </Section>
 
           {/* Service groups */}
-          <Section title="Serviços" id="servicos">
+          <Section
+            title="Serviços"
+            id="servicos"
+            accao={
+              doc.serviceGroups.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setReordenarGrupos((r) => !r)}
+                  aria-pressed={reordenarGrupos}
+                  // `sm:hidden`: no computador as setas cabem na linha do grupo
+                  // e estão sempre lá. Este modo existe para o telemóvel, onde
+                  // não cabem — pô-lo nos dois sítios era dar duas formas de
+                  // fazer a mesma coisa no ecrã onde ela já cabia.
+                  className={`alvo-toque sm:hidden rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    reordenarGrupos
+                      ? "bg-[#4d6350] text-white"
+                      : "text-[#4d6350] hover:bg-[#4d6350]/10"
+                  }`}
+                >
+                  {reordenarGrupos ? "Concluir" : "Reordenar"}
+                </button>
+              ) : undefined
+            }
+          >
+            {/* O MODO DE REORDENAR, e porque é um modo.
+                As setas ↑↓ estavam sempre na linha do grupo. Num telemóvel isso
+                são dois alvos de 44 px a competir com o campo do título pela
+                mesma largura, presentes o tempo todo para uma coisa que se faz
+                uma vez por proposta. Aqui a ordem é uma TAREFA à parte: entra-se
+                nela, arruma-se, sai-se — e enquanto se está nela os grupos
+                encolhem para caberem todos no ecrã, que é o que torna reordenar
+                possível em vez de às cegas. */}
+            {reordenarGrupos ? (
+              <p className="mb-3 rounded-xl bg-[#e7efe4] px-3 py-2 text-xs text-[#3a5c39]">
+                A arrumar a ordem dos grupos. Toque em <strong>Concluir</strong> para voltar a
+                escrever.
+              </p>
+            ) : (
+              // A DICA DO GESTO. Um toque longo que ninguém sabe que existe é o
+              // mesmo que não existir — e é por isso que os gestos escondidos
+              // costumam ser má ideia. Aqui está dito, uma vez, onde se usa; e
+              // o "Reordenar" ao lado do título continua a fazer o mesmo sem
+              // gesto nenhum, para quem não ler isto.
+              doc.serviceGroups.length > 0 && (
+                <p className="mb-3 text-xs text-foreground/40 sm:hidden">
+                  Toque sem largar num grupo para o mover ou remover.
+                </p>
+              )
+            )}
             <div className="flex flex-col gap-3">
               {doc.serviceGroups.map((g, gi) => (
                 <div
@@ -1779,7 +1834,12 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                       letra fixa, o título com o resto) e as acções descem para
                       a segunda. A partir de `sm` volta tudo à mesma linha, que
                       é onde cabe. */}
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <ZonaDeToqueLongo
+                    aoDisparar={() => {
+                      if (!reordenarGrupos) setAccoesDoGrupo(gi);
+                    }}
+                    className="mb-2 flex flex-wrap items-center gap-2"
+                  >
                     <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1">
                       <input
                         className="bo-input w-12 shrink-0 px-2 py-2 text-center text-xs text-foreground/70"
@@ -1800,7 +1860,15 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                         aria-label="Título do grupo"
                       />
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* NO TELEMÓVEL ESTES BOTÕES SÓ APARECEM NO MODO DE
+                        REORDENAR. Fora dele, o mesmo está no toque longo sobre
+                        o cabeçalho — e a linha fica com o campo do título em
+                        vez de com três alvos que se usam uma vez por proposta.
+                        Do `sm` para cima cabem na linha e ficam sempre lá:
+                        esconder o que cabe seria escondê-lo por nada. */}
+                    <div
+                      className={`items-center gap-2 ${reordenarGrupos ? "flex" : "hidden sm:flex"}`}
+                    >
                       <MoveBtns
                         onUp={() => moveGroup(gi, -1)}
                         onDown={() => moveGroup(gi, 1)}
@@ -1816,8 +1884,14 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                         ×
                       </button>
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-2 pl-1">
+                  </ZonaDeToqueLongo>
+                  {/* A arrumar a ordem, os grupos encolhem ao cabeçalho: é o
+                      que permite ver quatro de uma vez e saber para onde se
+                      está a mover. No computador não encolhem — lá vê-se tudo
+                      sem isso. */}
+                  <div
+                    className={`flex-col gap-2 pl-1 ${reordenarGrupos ? "hidden sm:flex" : "flex"}`}
+                  >
                     {g.items.map((it, ii) => (
                       <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
                         <input
@@ -1879,6 +1953,77 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 nomeSugerido={doc.serviceGroups.find((g) => (g.title ?? "").trim())?.title}
               />
             </div>
+
+            {/* AS ACÇÕES DO GRUPO, em folha. Uma folha e não um menu flutuante:
+                é o `FolhaOuDialogo`, que no telemóvel sobe do fundo (ao alcance
+                do polegar, com alvos a sério) e no computador é um diálogo ao
+                centro. O texto diz de que grupo se trata — um menu que diz só
+                "Remover" depois de um toque longo é uma forma fácil de apagar o
+                grupo errado. */}
+            <FolhaOuDialogo
+              aberto={accoesDoGrupo !== null}
+              onFechar={() => setAccoesDoGrupo(null)}
+              titulo={
+                accoesDoGrupo !== null
+                  ? doc.serviceGroups[accoesDoGrupo]?.title?.trim() || "Grupo sem título"
+                  : "Grupo"
+              }
+              descricao={`Grupo ${(accoesDoGrupo ?? 0) + 1} de ${doc.serviceGroups.length}`}
+              largura="sm"
+            >
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  disabled={accoesDoGrupo === 0}
+                  onClick={() => {
+                    if (accoesDoGrupo === null) return;
+                    moveGroup(accoesDoGrupo, -1);
+                    setAccoesDoGrupo(null);
+                  }}
+                  className="alvo-toque !justify-start w-full rounded-lg px-3 py-3 text-left text-sm text-foreground/80 hover:bg-foreground/[0.05] disabled:opacity-30"
+                >
+                  ↑ Mover para cima
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    accoesDoGrupo === null || accoesDoGrupo === doc.serviceGroups.length - 1
+                  }
+                  onClick={() => {
+                    if (accoesDoGrupo === null) return;
+                    moveGroup(accoesDoGrupo, 1);
+                    setAccoesDoGrupo(null);
+                  }}
+                  className="alvo-toque !justify-start w-full rounded-lg px-3 py-3 text-left text-sm text-foreground/80 hover:bg-foreground/[0.05] disabled:opacity-30"
+                >
+                  ↓ Mover para baixo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReordenarGrupos(true);
+                    setAccoesDoGrupo(null);
+                  }}
+                  className="alvo-toque !justify-start w-full rounded-lg px-3 py-3 text-left text-sm text-foreground/80 hover:bg-foreground/[0.05]"
+                >
+                  ⇅ Arrumar a ordem de todos
+                </button>
+                {/* Destrutiva, a vermelho e separada das outras: mover é
+                    reversível com um toque, remover apaga o que lá está
+                    escrito. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (accoesDoGrupo === null) return;
+                    removeGroup(accoesDoGrupo);
+                    setAccoesDoGrupo(null);
+                  }}
+                  className="alvo-toque !justify-start mt-2 w-full rounded-lg border-t border-foreground/10 px-3 py-3 pt-4 text-left text-sm text-[#8a2a22] hover:bg-[#8a2a22]/[0.06]"
+                >
+                  × Remover grupo
+                </button>
+              </div>
+            </FolhaOuDialogo>
           </Section>
 
           {/* Mood boards — decoracao only */}
@@ -2654,11 +2799,16 @@ function Section({
   id,
   /** Marca à direita do título — "3 linhas", "por preencher". */
   nota,
+  /** Um controlo à direita do título — o "Reordenar" dos Serviços, por
+   *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
+   *  botão não é HTML válido, e clicar num fecharia o outro. */
+  accao,
 }: {
   title: string;
   children: React.ReactNode;
   id?: string;
   nota?: string;
+  accao?: React.ReactNode;
 }) {
   const [fechada, setFechada] = useState(false);
   // Ler no efeito e não no `useState` inicial: o servidor não tem
@@ -2710,6 +2860,7 @@ function Section({
           <h3 className="font-display text-base leading-tight text-foreground/90">{title}</h3>
         )}
         {nota && <span className="shrink-0 text-xs text-foreground/45">{nota}</span>}
+        {accao && <div className="shrink-0">{accao}</div>}
       </div>
       {/* `hidden` e não desmontar: uma secção fechada continua a ter os campos
           no formulário, e fechá-la não pode apagar o que lá está escrito. */}
@@ -2915,6 +3066,31 @@ function PreviewSummary({
         )}
       </div>
     </Section>
+  );
+}
+
+/**
+ * Uma caixa que responde ao toque longo.
+ *
+ * Existe como componente, e não como um `useToqueLongo` chamado no sítio, por
+ * uma razão do React: os cabeçalhos dos grupos nascem de um `map`, e um hook
+ * não se pode chamar dentro de um ciclo. Cada caixa é um componente, cada
+ * componente tem o seu gesto.
+ */
+function ZonaDeToqueLongo({
+  aoDisparar,
+  className,
+  children,
+}: {
+  aoDisparar: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const gestos = useToqueLongo(aoDisparar);
+  return (
+    <div className={className} {...gestos}>
+      {children}
+    </div>
   );
 }
 
