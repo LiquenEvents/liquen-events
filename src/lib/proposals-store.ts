@@ -26,6 +26,7 @@ export const mapper: Mapper<Proposal> = {
     follow_up_note: p.followUpNote || null,
     lost_reason: p.lostReason || null,
     lost_note: p.lostNote || null,
+    chosen_version: p.versaoEscolhida || null,
     // O documento do Estúdio (jsonb `proposals.doc`) só entra na linha quando a
     // proposta o TEM. Duas razões, ambas concretas:
     //  · uma proposta de linhas (criada em /api/propostas) nunca teve `doc` e
@@ -57,6 +58,7 @@ export const mapper: Mapper<Proposal> = {
     followUpNote: (r.follow_up_note as string) ?? undefined,
     lostReason: (r.lost_reason as Proposal["lostReason"]) ?? undefined,
     lostNote: (r.lost_note as string) ?? undefined,
+    versaoEscolhida: (r.chosen_version as Proposal["versaoEscolhida"]) ?? undefined,
     // Simétrico do `toRow`: sem documento gravado (proposta antiga, proposta de
     // linhas, ou coluna ainda por criar) a propriedade nem aparece — é o que
     // mantém `getProposal` a devolver exatamente o que devolvia antes desta

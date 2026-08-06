@@ -387,6 +387,17 @@ export interface Proposal {
   lostReason?: MotivoDeRecusa;
   /** O detalhe, quando o motivo sozinho não chega. */
   lostNote?: string;
+  /**
+   * Qual das duas versões o casal ficou — quando a proposta tinha extras.
+   *
+   * Preenchido POR ELA ao registar a resposta, não pelo cliente e não por
+   * dedução: quem responde responde por email ou ao telefone, e adivinhar a
+   * partir do valor facturado dava a versão errada em todas as propostas em que
+   * se negociou um desconto depois.
+   *
+   * Serve para uma pergunta só, e é a que interessa: os extras vendem-se?
+   */
+  versaoEscolhida?: import("./versoes-da-proposta").VersaoEscolhida;
   /** Rich multi-page proposal document (Proposal Studio). Stored so the studio
    *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
    *  not bytes. Optional — legacy line-item proposals don't set it. */

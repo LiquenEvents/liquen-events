@@ -210,3 +210,46 @@ describe("nada disto sai daqui", () => {
     }
   });
 });
+
+describe("qual das duas versões ficaram", () => {
+  const comExtras = (over: Partial<Proposal> = {}) =>
+    proposta({
+      status: "aceite",
+      doc: {
+        budgetItems: ["Cerimónia", "Arco floral"],
+        budgetAmounts: [4000, 1500],
+        budgetOpcional: [false, true],
+      } as Proposal["doc"],
+      ...over,
+    });
+
+  it("pergunta pelas ganhas que tinham extras, mesmo não estando em aberto", async () => {
+    // Uma proposta aceite não entra na lista de acompanhamento — não está em
+    // aberto. Mas é uma pergunta por responder, e é aqui que elas vivem.
+    montar([comExtras({ id: "p-ganha", clientName: "Ana e Rui" })]);
+    await waitFor(() => expect(screen.getByText(/Ficaram com que versão/)).toBeTruthy());
+    expect(screen.getByText(/Ana e Rui/)).toBeTruthy();
+  });
+
+  it("regista a escolha e não a deduz de mais nada", async () => {
+    montar([comExtras({ id: "p-ganha" })]);
+    await waitFor(() => expect(screen.getByText(/Ficaram com que versão/)).toBeTruthy());
+    await userEvent.click(screen.getByRole("button", { name: "Com extras" }));
+
+    await waitFor(() => expect(enviados).toHaveLength(1));
+    expect(enviados[0].url).toContain("/api/propostas/p-ganha");
+    expect(enviados[0].body).toEqual({ versaoEscolhida: "extras" });
+  });
+
+  it("uma proposta ganha SEM extras não gera pergunta nenhuma", async () => {
+    montar([comExtras({ id: "p-sem", doc: { budgetItems: ["Cerimónia"] } as Proposal["doc"] })]);
+    // Sem extras não há duas versões para escolher, e uma pergunta sem resposta
+    // possível ensina a passar os olhos por cima da secção.
+    await waitFor(() => expect(screen.queryByText(/Ficaram com que versão/)).toBeNull());
+  });
+
+  it("já registada, sai da lista", async () => {
+    montar([comExtras({ id: "p-ja", versaoEscolhida: "base" })]);
+    await waitFor(() => expect(screen.queryByText(/Ficaram com que versão/)).toBeNull());
+  });
+});

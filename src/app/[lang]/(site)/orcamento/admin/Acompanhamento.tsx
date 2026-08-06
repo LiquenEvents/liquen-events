@@ -8,6 +8,7 @@ import {
   seguimentosDevidos,
   type LinhaDeAcompanhamento,
 } from "@/lib/orcamento/proposta-estado";
+import { opcionaisDe } from "@/lib/orcamento/versoes-da-proposta";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState } from "./ui";
@@ -100,6 +101,26 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
   const expirando = useMemo(() => aExpirar(linhas), [linhas]);
   const devidos = useMemo(() => seguimentosDevidos(linhas), [linhas]);
 
+  /**
+   * As propostas ACEITES que tinham extras e em que ninguém registou qual das
+   * versões o casal ficou.
+   *
+   * Não entram na lista de cima — `acompanhamento` só devolve o que está em
+   * aberto, e uma proposta ganha não está. Mas é uma pergunta por responder, e
+   * as perguntas por responder é aqui que vivem. Quando estiverem todas
+   * respondidas, esta secção desaparece sozinha.
+   */
+  const porRegistar = useMemo(
+    () =>
+      (propostas ?? []).filter(
+        (p) =>
+          p.status === "aceite" &&
+          !p.versaoEscolhida &&
+          opcionaisDe(p.doc ?? { budgetItems: [] }).some(Boolean),
+      ),
+    [propostas],
+  );
+
   const gravar = useCallback(
     async (id: string, patch: Partial<Proposal>, comoDizer: string) => {
       setAGravar(id);
@@ -129,7 +150,7 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
 
   if (loading && !propostas) return <SkeletonList rows={4} />;
 
-  if (linhas.length === 0) {
+  if (linhas.length === 0 && porRegistar.length === 0) {
     return (
       <EmptyState
         title="Nenhuma proposta à espera de resposta"
@@ -165,6 +186,62 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
           <p className="mt-1 text-[11px] text-foreground/45">Marcados para hoje ou antes</p>
         </Card>
       </div>
+
+      {/* ── QUAL DAS DUAS VERSÕES ELES FICARAM ────────────────────────────
+          Só propostas que TINHAM extras, e só depois de aceites: antes disso a
+          pergunta não tem resposta, e sem extras não há duas versões.
+
+          Perguntada, não deduzida. O valor facturado não responde a isto — em
+          qualquer negociação em que se fez um desconto depois de aceitar,
+          deduzir dava a versão errada em silêncio. */}
+      {porRegistar.length > 0 && (
+        <section
+          aria-labelledby="versao-escolhida-titulo"
+          className="rounded-2xl border border-foreground/[0.10] bg-foreground/[0.015] p-4"
+        >
+          <h3 id="versao-escolhida-titulo" className="bo-eyebrow">
+            Ficaram com que versão?
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+            Propostas ganhas que tinham extras. É a resposta a uma pergunta só, e é a que interessa:
+            os extras vendem-se?
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {porRegistar.map((p) => (
+              <li
+                key={p.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-foreground/10 p-3"
+              >
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground/75">
+                  {`${p.clientName} · ${eur(p.total)}`}
+                </span>
+                {(
+                  [
+                    { id: "base", label: "Versão base" },
+                    { id: "extras", label: "Com extras" },
+                  ] as const
+                ).map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    disabled={aGravar === p.id}
+                    onClick={() =>
+                      gravar(
+                        p.id,
+                        { versaoEscolhida: v.id },
+                        v.id === "base" ? "Ficaram pela versão base." : "Levaram os extras.",
+                      )
+                    }
+                    className="alvo-toque rounded-full border border-foreground/12 px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-[#4d6350]/40 hover:text-foreground/85 disabled:opacity-50"
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <ul className="flex flex-col gap-3">
         {linhas.map((l) => (

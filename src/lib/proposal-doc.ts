@@ -243,6 +243,16 @@ export interface ProposalDoc {
   budgetScales?: (import("./orcamento/escala").Escala | null)[];
   /** Quantas pessoas por mesa, para as linhas "por mesa" (por omissão 10). */
   convidadosPorMesa?: number;
+  /**
+   * Quais das linhas são EXTRA — o que distingue a versão base da versão com
+   * extras da mesma proposta. Mesmo array paralelo dos outros.
+   *
+   * Uma proposta sem marcas nenhumas é exactamente a proposta de antes: não há
+   * segundo total nem uma palavra a mais no PDF. Ver
+   * `src/lib/orcamento/versoes-da-proposta.ts` — em particular a razão de o
+   * total da base ser DERIVADO e não escrito.
+   */
+  budgetOpcional?: boolean[];
 
   /**
    * NOTAS INTERNAS — o que se sabe sobre este negócio e nunca se escreve ao

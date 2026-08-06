@@ -36,6 +36,7 @@ import {
   CARLITO_BOLD_TTF_B64,
   CARLITO_ITALIC_TTF_B64,
 } from "@/lib/proposal-fonts";
+import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { winAnsiSafe } from "@/lib/pdf-text";
 import { log } from "@/lib/logger";
 
@@ -928,22 +929,62 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         y -= 5;
       }
     } else {
-      for (const it of doc.budgetItems) {
-        const lines = wrap(f.reg, it, 10.5, boxW - 14);
+      // As linhas assinaladas como EXTRA saem marcadas, para o casal poder ler
+      // a proposta uma vez e ver as duas versões nela. A marca é uma palavra à
+      // direita e não uma segunda lista: partir o orçamento em dois quadros
+      // fazia parecer duas propostas, que é precisamente o que isto vem
+      // substituir. Ver `orcamento/versoes-da-proposta.ts`.
+      const marcas = opcionaisDe(doc);
+      doc.budgetItems.forEach((it, i) => {
+        const lines = wrap(f.reg, it, 10.5, boxW - 14 - (marcas[i] ? 46 : 0));
         budgetBreak(Math.max(20, lines.length * 15));
         p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
-        lines.forEach((ln) => {
+        lines.forEach((ln, j) => {
           text(p, ln, M + 14, y, { size: 10.5, color: INK });
+          if (j === 0 && marcas[i]) {
+            textRight(p, "extra", M + boxW, y, { size: 9, color: MUTED });
+          }
           y -= 15;
         });
         y -= 5;
-      }
+      });
     }
 
     budgetBreak(boxH + 24);
     y -= 16;
     drawTotal(p, y);
     y -= boxH + 20;
+
+    // ── A versão SEM os extras ─────────────────────────────────────────────
+    // O total grande é a proposta inteira; por baixo dele, e só quando há
+    // linhas assinaladas, a mesma proposta sem elas. É o que permite responder
+    // ao "e sem isso, quanto fica?" sem uma segunda proposta a divergir desta.
+    //
+    // Um extra sem preço não se desconta, e nesse caso os dois números sairiam
+    // iguais — melhor não desenhar nada do que desenhar duas vezes o mesmo
+    // número com rótulos diferentes.
+    const versoes = totaisDasVersoes(doc, doc.totalAmount ?? 0);
+    if (versoes && versoes.base > 0 && versoes.extras > 0) {
+      const maisIva = doc.totalVatMode === "acrescer" ? " + IVA" : "";
+      budgetBreak(40);
+      text(p, "Sem os extras assinalados", M, y, { size: 10.5, color: MUTED });
+      textRight(p, `${eur(versoes.base)}${maisIva}`, M + boxW, y, {
+        font: f.serif,
+        size: 13,
+        color: INK,
+      });
+      y -= 16;
+      text(
+        p,
+        versoes.linhasExtra === 1
+          ? "A linha assinalada com «extra» é opcional e pode ser retirada."
+          : `As ${versoes.linhasExtra} linhas assinaladas com «extra» são opcionais e podem ser retiradas.`,
+        M,
+        y,
+        { size: 9, color: MUTED },
+      );
+      y -= 22;
+    }
 
     // Extra budget lines — per-couple add-ons shown right under the total, exactly
     // as in the studio's real proposals (Deslocação da equipa, Wedding Coordinator,

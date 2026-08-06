@@ -85,6 +85,15 @@ alter table public.proposals add column if not exists follow_up_note text;
 alter table public.proposals add column if not exists lost_reason text;
 alter table public.proposals add column if not exists lost_note text;
 
+-- Qual das duas versões o casal ficou, quando a proposta tinha extras
+-- assinalados. Registada à mão por quem recebe a resposta — deduzi-la do valor
+-- facturado dava a versão errada em todas as propostas em que se negociou um
+-- desconto depois. Ver `orcamento/versoes-da-proposta.ts`.
+alter table public.proposals add column if not exists chosen_version text;
+alter table public.proposals drop constraint if exists proposals_chosen_version_chk;
+alter table public.proposals add constraint proposals_chosen_version_chk
+  check (chosen_version is null or chosen_version in ('base','extras')) not valid;
+
 -- O estado "em_negociacao" nasceu depois da restrição de estados. Numa base já
 -- instalada, o `if not exists` mais abaixo não a substitui — é preciso deixá-la
 -- cair e voltar a criá-la, senão marcar "em negociação" rebenta com um 23514.

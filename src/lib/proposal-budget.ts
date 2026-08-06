@@ -165,13 +165,58 @@ export function asDuasFormas(
 // Todas passam por aqui, e todas mexem nos DOIS arrays. É esta a única defesa
 // contra o desalinhamento dos índices.
 
-type ComOrcamento = Pick<ProposalDoc, "budgetItems" | "budgetAmounts">;
+type ComOrcamento = Pick<
+  ProposalDoc,
+  "budgetItems" | "budgetAmounts" | "budgetCosts" | "budgetScales" | "budgetOpcional"
+>;
+
+/**
+ * Os arrays paralelos que NÃO são os preços: custo, escala e marca de extra.
+ *
+ * Estão aqui porque acompanham a linha e têm de acompanhar também o que lhe
+ * acontece. Enquanto só o preço era tratado, apagar a linha 2 de cinco deixava
+ * os custos, as escalas e as marcas todas uma posição à frente — o custo da
+ * iluminação passava a ser o do ramo da noiva, e a margem dessa linha saía de
+ * outra linha qualquer. Não dava erro nenhum: dava números errados com bom
+ * aspecto, que é a pior maneira de um orçamento correr mal.
+ *
+ * Cada um traz o valor com que uma linha nova nasce.
+ */
+const PARALELOS = [
+  { campo: "budgetCosts", nascePor: null },
+  { campo: "budgetScales", nascePor: null },
+  { campo: "budgetOpcional", nascePor: false },
+] as const;
+
+/** Corta ou estica um array paralelo até ao tamanho das linhas. */
+function alinhado(doc: ComOrcamento, campo: (typeof PARALELOS)[number]["campo"], omissao: unknown) {
+  const n = doc.budgetItems?.length ?? 0;
+  const guardado = (doc[campo] as unknown[] | undefined) ?? [];
+  return Array.from({ length: n }, (_, i) => (i < guardado.length ? guardado[i] : omissao));
+}
+
+/** Aplica a mesma transformação a todos os arrays paralelos de uma vez. */
+function comParalelos<T extends ComOrcamento>(
+  doc: T,
+  transformar: (valores: unknown[], nascePor: unknown) => unknown[],
+): Partial<Record<(typeof PARALELOS)[number]["campo"], unknown[]>> {
+  const out: Record<string, unknown[]> = {};
+  for (const { campo, nascePor } of PARALELOS) {
+    // Só se escreve o que JÁ existia: um documento que nunca teve custos não
+    // ganha um array de nulls por ter perdido uma linha, e continua a
+    // serializar exactamente como serializava.
+    if (doc[campo] === undefined) continue;
+    out[campo] = transformar(alinhado(doc, campo, nascePor), nascePor);
+  }
+  return out;
+}
 
 export function adicionarLinha<T extends ComOrcamento>(doc: T, item = ""): T {
   return {
     ...doc,
     budgetItems: [...(doc.budgetItems ?? []), item],
     budgetAmounts: [...precosDe(doc), null],
+    ...comParalelos(doc, (v, nascePor) => [...v, nascePor]),
   };
 }
 
@@ -180,6 +225,7 @@ export function removerLinha<T extends ComOrcamento>(doc: T, i: number): T {
     ...doc,
     budgetItems: (doc.budgetItems ?? []).filter((_, j) => j !== i),
     budgetAmounts: precosDe(doc).filter((_, j) => j !== i),
+    ...comParalelos(doc, (v) => v.filter((_, j) => j !== i)),
   };
 }
 

@@ -691,6 +691,59 @@ describe("os números internos nunca saem no PDF", () => {
   });
 });
 
+describe("a versão base e a versão com extras", () => {
+  /**
+   * O casal pede "uma coisa mais simples e outra com tudo". A alternativa a
+   * isto eram duas propostas — dois documentos a divergir, e ao fim de duas
+   * semanas ninguém saber qual é a que vale.
+   */
+  const comExtras = () => ({
+    ...decoracaoDoc(),
+    budgetItems: ["Decoração de cerimónia", "Arranjos de mesa", "Arco floral"],
+    budgetAmounts: [4000, 3000, 1500],
+    budgetOpcional: [false, false, true],
+    totalAmount: 8500,
+    totalVatMode: "acrescer" as const,
+  });
+
+  const desenho = async (doc: Parameters<typeof renderProposalDocPdf>[0]) => {
+    const pdf = await PDFDocument.load(await renderProposalDocPdf(doc));
+    let texto = "";
+    for (let i = 0; i < pdf.getPageCount(); i += 1) texto += pageContent(pdf, i);
+    return texto;
+  };
+
+  it("uma proposta SEM extras desenha exactamente o que desenhava antes", async () => {
+    // A garantia que interessa primeiro: isto não pode acrescentar uma linha,
+    // uma palavra ou um espaço a nenhuma das propostas que já existem.
+    const semMarcas = { ...comExtras(), budgetOpcional: undefined };
+    const semCampo = { ...comExtras(), budgetOpcional: [false, false, false] };
+    expect(await desenho(semCampo)).toBe(await desenho(semMarcas));
+  });
+
+  it("com extras assinalados o desenho MUDA — é o que a proposta vem dizer", async () => {
+    const semMarcas = { ...comExtras(), budgetOpcional: undefined };
+    expect(await desenho(comExtras())).not.toBe(await desenho(semMarcas));
+  });
+
+  it("um extra SEM preço não desenha um segundo total", async () => {
+    // Sem preço a subtracção não desce, e os dois números sairiam iguais com
+    // rótulos diferentes — pior do que não haver segundo número nenhum.
+    const semPreco = {
+      ...comExtras(),
+      budgetAmounts: [4000, 3000, null],
+      budgetOpcional: [false, false, true],
+    };
+    const so = { ...semPreco, budgetOpcional: undefined };
+    // O desenho difere só pela palavra "extra" ao lado da linha; o bloco do
+    // segundo total não entra. Verifica-se pelo comprimento: um bloco a mais
+    // são duas linhas de texto, não meia dúzia de caracteres.
+    const [a, b] = [await desenho(semPreco), await desenho(so)];
+    expect(a).not.toBe(b);
+    expect(Math.abs(a.length - b.length)).toBeLessThan(400);
+  });
+});
+
 describe("as notas internas nunca saem no PDF", () => {
   /**
    * "Cliente da AMARA, cuidado com o prazo" é uma frase que se escreve para si

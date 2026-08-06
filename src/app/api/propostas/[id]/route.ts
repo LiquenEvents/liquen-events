@@ -31,6 +31,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if ("followUpAt" in body && body.followUpAt && !/^\d{4}-\d{2}-\d{2}$/.test(body.followUpAt)) {
       return NextResponse.json({ error: "Data de seguimento inválida" }, { status: 400 });
     }
+    // Lista fechada, como os motivos e pela mesma razão: o que isto serve
+    // para responder é "os extras vendem-se?", e uma coluna que se conta com
+    // texto livre lá dentro é uma coluna que nunca mais se conta.
+    if (
+      "versaoEscolhida" in body &&
+      body.versaoEscolhida &&
+      !["base", "extras"].includes(body.versaoEscolhida)
+    ) {
+      return NextResponse.json({ error: "Versão inválida" }, { status: 400 });
+    }
     const allowed = [
       "status",
       "respondedAt",
@@ -38,6 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       "followUpNote",
       "lostReason",
       "lostNote",
+      "versaoEscolhida",
     ] as const;
     const patch: Record<string, unknown> = {};
     for (const k of allowed) {

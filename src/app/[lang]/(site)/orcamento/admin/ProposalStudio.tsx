@@ -22,6 +22,7 @@ import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import NotasInternas from "./NotasInternas";
 import Versoes from "./Versoes";
+import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { custosDe } from "@/lib/orcamento/margem";
 import {
   CONVIDADOS_POR_MESA_OMISSAO,
@@ -861,6 +862,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   /** Quantas pessoas, lido do campo do documento ("125 pax" → 125). */
   const convidados = convidadosDoDoc(doc as ProposalDoc);
   const escalasDoDoc = escalasDe(doc as ProposalDoc);
+  const extrasDoDoc = opcionaisDe(doc as ProposalDoc);
 
   /**
    * Trocar o tipo de escala de uma linha.
@@ -1445,6 +1447,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
   function updateBudgetPrice(i: number, texto: string) {
     setDoc((d) => definirPreco(d, i, normalizarValor(texto)));
+  }
+  /**
+   * Marca (ou desmarca) uma linha como EXTRA.
+   *
+   * É isto que faz a mesma proposta ter uma versão base e uma versão com
+   * extras: o casal pede "uma coisa mais simples e outra com tudo", e a
+   * alternativa era duas propostas — dois documentos a divergir, e ao fim de
+   * duas semanas ninguém saber qual é a que vale.
+   */
+  function updateBudgetExtraFlag(i: number, extra: boolean) {
+    setDoc((d) => marcarExtra(d as ProposalDoc, i, extra) as StudioDoc);
   }
 
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
@@ -2270,6 +2283,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             aria-label={`Preço de ${l.item || "linha sem nome"}`}
                           />
                         </span>
+                        {/* EXTRA OU NÃO. Uma caixa e não um menu: a pergunta é
+                          de sim ou não, e um menu de duas entradas custa duas
+                          carregadas para responder a uma pergunta de uma. */}
+                        <label className="alvo-toque flex shrink-0 items-center gap-1.5 text-[11px] text-foreground/50">
+                          <input
+                            type="checkbox"
+                            checked={extrasDoDoc[i] ?? false}
+                            onChange={(e) => updateBudgetExtraFlag(i, e.target.checked)}
+                            aria-label={`${l.item || "Linha sem nome"} é um extra opcional`}
+                          />
+                          extra
+                        </label>
                         <button
                           type="button"
                           className={REMOVE_BTN}
@@ -2309,6 +2334,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       </span>
                     )}
                   </div>
+
+                  {/* ── AS DUAS VERSÕES, SEM SEREM DUAS PROPOSTAS ──────────
+                      Assim que uma linha é marcada como extra, esta proposta
+                      passa a responder ao "e sem isso, quanto fica?" — e o PDF
+                      leva os dois números. É de propósito que só o total com
+                      extras é escrito à mão: o outro é a subtracção, e dois
+                      números escritos podiam discordar no dia em que ela
+                      corrigisse só um. */}
+                  {(() => {
+                    const v = totaisDasVersoes(doc as ProposalDoc, doc.totalAmount ?? 0);
+                    if (!v) return null;
+                    return (
+                      <div className="mt-1 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
+                        <p className="text-xs leading-relaxed text-foreground/70">
+                          {`Versão base ${eur(v.base)} · com extras ${eur(v.comExtras)}`}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-foreground/45">
+                          {v.linhasExtra === 1
+                            ? "A linha marcada como extra sai assinalada no PDF, com o valor sem ela por baixo do total."
+                            : `As ${v.linhasExtra} linhas marcadas como extra saem assinaladas no PDF, com o valor sem elas por baixo do total.`}
+                        </p>
+                        {v.extrasSemPreco > 0 && (
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-[#8a6420]">
+                            {v.extrasSemPreco === 1
+                              ? "Um dos extras não tem preço, por isso não desce da versão base — e enquanto assim for o PDF não mostra o segundo valor."
+                              : `${v.extrasSemPreco} extras não têm preço, por isso não descem da versão base — e enquanto assim for o PDF não mostra o segundo valor.`}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field
