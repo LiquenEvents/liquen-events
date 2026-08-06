@@ -422,23 +422,34 @@ body {
 
    Nos botões que passam por `ui/Button.tsx` e `ui/Segmented.tsx` isto já vem de
    lá (`pointer-coarse:h-11`); esta classe é para os que são escritos à mão. */
+/* O TAMANHO MÍNIMO fica fora de camadas, de propósito: é a razão de esta classe
+   existir, e um `h-8` escrito por distracção não a pode desligar. */
 @media (pointer: coarse) {
   .alvo-toque {
     min-height: 44px;
     min-width: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
   }
-  /* Rede contra o efeito secundário do `display` acima: um elemento com
-     `hidden` do Tailwind está escondido POR `display: none`, e juntar-lhe
-     `.alvo-toque` fá-lo-ia REAPARECER no telemóvel — exactamente onde estava
-     escondido de propósito. Aconteceu-me a pensar no atalho de pesquisa da
-     barra de topo (`hidden sm:flex`), que se resolveu com `min-h` em vez desta
-     classe. Isto garante que, se alguém as juntar por engano, o `hidden`
-     ganha. */
-  .alvo-toque.hidden {
-    display: none;
+}
+/* O `display` é outra história, e tem de estar NUMA CAMADA.
+   ─────────────────────────────────────────────────────────────────────────
+   Fora de camadas, este `inline-flex` ganhava a QUALQUER utilitário de
+   `display` do Tailwind — incluindo `pointer-coarse:hidden`. O sintoma: o botão
+   "Atalhos" da gaveta, marcado `alvo-toque pointer-coarse:hidden` para não
+   aparecer num ecrã de toque, continuava lá. Medido: `display: flex` com
+   `(pointer: coarse)` verdadeiro. É a mesma armadilha do `width` do
+   `.bo-input`, e por isso a correcção é a mesma.
+
+   A rede que aqui estava (`.alvo-toque.hidden { display: none }`) só apanhava
+   o `hidden` sem variante; qualquer `sm:hidden`, `lg:flex` ou
+   `pointer-coarse:hidden` continuava calado. Dentro de `@layer components` já
+   não é preciso rede nenhuma: a cascata resolve todos os casos de uma vez. */
+@layer components {
+  @media (pointer: coarse) {
+    .alvo-toque {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 }
 /* Subtle scrim behind white text that sits over the near-transparent MIDDLE of
