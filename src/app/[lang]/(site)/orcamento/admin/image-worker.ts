@@ -35,8 +35,52 @@ export interface WorkerRequest {
  *  do fio principal, que sabe descodificar coisas que o trabalhador não sabe
  *  (HEIC no Safari, via `<img>`, que aqui não existe). */
 export type WorkerResponse =
-  | { id: number; ok: true; blob: Blob | null; thumb: Blob | null }
+  | { id: number; ok: true; blob: Blob | null; thumb: Blob | null; lqip: string | null }
   | { id: number; ok: false; reason: string };
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O LQIP — a imagem que aparece a 0 ms, antes de haver rede
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO na linha de base (IMAGENS-BEFORE.md): entre abrir a Biblioteca de
+ * Temas e ver a primeira fotografia passam **1845 ms** no computador e
+ * **2192 ms** no telemóvel, com Slow 4G. Nesse tempo o que lá está é uma caixa
+ * cinzenta. Não é lentidão do código — é o tempo que os bytes levam a chegar, e
+ * nenhuma optimização de rede o leva a zero.
+ *
+ * O que o leva a zero é não precisar da rede. Uma versão de 16 px da fotografia
+ * cabe em ~300 bytes de base64, viaja DENTRO do JSON que já se estava a buscar,
+ * e desenha-se no instante em que o JSON chega — sem um único pedido a mais.
+ *
+ * ── Porque 16 px e WebP ─────────────────────────────────────────────────────
+ * · 16 px de lado maior é o suficiente para dar a COR e a COMPOSIÇÃO. Ampliado
+ *   e desfocado, lê-se como "a fotografia está a chegar e é assim". A 8 px
+ *   perde-se a composição; a 32 px o base64 triplica sem se ganhar nada que o
+ *   desfoque não apague.
+ * · WebP a q40 é ~40% mais pequeno do que JPEG no mesmo tamanho, e a esta
+ *   escala o artefacto é invisível — vai desfocado por cima.
+ * · Se o browser não souber encodar WebP, cai para JPEG. Nunca falha o
+ *   carregamento por causa disto: um LQIP em falta é uma caixa cinzenta, que é
+ *   exactamente o que já existe hoje.
+ *
+ * ── E porque é AQUI ────────────────────────────────────────────────────────
+ * Porque o bitmap já está descodificado. Sai do MESMO canvas já reduzido que
+ * gera a miniatura — não há uma segunda descodificação, não há um segundo
+ * `createImageBitmap`, e o custo de um lote de 300 fotos não muda. É o
+ * princípio da missão aplicado à letra: o trabalho acontece uma vez, no
+ * carregamento, quando ninguém está à espera.
+ */
+export const LQIP_EDGE = 16;
+/** Qualidade do LQIP. Baixa de propósito — vai desfocado e ampliado. */
+export const LQIP_QUALITY = 0.4;
+/**
+ * Tecto de caracteres. Um LQIP que passe disto deixou de ser "uma string curta"
+ * e passou a ser peso morto em cada linha do JSON — e o JSON é servido a cada
+ * abertura. Acima do tecto devolve-se `null`: melhor sem placeholder do que com
+ * um que custa mais do que a miniatura que substitui.
+ */
+export const LQIP_MAX_CHARS = 1200;
 
 /** Cópia de `fitWithin` da image-prep (ver nota no cabeçalho). */
 export function planResize(w: number, h: number, maxEdge: number): { w: number; h: number } {
@@ -62,14 +106,53 @@ function drawTo(source: CanvasImageSource, w: number, h: number): OffscreenCanva
   return canvas;
 }
 
+/** Um `Blob` em `data:` URI — é assim que o LQIP viaja e é desenhado, sem rede. */
+async function comoDataUri(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = "";
+  // Aos pedaços: `String.fromCharCode(...array)` com um array grande estoira a
+  // pilha de chamadas. Aqui são ~300 bytes, mas o limite é do tamanho da
+  // entrada e não do que hoje se lhe dá.
+  for (let i = 0; i < bytes.length; i += 8192) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return `data:${blob.type};base64,${btoa(bin)}`;
+}
+
 /**
- * O trabalho de uma foto: UMA descodificação serve o original e a miniatura.
- * Descodificar duas vezes duplicaria o custo de um lote de 300 fotos, que é
- * exatamente o tamanho para que isto está dimensionado.
+ * O LQIP de um canvas já reduzido. Nunca lança: sem LQIP a grelha comporta-se
+ * exactamente como hoje.
+ */
+export async function lqipDe(
+  base: CanvasImageSource,
+  w: number,
+  h: number,
+): Promise<string | null> {
+  try {
+    const t = planResize(w, h, LQIP_EDGE);
+    const canvas = drawTo(base, t.w, t.h);
+    if (!canvas) return null;
+    const blob =
+      (await canvas
+        .convertToBlob({ type: "image/webp", quality: LQIP_QUALITY })
+        .catch(() => null)) ??
+      (await canvas.convertToBlob({ type: "image/jpeg", quality: LQIP_QUALITY }).catch(() => null));
+    if (!blob) return null;
+    const uri = await comoDataUri(blob);
+    return uri.length <= LQIP_MAX_CHARS ? uri : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O trabalho de uma foto: UMA descodificação serve o original, a miniatura e o
+ * LQIP. Descodificar mais do que uma vez duplicaria o custo de um lote de 300
+ * fotos, que é exatamente o tamanho para que isto está dimensionado.
  */
 export async function prepareInWorker(
   req: WorkerRequest,
-): Promise<{ blob: Blob | null; thumb: Blob | null }> {
+): Promise<{ blob: Blob | null; thumb: Blob | null; lqip: string | null }> {
   const bitmap = await createImageBitmap(req.blob);
   try {
     let blob: Blob | null = null;
@@ -104,7 +187,12 @@ export async function prepareInWorker(
       }
     }
 
-    return { blob, thumb };
+    // Do MESMO canvas já reduzido, como a miniatura. Sempre — uma foto sem
+    // miniatura (já pequena) é precisamente uma que continua a precisar de
+    // alguma coisa para mostrar enquanto chega.
+    const lqip = await lqipDe(base, bw, bh);
+
+    return { blob, thumb, lqip };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.
@@ -140,8 +228,8 @@ if (
   self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     const req = e.data;
     try {
-      const { blob, thumb } = await prepareInWorker(req);
-      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb };
+      const { blob, thumb, lqip } = await prepareInWorker(req);
+      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb, lqip };
       self.postMessage(res);
     } catch (err) {
       const res: WorkerResponse = {

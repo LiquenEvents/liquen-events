@@ -23,6 +23,7 @@
  */
 
 import type { WorkerRequest, WorkerResponse } from "./image-worker";
+import { LQIP_EDGE, LQIP_MAX_CHARS, LQIP_QUALITY } from "./image-worker";
 
 const SUPPORTED = /^image\/(jpe?g|png|webp)$/i;
 
@@ -138,6 +139,14 @@ export interface PreparedImage {
    *  Nunca é motivo para falhar o carregamento: sem miniatura a grelha usa o
    *  original, exatamente como faz com as fotos anteriores a esta funcionalidade. */
   thumb: File | null;
+  /**
+   * A imagem de 16 px em `data:` URI — o que a grelha desenha a 0 ms, antes de
+   * haver rede (ver `LQIP_EDGE` em `image-worker.ts`).
+   *
+   * `null` quando o browser não a soube gerar. Não é motivo para falhar nada:
+   * sem LQIP a célula fica como está hoje, uma caixa à espera.
+   */
+  lqip: string | null;
 }
 
 // ── Pool de trabalhadores ──
@@ -256,7 +265,7 @@ async function prepareViaWorker(
   preset: { maxEdge: number; quality: number },
   skipOriginal: boolean,
   wantThumb: boolean,
-): Promise<{ blob: Blob | null; thumb: Blob | null } | null> {
+): Promise<{ blob: Blob | null; thumb: Blob | null; lqip: string | null } | null> {
   const lane = await acquire();
   if (!lane) return null;
   const id = nextJobId++;
@@ -285,7 +294,7 @@ async function prepareViaWorker(
     }
   });
   if (!res || !res.ok) return null;
-  return { blob: res.blob, thumb: res.thumb };
+  return { blob: res.blob, thumb: res.thumb, lqip: res.lqip };
 }
 
 type Source = ImageBitmap | HTMLImageElement;
@@ -331,6 +340,39 @@ function encode(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null
   return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
 }
 
+/**
+ * O LQIP no fio principal — o gémeo de `lqipDe` do trabalhador, para os
+ * browsers que não têm `OffscreenCanvas` (e para o caminho do HEIC no Safari,
+ * que passa por `<img>`).
+ *
+ * A duplicação é a mesma que já existe entre `drawTo`/`planResize` daqui e do
+ * trabalhador, e pela mesma razão: um trabalhador não tem DOM. Os LIMIARES são
+ * importados do trabalhador, não copiados — o que não pode divergir é o
+ * tamanho e o tecto, e esses vivem num sítio só.
+ *
+ * Nunca lança: sem LQIP a célula da grelha fica como está hoje.
+ */
+async function lqipNoFioPrincipal(
+  base: CanvasImageSource,
+  w: number,
+  h: number,
+): Promise<string | null> {
+  try {
+    const t = fitWithin(w, h, LQIP_EDGE);
+    const canvas = drawTo(base, t.w, t.h);
+    if (!canvas) return null;
+    const uri = canvas.toDataURL("image/webp", LQIP_QUALITY);
+    // Um browser que não saiba encodar WebP devolve um PNG em silêncio — e um
+    // PNG de 16 px é maior do que o tecto. O JPEG é o plano B explícito.
+    const escolhido = uri.startsWith("data:image/webp")
+      ? uri
+      : canvas.toDataURL("image/jpeg", LQIP_QUALITY);
+    return escolhido.length <= LQIP_MAX_CHARS ? escolhido : null;
+  } catch {
+    return null;
+  }
+}
+
 function sizeOf(source: Source): { w: number; h: number } {
   return "naturalWidth" in source
     ? { w: source.naturalWidth, h: source.naturalHeight }
@@ -352,7 +394,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
   const keep = keepOriginal(file.type, file.size, kind);
   // Sem miniatura a pedir, um ficheiro já pequeno e suportado nem sequer é
   // descodificado — é o caminho barato que o estúdio de propostas já usava.
-  if (keep && !wantThumb) return { file, thumb: null };
+  if (keep && !wantThumb) return { file, thumb: null, lqip: null };
 
   // 1ª tentativa: fora do fio principal. Devolve `null` quando este browser não
   // tem `OffscreenCanvas` ou quando o trabalhador não consegue descodificar o
@@ -365,7 +407,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     const thumb = viaWorker.thumb
       ? new File([viaWorker.thumb], thumbFileName(file.name), { type: "image/jpeg" })
       : null;
-    return { file: out, thumb };
+    return { file: out, thumb, lqip: viaWorker.lqip };
   }
 
   let source: Source;
@@ -374,7 +416,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
   } catch {
     // Formato suportado que este browser não descodifica: sobe tal e qual e
     // fica sem miniatura (a grelha usa o original).
-    if (SUPPORTED.test(file.type)) return { file, thumb: null };
+    if (SUPPORTED.test(file.type)) return { file, thumb: null, lqip: null };
     throw new Error(
       `"${file.name}" não é suportada neste navegador. Converta para JPG e tente de novo.`,
     );
@@ -417,7 +459,11 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
       if (blob) thumb = new File([blob], thumbFileName(file.name), { type: "image/jpeg" });
     }
 
-    return { file: out, thumb };
+    // 3) O LQIP, do MESMO canvas — a imagem que a grelha desenha a 0 ms.
+    //    Silencioso como a miniatura: sem ele fica a caixa de hoje.
+    const lqip = await lqipNoFioPrincipal(base, bw, bh);
+
+    return { file: out, thumb, lqip };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.
