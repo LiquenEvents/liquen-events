@@ -1252,6 +1252,8 @@ function Photo({
   const [lightBroken, setLightBroken] = useState(false);
   /** A fila deu a vez a esta célula. */
   const [turn, setTurn] = useState(false);
+  /** A fotografia já chegou — é o que dispara o fade por cima do LQIP. */
+  const [pintada, setPintada] = useState(false);
   /** Sem imagem barata, esta célula vai puxar ~2,6 MB: espera pela vez. */
   const heavy = !light || lightBroken;
   const release = useRef<(() => void) | null>(null);
@@ -1288,22 +1290,39 @@ function Photo({
   };
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      // As pesadas são geridas pela fila — pô-las também em `lazy` fazia uma
-      // célula fora do ecrã ficar com a vez sem chegar a pedir nada.
-      loading={heavy || priority ? "eager" : "lazy"}
-      fetchPriority={priority ? "high" : undefined}
-      decoding="async"
-      onLoad={finished}
-      onError={() => {
-        finished();
-        if (!heavy) setLightBroken(true);
-      }}
-      className="h-full w-full object-cover"
-    />
+    /* O LQIP É O FUNDO DA CÉLULA — mesma regra do seletor de temas, e pela
+       mesma razão: um `background-image` com um `data:` URI não é um pedido,
+       não entra na fila de descarregamentos, e está pintado no instante em que
+       este elemento existe.
+       Aqui há uma diferença: a célula pode já ter `localSrc` — a miniatura que
+       acabou de ser feita no browser, ainda em memória, de uma foto carregada
+       há segundos. Essa aparece na hora e não precisa de placeholder nenhum. */
+    <div
+      className="h-full w-full bg-foreground/[0.04] bg-cover bg-center"
+      style={image.lqip && !localSrc ? { backgroundImage: `url("${image.lqip}")` } : undefined}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        // As pesadas são geridas pela fila — pô-las também em `lazy` fazia uma
+        // célula fora do ecrã ficar com a vez sem chegar a pedir nada.
+        loading={heavy || priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        decoding="async"
+        onLoad={() => {
+          finished();
+          setPintada(true);
+        }}
+        onError={() => {
+          finished();
+          if (!heavy) setLightBroken(true);
+        }}
+        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-200 ${
+          pintada || localSrc || !image.lqip ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </div>
   );
 }
 
