@@ -54,6 +54,15 @@ export interface TabelaOuCartoesProps<T> {
   ordemInicial?: { chave: string; ascendente: boolean };
   /** Rótulo acessível da tabela. */
   legenda: string;
+  /**
+   * O cartão já traz a sua própria moldura e o seu próprio botão.
+   *
+   * Existe para os ecrãs cujo cartão de telemóvel já foi desenhado e auditado —
+   * envolvê-lo noutra caixa daria duas bordas e, pior, um botão dentro de outro
+   * botão. Nesses casos o `aoAbrir` é ignorado no telemóvel: quem abre é o
+   * próprio cartão.
+   */
+  semMoldura?: boolean;
 }
 
 export function TabelaOuCartoes<T>({
@@ -65,6 +74,7 @@ export function TabelaOuCartoes<T>({
   vazio,
   ordemInicial,
   legenda,
+  semMoldura = false,
 }: TabelaOuCartoesProps<T>) {
   const { desktop, largo, montado } = useAdaptativo();
   const [ordem, setOrdem] = useState(ordemInicial ?? null);
@@ -87,7 +97,9 @@ export function TabelaOuCartoes<T>({
       <ul className="flex flex-col gap-2" aria-label={legenda}>
         {ordenados.map((item) => (
           <li key={chaveDe(item)}>
-            {aoAbrir ? (
+            {semMoldura ? (
+              cartao(item)
+            ) : aoAbrir ? (
               <button
                 type="button"
                 onClick={() => aoAbrir(item)}

@@ -43,7 +43,7 @@ import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
-import { Button, SectionCard, Segmented } from "./ui";
+import { Button, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -263,6 +263,129 @@ function statusBadge(status: QuoteStatus): ReactNode {
 // is a stable string; onOpen/onToggle are stable callbacks), so memo skips
 // re-rendering each row. Saves, selection and filtering still update the list
 // because they change these props (via visibleQuotes / the booleans).
+
+/**
+ * AS COLUNAS DOS PEDIDOS — a forma de computador da mesma lista.
+ *
+ * A lista de pedidos é o ecrã onde ela passa mais tempo, e num monitor uma
+ * pilha de cartões grandes mostra oito pedidos onde cabiam vinte e cinco. A
+ * tabela existe para isso: ver muitos ao mesmo tempo, ordenar por quem espera
+ * há mais tempo, e varrer com os olhos.
+ *
+ * O CARTÃO continua a ser o do telemóvel, intacto — foi desenhado para o
+ * polegar e auditado ao toque. Isto não o substitui; convive com ele.
+ */
+function COLUNAS_DE_PEDIDOS(ctx: {
+  selectedIds: Set<string>;
+  toggleSelect: (id: string) => void;
+  todayStr: string;
+  atual?: string;
+}): Coluna<Quote>[] {
+  const diasAEsperar = (q: Quote) =>
+    Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
+  return [
+    {
+      chave: "sel",
+      cabecalho: "",
+      largura: "w-10",
+      celula: (q) => (
+        <label
+          className="flex cursor-pointer items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={ctx.selectedIds.has(q.id)}
+            onChange={() => ctx.toggleSelect(q.id)}
+            className="h-4 w-4 cursor-pointer accent-[#4d6350]"
+            aria-label={`Selecionar pedido de ${q.name}`}
+          />
+        </label>
+      ),
+    },
+    {
+      chave: "nome",
+      cabecalho: "Cliente",
+      ordenar: (a, b) => a.name.localeCompare(b.name, "pt"),
+      celula: (q) => (
+        <span className="block">
+          <span
+            className={`block truncate ${
+              ctx.atual === q.id ? "font-semibold text-[#4d6350]" : "text-foreground/85"
+            }`}
+          >
+            {q.name}
+          </span>
+          <span className="block truncate text-[11px] text-foreground/45">{q.email}</span>
+        </span>
+      ),
+    },
+    { chave: "estado", cabecalho: "Estado", celula: (q) => statusBadge(q.status) },
+    {
+      chave: "data",
+      cabecalho: "Data do evento",
+      ordenar: (a, b) => (a.date ?? "").localeCompare(b.date ?? ""),
+      celula: (q) => {
+        const cd = eventCountdown(q.date);
+        return (
+          <span className="whitespace-nowrap">
+            {q.date || "—"}
+            {cd && cd.tone !== "past" && (
+              <span
+                className={`ml-1.5 text-[10px] ${
+                  cd.tone === "today" || cd.tone === "soon"
+                    ? "font-medium text-[#b5654a]"
+                    : "text-foreground/45"
+                }`}
+              >
+                {cd.label}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      chave: "local",
+      cabecalho: "Local",
+      soLargo: true,
+      celula: (q) => <span className="block truncate">{q.location || "—"}</span>,
+    },
+    {
+      chave: "pax",
+      cabecalho: "Pax",
+      soLargo: true,
+      alinharADireita: true,
+      ordenar: (a, b) => (a.guests ?? 0) - (b.guests ?? 0),
+      celula: (q) => <span className="tabular-nums">{q.guests || "—"}</span>,
+    },
+    {
+      // A coluna que ela pediu, e a que muda o que se faz a seguir: quem está
+      // à espera há mais tempo. Ordenar por aqui é a pergunta "a quem devo
+      // responder já", que na pilha de cartões não se conseguia fazer.
+      chave: "espera",
+      cabecalho: "À espera",
+      alinharADireita: true,
+      ordenar: (a, b) => diasAEsperar(b) - diasAEsperar(a),
+      celula: (q) => {
+        const d = diasAEsperar(q);
+        const parado =
+          (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
+          d >= 14;
+        return (
+          <span
+            className={`tabular-nums whitespace-nowrap ${
+              parado ? "font-medium text-amber-600" : "text-foreground/60"
+            }`}
+          >
+            {d}d
+          </span>
+        );
+      },
+    },
+  ];
+}
+
 const QuoteCard = memo(function QuoteCard({
   q,
   isCurrent,
@@ -2319,17 +2442,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     />
                   </div>
                 )}
-                {visibleQuotes.map((q) => (
-                  <QuoteCard
-                    key={q.id}
-                    q={q}
-                    isCurrent={selected?.id === q.id}
-                    isSelected={selectedIds.has(q.id)}
-                    todayStr={todayStr}
-                    onOpen={openQuoteStable}
-                    onToggle={toggleSelect}
+                {visibleQuotes.length > 0 && (
+                  <TabelaOuCartoes
+                    itens={visibleQuotes}
+                    chaveDe={(q) => q.id}
+                    legenda="Pedidos"
+                    // O cartão do telemóvel é o QuoteCard, que já foi desenhado
+                    // e auditado ao toque — traz a sua própria moldura e o seu
+                    // próprio botão, e não pode ser embrulhado noutro.
+                    semMoldura
+                    cartao={(q) => (
+                      <QuoteCard
+                        q={q}
+                        isCurrent={selected?.id === q.id}
+                        isSelected={selectedIds.has(q.id)}
+                        todayStr={todayStr}
+                        onOpen={openQuoteStable}
+                        onToggle={toggleSelect}
+                      />
+                    )}
+                    aoAbrir={openQuoteStable}
+                    colunas={COLUNAS_DE_PEDIDOS({
+                      selectedIds,
+                      toggleSelect,
+                      todayStr,
+                      atual: selected?.id,
+                    })}
                   />
-                ))}
+                )}
                 {filtered.length > visibleCount && (
                   <button
                     type="button"
