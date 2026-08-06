@@ -78,6 +78,71 @@ test.describe("Pedido de orçamento", () => {
     await expect(page).toHaveURL(/\/orcamento\/confirmacao\/LIQ-E2E-OPEN$/);
   });
 
+  test("“ainda a definir” oferece a ordem de grandeza, sem a exigir", async ({ page }) => {
+    await page.goto("/orcamento");
+    await page.getByRole("radio", { name: "Casamento", exact: true }).click();
+
+    // Antes de marcar a caixa os intervalos não existem: quem sabe o número não
+    // tem de ver uma pergunta a mais.
+    const intervalos = page.getByRole("group", { name: /Mais ou menos quantas/ });
+    await expect(intervalos).toHaveCount(0);
+
+    await page.getByLabel("Ainda a definir", { exact: true }).check();
+    await expect(intervalos).toBeVisible();
+
+    // Carregar marca; voltar a carregar no mesmo desmarca — é uma estimativa
+    // opcional, e ter de recarregar a página para a tirar seria absurdo.
+    const cem = intervalos.getByRole("button", { name: "100 a 150" });
+    await cem.click();
+    await expect(cem).toHaveAttribute("aria-pressed", "true");
+    await cem.click();
+    await expect(cem).toHaveAttribute("aria-pressed", "false");
+
+    // E sem intervalo nenhum o envio passa à mesma: quem não faz mesmo ideia
+    // segue em frente em vez de inventar um número.
+    let enviado: { form?: Record<string, unknown> } | undefined;
+    await page.route("**/api/orcamento", (route) => {
+      enviado = route.request().postDataJSON();
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "LIQ-E2E-EST", status: "ok" }),
+      });
+    });
+    await page.getByLabel("Data ainda a definir").check();
+    await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
+    await page.getByPlaceholder("O seu nome").fill("Rita Sem Numero");
+    await page.getByPlaceholder("email@exemplo.com").fill("rita@exemplo.pt");
+    await page.getByPlaceholder("+351 9XX XXX XXX").fill("912345678");
+    await page
+      .getByPlaceholder("Estilo, cores, ambiente, inspirações que guardou…")
+      .fill("Simples e com muita luz.");
+    await page.getByRole("button", { name: /Enviar pedido/ }).click();
+    await expect(page).toHaveURL(/\/orcamento\/confirmacao\/LIQ-E2E-EST$/);
+    expect(enviado?.form?.guestsRange).toBe("");
+  });
+
+  test("os nomes dos noivos só aparecem no casamento, e só ao escrever o nome", async ({
+    page,
+  }) => {
+    await page.goto("/orcamento");
+    const noivo = page.getByPlaceholder("Nome do noivo");
+
+    // Casamento escolhido, nome ainda em branco → os campos não existem.
+    await page.getByRole("radio", { name: "Casamento", exact: true }).click();
+    await expect(noivo).toHaveCount(0);
+
+    // Começa a escrever o nome → aparecem.
+    await page.getByPlaceholder("O seu nome").fill("Ana");
+    await expect(noivo).toBeVisible();
+    await expect(page.getByPlaceholder("Nome da noiva")).toBeVisible();
+
+    // Muda para um tipo de evento sem noivos → desaparecem, mesmo com o nome
+    // escrito. Um aniversário não tem noivos.
+    await page.getByRole("radio", { name: "Aniversário", exact: true }).click();
+    await expect(noivo).toHaveCount(0);
+  });
+
   test("o rascunho sobrevive a sair e voltar à página", async ({ page }) => {
     await page.goto("/orcamento");
     await page.getByRole("radio", { name: "Aniversário", exact: true }).click();

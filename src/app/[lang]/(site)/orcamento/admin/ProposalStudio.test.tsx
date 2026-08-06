@@ -1,19 +1,81 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import ProposalStudio, { avisoDeConteudoIncompleto, cortesDoCabecalho } from "./ProposalStudio";
 import type { Quote } from "@/lib/orcamento/types";
 
-/** A biblioteca de temas, reduzida a um botão que devolve uma foto escolhida —
- *  é o caminho por onde uma foto entra num mood board sem passar por um ficheiro
- *  real (o carregamento verdadeiro precisa de canvas/worker, que o jsdom não tem). */
+/** O runtime de importação do seletor, reduzido aos três momentos que o estúdio
+ *  tem de saber tratar: o lugar é RESERVADO no instante do clique, a cópia
+ *  CONFIRMA (e traz o caminho definitivo), ou FALHA. É por aqui que uma foto
+ *  entra num mood board sem passar por um ficheiro real (o carregamento
+ *  verdadeiro precisa de canvas/worker, que o jsdom não tem). */
+const seletor = vi.hoisted(() => ({ tokens: [] as string[], n: 0 }));
+
+interface FotoImportada {
+  path: string;
+  url: string;
+  thumbUrl?: string;
+  sourcePath?: string;
+  token?: string;
+}
+
 vi.mock("./ThemePicker", () => ({
-  default: ({ onPicked }: { onPicked: (imgs: { path: string; url: string }[]) => void }) => (
-    <button type="button" onClick={() => onPicked([{ path: "board/nova.jpg", url: "u" }])}>
-      escolher-foto-de-teste
-    </button>
+  default: ({
+    onPicked,
+    onReserve,
+    onDropped,
+  }: {
+    onPicked: (imgs: FotoImportada[]) => void;
+    onReserve?: (r: { token: string; thumbUrl?: string; sourcePath: string }[]) => void;
+    onDropped?: (tokens: string[]) => void;
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          const n = ++seletor.n;
+          const token = `pending:tok-${n}`;
+          seletor.tokens.push(token);
+          onReserve?.([{ token, thumbUrl: `tema-thumb-${n}`, sourcePath: `t1/origem-${n}.jpg` }]);
+        }}
+      >
+        reservar-foto-de-teste
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          // Confirma a ÚLTIMA reservada — é o que deixa verificar que a troca é
+          // no lugar dela, e não no fim da lista.
+          const token = seletor.tokens.pop();
+          const n = token?.replace("pending:tok-", "") ?? "0";
+          onPicked([
+            {
+              path: `LQ-001/copia-${n}.jpg`,
+              url: `u-${n}`,
+              thumbUrl: `copia-thumb-${n}`,
+              sourcePath: `t1/origem-${n}.jpg`,
+              token,
+            },
+          ]);
+        }}
+      >
+        confirmar-foto-de-teste
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const token = seletor.tokens.pop();
+          if (token) onDropped?.([token]);
+        }}
+      >
+        falhar-foto-de-teste
+      </button>
+      <button type="button" onClick={() => onPicked([{ path: "board/nova.jpg", url: "u" }])}>
+        escolher-foto-de-teste
+      </button>
+    </>
   ),
 }));
 
@@ -87,16 +149,28 @@ function reply(body: { ok?: boolean; json?: unknown; headers?: Record<string, st
 
 /** O que a rota `proposta-doc` devolve neste teste (pré-visualização e envio). */
 let propostaDoc: Response = reply({ headers: {}, json: { ok: true, emailed: true } });
+/** Tudo o que saiu daqui — é onde se lê o que foi GRAVADO e o que foi ENVIADO. */
+let pedidos: { url: string; init?: RequestInit }[] = [];
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-  void init; // registado nas chamadas — é onde se vê o que foi GRAVADO
   const url = String(input);
+  pedidos.push({ url, init });
   if (url.includes("proposta-doc")) return propostaDoc;
   if (url.includes("proposta-rascunho")) return reply({ ok: false });
   return reply({ json: { images: [] } });
 });
 
+/** Os corpos enviados a uma rota, pela ordem. */
+function corpos(parte: string, metodo = "PUT"): string[] {
+  return pedidos
+    .filter((p) => p.url.includes(parte) && (p.init?.method ?? "GET") === metodo)
+    .map((p) => String(p.init?.body ?? ""));
+}
+
 beforeEach(() => {
   localStorage.clear();
+  seletor.tokens.length = 0;
+  seletor.n = 0;
+  pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
   fetchMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
@@ -376,8 +450,226 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
 
     const alerta = await screen.findByRole("alert");
     const texto = alerta.textContent ?? "";
-    expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la\)/);
+    expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la ou desenhá-la\)/);
     expect(texto).toMatch(/Campo «Local»: 1 linha cortada/);
+  });
+});
+
+/**
+ * A FOTO APARECE NO INSTANTE DO CLIQUE — E O MARCADOR NUNCA SAI DAQUI.
+ *
+ * Escolher fotos na Biblioteca de Temas fecha o diálogo já, mas a CÓPIA para a
+ * pasta desta proposta demora. Entre o clique e a confirmação, o que ocupa o
+ * lugar no documento é um marcador `pending:<uuid>` — que não é caminho de
+ * coisa nenhuma. Fixa-se aqui o ciclo inteiro:
+ *
+ *  1. ao clicar, a foto está no mood board, esbatida e anunciada (`aria-busy`);
+ *  2. ao confirmar, o marcador dá lugar ao caminho definitivo NA MESMA CÉLULA —
+ *     nada reordena, nada salta;
+ *  3. ao falhar, o marcador sai (e o aviso é da pastilha, não daqui);
+ *  4. e — o mais importante — um marcador NUNCA é gravado no rascunho nem vai
+ *     dentro do documento que gera o PDF. Gravado, sobrevivia ao recarregar da
+ *     página como uma foto que não existe; enviado, era um buraco silencioso no
+ *     PDF do cliente.
+ */
+describe("fotos da biblioteca em estado provisório", () => {
+  /** As células de foto do documento, por ordem no DOM (cada uma tem o seu «×»). */
+  const celulas = () =>
+    screen.queryAllByRole("button", { name: "Remover imagem" }).map((b) => b.parentElement!);
+  const estados = () => celulas().map((c) => c.getAttribute("aria-busy"));
+
+  async function abrirBiblioteca(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
+    );
+  }
+  const reservar = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole("button", { name: "reservar-foto-de-teste" }));
+  const confirmar = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole("button", { name: "confirmar-foto-de-teste" }));
+
+  /** Esquece o que já foi gravado e espera pela PRÓXIMA gravação do rascunho
+   *  (que é feita com debounce). */
+  async function proximaGravacao() {
+    pedidos = [];
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+  }
+
+  it("a foto entra no mood board no INSTANTE do clique, em estado provisório", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    const antes = pedidos.length;
+    await reservar(user);
+
+    // Sem esperar por rede nenhuma: são duas células, a nova por assentar.
+    expect(estados()).toEqual([null, "true"]);
+    // Percetível por quem não vê o esbatido, e não só por opacidade.
+    expect(screen.getByText("a entrar…")).toBeInTheDocument();
+    // E ZERO pedidos novos: a miniatura é a que o seletor já tinha em memória.
+    expect(pedidos.length).toBe(antes);
+  });
+
+  it("ao confirmar, o marcador dá lugar ao caminho definitivo NA MESMA POSIÇÃO", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+    await reservar(user);
+    expect(estados()).toEqual([null, "true", "true"]);
+
+    // Confirma-se a SEGUNDA das duas. Se a troca fosse um "acrescentar", ela
+    // ia parar ao fim da lista e a primeira descia de posição.
+    await confirmar(user);
+    expect(estados()).toEqual([null, "true", null]);
+
+    await confirmar(user);
+    expect(estados()).toEqual([null, null, null]);
+    await proximaGravacao();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].images).toEqual([
+      "board/foto-0.jpg",
+      "LQ-001/copia-1.jpg",
+      "LQ-001/copia-2.jpg",
+    ]);
+  });
+
+  it("ao falhar, o marcador sai do documento — e o aviso não se repete", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+    expect(estados()).toEqual([null, "true"]);
+
+    await user.click(screen.getByRole("button", { name: "falhar-foto-de-teste" }));
+
+    expect(estados()).toEqual([null]);
+    expect(screen.queryByText("a entrar…")).not.toBeInTheDocument();
+    // A pastilha do seletor é que avisa e oferece "Repetir"; o estúdio cala-se
+    // (a região de avisos existe sempre, mas fica vazia).
+    expect(screen.getByRole("alert").textContent).toBe("");
+  });
+
+  it("um marcador provisório NUNCA é gravado no rascunho", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+    await proximaGravacao();
+
+    // Nem na cópia local (documento e mapas de apoio)…
+    expect(localStorage.getItem(DRAFT_KEY)).not.toContain("pending:");
+    expect(localStorage.getItem(`${DRAFT_KEY}:meta`)).not.toContain("pending:");
+    // …nem na do servidor, que é a que viaja para o outro dispositivo.
+    expect(corpos("proposta-rascunho").join("")).not.toContain("pending:");
+    // E o que já lá estava não se perdeu no caminho.
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].images).toEqual([
+      "board/foto-0.jpg",
+    ]);
+  });
+
+  it("a capa reservada não encolhe a outra posição (a foto da direita sai à direita)", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    // Posição 1 = capa DIREITA. Um array compactado mandava-a imprimir à esquerda.
+    const daBiblioteca = await screen.findAllByRole("button", { name: "Da biblioteca de temas" });
+    await user.click(daBiblioteca[1]);
+    await reservar(user);
+    await proximaGravacao();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).coverImages).toEqual(["", ""]);
+
+    await confirmar(user);
+    await proximaGravacao();
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).coverImages).toEqual([
+      "",
+      "LQ-001/copia-1.jpg",
+    ]);
+  });
+
+  it("a pré-visualização sai sem o marcador e diz que a foto ainda não entrou", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+
+    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Descarregar PDF/ }));
+
+    const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
+    expect(corpo).not.toContain("pending:");
+    expect(JSON.parse(corpo).doc.moodBoards[0].images).toEqual(["board/foto-0.jpg"]);
+    // E dito por extenso, senão o PDF que ela acabou de abrir parecia um erro.
+    expect(
+      await screen.findByText(/PDF gerado sem 1 foto que ainda está a entrar/),
+    ).toBeInTheDocument();
+  });
+
+  it("o ENVIO espera pelas fotos por confirmar, e depois leva o caminho definitivo", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await abrirBiblioteca(user);
+    await reservar(user);
+
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    // O gesto irreversível não segue com a proposta a meio: fica travado, com
+    // a razão escrita — e não uma mensagem a mandá-la preencher campos.
+    expect(await screen.findByText(/1 foto ainda está a entrar na proposta/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Gerar e enviar ao cliente/ })).toBeDisabled();
+    expect(corpos("proposta-doc", "POST")).toHaveLength(0);
+
+    // Mal assenta, o envio abre sozinho — e o documento leva o caminho real.
+    await confirmar(user);
+    const enviar = screen.getByRole("button", { name: /Gerar e enviar ao cliente/ });
+    expect(enviar).toBeEnabled();
+    await user.click(enviar);
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
+    expect(corpo).not.toContain("pending:");
+    expect(JSON.parse(corpo).doc.moodBoards[0].images).toEqual([
+      "board/foto-0.jpg",
+      "LQ-001/copia-1.jpg",
+    ]);
+  });
+
+  it("um marcador deixado num rascunho antigo não sobrevive a reabrir o estúdio", async () => {
+    // Uma versão anterior (ou um rascunho corrompido) podia ter gravado um.
+    // Abrir com ele seria pôr no ecrã uma foto que não existe em lado nenhum.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [],
+        moodBoards: [
+          { title: "Cerimónia", annotation: "", images: ["board/foto-0.jpg", "pending:antigo"] },
+        ],
+        budgetItems: [],
+        coverImages: ["pending:capa", "board/capa-1.jpg"],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    renderStudio();
+
+    // O TÍTULO da secção: a coluna lateral (NavEstudio) também diz "Mood
+    // boards", e um `findByText` solto passou a encontrar os dois.
+    await screen.findByRole("heading", { name: "Mood boards" });
+    // Uma foto no mood board, uma capa — e nenhuma célula provisória.
+    expect(estados()).toEqual([null, null]);
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    expect(localStorage.getItem(DRAFT_KEY)).not.toContain("pending:");
   });
 });
 
@@ -389,7 +681,7 @@ describe("a frase do aviso", () => {
         { where: "Nome na capa", dropped: 1, unit: "linhas" },
       ]),
     ).toBe(
-      "2 fotos não entraram (não foi possível ir buscá-las); " +
+      "2 fotos não entraram (não foi possível ir buscá-las ou desenhá-las); " +
         "Mood board «Cerimónia»: 3 fotos não entram no PDF; " +
         "Nome na capa: 1 linha cortada",
     );
@@ -481,188 +773,44 @@ describe("O valor é UM só — o do pedido", () => {
   });
 });
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * AS ACÇÕES DE UM GRUPO DE SERVIÇOS, NUM TELEMÓVEL
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O cabeçalho de cada grupo tinha quatro coisas na mesma linha: a letra, o
- * título, duas setas e o ×. Num ecrã de 375 px são três alvos de 44 px a
- * competir com o campo do título, presentes o tempo todo para acções que se
- * fazem uma vez por proposta.
- *
- * Passaram a ter dois caminhos, e o que estes testes guardam é que são MESMO
- * dois — porque um gesto escondido sem alternativa visível é o defeito, não a
- * correcção:
- *
- *  1. TOQUE LONGO no cabeçalho → uma folha com mover e remover;
- *  2. o botão "Reordenar" ao lado do título da secção, para quem nunca
- *     descobrir o gesto.
- */
-describe("grupos de serviços — mover e remover sem encher a linha", () => {
-  /** Um rascunho com três grupos, que é onde a ordem passa a interessar. */
-  function seedGrupos(quantos = 3) {
-    const nomes = ["Cerimónia", "Copo de água", "Festa"];
-    localStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({
-        template: "decoracao",
-        ref: "PO Decoração",
-        clientNames: "Maria & Zé",
-        eventType: "Casamento",
-        eventDate: "12 de setembro de 2026",
-        location: "Évora",
-        guests: "80 pax",
-        serviceGroups: nomes
-          .slice(0, quantos)
-          .map((title, i) => ({ letter: `${"abc"[i]})`, title, items: [] })),
-        moodBoards: [],
-        budgetItems: [],
-        coverImages: ["", ""],
-        totalAmount: 3000,
-        totalVatMode: "acrescer",
-      }),
-    );
-  }
-
-  /** O rascunho é restaurado num efeito; sem esperar por ele mede-se o estúdio
-   *  vazio. */
-  const desenharComGrupos = async (quantos = 3) => {
-    seedGrupos(quantos);
+describe("linhas que escalam com os convidados", () => {
+  /**
+   * Metade das linhas de um orçamento de casamento é uma multiplicação, não um
+   * preço. O que se prende aqui é o que a torna confiável: a conta aparece, e
+   * mudar o tipo de escala não faz o total saltar debaixo dos pés.
+   */
+  it("mostra a conta ao lado do número quando a linha passa a ser por mesa", async () => {
     renderStudio();
-    await screen.findAllByLabelText("Título do grupo");
-  };
-
-  const titulos = () =>
-    screen.getAllByLabelText("Título do grupo").map((i) => (i as HTMLInputElement).value);
-
-  /** O cabeçalho do grupo `i` — a caixa que ouve o toque longo. */
-  const cabecalhoDoGrupo = (i: number) =>
-    screen.getAllByLabelText("Título do grupo")[i].parentElement!.parentElement!;
-
-  /**
-   * O toque longo do `useToqueLongo`: dedo pousado, 550 ms parado, sem sair de
-   * cima. Um `click` não serve — o gesto é outro, e é o gesto que se testa.
-   *
-   * Os temporizadores falsos ficam ligados só durante o gesto: com eles ligados
-   * o `findBy*` da testing-library nunca resolve, porque espera em temporizador
-   * real. Foi o que fez a primeira versão destes testes esgotar o tempo toda.
-   */
-  async function toqueLongo(el: Element, { mover }: { mover?: { x: number; y: number } } = {}) {
-    vi.useFakeTimers();
-    try {
-      el.dispatchEvent(
-        new PointerEvent("pointerdown", {
-          pointerType: "touch",
-          clientX: 100,
-          clientY: 100,
-          bubbles: true,
-        }),
-      );
-      if (mover) {
-        el.dispatchEvent(
-          new PointerEvent("pointermove", {
-            pointerType: "touch",
-            clientX: mover.x,
-            clientY: mover.y,
-            bubbles: true,
-          }),
-        );
-      }
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(600);
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  }
-
-  /**
-   * As acções DENTRO da folha.
-   *
-   * Procurar `screen.getByRole("button", { name: /Mover para cima/ })` no
-   * documento inteiro encontra também as setas que cada grupo tem na linha —
-   * no browser estão escondidas por CSS abaixo de `sm`, mas o jsdom não corre
-   * CSS nenhum e vê-as todas. A pergunta certa é sempre "dentro da folha".
-   */
-  const naFolha = async () => within(await screen.findByRole("dialog"));
-
-  it("o toque longo abre as acções do grupo, com o nome dele à vista", async () => {
-    await desenharComGrupos();
-    await toqueLongo(cabecalhoDoGrupo(1));
-
-    // O nome do grupo no título da folha: um menu que diz só "Remover" depois
-    // de um toque longo é a forma fácil de apagar o grupo errado.
-    const folha = await naFolha();
-    expect(folha.getByRole("heading", { name: "Copo de água" })).toBeInTheDocument();
-    expect(folha.getByRole("button", { name: /Mover para cima/ })).toBeInTheDocument();
-    expect(folha.getByRole("button", { name: /Remover grupo/ })).toBeInTheDocument();
-  });
-
-  it("mover para cima pela folha muda mesmo a ordem", async () => {
     const user = userEvent.setup();
-    await desenharComGrupos();
-    expect(titulos()).toEqual(["Cerimónia", "Copo de água", "Festa"]);
 
-    await toqueLongo(cabecalhoDoGrupo(1));
-    await user.click((await naFolha()).getByRole("button", { name: /Mover para cima/ }));
+    await user.click(screen.getByRole("button", { name: /\+ Adicionar item/ }));
+    const nome = screen.getAllByLabelText("Item de orçamento").at(-1)!;
+    await user.clear(nome);
+    await user.type(nome, "Arranjos de mesa");
 
-    expect(titulos()).toEqual(["Copo de água", "Cerimónia", "Festa"]);
+    // O pedido de teste não traz convidados; escreve-se o número no campo do
+    // Evento, que é de onde a conta os lê.
+    const campoConvidados = screen.getByLabelText("Convidados");
+    await user.clear(campoConvidados);
+    await user.type(campoConvidados, "120 pax");
+
+    const comoEscala = screen.getByLabelText(/Como escala Arranjos de mesa/);
+    await user.selectOptions(comoEscala, "por-mesa");
+
+    const unitario = screen.getByLabelText(/Preço por mesa de Arranjos de mesa/);
+    await user.clear(unitario);
+    await user.type(unitario, "45");
+    await user.tab();
+
+    // 120 convidados → 12 mesas de 10, a 45 € cada.
+    await waitFor(() => expect(screen.getByText(/12 mesas × /)).toBeTruthy());
   });
 
-  it("remover pela folha tira o grupo certo", async () => {
+  it("uma linha fixa não mostra fórmula nenhuma", async () => {
+    renderStudio();
     const user = userEvent.setup();
-    await desenharComGrupos();
-
-    await toqueLongo(cabecalhoDoGrupo(2));
-    await user.click((await naFolha()).getByRole("button", { name: /Remover grupo/ }));
-
-    expect(titulos()).toEqual(["Cerimónia", "Copo de água"]);
-  });
-
-  /**
-   * A metade que impede isto de ser um gesto escondido. Se o "Reordenar"
-   * desaparecesse, mover um grupo passava a depender de adivinhar um toque
-   * longo — e quem não o adivinhasse ficava sem forma nenhuma de o fazer.
-   */
-  it("há um caminho visível que não depende de adivinhar o gesto", async () => {
-    await desenharComGrupos();
-    expect(screen.getByRole("button", { name: "Reordenar" })).toBeInTheDocument();
-    expect(screen.getByText(/Toque sem largar num grupo/)).toBeInTheDocument();
-  });
-
-  it("o modo de reordenar diz que está ligado, e sai", async () => {
-    const user = userEvent.setup();
-    await desenharComGrupos();
-
-    await user.click(screen.getByRole("button", { name: "Reordenar" }));
-    expect(screen.getByText(/A arrumar a ordem dos grupos/)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Concluir" }));
-    expect(screen.queryByText(/A arrumar a ordem dos grupos/)).not.toBeInTheDocument();
-  });
-
-  /** Com um grupo só não há ordem nenhuma para arrumar, e o botão seria ruído. */
-  it("sem grupos que cheguem, o botão de reordenar não aparece", async () => {
-    await desenharComGrupos(1);
-    expect(screen.queryByRole("button", { name: "Reordenar" })).not.toBeInTheDocument();
-  });
-
-  /**
-   * O gesto NÃO pode disparar em cima de um campo de texto: pousar o dedo e
-   * não largar é como se põe o cursor a meio de uma palavra no iOS, e abrir
-   * aqui um menu tirava-lhe isso a cada hesitação a escrever.
-   */
-  it("pousar o dedo no campo do título não abre menu nenhum", async () => {
-    await desenharComGrupos();
-    await toqueLongo(screen.getAllByLabelText("Título do grupo")[1]);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  /** Um dedo que se move está a rolar a lista, não a pedir um menu. */
-  it("começar a rolar com o dedo pousado cancela o gesto", async () => {
-    await desenharComGrupos();
-    await toqueLongo(cabecalhoDoGrupo(1), { mover: { x: 100, y: 160 } });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /\+ Adicionar item/ }));
+    expect(screen.queryByText(/mesas × /)).toBeNull();
+    expect(screen.queryByText(/pessoas × /)).toBeNull();
   });
 });

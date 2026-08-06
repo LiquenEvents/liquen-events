@@ -13,15 +13,19 @@ export type View =
   | "clientes"
   | "calendario"
   | "propostas"
+  | "acompanhamento"
   | "fazer-proposta"
   | "tarefas"
   | "fornecedores"
   | "inventario"
+  | "material"
   | "temas"
   | "estatisticas"
   | "faturas"
   | "contratos"
-  | "modelos-email";
+  | "modelos-email"
+  | "definicoes"
+  | "servicos";
 
 /**
  * Sidebar split for the calm, ChatGPT-like rail. Only the owner's DAILY CORE
@@ -43,12 +47,24 @@ export const CORE_NAV: View[] = [
   "overview",
   "pedidos",
   "fazer-proposta",
+  // O acompanhamento fica no núcleo, a seguir a fazer a proposta, porque é a
+  // outra metade do mesmo trabalho: enviar é metade, e a que se esquece.
+  "acompanhamento",
   "propostas",
   "calendario",
   "tarefas",
 ];
 
-export const MORE_NAV: View[] = ["faturas", "contratos", "temas", "kanban", "estatisticas"];
+export const MORE_NAV: View[] = [
+  "faturas",
+  "contratos",
+  "material",
+  "temas",
+  "kanban",
+  "estatisticas",
+  "servicos",
+  "definicoes",
+];
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -193,6 +209,57 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     ),
   },
   {
+    id: "servicos",
+    label: "Biblioteca de serviços",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M4 19.5V5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-1.5z" />
+        <path d="M8 7h8M8 11h5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "definicoes",
+    label: "Definições",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    ),
+  },
+  {
+    id: "acompanhamento",
+    label: "Acompanhamento",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     id: "tarefas",
     label: "Tarefas",
     icon: (
@@ -206,6 +273,25 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "material",
+    label: "Material",
+    // Caixa de ferramentas: a pega e o corpo. É o que vai na carrinha.
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <rect x="3" y="8" width="18" height="12" rx="2" />
+        <path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" strokeLinecap="round" />
+        <path d="M3 13h18" />
       </svg>
     ),
   },

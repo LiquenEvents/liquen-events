@@ -239,9 +239,10 @@ export async function renderStoredProposalDocPdf(doc: ProposalDoc): Promise<Buff
 /**
  * Como `renderStoredProposalDocPdf`, mas diz também o que o PDF não leva:
  *
- * - `missingImages` — fotos PEDIDAS que não chegaram (não resolveram, ou
- *   passaram do tecto de imagens por documento). É uma AVARIA: a correcção é
- *   voltar a tentar ou recarregar a foto.
+ * - `missingImages` — fotos PEDIDAS que não entraram: as que não resolveram do
+ *   armazenamento (ou passaram do tecto de imagens por documento) MAIS as que
+ *   resolveram e que o gerador não conseguiu desenhar. É uma AVARIA: a
+ *   correcção é voltar a tentar ou recarregar a foto.
  * - `truncations` — conteúdo que chegou inteiro e que o DESENHO não mostra
  *   todo (a sétima foto de um mood board, a terceira linha do "Local"…). É uma
  *   ESCOLHA de composição a morder o conteúdo: a correcção é editorial —
@@ -264,10 +265,23 @@ export async function renderStoredProposalDocPdfWithReport(
   // As duas contagens não se sobrepõem: o gerador só vê as fotos que
   // RESOLVERAM (as outras já foram descartadas aqui e contadas em `missing`),
   // por isso uma foto em falta nunca é também contada como cortada.
-  const { bytes: pdfBytes, truncations } = await renderProposalDocPdfWithReport(resolved);
-  if (missing > 0) {
+  const {
+    bytes: pdfBytes,
+    truncations,
+    undrawnImages,
+  } = await renderProposalDocPdfWithReport(resolved);
+  // A foto que RESOLVEU e que o gerador não conseguiu desenhar (um WebP antigo
+  // da biblioteca, bytes corrompidos) some-se aqui às que nem chegaram: para
+  // quem vai enviar a proposta é a mesma coisa — uma foto que o cliente devia
+  // ver e não vê, com a mesma correcção (tentar de novo, ou recarregá-la). Sem
+  // esta soma era a perda MAIS invisível de todas: a foto existia, descarregava
+  // bem, e desaparecia calada no desenho.
+  const emFalta = missing + undrawnImages;
+  if (emFalta > 0) {
     log.error("proposal-doc-render: PDF gerado com fotos EM FALTA", null, {
-      emFalta: missing,
+      emFalta,
+      naoResolvidas: missing,
+      naoDesenhadas: undrawnImages,
       ref: doc.ref,
     });
   }
@@ -277,5 +291,5 @@ export async function renderStoredProposalDocPdfWithReport(
       ref: doc.ref,
     });
   }
-  return { pdf: Buffer.from(pdfBytes), missingImages: missing, truncations };
+  return { pdf: Buffer.from(pdfBytes), missingImages: emFalta, truncations };
 }

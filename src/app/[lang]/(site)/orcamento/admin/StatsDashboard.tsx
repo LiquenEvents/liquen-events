@@ -7,6 +7,7 @@ import { computeEventMetrics } from "@/lib/orcamento/dossier";
 import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
 import { eur0 as eur } from "@/lib/money";
 import { Button, Card, EmptyState, Segmented } from "./ui";
+import AnalisePropostas from "./AnalisePropostas";
 
 // Unified status vocabulary — the same words a newcomer sees everywhere else in
 // the back office (Overview, Kanban): Novo / Em revisão / Proposta enviada /
@@ -557,6 +558,19 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
           label="Previsão pipeline"
         />
       </div>
+
+      {/* ── O QUE AS PROPOSTAS DIZEM ────────────────────────────────────
+          O painel de cima conta PEDIDOS: quantos entraram, quantos fecharam,
+          em que meses. Isto conta PROPOSTAS, e responde a outras perguntas —
+          a primeira das quais é a que fez o motivo de recusa ser uma lista
+          fechada em vez de texto livre: perdemos por preço quantas vezes? */}
+      <Section
+        title="Propostas"
+        hint="Fecho, motivos de recusa e o que os extras vendem."
+        defaultOpen
+      >
+        <AnalisePropostas />
+      </Section>
 
       {/* Financeiro */}
       {stats.hasPayments && (

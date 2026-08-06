@@ -48,6 +48,19 @@ interface PortalViewProps {
   currency: string;
 }
 
+/**
+ * O estado que o CLIENTE vê.
+ *
+ * "Em negociação" é uma anotação interna dela, para saber a quem telefonar
+ * amanhã. Do lado de lá não muda nada: a proposta seguiu e espera resposta —
+ * que é exactamente o que "enviada" já diz. Mostrar a palavra "negociação" a
+ * quem está a decidir seria dar-lhe a ler o caderno de apontamentos de quem lhe
+ * está a vender.
+ */
+function estadoParaOCliente(s: ProposalStatus): Exclude<ProposalStatus, "em_negociacao"> {
+  return s === "em_negociacao" ? "enviada" : s;
+}
+
 const eur = (n: number, currency = "EUR", locale = "pt-PT") =>
   new Intl.NumberFormat(locale, {
     style: "currency",
@@ -134,7 +147,9 @@ export default function PortalView({
                   <p className="text-foreground/62 text-[11px] tracking-[0.15em] uppercase mb-1">
                     {t.proposta.statusLabel}
                   </p>
-                  <p className="text-foreground/85 text-sm">{t.proposta.status[proposal.status]}</p>
+                  <p className="text-foreground/85 text-sm">
+                    {t.proposta.status[estadoParaOCliente(proposal.status)]}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-foreground/62 text-[11px] tracking-[0.15em] uppercase mb-1">

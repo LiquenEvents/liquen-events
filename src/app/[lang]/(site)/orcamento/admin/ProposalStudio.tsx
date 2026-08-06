@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import {
   withProposalDefaults,
@@ -8,17 +8,35 @@ import {
   detectVatMode,
   parseMoneyText,
   normaliseCoverImages,
+  countPendingImages,
+  isPendingImage,
+  stripPendingImages,
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
   type VatMode,
 } from "@/lib/proposal-doc";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
+import { guestRangeLabel } from "@/lib/orcamento/data";
+import PainelInterno from "./PainelInterno";
+import Conferencia from "./Conferencia";
+import NotasInternas from "./NotasInternas";
+import Versoes from "./Versoes";
+import { comoSeDiz, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
+import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
+import { custosDe } from "@/lib/orcamento/margem";
+import {
+  CONVIDADOS_POR_MESA_OMISSAO,
+  convidadosDoDoc,
+  escalasDe,
+  formulaDaLinha,
+  recalcular,
+  totalDaLinha,
+  type TipoDeEscala,
+} from "@/lib/orcamento/escala";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
-import { FolhaOuDialogo } from "./ui/FolhaOuDialogo";
-import { useToqueLongo } from "./ui/adaptativo";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { depositPercentOf } from "@/lib/proposal-doc";
 import type { ProposalDoc } from "@/lib/proposal-doc";
@@ -37,7 +55,8 @@ import {
 import { eur, splitSinal } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
-import ThemePicker, { type ImportedImage } from "./ThemePicker";
+import ThemePicker, { type ImportedImage, type ReservedImage } from "./ThemePicker";
+import ServicesEditor, { MoveBtns } from "./ServicesEditor";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
 import { Button, Card, Field, Segmented } from "./ui";
 
@@ -110,15 +129,29 @@ function buildRef(d: StudioDoc): string {
   return `${tpl} ${d.eventType} ${d.clientNames} · ${d.eventDate}`.replace(/\s+/g, " ").trim();
 }
 
+/** "Maria & Zé" a partir dos nomes que o casal deu, ou "" se não deu nenhum.
+ *  Com um só nome escrito, devolve esse — meio par continua a ser melhor do que
+ *  o nome de quem preencheu o formulário. */
+function nomesDoCasal(quote: Quote): string {
+  const par = [quote.partnerA, quote.partnerB].map((n) => n?.trim()).filter(Boolean);
+  return par.join(" & ");
+}
+
 function initialDoc(quote: Quote): StudioDoc {
   const base: StudioDoc = {
     template: "decoracao",
     ref: "",
-    clientNames: quote.name ?? "",
+    // Se o casal escreveu os dois nomes no pedido, a proposta abre dirigida a
+    // ELES. O `quote.name` é de quem escreveu — pode ser a mãe da noiva ou uma
+    // planner, e uma proposta endereçada a quem preencheu o formulário em vez
+    // de a quem casa lê-se como um erro de quem a mandou.
+    clientNames: nomesDoCasal(quote) || (quote.name ?? ""),
     eventType: eventTypeLabel(quote),
     eventDate: formatEventDate(quote.date),
     location: quote.location ?? "",
-    guests: quote.guests ? `${quote.guests} pax` : "",
+    // Sem número exacto, vale a ordem de grandeza que o casal deu ("100 a 150").
+    // Escrever "0 pax" era pior do que não escrever nada.
+    guests: quote.guests ? `${quote.guests} pax` : guestRangeLabel(quote.guestsRange),
     ceremony: "",
     time: "",
     weddingPlanners: "",
@@ -218,7 +251,6 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
   return next;
 }
 
-const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 
 /**
  * Quantos passos atrás o Cmd+Z consegue ir.
@@ -236,6 +268,46 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const copy = arr.slice();
   [copy[i], copy[j]] = [copy[j], copy[i]];
   return copy;
+}
+
+/**
+ * Reescreve TODAS as posições de foto do documento (capas + mood boards) com
+ * `f`, que devolve o caminho novo ou `null` para a foto sair.
+ *
+ * Um só sítio a andar por dentro do documento à procura de fotos, porque as
+ * duas operações do estado provisório — trocar o marcador pelo caminho
+ * definitivo e tirar o marcador que ficou sem foto — têm de tratar os DOIS
+ * sítios da mesma maneira, e falhar um deles deixaria um `pending:` para trás.
+ *
+ * Numa capa, "sair" é ficar `""` e NÃO encolher o array: é a posição que decide
+ * o lado onde a foto é impressa. Num mood board é ordem, e sai mesmo.
+ *
+ * Devolve o mesmo objeto quando nada muda — uma entrega que já não encontra o
+ * seu lugar (a foto foi removida à mão entretanto) não pode marcar o rascunho
+ * como alterado.
+ */
+function mapImagePaths(d: StudioDoc, f: (path: string) => string | null): StudioDoc {
+  let changed = false;
+  const cover = normaliseCoverImages(d.coverImages).map((p) => {
+    if (!p) return p;
+    const next = f(p);
+    if (next === p) return p;
+    changed = true;
+    return next ?? "";
+  });
+  const boards = d.moodBoards.map((b) => {
+    let touched = false;
+    const images: string[] = [];
+    for (const p of b.images) {
+      const next = f(p);
+      if (next !== p) touched = true;
+      if (next !== null) images.push(next);
+    }
+    if (!touched) return b;
+    changed = true;
+    return { ...b, images };
+  });
+  return changed ? { ...d, coverImages: cover, moodBoards: boards } : d;
 }
 
 // ── O que o PDF não leva ──
@@ -305,10 +377,14 @@ function fraseDeCorte(c: Corte): string {
 export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): string | null {
   const partes: string[] = [];
   if (emFalta > 0) {
+    // "buscá-la OU desenhá-la": a contagem cobre as duas avarias — a foto que
+    // não se conseguiu ir buscar ao armazenamento e a que se foi buscar e não
+    // se conseguiu imprimir (um WebP antigo da biblioteca, bytes corrompidos).
+    // Para quem envia é a mesma perda e a mesma correcção: recarregar a foto.
     partes.push(
       emFalta === 1
-        ? "1 foto não entrou (não foi possível ir buscá-la)"
-        : `${emFalta} fotos não entraram (não foi possível ir buscá-las)`,
+        ? "1 foto não entrou (não foi possível ir buscá-la ou desenhá-la)"
+        : `${emFalta} fotos não entraram (não foi possível ir buscá-las ou desenhá-las)`,
     );
   }
   for (const c of cortes) partes.push(fraseDeCorte(c));
@@ -317,6 +393,13 @@ export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): str
 
 interface Props {
   quote: Quote;
+  /**
+   * Os outros pedidos, só para o painel interno saber o que ela costuma cobrar
+   * num casamento desta dimensão. Opcional: sem eles o estúdio funciona na
+   * mesma e o aviso de "valor fora do habitual" simplesmente não aparece —
+   * comparar com dois eventos seria pior do que não comparar.
+   */
+  quotes?: Quote[];
   onSent?: () => void;
   /**
    * O valor mudou aqui. O pai actualiza a sua cópia do pedido para o "Preço
@@ -326,7 +409,7 @@ interface Props {
   onQuoteUpdated?: (quote: Quote) => void;
 }
 
-export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props) {
+export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }: Props) {
   const { toast } = useToast();
   const DRAFT_KEY = `liquen-proposal-studio-${quote.id}`;
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
@@ -355,9 +438,16 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
    * certa é quase sempre "sim" — por isso carrega-se sem ler. A anulação
    * pergunta DEPOIS, quando o ecrã já mostra o estrago.
    */
-  const [limpo, setLimpo] = useState<{ doc: StudioDoc; total: string; segundos: number } | null>(
-    null,
-  );
+  const [limpo, setLimpo] = useState<{
+    doc: StudioDoc;
+    total: string;
+    segundos: number;
+    /** O que aconteceu, para o aviso poder dizê-lo. O "Limpar" não é o único
+     *  gesto que deita fora o que estava no ecrã: repor uma versão antiga
+     *  também, e um aviso a dizer "rascunho limpo" depois de um restauro
+     *  mandava procurar um problema que não houve. */
+    motivo: string;
+  } | null>(null);
   /**
    * Histórico para o Cmd+Z. Guardado num `ref` e não em estado: crescer o
    * histórico não pode redesenhar a página, ou escrever numa caixa de texto
@@ -377,9 +467,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   const [podeDesfazer, setPodeDesfazer] = useState(false);
   /** O modo de arrumar a ordem dos grupos de serviços. Só existe no telemóvel
    *  — a razão está escrita ao lado do botão "Reordenar". */
-  const [reordenarGrupos, setReordenarGrupos] = useState(false);
   /** Qual o grupo cujo menu de acções está aberto (por toque longo). */
-  const [accoesDoGrupo, setAccoesDoGrupo] = useState<number | null>(null);
   /**
    * O que ela já escreveu antes, para não voltar a escrever.
    *
@@ -440,7 +528,13 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           // na posição da direita.
           setDoc((d) => {
             const merged = { ...d, ...parsed };
-            return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
+            // `stripPendingImages` também aqui: gravar já os filtra, mas um
+            // rascunho escrito por uma versão anterior (ou por outra aba) não
+            // pode fazer aparecer no ecrã um caminho que nunca vai existir.
+            return stripPendingImages({
+              ...merged,
+              coverImages: normaliseCoverImages(merged.coverImages),
+            });
           });
           // A BASE, não o `totalAmount` cru — ver `baseDoDoc`.
           const base = baseDoDoc(parsed);
@@ -517,7 +611,10 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         if (localStamp > Date.parse(draft.updatedAt ?? 0)) return;
         setDoc((d) => {
           const merged = { ...d, ...(draft.doc as Partial<StudioDoc>) };
-          return { ...merged, coverImages: normaliseCoverImages(merged.coverImages) };
+          return stripPendingImages({
+            ...merged,
+            coverImages: normaliseCoverImages(merged.coverImages),
+          });
         });
         const base = baseDoDoc(draft.doc as Partial<StudioDoc>);
         if (base != null) setTotalInput(String(base));
@@ -573,6 +670,12 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }, [doc.template, doc.eventType, doc.clientNames, doc.eventDate, refEdited]);
 
   // ── Debounced draft persistence ──
+  //
+  // `flushDraft` guarda a MESMA gravação que o debounce ia fazer, para o
+  // Ctrl/Cmd+Enter dos Serviços a poder disparar já (sem duplicar a lógica nem
+  // encurtar o debounce, que é o que segura a escrita durante a escrita).
+  const flushDraft = useRef<() => void>(() => {});
+
   // Assim que o documento muda há trabalho por gravar. Volta a false quando a
   // gravação local acontece, oitocentos milissegundos depois.
   useEffect(() => {
@@ -582,7 +685,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
   useEffect(() => {
     if (!hydrated.current) return;
-    const t = setTimeout(() => {
+    const save = () => {
       // Uma fotografia para o Cmd+Z, tirada quando ela pára de escrever. Se
       // fosse a cada tecla, desfazer andava letra a letra e não servia para
       // nada; se fosse só nas remoções, não desfazia um texto trocado.
@@ -593,12 +696,31 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       // Dois, e não um: o último do histórico é o documento ACTUAL, portanto
       // com uma só fotografia não há nada anterior para onde voltar.
       setPodeDesfazer(historico.current.length >= 2);
+
+      // NADA DE MARCADORES PROVISÓRIOS NO RASCUNHO GRAVADO.
+      //
+      // Um `pending:<uuid>` é uma promessa viva na memória desta aba: a cópia
+      // que lhe vai dar morada corre aqui, e mais ninguém a conhece. Gravado,
+      // sobreviveria ao recarregar da página como um caminho que nunca vai
+      // existir — uma foto fantasma no mood board, e um buraco silencioso no
+      // PDF que ninguém volta a saber explicar. Sai do documento e sai também
+      // dos mapas de apoio, que são gravados ao lado dele.
+      const gravavel = stripPendingImages(doc);
+      const semProvisorios = <T,>(mapa: Record<string, T>): Record<string, T> => {
+        const out: Record<string, T> = {};
+        for (const [k, v] of Object.entries(mapa)) if (!isPendingImage(k)) out[k] = v;
+        return out;
+      };
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(gravavel));
         localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
         localStorage.setItem(
           SIDE_KEY,
-          JSON.stringify({ urls: assetUrls, themeOrigins, refEdited }),
+          JSON.stringify({
+            urls: semProvisorios(assetUrls),
+            themeOrigins: semProvisorios(themeOrigins),
+            refEdited,
+          }),
         );
         setGravadoEm(new Date());
         setPorGravar(false);
@@ -613,7 +735,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           const res = await fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ doc, baseUpdatedAt: serverStamp.current }),
+            body: JSON.stringify({ doc: gravavel, baseUpdatedAt: serverStamp.current }),
           });
           if (!res.ok) return;
           const data = await res.json().catch(() => null);
@@ -634,9 +756,17 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           /* offline — a cópia local guarda o trabalho até haver rede */
         }
       })();
-    }, 800);
+    };
+    flushDraft.current = save;
+    const t = setTimeout(save, 800);
     return () => clearTimeout(t);
   }, [doc, assetUrls, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY, quote.id, toast]);
+
+  /** Ctrl/Cmd+Enter nos Serviços — grava agora e diz que gravou. */
+  const saveNow = useCallback(() => {
+    flushDraft.current();
+    toast("Rascunho guardado", "success");
+  }, [toast]);
 
   const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
 
@@ -747,6 +877,47 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   // total, e na barra fixa do fundo.
   const soma = somaDosItens(doc);
   const desvio = desalinhamento(doc, money.base);
+  /** Quantas pessoas, lido do campo do documento ("125 pax" → 125). */
+  const convidados = convidadosDoDoc(doc as ProposalDoc);
+  const escalasDoDoc = escalasDe(doc as ProposalDoc);
+  const extrasDoDoc = opcionaisDe(doc as ProposalDoc);
+
+  /**
+   * Trocar o tipo de escala de uma linha.
+   *
+   * Ao passar a escalonável, o unitário nasce do preço que já lá estava
+   * dividido pelas unidades — para o total não dar um salto no instante em que
+   * ela escolhe a opção. Ao voltar a fixa, o preço fica onde está: era o
+   * resultado da última multiplicação, e é um número que ela reconhece.
+   */
+  function definirEscala(i: number, tipo: TipoDeEscala) {
+    setDoc((d) => {
+      const escalas = escalasDe(d as ProposalDoc);
+      const porMesa = d.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO;
+      const proximas = escalas.map((e, j) => {
+        if (j !== i) return e;
+        if (tipo === "fixa") return null;
+        const unidades =
+          tipo === "por-mesa"
+            ? Math.max(1, Math.ceil(convidados / porMesa))
+            : Math.max(1, convidados);
+        const precoActual = (d.budgetAmounts ?? [])[i];
+        const base =
+          typeof precoActual === "number" && precoActual > 0 ? precoActual / unidades : 0;
+        return { tipo, unitario: Math.round(base * 100) / 100 };
+      });
+      return recalcular({ ...d, budgetScales: proximas }, convidados);
+    });
+  }
+
+  function definirUnitario(i: number, texto: string) {
+    const n = normalizarValor(texto);
+    setDoc((d) => {
+      const escalas = escalasDe(d as ProposalDoc);
+      const proximas = escalas.map((e, j) => (j === i && e ? { ...e, unitario: n ?? 0 } : e));
+      return recalcular({ ...d, budgetScales: proximas }, convidados);
+    });
+  }
   const duasFormas = asDuasFormas(money.base, doc.vatRate ?? DEFAULT_VAT_RATE);
 
   // ── O preço mudou na Gestão do pedido: aparece aqui ─────────────────────
@@ -880,10 +1051,45 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     toast("Rascunho reposto.", "success");
   }
 
+  /**
+   * Repõe no estúdio uma versão que já tinha sido enviada.
+   *
+   * Passa pela MESMA anulação de dez segundos do "Limpar", e pela mesma razão:
+   * o gesto deita fora o que estava no ecrã, e quem carrega só vê o que perdeu
+   * depois de carregar. Uma caixa a perguntar "tem a certeza?" seria respondida
+   * sem ser lida.
+   *
+   * Não envia nada. Fica um rascunho igual ao que seguiu naquele dia, para se
+   * mexer e voltar a passar pelo Enviar.
+   */
+  function restaurarVersao(antiga: ProposalDoc) {
+    setLimpo({
+      doc,
+      total: totalInput,
+      segundos: 10,
+      motivo: "Versão anterior reposta no rascunho.",
+    });
+    const reposto = antiga as StudioDoc;
+    setDoc(reposto);
+    // O campo do total é texto (aceita "1.500" e "1 500 €"), por isso não sai de
+    // graça do documento: deriva-se a base do que foi reposto, senão ficava com
+    // o número da versão que se acabou de substituir.
+    const base = baseDoDoc(reposto);
+    setTotalInput(typeof base === "number" && base > 0 ? String(base) : "");
+    // A referência é composta a partir dos campos ATÉ alguém lhe mexer. Uma
+    // versão reposta traz a referência com que seguiu, e recompô-la por cima
+    // trocava o número da proposta que o cliente tem em mãos.
+    setRefEdited(true);
+    setConfirmSend(false);
+    setSent(false);
+    setStep("conteudo");
+    toast("Versão reposta. Pode anular durante 10 segundos.", "info");
+  }
+
   function clearDraft() {
     // Sem caixa de confirmação: guarda-se o que estava e dá-se dez segundos
     // para o trazer de volta. Ver a razão em `limpo`, mais acima.
-    setLimpo({ doc, total: totalInput, segundos: 10 });
+    setLimpo({ doc, total: totalInput, segundos: 10, motivo: "Rascunho limpo." });
     try {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(`${DRAFT_KEY}:at`);
@@ -1014,6 +1220,52 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
    *  marcar. Sai do DOCUMENTO (capas + mood boards) e não do mapa de origens:
    *  uma foto removida do rascunho deixa de contar no instante em que é
    *  removida, mesmo que a origem fique lá guardada. */
+  /**
+   * Os caminhos de ORIGEM das fotos de biblioteca que estão neste documento.
+   *
+   * Origem e não caminho da proposta: as fotos da proposta são cópias com
+   * caminho próprio, e comparar cópias nunca diria que duas propostas mostraram
+   * a mesma imagem.
+   */
+  function origensNoDocumento(): string[] {
+    const noDoc = new Set<string>();
+    for (const p of doc.coverImages ?? []) if (p) noDoc.add(p);
+    for (const b of doc.moodBoards ?? []) for (const p of b.images) if (p) noDoc.add(p);
+    const origens = new Set<string>();
+    for (const p of noDoc) {
+      const de = themeOrigins[p];
+      if (de) origens.add(de);
+    }
+    return [...origens];
+  }
+
+  /**
+   * As fotos da biblioteca que já foram para OUTROS casamentos, e para onde.
+   *
+   * Lê-se uma vez por pedido: o que já foi enviado não muda enquanto se escreve
+   * esta proposta. Falhar não impede nada — sem a resposta a grelha é a de
+   * antes, e escolher uma foto repetida continua a ser possível, que é como
+   * deve ser.
+   */
+  const [usadasNoutras, setUsadasNoutras] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/orcamento/${quote.id}/fotos-repetidas`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { fotos?: FotoRepetida[] };
+        if (!vivo || !Array.isArray(data.fotos)) return;
+        setUsadasNoutras(Object.fromEntries(data.fotos.map((f) => [f.origem, comoSeDiz(f)])));
+      } catch {
+        /* a grelha fica a de antes */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [quote.id]);
+
   const usedThemePaths = useMemo(() => {
     if (!picker) return [];
     const inDoc = new Set<string>();
@@ -1027,16 +1279,67 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     return sources;
   }, [picker, doc.coverImages, doc.moodBoards, themeOrigins]);
 
+  /**
+   * O INSTANTE DO CLIQUE — a foto ocupa já o seu lugar.
+   *
+   * O seletor entrega um marcador por foto (`pending:<uuid>`), que não é
+   * caminho de coisa nenhuma, e a miniatura que ele JÁ tem desenhada em
+   * memória. O marcador entra no documento no sítio para onde o seletor foi
+   * aberto e o `assetUrls` aponta-o a essa miniatura: a foto aparece no mood
+   * board (ou na capa) sem um único pedido de rede novo, na célula certa e com
+   * o mesmo `aspect-ratio` das outras — nada salta quando ela assentar.
+   *
+   * A origem entra AQUI e não só na confirmação: uma foto a caminho já conta
+   * como "já nesta proposta" (ver `usedThemePaths`), senão dava para a escolher
+   * outra vez enquanto a primeira cópia ainda ia a caminho.
+   */
+  function onReservedFromLibrary(reservas: ReservedImage[]) {
+    if (reservas.length === 0) return;
+    setAssetUrls((prev) => {
+      const next = { ...prev };
+      for (const r of reservas) if (r.thumbUrl) next[r.token] = r.thumbUrl;
+      return next;
+    });
+    setThemeOrigins((prev) => {
+      const next = { ...prev };
+      for (const r of reservas) if (r.sourcePath) next[r.token] = r.sourcePath;
+      return next;
+    });
+    if (picker?.kind === "board") {
+      addBoardImages(
+        picker.bi,
+        reservas.map((r) => r.token),
+      );
+    } else if (picker?.kind === "cover") {
+      setCoverAt(picker.idx, reservas[0].token);
+    }
+  }
+
   // As fotos escolhidas vêm REFERENCIADAS (`tema:<caminho>`) pela rota
-  // /assets/importar — não copiadas. Para o rascunho é indiferente: continua a
-  // ser uma string por foto, e quem a resolve (a grelha aqui, o gerador de PDF
-  // lá) sabe ler as duas famílias. O porquê está em `src/lib/theme-ref.ts`.
+  // /assets/importar — deixaram de ser copiadas. Para o documento é
+  // indiferente: continua a ser uma string por foto, e quem a resolve (a grelha
+  // aqui, o gerador de PDF lá) sabe ler as duas famílias. O porquê está em
+  // `src/lib/theme-ref.ts`.
   //
   // O seletor entrega as fotos LOTE A LOTE (é assim que a barra de progresso
-  // pode ser verdadeira), por isso isto corre várias vezes por importação —
-  // tudo o que faz é acrescentar, nunca substituir.
+  // pode ser verdadeira), por isso isto corre várias vezes por importação.
+  //
+  // Cada foto que traz o seu `token` é uma TROCA NO LUGAR: o marcador provisório
+  // dá lugar ao caminho definitivo na mesma célula, sem reordenar nada. As que
+  // vêm sem `token` — quem não reservou lugar, ou um lote que o servidor não
+  // deixou emparelhar com segurança — são acrescentadas, como sempre foram.
+  //
+  // Um marcador que já não esteja no documento (ela removeu a foto enquanto a
+  // cópia ia a caminho) não volta a entrar: a decisão dela é mais recente.
   function onPickedFromLibrary(images: ImportedImage[]) {
     if (images.length === 0) return;
+    const trocas = new Map<string, string>();
+    const novas: ImportedImage[] = [];
+    for (const im of images) {
+      if (!im.path) continue;
+      if (im.token) trocas.set(im.token, im.path);
+      else novas.push(im);
+    }
     setAssetUrls((prev) => {
       const next = { ...prev };
       // A miniatura é a DO TEMA — o mesmo `theme-thumbs/<pasta>/<x>.jpg` que o
@@ -1044,69 +1347,64 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       // worker já a tem no disco (guarda por caminho, sem token), portanto a
       // célula desenha sem tocar na rede.
       for (const im of images) if (im.path && im.url) next[im.path] = im.thumbUrl || im.url;
+      for (const token of trocas.keys()) delete next[token];
       return next;
     });
     setThemeOrigins((prev) => {
       const next = { ...prev };
       for (const im of images) if (im.path && im.sourcePath) next[im.path] = im.sourcePath;
+      for (const token of trocas.keys()) delete next[token];
       return next;
     });
+    if (trocas.size > 0) {
+      setDoc((d) => mapImagePaths(d, (p) => trocas.get(p) ?? p));
+    }
+    if (novas.length === 0) return;
     if (picker?.kind === "board") {
       addBoardImages(
         picker.bi,
-        images.map((im) => im.path),
+        novas.map((im) => im.path),
       );
     } else if (picker?.kind === "cover") {
-      setCoverAt(picker.idx, images[0].path);
+      setCoverAt(picker.idx, novas[0].path);
     }
   }
 
-  // ── Service groups ──
-  function addGroup() {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: [
-        ...d.serviceGroups,
-        { letter: `${LETTERS[d.serviceGroups.length] ?? ""})`, title: "", items: [] },
-      ],
-    }));
+  /**
+   * A cópia falhou (ou foi parada): o lugar reservado desaparece.
+   *
+   * SEM AVISO NENHUM daqui — a pastilha do seletor já diz quantas não entraram,
+   * porquê, e oferece "Repetir". Um segundo aviso a dizer o mesmo só ensinaria
+   * a ignorar os dois.
+   */
+  function onDroppedFromLibrary(tokens: string[]) {
+    if (tokens.length === 0) return;
+    const perdidos = new Set(tokens);
+    setDoc((d) => mapImagePaths(d, (p) => (perdidos.has(p) ? null : p)));
+    setAssetUrls((prev) => {
+      const next = { ...prev };
+      for (const t of tokens) delete next[t];
+      return next;
+    });
+    setThemeOrigins((prev) => {
+      const next = { ...prev };
+      for (const t of tokens) delete next[t];
+      return next;
+    });
   }
-  function updateGroup(gi: number, p: Partial<StudioDoc["serviceGroups"][number]>) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) => (i === gi ? { ...g, ...p } : g)),
-    }));
-  }
-  function removeGroup(gi: number) {
-    setDoc((d) => ({ ...d, serviceGroups: d.serviceGroups.filter((_, i) => i !== gi) }));
-  }
-  function moveGroup(gi: number, dir: -1 | 1) {
-    setDoc((d) => ({ ...d, serviceGroups: move(d.serviceGroups, gi, dir) }));
-  }
-  function addServiceItem(gi: number) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) =>
-        i === gi ? { ...g, items: [...g.items, { label: "", desc: "" }] } : g,
-      ),
-    }));
-  }
-  function updateServiceItem(gi: number, ii: number, p: Partial<{ label: string; desc: string }>) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) =>
-        i === gi ? { ...g, items: g.items.map((it, j) => (j === ii ? { ...it, ...p } : it)) } : g,
-      ),
-    }));
-  }
-  function removeServiceItem(gi: number, ii: number) {
-    setDoc((d) => ({
-      ...d,
-      serviceGroups: d.serviceGroups.map((g, i) =>
-        i === gi ? { ...g, items: g.items.filter((_, j) => j !== ii) } : g,
-      ),
-    }));
-  }
+
+  // ── Serviços ──
+  // O editor da secção vive em `ServicesEditor.tsx` (teclado, arrasto, anular).
+  // Aqui fica só a ponte para o documento.
+  const setServiceGroups = useCallback(
+    (update: (prev: StudioDoc["serviceGroups"]) => StudioDoc["serviceGroups"]) => {
+      setDoc((d) => {
+        const next = update(d.serviceGroups);
+        return next === d.serviceGroups ? d : { ...d, serviceGroups: next };
+      });
+    },
+    [],
+  );
 
   // ── Mood boards (decoracao) ──
   function addBoard() {
@@ -1232,6 +1530,17 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   function updateBudgetPrice(i: number, texto: string) {
     setDoc((d) => definirPreco(d, i, normalizarValor(texto)));
   }
+  /**
+   * Marca (ou desmarca) uma linha como EXTRA.
+   *
+   * É isto que faz a mesma proposta ter uma versão base e uma versão com
+   * extras: o casal pede "uma coisa mais simples e outra com tudo", e a
+   * alternativa era duas propostas — dois documentos a divergir, e ao fim de
+   * duas semanas ninguém saber qual é a que vale.
+   */
+  function updateBudgetExtraFlag(i: number, extra: boolean) {
+    setDoc((d) => marcarExtra(d as ProposalDoc, i, extra) as StudioDoc);
+  }
 
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
   function addBudgetExtra() {
@@ -1265,6 +1574,23 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }
 
   // ── Actions ──
+  //
+  // ── FOTOS POR CONFIRMAR ──
+  //
+  // O documento que sai daqui NUNCA leva marcadores provisórios: o gerador não
+  // os sabe ir buscar e o resultado seria uma foto a menos, em silêncio, no PDF
+  // do cliente. `stripPendingImages` é a fronteira.
+  //
+  // Filtrar sozinho não chega — seria enviar com buracos e calar. Por isso:
+  //
+  //  · PRÉ-VISUALIZAR gera à mesma, sem elas, e DIZ-LO. É um PDF para ela ver,
+  //    volta a gerar-se daqui a dez segundos, e travar aqui só a impedia de ir
+  //    ver o resto da proposta enquanto as fotos assentam.
+  //
+  //  · ENVIAR ESPERA. É o gesto irreversível: o email sai uma vez e o noivo lê
+  //    o que lhe chegou. A cópia demora segundos; um PDF sem a foto que ela
+  //    escolheu dura para sempre. O botão fica desligado enquanto houver fotos
+  //    a caminho, com a razão escrita ao lado, e volta sozinho quando assentam.
   async function preview() {
     if (busy) return;
     setBusy("preview");
@@ -1272,7 +1598,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "preview", doc }),
+        body: JSON.stringify({ mode: "preview", doc: stripPendingImages(doc) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
@@ -1300,6 +1626,13 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       const aviso = avisoDeConteudoIncompleto(emFalta, cortes);
       if (aviso) {
         toast(`PDF gerado, mas ${aviso}. Verifique antes de enviar.`, "error");
+      } else if (fotosPorConfirmar > 0) {
+        toast(
+          fotosPorConfirmar === 1
+            ? "PDF gerado sem 1 foto que ainda está a entrar na proposta. Gere outra vez daqui a pouco."
+            : `PDF gerado sem ${fotosPorConfirmar} fotos que ainda estão a entrar na proposta. Gere outra vez daqui a pouco.`,
+          "info",
+        );
       } else {
         toast("Pré-visualização gerada (PDF descarregado)", "success");
       }
@@ -1312,13 +1645,34 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
   async function send() {
     if (busy) return;
+    // A trava do envio é o `canSend` (o botão nem chega a estar ligado), mas
+    // repete-se aqui: entre carregar em "Enviar" e carregar em "Confirmar" pode
+    // ter entrado outro lote de fotos, e o segundo clique não pode ser o que
+    // manda a proposta sem elas.
+    if (fotosPorConfirmar > 0) {
+      toast(
+        fotosPorConfirmar === 1
+          ? "Ainda há 1 foto a entrar na proposta. Assim que assentar, o envio fica disponível."
+          : `Ainda há ${fotosPorConfirmar} fotos a entrar na proposta. Assim que assentarem, o envio fica disponível.`,
+        "info",
+      );
+      setConfirmSend(false);
+      return;
+    }
     setBusy("send");
     setConfirmSend(false);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "send", doc }),
+        // As ORIGENS das fotos entram no documento no envio, e só no envio:
+        // é a partir daqui que a proposta seguinte pode saber que esta já usou
+        // aquele arco. Enquanto é rascunho, o mapa vive ao lado (SIDE_KEY) e
+        // não tem de viajar.
+        body: JSON.stringify({
+          mode: "send",
+          doc: { ...stripPendingImages(doc), fotosDeBiblioteca: origensNoDocumento() },
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
@@ -1467,13 +1821,21 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }
 
   const isDeco = doc.template !== "organizacao";
+  /** Fotos que ocupam já o seu lugar no documento mas ainda não têm caminho.
+   *  Nome distinto do `porConfirmar` dos CAMPOS (acima): são coisas diferentes
+   *  e partilhar o nome era o caminho para uma delas passar a mentir. */
+  const fotosPorConfirmar = countPendingImages(doc);
   // O botão e o aviso lateral leem a MESMA lista, de propósito: escritos cada
   // um à sua maneira, mais cedo ou mais tarde discordavam — o aviso dizia que
   // faltava o valor e o botão deixava enviar na mesma. A regra (e a razão de
   // cada exigência) está em `proposal-progress.ts`.
   const seccoes = estadoDasSeccoes(doc as ProposalDoc);
   const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross);
-  const canSend = podeEnviar(doc as ProposalDoc, money.gross);
+  // A regra das FOTOS POR CONFIRMAR fica aqui e não em `proposal-progress`:
+  // esse olha para o DOCUMENTO, e isto é um estado desta aba — a cópia que
+  // ainda vai a caminho só esta sessão a conhece. O email sai uma vez, e um
+  // PDF sem a foto escolhida dura para sempre.
+  const canSend = podeEnviar(doc as ProposalDoc, money.gross) && fotosPorConfirmar === 0;
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -1531,11 +1893,11 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       {limpo && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
           <span className="text-xs text-foreground/70">
-            Rascunho limpo. Pode anular durante {limpo.segundos}s.
+            {limpo.motivo} Pode anular durante {limpo.segundos}s.
           </span>
           <button
             type="button"
-            className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            className="alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
             onClick={anularLimpeza}
           >
             Anular
@@ -1609,6 +1971,13 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
           {/* Event fields */}
           <Section title="Evento" id="evento">
+            {/* A nota geral fica no princípio, que é onde se olha ao abrir uma
+                proposta seis meses depois. */}
+            <NotasInternas
+              valor={doc.notasInternas ?? ""}
+              onChange={(notasInternas) => setDoc((d) => ({ ...d, notasInternas }))}
+              placeholder="Ex.: cliente da AMARA, cuidado com o prazo. Recusaram em 2025 por preço."
+            />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
                 label="Clientes"
@@ -1735,6 +2104,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                         url={assetUrls[path]}
                         onRemove={() => removeCoverAt(idx)}
                         className="aspect-[4/3]"
+                        pendente={isPendingImage(path)}
                       />
                     ) : (
                       <>
@@ -1775,286 +2145,14 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           </Section>
 
           {/* Service groups */}
-          <Section
-            title="Serviços"
-            id="servicos"
-            accao={
-              doc.serviceGroups.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setReordenarGrupos((r) => !r)}
-                  aria-pressed={reordenarGrupos}
-                  // `sm:hidden`: no computador as setas cabem na linha do grupo
-                  // e estão sempre lá. Este modo existe para o telemóvel, onde
-                  // não cabem — pô-lo nos dois sítios era dar duas formas de
-                  // fazer a mesma coisa no ecrã onde ela já cabia.
-                  className={`alvo-toque sm:hidden rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    reordenarGrupos
-                      ? "bg-[#4d6350] text-white"
-                      : "text-[#4d6350] hover:bg-[#4d6350]/10"
-                  }`}
-                >
-                  {reordenarGrupos ? "Concluir" : "Reordenar"}
-                </button>
-              ) : undefined
-            }
-          >
-            {/* O MODO DE REORDENAR, e porque é um modo.
-                As setas ↑↓ estavam sempre na linha do grupo. Num telemóvel isso
-                são dois alvos de 44 px a competir com o campo do título pela
-                mesma largura, presentes o tempo todo para uma coisa que se faz
-                uma vez por proposta. Aqui a ordem é uma TAREFA à parte: entra-se
-                nela, arruma-se, sai-se — e enquanto se está nela os grupos
-                encolhem para caberem todos no ecrã, que é o que torna reordenar
-                possível em vez de às cegas. */}
-            {reordenarGrupos ? (
-              <p className="mb-3 rounded-xl bg-[#e7efe4] px-3 py-2 text-xs text-[#3a5c39]">
-                A arrumar a ordem dos grupos. Toque em <strong>Concluir</strong> para voltar a
-                escrever.
-              </p>
-            ) : (
-              // A DICA DO GESTO. Um toque longo que ninguém sabe que existe é o
-              // mesmo que não existir — e é por isso que os gestos escondidos
-              // costumam ser má ideia. Aqui está dito, uma vez, onde se usa; e
-              // o "Reordenar" ao lado do título continua a fazer o mesmo sem
-              // gesto nenhum, para quem não ler isto.
-              doc.serviceGroups.length > 0 && (
-                <p className="mb-3 text-xs text-foreground/40 sm:hidden">
-                  Toque sem largar num grupo para o mover ou remover.
-                </p>
-              )
-            )}
-            <div className="flex flex-col gap-3">
-              {doc.serviceGroups.map((g, gi) => (
-                <div
-                  key={gi}
-                  className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-                >
-                  {/* A LETRA E O TÍTULO NA MESMA LINHA, no telemóvel.
-
-                      O que aqui estava, medido a 375 px: um campo de LARGURA
-                      TOTAL para escrever "a)" — dois caracteres num campo de
-                      343 px —, o título noutra linha, e as acções numa
-                      terceira. Três linhas para o cabeçalho de um grupo, numa
-                      lista onde há um cabeçalho destes por cada grupo.
-
-                      A causa não estava aqui: o `w-12` da letra nunca chegou a
-                      valer, porque o `.bo-input` declarava `width: 100%` fora
-                      de camada e no Tailwind v4 isso ganha a qualquer `w-*`
-                      (a razão longa está no `globals.css`, e o
-                      `CamadasCss.contrato.test.ts` guarda-a). Com a largura
-                      arrumada, a letra volta aos 48 px que sempre pediu.
-
-                      Feito isso, a letra e o título cabem na primeira linha (a
-                      letra fixa, o título com o resto) e as acções descem para
-                      a segunda. A partir de `sm` volta tudo à mesma linha, que
-                      é onde cabe. */}
-                  <ZonaDeToqueLongo
-                    aoDisparar={() => {
-                      if (!reordenarGrupos) setAccoesDoGrupo(gi);
-                    }}
-                    className="mb-2 flex flex-wrap items-center gap-2"
-                  >
-                    <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1">
-                      <input
-                        className="bo-input w-12 shrink-0 px-2 py-2 text-center text-xs text-foreground/70"
-                        value={g.letter ?? ""}
-                        onChange={(e) => updateGroup(gi, { letter: e.target.value })}
-                        placeholder="a)"
-                        aria-label="Letra do grupo (a, b, c…)"
-                      />
-                      {/* `min-w-0` e não `min-w-[12rem]`: a partilhar a linha
-                          com a letra, um mínimo de 12rem só o impedia de
-                          encolher para caber — e é o `flex-1` que lhe dá a
-                          largura, não o mínimo. */}
-                      <input
-                        className="bo-input min-w-0 flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                        value={g.title}
-                        onChange={(e) => updateGroup(gi, { title: e.target.value })}
-                        placeholder="Decoração Floral de Casamento"
-                        aria-label="Título do grupo"
-                      />
-                    </div>
-                    {/* NO TELEMÓVEL ESTES BOTÕES SÓ APARECEM NO MODO DE
-                        REORDENAR. Fora dele, o mesmo está no toque longo sobre
-                        o cabeçalho — e a linha fica com o campo do título em
-                        vez de com três alvos que se usam uma vez por proposta.
-                        Do `sm` para cima cabem na linha e ficam sempre lá:
-                        esconder o que cabe seria escondê-lo por nada. */}
-                    <div
-                      className={`items-center gap-2 ${reordenarGrupos ? "flex" : "hidden sm:flex"}`}
-                    >
-                      <MoveBtns
-                        onUp={() => moveGroup(gi, -1)}
-                        onDown={() => moveGroup(gi, 1)}
-                        disUp={gi === 0}
-                        disDown={gi === doc.serviceGroups.length - 1}
-                      />
-                      <button
-                        type="button"
-                        className={REMOVE_BTN}
-                        onClick={() => removeGroup(gi)}
-                        aria-label="Remover grupo"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </ZonaDeToqueLongo>
-                  {/* A arrumar a ordem, os grupos encolhem ao cabeçalho: é o
-                      que permite ver quatro de uma vez e saber para onde se
-                      está a mover. No computador não encolhem — lá vê-se tudo
-                      sem isso. */}
-                  <div
-                    className={`flex-col gap-2 pl-1 ${reordenarGrupos ? "hidden sm:flex" : "flex"}`}
-                  >
-                    {g.items.map((it, ii) => (
-                      // O × AO LADO DO CAMPO, e não numa linha só dele.
-                      // Estava tudo empilhado num `flex-col` até `sm`, e num
-                      // orçamento de decoração (onde não há campo de descrição)
-                      // sobrava um × sozinho, centrado, a ocupar uma linha
-                      // inteira por cada item — um símbolo solto no meio do
-                      // cartão, sem nada que dissesse a que pertencia.
-                      // Agora a linha é sempre [campo(s)] [×]: os campos
-                      // empilham entre si no telemóvel, o × fica encostado à
-                      // direita do primeiro.
-                      <div key={ii} className="flex items-start gap-1.5">
-                        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row">
-                          <input
-                            className={INPUT_SM}
-                            value={it.label}
-                            onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
-                            // SEM EXEMPLO. Estava aqui "Reunião inicial", que é
-                            // uma linha de uma proposta de ORGANIZAÇÃO — num
-                            // orçamento de decoração não quer dizer nada, e um
-                            // exemplo a cinzento dentro de uma caixa lê-se como
-                            // conteúdo que já lá está. O campo vive debaixo do
-                            // título do grupo; é isso que diz o que ali vai.
-                            aria-label="Item"
-                          />
-                          {!isDeco && (
-                            <input
-                              className={INPUT_SM}
-                              value={it.desc ?? ""}
-                              onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
-                              placeholder="Descrição"
-                              aria-label="Descrição do item"
-                            />
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          className={REMOVE_BTN}
-                          onClick={() => removeServiceItem(gi, ii)}
-                          aria-label="Remover item"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    <button type="button" className={ADD_BTN} onClick={() => addServiceItem(gi)}>
-                      + Adicionar item
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-4">
-              <button type="button" className={ADD_BTN} onClick={addGroup}>
-                + Adicionar grupo de serviços
-              </button>
-              <ModelosParciais
-                tipo="grupo"
-                toast={toast}
-                onInserir={(g) =>
-                  setDoc((d) => ({
-                    ...d,
-                    serviceGroups: [
-                      ...d.serviceGroups,
-                      // A letra é a POSIÇÃO na lista, não uma propriedade do
-                      // modelo: inserir um bloco guardado como "b)" no fim de uma
-                      // proposta que já tem três grupos daria dois "b)".
-                      {
-                        ...(g as StudioDoc["serviceGroups"][number]),
-                        letter: `${LETTERS[d.serviceGroups.length] ?? ""})`,
-                      },
-                    ],
-                  }))
-                }
-                paraGuardar={doc.serviceGroups.find((g) => (g.title ?? "").trim())}
-                nomeSugerido={doc.serviceGroups.find((g) => (g.title ?? "").trim())?.title}
-              />
-            </div>
-
-            {/* AS ACÇÕES DO GRUPO, em folha. Uma folha e não um menu flutuante:
-                é o `FolhaOuDialogo`, que no telemóvel sobe do fundo (ao alcance
-                do polegar, com alvos a sério) e no computador é um diálogo ao
-                centro. O texto diz de que grupo se trata — um menu que diz só
-                "Remover" depois de um toque longo é uma forma fácil de apagar o
-                grupo errado. */}
-            <FolhaOuDialogo
-              aberto={accoesDoGrupo !== null}
-              onFechar={() => setAccoesDoGrupo(null)}
-              titulo={
-                accoesDoGrupo !== null
-                  ? doc.serviceGroups[accoesDoGrupo]?.title?.trim() || "Grupo sem título"
-                  : "Grupo"
-              }
-              descricao={`Grupo ${(accoesDoGrupo ?? 0) + 1} de ${doc.serviceGroups.length}`}
-              largura="sm"
-            >
-              <div className="flex flex-col gap-1">
-                <button
-                  type="button"
-                  disabled={accoesDoGrupo === 0}
-                  onClick={() => {
-                    if (accoesDoGrupo === null) return;
-                    moveGroup(accoesDoGrupo, -1);
-                    setAccoesDoGrupo(null);
-                  }}
-                  className="alvo-toque !justify-start w-full rounded-lg px-3 py-3 text-left text-sm text-foreground/80 hover:bg-foreground/[0.05] disabled:opacity-30"
-                >
-                  ↑ Mover para cima
-                </button>
-                <button
-                  type="button"
-                  disabled={
-                    accoesDoGrupo === null || accoesDoGrupo === doc.serviceGroups.length - 1
-                  }
-                  onClick={() => {
-                    if (accoesDoGrupo === null) return;
-                    moveGroup(accoesDoGrupo, 1);
-                    setAccoesDoGrupo(null);
-                  }}
-                  className="alvo-toque !justify-start w-full rounded-lg px-3 py-3 text-left text-sm text-foreground/80 hover:bg-foreground/[0.05] disabled:opacity-30"
-                >
-                  ↓ Mover para baixo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReordenarGrupos(true);
-                    setAccoesDoGrupo(null);
-                  }}
-                  className="alvo-toque !justify-start w-full rounded-lg px-3 py-3 text-left text-sm text-foreground/80 hover:bg-foreground/[0.05]"
-                >
-                  ⇅ Arrumar a ordem de todos
-                </button>
-                {/* Destrutiva, a vermelho e separada das outras: mover é
-                    reversível com um toque, remover apaga o que lá está
-                    escrito. */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (accoesDoGrupo === null) return;
-                    removeGroup(accoesDoGrupo);
-                    setAccoesDoGrupo(null);
-                  }}
-                  className="alvo-toque !justify-start mt-2 w-full rounded-lg border-t border-foreground/10 px-3 py-3 pt-4 text-left text-sm text-[#8a2a22] hover:bg-[#8a2a22]/[0.06]"
-                >
-                  × Remover grupo
-                </button>
-              </div>
-            </FolhaOuDialogo>
+          <Section title="Serviços" id="servicos">
+            {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
+            <ServicesEditor
+              groups={doc.serviceGroups}
+              onGroupsChange={setServiceGroups}
+              showDesc={!isDeco}
+              onSave={saveNow}
+            />
           </Section>
 
           {/* Mood boards — decoracao only */}
@@ -2115,11 +2213,16 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {b.images.map((path, ii) => (
                         <Thumb
-                          key={`${path}-${ii}`}
+                          // A chave é a POSIÇÃO, não o caminho: quando o
+                          // marcador provisório dá lugar ao caminho definitivo,
+                          // uma chave com o caminho faria o React desmontar a
+                          // célula e a foto piscava a meio da troca.
+                          key={ii}
                           url={assetUrls[path]}
                           onRemove={() => removeBoardImage(bi, path)}
                           className="aspect-square"
                           foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
+                          pendente={isPendingImage(path)}
                         />
                       ))}
                       <UploadArea
@@ -2241,43 +2344,103 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                     a mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único,
                     como nas suas propostas.
                   </p>
-                  {linhasDe(doc).map((l, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        className={`${INPUT_SM} flex-1`}
-                        value={l.item}
-                        onChange={(e) => updateBudgetItem(i, e.target.value)}
-                        placeholder="Decor Cerimónia"
-                        aria-label="Item de orçamento"
-                      />
-                      {/* A largura vai no invólucro e não no campo: `.bo-input`
+                  {linhasDe(doc).map((l, i) => {
+                    const escala = escalasDoDoc[i];
+                    return (
+                      <div key={i} className="flex flex-wrap items-center gap-2">
+                        <input
+                          className={`${INPUT_SM} flex-1`}
+                          value={l.item}
+                          onChange={(e) => updateBudgetItem(i, e.target.value)}
+                          placeholder="Decor Cerimónia"
+                          aria-label="Item de orçamento"
+                        />
+                        {/* COMO É QUE ESTA LINHA ESCALA. Metade das linhas de um
+                          orçamento de casamento não é um preço, é uma
+                          multiplicação — e quando os convidados mudam, refazer
+                          essas contas à mão é onde entra o erro que ninguém vê,
+                          porque o resultado continua a parecer um preço. */}
+                        <select
+                          value={escala?.tipo ?? "fixa"}
+                          onChange={(e) => definirEscala(i, e.target.value as TipoDeEscala)}
+                          aria-label={`Como escala ${l.item || "a linha sem nome"}`}
+                          className="bo-input w-32 shrink-0 px-2 py-2 text-xs"
+                        >
+                          <option value="fixa">Valor fixo</option>
+                          <option value="por-convidado">Por convidado</option>
+                          <option value="por-mesa">Por mesa</option>
+                        </select>
+                        {escala && (
+                          <span className="w-24 shrink-0">
+                            <input
+                              className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                              defaultValue={String(escala.unitario)}
+                              onBlur={(e) => definirUnitario(i, e.target.value)}
+                              placeholder="45"
+                              inputMode="decimal"
+                              aria-label={`Preço por ${escala.tipo === "por-mesa" ? "mesa" : "convidado"} de ${l.item || "linha sem nome"}`}
+                            />
+                          </span>
+                        )}
+                        {/* A largura vai no invólucro e não no campo: `.bo-input`
                         tem `width: 100%` escrito em CSS, que ganha a um
                         `w-28` do Tailwind. Sem isto o preço comia a linha
                         toda e o nome ficava numa caixa de trinta pixels — foi
                         o que a captura de ecrã mostrou. */}
-                      <span className="w-28 shrink-0">
-                        <input
-                          className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
-                          defaultValue={l.preco === null ? "" : String(l.preco)}
-                          // `onBlur` e não `onChange`: normalizar a cada tecla
-                          // apagava o que ela estava a escrever a meio ("1." vira
-                          // 1, e o "500" seguinte já não tinha onde entrar).
-                          onBlur={(e) => updateBudgetPrice(i, e.target.value)}
-                          placeholder="900"
-                          inputMode="decimal"
-                          aria-label={`Preço de ${l.item || "linha sem nome"}`}
-                        />
-                      </span>
-                      <button
-                        type="button"
-                        className={REMOVE_BTN}
-                        onClick={() => removeBudgetItem(i)}
-                        aria-label="Remover item"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <span className="w-28 shrink-0">
+                          <input
+                            className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                            defaultValue={l.preco === null ? "" : String(l.preco)}
+                            // `onBlur` e não `onChange`: normalizar a cada tecla
+                            // apagava o que ela estava a escrever a meio ("1." vira
+                            // 1, e o "500" seguinte já não tinha onde entrar).
+                            onBlur={(e) => updateBudgetPrice(i, e.target.value)}
+                            placeholder="900"
+                            inputMode="decimal"
+                            aria-label={`Preço de ${l.item || "linha sem nome"}`}
+                          />
+                        </span>
+                        {/* EXTRA OU NÃO. Uma caixa e não um menu: a pergunta é
+                          de sim ou não, e um menu de duas entradas custa duas
+                          carregadas para responder a uma pergunta de uma. */}
+                        <label className="alvo-toque flex shrink-0 items-center gap-1.5 text-[11px] text-foreground/50">
+                          <input
+                            type="checkbox"
+                            checked={extrasDoDoc[i] ?? false}
+                            onChange={(e) => updateBudgetExtraFlag(i, e.target.checked)}
+                            aria-label={`${l.item || "Linha sem nome"} é um extra opcional`}
+                          />
+                          extra
+                        </label>
+                        <button
+                          type="button"
+                          className={REMOVE_BTN}
+                          onClick={() => removeBudgetItem(i)}
+                          aria-label="Remover item"
+                        >
+                          ×
+                        </button>
+                        {/* A fórmula ao lado do número: um total que muda sozinho
+                          e não explica porquê é um total em que se deixa de
+                          confiar à primeira surpresa. */}
+                        {escala && (
+                          <span className="w-full pl-1 text-[10px] text-foreground/40">
+                            {`${formulaDaLinha(
+                              escala,
+                              convidados,
+                              doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
+                            )} = ${eur(
+                              totalDaLinha(
+                                escala,
+                                convidados,
+                                doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
+                              ) ?? 0,
+                            )}`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
                       + Adicionar item
@@ -2288,6 +2451,37 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                       </span>
                     )}
                   </div>
+
+                  {/* ── AS DUAS VERSÕES, SEM SEREM DUAS PROPOSTAS ──────────
+                      Assim que uma linha é marcada como extra, esta proposta
+                      passa a responder ao "e sem isso, quanto fica?" — e o PDF
+                      leva os dois números. É de propósito que só o total com
+                      extras é escrito à mão: o outro é a subtracção, e dois
+                      números escritos podiam discordar no dia em que ela
+                      corrigisse só um. */}
+                  {(() => {
+                    const v = totaisDasVersoes(doc as ProposalDoc, doc.totalAmount ?? 0);
+                    if (!v) return null;
+                    return (
+                      <div className="mt-1 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
+                        <p className="text-xs leading-relaxed text-foreground/70">
+                          {`Versão base ${eur(v.base)} · com extras ${eur(v.comExtras)}`}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-foreground/45">
+                          {v.linhasExtra === 1
+                            ? "A linha marcada como extra sai assinalada no PDF, com o valor sem ela por baixo do total."
+                            : `As ${v.linhasExtra} linhas marcadas como extra saem assinaladas no PDF, com o valor sem elas por baixo do total.`}
+                        </p>
+                        {v.extrasSemPreco > 0 && (
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-[#8a6420]">
+                            {v.extrasSemPreco === 1
+                              ? "Um dos extras não tem preço, por isso não desce da versão base — e enquanto assim for o PDF não mostra o segundo valor."
+                              : `${v.extrasSemPreco} extras não têm preço, por isso não descem da versão base — e enquanto assim for o PDF não mostra o segundo valor.`}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field
@@ -2408,6 +2602,50 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
+          <NotasInternas
+            compacta
+            titulo="Nota sobre o orçamento"
+            placeholder="Ex.: margem apertada, não descer mais."
+            valor={doc.notasPorSeccao?.orcamento ?? ""}
+            onChange={(nota) =>
+              setDoc((d) => ({
+                ...d,
+                notasPorSeccao: { ...(d.notasPorSeccao ?? {}), orcamento: nota },
+              }))
+            }
+          />
+
+          {/* ── O painel que o cliente nunca vê ────────────────────────────
+              Custos, margem, deslocação calculada e o aviso de valor fora do
+              habitual. Vive AQUI, no fim do orçamento, porque é aqui que os
+              números que ele comenta acabam de ser escritos. */}
+          <PainelInterno
+            doc={doc as ProposalDoc}
+            quote={quote}
+            quotes={quotes}
+            totalBruto={money.gross}
+            onCusto={(i, custo) =>
+              setDoc((d) => ({
+                ...d,
+                // O array dos custos acompanha sempre o das linhas — se ficasse
+                // mais curto, o índice 3 passava a ser o custo da linha 4.
+                budgetCosts: custosDe(d as ProposalDoc).map((v, j) => (j === i ? custo : v)),
+              }))
+            }
+            onDeslocacao={(label, valueText) =>
+              setDoc((d) => {
+                // Se já lá está uma linha de deslocação, actualiza-se essa em
+                // vez de acrescentar uma segunda — duas linhas de deslocação
+                // numa proposta são uma pergunta do cliente ao telefone.
+                const extras = [...(d.budgetExtras ?? [])];
+                const i = extras.findIndex((e) => /desloca/i.test(e.label ?? ""));
+                if (i >= 0) extras[i] = { ...extras[i], label, valueText };
+                else extras.push({ label, valueText });
+                return { ...d, budgetExtras: extras };
+              })
+            }
+          />
+
           <Section title="Total, IVA e validade" id="total">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
@@ -2606,7 +2844,47 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 />
                 <SummaryRow label="Sinal 30%" value={money.gross > 0 ? eur(split.sinal) : "—"} />
               </dl>
-              {!canSend && (
+              {/* As fotos a caminho têm a sua própria linha, e não a genérica
+                  dos campos por preencher: aqui não há nada a fazer senão
+                  esperar uns segundos — dizer-lhe para "preencher" seria
+                  mandá-la procurar um campo que está bem. */}
+              {fotosPorConfirmar > 0 && (
+                <p
+                  aria-live="polite"
+                  className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]"
+                >
+                  <span aria-hidden="true">⏳</span>
+                  <span>
+                    {fotosPorConfirmar === 1
+                      ? "1 foto ainda está a entrar na proposta."
+                      : `${fotosPorConfirmar} fotos ainda estão a entrar na proposta.`}{" "}
+                    O envio fica disponível mal ela assente — assim a proposta segue completa.
+                  </span>
+                </p>
+              )}
+              {/* A PASSAGEM DE OLHOS. Depois do resumo (que diz o que vai
+                  seguir) e antes do botão (que o torna irreversível). */}
+              <Conferencia
+                doc={doc as ProposalDoc}
+                quote={quote}
+                quotes={quotes}
+                totalBruto={money.gross}
+              />
+              {/* ── O QUE JÁ SEGUIU ────────────────────────────────────────
+                  Depois da conferência (que olha para ESTA proposta) e antes
+                  do botão: é aqui que a pergunta "o que é que eles vão ver de
+                  diferente?" se faz, com o dedo já a caminho do Enviar.
+
+                  O `key` muda quando se envia — assim o painel volta a ler o
+                  histórico e a proposta que acabou de sair aparece nele, em vez
+                  de ficar com a lista de antes do envio. */}
+              <Versoes
+                key={String(sent)}
+                quoteId={quote.id}
+                doc={doc as ProposalDoc}
+                onRestaurar={restaurarVersao}
+              />
+              {!canSend && fotosPorConfirmar === 0 && (
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
                   <span aria-hidden="true">⚠</span>
                   <span>
@@ -2769,7 +3047,9 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 title={
                   canSend
                     ? undefined
-                    : "Preencha clientes, referência e um total maior que 0 antes de enviar."
+                    : fotosPorConfirmar > 0
+                      ? "Há fotos ainda a entrar na proposta. Falta pouco."
+                      : "Preencha clientes, referência e um total maior que 0 antes de enviar."
                 }
                 iconRight={<span aria-hidden="true">→</span>}
                 className="ml-auto"
@@ -2792,8 +3072,11 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           quoteId={quote.id}
           multiple={picker.kind === "board"}
           usedThemePaths={usedThemePaths}
+          usadasNoutras={usadasNoutras}
           onClose={() => setPicker(null)}
           onPicked={onPickedFromLibrary}
+          onReserve={onReservedFromLibrary}
+          onDropped={onDroppedFromLibrary}
         />
       )}
     </div>
@@ -2960,10 +3243,15 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 }
 
 /** Miniatura só de leitura (sem botão de remover) para o resumo. */
-function PreviewThumb({ url }: { url?: string }) {
+function PreviewThumb({ url, pendente = false }: { url?: string; pendente?: boolean }) {
   const [failed, setFailed] = useState(false);
   return (
-    <div className="aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]">
+    <div
+      aria-busy={pendente || undefined}
+      className={`aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${
+        pendente ? "opacity-45" : ""
+      }`}
+    >
       {url && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -3003,10 +3291,13 @@ function PreviewSummary({
   split: ReturnType<typeof splitSinal>;
 }) {
   const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
+  const porConfirmar = countPendingImages(doc);
   const groups = doc.serviceGroups.filter((g) => (g.title ?? "").trim() || g.items.length > 0);
   const extras = (doc.budgetExtras ?? []).filter(
     (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
   );
+  /** Calculado aqui e não recebido: este resumo só conhece o documento. */
+  const fotosPorConfirmar = countPendingImages(doc);
   return (
     <Section title="Resumo da proposta">
       <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
@@ -3014,10 +3305,20 @@ function PreviewSummary({
         «Descarregar PDF».
       </p>
 
+      {/* O resumo mostra as fotos a caminho esbatidas; dizer quantas são evita
+          que um PDF gerado agora — que não as leva — pareça um erro. */}
+      {fotosPorConfirmar > 0 && (
+        <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[#b5654a]">
+          {fotosPorConfirmar === 1
+            ? "1 foto ainda está a entrar na proposta e não entra num PDF gerado agora."
+            : `${fotosPorConfirmar} fotos ainda estão a entrar na proposta e não entram num PDF gerado agora.`}
+        </p>
+      )}
+
       {covers.length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-3">
           {covers.map((path, i) => (
-            <PreviewThumb key={`${path}-${i}`} url={assetUrls[path]} />
+            <PreviewThumb key={i} url={assetUrls[path]} pendente={isPendingImage(path)} />
           ))}
         </div>
       )}
@@ -3101,65 +3402,41 @@ function PreviewSummary({
 }
 
 /**
- * Uma caixa que responde ao toque longo.
+ * A foto de uma célula, com a URL a trocar SEM a célula piscar.
  *
- * Existe como componente, e não como um `useToqueLongo` chamado no sítio, por
- * uma razão do React: os cabeçalhos dos grupos nascem de um `map`, e um hook
- * não se pode chamar dentro de um ciclo. Cada caixa é um componente, cada
- * componente tem o seu gesto.
+ * Quando uma foto provisória assenta, o caminho muda e com ele a URL assinada —
+ * mesmos pixéis, morada nova. Pôr a nova no `src` de imediato deixava a célula
+ * branca durante o download: a foto desaparecia para voltar igual, que é o
+ * salto que este ecrã não pode ter. Por isso a nova só entra depois de estar
+ * descarregada; até lá continua a ver-se a que já estava.
+ *
+ * Só quando JÁ há foto desenhada: a primeira nunca espera por nada.
  */
-function ZonaDeToqueLongo({
-  aoDisparar,
-  className,
-  children,
-}: {
-  aoDisparar: () => void;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  const gestos = useToqueLongo(aoDisparar);
-  return (
-    <div className={className} {...gestos}>
-      {children}
-    </div>
-  );
-}
-
-function MoveBtns({
-  onUp,
-  onDown,
-  disUp,
-  disDown,
-}: {
-  onUp: () => void;
-  onDown: () => void;
-  disUp: boolean;
-  disDown: boolean;
-}) {
-  const base =
-    "alvo-toque w-6 h-6 rounded-md text-foreground/35 hover:text-foreground/65 hover:bg-foreground/[0.06] disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-xs leading-none";
-  return (
-    <div className="flex items-center gap-0.5 shrink-0">
-      <button
-        type="button"
-        className={base}
-        onClick={onUp}
-        disabled={disUp}
-        aria-label="Mover para cima"
-      >
-        ↑
-      </button>
-      <button
-        type="button"
-        className={base}
-        onClick={onDown}
-        disabled={disDown}
-        aria-label="Mover para baixo"
-      >
-        ↓
-      </button>
-    </div>
-  );
+function useSrcSemPiscar(url?: string): string | undefined {
+  /** A última URL que já esteve mesmo desenhada nesta célula. */
+  const [pronta, setPronta] = useState<string | undefined>(url);
+  useEffect(() => {
+    if (!url || url === pronta) return;
+    let alive = true;
+    const pre = new window.Image();
+    // Falhar também troca: a célula tem o seu próprio estado de erro, e ficar
+    // presa à foto antiga seria mostrar uma coisa que já não está no documento.
+    const swap = () => {
+      if (alive) setPronta(url);
+    };
+    pre.onload = swap;
+    pre.onerror = swap;
+    pre.decoding = "async";
+    pre.src = url;
+    return () => {
+      alive = false;
+    };
+    // `pronta` é o que já está no ecrã: entrar nas dependências reexecutaria
+    // isto no momento exato em que a troca acabou de acontecer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+  // Sem nada desenhado, a URL nova entra já — a primeira foto nunca espera.
+  return pronta && url ? pronta : url;
 }
 
 function Thumb({
@@ -3167,24 +3444,32 @@ function Thumb({
   onRemove,
   className = "",
   foraDoPdf = false,
+  pendente = false,
 }: {
   url?: string;
   onRemove: () => void;
   className?: string;
   /** Esta foto está no rascunho mas a página do PDF já não a desenha. */
   foraDoPdf?: boolean;
+  /** A foto já ocupa este lugar mas a cópia ainda não confirmou. */
+  pendente?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const src = useSrcSemPiscar(url);
   return (
     <div
-      className={`group relative overflow-hidden rounded-lg border bg-foreground/[0.04] ${
+      // `aria-busy` e não só a opacidade: quem não vê a célula esbatida tem de
+      // saber na mesma que esta foto ainda está a entrar (a pastilha «X a
+      // caminho» diz o total, isto diz QUAL).
+      aria-busy={pendente || undefined}
+      className={`group relative overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-opacity motion-safe:duration-500 ${
         foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-foreground/[0.1]"
-      } ${className}`}
+      } ${pendente ? "opacity-45" : ""} ${className}`}
     >
-      {url && !failed ? (
+      {src && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={url}
+          src={src}
           alt=""
           // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
           // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
@@ -3209,7 +3494,14 @@ function Thumb({
           )}
         </div>
       )}
-      {foraDoPdf && (
+      {/* Sobreposta, nunca no fluxo: a célula tem de ter exatamente o mesmo
+          tamanho antes e depois de a foto assentar. */}
+      {pendente && (
+        <span className="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[8px] tracking-[0.12em] uppercase text-white">
+          a entrar…
+        </span>
+      )}
+      {foraDoPdf && !pendente && (
         <span className="absolute inset-x-0 bottom-0 bg-[#8a2a22]/85 px-1 py-0.5 text-center text-[8px] tracking-[0.12em] uppercase text-white">
           fora do PDF
         </span>

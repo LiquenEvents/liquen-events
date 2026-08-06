@@ -18,10 +18,19 @@ const stores = vi.hoisted(() => ({
   invoices: vi.fn(async () => [] as unknown[]),
   contracts: vi.fn(async () => [] as unknown[]),
   inventoryItems: vi.fn(async () => [] as unknown[]),
+  materialItems: vi.fn(async () => [] as unknown[]),
+  materialLists: vi.fn(async () => [] as unknown[]),
+  materialListItems: vi.fn(async () => [] as unknown[]),
+  materialRules: vi.fn(async () => [] as unknown[]),
+  eventMaterial: vi.fn(async () => [] as unknown[]),
+  eventMaterialItems: vi.fn(async () => [] as unknown[]),
+  eventMaterialLog: vi.fn(async () => [] as unknown[]),
   emailTemplates: vi.fn(async () => [] as unknown[]),
   themes: vi.fn(async () => [] as unknown[]),
   messageLinks: vi.fn(async () => [] as unknown[]),
   overviewSettings: vi.fn(async () => [] as unknown[]),
+  propostaDefinicoes: vi.fn(async () => [] as unknown[]),
+  servicosCatalogo: vi.fn(async () => [] as unknown[]),
   bibliotecaEtiquetas: vi.fn(async () => [] as unknown[]),
   bibliotecaFotos: vi.fn(async () => [] as unknown[]),
   bibliotecaFotoEtiquetas: vi.fn(async () => [] as unknown[]),
@@ -40,6 +49,17 @@ vi.mock("@/lib/calendar-store", () => ({ listCalendarEvents: stores.calendarEven
 vi.mock("@/lib/invoices-store", () => ({ listInvoices: stores.invoices }));
 vi.mock("@/lib/contracts-store", () => ({ listContracts: stores.contracts }));
 vi.mock("@/lib/inventory-store", () => ({ listItems: stores.inventoryItems }));
+vi.mock("@/lib/material-store", () => ({ listMaterial: stores.materialItems }));
+vi.mock("@/lib/material-lists-store", () => ({ listLists: stores.materialLists }));
+vi.mock("@/lib/material-list-items-store", () => ({
+  listAllListItems: stores.materialListItems,
+}));
+vi.mock("@/lib/material-rules-store", () => ({ listRules: stores.materialRules }));
+vi.mock("@/lib/event-material-store", () => ({ listEventMaterial: stores.eventMaterial }));
+vi.mock("@/lib/event-material-items-store", () => ({
+  listAllEventItems: stores.eventMaterialItems,
+}));
+vi.mock("@/lib/event-material-log-store", () => ({ listAllLog: stores.eventMaterialLog }));
 vi.mock("@/lib/email-templates-store", () => ({
   listTemplatesWithDefaults: stores.emailTemplates,
 }));
@@ -53,6 +73,12 @@ vi.mock("@/lib/biblioteca-foto-etiquetas-store", () => ({
 // `readOverviewSettings` devolve os campos indexados; a rota faz-lhes
 // `Object.values`, que sobre um array devolve o próprio conteúdo — por isso o
 // mock pode servir uma lista como todos os outros.
+vi.mock("@/lib/proposta-definicoes-store", () => ({
+  listarDefinicoes: stores.propostaDefinicoes,
+}));
+vi.mock("@/lib/servicos-catalogo-store", () => ({
+  listarServicos: stores.servicosCatalogo,
+}));
 vi.mock("@/lib/overview-settings-store", () => ({
   readOverviewSettings: stores.overviewSettings,
 }));

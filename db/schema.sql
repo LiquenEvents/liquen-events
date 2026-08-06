@@ -72,6 +72,45 @@ alter table public.proposals add column if not exists responded_at timestamptz;
 -- apenas sem o botão do PDF.
 alter table public.proposals add column if not exists doc jsonb;
 
+-- ── O acompanhamento depois de a proposta seguir ───────────────────────────
+-- Quando voltar a falar com esta pessoa, e porque é que se perdeu. São dados
+-- dela, não derivados: o motivo de recusa de um casamento de 2026 não se
+-- reconstrói de mais lado nenhum.
+--
+-- `follow_up_at` é uma DATE e não um timestamptz de propósito. É "quinta-feira",
+-- não "quinta-feira às 14:07 UTC" — guardar hora obrigava a escolher um fuso
+-- para a mostrar, e ao pé da meia-noite mostrava o dia errado.
+alter table public.proposals add column if not exists follow_up_at date;
+alter table public.proposals add column if not exists follow_up_note text;
+alter table public.proposals add column if not exists lost_reason text;
+alter table public.proposals add column if not exists lost_note text;
+
+-- Qual das duas versões o casal ficou, quando a proposta tinha extras
+-- assinalados. Registada à mão por quem recebe a resposta — deduzi-la do valor
+-- facturado dava a versão errada em todas as propostas em que se negociou um
+-- desconto depois. Ver `orcamento/versoes-da-proposta.ts`.
+alter table public.proposals add column if not exists chosen_version text;
+alter table public.proposals drop constraint if exists proposals_chosen_version_chk;
+alter table public.proposals add constraint proposals_chosen_version_chk
+  check (chosen_version is null or chosen_version in ('base','extras')) not valid;
+
+-- O estado "em_negociacao" nasceu depois da restrição de estados. Numa base já
+-- instalada, o `if not exists` mais abaixo não a substitui — é preciso deixá-la
+-- cair e voltar a criá-la, senão marcar "em negociação" rebenta com um 23514.
+alter table public.proposals drop constraint if exists proposals_status_chk;
+alter table public.proposals add constraint proposals_status_chk
+  check (status in ('rascunho','enviada','em_negociacao','aceite','rejeitada')) not valid;
+
+-- A mesma lista fechada do lado da aplicação (`MotivoDeRecusa`). Está aqui
+-- porque o objetivo é poder CONTAR — "perdi seis por preço" — e texto livre
+-- numa coluna que se conta é a maneira de nunca mais se poder contar.
+alter table public.proposals drop constraint if exists proposals_lost_reason_chk;
+alter table public.proposals add constraint proposals_lost_reason_chk
+  check (
+    lost_reason is null
+    or lost_reason in ('preco','data','escolheram-outro','sem-resposta','outro')
+  ) not valid;
+
 create index if not exists proposals_quote_id_idx on public.proposals (quote_id);
 create index if not exists proposals_created_at_idx on public.proposals (created_at desc);
 
@@ -146,6 +185,48 @@ create table if not exists public.overview_settings (
   id          text primary key,          -- notas | meta
   value       text not null default '',
   revision    integer not null default 0,
+  updated_at  timestamptz not null default now()
+);
+
+-- ── A biblioteca de serviços ──
+-- O mesmo serviço aparecia escrito de maneira diferente conforme o dia. Não é
+-- um problema de arrumação: é o cliente a receber, na proposta, uma descrição
+-- escrita à pressa quando existia uma escrita com tempo.
+--
+-- Os dois idiomas vivem na MESMA linha. Um serviço com o português feito e o
+-- inglês por fazer é um serviço incompleto, não dois serviços — e separá-los
+-- deixava-os a divergir sem nada a assinalá-lo.
+create table if not exists public.service_catalog (
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  description    text not null default '',
+  name_en        text not null default '',
+  description_en text not null default '',
+  category       text not null default 'Outros',
+  -- Arquivado sai do seletor e continua nas propostas antigas, que é onde as
+  -- palavras dele ainda fazem sentido.
+  archived       boolean not null default false,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create index if not exists service_catalog_name_idx on public.service_catalog (name);
+
+-- ── Os números com que o estúdio faz contas ──
+-- O preço do combustível, o resto do custo por quilómetro, e a margem mínima
+-- abaixo da qual o estúdio avisa.
+--
+-- Vivem aqui e não no código pela razão que ela deu: "depende também de que
+-- valor está a gasolina". O gasóleo muda todas as semanas e o código muda
+-- quando alguém se lembra — um número de 2026 a calcular deslocações de 2027
+-- não dá erro nenhum, dá um preço silenciosamente errado, para menos, em todas
+-- as propostas.
+--
+-- `updated_at` é metade do ponto: é o que permite ao ecrã dizer "o preço do
+-- gasóleo foi definido há quatro meses" em vez de calcular em silêncio.
+create table if not exists public.proposal_settings (
+  id          text primary key,          -- deslocacao | margem
+  value       jsonb not null default '{}'::jsonb,
   updated_at  timestamptz not null default now()
 );
 
@@ -241,6 +322,166 @@ create table if not exists public.inventory_items (
 );
 
 create index if not exists inventory_category_idx on public.inventory_items (category);
+
+-- ── Catálogo de material de LOGÍSTICA ───────────────────────────
+-- O que faz a montagem acontecer: escadote, extensões, ferramentas, fita-cola,
+-- sacos do lixo, luvas. NÃO são adereços — esses vivem em `inventory_items`,
+-- acima, e são outra coisa: um berbequim e um vaso não se gerem da mesma
+-- maneira, não se compram pelas mesmas razões e não interessam às mesmas
+-- pessoas. As duas tabelas são deliberadamente separadas (ver MATERIAL.md §0.1).
+--
+-- `kind` é a coluna que decide o comportamento todo:
+--   consumivel   → desconta do stock quando é usado, e dispara reposição;
+--   reutilizavel → não desconta, mas TEM de voltar, e é isso que o regresso
+--                  controla. Esquecer um escadote a 200 km custa horas.
+create table if not exists public.material_items (
+  id          text primary key,
+  name        text not null,
+  category    text not null default 'Ferramentas',
+  kind        text not null default 'reutilizavel',
+  unit        text,                              -- unidade | metro | rolo | par | caixa
+  stock       numeric not null default 0,
+  -- Abaixo disto entra na lista de compras. Nulo = não vigiar este item.
+  min_stock   numeric,
+  notes       text,
+  photo_path  text,
+  updated_at  timestamptz not null default now()
+);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'material_items_kind_ck') then
+    alter table public.material_items
+      add constraint material_items_kind_ck check (kind in ('consumivel', 'reutilizavel'));
+  end if;
+end $$;
+
+create index if not exists material_items_category_idx on public.material_items (category);
+create index if not exists material_items_kind_idx     on public.material_items (kind);
+
+-- ── Listas base de material (conjuntos reutilizáveis) ───────────
+-- "Essenciais de carrinha" (`is_default`) vai SEMPRE, em todos os eventos. As
+-- outras são criadas por tipo de montagem e entram por regra ou à mão.
+create table if not exists public.material_lists (
+  id          text primary key,
+  name        text not null,
+  is_default  boolean not null default false,
+  notes       text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create table if not exists public.material_list_items (
+  id          text primary key,
+  list_id     text not null references public.material_lists(id) on delete cascade,
+  -- `restrict` de propósito: apagar do catálogo um item que está em listas tem
+  -- de doer, senão as listas esvaziam-se sozinhas sem ninguém dar por isso.
+  item_id     text not null references public.material_items(id) on delete restrict,
+  qty         numeric not null default 1,
+  -- Escala com o número de convidados: 0.02 (=1/50) → um saco por cada 50 pax.
+  -- A conta é ceil(pax × qty_per_pax), nunca abaixo de `qty`.
+  qty_per_pax numeric,
+  critical    boolean not null default false,
+  position    integer not null default 0
+);
+
+create index if not exists material_list_items_list_idx
+  on public.material_list_items (list_id);
+
+-- ── Regras: o que a PROPOSTA implica em material ────────────────
+-- Editáveis pela equipa, de propósito. Uma condição por regra, sem E/OU:
+-- condições compostas são uma linguagem de programação com outro nome, e o
+-- sítio onde isto deixa de ser depurável. Duas condições fazem-se com duas
+-- regras, e a checklist mostra qual delas disparou.
+create table if not exists public.material_rules (
+  id          text primary key,
+  name        text not null,
+  enabled     boolean not null default true,
+  match_kind  text not null,          -- sempre | servico | texto | pax
+  match_value text,
+  action      text not null default 'add_list',   -- add_list | add_item
+  list_id     text references public.material_lists(id) on delete cascade,
+  item_id     text references public.material_items(id) on delete cascade,
+  qty         numeric,
+  qty_per_pax numeric,
+  position    integer not null default 0,
+  updated_at  timestamptz not null default now()
+);
+
+-- ── Checklist de material POR EVENTO ────────────────────────────
+-- É uma CÓPIA das listas base, não uma referência: mudar uma lista base não
+-- pode mexer na checklist de um evento já preparado.
+create table if not exists public.event_material (
+  id           text primary key,
+  quote_id     text not null references public.quotes(id) on delete cascade,
+  status       text not null default 'preparada',  -- preparada|carregada|devolvida
+  generated_at timestamptz not null default now(),
+  vehicles     jsonb not null default '[]',
+  notes        text,
+  updated_at   timestamptz not null default now()
+);
+
+-- UMA checklist por evento, imposta pela base de dados e não pela boa vontade
+-- de quem chama. Dois pedidos de "gerar" ao mesmo tempo — duas pessoas, ou dois
+-- separadores — liam ambos "ainda não há" e criavam ambos; ficavam duas
+-- checklists e as marcações dividiam-se entre elas, sem ninguém dar por isso.
+create unique index if not exists event_material_quote_uidx
+  on public.event_material (quote_id);
+
+create table if not exists public.event_material_items (
+  id          text primary key,
+  event_id    text not null references public.event_material(id) on delete cascade,
+  -- Sem chave estrangeira apertada: a checklist do dia não pode depender de o
+  -- item continuar a existir no catálogo. Serve para descontar stock e para
+  -- relatórios; o NOME copiado é que faz a lista sobreviver a tudo.
+  item_id     text,
+  name        text not null,
+  category    text not null,
+  unit        text,
+  kind        text not null,
+  qty         numeric not null,
+  critical    boolean not null default false,
+  -- Para o ecrã poder responder a "porque é que isto está aqui?". Sem isto,
+  -- uma lista gerada por regras é uma lista que ninguém percebe e toda a gente
+  -- começa a ignorar.
+  origin      text not null,          -- base | regra | manual
+  origin_ref  text,                   -- id da lista ou da regra
+  -- O rótulo legível, copiado como o nome e pela mesma razão: a regra pode ser
+  -- renomeada ou apagada, e a checklist do dia tem de continuar a explicar-se.
+  origin_label text not null default '',
+  vehicle_id  text,
+  loaded_at   timestamptz,
+  loaded_by   text,
+  returned_at timestamptz,
+  returned_by text,
+  missing     boolean not null default false,
+  used_qty    numeric,
+  note        text
+);
+
+create index if not exists event_material_items_event_idx
+  on public.event_material_items (event_id);
+
+-- Quem marcou o quê e quando. Guarda TAMBÉM as marcações que perderam um
+-- conflito: uma marcação que desaparece sem rasto é o que faz duas pessoas
+-- discutirem sobre quem carregou o escadote.
+create table if not exists public.event_material_log (
+  id         text primary key,
+  event_id   text not null references public.event_material(id) on delete cascade,
+  item_id    text not null,
+  action     text not null,          -- loaded|unloaded|returned|missing|note|used
+  value      text,
+  actor      text not null,
+  -- Relógio de QUEM MARCOU. Pode vir do passado: o telemóvel esteve offline.
+  marked_at  timestamptz not null,
+  -- Relógio do servidor, quando a marcação finalmente chegou.
+  synced_at  timestamptz not null default now(),
+  -- A marcação chegou mas perdeu para uma mais recente. Fica registada.
+  superseded boolean not null default false
+);
+
+create index if not exists event_material_log_event_idx
+  on public.event_material_log (event_id);
 
 -- ── Biblioteca de temas (fotos de inspiração reutilizáveis) ─────
 -- Só os METADADOS de cada tema ("Itália", "Terracotta"). As fotos vivem no
@@ -384,7 +625,7 @@ do $$ begin
 
   if not exists (select 1 from pg_constraint where conname = 'proposals_status_chk') then
     alter table public.proposals add constraint proposals_status_chk
-      check (status in ('rascunho','enviada','aceite','rejeitada')) not valid;
+      check (status in ('rascunho','enviada','em_negociacao','aceite','rejeitada')) not valid;
   end if;
 
   if not exists (select 1 from pg_constraint where conname = 'proposals_amounts_chk') then
@@ -609,6 +850,9 @@ on conflict (id) do nothing;
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.
 alter table public.quotes    enable row level security;
 alter table public.proposals enable row level security;
+-- Sem políticas: só a service_role lá chega, como em todas as outras.
+alter table public.proposal_settings enable row level security;
+alter table public.service_catalog enable row level security;
 alter table public.tasks     enable row level security;
 alter table public.suppliers enable row level security;
 alter table public.calendar_events enable row level security;
@@ -619,6 +863,13 @@ alter table public.overview_settings enable row level security;
 alter table public.invoices    enable row level security;
 alter table public.invoice_counters enable row level security;
 alter table public.inventory_items enable row level security;
+alter table public.material_items  enable row level security;
+alter table public.material_lists      enable row level security;
+alter table public.material_list_items enable row level security;
+alter table public.material_rules        enable row level security;
+alter table public.event_material        enable row level security;
+alter table public.event_material_items  enable row level security;
+alter table public.event_material_log    enable row level security;
 alter table public.proposal_themes enable row level security;
 alter table public.biblioteca_etiquetas enable row level security;
 alter table public.biblioteca_fotos enable row level security;

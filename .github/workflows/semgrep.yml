@@ -11,9 +11,16 @@ name: Static analysis (semgrep)
 # disparou sobre código real é ruído à espera de acontecer, e o custo do ruído
 # é a equipa aprender a ignorar o alarme.
 
+# Só no `push`, pela mesma razão do Secret scan: com os dois eventos, cada
+# commit num ramo com PR aberto lançava DUAS execuções idênticas desta análise.
+# Aqui não chegavam a morrer no timeout como as do gitleaks, mas o desperdício
+# era o mesmo — duas imagens de contentor a arrancar e duas análises completas
+# para dar exactamente o mesmo resultado sobre o mesmo commit.
+#
+# Não se perde cobertura: os ramos dos PRs vivem neste repositório, portanto o
+# `push` vê tudo o que o `pull_request` via.
 on:
   push:
-  pull_request:
 
 permissions:
   contents: read

@@ -11,6 +11,7 @@ import {
 import { getProposalByQuote } from "@/lib/proposals-store";
 import { getProposalDraft } from "@/lib/proposal-drafts";
 import { refsDeTemaNoDoc } from "@/lib/theme-materializar";
+import { garantirFormatoImprimivel } from "@/lib/proposal-image";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -163,7 +164,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         { status: 415 },
       );
     }
-    const res = await uploadProposalImage(id, bytes, file.type);
+    // O que fica GUARDADO tem de ser um formato que o PDF saiba imprimir.
+    // Aceita-se WebP à porta (é o formato em que o Pinterest serve as imagens,
+    // e é de lá que vem a inspiração do estúdio), mas converte-se para JPEG
+    // ANTES de guardar: o `pdf-lib` só embute JPEG/PNG, e um WebP guardado tal
+    // e qual acabava numa moldura vazia na proposta do cliente.
+    const pronto = await garantirFormatoImprimivel(bytes, file.type);
+    if (!pronto) {
+      return NextResponse.json(
+        { error: `Não foi possível processar a imagem: ${file.name}.` },
+        { status: 415 },
+      );
+    }
+    const res = await uploadProposalImage(id, pronto.bytes, pronto.contentType);
     if (!res) {
       log.error("assets: upload falhou", null, { id, name: file.name });
       return NextResponse.json({ error: "Falha ao guardar a imagem." }, { status: 502 });

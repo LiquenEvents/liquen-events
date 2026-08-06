@@ -5,7 +5,10 @@ import {
   DEFAULT_CONDICOES_GERAIS,
   DEFAULT_NOTAS_IMPORTANTES,
   COVER_SLOTS,
+  countPendingImages,
   detectVatMode,
+  isPendingImage,
+  stripPendingImages,
   normaliseCoverImages,
   parseMoneyText,
   resolveProposalMoney,
@@ -248,6 +251,35 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(doc.coverImages).toEqual(["", ""]);
   });
 
+  it("BUG-GUARD: os ids dos serviços vêm da POSIÇÃO, nunca sorteados", () => {
+    // Isto corre a cada pré-visualização e a cada envio. Um id sorteado aqui
+    // faria o MESMO documento serializar diferente de cada vez — rascunho a
+    // "mudar" sozinho, gravações e comparações a acordar sem motivo.
+    const partida = base({
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+    });
+    const uma = withProposalDefaults(partida);
+    const outra = withProposalDefaults(partida);
+    expect(JSON.stringify(uma.serviceGroups)).toBe(JSON.stringify(outra.serviceGroups));
+    expect(uma.serviceGroups[0].id).toBe("g0");
+    expect(uma.serviceGroups[0].items[0].id).toBe("g0~i0");
+  });
+
+  it("respeita os ids que o editor já atribuiu (e desempata repetidos)", () => {
+    const doc = withProposalDefaults(
+      base({
+        serviceGroups: [
+          { id: "sA", title: "Um", items: [{ id: "sX", label: "L" }] },
+          { id: "sA", title: "Dois", items: [] },
+        ],
+      }),
+    );
+    expect(doc.serviceGroups[0].id).toBe("sA");
+    expect(doc.serviceGroups[0].items[0].id).toBe("sX");
+    // Um rascunho estragado com o id repetido não pode dar duas chaves iguais.
+    expect(doc.serviceGroups[1].id).toBe("sA_2");
+  });
+
   it("substitutes {DATA} and {CONVIDADOS} in the general conditions", () => {
     const doc = withProposalDefaults(base());
     const joined = doc.condicoesGerais.join("\n");
@@ -287,6 +319,26 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(DEFAULT_CONDICOES_GERAIS.some((s) => s.includes("{DATA}"))).toBe(true);
   });
 
+  it("as condições cobram deslocação E alojamento — são custos diferentes", () => {
+    // A deslocação já lá estava. O ALOJAMENTO não: um casamento a quatro horas
+    // de Évora obriga a equipa a dormir lá, e esse custo não era dito ao
+    // cliente nem cobrado — ficava com a Líquen.
+    const doc = withProposalDefaults(base());
+    const texto = doc.condicoesGerais.join("\n");
+    expect(texto).toMatch(/deslocação/i);
+    expect(texto).toMatch(/pernoitar/i);
+    expect(texto).toMatch(/alojamento/i);
+  });
+
+  it("uma proposta já gravada NÃO é reescrita pelas condições novas", () => {
+    // A regra que torna seguro afinar os textos: mudar o modelo não pode
+    // alterar o que já foi enviado a um cliente, porque isso mudava um
+    // documento que ele já tem na mão.
+    const proprias = ["Só isto foi acordado com este cliente."];
+    const doc = withProposalDefaults(base({ condicoesGerais: proprias }));
+    expect(doc.condicoesGerais).toEqual(proprias);
+  });
+
   it("BUG-GUARD: normalises the cover to two POSITIONS so a right-slot photo stays right", () => {
     // Draft antigo com um buraco à esquerda: a foto tem de continuar na posição 1.
     const doc = withProposalDefaults(
@@ -324,5 +376,44 @@ describe("proposal-doc — normaliseCoverImages", () => {
     const out = normaliseCoverImages(input);
     out[0] = "z";
     expect(input[0]).toBe("a");
+  });
+});
+
+describe("proposal-doc — marcadores provisórios de foto", () => {
+  const doc = {
+    coverImages: ["pending:a", "capa/direita.jpg"],
+    moodBoards: [
+      { title: "Cerimónia", images: ["b/1.jpg", "pending:b", "b/2.jpg"] },
+      { title: "Copo", images: ["b/3.jpg"] },
+    ],
+  };
+
+  it("reconhece o marcador e nunca confunde um caminho com ele", () => {
+    expect(isPendingImage("pending:abc")).toBe(true);
+    // Um caminho de Storage é `<uuid>/<ficheiro>` — nunca tem o prefixo.
+    expect(isPendingImage("LQ-001/pending-foto.jpg")).toBe(false);
+    expect(isPendingImage("")).toBe(false);
+    expect(isPendingImage(undefined)).toBe(false);
+  });
+
+  it("conta as fotos que ainda são promessas, nas capas e nos mood boards", () => {
+    expect(countPendingImages(doc)).toBe(2);
+    expect(countPendingImages({})).toBe(0);
+  });
+
+  it("na CAPA o marcador vira vazio e a posição não encolhe", () => {
+    // Compactar aqui mandava a foto da direita imprimir à esquerda.
+    expect(stripPendingImages(doc).coverImages).toEqual(["", "capa/direita.jpg"]);
+  });
+
+  it("no mood board o marcador sai da lista, sem mexer na ordem das outras", () => {
+    expect(stripPendingImages(doc).moodBoards[0].images).toEqual(["b/1.jpg", "b/2.jpg"]);
+    // O board que não tinha nenhum sai intacto (a MESMA referência).
+    expect(stripPendingImages(doc).moodBoards[1]).toBe(doc.moodBoards[1]);
+  });
+
+  it("devolve o MESMO objeto quando não há nada a filtrar", () => {
+    const limpo = { coverImages: ["a", "b"], moodBoards: [{ title: "t", images: ["c"] }] };
+    expect(stripPendingImages(limpo)).toBe(limpo);
   });
 });

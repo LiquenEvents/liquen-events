@@ -43,6 +43,7 @@ vi.mock("./lazy", () => {
     ProductionPlan: stub("production-plan"),
     ClientMessenger: stub("client-messenger"),
     EventChecklist: stub("event-checklist"),
+    EventMaterial: stub("event-material"),
     EventTimeline: stub("event-timeline"),
     PaymentsPanel: stub("payments-panel"),
     EventCosts: stub("event-costs"),
@@ -211,6 +212,109 @@ describe("AdminClient shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
     expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
+  });
+
+  /**
+   * O botão "Atualizar" era o programa a perguntar a quem o usa se os dados
+   * estariam velhos. Foi-se, e no lugar dele a lista revalida-se sozinha ao
+   * voltar ao separador. Estes dois testes existem para o botão não voltar por
+   * distração e para a revalidação não morrer em silêncio.
+   */
+  it("já não há botão de atualizar — a lista trata disso sozinha", () => {
+    renderAdmin([makeQuote()]);
+    expect(screen.queryByRole("button", { name: /Atualizar/i })).not.toBeInTheDocument();
+  });
+
+  it("volta a ler os pedidos ao regressar ao separador", async () => {
+    const novo = makeQuote({ name: "Filipa Nova" });
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        status: 200,
+        ok: true,
+        headers: { get: () => 'W/"2"' },
+        json: () => Promise.resolve([novo]),
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAdmin([makeQuote({ name: "Gabriel Antigo" })]);
+    navTo(/Pedidos/);
+    expect(screen.getByText("Gabriel Antigo")).toBeInTheDocument();
+    expect(screen.queryByText("Filipa Nova")).not.toBeInTheDocument();
+
+    // Sair e voltar ao separador é o gesto que dispara a revalidação.
+    fireEvent(document, new Event("visibilitychange"));
+    await screen.findByText("Filipa Nova");
+
+    const pedidos = fetchMock.mock.calls.filter(
+      (args) => (args as unknown as [string])[0] === "/api/orcamento",
+    );
+    expect(pedidos).toHaveLength(1);
+    expect(screen.queryByText("Gabriel Antigo")).not.toBeInTheDocument();
+  });
+
+  /**
+   * A lista mostrava tudo igual, com a mesma etiqueta "Novo" num pedido de
+   * ontem e num de há nove dias. Estes testes prendem o que substitui isso.
+   */
+  describe("urgência e contexto na lista de pedidos", () => {
+    /** Um pedido entrado há N dias, ainda sem resposta. */
+    const hAtras = (dias: number) => new Date(Date.now() - dias * 86400000).toISOString();
+
+    it("põe à cabeça quem espera há mais tempo, sem ser preciso mexer na ordem", () => {
+      renderAdmin([
+        makeQuote({ name: "Recente", submittedAt: hAtras(1) }),
+        makeQuote({ name: "Antigo", submittedAt: hAtras(12) }),
+      ]);
+      navTo(/Pedidos/);
+
+      const nomes = screen.getAllByText(/^(Recente|Antigo)$/).map((n) => n.textContent);
+      expect(nomes[0]).toBe("Antigo");
+    });
+
+    it("diz há quantos dias cada um espera", () => {
+      renderAdmin([makeQuote({ name: "Ana", submittedAt: hAtras(4) })]);
+      navTo(/Pedidos/);
+      expect(screen.getByText("há 4 dias")).toBeInTheDocument();
+    });
+
+    it("não conta dias a quem já teve resposta — esse espera por eles", () => {
+      renderAdmin([makeQuote({ name: "Com proposta", status: "cotado", submittedAt: hAtras(30) })]);
+      navTo(/Pedidos/);
+      expect(screen.queryByText(/há 30 dias/)).not.toBeInTheDocument();
+    });
+
+    it("marca o provável casamento à distância: sem data E sem local concreto", () => {
+      renderAdmin([makeQuote({ name: "Longe", date: "", location: "Portugal" })]);
+      navTo(/Pedidos/);
+      expect(screen.getByText("Provável casamento à distância")).toBeInTheDocument();
+    });
+
+    it("uma ausência sozinha não faz um casamento à distância", () => {
+      renderAdmin([makeQuote({ name: "Perto sem data", date: "", location: "Évora" })]);
+      navTo(/Pedidos/);
+      expect(screen.queryByText("Provável casamento à distância")).not.toBeInTheDocument();
+    });
+
+    it("mostra a região e a distância a Évora", () => {
+      renderAdmin([makeQuote({ name: "Palmela", location: "Quinta X, Palmela" })]);
+      navTo(/Pedidos/);
+      expect(screen.getByText(/Palmela · ≈ \d+ km/)).toBeInTheDocument();
+    });
+
+    it("o filtro da espera esconde quem ainda não esperou o suficiente", () => {
+      renderAdmin([
+        makeQuote({ name: "Ontem", submittedAt: hAtras(1) }),
+        makeQuote({ name: "Ha Muito", submittedAt: hAtras(9) }),
+      ]);
+      navTo(/Pedidos/);
+
+      fireEvent.change(screen.getByLabelText("Filtrar por tempo de espera"), {
+        target: { value: "7" },
+      });
+      expect(screen.getByText("Ha Muito")).toBeInTheDocument();
+      expect(screen.queryByText("Ontem")).not.toBeInTheDocument();
+    });
   });
 
   it("tracks bulk selection via the row checkboxes", () => {

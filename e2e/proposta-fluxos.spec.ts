@@ -190,7 +190,11 @@ test.describe("Fazer uma proposta @propostas", () => {
       "Decoração Floral e Decoração",
       { timeout: 15_000 },
     );
-    await expect(page.getByLabel("Item", { exact: true }).first()).toHaveValue("Igreja");
+    // O editor de serviços foi extraído para `ServicesEditor`, e ali cada
+    // linha diz QUAL é: "Linha 1 do grupo 1" em vez de um "Item" repetido
+    // trinta vezes — quem ouve o ecrã fica a saber onde está. O que este
+    // teste prende é a CÓPIA, não a palavra do rótulo.
+    await expect(page.getByLabel(/Linha 1 do grupo 1/).first()).toHaveValue("Igreja");
     await expect(page.getByLabel("Item de orçamento").first()).toHaveValue("Decoração Cerimónia");
     // As condições e a validade também — é metade do que se poupa.
     await expect(page.getByLabel(/Dias de validade/)).toHaveValue("45");

@@ -151,6 +151,35 @@ export async function buscarPrimeiraPagina(themeId: string, forcar = false): Pro
 }
 
 /**
+ * Guarda o que a grelha tem AGORA de um tema — incluindo as páginas que o
+ * "Mostrar mais" mandou vir, que o `buscarPrimeiraPagina` por definição não
+ * conhece. Sem isto, reabrir um tema onde ela desceu três páginas devolvia-lhe
+ * só a primeira e obrigava a descer outra vez.
+ *
+ * O relógio da entrada é o da PRIMEIRA leitura, não o desta escrita: os URLs
+ * são assinados e têm hora de morte própria. Carimbar de novo a cada página
+ * que entra fazia a entrada renovar-se sozinha para lá da assinatura, e a
+ * grelha acabava a servir links mortos.
+ */
+export function guardarPagina(themeId: string, pagina: Omit<PaginaTema, "at">): void {
+  const at = paginas.get(themeId)?.at ?? Date.now();
+  paginas.set(themeId, { valor: { ...pagina, at }, at });
+}
+
+/**
+ * Procura uma foto pelo caminho em tudo o que está guardado. A seleção
+ * atravessa separadores, portanto uma foto escolhida pode já não estar na
+ * grelha que se vê — e o que se quer dela é só a miniatura, para a pastilha.
+ */
+export function fotoEmCache(path: string): ThemeImage | null {
+  for (const { valor } of paginas.values()) {
+    const hit = valor.images.find((i) => i.path === path);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
  * AQUECER: ir buscar o que o diálogo vai precisar, antes de ele abrir.
  *
  * Chamado quando o rato se aproxima do botão que abre o seletor. O tempo entre

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import sharp from "sharp";
 import {
   PDFArray,
@@ -8,6 +8,22 @@ import {
   decodePDFRawStream,
   type PDFObject,
 } from "pdf-lib";
+/**
+ * O caminho principal do desenho (`resizeToBox`, sharp) é o real. A encenação
+ * serve um só teste: o que acontece quando ESSE caminho falha no servidor
+ * implantado e o gerador cai no recurso de embutir os bytes originais — que foi
+ * exatamente o que aconteceu na proposta que saiu com molduras vazias.
+ */
+const st = vi.hoisted(() => ({ sharpResizeAvariado: false }));
+vi.mock("@/lib/proposal-image", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/proposal-image")>();
+  return {
+    ...real,
+    resizeToBox: async (...args: Parameters<typeof real.resizeToBox>) =>
+      st.sharpResizeAvariado ? null : real.resizeToBox(...args),
+  };
+});
+
 import { renderProposalDocPdf, renderProposalDocPdfWithReport } from "./proposal-doc-pdf";
 import { withProposalDefaults, MOOD_BOARD_MAX_IMAGES, type ProposalDoc } from "@/lib/proposal-doc";
 
@@ -479,5 +495,284 @@ describe("relatório de conteúdo CORTADO pelo desenho", () => {
   it("renderProposalDocPdf continua a devolver só os bytes", async () => {
     const bytes = await renderProposalDocPdf(decoracaoDoc());
     expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
+  });
+});
+
+/**
+ * NUNCA UMA MOLDURA VAZIA — E UMA FOTO QUE NÃO SE DESENHA É UMA FOTO EM FALTA.
+ *
+ * A avaria, tal como chegou do estúdio: uma página de mood board saiu com SEIS
+ * molduras e DUAS fotos, e o PDF seguiu assim para o cliente. As quatro fotos em
+ * branco vinham da Biblioteca de Temas, e a origem delas era o Pinterest — que
+ * serve as imagens em WebP. O `pdf-lib` só sabe embutir JPEG e PNG: quando o
+ * caminho do sharp falha e o gerador cai no recurso de embutir os bytes
+ * ORIGINAIS, um JPEG ainda sai e um WebP não sai de todo. O contorno, esse, era
+ * desenhado sempre — por cima de nada.
+ *
+ * Três coisas ficam fixadas aqui:
+ *  1. um WebP e um JPEG no mesmo mood board são AMBOS desenhados;
+ *  2. uma foto que não há maneira de desenhar não deixa moldura nenhuma;
+ *  3. …e é CONTADA, para o estúdio ser avisado antes de a proposta seguir.
+ */
+
+/** Contorno de célula do collage: rectângulo FECHADO, traçado a 0,5 pt na cor
+ *  `LINE`. A hairline do rodapé usa a mesma cor e espessura mas é um traço
+ *  aberto (`m … l S`, sem `h`), por isso não entra nesta conta. */
+const MOLDURA =
+  /0\.886 0\.871 0\.835 RG\s+0\.5 w\s+\[\] 0 d\s+1 0 0 1 [-\d.]+ [-\d.]+ cm\s+1 0 0 1 0 0 cm\s+1 0 0 1 0 0 cm\s+0 0 m\s+0 [-\d.]+ l\s+[-\d.]+ [-\d.]+ l\s+[-\d.]+ 0 l\s+h\s+S/g;
+
+/** A página de mood board: a única página de CONTEÚDO com fotografias (as
+ *  outras só desenham o logótipo; as capas ficam de fora da procura). */
+function moodBoardPage(pdf: PDFDocument): string {
+  let best = "";
+  let most = 0;
+  for (let i = 1; i < pdf.getPageCount() - 1; i++) {
+    const content = pageContent(pdf, i);
+    const fotos = imageDraws(content) - 1; // menos o logótipo do cabeçalho
+    if (fotos > most) {
+      most = fotos;
+      best = content;
+    }
+  }
+  return best;
+}
+
+/** Quantas molduras de célula foram desenhadas nesta página. */
+function frames(content: string): number {
+  return [...content.matchAll(MOLDURA)].length;
+}
+
+/** Uma foto real em WebP — o formato em que o Pinterest serve as imagens. */
+async function webpB64(seed = 40): Promise<string> {
+  const bytes = await sharp({
+    create: { width: 160, height: 120, channels: 3, background: { r: seed, g: 120, b: 90 } },
+  })
+    .webp()
+    .toBuffer();
+  return bytes.toString("base64");
+}
+
+/** Uma foto real em JPEG, para acompanhar a WebP no mesmo mood board. */
+async function jpegB64(seed = 200): Promise<string> {
+  const bytes = await sharp({
+    create: { width: 160, height: 120, channels: 3, background: { r: seed, g: 60, b: 60 } },
+  })
+    .jpeg()
+    .toBuffer();
+  return bytes.toString("base64");
+}
+
+/** Bytes que NÃO são imagem nenhuma: nem o `pdf-lib` os embute nem o sharp os
+ *  lê. É a foto que não há maneira de desenhar. */
+function lixoB64(): string {
+  return Buffer.alloc(96, 0x5a).toString("base64");
+}
+
+afterEach(() => {
+  st.sharpResizeAvariado = false;
+});
+
+describe("uma foto que não se desenha não deixa moldura (e conta como em falta)", () => {
+  it("mood board com uma WEBP e uma JPEG: as DUAS são desenhadas", async () => {
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [{ title: "Decoração Floral", images: [await webpB64(), await jpegB64()] }],
+    };
+    const { bytes, undrawnImages } = await renderProposalDocPdfWithReport(doc);
+    const parsed = await PDFDocument.load(bytes);
+    const page = moodBoardPage(parsed);
+    expect(imageDraws(page) - 1).toBe(2); // as duas fotos, além do logótipo
+    expect(frames(page)).toBe(2); // cada uma com a sua moldura
+    expect(undrawnImages).toBe(0);
+  }, 30_000);
+
+  it("BUG-GUARD: …e continuam as DUAS a ser desenhadas quando o sharp não redimensiona", async () => {
+    // A avaria a sério: no servidor implantado o caminho do `resizeToBox`
+    // falhou e o gerador caiu no recurso de embutir os bytes ORIGINAIS. Aí o
+    // JPEG entrava e o WebP não — umas fotos apareciam, as outras deixavam a
+    // moldura vazia. Agora os bytes que o `pdf-lib` não sabe ler são
+    // convertidos para JPEG antes de serem embutidos.
+    st.sharpResizeAvariado = true;
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [{ title: "Decoração Floral", images: [await webpB64(), await jpegB64()] }],
+    };
+    const { bytes, undrawnImages } = await renderProposalDocPdfWithReport(doc);
+    const parsed = await PDFDocument.load(bytes);
+    const page = moodBoardPage(parsed);
+    expect(imageDraws(page) - 1).toBe(2);
+    expect(frames(page)).toBe(2);
+    expect(undrawnImages).toBe(0);
+  }, 30_000);
+
+  it("a foto impossível NÃO deixa moldura — e a boa sai com a dela", async () => {
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [{ title: "Decoração Floral", images: [await jpegB64(), lixoB64()] }],
+    };
+    const { bytes } = await renderProposalDocPdfWithReport(doc);
+    const parsed = await PDFDocument.load(bytes);
+    const page = moodBoardPage(parsed);
+    expect(imageDraws(page) - 1).toBe(1);
+    // UMA moldura, não duas: um rectângulo vazio num PDF que vai para o
+    // cliente é pior do que não haver caixa nenhuma.
+    expect(frames(page)).toBe(1);
+  }, 30_000);
+
+  it("a foto impossível CONTA como foto em falta", async () => {
+    const doc = {
+      ...decoracaoDoc(),
+      moodBoards: [{ title: "Decoração Floral", images: [await jpegB64(), lixoB64()] }],
+    };
+    const { undrawnImages, truncations } = await renderProposalDocPdfWithReport(doc);
+    expect(undrawnImages).toBe(1);
+    // E NÃO como conteúdo cortado: não há aqui escolha de composição nenhuma,
+    // é uma avaria — a correcção é recarregar a foto, não editar o documento.
+    expect(truncations).toEqual([]);
+  }, 30_000);
+
+  it("a MESMA foto impossível em vários sítios conta UMA vez", async () => {
+    // A capa é desenhada duas vezes (página 1 e contracapa) e a mesma foto pode
+    // ir para os dois lados: contar cada desenho mandava o estúdio procurar
+    // quatro fotos onde só há uma.
+    const lixo = lixoB64();
+    const { undrawnImages } = await renderProposalDocPdfWithReport({
+      ...decoracaoDoc(),
+      coverImages: [lixo, lixo],
+      moodBoards: [{ title: "Decoração Floral", images: [await jpegB64(), lixo] }],
+    });
+    expect(undrawnImages).toBe(1);
+  }, 30_000);
+
+  it("uma proposta inteira que se desenha bem não inventa fotos em falta", async () => {
+    const { undrawnImages } = await renderProposalDocPdfWithReport({
+      ...decoracaoDoc(),
+      coverImages: [await photoB64(), await photoB64()],
+      moodBoards: [{ title: "Decoração Floral", images: await distinctPhotos(4) }],
+    });
+    expect(undrawnImages).toBe(0);
+  }, 30_000);
+});
+
+describe("os números internos nunca saem no PDF", () => {
+  /**
+   * O custo por linha e a margem existem para ela decidir se o negócio se faz.
+   * Um deles impresso na proposta é o fim da negociação antes de ela começar —
+   * e ao contrário de quase tudo o resto, isto não se corrige depois: o email
+   * sai uma vez.
+   *
+   * ── PORQUE É UMA COMPARAÇÃO E NÃO UMA PROCURA ────────────────────────────
+   * Procurar "1357" no ficheiro não serve: o texto vai como códigos de glifo
+   * hexadecimais (a fonte é subconjunto), e os dígitos que se encontram em
+   * texto cru são coordenadas — "0.2468" dava um falso positivo e um teste que
+   * falha por engano acaba apagado.
+   *
+   * O que se compara é o que fica DESENHADO: as duas versões do mesmo
+   * documento, uma com custos e outra sem, têm de produzir exactamente as
+   * mesmas instruções de desenho. Se um dia alguém puser a margem "só no
+   * rodapé para conferir", os fluxos deixam de bater certo e isto acusa.
+   */
+  it("um documento com custos desenha exactamente o mesmo que um sem custos", async () => {
+    const semCustos = {
+      ...decoracaoDoc(),
+      budgetItems: ["Decoração de cerimónia", "Arranjos de mesa"],
+      budgetAmounts: [4321, 8765],
+    };
+    const comCustos = { ...semCustos, budgetCosts: [1357, 2468] };
+
+    const fluxos = async (doc: Parameters<typeof renderProposalDocPdf>[0]) => {
+      const pdf = await PDFDocument.load(await renderProposalDocPdf(doc));
+      let texto = "";
+      for (let i = 0; i < pdf.getPageCount(); i += 1) texto += pageContent(pdf, i);
+      return texto;
+    };
+
+    expect(await fluxos(comCustos)).toBe(await fluxos(semCustos));
+  });
+});
+
+describe("a versão base e a versão com extras", () => {
+  /**
+   * O casal pede "uma coisa mais simples e outra com tudo". A alternativa a
+   * isto eram duas propostas — dois documentos a divergir, e ao fim de duas
+   * semanas ninguém saber qual é a que vale.
+   */
+  const comExtras = () => ({
+    ...decoracaoDoc(),
+    budgetItems: ["Decoração de cerimónia", "Arranjos de mesa", "Arco floral"],
+    budgetAmounts: [4000, 3000, 1500],
+    budgetOpcional: [false, false, true],
+    totalAmount: 8500,
+    totalVatMode: "acrescer" as const,
+  });
+
+  const desenho = async (doc: Parameters<typeof renderProposalDocPdf>[0]) => {
+    const pdf = await PDFDocument.load(await renderProposalDocPdf(doc));
+    let texto = "";
+    for (let i = 0; i < pdf.getPageCount(); i += 1) texto += pageContent(pdf, i);
+    return texto;
+  };
+
+  it("uma proposta SEM extras desenha exactamente o que desenhava antes", async () => {
+    // A garantia que interessa primeiro: isto não pode acrescentar uma linha,
+    // uma palavra ou um espaço a nenhuma das propostas que já existem.
+    const semMarcas = { ...comExtras(), budgetOpcional: undefined };
+    const semCampo = { ...comExtras(), budgetOpcional: [false, false, false] };
+    expect(await desenho(semCampo)).toBe(await desenho(semMarcas));
+  });
+
+  it("com extras assinalados o desenho MUDA — é o que a proposta vem dizer", async () => {
+    const semMarcas = { ...comExtras(), budgetOpcional: undefined };
+    expect(await desenho(comExtras())).not.toBe(await desenho(semMarcas));
+  });
+
+  it("um extra SEM preço não desenha um segundo total", async () => {
+    // Sem preço a subtracção não desce, e os dois números sairiam iguais com
+    // rótulos diferentes — pior do que não haver segundo número nenhum.
+    const semPreco = {
+      ...comExtras(),
+      budgetAmounts: [4000, 3000, null],
+      budgetOpcional: [false, false, true],
+    };
+    const so = { ...semPreco, budgetOpcional: undefined };
+    // O desenho difere só pela palavra "extra" ao lado da linha; o bloco do
+    // segundo total não entra. Verifica-se pelo comprimento: um bloco a mais
+    // são duas linhas de texto, não meia dúzia de caracteres.
+    const [a, b] = [await desenho(semPreco), await desenho(so)];
+    expect(a).not.toBe(b);
+    expect(Math.abs(a.length - b.length)).toBeLessThan(400);
+  });
+});
+
+describe("as notas internas nunca saem no PDF", () => {
+  /**
+   * "Cliente da AMARA, cuidado com o prazo" é uma frase que se escreve para si
+   * própria. Chegar ao cliente não é um bug com um erro visível — é uma frase
+   * sobre ele, escrita por quem lhe está a vender, dentro do documento que ele
+   * abriu com expectativa.
+   *
+   * Mesma técnica do teste dos custos, e pela mesma razão: compara-se o que
+   * fica DESENHADO, porque procurar as palavras no ficheiro não serve (o texto
+   * vai como códigos de glifo hexadecimais).
+   */
+  it("um documento com notas desenha exactamente o mesmo que um sem notas", async () => {
+    const semNotas = decoracaoDoc();
+    const comNotas = {
+      ...semNotas,
+      notasInternas: "Cliente da AMARA, cuidado com o prazo. Recusaram em 2025 por preço.",
+      notasPorSeccao: {
+        orcamento: "Margem apertada, não descer mais.",
+        servicos: "Ela quer eucalipto e mais nada.",
+      },
+    };
+
+    const fluxos = async (doc: Parameters<typeof renderProposalDocPdf>[0]) => {
+      const pdf = await PDFDocument.load(await renderProposalDocPdf(doc));
+      let texto = "";
+      for (let i = 0; i < pdf.getPageCount(); i += 1) texto += pageContent(pdf, i);
+      return texto;
+    };
+
+    expect(await fluxos(comNotas)).toBe(await fluxos(semNotas));
   });
 });

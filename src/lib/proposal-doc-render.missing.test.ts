@@ -19,6 +19,8 @@ const fetchMock = vi.hoisted(() => vi.fn());
 const pdfMock = vi.hoisted(() => ({
   docs: [] as unknown[],
   truncations: [] as { where: string; dropped: number; unit: "fotos" | "linhas" }[],
+  /** Fotos que o gerador RECEBEU e não conseguiu desenhar. */
+  undrawnImages: 0,
 }));
 
 vi.mock("@/lib/proposal-storage", () => ({
@@ -31,7 +33,11 @@ vi.mock("@/lib/proposal-doc-pdf", async (importOriginal) => ({
   caixasDoCollage: (await importOriginal<typeof import("./proposal-doc-pdf")>()).caixasDoCollage,
   renderProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
     pdfMock.docs.push(doc);
-    return { bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]), truncations: pdfMock.truncations };
+    return {
+      bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+      truncations: pdfMock.truncations,
+      undrawnImages: pdfMock.undrawnImages,
+    };
   }),
 }));
 
@@ -49,6 +55,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   pdfMock.docs = [];
   pdfMock.truncations = [];
+  pdfMock.undrawnImages = 0;
 });
 
 describe("contagem de fotos em falta", () => {
@@ -98,6 +105,31 @@ describe("contagem de fotos em falta", () => {
     const muitas = Array.from({ length: 90 }, (_, i) => `f${i}.jpg`);
     const { missingImages } = await renderStoredProposalDocPdfWithReport(docWith([], muitas));
     expect(missingImages).toBe(10); // 90 pedidas, tecto de 80
+  });
+
+  it("a foto que RESOLVE e não se consegue DESENHAR também conta como em falta", async () => {
+    // Era a perda mais invisível de todas: a foto existia no armazenamento,
+    // descarregava bem — e depois o gerador não a conseguia embutir (um WebP do
+    // Pinterest, que o pdf-lib não sabe imprimir) e deixava a página com um
+    // buraco. Para quem envia a proposta é exactamente a mesma coisa que uma
+    // foto que não chegou, por isso entra na MESMA contagem e no mesmo aviso.
+    fetchMock.mockResolvedValue(Buffer.from("x"));
+    pdfMock.undrawnImages = 2;
+    const { missingImages } = await renderStoredProposalDocPdfWithReport(
+      docWith(["a.jpg"], ["b.webp", "c.webp"]),
+    );
+    expect(missingImages).toBe(2);
+  });
+
+  it("soma as que não resolvem e as que não se desenham", async () => {
+    fetchMock.mockImplementation(async (ref: string) =>
+      ref === "b.webp" ? null : Buffer.from("x"),
+    );
+    pdfMock.undrawnImages = 1;
+    const { missingImages } = await renderStoredProposalDocPdfWithReport(
+      docWith(["a.jpg"], ["b.webp", "c.webp"]),
+    );
+    expect(missingImages).toBe(2);
   });
 
   it("o PDF sai à mesma, mesmo com fotos em falta", async () => {

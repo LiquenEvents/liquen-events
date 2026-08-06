@@ -11,6 +11,7 @@ import {
   type ThemeThumbInput,
 } from "@/lib/theme-storage";
 import { isFingerprint } from "@/lib/theme-fingerprint";
+import { garantirFormatoImprimivel } from "@/lib/proposal-image";
 import {
   THEME_PAGE_SIZE,
   MAX_THEME_PAGE_SIZE,
@@ -251,7 +252,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         { status: 413 },
       );
     }
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const recebidos = Buffer.from(await file.arrayBuffer());
+
+    // O que fica GUARDADO tem de ser um formato que o PDF saiba imprimir. Um
+    // WebP (o formato em que o Pinterest serve as imagens, e daí vem a maior
+    // parte destas fotos) não é embutível pelo `pdf-lib` e saía como uma
+    // moldura vazia no PDF do cliente. Continua a aceitar-se WebP à porta — o
+    // que muda é o que se guarda.
+    //
+    // Isto ficou MAIS importante, não menos, desde que uma foto escolhida para
+    // um mood board passou a ser REFERENCIADA em vez de copiada (ver
+    // `theme-ref.ts`): os bytes que estão neste bucket são agora, sem
+    // intermediário nenhum, os bytes que o gerador de PDF vai buscar.
+    const pronto = await garantirFormatoImprimivel(recebidos, file.type);
+    if (!pronto) {
+      return NextResponse.json(
+        { error: `Não foi possível processar a imagem: ${file.name}.` },
+        { status: 415 },
+      );
+    }
+    // A partir daqui trabalha-se sobre os bytes CONVERTIDOS: é sobre eles que a
+    // rede secundária compara MD5, e são eles que ficam no bucket — comparar
+    // uns e guardar outros deixaria a verificação a olhar para o ficheiro
+    // errado. A conversão é determinística, portanto a mesma foto carregada
+    // duas vezes continua a dar os mesmos bytes (e a ser apanhada como
+    // repetida). O `hashes` do cliente é do ficheiro ORIGINAL e não muda.
+    const bytes = pronto.bytes;
 
     // Rede secundária: a foto antiga, de nome UUID, que o resumo não apanha.
     // Feita ANTES de escrever, para não deixar uma segunda cópia no bucket.
@@ -263,6 +289,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
+    // A miniatura fica como veio: só é vista na grelha do navegador, nunca é
+    // impressa, e todos os browsers que a geram já a dão em JPEG.
     const thumb = thumbs[i];
     const thumbInput: ThemeThumbInput | undefined = thumb
       ? { bytes: Buffer.from(await thumb.arrayBuffer()), contentType: thumb.type }
@@ -271,10 +299,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const microInput: ThemeThumbInput | undefined = micro
       ? { bytes: Buffer.from(await micro.arrayBuffer()), contentType: micro.type }
       : undefined;
+    // `pronto.contentType` e não `file.type`: o que ficou guardado foi o
+    // ficheiro CONVERTIDO, e declarar o tipo de entrada faria o bucket guardar
+    // um JPEG rotulado de WebP.
     const res = await uploadThemeImage(
       id,
       bytes,
-      file.type,
+      pronto.contentType,
       thumbInput,
       { fingerprint: hashes[i], force },
       microInput,

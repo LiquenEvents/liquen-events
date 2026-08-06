@@ -16,10 +16,19 @@ import { mapper as calendarMapper, listCalendarEvents } from "./calendar-store";
 import { mapper as invoicesMapper, listInvoices } from "./invoices-store";
 import { mapper as contractsMapper, listContracts } from "./contracts-store";
 import { mapper as inventoryMapper, listItems } from "./inventory-store";
+import { mapper as materialMapper, listMaterial } from "./material-store";
+import { mapper as materialListMapper, listLists } from "./material-lists-store";
+import { mapper as materialListItemMapper, listAllListItems } from "./material-list-items-store";
+import { mapper as materialRuleMapper, listRules } from "./material-rules-store";
+import { mapper as eventMaterialMapper, listEventMaterial } from "./event-material-store";
+import { mapper as eventMaterialItemMapper, listAllEventItems } from "./event-material-items-store";
+import { mapper as eventMaterialLogMapper, listAllLog } from "./event-material-log-store";
 import { mapper as templatesMapper, listTemplates } from "./email-templates-store";
 import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
 import { mapper as overviewMapper, type OverviewField } from "./overview-settings-store";
+import { mapper as definicoesMapper, listarDefinicoes } from "./proposta-definicoes-store";
+import { mapper as catalogoMapper, listarServicos } from "./servicos-catalogo-store";
 import { mapper as etiquetasMapper, listEtiquetas } from "./biblioteca-etiquetas-store";
 import { mapper as fotosMapper, listFotos } from "./biblioteca-fotos-store";
 import {
@@ -123,6 +132,29 @@ const text = (max: number) => z.string().max(max).nullish();
 const stamp = z.string().max(64).nullish();
 const money = z.number().finite().min(0).max(1_000_000_000);
 
+/**
+ * As definições da proposta. O `value` é um objecto e não se valida por dentro:
+ * são meia dúzia de números com limites que a ROTA já impõe, e duplicá-los aqui
+ * criava uma segunda verdade a envelhecer ao lado da primeira. Uma cópia de uma
+ * versão anterior, com menos campos, tem de continuar a poder ser reposta.
+ */
+const servicoCatalogoSchema = z.looseObject({
+  id,
+  nome: z.string().max(200),
+  descricao: text(2_000),
+  nomeEn: text(200),
+  descricaoEn: text(2_000),
+  categoria: text(120),
+  createdAt: stamp,
+  updatedAt: stamp,
+});
+
+const definicaoSchema = z.looseObject({
+  id,
+  valor: z.looseObject({}).default({}),
+  updatedAt: stamp,
+});
+
 const quoteSchema = z.looseObject({
   id,
   status: z.enum(["pendente", "em_revisao", "cotado", "aceite", "rejeitado"]),
@@ -170,12 +202,19 @@ const proposalSchema = z.looseObject({
   subtotal: money,
   vat: money,
   total: money,
-  status: z.enum(["rascunho", "enviada", "aceite", "rejeitada"]),
+  status: z.enum(["rascunho", "enviada", "em_negociacao", "aceite", "rejeitada"]),
   createdAt: z.string().max(64),
   validUntil: text(64),
   notes: text(20_000),
   sentAt: stamp,
   respondedAt: stamp,
+  // O acompanhamento: quando voltar a falar, e porque é que se perdeu. Entra
+  // na cópia porque é trabalho dela, não um derivado — o motivo de recusa de
+  // um casamento de 2026 não se recupera de mais lado nenhum.
+  followUpAt: text(64),
+  followUpNote: text(2_000),
+  lostReason: text(40),
+  lostNote: text(2_000),
 });
 
 const supplierSchema = z.looseObject({
@@ -239,6 +278,80 @@ const inventorySchema = z.looseObject({
   quantity: z.number().int().min(0).max(1_000_000),
   condition: z.enum(["novo", "bom", "usado", "danificado"]),
   updatedAt: z.string().max(64),
+});
+
+const materialSchema = z.looseObject({
+  id,
+  name: z.string().max(300),
+  category: z.string().max(120).default("Ferramentas"),
+  kind: z.enum(["consumivel", "reutilizavel"]),
+  stock: z.number().min(0).max(1_000_000),
+  // Opcional a sério: ausente quer dizer "não vigiar este item", e é diferente
+  // de zero. Um `.default(0)` aqui repunha a cópia com a reposição desligada em
+  // silêncio para todos os itens que não a tinham.
+  minStock: z.number().min(0).max(1_000_000).optional(),
+  updatedAt: z.string().max(64),
+});
+
+const materialListSchema = z.looseObject({
+  id,
+  name: z.string().max(300),
+  isDefault: z.boolean().default(false),
+  createdAt: z.string().max(64),
+  updatedAt: z.string().max(64),
+});
+
+const materialListItemSchema = z.looseObject({
+  id,
+  listId: z.string().max(120),
+  itemId: z.string().max(120),
+  qty: z.number().min(0).max(1_000_000),
+  // Ausente = não escala com convidados. Um `.default(0)` aqui era inofensivo
+  // na conta (0 nunca ganha ao mínimo) mas mentia sobre a intenção da linha.
+  qtyPerPax: z.number().min(0).max(1_000_000).optional(),
+  critical: z.boolean().default(false),
+  position: z.number().default(0),
+});
+
+const materialRuleSchema = z.looseObject({
+  id,
+  name: z.string().max(300),
+  enabled: z.boolean().default(true),
+  matchKind: z.enum(["sempre", "servico", "texto", "pax"]),
+  action: z.enum(["add_list", "add_item"]),
+  position: z.number().default(0),
+  updatedAt: z.string().max(64),
+});
+
+const eventMaterialSchema = z.looseObject({
+  id,
+  quoteId: z.string().max(120),
+  status: z.enum(["preparada", "carregada", "devolvida"]),
+  generatedAt: z.string().max(64),
+  updatedAt: z.string().max(64),
+});
+
+const eventMaterialItemSchema = z.looseObject({
+  id,
+  eventId: z.string().max(120),
+  name: z.string().max(300),
+  category: z.string().max(120),
+  kind: z.enum(["consumivel", "reutilizavel"]),
+  qty: z.number().min(0).max(1_000_000),
+  critical: z.boolean().default(false),
+  origin: z.enum(["base", "regra", "manual"]),
+  missing: z.boolean().default(false),
+});
+
+const eventMaterialLogSchema = z.looseObject({
+  id,
+  eventId: z.string().max(120),
+  itemId: z.string().max(120),
+  action: z.enum(["loaded", "unloaded", "returned", "missing", "note", "used"]),
+  actor: z.string().max(200),
+  markedAt: z.string().max(64),
+  syncedAt: z.string().max(64),
+  superseded: z.boolean().default(false),
 });
 
 const templateSchema = z.looseObject({
@@ -480,6 +593,78 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     stamp: (i) => i.updatedAt,
   }),
   asTarget({
+    key: "materialItems",
+    label: "Material de logística",
+    table: materialMapper.table,
+    mapper: materialMapper,
+    schema: materialSchema,
+    current: listMaterial,
+    stamp: (i) => i.updatedAt,
+  }),
+  asTarget({
+    key: "materialLists",
+    label: "Listas de material",
+    table: materialListMapper.table,
+    mapper: materialListMapper,
+    schema: materialListSchema,
+    current: listLists,
+    stamp: (l) => l.updatedAt,
+    extraColumns: (l) => ({ created_at: l.createdAt }),
+  }),
+  asTarget({
+    key: "materialListItems",
+    label: "Linhas das listas de material",
+    table: materialListItemMapper.table,
+    mapper: materialListItemMapper,
+    schema: materialListItemSchema,
+    current: listAllListItems,
+    // As linhas não têm relógio próprio: pertencem à lista e vivem e morrem
+    // com ela. O carimbo da lista é o que interessa.
+    stamp: () => "",
+  }),
+  asTarget({
+    key: "materialRules",
+    label: "Regras de material",
+    table: materialRuleMapper.table,
+    mapper: materialRuleMapper,
+    schema: materialRuleSchema,
+    current: listRules,
+    stamp: (r) => r.updatedAt,
+  }),
+  asTarget({
+    key: "eventMaterial",
+    label: "Checklists de material",
+    table: eventMaterialMapper.table,
+    mapper: eventMaterialMapper,
+    schema: eventMaterialSchema,
+    current: listEventMaterial,
+    stamp: (e) => e.updatedAt,
+    extraColumns: (e) => ({ generated_at: e.generatedAt }),
+  }),
+  asTarget({
+    key: "eventMaterialItems",
+    label: "Linhas das checklists de material",
+    table: eventMaterialItemMapper.table,
+    mapper: eventMaterialItemMapper,
+    schema: eventMaterialItemSchema,
+    current: listAllEventItems,
+    // Sem relógio próprio: as linhas pertencem à checklist e o carimbo dela
+    // é que conta.
+    stamp: () => "",
+  }),
+  asTarget({
+    key: "eventMaterialLog",
+    label: "Registo de marcações de material",
+    table: eventMaterialLogMapper.table,
+    mapper: eventMaterialLogMapper,
+    schema: eventMaterialLogSchema,
+    current: listAllLog,
+    // O relógio que interessa é o de QUEM MARCOU, não o de chegada: é por ele
+    // que os conflitos foram resolvidos, e é ele que explica o histórico.
+    stamp: (l) => l.markedAt,
+    extraColumns: (l) => ({ marked_at: l.markedAt, synced_at: l.syncedAt }),
+  }),
+  asTarget({
     key: "emailTemplates",
     label: "Modelos de email",
     table: templatesMapper.table,
@@ -500,6 +685,24 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     schema: themeSchema,
     current: listThemes,
     stamp: (t) => t.updatedAt,
+  }),
+  asTarget({
+    key: "servicosCatalogo",
+    label: "Biblioteca de serviços",
+    table: catalogoMapper.table,
+    mapper: catalogoMapper,
+    schema: servicoCatalogoSchema,
+    current: listarServicos,
+    stamp: (s) => s.updatedAt,
+  }),
+  asTarget({
+    key: "propostaDefinicoes",
+    label: "Definições da proposta (combustível, margem)",
+    table: definicoesMapper.table,
+    mapper: definicoesMapper,
+    schema: definicaoSchema,
+    current: listarDefinicoes,
+    stamp: (d) => d.updatedAt,
   }),
   asTarget({
     key: "overviewSettings",

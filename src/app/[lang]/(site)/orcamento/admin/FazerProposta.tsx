@@ -5,6 +5,8 @@ import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { Button, Card, EmptyState } from "./ui";
 import { ProposalStudio } from "./lazy";
+import AvisoDataOcupada from "./AvisoDataOcupada";
+import { choquesDeData } from "@/lib/orcamento/choque-de-datas";
 
 /**
  * FAZER PROPOSTA — um ecrã com um trabalho só.
@@ -124,6 +126,22 @@ export default function FazerProposta({
     [quotes],
   );
 
+  /**
+   * Que pedidos da lista caem em cima de um dia já comprometido.
+   *
+   * O aviso a sério aparece depois de escolher, com o outro evento e a
+   * distância. Aqui é só uma pastilha, para a escolha não ser às cegas: se dois
+   * pedidos servem igualmente bem para começar a manhã, é melhor começar pelo
+   * que não vai dar problema.
+   *
+   * Corre sobre a lista já filtrada, não sobre as centenas todas.
+   */
+  const comChoque = useMemo(() => {
+    const ids = new Set<string>();
+    for (const q of lista) if (choquesDeData(q, quotes).length > 0) ids.add(q.id);
+    return ids;
+  }, [lista, quotes]);
+
   // ── Com cliente escolhido: o ecrã é o estúdio ────────────────────────────
   if (escolhido) {
     return (
@@ -149,12 +167,17 @@ export default function FazerProposta({
           </div>
         </Card>
 
+        {/* ANTES do estúdio, de propósito. Saber que o dia já está ocupado
+            depois de escrever a proposta toda é saber tarde de mais. */}
+        <AvisoDataOcupada quote={escolhido} quotes={quotes} onAbrir={onSelect} />
+
         {/* `key` pelo id: trocar de cliente TEM de recomeçar o estúdio do zero.
             Sem isto o React reaproveitava a instância e o rascunho de um casal
             aparecia no ecrã do seguinte. */}
         <ProposalStudio
           key={`fazer-proposta-${escolhido.id}`}
           quote={escolhido}
+          quotes={quotes}
           onQuoteUpdated={onQuoteUpdated}
           onSent={() => onSent(escolhido)}
         />
@@ -237,10 +260,17 @@ export default function FazerProposta({
                         {q.location ? ` · ${q.location}` : ""}
                       </span>
                     </span>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium tracking-[0.08em] uppercase ${e.classe}`}
-                    >
-                      {e.label}
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {comChoque.has(q.id) && (
+                        <span className="rounded-full bg-[#c08a3e]/15 px-2.5 py-1 text-[10px] font-medium tracking-[0.08em] uppercase text-[#8a6420]">
+                          Data ocupada
+                        </span>
+                      )}
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-medium tracking-[0.08em] uppercase ${e.classe}`}
+                      >
+                        {e.label}
+                      </span>
                     </span>
                   </span>
                 </button>

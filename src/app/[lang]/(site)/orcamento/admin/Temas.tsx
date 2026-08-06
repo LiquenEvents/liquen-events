@@ -311,6 +311,21 @@ function photoCountLabel(count: number | null, truncated?: boolean): string {
  * `stop` é consultado antes de cada item: é assim que sair da pasta trava o
  * que ainda não começou, sem cortar o que já vai a caminho.
  */
+/**
+ * Avisa o seletor da Biblioteca de Temas que o que ele tem em cache deixou de
+ * corresponder à realidade.
+ *
+ * O seletor (ThemePicker) guarda temas e páginas de miniaturas em cache de
+ * módulo, para reabrir sem disparar um pedido. Essa cache só é invalidada por
+ * este evento — sem ele, acrescentar ou remover uma foto aqui deixava o
+ * seletor a mostrar a biblioteca velha até a aba ser recarregada. Um evento em
+ * `window` (e não um import) mantém os dois ecrãs sem se conhecerem.
+ */
+function bibliotecaAlterada(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("liquen:biblioteca-alterada"));
+}
+
 async function pool<T>(
   items: T[],
   limit: number,
@@ -625,6 +640,7 @@ export default function Temas() {
       setBlocked(null);
       const created: ThemeSummary = data;
       setThemes((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "pt")));
+      bibliotecaAlterada();
       setNewName("");
       setNewNotes("");
       setAdding(false);
@@ -670,6 +686,7 @@ export default function Temas() {
     try {
       const res = await fetch(`/api/temas/${t.id}`, { method: "DELETE" });
       if (res.ok) {
+        bibliotecaAlterada();
         toast("Tema eliminado.", "success");
         return;
       }
@@ -1848,6 +1865,7 @@ function ThemeFolder({
             // em paralelo perdiam fotos e uma foto removida entretanto voltava.
             setImages((prev) => (prev.some((x) => x.path === im.path) ? prev : [im, ...prev]));
             setTotal((t) => (t === null ? null : t + 1));
+            bibliotecaAlterada();
             added += 1;
           } catch (e) {
             // A foto não subiu: a célula provisória sai (a caixa vermelha do
@@ -2257,6 +2275,7 @@ function ThemeFolder({
     });
     anchor.current = null;
     setTotal((t) => (t === null ? null : Math.max(0, t - targets.length)));
+    bibliotecaAlterada();
 
     const errors: ThemeImage[] = [];
     await pool(targets, DELETE_CONCURRENCY, async (im) => {

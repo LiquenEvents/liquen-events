@@ -66,6 +66,9 @@ export interface MoodBoard {
 }
 
 export interface ServiceItem {
+  /** IDENTIDADE ESTÁVEL da linha, para o editor (chave de React, arrasto,
+   *  foco). Não é impressa: o PDF só lê `label`/`desc`. Ver {@link withServiceIds}. */
+  id?: string;
   /** Bold label, e.g. "Reunião inicial" or "Decoração Cerimónia". */
   label: string;
   /** Optional description shown after the label (Organização template). */
@@ -73,12 +76,68 @@ export interface ServiceItem {
 }
 
 export interface ServiceGroup {
+  /** Identidade estável do grupo — ver {@link ServiceItem.id}. */
+  id?: string;
   /** Ordinal marker, e.g. "a)". */
   letter?: string;
   /** Group title, e.g. "Decoração Floral de Casamento". */
   title: string;
   /** Sub-items (bullets); each is a label with an optional description. */
   items: ServiceItem[];
+}
+
+/**
+ * Id de recurso para um grupo/item que ainda não tem nenhum — DERIVADO DA
+ * POSIÇÃO, nunca sorteado.
+ *
+ * O editor usa o mesmo par de funções para desenhar as chaves de React antes de
+ * o preenchimento chegar ao documento, por isso a linha nunca troca de
+ * identidade a meio (que é exatamente o que fazia o cursor saltar).
+ */
+export function fallbackServiceGroupId(index: number): string {
+  return `g${index}`;
+}
+export function fallbackServiceItemId(groupId: string, index: number): string {
+  return `${groupId}~i${index}`;
+}
+
+/**
+ * Devolve os grupos com `id` em todos os grupos e itens, preenchendo os que
+ * faltam a partir da POSIÇÃO.
+ *
+ * Determinístico de propósito: isto corre a cada chamada de
+ * {@link withProposalDefaults} — do lado do servidor, a cada pré-visualização e
+ * a cada envio — e um id sorteado faria o MESMO documento serializar diferente
+ * de cada vez (rascunho a "mudar" sozinho, gravações e comparações inúteis).
+ *
+ * Ids já existentes são respeitados; um id repetido (rascunho estragado) é
+ * desempatado com um sufixo, também ele determinístico. Quando não há nada a
+ * preencher devolve o MESMO array, para o editor poder comparar por identidade.
+ */
+export function withServiceIds(groups: readonly ServiceGroup[]): ServiceGroup[] {
+  const used = new Set<string>();
+  /** O `base`, ou `base_2`, `base_3`… até sair um id livre. */
+  const free = (base: string): string => {
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}_${n}`;
+    used.add(id);
+    return id;
+  };
+  let changed = false;
+  const next = groups.map((g, gi) => {
+    const groupId = free(g.id || fallbackServiceGroupId(gi));
+    let itemsChanged = false;
+    const items = (g.items ?? []).map((it, ii) => {
+      const itemId = free(it.id || fallbackServiceItemId(groupId, ii));
+      if (itemId === it.id) return it;
+      itemsChanged = true;
+      return { ...it, id: itemId };
+    });
+    if (groupId === g.id && !itemsChanged) return g;
+    changed = true;
+    return { ...g, id: groupId, items };
+  });
+  return changed ? next : (groups as ServiceGroup[]);
 }
 
 /** A timeline phase in the "Cronograma de Organização" (Organização template). */
@@ -157,6 +216,81 @@ export interface ProposalDoc {
    * de ser um array paralelo e não um campo dentro de `budgetItems`.
    */
   budgetAmounts?: (number | null)[];
+  /**
+   * O que cada linha CUSTA à Líquen — flores, aluguer, horas de equipa.
+   *
+   * Mesmo array paralelo que `budgetAmounts`, e pelas mesmas razões (ver
+   * `proposal-budget.ts`). Opcional linha a linha: preencher o custo de duas
+   * linhas em dez já dá uma margem parcial útil, e exigir todos garantia que
+   * não se preenchia nenhum.
+   *
+   * NUNCA SAI DAQUI. Não é lido pelo desenhador do PDF, não vai no email, não
+   * existe no portal do cliente. Um número destes numa proposta é o fim de uma
+   * negociação — e há um teste em `proposal-doc-pdf` a garanti-lo.
+   */
+  budgetCosts?: (number | null)[];
+  /**
+   * Como é que cada linha ESCALA com o número de convidados: fixa (o normal),
+   * por convidado, ou por mesa. Mesmo array paralelo dos outros.
+   *
+   * Quando uma linha tem escala, o `budgetAmounts[i]` dela deixa de ser escrito
+   * à mão e passa a ser o RESULTADO da multiplicação — escrito no mesmo sítio
+   * de sempre, para que a soma, o desvio do total, a margem e o resumo
+   * continuem a ler o que já liam sem saberem que aquele número foi calculado.
+   *
+   * Ver `src/lib/orcamento/escala.ts`.
+   */
+  budgetScales?: (import("./orcamento/escala").Escala | null)[];
+  /** Quantas pessoas por mesa, para as linhas "por mesa" (por omissão 10). */
+  convidadosPorMesa?: number;
+  /**
+   * Quais das linhas são EXTRA — o que distingue a versão base da versão com
+   * extras da mesma proposta. Mesmo array paralelo dos outros.
+   *
+   * Uma proposta sem marcas nenhumas é exactamente a proposta de antes: não há
+   * segundo total nem uma palavra a mais no PDF. Ver
+   * `src/lib/orcamento/versoes-da-proposta.ts` — em particular a razão de o
+   * total da base ser DERIVADO e não escrito.
+   */
+  budgetOpcional?: boolean[];
+
+  /**
+   * De que fotos da BIBLIOTECA saíram as fotos desta proposta.
+   *
+   * Guarda os caminhos de ORIGEM (o ficheiro no bucket dos temas), não os da
+   * proposta: as fotos da proposta são cópias, com caminho próprio, e comparar
+   * cópias nunca diria que duas propostas mostraram a mesma imagem.
+   *
+   * Serve uma coisa só, e não sai daqui para lado nenhum: avisar que uma foto
+   * já foi para outro casamento. Duas noivas com o mesmo Pinterest é uma
+   * coincidência; duas propostas da Líquen com o mesmo arco é um descuido que
+   * se vê de longe quando as duas se encontram no Instagram.
+   *
+   * NÃO É DESENHADA. O PDF não a lê — e o teste que compara os desenhos com e
+   * sem custos/notas cobre a mesma garantia por construção: só entra no
+   * documento o que alguém mandou desenhar.
+   */
+  fotosDeBiblioteca?: string[];
+
+  /**
+   * NOTAS INTERNAS — o que se sabe sobre este negócio e nunca se escreve ao
+   * cliente. "Cliente da AMARA, cuidado com o prazo." "Já recusaram uma
+   * proposta em 2025 por preço."
+   *
+   * Vivem no documento porque é ao documento que dizem respeito, e porque é
+   * assim que viajam com ele na cópia de segurança. NUNCA SÃO DESENHADAS: o
+   * gerador do PDF não as lê, e há um teste que compara as instruções de
+   * desenho com e sem notas para garantir que continua assim.
+   *
+   * O sítio onde isto podia correr mal é o de sempre — alguém acrescenta um
+   * rodapé "para conferir" e esquece-se de o tirar. É esse o teste.
+   */
+  notasInternas?: string;
+  /**
+   * Notas presas a uma secção ("nas flores, ela quer eucalipto e mais nada").
+   * A chave é o id da secção do estúdio: evento, servicos, orcamento, total…
+   */
+  notasPorSeccao?: Record<string, string>;
   totalLabel: string; // "Valor Total Decoração"
   totalText: string; // "3000,00 € + IVA" — kept as text to match the studio's format
   /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding
@@ -249,7 +383,14 @@ export const DEFAULT_CONDICOES_GERAIS: string[] = [
   "Aos valores acresce o IVA à taxa legal em vigor como descrito.",
   "Os orçamentos enviados pela Líquen Events terão de ser validados pela mesma, aquando da sua confirmação por parte dos clientes, sendo o critério aplicado, a disponibilidade para a realização do evento.",
   "A pré-reserva do evento deve ser efetuada por escrito através de email. A confirmação do evento só será concluída após pagamento da adjudicação.",
+  // A sede é em Évora e os casamentos são em todo o país: a deslocação é
+  // cobrada pela distância até ao sítio onde o evento acontece. A isenção do
+  // distrito de Évora fica: aí não há deslocação a cobrar.
   "Será cobrado o valor de deslocação da equipa Líquen de acordo com os quilómetros relativos à distância de Évora ao local do evento, sempre que o evento se realize fora do distrito de Évora.",
+  // Trabalhar longe é mais do que combustível: um casamento a quatro horas de
+  // Évora obriga a equipa a dormir lá, e isso era um custo que a proposta não
+  // dizia e a Líquen absorvia.
+  "Sempre que a distância ao local ou o horário do evento obriguem a equipa Líquen a pernoitar, será cobrado o valor do alojamento.",
   "Deve estar contemplada a refeição para os elementos da equipa Líquen que ficam durante todo o evento.",
   "Esta proposta só é válida para o evento a realizar no dia {DATA}.",
   "O orçamento é válido para o número de {CONVIDADOS} convidados; abaixo ou acima deste número o valor da proposta terá de ser revisto.",
@@ -301,6 +442,76 @@ export function normaliseCoverImages(
     const v = images?.[i];
     return typeof v === "string" ? v : "";
   });
+}
+
+// ── Marcadores provisórios de foto ─────────────────────────────────────────
+//
+// Quando se escolhem fotos na Biblioteca de Temas, a cópia para a pasta desta
+// proposta demora — e a foto tem de aparecer no sítio certo no INSTANTE do
+// clique, não quando a cópia confirma. O que entra no documento nesse instante
+// é um MARCADOR: `pending:<uuid>`.
+//
+// Um marcador NÃO é um caminho de Storage e não é um valor legítimo de
+// documento: é uma promessa que ainda não tem morada. Por isso tem de ser
+// filtrado em TODAS as fronteiras por onde o documento sai do editor — o
+// rascunho gravado (local e servidor) e o documento que gera a
+// pré-visualização / a proposta enviada. Um marcador que atravesse uma dessas
+// fronteiras é uma foto que o gerador não consegue ir buscar: um buraco
+// silencioso no PDF do cliente, exatamente o que os avisos de conteúdo
+// incompleto existem para evitar.
+//
+// O prefixo vive AQUI, no modelo do documento, e não no seletor que o cria:
+// quem filtra são os dois lados, e uma segunda definição do prefixo seria uma
+// maneira de um deles deixar de filtrar sem ninguém dar por isso.
+
+/** Prefixo dos marcadores provisórios. Os dois pontos garantem que nunca
+ *  colide com um caminho de Storage (`<uuid>/<ficheiro>`). */
+export const PENDING_IMAGE_PREFIX = "pending:";
+
+/** Este caminho é um marcador provisório (uma foto ainda por copiar)? */
+export function isPendingImage(path: string | null | undefined): boolean {
+  return typeof path === "string" && path.startsWith(PENDING_IMAGE_PREFIX);
+}
+
+/** As fotos deste documento que ainda são promessas — o número que decide se
+ *  a proposta já pode seguir para o cliente. */
+export function countPendingImages(
+  doc: Partial<Pick<ProposalDoc, "coverImages" | "moodBoards">>,
+): number {
+  let n = 0;
+  for (const p of doc.coverImages ?? []) if (isPendingImage(p)) n += 1;
+  for (const b of doc.moodBoards ?? [])
+    for (const p of b.images ?? []) if (isPendingImage(p)) n += 1;
+  return n;
+}
+
+/**
+ * O mesmo documento sem um único marcador provisório.
+ *
+ * Nas capas o marcador vira `""` e NÃO desaparece do array: é a posição que
+ * decide o lado onde a foto é impressa (ver {@link normaliseCoverImages}), por
+ * isso compactar aqui mandaria a foto da direita imprimir à esquerda. Nos mood
+ * boards sai mesmo da lista — ali a posição é só ordem.
+ *
+ * Devolve o MESMO objeto quando não há nada a filtrar (o caso normal), para
+ * não sujar as comparações por referência de quem grava o rascunho.
+ */
+export function stripPendingImages<
+  T extends Partial<Pick<ProposalDoc, "coverImages" | "moodBoards">>,
+>(doc: T): T {
+  if (countPendingImages(doc) === 0) return doc;
+  const out: T = { ...doc };
+  if (doc.coverImages) {
+    out.coverImages = doc.coverImages.map((p) => (isPendingImage(p) ? "" : p));
+  }
+  if (doc.moodBoards) {
+    out.moodBoards = doc.moodBoards.map((b) =>
+      (b.images ?? []).some(isPendingImage)
+        ? { ...b, images: b.images.filter((p) => !isPendingImage(p)) }
+        : b,
+    );
+  }
+  return out;
 }
 
 /** Extrai o primeiro número monetário de texto livre pt-PT
@@ -430,7 +641,10 @@ export function withProposalDefaults(
     // draft (merged in the studio on mount) could omit them, and the PDF
     // renderer iterates serviceGroups/budgetItems/… directly. A missing array
     // would throw "undefined is not iterable" → generic 500 "erro ao gerar".
-    serviceGroups: doc.serviceGroups ?? [],
+    // Com `id` em cada grupo/item — preenchido pela POSIÇÃO quando falta (ver
+    // {@link withServiceIds}), para o editor ter uma identidade estável por
+    // linha sem que o documento serialize diferente a cada chamada.
+    serviceGroups: withServiceIds(doc.serviceGroups ?? []),
     moodBoards: doc.moodBoards ?? [],
     cronograma: doc.cronograma ?? [],
     budgetItems: doc.budgetItems ?? [],

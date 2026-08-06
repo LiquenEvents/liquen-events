@@ -106,24 +106,24 @@ export const en: Dict = {
 
   meta: {
     ogLocale: "en_GB",
-    homeTitle: "Event & Wedding Decoration in Évora | Líquen Events",
+    homeTitle: "Wedding & Event Decoration in Portugal | Líquen Events",
     homeDescription:
-      "Líquen Events decorates and coordinates weddings, company events and private celebrations. Based in Évora, over 100 events since 2018.",
-    sobreTitle: "Event Decoration Company in the Alentejo",
+      "Líquen Events decorates and coordinates weddings, company events and private celebrations across Portugal. Over 100 events since 2018.",
+    sobreTitle: "Event Decoration Company in Portugal",
     sobreDescription:
-      "Líquen Events, an event decoration company in Évora. Over 100 weddings and celebrations decorated across the Alentejo and Portugal since 2018.",
-    servicosTitle: "Wedding & Event Decoration in the Alentejo",
+      "Líquen Events, an event decoration and coordination company working across Portugal. Over 100 weddings and celebrations decorated since 2018.",
+    servicosTitle: "Wedding & Event Decoration in Portugal",
     servicosDescription:
-      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties in Évora, the Alentejo and Portugal.",
-    galeriaTitle: "Wedding & Event Gallery in the Alentejo",
+      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties right across Portugal.",
+    galeriaTitle: "Wedding & Event Gallery in Portugal",
     galeriaDescription:
-      "Photo gallery of events decorated by Líquen Events in the Alentejo and Portugal: weddings, corporate events, conferences and celebrations.",
+      "Photo gallery of events decorated by Líquen Events across Portugal: weddings, corporate events, conferences and celebrations.",
     clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
       "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
     contactoTitle: "Contact: Request Your Event Quote",
     contactoDescription:
-      "Contact Líquen Events to plan your event in Évora, the Alentejo or Portugal. Receive a tailored proposal for your event.",
+      "Contact Líquen Events to decorate your event anywhere in the country. Receive a tailored proposal for your event.",
     orcamentoTitle: "Request a Quote: Weddings & Events",
     orcamentoDescription:
       "Request your quote from Líquen Events. Tell us the event type, date and number of guests, and receive a tailored proposal.",
@@ -406,7 +406,7 @@ export const en: Dict = {
       },
       {
         q: "Can you handle only part of the organisation?",
-        a: "Absolutely. We can take care of everything, from concept to execution, or just specific areas such as décor, day-of coordination, catering or audiovisual. We tailor the service to what you need.",
+        a: "Absolutely. What we do is decoration and coordination: we can design and deliver the whole décor and coordinate the day, or take on just one part, concept only, floral decoration only, coordination only. We tailor the service to what you need.",
       },
       {
         q: "How does the quoting process work?",
@@ -454,6 +454,11 @@ export const en: Dict = {
     labelTelefone: "Phone",
     labelMensagem: "How do you picture your event?",
     phPessoas: "e.g. 120",
+    labelNoivos: "Names of the couple",
+    phNoivo: "Groom's name",
+    phNoiva: "Bride's name",
+    hintNoivos:
+      "They appear on the proposal and the contract. You can leave this and tell us later.",
     phLocal: "e.g. Évora, Alentejo…",
     phNome: "Your name",
     phEmail: "email@example.com",
@@ -514,7 +519,7 @@ export const en: Dict = {
         services: [
           {
             title: "Weddings",
-            desc: "Your most special day: coordination, decoration, photography and catering. We handle it all so you can simply live it.",
+            desc: "Your most special day: concept, floral decoration, scenography and day-of coordination. We handle every detail so you can simply live it.",
           },
           {
             title: "Christenings & Communions",

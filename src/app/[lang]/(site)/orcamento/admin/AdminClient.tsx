@@ -17,6 +17,16 @@ import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
+import {
+  contextoDeLocal,
+  diasDeEspera,
+  esperaEmPalavras,
+  mesesDeEvento,
+  plannersDe,
+  porEspera,
+  regioesDe,
+  tomDeEspera,
+} from "@/lib/orcamento/espera";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel } from "@/lib/orcamento/data";
@@ -52,6 +62,9 @@ import {
   Clientes,
   Calendario,
   Propostas,
+  Acompanhamento,
+  DefinicoesProposta,
+  Servicos,
   Tarefas,
   Fornecedores,
   StatsDashboard,
@@ -63,9 +76,11 @@ import {
   Faturas,
   Contratos,
   Inventario,
+  Material,
   Temas,
   ClientMessenger,
   EventChecklist,
+  EventMaterial,
   EventTimeline,
   PaymentsPanel,
   EventCosts,
@@ -245,6 +260,13 @@ interface Props {
 
 // Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
 // can render it too — it's pure (status + the module-level STATUS_OPTIONS).
+/** "2027-05" → "maio de 2027", para o filtro dos meses ser legível. */
+function mesLegivel(yyyymm: string): string {
+  const d = new Date(`${yyyymm}-01T12:00:00`);
+  if (Number.isNaN(d.getTime())) return yyyymm;
+  return d.toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
+}
+
 function statusBadge(status: QuoteStatus): ReactNode {
   const s = STATUS_OPTIONS.find((o) => o.id === status);
   return (
@@ -413,6 +435,9 @@ const QuoteCard = memo(function QuoteCard({
   const isStale =
     (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
     daysSince >= 14;
+  const espera = diasDeEspera(q);
+  const tom = espera === null ? null : tomDeEspera(espera);
+  const ctx = contextoDeLocal(q);
   return (
     <div className="relative">
       {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
@@ -456,6 +481,26 @@ const QuoteCard = memo(function QuoteCard({
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             {statusBadge(q.status)}
+            {/* HÁ QUANTO TEMPO ESPERA. A etiqueta "Novo" dizia o mesmo de um
+                pedido de ontem e de um de há nove dias — e é o de há nove dias
+                que já pediu orçamento a mais alguém. Só aparece para quem ainda
+                espera resposta nossa: uma proposta enviada está à espera DELES.
+                Cores: cinzento até 2 dias, âmbar de 3 a 6, vermelho a partir
+                dos 7. */}
+            {espera !== null && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-semibold tracking-[0.1em] uppercase ${
+                  tom === "urgente"
+                    ? "bg-[#b5654a]/15 text-[#b5654a]"
+                    : tom === "aviso"
+                      ? "bg-[#c08a3e]/15 text-[#8a6420]"
+                      : "bg-foreground/[0.06] text-foreground/45"
+                }`}
+                title={`Entrou ${esperaEmPalavras(espera)} e ainda não teve resposta`}
+              >
+                {esperaEmPalavras(espera)}
+              </span>
+            )}
             {isStale && (
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold bg-amber-500/10 text-amber-600"
@@ -493,6 +538,18 @@ const QuoteCard = memo(function QuoteCard({
           )}
           <span className="w-px h-2.5 bg-foreground/12" />
           <span>{q.guests} convidados</span>
+          {/* ONDE É. A região reconhecida e a distância a Évora dizem, antes
+              de abrir seja o que for, se aquele casamento é ali ao lado ou se
+              obriga a dormir fora — que muda o preço e a equipa. */}
+          {ctx.regiao && (
+            <>
+              <span className="w-px h-2.5 bg-foreground/12" />
+              <span title={ctx.aproximado ? "Região, não morada" : undefined}>
+                {ctx.regiao}
+                {ctx.km !== null && ctx.km > 0 && ` · ≈ ${ctx.km} km`}
+              </span>
+            </>
+          )}
           {(() => {
             const cd = eventCountdown(q.date);
             if (!cd || cd.tone === "past") return null;
@@ -512,6 +569,21 @@ const QuoteCard = memo(function QuoteCard({
             );
           })()}
         </div>
+        {/* PROVÁVEL CASAMENTO À DISTÂNCIA: sem data E sem sítio reconhecível.
+            Não é um diagnóstico — é um aviso de que aquele pedido se trabalha
+            de outra maneira (fuso horário, visita impossível, tudo por
+            escrito). Uma das ausências sozinha não bastava: datas por marcar há
+            às dezenas em casamentos de Évora. */}
+        {ctx.destination && (
+          <div className="mt-2.5">
+            <span
+              className="inline-flex items-center rounded-full bg-[#4d6350]/10 px-2 py-0.5 text-[9px] font-medium tracking-wide text-[#4d6350]"
+              title="Sem data e sem local concreto — normalmente organiza-se à distância"
+            >
+              Provável casamento à distância
+            </span>
+          </div>
+        )}
         {q.tags && q.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2.5">
             {q.tags.slice(0, 4).map((t) => (
@@ -560,10 +632,31 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  /**
+   * Os quatro filtros rápidos pedidos. Todos "all" por omissão: um filtro
+   * ligado sem se dar por isso é a maneira de jurar que um pedido desapareceu.
+   *
+   * `filterEspera` é o único que não é uma lista de valores — é um corte ("há
+   * três dias ou mais"), porque a pergunta que serve não é "quais esperam há
+   * exactamente quatro dias" mas "o que é que já esperou de mais".
+   */
+  const [filterEspera, setFilterEspera] = useState<"all" | "3" | "7">("all");
+  const [filterMes, setFilterMes] = useState<string>("all");
+  const [filterRegiao, setFilterRegiao] = useState<string>("all");
+  const [filterPlanner, setFilterPlanner] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [mineOnly, setMineOnly] = useState(false);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"recent" | "old" | "value" | "followup" | "eventdate">("recent");
+  /**
+   * A ordem por omissão é a ESPERA, não a data de entrada.
+   *
+   * "Mais recentes" põe à cabeça o que acabou de chegar — que é o que menos
+   * urge. O que se perde é o pedido de há nove dias, que com essa ordem está no
+   * fundo do ecrã, com a mesma etiqueta "Novo" de um que entrou esta manhã.
+   */
+  const [sort, setSort] = useState<
+    "espera" | "recent" | "old" | "value" | "followup" | "eventdate"
+  >("espera");
   const [saving, setSaving] = useState(false);
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
@@ -584,11 +677,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // management form and the tools (tabs) section.
   const gestaoRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  // ETag da última lista de pedidos vinda de `/api/orcamento`, para que o botão
-  // "Atualizar" possa perguntar "mudou alguma coisa?" em vez de mandar vir tudo
+  // ETag da última lista de pedidos vinda de `/api/orcamento`, para a
+  // revalidação poder perguntar "mudou alguma coisa?" em vez de mandar vir tudo
   // outra vez. Começa vazio: a primeira lista veio no HTML, sem carimbo.
   const quotesEtag = useRef<string | null>(null);
+  /** Quando foi a última revalidação, para não a repetir a cada piscar de olhos. */
+  const ultimaRevalidacao = useRef(0);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
   /** Já desceu o suficiente para o cabeçalho encolher? Ver `ui/adaptativo.ts`. */
@@ -725,6 +819,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         setFilterStatus(f as QuoteStatus | "all");
       const so = localStorage.getItem("liquen-admin-sort");
       if (
+        so === "espera" ||
         so === "recent" ||
         so === "old" ||
         so === "value" ||
@@ -1032,38 +1127,80 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }
 
-  async function refresh() {
-    setRefreshing(true);
-    try {
-      const res = await fetch("/api/orcamento", {
-        cache: "no-store",
-        headers: {
-          "x-admin-refresh": "1",
-          // Pedido condicional: se a lista no servidor for a mesma que
-          // recebemos da última vez, ele responde 304 sem corpo.
-          ...(quotesEtag.current ? { "If-None-Match": quotesEtag.current } : {}),
-        },
-      });
-      // 304 = o servidor leu a tabela e nada mudou. É uma resposta tão fresca
-      // como um 200 — poupa a transferência (com 300 pedidos, ~440 KB) e, o
-      // que se nota mais, evita substituir a lista inteira por uma cópia
-      // idêntica, o que faria a página redesenhar-se toda sem motivo.
-      if (res.status === 304) {
-        toast(`Atualizado — ${quotes.length} pedido${quotes.length !== 1 ? "s" : ""}`, "success");
-        return;
+  /**
+   * Vai buscar a lista de pedidos ao servidor, em silêncio.
+   *
+   * Isto era um botão "Atualizar" no cimo da página. Um botão desses é uma
+   * pergunta que o programa faz a quem o usa — "achas que isto está velho?" —
+   * quando é o programa que sabe a resposta. Passou a correr sozinho: ao voltar
+   * ao separador, ao devolver o foco à janela, e de dois em dois minutos com a
+   * página à vista. Um pedido novo entrado pelo site aparece sem ninguém pedir.
+   *
+   * Custa quase nada porque vai com `If-None-Match`: quando nada mudou o
+   * servidor responde **304 sem corpo** e ficamos com o array que já tínhamos —
+   * a MESMA referência, por isso o React nem sequer volta a desenhar as linhas.
+   *
+   * `forcar` salta o intervalo mínimo. É o que as mutações usam: depois de
+   * gravar quero a lista do servidor, não a que tinha há trinta segundos.
+   */
+  const revalidarPedidos = useCallback(
+    async (forcar = false) => {
+      const agora = Date.now();
+      if (!forcar && agora - ultimaRevalidacao.current < 15_000) return;
+      ultimaRevalidacao.current = agora;
+      try {
+        const res = await fetch("/api/orcamento", {
+          cache: "no-store",
+          headers: {
+            "x-admin-refresh": "1",
+            ...(quotesEtag.current ? { "If-None-Match": quotesEtag.current } : {}),
+          },
+        });
+        if (res.status === 304) return;
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          quotesEtag.current = res.headers.get("etag");
+          setQuotes(data);
+        }
+      } catch {
+        // Sem rede não há nada a dizer: a lista que está no ecrã continua a ser
+        // a última verdade conhecida, e um erro por cada tentativa falhada
+        // seria ruído de fundo em vez de informação.
       }
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        quotesEtag.current = res.headers.get("etag");
-        setQuotes(data);
-        toast(`Atualizado — ${data.length} pedido${data.length !== 1 ? "s" : ""}`, "success");
-      }
-    } catch {
-      toast("Não foi possível atualizar. Verifique a ligação.", "error");
-    } finally {
-      setRefreshing(false);
-    }
-  }
+    },
+    [setQuotes],
+  );
+
+  /**
+   * A lista mantém-se fresca sozinha — é isto que dispensa o botão "Atualizar".
+   *
+   * Três gatilhos, todos com uma razão concreta:
+   *   • voltar ao separador (`visibilitychange`) — o caso comum, estar noutro
+   *     lado e regressar depois de o telefone ter tocado;
+   *   • devolver o foco à janela (`focus`) — o mesmo, sem trocar de separador;
+   *   • dois em dois minutos com a página à vista, para o pedido que entra pelo
+   *     site enquanto a Catarina está a olhar para a lista.
+   *
+   * O relógio pára quando a página está escondida: revalidar um separador que
+   * ninguém vê é gastar bateria para nada. O `revalidarPedidos` tem um intervalo
+   * mínimo próprio, por isso alt-tab a repetir não dispara pedidos a repetir.
+   */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") void revalidarPedidos();
+    };
+    const relogio = setInterval(() => {
+      if (document.visibilityState === "visible") void revalidarPedidos();
+    }, 120_000);
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      clearInterval(relogio);
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [revalidarPedidos]);
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -1299,6 +1436,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // "Arquivados" toggle on Pedidos and the command palette.
   const activeQuotes = useMemo(() => quotes.filter((q) => !q.archived), [quotes]);
 
+  /**
+   * As opções dos filtros saem dos DADOS, não de uma lista fixa. Um mês sem
+   * eventos ou uma região onde nunca houve um casamento não aparecem — um
+   * filtro que só tem escolhas vazias é ruído com aspeto de função.
+   */
+  const mesesDisponiveis = useMemo(() => mesesDeEvento(activeQuotes), [activeQuotes]);
+  const regioesDisponiveis = useMemo(() => regioesDe(activeQuotes), [activeQuotes]);
+  const plannersDisponiveis = useMemo(() => plannersDe(activeQuotes), [activeQuotes]);
+
   // Keep the search input instant while the expensive filter+sort over all leads
   // runs at lower priority: typing updates `search` immediately, but the O(n)
   // filter/O(n log n) sort + list re-render key off the deferred value, so a
@@ -1316,6 +1462,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
     if (mineOnly) {
       list = list.filter((x) => x.assignedTo === userName);
+    }
+    if (filterEspera !== "all") {
+      const corte = Number(filterEspera);
+      list = list.filter((x) => (diasDeEspera(x) ?? -1) >= corte);
+    }
+    if (filterMes !== "all") {
+      list = list.filter((x) => (x.date ?? "").slice(0, 7) === filterMes);
+    }
+    if (filterRegiao !== "all") {
+      list = list.filter((x) => contextoDeLocal(x).regiao === filterRegiao);
+    }
+    if (filterPlanner !== "all") {
+      list = list.filter((x) => (x.company ?? "").trim() === filterPlanner);
     }
     if (tagFilter) {
       list = list.filter((x) => (x.tags ?? []).includes(tagFilter));
@@ -1338,7 +1497,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       );
     }
     const sorted = [...list];
-    if (sort === "recent")
+    if (sort === "espera") sorted.sort((a, b) => porEspera(a, b));
+    else if (sort === "recent")
       sorted.sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
     else if (sort === "old")
       sorted.sort((a, b) => +new Date(a.submittedAt) - +new Date(b.submittedAt));
@@ -1371,6 +1531,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     quotes,
     filterStatus,
     filterCategory,
+    filterEspera,
+    filterMes,
+    filterRegiao,
+    filterPlanner,
     tagFilter,
     deferredSearch,
     sort,
@@ -1501,10 +1665,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Clientes",
     calendario: "Calendário",
     propostas: "Propostas",
+    acompanhamento: "Acompanhamento",
+    definicoes: "Definições",
+    servicos: "Biblioteca de serviços",
     "fazer-proposta": "Fazer proposta",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
+    material: "Material",
     temas: "Temas",
     estatisticas: "Estatísticas",
     faturas: "Faturas",
@@ -1542,10 +1710,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     clientes: "Histórico por cliente",
     calendario: "Os seus eventos no tempo",
     propostas: "Todas as propostas enviadas",
+    acompanhamento: "O que está à espera de resposta, por ordem de urgência",
+    definicoes: "Os números com que o estúdio faz contas",
+    servicos: "As palavras que vão nas propostas, escritas com tempo",
     "fazer-proposta": "Escolha o cliente e escreva a proposta",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
+    material: "O que vai nas carrinhas: ferramentas, consumíveis, escadotes",
     temas: "Fotos de inspiração por tema, prontas para as propostas",
     estatisticas: "Métricas e desempenho",
     faturas: "Livro de faturação e pagamentos",
@@ -1566,7 +1738,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           instante nenhum em que a página esteja na posição errada. */}
       <div className="-mt-24 min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-        <RestoreDialog open={restoreOpen} onClose={() => setRestoreOpen(false)} toast={toast} />
+        {/* Repor uma cópia troca os dados TODOS no servidor, e a lista que está
+            aqui em memória não tem como saber o que mudou. É o único sítio onde
+            a revalidação salta o intervalo mínimo: ao fechar o diálogo, o que
+            está no ecrã tem de ser o que ficou gravado. */}
+        <RestoreDialog
+          open={restoreOpen}
+          onClose={() => {
+            setRestoreOpen(false);
+            void revalidarPedidos(true);
+          }}
+          toast={toast}
+        />
         <PasskeysDialog open={passkeysOpen} onClose={() => setPasskeysOpen(false)} toast={toast} />
         <AjudaGlossario open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
         <CommandPalette
@@ -2141,37 +2324,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 )}
                 {mostrarAccoesDePedidos && (
                   <button
-                    onClick={refresh}
-                    disabled={refreshing}
-                    aria-label="Atualizar pedidos"
-                    className="alvo-toque group flex items-center gap-2 px-3 py-2 text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-accent)] transition-colors"
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      className={
-                        refreshing
-                          ? "animate-spin"
-                          : "group-hover:rotate-180 transition-transform duration-500"
-                      }
-                    >
-                      <path
-                        d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <span className="hidden sm:inline">
-                      {refreshing ? "A atualizar" : "Atualizar"}
-                    </span>
-                  </button>
-                )}
-                {mostrarAccoesDePedidos && (
-                  <button
                     onClick={() => setNewQuoteOpen(true)}
                     aria-label="Novo pedido"
                     className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
@@ -2274,6 +2426,27 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </div>
           )}
 
+          {/* ── Biblioteca de serviços ── */}
+          {view === "servicos" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Servicos />
+            </div>
+          )}
+
+          {/* ── Definições: combustível, custo por km, margem mínima ── */}
+          {view === "definicoes" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <DefinicoesProposta />
+            </div>
+          )}
+
+          {/* ── Acompanhamento: o que ficou à espera de resposta ── */}
+          {view === "acompanhamento" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Acompanhamento quotes={quotes} onOpenQuote={openQuote} />
+            </div>
+          )}
+
           {/* ── Tarefas ── */}
           {view === "tarefas" && (
             <div className={`${VIEW_WRAP} view-in`}>
@@ -2299,6 +2472,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "inventario" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Inventario />
+            </div>
+          )}
+
+          {/* ── Material de logística ── */}
+          {view === "material" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Material />
             </div>
           )}
 
@@ -2394,11 +2574,67 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   ))}
                 </select>
                 <select
+                  value={filterEspera}
+                  onChange={(e) => setFilterEspera(e.target.value as typeof filterEspera)}
+                  aria-label="Filtrar por tempo de espera"
+                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                >
+                  <option value="all">Qualquer espera</option>
+                  <option value="3">Espera há 3+ dias</option>
+                  <option value="7">Espera há 7+ dias</option>
+                </select>
+                {mesesDisponiveis.length > 1 && (
+                  <select
+                    value={filterMes}
+                    onChange={(e) => setFilterMes(e.target.value)}
+                    aria-label="Filtrar por mês do evento"
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  >
+                    <option value="all">Todos os meses</option>
+                    {mesesDisponiveis.map((m) => (
+                      <option key={m} value={m}>
+                        {mesLegivel(m)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {regioesDisponiveis.length > 1 && (
+                  <select
+                    value={filterRegiao}
+                    onChange={(e) => setFilterRegiao(e.target.value)}
+                    aria-label="Filtrar por região"
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  >
+                    <option value="all">Todas as regiões</option>
+                    {regioesDisponiveis.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {plannersDisponiveis.length > 0 && (
+                  <select
+                    value={filterPlanner}
+                    onChange={(e) => setFilterPlanner(e.target.value)}
+                    aria-label="Filtrar por planner"
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  >
+                    <option value="all">Todas as planners</option>
+                    {plannersDisponiveis.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as typeof sort)}
                   aria-label="Ordenar pedidos"
                   className="flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
                 >
+                  <option value="espera">Quem espera há mais tempo</option>
                   <option value="recent">Mais recentes</option>
                   <option value="old">Mais antigos</option>
                   <option value="value">Maior valor</option>
@@ -2413,7 +2649,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       "success",
                     );
                   }}
-                  className="flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm whitespace-nowrap"
+                  // `alvo-toque`: 44 px no dedo sem mexer no aspeto com rato.
+                  // Media 85x38 e passava despercebido porque, a 375 px, ficava
+                  // fora da margem — os filtros novos mudaram a dobra da barra
+                  // e trouxeram-no para dentro do ecrã, onde a régua o apanhou.
+                  className="alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm whitespace-nowrap"
                   title="Exportar a lista atual para CSV (Excel)"
                 >
                   <svg
@@ -3499,6 +3739,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               }}
                             />
 
+                            {/* Material que vai na carrinha */}
+                            <EventMaterial key={`mat-${selected.id}`} quote={selected} />
+
                             {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child
                                   mounted (hidden via CSS), so fetch/PATCH lifecycles are
@@ -3654,6 +3897,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 <ProposalStudio
                                   key={`studio-${selected.id}`}
                                   quote={selected}
+                                  quotes={activeQuotes}
                                   // O valor é um só: o estúdio grava-o no
                                   // pedido, e o "Preço final" aqui ao lado tem
                                   // de mostrar o mesmo número sem ser preciso

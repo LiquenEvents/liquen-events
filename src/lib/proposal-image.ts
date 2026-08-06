@@ -177,6 +177,80 @@ export async function resizeToBox(
 }
 
 /**
+ * Os únicos formatos que o PDF sabe embutir DIRECTAMENTE: o `pdf-lib` só tem
+ * `embedJpg` e `embedPng`. Tudo o resto (WebP, AVIF…) tem de passar primeiro
+ * pelo sharp — ver `transcodificarParaJpeg`.
+ */
+export function embutivelNoPdf(contentType: string): boolean {
+  return /^image\/(jpe?g|png)$/i.test(contentType);
+}
+
+/**
+ * Reencoda quaisquer bytes que o sharp saiba ler em JPEG baseline.
+ *
+ * Existe por causa de uma proposta real que seguiu para um cliente com quatro
+ * molduras vazias: as fotos vinham do Pinterest, que serve WebP, e o `pdf-lib`
+ * não sabe embutir WebP. O caminho normal (`resizeToBox`) já reencodava tudo
+ * para JPEG, mas quando ESSE falha o gerador cai no original — e aí um WebP não
+ * era desenhado de todo.
+ *
+ * Corta no `MAX_IMAGE_EDGE_PX` pela mesma razão que o resto do módulo: nada
+ * entra no documento com mais pixéis do que os que chegam a ser vistos. `fit:
+ * "inside"` preserva o aspeto, portanto o desenho por recorte de quem chama
+ * continua a não poder esticar nada.
+ *
+ * Duas tentativas, como em `resizeToBox`: a estrita e a tolerante a ficheiros
+ * truncados. Nunca lança; `null` = nem o sharp consegue ler estes bytes.
+ */
+export async function transcodificarParaJpeg(bytes: Buffer): Promise<Buffer | null> {
+  if (bytes.length < 32) return null;
+  const converter = (failOn: "warning" | "none") =>
+    sharp(bytes, { failOn })
+      .rotate() // orientação EXIF, como no resto do módulo
+      .resize({
+        width: MAX_IMAGE_EDGE_PX,
+        height: MAX_IMAGE_EDGE_PX,
+        fit: "inside",
+        withoutEnlargement: true,
+        kernel: "lanczos3",
+      })
+      .jpeg(PDF_JPEG_OPTIONS)
+      .toBuffer();
+  try {
+    return await converter("warning");
+  } catch {
+    /* segue para a tentativa tolerante */
+  }
+  try {
+    return await converter("none");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Garante que os bytes que vão ser GUARDADOS estão num formato que o PDF sabe
+ * imprimir: o que já é JPEG/PNG passa intacto, o resto é convertido para JPEG.
+ *
+ * É a porta de entrada. O estúdio continua a poder carregar WebP — é o formato
+ * em que o Pinterest, a principal fonte de inspiração, serve as imagens — mas o
+ * que fica no armazenamento (e portanto o que um dia entra no PDF) é sempre um
+ * formato imprimível. Recusar o WebP à porta fecharia o fluxo de trabalho; o
+ * problema nunca foi aceitar o formato, foi guardá-lo.
+ *
+ * `null` = nem o sharp lê estes bytes; quem chama recusa o ficheiro (não é uma
+ * imagem que se possa guardar, porque nunca chegaria a ser impressa).
+ */
+export async function garantirFormatoImprimivel(
+  bytes: Buffer,
+  contentType: string,
+): Promise<{ bytes: Buffer; contentType: string } | null> {
+  if (embutivelNoPdf(contentType)) return { bytes, contentType };
+  const jpeg = await transcodificarParaJpeg(bytes);
+  return jpeg ? { bytes: jpeg, contentType: "image/jpeg" } : null;
+}
+
+/**
  * DPI a que o logótipo é embutido no PDF.
  *
  * Medido no ficheiro que saía antes disto: o logótipo ia a 720×430 px para ser

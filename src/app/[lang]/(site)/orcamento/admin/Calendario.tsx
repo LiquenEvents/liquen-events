@@ -35,7 +35,7 @@ const STATUS_COLOR: Record<string, string> = {
 const KIND_META: Record<CalendarEventKind, { label: string; color: string }> = {
   reuniao: { label: "Reunião", color: "#7a8caa" },
   evento: { label: "Evento", color: "#7c854b" },
-  bloqueio: { label: "Bloqueio", color: "#b5654a" },
+  bloqueio: { label: "Data fechada", color: "#b5654a" },
   nota: { label: "Nota", color: "#a08a5a" },
 };
 
@@ -789,7 +789,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 </svg>
               }
               title="Mês sem eventos"
-              description="Clique num dia do calendário para adicionar uma reunião, um bloqueio ou uma nota."
+              description="Clique num dia do calendário para adicionar uma reunião, uma data fechada ou uma nota."
             />
           )}
         </Card>

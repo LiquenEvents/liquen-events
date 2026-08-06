@@ -111,6 +111,77 @@ vi.mock("@/lib/inventory-store", () =>
     PROP_CATEGORIES: ["Outro"],
   }),
 );
+// Material de logística: catálogo e listas base. Simulados como os outros —
+// sem isto, a auditoria só conseguia afirmar que a rota devolve 401, e não a
+// parte que interessa, que é NENHUMA escrita ter acontecido antes disso.
+vi.mock("@/lib/material-store", () =>
+  H.build("material-store", ["createMaterial", "deleteMaterial", "updateMaterial", "getMaterial"], {
+    listMaterial: H.afn("material-store.listMaterial", async () => []),
+  }),
+);
+vi.mock("@/lib/material-rules-store", () =>
+  H.build("material-rules-store", ["createRule", "updateRule", "deleteRule"], {
+    listRules: H.afn("material-rules-store.listRules", async () => []),
+  }),
+);
+vi.mock("@/lib/material-list-items-store", () =>
+  H.build(
+    "material-list-items-store",
+    ["addListItem", "updateListItem", "removeListItem", "listItemsOf", "removeItemsOf"],
+    { listAllListItems: H.afn("material-list-items-store.listAllListItems", async () => []) },
+  ),
+);
+vi.mock("@/lib/event-material-store", () =>
+  H.build(
+    "event-material-store",
+    [
+      "getForQuote",
+      "createEventMaterial",
+      "updateEventMaterial",
+      "deleteEventMaterial",
+      "getEventMaterial",
+    ],
+    { listEventMaterial: H.afn("event-material-store.listEventMaterial", async () => []) },
+  ),
+);
+vi.mock("@/lib/event-material-log-store", () =>
+  H.build("event-material-log-store", ["registar", "listLogOf"], {
+    listAllLog: H.afn("event-material-log-store.listAllLog", async () => []),
+  }),
+);
+vi.mock("@/lib/event-material-items-store", () =>
+  H.build(
+    "event-material-items-store",
+    [
+      "addEventItem",
+      "updateEventItem",
+      "removeEventItem",
+      "listItemsOfEvent",
+      "removeItemsOfEvent",
+    ],
+    { listAllEventItems: H.afn("event-material-items-store.listAllEventItems", async () => []) },
+  ),
+);
+vi.mock("@/lib/material-lists-store", () =>
+  H.build(
+    "material-lists-store",
+    [
+      "createList",
+      "updateList",
+      "deleteList",
+      "getList",
+      "addListItem",
+      "updateListItem",
+      "removeListItem",
+      "listItemsOf",
+      "duplicateList",
+    ],
+    {
+      listLists: H.afn("material-lists-store.listLists", async () => []),
+      listAllListItems: H.afn("material-lists-store.listAllListItems", async () => []),
+    },
+  ),
+);
 vi.mock("@/lib/invoices-store", () =>
   H.build("invoices-store", [
     "listInvoices",
@@ -236,6 +307,20 @@ vi.mock("@/lib/proposal-drafts", () =>
 // Parcial: o esquema Zod da rota lê OVERVIEW_FIELDS/MAX_* no topo do módulo e o
 // 409 depende da classe StaleWriteError real — só as duas funções de I/O é que
 // passam a espias.
+vi.mock("@/lib/servicos-catalogo-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/servicos-catalogo-store")>()),
+  listarServicos: H.afn("servicos-catalogo-store.listarServicos", async () => []),
+  criarServico: H.afn("servicos-catalogo-store.criarServico", async () => undefined),
+  actualizarServico: H.afn("servicos-catalogo-store.actualizarServico", async () => ({})),
+  apagarServico: H.afn("servicos-catalogo-store.apagarServico", async () => undefined),
+}));
+
+vi.mock("@/lib/proposta-definicoes-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/proposta-definicoes-store")>()),
+  listarDefinicoes: H.afn("proposta-definicoes-store.listarDefinicoes", async () => []),
+  gravarDefinicao: H.afn("proposta-definicoes-store.gravarDefinicao", async () => ({})),
+}));
+
 vi.mock("@/lib/overview-settings-store", async (orig) => ({
   ...(await orig<typeof import("@/lib/overview-settings-store")>()),
   readOverviewSettings: H.afn("overview-settings-store.readOverviewSettings", async () => ({})),
@@ -347,6 +432,17 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./inbox/reply/route", methods: ["POST"] },
   { path: "./inventario/route", methods: ["GET", "POST"] },
   { path: "./inventario/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./material/route", methods: ["GET", "POST"] },
+  { path: "./material/[id]/route", methods: ["PATCH", "DELETE"] },
+  // Escreve o catálogo todo de uma vez a partir de um CSV. Sem sessão, um
+  // pedido só podia apagar meio inventário.
+  { path: "./material/importar/route", methods: ["POST"] },
+  { path: "./material/listas/route", methods: ["GET", "POST"] },
+  { path: "./material/listas/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./material/regras/route", methods: ["GET", "POST"] },
+  { path: "./material/regras/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./orcamento/[id]/material/route", methods: ["GET", "POST"] },
+  { path: "./orcamento/[id]/material/marcar/route", methods: ["POST"] },
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
   { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },
@@ -362,6 +458,16 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // O rascunho é trabalho comercial por publicar (preços, notas internas): ler
   // conta tanto como escrever.
   { path: "./orcamento/[id]/proposta-rascunho/route", methods: ["GET", "PUT", "DELETE"] },
+  // O histórico devolve o que se cobrou em cada ronda de negociação, e com
+  // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
+  { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
+  // A memória de preços atravessa TODAS as propostas já enviadas: o que se
+  // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa
+  // resposta JSON.
+  { path: "./orcamento/[id]/memoria/route", methods: ["GET"] },
+  // Diz para que casamentos é que cada foto da biblioteca já foi — nomes de
+  // clientes, datas e locais de OUTROS pedidos, numa resposta só.
+  { path: "./orcamento/[id]/fotos-repetidas/route", methods: ["GET"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
   // A biblioteca visual: o vocabulário de etiquetas, a procura por etiquetas e
   // o etiquetar em lote. Tudo isto lê e escreve o trabalho de arrumação da
@@ -393,6 +499,14 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./temas/[id]/repetidas/route", methods: ["POST"] },
   // Notas da equipa e meta de receita — texto interno, e uma escrita.
   { path: "./visao-geral/route", methods: ["GET", "PUT"] },
+  // Os números com que o estúdio faz contas (combustível, margem mínima). Ler
+  // não expõe dados de clientes, mas ESCREVER muda o que todas as propostas
+  // seguintes cobram de deslocação — é tão de sessão como o resto.
+  { path: "./proposta-definicoes/route", methods: ["GET", "PUT"] },
+  // A biblioteca de serviços: as palavras que vão nas propostas. Ler já é
+  // interno; escrever muda o que sai em todas as propostas seguintes.
+  { path: "./servicos-catalogo/route", methods: ["GET", "POST"] },
+  { path: "./servicos-catalogo/[id]/route", methods: ["PATCH", "DELETE"] },
   // Passkeys. A LISTA e a REMOÇÃO são de sessão, como tudo o resto. O REGISTO
   // também, e é o ponto todo do desenho: transformar um aparelho numa chave só
   // pode ser feito por quem já provou ser quem diz. Sem esta guarda, um estranho
@@ -446,6 +560,22 @@ describe("ADMIN-SESSION routes reject the unauthenticated before touching the st
     const res = await fn(req("GET"), ctx());
     expect(res.status).not.toBe(401);
     expect(calls).toContain("themes-store.listThemes");
+  });
+
+  it("GET /api/servicos-catalogo passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./servicos-catalogo/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("servicos-catalogo-store.listarServicos");
+  });
+
+  it("GET /api/proposta-definicoes passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./proposta-definicoes/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("proposta-definicoes-store.listarDefinicoes");
   });
 
   it("GET /api/visao-geral passes the guard for an authenticated admin (reaches the store)", async () => {

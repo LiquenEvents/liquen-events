@@ -72,6 +72,19 @@ export interface QuoteFormData {
    */
   decorPoints?: string[];
   /**
+   * Os nomes dos noivos, quando o pedido é um casamento e o casal os quis dar.
+   * O `name` continua a ser o de QUEM ESCREVEU — pode ser a mãe da noiva, uma
+   * wedding planner, um dos dois. São coisas diferentes e não se podem
+   * sobrepor: é a este par que a proposta e o contrato se dirigem, e é aquele
+   * que se trata por tu ao responder ao email.
+   *
+   * Opcionais em todos os sentidos: não existem fora dos casamentos, não
+   * existem nos pedidos anteriores a este campo, e não existem quando o casal
+   * preferiu não os escrever. Nunca assumir presentes.
+   */
+  partnerA?: string;
+  partnerB?: string;
+  /**
    * Ordem de grandeza dos convidados, quando o número exacto ainda não existe
    * (ver `GUEST_RANGES`). Vazio quando `guests` traz um número a sério — os
    * dois nunca convivem, e é o número que manda.
@@ -270,6 +283,16 @@ export interface Quote extends QuoteFormData {
   assignedTo?: string;
   /** Reason the deal was lost — filled when status → rejeitado. */
   lostReason?: string;
+  /**
+   * O idioma em que a pessoa fez o pedido ("pt" ou "en"), lido do site no
+   * momento em que o formulário foi submetido.
+   *
+   * Já se usava para escolher a língua do email de confirmação, mas era
+   * deitado fora a seguir. Guardá-lo permite, meses depois, saber que aquele
+   * casal escreveu em inglês — e a proposta do estúdio é escrita em português.
+   * Ausente em todos os pedidos anteriores a este campo: nunca assumir "pt".
+   */
+  locale?: string;
 }
 
 /** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */
@@ -301,7 +324,30 @@ export interface Supplier {
 }
 
 // ── Propostas (criadas internamente, enviadas em PDF ao cliente) ──
-export type ProposalStatus = "rascunho" | "enviada" | "aceite" | "rejeitada";
+/**
+ * O estado interno de uma proposta, marcado por ela.
+ *
+ * "em_negociacao" é o estado que faltava e que descreve a maior parte do tempo
+ * real: a proposta seguiu, houve resposta, e está a discutir-se. Sem ele, uma
+ * proposta em terceira ronda de conversa era indistinguível de uma que ninguém
+ * abriu — e é justamente essa distinção que decide quem se contacta amanhã.
+ *
+ * NÃO existe aqui um estado "expirada". A validade é uma data; um estado
+ * gravado que diga "expirou" fica errado no minuto seguinte ao da gravação, e
+ * corrigi-lo exigiria alguém (ou algo) a passar por todas as propostas todos os
+ * dias. Deriva-se de `validUntil` — ver `estaExpirada` em proposta-estado.ts.
+ */
+export type ProposalStatus = "rascunho" | "enviada" | "em_negociacao" | "aceite" | "rejeitada";
+
+/**
+ * Porque é que se perdeu.
+ *
+ * Uma lista curta e fechada, porque o objetivo é poder CONTAR: "perdi seis por
+ * preço este semestre" é uma frase que muda decisões, e não se chega lá com
+ * texto livre. O `outro` existe para quem não cabe na lista não ser forçado a
+ * mentir numa das quatro — e leva nota à parte.
+ */
+export type MotivoDeRecusa = "preco" | "data" | "escolheram-outro" | "sem-resposta" | "outro";
 
 export interface ProposalLineItem {
   description: string;
@@ -327,6 +373,31 @@ export interface Proposal {
   sentAt?: string;
   /** When the client accepted/declined via the public link. */
   respondedAt?: string;
+  /**
+   * Quando voltar a falar com esta pessoa (yyyy-mm-dd), escolhido por ela.
+   *
+   * Não dispara nada para o cliente — não há email automático, não há aviso do
+   * lado de lá. É um lembrete do lado de cá, e é isso que o painel de
+   * acompanhamento ordena.
+   */
+  followUpAt?: string;
+  /** O que fica por dizer no próximo contacto ("mandar fotos do arco"). */
+  followUpNote?: string;
+  /** Porque é que se perdeu — preenchido ao marcar como recusada. */
+  lostReason?: MotivoDeRecusa;
+  /** O detalhe, quando o motivo sozinho não chega. */
+  lostNote?: string;
+  /**
+   * Qual das duas versões o casal ficou — quando a proposta tinha extras.
+   *
+   * Preenchido POR ELA ao registar a resposta, não pelo cliente e não por
+   * dedução: quem responde responde por email ou ao telefone, e adivinhar a
+   * partir do valor facturado dava a versão errada em todas as propostas em que
+   * se negociou um desconto depois.
+   *
+   * Serve para uma pergunta só, e é a que interessa: os extras vendem-se?
+   */
+  versaoEscolhida?: import("./versoes-da-proposta").VersaoEscolhida;
   /** Rich multi-page proposal document (Proposal Studio). Stored so the studio
    *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
    *  not bytes. Optional — legacy line-item proposals don't set it. */

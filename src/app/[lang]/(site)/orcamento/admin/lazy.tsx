@@ -103,6 +103,9 @@ const clientes = splitView(() => import("./Clientes"));
 const calendario = splitView(() => import("./Calendario"));
 const fazerProposta = splitView(() => import("./FazerProposta"));
 const propostas = splitView(() => import("./Propostas"));
+const acompanhamento = splitView(() => import("./Acompanhamento"));
+const definicoes = splitView(() => import("./DefinicoesProposta"));
+const servicos = splitView(() => import("./Servicos"));
 const tarefas = splitView(() => import("./Tarefas"));
 const fornecedores = splitView(() => import("./Fornecedores"));
 const estatisticas = splitView(() => import("./StatsDashboard"));
@@ -110,6 +113,7 @@ const modelosEmail = splitView(() => import("./EmailTemplates"));
 const faturas = splitView(() => import("./Faturas"));
 const contratos = splitView(() => import("./Contratos"));
 const inventario = splitView(() => import("./Inventario"));
+const material = splitView(() => import("./Material"));
 const temas = splitView(() => import("./Temas"));
 
 export const Kanban = kanban.View;
@@ -117,6 +121,9 @@ export const Clientes = clientes.View;
 export const Calendario = calendario.View;
 export const FazerProposta = fazerProposta.View;
 export const Propostas = propostas.View;
+export const Acompanhamento = acompanhamento.View;
+export const DefinicoesProposta = definicoes.View;
+export const Servicos = servicos.View;
 export const Tarefas = tarefas.View;
 export const Fornecedores = fornecedores.View;
 export const StatsDashboard = estatisticas.View;
@@ -124,6 +131,7 @@ export const EmailTemplates = modelosEmail.View;
 export const Faturas = faturas.View;
 export const Contratos = contratos.View;
 export const Inventario = inventario.View;
+export const Material = material.View;
 export const Temas = temas.View;
 
 // ── Detail-panel tools (only needed once a quote is opened) ──
@@ -137,6 +145,7 @@ export const ClientMessenger = dynamic(() => import("./ClientMessenger"), {
   loading: PanelLoading,
 });
 export const EventChecklist = dynamic(() => import("./EventChecklist"), { loading: PanelLoading });
+export const EventMaterial = dynamic(() => import("./EventMaterial"), { loading: PanelLoading });
 export const ProductionPlan = dynamic(() => import("./ProductionPlan"), { loading: PanelLoading });
 export const EventTimeline = dynamic(() => import("./EventTimeline"), { loading: PanelLoading });
 export const PaymentsPanel = dynamic(() => import("./PaymentsPanel"), { loading: PanelLoading });
@@ -181,9 +190,13 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   calendario: calendario.warm,
   "fazer-proposta": fazerProposta.warm,
   propostas: propostas.warm,
+  acompanhamento: acompanhamento.warm,
+  definicoes: definicoes.warm,
+  servicos: servicos.warm,
   tarefas: tarefas.warm,
   fornecedores: fornecedores.warm,
   inventario: inventario.warm,
+  material: material.warm,
   temas: temas.warm,
   estatisticas: estatisticas.warm,
   faturas: faturas.warm,

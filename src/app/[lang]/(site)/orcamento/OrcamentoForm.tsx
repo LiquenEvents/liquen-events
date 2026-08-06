@@ -152,6 +152,11 @@ export default function OrcamentoForm({
   // Nunca entram na validação: quem não faz ideia do que quer segue em frente
   // sem marcar nada, que é exactamente o estado em que muita gente chega.
   const [decor, setDecor] = useState<string[]>([]);
+  /** Os nomes dos noivos. Só existem no casamento, e só aparecem depois de ela
+   *  começar a escrever o nome de contacto — pedi-los antes disso era abrir o
+   *  formulário com quatro campos de nome à espera, que é o que faz desistir. */
+  const [noivo, setNoivo] = useState("");
+  const [noiva, setNoiva] = useState("");
   /**
    * A ordem de grandeza dos convidados, para quem marca «ainda a definir».
    *
@@ -356,6 +361,9 @@ export default function OrcamentoForm({
   const okTelefone = telefone.replace(/\D/g, "").length >= 9;
   // "Ainda a definir" IS an answer — the field is satisfied either way.
   const okData = dateFlexible || data !== "";
+  // "Ainda a definir" IS an answer here too: a ordem de grandeza que ela pode
+  // escolher a seguir fica OPCIONAL de propósito — quem não faz mesmo ideia
+  // segue em frente, que é melhor do que inventar um número ou desistir.
   const okPessoas = guestsFlexible || Number(pessoas) > 0;
   const okLocal = local.trim().length >= 2;
   const okMensagem = mensagem.trim().length > 0;
@@ -427,6 +435,11 @@ export default function OrcamentoForm({
       // decoração de casamento agarrada a uma festa que não é uma — e a
       // proposta nascia semeada com o que ninguém pediu.
       decorPoints: opt?.eventType === "casamentos" ? decor : [],
+      // Mesma guarda que os pontos de decoração: mudar de "Casamento" para
+      // "Aniversário" depois de escrever os nomes não pode deixar um casal
+      // agarrado a uma festa que não é um casamento.
+      partnerA: opt?.eventType === "casamentos" ? noivo.trim() || undefined : undefined,
+      partnerB: opt?.eventType === "casamentos" ? noiva.trim() || undefined : undefined,
       // Só quando NÃO há número: os dois nunca convivem, e é o número que
       // manda. Enviar os dois deixava a equipa sem saber qual acreditar.
       guestsRange: guestsFlexible ? pessoasAprox : "",
@@ -958,6 +971,46 @@ export default function OrcamentoForm({
                 />
               </FloatingField>
             </div>
+
+            {/* Nomes dos noivos — só no casamento, e só depois de ela começar a
+                escrever o nome de contacto. São OPCIONAIS: quem chega ainda a
+                sondar não tem de expor os dois nomes para pedir um orçamento,
+                e travar o envio por causa disto perdia o contacto por uma
+                coisa que se pergunta depois numa frase. */}
+            {ehCasamento && nome.trim().length > 0 && (
+              <div>
+                <p className="mb-3 text-[11px] tracking-[0.14em] uppercase text-foreground/55">
+                  {to.labelNoivos}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
+                  <FloatingField htmlFor="of-noivo" label={to.phNoivo}>
+                    <input
+                      id="of-noivo"
+                      type="text"
+                      autoComplete="off"
+                      maxLength={80}
+                      value={noivo}
+                      onChange={(e) => setNoivo(e.target.value)}
+                      className={ffInputCls}
+                      placeholder={to.phNoivo}
+                    />
+                  </FloatingField>
+                  <FloatingField htmlFor="of-noiva" label={to.phNoiva}>
+                    <input
+                      id="of-noiva"
+                      type="text"
+                      autoComplete="off"
+                      maxLength={80}
+                      value={noiva}
+                      onChange={(e) => setNoiva(e.target.value)}
+                      className={ffInputCls}
+                      placeholder={to.phNoiva}
+                    />
+                  </FloatingField>
+                </div>
+                <p className="mt-2 text-[11px] text-foreground/55">{to.hintNoivos}</p>
+              </div>
+            )}
 
             {/* Telefone */}
             <FloatingField

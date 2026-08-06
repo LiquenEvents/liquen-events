@@ -244,6 +244,10 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   // DECISÃO e não nas notas porque é isto que diz, antes da primeira chamada,
   // se o pedido é a cerimónia toda ou só as mesas do jantar.
   const decor = rotularPontos(form.decorPoints ?? [], "pt").join(" · ");
+  const noivos = [form.partnerA, form.partnerB]
+    .map((n) => n?.trim())
+    .filter(Boolean)
+    .join(" & ");
   // Quando não há número exacto, a ordem de grandeza vale mais do que um vazio
   // — um casamento de 40 e um de 300 não são o mesmo trabalho.
   const convidados = form.guests
@@ -254,6 +258,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const eventRows =
     row("Convidados", esc(convidados)) +
     row("Local", esc(local)) +
+    (noivos ? row("Noivos", esc(noivos)) : "") +
     (decor ? row("Decoração", esc(decor)) : "") +
     (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
     (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");
@@ -520,6 +525,11 @@ export async function POST(request: NextRequest) {
       submittedAt: new Date().toISOString(),
       status: "pendente",
       priceBreakdown: breakdown,
+      // A língua em que esta pessoa escreveu. Já se lia do cookie para escolher
+      // a língua do email de confirmação e deitava-se fora a seguir; guardada,
+      // permite meses depois saber que aquele casal escreveu em inglês — e a
+      // proposta do estúdio sai em português.
+      locale: normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value),
     };
 
     // ── Durable delivery FIRST ──────────────────────────────────────────────

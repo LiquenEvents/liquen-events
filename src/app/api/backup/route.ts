@@ -8,6 +8,13 @@ import { listCalendarEvents } from "@/lib/calendar-store";
 import { listInvoices } from "@/lib/invoices-store";
 import { listContracts } from "@/lib/contracts-store";
 import { listItems } from "@/lib/inventory-store";
+import { listMaterial } from "@/lib/material-store";
+import { listLists } from "@/lib/material-lists-store";
+import { listAllListItems } from "@/lib/material-list-items-store";
+import { listRules } from "@/lib/material-rules-store";
+import { listEventMaterial } from "@/lib/event-material-store";
+import { listAllEventItems } from "@/lib/event-material-items-store";
+import { listAllLog } from "@/lib/event-material-log-store";
 import { listTemplatesWithDefaults } from "@/lib/email-templates-store";
 import { listThemes } from "@/lib/themes-store";
 import { listLinks } from "@/lib/message-links-store";
@@ -15,6 +22,8 @@ import { listEtiquetas } from "@/lib/biblioteca-etiquetas-store";
 import { listFotos } from "@/lib/biblioteca-fotos-store";
 import { listFotoEtiquetas } from "@/lib/biblioteca-foto-etiquetas-store";
 import { readOverviewSettings } from "@/lib/overview-settings-store";
+import { listarDefinicoes } from "@/lib/proposta-definicoes-store";
+import { listarServicos } from "@/lib/servicos-catalogo-store";
 import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -88,6 +97,22 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
   { key: "invoiceCounters", table: "invoice_counters", list: listInvoiceCounters },
   { key: "contracts", table: "contracts", list: listContracts },
   { key: "inventoryItems", table: "inventory_items", list: listItems },
+  // O catálogo de logística: é o inventário físico da empresa, escrito à mão
+  // ou importado de uma folha de cálculo que pode já não existir.
+  { key: "materialItems", table: "material_items", list: listMaterial },
+  // As listas base são receitas escritas à mão ao longo de meses. Perdê-las
+  // custa mais do que perder o catálogo, que se reimporta de um CSV.
+  { key: "materialLists", table: "material_lists", list: listLists },
+  { key: "materialListItems", table: "material_list_items", list: listAllListItems },
+  // As regras são meses de afinação escritos à mão; as checklists dos eventos
+  // são o registo de quem marcou o quê e quando, que é o que resolve uma
+  // discussão sobre material perdido.
+  { key: "materialRules", table: "material_rules", list: listRules },
+  { key: "eventMaterial", table: "event_material", list: listEventMaterial },
+  { key: "eventMaterialItems", table: "event_material_items", list: listAllEventItems },
+  // O registo é a prova de quem marcou o quê. Sem ele, uma discussão sobre
+  // material perdido não tem como se resolver.
+  { key: "eventMaterialLog", table: "event_material_log", list: listAllLog },
   // `...WithDefaults` de propósito: interessa guardar os modelos TAL COMO a
   // equipa os vê, incluindo os que ainda estão na versão de origem.
   { key: "emailTemplates", table: "email_templates", list: listTemplatesWithDefaults },
@@ -107,6 +132,22 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
     key: "overviewSettings",
     table: "overview_settings",
     list: async () => Object.values(await readOverviewSettings()),
+  },
+  // Os números com que o estúdio faz contas — o preço do combustível, o resto
+  // do custo por quilómetro, a margem mínima. Entram na cópia porque são
+  // trabalho dela e não um derivado: perdidos, as propostas seguintes voltam a
+  // calcular com os valores de partida sem nada a assinalá-lo.
+  {
+    key: "propostaDefinicoes",
+    table: "proposal_settings",
+    list: listarDefinicoes,
+  },
+  // A biblioteca de serviços é redacção — horas de escrever bem, que não se
+  // reconstroem de mais lado nenhum.
+  {
+    key: "servicosCatalogo",
+    table: "service_catalog",
+    list: listarServicos,
   },
 ] as const;
 

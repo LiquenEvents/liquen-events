@@ -1,8 +1,18 @@
 name: Secret scan
 
+# Só no `push`. Com os dois eventos, cada commit num ramo com PR aberto lançava
+# DUAS execuções idênticas, e uma delas ficava presa no checkout até bater no
+# `timeout-minutes` — dez minutos a clonar o histórico todo enquanto a gémea o
+# clonava também. Alternava qual morria (medido em trinta execuções seguidas), e
+# a que morria aparecia no PR como uma verificação vermelha que não queria dizer
+# nada. Um sinal que está sempre lá deixa de ser lido — que é precisamente o que
+# não se quer de um scan de segredos.
+#
+# Não se perde cobertura: os ramos dos PRs vivem NESTE repositório, portanto o
+# `push` já vê todos os commits que o `pull_request` via, e ainda vê os dos
+# ramos que ainda não têm PR aberto.
 on:
   push:
-  pull_request:
 
 permissions:
   contents: read
