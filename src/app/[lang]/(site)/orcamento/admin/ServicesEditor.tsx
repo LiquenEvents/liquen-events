@@ -921,19 +921,26 @@ function DragHandle({
   ref?: (el: HTMLElement | null) => void;
 }) {
   return (
-    // `alvo-toque` cresce a pega para 44×44 em ecrã táctil e deixa o rato como
-    // estava. A pega media 16×24: com o dedo, agarrar uma linha para a
-    // reordenar era acertar num alvo mais estreito do que a própria unha, e
-    // falhar significava tocar no campo ao lado e pôr o cursor a piscar onde
-    // não se queria. Em telemóvel o arrasto já é o mais difícil dos três
-    // caminhos para reordenar (há também as setas e o teclado); não pode ser
-    // também o mais pequeno.
+    // A PEGA DE ARRASTO NÃO EXISTE EM ECRÃ TÁCTIL, e isso é a correcção.
+    //
+    // Media 16×24 — com o dedo, agarrar uma linha era acertar num alvo mais
+    // estreito do que a própria unha. A tentativa óbvia (pôr-lhe `alvo-toque`)
+    // trocou o defeito por um pior: numa linha de 375 px já vivem seis botões
+    // de 44 px, e a pega a crescer espremeu o CAMPO DE ESCREVER para 25 px.
+    // O guarda de ergonomia apanhou os dois, um de cada vez.
+    //
+    // Em telemóvel a pega é redundante: reordenar faz-se com as setas, que
+    // estão ali ao lado, já têm 44 px e respondem a um toque simples. A pega
+    // exige um toque MANTIDO de 180 ms (é o sensor de toque do dnd-kit) — é o
+    // caminho mais difícil dos três, e era o que estava a roubar a largura ao
+    // único sítio da linha onde se escreve. Com rato, onde o arrasto é o gesto
+    // natural e não há dedo para acomodar, fica exactamente como estava.
     <button
       type="button"
       {...rest}
       aria-label={`${label} (ou use as setas)`}
       title="Arrastar para reordenar"
-      className="alvo-toque inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-foreground/80 focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
+      className="[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-foreground/80 focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
     >
       <span aria-hidden="true" className="text-[13px] leading-none">
         ⠿

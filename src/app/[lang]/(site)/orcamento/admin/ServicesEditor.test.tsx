@@ -266,18 +266,34 @@ describe("guardar na biblioteca", () => {
 });
 
 describe("ergonomia táctil", () => {
-  it("as pegas de arrasto são alvos de toque a sério", () => {
-    // Mediam 16×24. Com o dedo, agarrar uma linha para a reordenar era acertar
-    // num alvo mais estreito do que a própria unha — e falhar punha o cursor a
-    // piscar no campo ao lado. O guarda de ergonomia do `admin-mobile.spec.ts`
-    // apanhou-o em CI; este teste apanha-o antes.
+  it("a pega de arrasto sai do caminho em ecrã táctil", () => {
+    // Mediam 16×24: com o dedo, agarrar uma linha era acertar num alvo mais
+    // estreito do que a própria unha. Dar-lhes `alvo-toque` trocou o defeito
+    // por um pior — numa linha de 375 px já vivem seis botões de 44 px, e a
+    // pega a crescer espremeu o CAMPO DE ESCREVER para 25 px.
+    //
+    // Em telemóvel a pega é redundante (as setas reordenam com um toque
+    // simples e já têm 44 px), por isso desaparece e devolve a largura a quem
+    // dela precisa. Com rato fica como estava.
     render(<Host initial={grupo(["Uma linha"])} />);
 
-    for (const pega of screen.getAllByRole("button", { name: /Arrastar (grupo|linha)/ })) {
+    const pegas = screen.getAllByRole("button", { name: /Arrastar (grupo|linha)/ });
+    expect(pegas.length).toBeGreaterThan(0);
+    for (const pega of pegas) {
       expect(
         pega.className,
-        `A pega «${pega.getAttribute("aria-label")}» não cresce em ecrã táctil`,
-      ).toContain("alvo-toque");
+        `A pega «${pega.getAttribute("aria-label")}» continua a ocupar largura em ecrã táctil`,
+      ).toContain("[@media(pointer:coarse)]:hidden");
+      // E NÃO pode ter `alvo-toque`: era essa a correcção que espremeu o campo.
+      expect(pega.className).not.toContain("alvo-toque");
     }
+  });
+
+  it("as setas continuam lá, que são o caminho do telemóvel", () => {
+    render(<Host initial={grupo(["Uma", "Duas"])} />);
+    // Se a pega desaparece no telemóvel, reordenar passa a depender delas.
+    expect(
+      screen.getAllByRole("button", { name: /Mover .* para (cima|baixo)/i }).length,
+    ).toBeGreaterThan(0);
   });
 });
