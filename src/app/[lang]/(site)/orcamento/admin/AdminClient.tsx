@@ -62,6 +62,7 @@ import {
   Calendario,
   Propostas,
   Acompanhamento,
+  DefinicoesProposta,
   Tarefas,
   Fornecedores,
   StatsDashboard,
@@ -1503,6 +1504,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     calendario: "Calendário",
     propostas: "Propostas",
     acompanhamento: "Acompanhamento",
+    definicoes: "Definições",
     "fazer-proposta": "Fazer proposta",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
@@ -1525,6 +1527,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     calendario: "Os seus eventos no tempo",
     propostas: "Todas as propostas enviadas",
     acompanhamento: "O que está à espera de resposta, por ordem de urgência",
+    definicoes: "Os números com que o estúdio faz contas",
     "fazer-proposta": "Escolha o cliente e escreva a proposta",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
@@ -2073,6 +2076,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   setSelected((prev) => (prev?.id === q.id ? q : prev));
                 }}
               />
+            </div>
+          )}
+
+          {/* ── Definições: combustível, custo por km, margem mínima ── */}
+          {view === "definicoes" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <DefinicoesProposta />
             </div>
           )}
 
