@@ -11,6 +11,7 @@ import {
   themeNameTakenError,
   type ThemeSummary,
 } from "@/lib/theme-types";
+import { lerRegra } from "@/lib/biblioteca-types";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -132,9 +133,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: themeNameTakenError(name) }, { status: 409 });
     }
 
+    // Um tema pode nascer como PERGUNTA GUARDADA: a equipa filtra a biblioteca
+    // por etiquetas, gosta do resultado, e dá-lhe um nome. Uma regra que não
+    // seja utilizável é recusada em vez de gravada como null — um tema-filtro
+    // sem regra mostraria a biblioteca inteira, e ninguém perceberia porquê.
+    const regra = lerRegra(body?.filterRule);
+    if (body?.filterRule !== undefined && !regra) {
+      return NextResponse.json({ error: "Filtro inválido." }, { status: 400 });
+    }
+
     const theme = await createTheme({
       name,
       notes: str(body?.notes, MAX_THEME_NOTES) || undefined,
+      ...(regra ? { kind: "filtro" as const, filterRule: regra } : {}),
     });
     return NextResponse.json({ ...theme, imageCount: 0 } satisfies ThemeSummary);
   } catch (err) {

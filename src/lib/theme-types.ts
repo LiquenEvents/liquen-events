@@ -36,6 +36,22 @@ export interface ProposalTheme {
    * apagar uma foto nunca deixa a ordem inválida.
    */
   photoOrder?: string[];
+  /**
+   * O que este tema É.
+   *
+   * `pasta` — as suas fotos são as da pasta com o mesmo id (como sempre foi).
+   * `filtro` — é uma pergunta guardada: as fotos são as que respondem à
+   *   `filterRule`, venham da pasta que vierem. É o que permite que a mesma foto
+   *   apareça em vários temas sem existir duas vezes.
+   * `manual` — uma lista de fotos escolhida à mão, para o que não encaixa em
+   *   etiqueta nenhuma.
+   *
+   * Ausente conta como `pasta`: é o comportamento de antes desta funcionalidade
+   * e o de qualquer base onde a migração ainda não correu.
+   */
+  kind?: "pasta" | "filtro" | "manual";
+  /** A regra, quando `kind` é `filtro` (ver `RegraDoTema`). */
+  filterRule?: import("./biblioteca-types").RegraDoTema;
   /** Fixado no topo da lista. Os temas de que se usa em quase todas as
    *  propostas não têm de ser procurados de cada vez. */
   favorito?: boolean;

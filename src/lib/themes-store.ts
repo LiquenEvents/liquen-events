@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { createRepository, type Mapper } from "./repository";
 import type { ProposalTheme } from "./theme-types";
+import { lerRegra } from "./biblioteca-types";
 
 /**
  * Metadados da Biblioteca de Temas (nome + nota de cada tema), persistidos
@@ -34,6 +35,8 @@ export const mapper: Mapper<ProposalTheme> = {
     // `alter table` ainda não correu estas colunas não existem, e escrevê-las
     // sempre partia até um simples renomear. Só quem fixa ou arquiva um tema é
     // que apanha o 503 que manda correr o schema.
+    ...("kind" in t ? { kind: t.kind ?? "pasta" } : {}),
+    ...("filterRule" in t ? { filter_rule: t.filterRule ?? null } : {}),
     ...("favorito" in t ? { favorito: !!t.favorito } : {}),
     ...("arquivado" in t ? { arquivado: !!t.arquivado } : {}),
     created_at: t.createdAt || new Date().toISOString(),
@@ -57,6 +60,10 @@ export const mapper: Mapper<ProposalTheme> = {
       : {}),
     // Simétrico: sem coluna (base antiga) ou a false, a propriedade nem aparece
     // — é o que mantém o `toRow` calado nessas instalações.
+    // `pasta` é o valor por omissão da coluna e o comportamento de sempre —
+    // não vale a pena carregá-lo para dentro do objecto.
+    ...(r.kind === "filtro" || r.kind === "manual" ? { kind: r.kind } : {}),
+    ...(lerRegra(r.filter_rule) ? { filterRule: lerRegra(r.filter_rule)! } : {}),
     ...(r.favorito === true ? { favorito: true } : {}),
     ...(r.arquivado === true ? { arquivado: true } : {}),
     createdAt: String(r.created_at ?? new Date().toISOString()),
@@ -77,12 +84,20 @@ export const listThemes = (): Promise<ProposalTheme[]> => repo.list();
 
 export const getTheme = (id: string): Promise<ProposalTheme | null> => repo.get(id);
 
-export async function createTheme(input: { name: string; notes?: string }): Promise<ProposalTheme> {
+export async function createTheme(
+  input: Pick<ProposalTheme, "name"> &
+    Partial<Pick<ProposalTheme, "notes" | "kind" | "filterRule">>,
+): Promise<ProposalTheme> {
   const now = new Date().toISOString();
   const theme: ProposalTheme = {
     id: newThemeId(),
     name: input.name,
     notes: input.notes,
+    // Só se escreve o que foi pedido: um tema normal continua a não tocar nas
+    // colunas novas, e por isso continua a poder ser criado numa base onde o
+    // db/schema.sql ainda não correu.
+    ...(input.kind ? { kind: input.kind } : {}),
+    ...(input.filterRule ? { filterRule: input.filterRule } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -96,7 +111,12 @@ export async function createTheme(input: { name: string; notes?: string }): Prom
  */
 export const updateTheme = (
   id: string,
-  patch: Partial<Pick<ProposalTheme, "name" | "notes" | "coverPath" | "favorito" | "arquivado">>,
+  patch: Partial<
+    Pick<
+      ProposalTheme,
+      "name" | "notes" | "coverPath" | "favorito" | "arquivado" | "kind" | "filterRule"
+    >
+  >,
 ): Promise<ProposalTheme | null> => repo.update(id, patch);
 
 export const deleteTheme = (id: string): Promise<void> => repo.remove(id);

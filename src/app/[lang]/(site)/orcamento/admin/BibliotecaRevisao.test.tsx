@@ -57,6 +57,9 @@ beforeEach(() => {
     if (url.startsWith("/api/biblioteca/fotos")) {
       return new Response(JSON.stringify(resposta), { status: 200 });
     }
+    if (url === "/api/temas") {
+      return new Response(JSON.stringify({ id: "novo", name: body?.name }), { status: 200 });
+    }
     if (url.startsWith("/api/biblioteca/etiquetar")) {
       return new Response(JSON.stringify({ ok: true, pedidas: 3, mudadas }), { status: 200 });
     }
@@ -182,6 +185,45 @@ describe("rever etiquetas", () => {
       expect(pedidos.some((p) => p.url.startsWith("/api/biblioteca/etiquetar"))).toBe(true),
     );
     expect(contador()?.textContent).toBe("1 foto escolhida");
+  });
+
+  /**
+   * O passo que fecha o círculo: filtrar, gostar do resultado, dar-lhe um nome.
+   * As etiquetas escolhidas agrupam-se POR EIXO — dois valores da mesma paleta
+   * são UMA exigência com os dois, não duas exigências —, porque é assim que
+   * "Bouquets Branco e Amarelo" continua a querer dizer o que sempre disse.
+   */
+  it("guarda a procura como tema, com uma exigência por eixo", async () => {
+    abrir();
+    await waitFor(() => expect(fotos()).toHaveLength(3));
+    fireEvent.click(screen.getByRole("button", { name: "bouquet" }));
+    fireEvent.click(screen.getByRole("button", { name: "terracotta" }));
+    fireEvent.change(screen.getByLabelText("Nome do tema a criar com este filtro"), {
+      target: { value: "Bouquets terracotta" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar tema" }));
+    await waitFor(() => {
+      const criacao = pedidos.find((p) => p.url === "/api/temas");
+      expect(criacao?.body).toEqual({
+        name: "Bouquets terracotta",
+        filterRule: {
+          v: 1,
+          eixos: [
+            { eixo: "tipo", modo: "todas", etiquetas: ["tipo:bouquet"] },
+            { eixo: "paleta", modo: "todas", etiquetas: ["paleta:terracotta"] },
+          ],
+        },
+      });
+    });
+  });
+
+  /** "sem tipo" é um filtro de ARRUMAÇÃO: um tema feito com ele esvaziava-se
+   *  sozinho à medida que o trabalho fosse sendo feito. */
+  it("não oferece guardar como tema quando o filtro é só «sem tipo»", async () => {
+    abrir();
+    await waitFor(() => expect(fotos()).toHaveLength(3));
+    fireEvent.click(screen.getByRole("button", { name: "sem tipo" }));
+    expect(screen.queryByLabelText("Nome do tema a criar com este filtro")).not.toBeInTheDocument();
   });
 
   it("sem nada por arrumar, diz isso em vez de um vazio mudo", async () => {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EIXOS, type Eixo, type Etiqueta } from "@/lib/biblioteca-types";
+import { EIXOS, type Eixo, type EixoDaRegra, type Etiqueta } from "@/lib/biblioteca-types";
+import { MAX_THEME_NAME } from "@/lib/theme-types";
 import { Button, Card } from "./ui";
 import { useToast } from "./Toast";
 
@@ -53,6 +54,8 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
   /** A última foto tocada — é a âncora do Shift+clique. */
   const ancora = useRef<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
+  const [nomeDoTema, setNomeDoTema] = useState("");
+  const [aCriarTema, setACriarTema] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -176,6 +179,47 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
     }
   }
 
+  /**
+   * Guarda a procura actual como tema.
+   *
+   * As etiquetas escolhidas são agrupadas POR EIXO, e cada eixo vira uma
+   * exigência com `modo: "todas"` — a mesma leitura que a Catarina aprovou e a
+   * mesma que a migração usou nos seis temas de origem. Escolher "branco" e
+   * "amarelo" no eixo da paleta faz um tema de bouquets branco E amarelo, tal
+   * como o nome sempre disse.
+   */
+  async function guardarComoTema() {
+    const nome = nomeDoTema.trim();
+    if (!nome || exigidas.length === 0) return;
+    const porEixoDaRegra = new Map<Eixo, string[]>();
+    for (const id of exigidas) {
+      const eixo = vocabulario.find((e) => e.id === id)?.eixo;
+      if (!eixo) continue;
+      porEixoDaRegra.set(eixo, [...(porEixoDaRegra.get(eixo) ?? []), id]);
+    }
+    const eixos: EixoDaRegra[] = [...porEixoDaRegra].map(([eixo, etiquetas]) => ({
+      eixo,
+      modo: "todas",
+      etiquetas,
+    }));
+    setACriarTema(true);
+    try {
+      const res = await fetch("/api/temas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nome, filterRule: { v: 1, eixos } }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Não foi possível criar o tema.");
+      setNomeDoTema("");
+      toast(`Tema “${nome}” criado com esta procura`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível criar o tema.", "error");
+    } finally {
+      setACriarTema(false);
+    }
+  }
+
   const porEixo = (eixo: Eixo) => vocabulario.filter((e) => e.eixo === eixo);
 
   const chip = (activo: boolean) =>
@@ -261,6 +305,40 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
             </div>
           );
         })}
+
+        {/* O passo que fecha o círculo: filtrar, gostar do resultado, e dar-lhe
+            um nome. É assim que um tema NASCE a partir de agora — uma pergunta
+            guardada, não uma pasta para onde é preciso copiar fotos.
+            Só com etiquetas escolhidas: "sem tipo" é um filtro de arrumação,
+            e um tema que mostrasse "o que ainda não etiquetei" esvaziava-se
+            sozinho à medida que o trabalho fosse sendo feito. */}
+        {exigidas.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-foreground/[0.07] pt-3">
+            <input
+              value={nomeDoTema}
+              onChange={(ev) => setNomeDoTema(ev.target.value)}
+              placeholder="Guardar esta procura como tema…"
+              aria-label="Nome do tema a criar com este filtro"
+              maxLength={MAX_THEME_NAME}
+              className="bo-input w-auto min-w-56 flex-1 py-2 text-sm"
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") void guardarComoTema();
+              }}
+            />
+            <Button
+              size="sm"
+              onClick={guardarComoTema}
+              loading={aCriarTema}
+              disabled={!nomeDoTema.trim() || aCriarTema}
+            >
+              Criar tema
+            </Button>
+            <span className="bo-text-muted text-xs">
+              {total} {total === 1 ? "foto" : "fotos"} — e as próximas que corresponderem entram
+              sozinhas
+            </span>
+          </div>
+        )}
 
         {(exigidas.length > 0 || semEixo.length > 0 || porConfirmar) && (
           <button
