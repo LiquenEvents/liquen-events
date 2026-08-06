@@ -31,3 +31,29 @@ export { Segmented } from "./Segmented";
 export type { SegmentedProps, SegmentedOption } from "./Segmented";
 
 export { cn } from "./cn";
+
+// ── Fundações adaptativas ──────────────────────────────────────────────────
+// Responsivo ≠ adaptativo: estes não encolhem, mudam de forma. Ver
+// ADAPTIVE-PRIMITIVES.md para quando usar cada um (e quando NÃO usar nenhum,
+// que é sempre que a diferença for só de estilo — isso faz-se em CSS).
+export {
+  CORTES,
+  useAdaptativo,
+  useLargura,
+  useCapacidade,
+  useMontado,
+  usePodeEsconderNoHover,
+} from "./adaptativo";
+export type { Largura, Capacidade, Adaptativo } from "./adaptativo";
+
+export { FolhaOuDialogo } from "./FolhaOuDialogo";
+export type { FolhaOuDialogoProps } from "./FolhaOuDialogo";
+
+export { TabelaOuCartoes } from "./TabelaOuCartoes";
+export type { TabelaOuCartoesProps, Coluna } from "./TabelaOuCartoes";
+
+export { MenuDeAccoes } from "./MenuDeAccoes";
+export type { MenuDeAccoesProps, AccaoDeItem } from "./MenuDeAccoes";
+
+export { CampoData, porExtenso } from "./CampoData";
+export type { CampoDataProps } from "./CampoData";
