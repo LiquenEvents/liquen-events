@@ -1726,7 +1726,7 @@ function ThemeFolder({
             // CAPA, impressa em grande. Guardá-la com 1600 px degradava-a para
             // sempre (o original nunca mais existe). A miniatura sai da MESMA
             // descodificação, para um lote de 300 fotos não custar o dobro.
-            const { file, thumb } = await prepareImageWithThumb(f, "cover");
+            const { file, thumb, lqip } = await prepareImageWithThumb(f, "cover");
             // A miniatura acabada de fazer é a melhor pré-visualização que há:
             // 400 px, ~25 KB, e já está em memória. As células que ainda não
             // tinham imagem ganham-na aqui; as que já tinham ficam com a que
@@ -1745,6 +1745,10 @@ function ThemeFolder({
             const form = new FormData();
             form.append("files", file);
             if (thumb) form.append("thumbs", thumb);
+            // O LQIP viaja no MESMO pedido que a foto — é trabalho do
+            // carregamento, e o carregamento já está a falar com o servidor.
+            // Emparelhado pela ORDEM, como o `thumbs` e o `hashes`.
+            if (lqip) form.append("lqips", lqip);
             // O resumo do ficheiro ORIGINAL (não do preparado): é ele que vira
             // o nome no Storage e torna a garantia de "não repetir" atómica.
             const hash = hashOf.get(f);

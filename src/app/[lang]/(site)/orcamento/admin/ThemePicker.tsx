@@ -1231,6 +1231,8 @@ function Photo({ image, priority }: { image: ThemeImage; priority?: boolean }) {
   const [thumbBroken, setThumbBroken] = useState(false);
   /** A fila deu a vez a esta célula. */
   const [turn, setTurn] = useState(false);
+  /** A fotografia já chegou — é o que dispara o fade por cima do LQIP. */
+  const [pintada, setPintada] = useState(false);
   /** Sem miniatura, esta célula puxa ~2,6 MB: espera pela vez. */
   const heavy = !image.thumbUrl || thumbBroken;
   const release = useRef<(() => void) | null>(null);
@@ -1262,20 +1264,45 @@ function Photo({ image, priority }: { image: ThemeImage; priority?: boolean }) {
   };
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      loading={heavy || priority ? "eager" : "lazy"}
-      fetchPriority={priority ? "high" : undefined}
-      decoding="async"
-      onLoad={finished}
-      onError={() => {
-        finished();
-        if (!heavy) setThumbBroken(true);
-      }}
-      className="h-full w-full object-cover"
-    />
+    /**
+     * O LQIP É O FUNDO DA CÉLULA, e a fotografia entra por cima.
+     *
+     * Não é um segundo `<img>`: um `background-image` com um `data:` URI não é
+     * um pedido, não entra na fila de descarregamentos e está PINTADO no
+     * instante em que este elemento existe — que é o instante em que o JSON
+     * chega. Medido na linha de base: era aqui que se ficava 1032 a 2192 ms a
+     * olhar para uma caixa cinzenta.
+     *
+     * Sem `lqip` (fotos anteriores à migração) fica o fundo neutro de sempre.
+     */
+    <div
+      className="h-full w-full bg-foreground/[0.04] bg-cover bg-center"
+      style={image.lqip ? { backgroundImage: `url("${image.lqip}")` } : undefined}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        loading={heavy || priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        decoding="async"
+        onLoad={() => {
+          finished();
+          setPintada(true);
+        }}
+        onError={() => {
+          finished();
+          if (!heavy) setThumbBroken(true);
+        }}
+        /* 200 ms de fade, e NUNCA um corte seco: a fotografia final entra por
+           cima da sua própria versão desfocada, que já lá está e já tem a cor
+           certa. `motion-safe` porque quem pede menos movimento não quer um
+           fade — quer a imagem. */
+        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-200 ${
+          pintada || !image.lqip ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </div>
   );
 }
 

@@ -95,6 +95,46 @@ export const updateFoto = (
   patch: Partial<Pick<Foto, "fingerprint" | "md5" | "largura" | "altura" | "lqip">>,
 ): Promise<Foto | null> => repo.update(path, patch);
 
+/**
+ * Os LQIP de um conjunto de caminhos, num pedido só.
+ *
+ * EM LOTE, e não um por foto: isto corre no caminho de LEITURA da grelha, que é
+ * onde a missão diz que não pode haver trabalho. Uma consulta por fotografia
+ * seriam 60 idas à base de dados para desenhar uma página — trocava-se um
+ * problema de rede por um pior.
+ *
+ * Uma foto sem linha, ou com `lqip` a nulo, simplesmente não entra no mapa; a
+ * célula fica como está hoje. Nunca lança: um placeholder é acessório, e uma
+ * base de dados em baixo não pode esconder as fotografias.
+ */
+export async function lqipsDeCaminhos(paths: readonly string[]): Promise<Map<string, string>> {
+  const saida = new Map<string, string>();
+  if (paths.length === 0) return saida;
+  // Uma consulta por PASTA, não por foto. `pasta` é uma coluna gerada e tem
+  // índice (`biblioteca_fotos_pasta_idx`), e a página de um tema costuma vir
+  // toda da mesma pasta — na prática é uma ida só. Sessenta consultas para
+  // desenhar uma página trocavam um problema de rede por um pior.
+  //
+  // O QUE ISTO CUSTA, dito: numa pasta de milhares de fotos lêem-se mais linhas
+  // do que as 60 que se vão usar. As linhas são pequenas (caminho + ~180
+  // caracteres), mas a conta cresce com a PASTA e não com a página — o oposto
+  // da promessa deste módulo. A correcção é um `in` no repositório, e o sítio
+  // dela é o Pilar 7 (escala), junto com a virtualização.
+  const pastas = new Set(paths.map((p) => p.split("/")[0]).filter(Boolean));
+  const querido = new Set(paths);
+  try {
+    const listas = await Promise.all(
+      [...pastas].map((pasta) => repo.where("pasta", pasta, (f) => f.pasta === pasta)),
+    );
+    for (const f of listas.flat()) {
+      if (f.lqip && querido.has(f.path)) saida.set(f.path, f.lqip);
+    }
+  } catch {
+    /* sem placeholders — a grelha desenha-se na mesma */
+  }
+  return saida;
+}
+
 /** Apaga a linha (as etiquetas vão atrás, por `on delete cascade`). Chamada
  *  quando a FOTO sai do bucket — nunca ao contrário. */
 export const deleteFoto = (path: string): Promise<void> => repo.remove(path);

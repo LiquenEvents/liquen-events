@@ -23,6 +23,7 @@ import {
   type UploadTicket,
 } from "./proposal-storage";
 import { log } from "./logger";
+import { lqipsDeCaminhos } from "./biblioteca-fotos-store";
 import type { ThemeImage, ThemeImagePage } from "./theme-types";
 import { THEME_PAGE_SIZE, MAX_THEME_PAGE_SIZE } from "./theme-types";
 
@@ -1032,14 +1033,25 @@ export async function listThemeImagePage(
   } else {
     paths = paths.slice(0, size);
   }
-  const [urls, thumbs] = await Promise.all([
+  // Os três EM PARALELO. O LQIP é a única leitura que não vai ao Storage, e
+  // pô-la em série atrás das assinaturas somaria a latência da base de dados ao
+  // caminho crítico da grelha — para servir precisamente aquilo que existe
+  // para o caminho crítico ser mais curto.
+  const [urls, thumbs, lqips] = await Promise.all([
     signThemePaths(paths),
     paths.length > 0 ? signThemeThumbs(paths) : Promise.resolve(new Map<string, string>()),
+    paths.length > 0 ? lqipsDeCaminhos(paths) : Promise.resolve(new Map<string, string>()),
   ]);
   const images: ThemeImage[] = paths
     .map((path) => {
       const thumbUrl = thumbs.get(path);
-      return { path, url: urls.get(path) ?? "", ...(thumbUrl ? { thumbUrl } : {}) };
+      const lqip = lqips.get(path);
+      return {
+        path,
+        url: urls.get(path) ?? "",
+        ...(thumbUrl ? { thumbUrl } : {}),
+        ...(lqip ? { lqip } : {}),
+      };
     })
     .filter((im) => im.url);
 

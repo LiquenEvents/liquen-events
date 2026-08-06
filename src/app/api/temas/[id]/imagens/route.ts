@@ -20,6 +20,8 @@ import {
 } from "@/lib/theme-types";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
+import { lqipAceitavel } from "@/lib/lqip";
+import { garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,6 +130,29 @@ function pairThumbs(files: File[], form: FormData): (File | null)[] {
  * desalinhar os outros. É também a validação que impede o nome do ficheiro
  * — que passa a vir do cliente — de conter travessia de diretórios.
  */
+/**
+ * Os LQIP, emparelhados pela ORDEM — mesma regra do `pairThumbs` e do
+ * `pairHashes`, e pela mesma razão: comprimentos diferentes significam que o
+ * cliente e o servidor discordam sobre o que está a ser enviado, e um
+ * placeholder atribuído à foto errada seria a cor de outra fotografia a
+ * aparecer nesta célula. Aí não se adivinha — vão todos a `null`.
+ *
+ * Cada valor passa pelo guarda do `lqip.ts`: um `data:` URI que vem do cliente
+ * e vai parar a um `src` não entra sem lista de permitidos.
+ */
+function pairLqips(files: File[], form: FormData): (string | null)[] {
+  const raw = form.getAll("lqips").filter((v): v is string => typeof v === "string");
+  if (raw.length === 0) return files.map(() => null);
+  if (raw.length !== files.length) {
+    log.warn("temas: LQIP ignorados (não correspondem aos ficheiros)", {
+      files: files.length,
+      lqips: raw.length,
+    });
+    return files.map(() => null);
+  }
+  return raw.map((v) => (lqipAceitavel(v) ? v : null));
+}
+
 function pairHashes(files: File[], form: FormData): (string | null)[] {
   const raw = form.getAll("hashes").filter((h): h is string => typeof h === "string");
   if (raw.length === 0) return files.map(() => null);
@@ -193,6 +218,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   const thumbs = pairThumbs(files, form);
   const hashes = pairHashes(files, form);
+  const lqips = pairLqips(files, form);
   const force = form.get("force") === "1";
 
   const uploaded: ThemeImage[] = [];
@@ -241,7 +267,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       duplicates.push({ name: file.name, path: res.path, reason: "no-tema" });
       continue;
     }
-    uploaded.push(res.image);
+    // O LQIP entra na linha da foto que acabou de nascer. Melhor esforço: a
+    // fotografia já está guardada, e falhar aqui deixa-a sem placeholder —
+    // exactamente como estão todas as anteriores a isto existir. Nunca é
+    // motivo para devolver erro de um carregamento que correu bem.
+    const lqip = lqips[i];
+    if (lqip) {
+      try {
+        await garantirFoto(res.image.path, { lqip });
+        await updateFoto(res.image.path, { lqip });
+      } catch (e) {
+        log.warn("temas: LQIP não guardado", { path: res.image.path, erro: String(e) });
+      }
+    }
+    // Devolvido JÁ na resposta: a célula que acabou de entrar na grelha não
+    // tem de esperar pela próxima listagem para ter placeholder.
+    uploaded.push(lqip ? { ...res.image, lqip } : res.image);
   }
 
   return NextResponse.json({ ok: true, images: uploaded, duplicates });

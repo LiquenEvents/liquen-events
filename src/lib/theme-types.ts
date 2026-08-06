@@ -77,6 +77,19 @@ export interface ThemeImage {
    *  a puxar originais são centenas de MB. As fotos carregadas ANTES de as
    *  miniaturas existirem não têm nenhuma — nesse caso mostra-se `url`. */
   thumbUrl?: string;
+  /**
+   * A fotografia em 16 px, em `data:` URI — desenhada a **0 ms**, antes de
+   * haver rede, enquanto a `thumbUrl` viaja.
+   *
+   * Viaja DENTRO deste JSON de propósito: são ~180 caracteres por foto (~19 KB
+   * nas 104 da biblioteca) contra os 1845–2192 ms de caixa cinzenta que a
+   * linha de base mediu. Um pedido a mais por foto deitaria a ideia toda ao
+   * chão — o que se está a comprar é precisamente não haver pedido.
+   *
+   * Ausente nas fotos carregadas antes disto existir, e enquanto a migração
+   * não correr. Sem ele a célula fica como sempre esteve.
+   */
+  lqip?: string;
 }
 
 /** O que `GET /api/temas/[id]/imagens?offset=&limit=` devolve. */

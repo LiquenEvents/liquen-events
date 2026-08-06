@@ -5,6 +5,8 @@ import { createThemeUploadTickets, confirmThemeUploads } from "@/lib/theme-stora
 import { UPLOAD_TICKET_TTL, MAX_UPLOAD_TICKETS } from "@/lib/proposal-storage";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
+import { lqipsDoLote } from "@/lib/lqip";
+import { garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,6 +136,39 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     const paths = raw.filter((p): p is string => typeof p === "string");
     const res = await confirmThemeUploads(id, paths);
+
+    /**
+     * O LQIP das fotos que ficaram.
+     *
+     * Vem no mesmo pedido que já existia — a confirmação — e não num pedido
+     * novo: é trabalho do CARREGAMENTO, e o carregamento já estava a falar com
+     * o servidor aqui.
+     *
+     * Cruzado com as fotos ACEITES, e não com as pedidas: uma foto recusada na
+     * confirmação já foi apagada do bucket, e gravar-lhe um placeholder
+     * deixava uma linha na base de dados a apontar para nada.
+     *
+     * Melhor esforço do princípio ao fim. A foto já está guardada quando isto
+     * corre; falhar aqui deixa-a sem placeholder — que é exactamente como
+     * estão todas as que foram carregadas antes disto existir.
+     */
+    const lqips = lqipsDoLote(
+      payload?.lqips,
+      res.images.map((im) => im.path),
+    );
+    if (lqips.size > 0) {
+      await Promise.all(
+        [...lqips].map(async ([path, lqip]) => {
+          try {
+            await garantirFoto(path);
+            await updateFoto(path, { lqip });
+          } catch (e) {
+            log.warn("temas: LQIP não guardado", { path, erro: String(e) });
+          }
+        }),
+      );
+    }
+
     return NextResponse.json({ ok: true, ...res });
   } catch (err) {
     log.error("temas confirmação PUT falhou", err, { id });
