@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import ProposalStudio, { avisoDeConteudoIncompleto, cortesDoCabecalho } from "./ProposalStudio";
@@ -812,5 +812,91 @@ describe("linhas que escalam com os convidados", () => {
     await user.click(screen.getByRole("button", { name: /\+ Adicionar item/ }));
     expect(screen.queryByText(/mesas × /)).toBeNull();
     expect(screen.queryByText(/pessoas × /)).toBeNull();
+  });
+});
+
+// ── A pré-visualização das fotos do documento ──────────────────────────────
+describe("uma célula que não conseguiu desenhar a foto", () => {
+  /**
+   * O `jsdom` não descarrega imagens: um `new Image()` nunca dispara `load` nem
+   * `error`. E o estúdio pré-carrega a URL nova antes de a trocar no ecrã (para
+   * a célula não piscar), portanto SEM este duplo a troca nunca se observa e
+   * este teste mediria o nada.
+   */
+  beforeEach(() => {
+    class ImagemQueCarrega {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      decoding = "";
+      set src(_v: string) {
+        setTimeout(() => this.onload?.(), 0);
+      }
+    }
+    vi.stubGlobal("Image", ImagemQueCarrega);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Um rascunho com UMA foto no mood board e os dois URLs dela: o que se
+   *  desenha (a miniatura) e o plano B (o original). */
+  function seedComFoto() {
+    seedDraft(1);
+    localStorage.setItem(
+      `${DRAFT_KEY}:meta`,
+      JSON.stringify({
+        urls: { "board/foto-0.jpg": "https://storage.test/mini.jpg" },
+        originais: { "board/foto-0.jpg": "https://storage.test/original.jpg" },
+      }),
+    );
+  }
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O DEFEITO QUE ELA VIU: "Guardada, mas não foi possível pré-visualizar"
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * As duas células que desenham fotos no estúdio guardavam "falhou" num
+   * estado que ninguém voltava a limpar. Bastava UM erro — um URL assinado que
+   * expirou, um instante sem rede, um service worker a servir uma resposta
+   * estragada — para a célula ficar para sempre com aquela frase. A fotografia
+   * estava lá e o URL seguinte estava bom; a célula é que já não olhava.
+   *
+   * E não havia plano B: uma miniatura que não existe (assinar um caminho no
+   * Storage NÃO garante que o ficheiro lá está) dava a célula por perdida com
+   * a fotografia inteira a um pedido de distância.
+   *
+   * Os dois testes abaixo são o defeito, um de cada vez.
+   */
+
+  /** A célula da capa, e o `<img>` lá dentro. */
+  const imagemDaCapa = () =>
+    screen
+      .queryAllByRole("button", { name: "Remover imagem" })
+      .map((b) => b.parentElement!.querySelector("img"))
+      .filter(Boolean)[0] as HTMLImageElement | undefined;
+
+  const avisoDeFalha = () => screen.queryByText(/não foi possível pré-visualizar/i);
+
+  it("tenta o ORIGINAL antes de desistir", async () => {
+    seedComFoto();
+    renderStudio();
+    const img = await waitFor(() => {
+      const i = imagemDaCapa();
+      expect(i).toBeTruthy();
+      return i!;
+    });
+    const primeiro = img.getAttribute("src");
+
+    // A miniatura falha (é o caso de a derivada não existir no bucket).
+    await act(async () => {
+      img.dispatchEvent(new Event("error"));
+    });
+
+    // NÃO desiste: passa a pedir outro URL — o original.
+    await waitFor(() => {
+      const agora = imagemDaCapa();
+      expect(agora, "a célula desistiu à primeira falha").toBeTruthy();
+      expect(agora!.getAttribute("src")).not.toBe(primeiro);
+    });
+    expect(avisoDeFalha()).toBeNull();
   });
 });

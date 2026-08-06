@@ -173,7 +173,7 @@ export const pt = {
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
-    manifestoText: "Mais de 100 eventos desde 2018, de Évora a todo o País.",
+    manifestoText: "Mais de 100 eventos desde 2018, em todo o País.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
     manifestoImageCaption: "Portugal · de norte a sul",
     statementLead: "Não decoramos apenas espaços.",
@@ -597,7 +597,7 @@ export const pt = {
     lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento, antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
     countdown: "Faltam {days} dias para a data do evento.",
     highSeasonNote:
-      "De maio a outubro o Alentejo enche e as melhores quintas fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
+      "De maio a outubro as melhores quintas do país fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
     recapTitle: "O que nos contou",
     recapTitlePlural: "O que nos contaram",
     refLabel: "Referência do Pedido",

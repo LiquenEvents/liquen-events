@@ -170,7 +170,7 @@ export const en: Dict = {
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
     manifestoTitleLine2: "We make memories last.",
-    manifestoText: "Over 100 events since 2018, from Évora to the whole country.",
+    manifestoText: "Over 100 events since 2018, all over the country.",
     // Corner caption (chapter idiom) over the manifesto photograph.
     manifestoImageCaption: "Across Portugal",
     statementLead: "We don't just decorate spaces.",
@@ -584,7 +584,7 @@ export const en: Dict = {
     lead: "We'll read everything carefully, check availability for the date and think about what makes sense for this event, before we reply. What follows isn't an automatic price, it's the beginning of a proposal built for you.",
     countdown: "{days} days to go until the event.",
     highSeasonNote:
-      "May to October is the busy season in the Alentejo and the best estates close their calendars far in advance. It's worth not leaving it too long.",
+      "May to October is the busy season and the best estates in the country close their calendars far in advance. It's worth not leaving it too long.",
     recapTitle: "What you told us",
     recapTitlePlural: "What you told us",
     refLabel: "Request Reference",

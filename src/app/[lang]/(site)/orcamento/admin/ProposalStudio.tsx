@@ -484,6 +484,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [totalInput, setTotalInput] = useState<string>("");
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  /**
+   * O ORIGINAL de cada foto — o plano B da célula.
+   *
+   * O `assetUrls` guarda o que é MELHOR desenhar (a miniatura, quando existe).
+   * Uma miniatura pode não existir: as fotos anteriores às miniaturas não têm
+   * nenhuma, e assinar um caminho no Storage não verifica que o ficheiro lá
+   * está — devolve um URL bem formado para um objecto que dá 404. Quem
+   * descobre isso é o navegador, e até aqui o que acontecia a seguir era a
+   * célula desistir e dizer "não foi possível pré-visualizar".
+   *
+   * Este mapa é para onde ela cai. É a mesma rede que a grelha dos temas e o
+   * seletor já tinham, e que só ao estúdio faltava.
+   */
+  const [assetOriginais, setAssetOriginais] = useState<Record<string, string>>({});
   // Foto NESTA proposta → foto da BIBLIOTECA de onde foi copiada.
   //
   // A importação copia os bytes para um uuid novo, por isso o caminho de
@@ -545,6 +559,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (rawMeta) {
         const meta = JSON.parse(rawMeta);
         if (meta?.urls && typeof meta.urls === "object") setAssetUrls(meta.urls);
+        // Rascunhos gravados antes de o plano B existir não o têm: abrem na
+        // mesma, e a hidratação preenche-o assim que responder.
+        if (meta?.originais && typeof meta.originais === "object") {
+          setAssetOriginais(meta.originais);
+        }
         // Rascunhos guardados antes de isto existir não têm `themeOrigins` —
         // abrem na mesma, só sem as marcas de "já nesta proposta".
         if (meta?.themeOrigins && typeof meta.themeOrigins === "object") {
@@ -651,6 +670,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             if (im.path && im.url && !next[im.path]) next[im.path] = im.thumbUrl || im.url;
           return next;
         });
+        // O original fica guardado à parte, para a célula ter para onde cair
+        // quando a miniatura não existir.
+        setAssetOriginais((prev) => {
+          const next = { ...prev };
+          for (const im of imgs) if (im.path && im.url) next[im.path] = im.url;
+          return next;
+        });
       } catch {
         /* offline / storage unavailable — the studio still works with uploads */
       }
@@ -718,6 +744,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           SIDE_KEY,
           JSON.stringify({
             urls: semProvisorios(assetUrls),
+            // O plano B viaja com o rascunho. Sem isto, reabrir num sítio sem
+            // rede (ou antes de a hidratação responder) deixava as células sem
+            // para onde cair — que é exactamente quando mais falta faz.
+            originais: semProvisorios(assetOriginais),
             themeOrigins: semProvisorios(themeOrigins),
             refEdited,
           }),
@@ -760,7 +790,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     flushDraft.current = save;
     const t = setTimeout(save, 800);
     return () => clearTimeout(t);
-  }, [doc, assetUrls, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY, quote.id, toast]);
+  }, [doc, assetUrls, assetOriginais, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY, quote.id, toast]);
 
   /** Ctrl/Cmd+Enter nos Serviços — grava agora e diz que gravou. */
   const saveNow = useCallback(() => {
@@ -1111,6 +1141,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         : "",
     );
     setAssetUrls({});
+    setAssetOriginais({});
     setThemeOrigins({});
     setRefEdited(false);
     setConfirmSend(false);
@@ -1161,6 +1192,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // A grelha desenha pela miniatura quando existe; o original fica para o
     // detalhe e para o PDF.
     setAssetUrls((prev) => ({ ...prev, [im.path]: im.thumbUrl || im.url }));
+    setAssetOriginais((prev) => ({ ...prev, [im.path]: im.url }));
     return im;
   }
 
@@ -1347,6 +1379,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // worker já a tem no disco (guarda por caminho, sem token), portanto a
       // célula desenha sem tocar na rede.
       for (const im of images) if (im.path && im.url) next[im.path] = im.thumbUrl || im.url;
+      for (const token of trocas.keys()) delete next[token];
+      return next;
+    });
+    setAssetOriginais((prev) => {
+      const next = { ...prev };
+      for (const im of images) if (im.path && im.url) next[im.path] = im.url;
       for (const token of trocas.keys()) delete next[token];
       return next;
     });
@@ -2102,6 +2140,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     {path ? (
                       <Thumb
                         url={assetUrls[path]}
+                        planoB={assetOriginais[path]}
                         onRemove={() => removeCoverAt(idx)}
                         className="aspect-[4/3]"
                         pendente={isPendingImage(path)}
@@ -2219,6 +2258,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           // célula e a foto piscava a meio da troca.
                           key={ii}
                           url={assetUrls[path]}
+                          planoB={assetOriginais[path]}
                           onRemove={() => removeBoardImage(bi, path)}
                           className="aspect-square"
                           foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
@@ -2803,7 +2843,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           the main source of typing lag on large proposals. */}
       {step === "prever" && (
         <div>
-          <PreviewSummary doc={doc} assetUrls={assetUrls} money={money} split={split} />
+          <PreviewSummary
+            doc={doc}
+            assetUrls={assetUrls}
+            assetOriginais={assetOriginais}
+            money={money}
+            split={split}
+          />
         </div>
       )}
 
@@ -3243,8 +3289,17 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 }
 
 /** Miniatura só de leitura (sem botão de remover) para o resumo. */
-function PreviewThumb({ url, pendente = false }: { url?: string; pendente?: boolean }) {
-  const [failed, setFailed] = useState(false);
+function PreviewThumb({
+  url,
+  planoB,
+  pendente = false,
+}: {
+  url?: string;
+  /** O ORIGINAL, para quando a miniatura não existir. */
+  planoB?: string;
+  pendente?: boolean;
+}) {
+  const { alvo, desistiu: failed, aoFalhar } = useFotoComPlanoB(url, planoB);
   return (
     <div
       aria-busy={pendente || undefined}
@@ -3252,10 +3307,10 @@ function PreviewThumb({ url, pendente = false }: { url?: string; pendente?: bool
         pendente ? "opacity-45" : ""
       }`}
     >
-      {url && !failed ? (
+      {alvo && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={url}
+          src={alvo}
           alt=""
           // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
           // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
@@ -3266,7 +3321,7 @@ function PreviewThumb({ url, pendente = false }: { url?: string; pendente?: bool
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover"
-          onError={() => setFailed(true)}
+          onError={aoFalhar}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-[0.15em] text-foreground/30">
@@ -3282,11 +3337,14 @@ function PreviewThumb({ url, pendente = false }: { url?: string; pendente?: bool
 function PreviewSummary({
   doc,
   assetUrls,
+  assetOriginais,
   money,
   split,
 }: {
   doc: StudioDoc;
   assetUrls: Record<string, string>;
+  /** O ORIGINAL de cada foto — o plano B das células. */
+  assetOriginais: Record<string, string>;
   money: ReturnType<typeof resolveProposalMoney>;
   split: ReturnType<typeof splitSinal>;
 }) {
@@ -3318,7 +3376,12 @@ function PreviewSummary({
       {covers.length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-3">
           {covers.map((path, i) => (
-            <PreviewThumb key={i} url={assetUrls[path]} pendente={isPendingImage(path)} />
+            <PreviewThumb
+              key={i}
+              url={assetUrls[path]}
+              planoB={assetOriginais[path]}
+              pendente={isPendingImage(path)}
+            />
           ))}
         </div>
       )}
@@ -3439,14 +3502,60 @@ function useSrcSemPiscar(url?: string): string | undefined {
   return pronta && url ? pronta : url;
 }
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UMA FOTO QUE TENTA O ORIGINAL ANTES DE DESISTIR — E NUNCA DESISTE PARA SEMPRE
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * As duas células que desenham fotos no estúdio tinham o mesmo defeito, cada
+ * uma com a sua cópia: um `useState(false)` de "falhou" que ninguém voltava a
+ * pôr a `false`. Bastava UM erro — um URL assinado expirado, um instante sem
+ * rede, um service worker a servir uma resposta estragada — para a célula ficar
+ * para sempre a dizer "Guardada, mas não foi possível pré-visualizar aqui". A
+ * fotografia estava lá, o URL seguinte estava bom, e a célula já não olhava
+ * para ele.
+ *
+ * É o mesmo erro que a cache de fotografias tinha: **gravar uma falha como se
+ * fosse um facto**.
+ *
+ * Duas regras, e agora num sítio só para não poderem voltar a divergir:
+ *
+ *  1. um `url` novo é sempre uma oportunidade nova;
+ *  2. antes de desistir tenta-se o ORIGINAL — uma miniatura pode não existir
+ *     (assinar um caminho no Storage NÃO garante que o ficheiro lá está, e
+ *     devolve um URL bem formado para um objecto que dá 404).
+ */
+export function useFotoComPlanoB(url?: string, planoB?: string) {
+  const [tentativa, setTentativa] = useState<"principal" | "planoB" | "desistiu">("principal");
+  // Ajustar o estado DURANTE o render, e não num efeito: é o que evita a
+  // célula piscar o aviso de erro durante um fotograma antes de voltar a
+  // tentar. É o padrão que o React documenta para estado derivado de props.
+  const [urlVisto, setUrlVisto] = useState(url);
+  if (urlVisto !== url) {
+    setUrlVisto(url);
+    setTentativa("principal");
+  }
+  return {
+    /** O URL a pedir agora, ou `undefined` se já não há por onde tentar. */
+    alvo: tentativa === "planoB" ? planoB : url,
+    /** Esgotaram-se as tentativas. */
+    desistiu: tentativa === "desistiu",
+    aoFalhar: () =>
+      setTentativa((t) => (t === "principal" && planoB && planoB !== url ? "planoB" : "desistiu")),
+  };
+}
+
 function Thumb({
   url,
+  planoB,
   onRemove,
   className = "",
   foraDoPdf = false,
   pendente = false,
 }: {
   url?: string;
+  /** O ORIGINAL, para quando a miniatura não existir. Ver `assetOriginais`. */
+  planoB?: string;
   onRemove: () => void;
   className?: string;
   /** Esta foto está no rascunho mas a página do PDF já não a desenha. */
@@ -3454,8 +3563,8 @@ function Thumb({
   /** A foto já ocupa este lugar mas a cópia ainda não confirmou. */
   pendente?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  const src = useSrcSemPiscar(url);
+  const { alvo, desistiu: failed, aoFalhar } = useFotoComPlanoB(url, planoB);
+  const src = useSrcSemPiscar(alvo);
   return (
     <div
       // `aria-busy` e não só a opacidade: quem não vê a célula esbatida tem de
@@ -3480,7 +3589,7 @@ function Thumb({
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover"
-          onError={() => setFailed(true)}
+          onError={aoFalhar}
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center text-[9px] leading-relaxed text-foreground/40">
