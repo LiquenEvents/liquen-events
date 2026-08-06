@@ -654,129 +654,123 @@ describe("deleteThemeFolder", () => {
   });
 });
 
-// ── Importar um LOTE tema → proposta ───────────────────────────────────────
-describe("importarFotosDaBiblioteca", () => {
-  it("assina o lote inteiro em DOIS pedidos, não dois por foto", async () => {
-    // É esta a correcção: antes eram 4 idas ao Storage por foto, das quais
-    // duas eram assinaturas singulares. Agora são duas assinaturas para o
-    // conjunto todo, com uma foto ou com quarenta.
-    const { importarFotosDaBiblioteca } = await load();
+// ── Escolher um LOTE da biblioteca para uma proposta ───────────────────────
+describe("referenciarFotosDaBiblioteca", () => {
+  /**
+   * O TESTE QUE INTERESSA. Isto copiava os bytes para a pasta da proposta —
+   * e era essa cópia que dava à foto uma identidade nova e deitava fora a
+   * cache do navegador sobre a foto que ele tinha acabado de descarregar no
+   * seletor. Se um dia voltar a haver aqui uma cópia, é este que fica
+   * vermelho.
+   */
+  it("não copia UM ÚNICO byte", async () => {
+    const { referenciarFotosDaBiblioteca } = await load();
     const paths = Array.from({ length: 10 }, (_, i) => `t-1/f${i}.jpg`);
-    const res = await importarFotosDaBiblioteca(paths, "q-42");
+    const res = await referenciarFotosDaBiblioteca(paths);
+
     expect(res.images).toHaveLength(10);
+    expect(st.copy, "copiou fotos entre buckets").not.toHaveBeenCalled();
+    expect(st.thumbCopy, "copiou miniaturas entre buckets").not.toHaveBeenCalled();
+    expect(st.upload, "voltou a carregar bytes").not.toHaveBeenCalled();
+    expect(st.download, "puxou bytes para a função").not.toHaveBeenCalled();
+  });
+
+  it("devolve REFERÊNCIAS, e assinadas contra o bucket dos temas", async () => {
+    const { referenciarFotosDaBiblioteca } = await load();
+    const res = await referenciarFotosDaBiblioteca(["t-1/a.jpg"]);
+
+    expect(res.images[0].path, "o caminho guardado no documento").toBe("tema:t-1/a.jpg");
+    // O `sourcePath` é o caminho nu — é o que o estúdio usa para marcar de que
+    // tema veio a foto.
+    expect(res.images[0].sourcePath).toBe("t-1/a.jpg");
+    // Os URLs vêm dos buckets da BIBLIOTECA. A pasta da proposta nem é tocada.
+    expect(st.signed).toHaveBeenCalledWith(["t-1/a.jpg"], SIGNED_TTL);
+    expect(st.thumbSigned).toHaveBeenCalledWith(["t-1/a.jpg"], SIGNED_TTL);
+    expect(st.buckets).toContain(THEME_BUCKET);
+    expect(st.buckets).toContain(THEME_THUMB_BUCKET);
+    expect(st.buckets).not.toContain("proposal-assets");
+    expect(st.buckets).not.toContain("proposal-thumbs");
+  });
+
+  /**
+   * A pasta de um pedido assina a 10 anos; a biblioteca a 6 horas, porque é o
+   * activo do estúdio inteiro e são milhares de ficheiros. Assinar uma foto da
+   * biblioteca com o prazo das propostas desfazia essa decisão em silêncio —
+   * e o sítio onde isso aconteceria é precisamente este, porque quem assina é
+   * código do `proposal-storage`.
+   */
+  it("assina com o prazo da BIBLIOTECA, não com o das propostas", async () => {
+    const { referenciarFotosDaBiblioteca } = await load();
+    await referenciarFotosDaBiblioteca(["t-1/a.jpg"]);
+    expect(SIGNED_TTL).toBe(60 * 60 * 6);
+    for (const chamada of [...st.signed.mock.calls, ...st.thumbSigned.mock.calls]) {
+      expect(chamada[1], "prazo de assinatura errado").toBe(SIGNED_TTL);
+    }
+  });
+
+  it("assina o lote inteiro em DOIS pedidos, não dois por foto", async () => {
+    const { referenciarFotosDaBiblioteca } = await load();
+    const paths = Array.from({ length: 40 }, (_, i) => `t-1/f${i}.jpg`);
+    const res = await referenciarFotosDaBiblioteca(paths);
+    expect(res.images).toHaveLength(40);
     expect(st.signOne, "assinou uma a uma").not.toHaveBeenCalled();
     expect(st.thumbSignOne, "assinou as miniaturas uma a uma").not.toHaveBeenCalled();
     expect(st.signed).toHaveBeenCalledTimes(1);
     expect(st.thumbSigned).toHaveBeenCalledTimes(1);
   });
 
-  it("mantém a ordem PEDIDA mesmo com as cópias a terminar ao contrário", async () => {
-    // A ordem por que ela toca nas fotos é a ordem por que elas saem no PDF.
-    const atrasos: Record<string, number> = {
-      "t-1/a.jpg": 30,
-      "t-1/b.jpg": 20,
-      "t-1/c.jpg": 10,
-      "t-1/d.jpg": 0,
-    };
-    st.copy.mockImplementation(async (origem: string) => {
-      await new Promise((r) => setTimeout(r, atrasos[origem] ?? 0));
-      return { data: { path: "copiado" }, error: null };
-    });
-    const { importarFotosDaBiblioteca } = await load();
+  it("mantém a ordem PEDIDA — é a ordem por que saem no PDF", async () => {
+    // O Storage devolve as assinaturas ao contrário, que é uma coisa que ele
+    // pode fazer: a ordem tem de vir do pedido, não da resposta.
+    st.signed.mockImplementation(async (paths: string[]) => ({
+      data: [...paths].reverse().map((path) => ({ path, signedUrl: `https://signed/${path}` })),
+      error: null,
+    }));
+    const { referenciarFotosDaBiblioteca } = await load();
     const paths = ["t-1/a.jpg", "t-1/b.jpg", "t-1/c.jpg", "t-1/d.jpg"];
-    const res = await importarFotosDaBiblioteca(paths, "q-1");
-    // Cada destino leva um uuid; a prova da ordem é a correspondência entre a
-    // origem pedida e o destino devolvido, que o `copy` registou.
-    const porOrigem = new Map(
-      st.copy.mock.calls.map((c: unknown[]) => [c[0] as string, c[1] as string]),
-    );
-    expect(res.images.map((i) => i.path)).toEqual(paths.map((p) => porOrigem.get(p)));
+    const res = await referenciarFotosDaBiblioteca(paths);
+    expect(res.images.map((i) => i.path)).toEqual(paths.map((p) => `tema:${p}`));
   });
 
-  it("mantém a ordem pedida com uma falha pelo meio, sem buracos nem trocas", async () => {
-    st.copy.mockImplementation(async (origem: string) =>
-      origem === "t-1/b.jpg"
-        ? { data: null, error: { message: "não" } }
-        : { data: { path: "copiado" }, error: null },
-    );
-    // Sem recurso: a falhada tem de falhar mesmo.
-    st.download.mockResolvedValue({ data: null, error: { message: "não" } });
-    const { importarFotosDaBiblioteca } = await load();
-    const res = await importarFotosDaBiblioteca(
-      ["t-1/a.jpg", "t-1/b.jpg", "t-1/c.jpg", "t-1/d.jpg"],
-      "q-1",
-    );
-    expect(res.images).toHaveLength(3);
+  it("uma foto sem URL sai da lista e é reportada, sem buracos nem trocas", async () => {
+    st.signed.mockImplementation(async (paths: string[]) => ({
+      data: paths
+        .filter((p) => p !== "t-1/b.jpg")
+        .map((path) => ({ path, signedUrl: `https://signed/${path}` })),
+      error: null,
+    }));
+    const { referenciarFotosDaBiblioteca } = await load();
+    const res = await referenciarFotosDaBiblioteca([
+      "t-1/a.jpg",
+      "t-1/b.jpg",
+      "t-1/c.jpg",
+      "t-1/d.jpg",
+    ]);
+    expect(res.images.map((i) => i.path)).toEqual([
+      "tema:t-1/a.jpg",
+      "tema:t-1/c.jpg",
+      "tema:t-1/d.jpg",
+    ]);
     expect(res.failed).toEqual(["t-1/b.jpg"]);
-    const porOrigem = new Map(
-      st.copy.mock.calls.map((c: unknown[]) => [c[0] as string, c[1] as string]),
-    );
-    expect(res.images.map((i) => i.path)).toEqual(
-      ["t-1/a.jpg", "t-1/c.jpg", "t-1/d.jpg"].map((p) => porOrigem.get(p)),
-    );
-  });
-
-  it("copia em paralelo, mas com um teto — não afoga o Storage", async () => {
-    // Sem tecto, 40 fotos eram 80 chamadas ao Storage ao mesmo tempo.
-    let emVoo = 0;
-    let pico = 0;
-    const contar = async () => {
-      emVoo++;
-      pico = Math.max(pico, emVoo);
-      await new Promise((r) => setTimeout(r, 5));
-      emVoo--;
-      return { data: { path: "copiado" }, error: null };
-    };
-    st.copy.mockImplementation(contar);
-    const { importarFotosDaBiblioteca } = await load();
-    await importarFotosDaBiblioteca(
-      Array.from({ length: 20 }, (_, i) => `t-1/f${i}.jpg`),
-      "q-1",
-    );
-    expect(st.copy).toHaveBeenCalledTimes(20);
-    expect(pico).toBeLessThanOrEqual(8);
-  });
-
-  it("a foto e a miniatura são copiadas AO MESMO TEMPO, não uma atrás da outra", async () => {
-    // É metade do ganho com uma foto só: sem isto o caminho crítico eram
-    // quatro esperas encadeadas em vez de duas.
-    const ordem: string[] = [];
-    st.copy.mockImplementation(async () => {
-      ordem.push("foto:início");
-      await new Promise((r) => setTimeout(r, 20));
-      ordem.push("foto:fim");
-      return { data: { path: "copiado" }, error: null };
-    });
-    st.thumbCopy.mockImplementation(async () => {
-      ordem.push("mini:início");
-      await new Promise((r) => setTimeout(r, 20));
-      ordem.push("mini:fim");
-      return { data: { path: "copiado" }, error: null };
-    });
-    const { importarFotosDaBiblioteca } = await load();
-    await importarFotosDaBiblioteca(["t-1/a.jpg"], "q-1");
-    // As duas arrancam antes de qualquer uma acabar.
-    expect(ordem.slice(0, 2).sort()).toEqual(["foto:início", "mini:início"]);
   });
 
   it("uma miniatura que falhe não impede a foto de entrar", async () => {
-    st.thumbCopy.mockResolvedValue({ data: null, error: { message: "sem miniatura" } });
     st.thumbSigned.mockResolvedValue({ data: [], error: null });
-    const { importarFotosDaBiblioteca } = await load();
-    const res = await importarFotosDaBiblioteca(["t-1/a.jpg"], "q-1");
+    const { referenciarFotosDaBiblioteca } = await load();
+    const res = await referenciarFotosDaBiblioteca(["t-1/a.jpg"]);
     expect(res.images).toHaveLength(1);
     expect(res.images[0].thumbUrl).toBeUndefined();
     expect(res.failed).toEqual([]);
   });
 
   it("recusa caminhos que não são do bucket de temas", async () => {
-    const { importarFotosDaBiblioteca } = await load();
-    const res = await importarFotosDaBiblioteca(
-      ["../proposal-assets/q-9/privada.jpg", "https://exemplo.pt/a.jpg"],
-      "q-1",
-    );
+    const { referenciarFotosDaBiblioteca } = await load();
+    const res = await referenciarFotosDaBiblioteca([
+      "../proposal-assets/q-9/privada.jpg",
+      "https://exemplo.pt/a.jpg",
+    ]);
     expect(res.images).toEqual([]);
-    expect(st.copy).not.toHaveBeenCalled();
+    expect(st.signed).not.toHaveBeenCalled();
   });
 });
 

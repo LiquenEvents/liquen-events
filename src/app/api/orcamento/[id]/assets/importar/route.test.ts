@@ -7,14 +7,14 @@ import type { NextRequest } from "next/server";
 // antes disso —, o tecto do lote, e a honestidade do relatório (sucesso
 // parcial, e 502 quando não entrou nada).
 //
-// A importação em si — as cópias, a ORDEM pedida, o tecto de concorrência e as
-// duas assinaturas em lote — é propriedade de `importarFotosDaBiblioteca` e
-// está testada em `src/lib/theme-storage.test.ts`. Aqui é um duplo do LOTE
-// inteiro, que é a forma como a rota a usa.
+// A escolha em si — as referências, a ORDEM pedida e as duas assinaturas em
+// lote — é propriedade de `referenciarFotosDaBiblioteca` e está testada em
+// `src/lib/theme-storage.test.ts`. Aqui é um duplo do LOTE inteiro, que é a
+// forma como a rota a usa.
 const st = vi.hoisted(() => ({
   authed: true,
   dbConfigured: true,
-  /** Caminhos de tema cuja cópia falha. */
+  /** Caminhos de tema cuja assinatura falha. */
   fails: new Set<string>(),
   /** Atraso (ms) por caminho, para terminarem fora da ordem pedida. */
   delays: {} as Record<string, number>,
@@ -23,13 +23,14 @@ const st = vi.hoisted(() => ({
   bucket: vi.fn(async () => true),
   /** Duplo do LOTE: recebe todos os caminhos e devolve o que entrou e o que
    *  falhou, preservando a ordem — tal como a função verdadeira. */
-  importar: vi.fn(async (themePaths: readonly string[], quoteId: string) => {
+  importar: vi.fn(async (themePaths: readonly string[]) => {
     const entraram = themePaths.filter((p) => !st.fails.has(p));
     return {
-      images: entraram.map((p) => {
-        const name = p.slice(p.indexOf("/") + 1);
-        return { path: `${quoteId}/copia-de-${name}`, url: `https://signed/${name}` };
-      }),
+      images: entraram.map((p) => ({
+        path: `tema:${p}`,
+        url: `https://signed/${p}`,
+        sourcePath: p,
+      })),
       failed: themePaths.filter((p) => st.fails.has(p)),
     };
   }),
@@ -43,7 +44,7 @@ vi.mock("@/lib/theme-storage", async () => {
   // As funções puras de caminho são as reais (é o que estamos a testar); só o
   // acesso ao Storage é substituído.
   const real = await vi.importActual<typeof import("@/lib/theme-storage")>("@/lib/theme-storage");
-  return { ...real, importarFotosDaBiblioteca: st.importar };
+  return { ...real, referenciarFotosDaBiblioteca: st.importar };
 });
 
 import { POST } from "./route";
@@ -81,16 +82,20 @@ describe("POST /api/orcamento/[id]/assets/importar", () => {
     expect(st.importar).not.toHaveBeenCalled();
   });
 
-  it("copia cada foto do tema para a pasta da proposta", async () => {
+  it("devolve uma REFERÊNCIA por foto do tema, sem copiar nada", async () => {
     const res = await POST(...req(["t-1/a.jpg", "t-1/b.png"], "q-42"));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.images).toHaveLength(2);
+    expect(body.images.map((i: { path: string }) => i.path)).toEqual([
+      "tema:t-1/a.jpg",
+      "tema:t-1/b.png",
+    ]);
     expect(body.failed).toEqual([]);
-    // UM pedido para o lote todo, com o id do pedido — e não um por foto.
+    // UM pedido para o lote todo — e não um por foto. O id do pedido já não
+    // entra: não há pasta de destino nenhuma para onde escrever.
     expect(st.importar).toHaveBeenCalledTimes(1);
-    expect(st.importar).toHaveBeenCalledWith(["t-1/a.jpg", "t-1/b.png"], "q-42");
+    expect(st.importar).toHaveBeenCalledWith(["t-1/a.jpg", "t-1/b.png"]);
   });
 
   it("recusa uma lista vazia ou em falta", async () => {
@@ -112,7 +117,7 @@ describe("POST /api/orcamento/[id]/assets/importar", () => {
   it("ignora os caminhos inválidos de um lote misto e importa os bons", async () => {
     const res = await POST(...req(["t-1/a.jpg", "../fora.jpg"]));
     expect(res.status).toBe(200);
-    expect(st.importar).toHaveBeenCalledWith(["t-1/a.jpg"], "q-1");
+    expect(st.importar).toHaveBeenCalledWith(["t-1/a.jpg"]);
   });
 
   it("limita o lote a 40 imagens", async () => {

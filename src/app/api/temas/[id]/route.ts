@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { getTheme, updateTheme, deleteTheme, listThemes } from "@/lib/themes-store";
-import { deleteThemeFolder, isThemePath, themeIdOfPath, themeFolder } from "@/lib/theme-storage";
+import { isThemePath, themeIdOfPath, themeFolder } from "@/lib/theme-storage";
+import { apagarPastaDaBiblioteca } from "@/lib/theme-materializar";
 import { isUniqueViolation } from "@/lib/invoices-store";
 import { isMissingTable, isPersistenceUnavailable } from "@/lib/repository";
 import {
@@ -143,9 +144,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 /**
- * Elimina um tema E as suas fotos. As propostas já feitas não são afetadas:
- * ao escolher fotos da biblioteca, os bytes são copiados para a pasta da
- * própria proposta, por isso não há referências pendentes para aqui.
+ * Elimina um tema E as suas fotos.
+ *
+ * As propostas já feitas não são afetadas, mas a razão MUDOU: escolher fotos
+ * da biblioteca deixou de copiar bytes e passou a guardar uma referência (ver
+ * `theme-ref.ts`). Quem garante que uma proposta enviada não perde imagens é
+ * agora o `apagarPastaDaBiblioteca`, que copia primeiro para quem referencia e
+ * só depois deixa apagar — e recusa a eliminação se não conseguir.
  */
 export async function DELETE(
   request: NextRequest,
@@ -159,13 +164,19 @@ export async function DELETE(
     // Storage primeiro, e só avançamos se ele CONFIRMAR a limpeza: apagar os
     // metadados com fotos por apagar deixava-as órfãs e invisíveis, sem forma
     // de lá voltar. Assim o tema continua listado e a ação pode ser repetida.
-    const cleaned = await deleteThemeFolder(id);
+    const cleaned = await apagarPastaDaBiblioteca(id);
     if (!cleaned.ok) {
-      log.error("temas DELETE: limpeza do Storage falhou", null, { id, removed: cleaned.removed });
+      log.error("temas DELETE: limpeza do Storage falhou", null, {
+        id,
+        removed: cleaned.removed,
+        motivo: cleaned.motivo,
+      });
       return NextResponse.json(
         {
           error:
-            "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tente de novo.",
+            cleaned.motivo === "referencias"
+              ? "Há propostas que usam fotos deste tema e não foi possível guardar lá uma cópia. O tema NÃO foi eliminado — tente de novo."
+              : "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tente de novo.",
         },
         { status: 502 },
       );

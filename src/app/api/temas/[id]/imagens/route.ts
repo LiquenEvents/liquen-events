@@ -4,7 +4,6 @@ import { getTheme } from "@/lib/themes-store";
 import {
   listThemeImagePage,
   uploadThemeImage,
-  deleteThemeImage,
   findThemeImageByBytes,
   isThemePath,
   themeIdOfPath,
@@ -19,6 +18,7 @@ import {
   type ThemeImage,
 } from "@/lib/theme-types";
 import { isDatabaseConfigured } from "@/lib/supabase";
+import { apagarFotoDaBiblioteca } from "@/lib/theme-materializar";
 import { log } from "@/lib/logger";
 import { lqipAceitavel } from "@/lib/lqip";
 import { garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
@@ -326,8 +326,20 @@ export async function DELETE(
     if (!isThemePath(path) || themeIdOfPath(path) !== themeFolder(id)) {
       return NextResponse.json({ error: "Caminho inválido." }, { status: 400 });
     }
-    const ok = await deleteThemeImage(path);
-    if (!ok) return NextResponse.json({ error: "Falha ao remover a imagem." }, { status: 502 });
+    // `apagarFotoDaBiblioteca` e não `deleteThemeImage`: uma foto escolhida
+    // para um mood board é REFERENCIADA, não copiada, por isso tem de ser posta
+    // a salvo antes de sair daqui. Ver `theme-materializar.ts`.
+    const { ok, motivo } = await apagarFotoDaBiblioteca(path);
+    if (!ok)
+      return NextResponse.json(
+        {
+          error:
+            motivo === "referencias"
+              ? "Esta foto é usada por uma proposta e não foi possível guardar lá uma cópia. A foto NÃO foi removida — tente de novo."
+              : "Falha ao remover a imagem.",
+        },
+        { status: 502 },
+      );
     return NextResponse.json({ ok: true });
   } catch (err) {
     return failed("temas imagens DELETE falhou", err, id);

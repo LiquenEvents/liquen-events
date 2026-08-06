@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { importarFotosDaBiblioteca, isThemePath } from "@/lib/theme-storage";
+import { referenciarFotosDaBiblioteca, isThemePath } from "@/lib/theme-storage";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { MAX_IMPORT_BATCH } from "@/lib/theme-types";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
-// Um lote são até 40 fotos. Mesmo com as cópias em paralelo e só duas
-// assinaturas, 80 chamadas de Storage não cabem folgadamente nos 10 s por
-// omissão do alojamento.
+// Sobra de propósito: isto são duas assinaturas em lote, e nem com 40 fotos se
+// aproxima dos 10 s por omissão do alojamento. Ficou nos 60 s de quando ainda
+// se copiavam bytes — baixá-lo não ganha nada e tira a folga a um Storage lento.
 export const maxDuration = 60;
 
 /**
- * Importa fotos da Biblioteca de Temas para uma proposta: recebe caminhos do
- * bucket de temas e COPIA os bytes para a pasta desta proposta, devolvendo os
- * novos `path` + `url` no formato que o estúdio já usa nos mood boards e na
- * capa.
+ * Escolhe fotos da Biblioteca de Temas para uma proposta: recebe caminhos do
+ * bucket de temas e devolve REFERÊNCIAS (`tema:<caminho>`) já assinadas, no
+ * formato que o estúdio usa nos mood boards e na capa.
  *
- * A cópia (em vez de referenciar o tema) é deliberada: a proposta fica
- * autónoma, por isso apagar ou reorganizar a biblioteca nunca parte uma
- * proposta já enviada, e o gerador de PDF continua a resolver um único bucket.
+ * Isto copiava os bytes para a pasta da proposta. Deixou de copiar — a cópia
+ * dava à foto uma identidade nova e deitava fora a cache do navegador sobre a
+ * foto que ele tinha acabado de descarregar no seletor. O raciocínio está em
+ * `theme-ref.ts`, e o que garante que uma proposta enviada continua a não
+ * perder fotos está em `theme-materializar.ts`.
  *
  * Corpo: `{ paths: string[] }`. Só admin.
  */
@@ -55,13 +56,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Caminhos inválidos." }, { status: 400 });
   }
 
-  // Todo o lote de uma assentada: as cópias em paralelo, e depois DUAS
-  // assinaturas para o conjunto inteiro. O caminho crítico são 2 idas ao
-  // Storage, com uma foto ou com quarenta — a razão está escrita em
-  // `importarFotosDaBiblioteca`. A ordem pedida é preservada lá dentro.
-  const { images, failed } = await importarFotosDaBiblioteca(paths, id);
+  // Todo o lote de uma assentada: duas assinaturas em paralelo para o conjunto
+  // inteiro. É UMA ida ao Storage, com uma foto ou com quarenta. A ordem pedida
+  // é preservada lá dentro.
+  const { images, failed } = await referenciarFotosDaBiblioteca(paths);
   for (const path of failed) {
-    log.error("importar: cópia para a proposta falhou", null, { id, path });
+    log.error("importar: foto da biblioteca não assinada", null, { id, path });
   }
 
   if (images.length === 0) {

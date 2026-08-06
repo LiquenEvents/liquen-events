@@ -17,7 +17,12 @@ import { aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
  * têm de falhar para o lado de NÃO carregar.
  */
 
-const fetchMock = vi.fn(async () => new Response("", { status: 200 }));
+// Os parâmetros são declarados (mesmo sem serem usados) para que
+// `fetchMock.mock.calls[0][0]` tenha tipo: sem eles o TypeScript vê um tuplo
+// vazio e o `expect` sobre o URL pedido não compila.
+const fetchMock = vi.fn(
+  async (_url?: unknown, _init?: unknown) => new Response("", { status: 200 }),
+);
 
 /** Instala uma ligação com as características dadas. */
 function comRede(rede: { saveData?: boolean; effectiveType?: string } | undefined) {

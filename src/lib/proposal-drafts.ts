@@ -31,10 +31,15 @@ export interface StoredProposalDraft {
   savedBy?: string;
 }
 
+/** O espaço de nomes dos rascunhos dentro do `app_state`. Exportado porque há
+ *  quem precise de os VARRER e não apenas de ler um: apagar uma foto da
+ *  Biblioteca tem de saber que rascunhos a usam (ver `theme-materializar.ts`). */
+export const DRAFT_PREFIX = "proposal-draft:";
+
 /** Chave do rascunho de um pedido. O id é saneado para não poder colidir com
  *  outras chaves do `app_state` (nem sair do seu espaço de nomes). */
 export function draftKey(quoteId: string): string {
-  return `proposal-draft:${quoteId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return `${DRAFT_PREFIX}${quoteId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 }
 
 export async function getProposalDraft(quoteId: string): Promise<StoredProposalDraft | null> {

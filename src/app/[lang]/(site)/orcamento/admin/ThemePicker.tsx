@@ -753,16 +753,20 @@ export default function ThemePicker({
         emVoo.current = null;
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error || "Falha ao adicionar as imagens.");
-        const copied: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
+        const copied: ImportedImage[] = Array.isArray(data?.images) ? data.images : [];
         const failedHere: string[] = Array.isArray(data?.failed) ? data.failed : [];
-        // A rota devolve as cópias pela ordem pedida, saltando as que
-        // falharam — é isso que deixa emparelhar cada cópia com a foto da
-        // biblioteca de onde veio. Se as contas não baterem certo, prefere-se
-        // ficar sem a marca "já nesta proposta" a inventar uma origem errada.
+        // A ORIGEM vem agora na resposta, foto a foto (`sourcePath`), desde que
+        // a rota deixou de copiar bytes e passou a devolver referências — ela
+        // sabe-a de certeza e nós deixámos de a ter de deduzir.
+        //
+        // O emparelhamento por POSIÇÃO fica como plano B, para o caso de uma
+        // resposta antiga (um separador aberto durante um deploy) chegar sem o
+        // campo. Se as contas não baterem certo, prefere-se ficar sem a marca
+        // "já nesta proposta" a inventar uma origem errada.
         const sources = chunk.filter((p) => !failedHere.includes(p));
         const aligned = sources.length === copied.length;
         const picked: ImportedImage[] = copied.map((im, k) =>
-          aligned ? { ...im, sourcePath: sources[k] } : { ...im },
+          im.sourcePath ? im : aligned ? { ...im, sourcePath: sources[k] } : { ...im },
         );
         if (picked.length > 0) {
           added += picked.length;

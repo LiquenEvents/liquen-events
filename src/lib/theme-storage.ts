@@ -22,6 +22,15 @@ import {
   signProposalThumbs,
   type UploadTicket,
 } from "./proposal-storage";
+import {
+  THEME_BUCKET,
+  THEME_THUMB_BUCKET,
+  THEME_MICRO_BUCKET,
+  THEME_SIGNED_TTL,
+  isThemePath,
+  refDeTema,
+  themeIdOfPath,
+} from "./theme-ref";
 import { log } from "./logger";
 import { lqipsDeCaminhos } from "./biblioteca-fotos-store";
 import type { ThemeImage, ThemeImagePage } from "./theme-types";
@@ -34,46 +43,50 @@ import { THEME_PAGE_SIZE, MAX_THEME_PAGE_SIZE } from "./theme-types";
  *
  * Porquê um bucket próprio: as fotos de um tema são um ativo do estúdio,
  * reutilizado em muitas propostas, e não devem ser apagadas quando um pedido
- * é limpo. Quando a equipa escolhe fotos de um tema para uma proposta, os
- * bytes são COPIADOS para a pasta da proposta (ver a rota
- * `/api/orcamento/[id]/assets/importar`) — assim tudo o que já existe a
- * jusante (gerador de PDF, portal do cliente, pré-visualização) continua a
- * lidar com um único bucket, e apagar/renovar um tema nunca estraga uma
- * proposta já enviada.
+ * é limpo. Quando a equipa escolhe fotos de um tema para uma proposta, o
+ * documento passa a guardar uma REFERÊNCIA (`tema:<pasta>/<ficheiro>.jpg`) e
+ * os bytes ficam onde estão — ver `theme-ref.ts` para o porquê e
+ * `materializarAntesDeApagar` mais abaixo para o que garante que uma proposta
+ * já enviada nunca perde uma foto por a biblioteca ter sido arrumada.
  *
  * Requer SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY. O bucket é criado no
  * primeiro uso (idempotente), tal como o das propostas.
+ *
+ * Os três nomes de bucket, o `isThemePath` e o formato da referência vivem em
+ * `theme-ref.ts` — um módulo-folha, para o `proposal-storage.ts` os poder ler
+ * sem criar um ciclo (este módulo já importa esse). Continuam a ser
+ * reexportados daqui porque é aqui que toda a gente os foi buscar até hoje.
  */
-export const THEME_BUCKET = "theme-assets";
+export {
+  THEME_BUCKET,
+  THEME_THUMB_BUCKET,
+  THEME_MICRO_BUCKET,
+  THEME_REF_PREFIX,
+  caminhoDoRefDeTema,
+  ehRefDeTema,
+  isThemePath,
+  refDeTema,
+  themeIdOfPath,
+} from "./theme-ref";
 
 /**
- * Bucket das MINIATURAS, também privado. Chave idêntica à do original: a
- * miniatura de `theme-assets/<tema>/<uuid>.jpg` é
- * `theme-thumbs/<tema>/<uuid>.jpg` — sem índice nenhum a manter, o caminho do
- * original é o caminho da miniatura.
+ * As MINIATURAS (`theme-thumbs`, 400 px) e as MICRO (`theme-micro`, 96 px)
+ * partilham a chave do original: a derivada de `theme-assets/<tema>/<x>.jpg` é
+ * `theme-thumbs/<tema>/<x>.jpg`. Sem índice nenhum a manter — o caminho do
+ * original é o caminho da derivada.
  *
  * São DERIVADAS e DESCARTÁVEIS: a listagem faz-se sempre sobre `theme-assets`,
- * uma miniatura em falta cai para o original (as fotos anteriores às
- * miniaturas não têm nenhuma) e falhar a limpeza das miniaturas NUNCA impede
- * apagar uma foto ou um tema. São geradas no NAVEGADOR, a partir do mesmo
- * bitmap já descodificado para comprimir o original — não há aqui `sharp` nem
- * transformações pagas do Supabase.
- */
-export const THEME_THUMB_BUCKET = "theme-thumbs";
-
-/**
- * Bucket das MICRO — 96 px, mesma chave dos outros dois.
+ * uma derivada em falta cai para a de cima (as fotos anteriores às miniaturas
+ * não têm nenhuma) e falhar a limpeza NUNCA impede apagar uma foto ou um tema.
+ * São geradas no NAVEGADOR, a partir do mesmo bitmap já descodificado para
+ * comprimir o original — não há aqui `sharp` nem transformações pagas do
+ * Supabase.
  *
- * Existe por uma medição: as três tiras de pré-visualização de cada cartão de
- * tema são desenhadas com 43 × 42 px e recebiam o ficheiro de 400 px. Eram 18
- * dos 24 pedidos da vista Temas e ~360 KB dos 415 KB. A 96 px são 1,8 KB por
- * foto — **91% menos bytes** para a mesma tira, medido sobre fotografias reais.
- *
- * Tal como as miniaturas: derivada, descartável, e a sua ausência nunca é um
- * erro. Sem micro o cartão usa a miniatura de 400 px, que é exactamente o que
- * ele faz hoje.
+ * A micro existe por uma medição: as três tiras de pré-visualização de cada
+ * cartão de tema são desenhadas com 43 × 42 px e recebiam o ficheiro de
+ * 400 px. Eram 18 dos 24 pedidos da vista Temas e ~360 KB dos 415 KB. A 96 px
+ * são 1,8 KB por foto — **91% menos bytes** para a mesma tira.
  */
-export const THEME_MICRO_BUCKET = "theme-micro";
 
 /**
  * Validade dos URLs assinados da biblioteca: 6 horas.
@@ -86,8 +99,12 @@ export const THEME_MICRO_BUCKET = "theme-micro";
  * último tema usado), por isso encurtar não custa nada a quem trabalha.
  * Prolongar a validade também não ajudava a cache do navegador: o token muda
  * a cada assinatura, logo o URL muda na mesma.
+ *
+ * O valor vive em `theme-ref.ts` porque o `proposal-storage.ts` também precisa
+ * dele: quando assina uma foto referenciada por um documento de proposta, o
+ * prazo que conta é este e não o das propostas.
  */
-export const SIGNED_TTL = 60 * 60 * 6;
+export const SIGNED_TTL = THEME_SIGNED_TTL;
 
 /**
  * A cópia tema → proposta assina no bucket DAS PROPOSTAS, e esse URL é
@@ -252,21 +269,6 @@ export function contentTypeForPath(path: string): string {
   if (/\.png$/i.test(path)) return "image/png";
   if (/\.webp$/i.test(path)) return "image/webp";
   return "image/jpeg";
-}
-
-/**
- * Um caminho `<pasta>/<ficheiro>.<ext>` dentro do bucket de temas, sem
- * travessia de diretórios. Usado para validar caminhos vindos do cliente
- * (importação para uma proposta, remoção de uma foto) antes de tocar no
- * Storage — pura, testada à parte.
- */
-export function isThemePath(ref: unknown): ref is string {
-  return typeof ref === "string" && /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.(jpe?g|png|webp)$/i.test(ref);
-}
-
-/** A pasta (id do tema) a que um caminho pertence; "" se o caminho for inválido. */
-export function themeIdOfPath(ref: string): string {
-  return isThemePath(ref) ? ref.slice(0, ref.indexOf("/")) : "";
 }
 
 /** A miniatura que acompanha uma foto no carregamento (feita no navegador). */
@@ -1281,151 +1283,67 @@ export async function fetchThemeImageBytes(path: string): Promise<Buffer | null>
 }
 
 /**
- * IMPORTAR UM LOTE de fotos da Biblioteca para uma proposta.
+ * ESCOLHER UM LOTE de fotos da Biblioteca para uma proposta.
  *
- * ── O que isto arruma, e porquê importa mesmo com UMA foto ────────────────
- * A versão anterior (`copyThemeImageToProposal`, ainda aqui em baixo) fazia
- * QUATRO idas ao Storage por foto, uma a seguir à outra:
+ * ── O que mudou aqui, e porquê ────────────────────────────────────────────
+ * Isto chamava-se `importarFotosDaBiblioteca` e COPIAVA os bytes para a pasta
+ * da proposta. Agora não copia nada: devolve `tema:<caminho>` e a foto fica
+ * onde está. O raciocínio completo está em `theme-ref.ts`; em duas linhas:
  *
- *     copiar a foto → assinar a foto → copiar a miniatura → assinar a miniatura
+ *   A cópia dava à foto uma identidade NOVA (`proposal-assets/<pedido>/<uuid>`)
+ *   e, com isso, deitava fora a cache do navegador e do service worker sobre a
+ *   foto que ele tinha ACABADO de descarregar no seletor. Importar catorze
+ *   fotos fazia a grelha do estúdio voltar a puxar catorze miniaturas que já
+ *   estavam no disco do telemóvel.
  *
- * Nenhuma delas move bytes pela rede — a cópia acontece dentro do Supabase —
- * mas cada uma paga a latência até lá. Quatro esperas encadeadas são os
- * segundos que se viam ao adicionar UMA foto, com a barra parada nos 0%.
+ * O que isso muda, medido em idas ao Storage:
  *
- * Duas observações mudam tudo:
- *
- *  1. **A foto e a miniatura são independentes.** Não há razão para a segunda
- *     esperar pela primeira: vão as duas ao mesmo tempo.
- *  2. **As assinaturas juntam-se.** `createSignedUrls` (plural) assina o lote
- *     inteiro num pedido — é o que a grelha dos temas já faz há muito.
- *
- * O caminho crítico passa de 4 idas ENCADEADAS para 2, e — o que interessa —
- * deixa de crescer com o número de fotos: 1 foto e 40 fotos custam as mesmas
- * duas esperas.
- *
- *     antes:  4 × ceil(N/5) idas encadeadas      (N=1 → 4;  N=40 → 32)
- *     depois: 2 idas encadeadas, sempre          (N=1 → 2;  N=40 → 2)
+ *     copiava:      ceil(N/8) + 1 idas,  e N × (576 KB + 20 KB) de bytes novos
+ *     referencia:   1 ida (duas assinaturas em paralelo),  0 bytes novos
  *
  * ── O que se mantém, e é de propósito ─────────────────────────────────────
- * · Continua a COPIAR em vez de referenciar. A proposta fica autónoma:
- *   reorganizar ou limpar a Biblioteca nunca pode partir uma proposta já
- *   enviada, e o gerador de PDF continua a resolver um bucket só.
- * · A ORDEM é a que ela pediu. Cada cópia escreve na sua posição, nunca no
- *   fim — a ordem por que se tocou nas fotos é a ordem por que saem no PDF.
- * · Uma foto que falhe não leva as outras atrás: sai da lista e o seu caminho
- *   é devolvido em `failed`, para o estúdio a poder manter seleccionada.
- * · Uma miniatura que falhe não é avaria nenhuma: a foto entra na mesma e a
- *   grelha cai para o original, como já fazia.
+ * · A ORDEM é a que ela pediu — as referências saem na ordem em que entraram.
+ * · Uma foto sem URL sai da lista e o seu caminho é devolvido em `failed`,
+ *   para o estúdio a poder manter seleccionada.
+ * · Uma miniatura em falta não é avaria: a foto entra na mesma e a grelha cai
+ *   para o original, como já fazia.
+ * · **Uma proposta já enviada não pode perder fotos.** Era esta a razão de ser
+ *   da cópia, e continua a ser respeitada — mas noutro sítio: apagar da
+ *   Biblioteca copia primeiro para quem referencia. Ver
+ *   {@link materializarAntesDeApagar}.
  *
- * @returns as cópias pela ordem pedida (sem os falhados) e a lista do que falhou.
+ * Os caminhos JÁ COPIADOS por propostas anteriores não são tocados: continuam
+ * a ser `<pedido>/<uuid>.jpg` no bucket das propostas e a resolver como sempre.
+ * Nada migra.
+ *
+ * @returns as referências pela ordem pedida (sem as falhadas) e o que falhou.
  */
-/** Fotos a copiar ao mesmo tempo. Cada uma são DUAS chamadas ao Storage (a
- *  foto e a miniatura), portanto oito fotos são dezasseis chamadas em voo. */
-const COPIAS_EM_PARALELO = 8;
-
-export async function importarFotosDaBiblioteca(
-  themePaths: readonly string[],
-  quoteId: string,
-): Promise<{
-  images: { path: string; url: string; thumbUrl?: string }[];
+export async function referenciarFotosDaBiblioteca(themePaths: readonly string[]): Promise<{
+  images: { path: string; url: string; thumbUrl?: string; sourcePath: string }[];
   failed: string[];
 }> {
-  const sb = getSupabase();
-  const safeQuoteId = quoteId.replace(/[^a-zA-Z0-9_-]/g, "");
   const validos = themePaths.filter(isThemePath);
-  if (!sb || !safeQuoteId || validos.length === 0) {
-    return { images: [], failed: [...themePaths] };
-  }
-  if (!(await ensureProposalBucket())) return { images: [], failed: [...themePaths] };
+  const invalidos = themePaths.filter((p) => !isThemePath(p));
+  if (validos.length === 0) return { images: [], failed: [...themePaths] };
 
-  /** O destino de cada foto, decidido AQUI para a ordem não depender de nada
-   *  que aconteça na rede. */
-  const destinos = validos.map((themePath) => ({
-    themePath,
-    dest: `${safeQuoteId}/${randomUUID()}.${extFor(contentTypeForPath(themePath))}`,
-  }));
+  // Uma ida: as duas assinaturas em paralelo, cada uma um pedido para o lote
+  // inteiro. Com 1 foto ou com 40, é a mesma espera.
+  const refs = validos.map(refDeTema);
+  const [urls, thumbs] = await Promise.all([signProposalPaths(refs), signProposalThumbs(refs)]);
 
-  // ── Ida 1: copiar tudo — fotos e miniaturas — ao mesmo tempo ────────────
-  const copiarFoto = async (d: (typeof destinos)[number]): Promise<boolean> => {
-    try {
-      const { error } = await sb.storage
-        .from(THEME_BUCKET)
-        .copy(d.themePath, d.dest, { destinationBucket: PROPOSAL_BUCKET });
-      if (!error) return true;
-      log.warn("theme-storage: cópia no Storage falhou, a descarregar", {
-        themePath: d.themePath,
-        erro: error.message,
-      });
-    } catch (e) {
-      log.error("theme-storage: cópia no Storage falhou", e, { themePath: d.themePath });
-    }
-    // Recurso: puxar os bytes e voltar a carregá-los. É lento (atravessa a
-    // função) e por isso fica ATRÁS de um aviso nos registos — se aparecer a
-    // sério, é ele que explica tudo o resto.
-    const bytes = await fetchThemeImageBytes(d.themePath);
-    if (!bytes) return false;
-    const carregada = await uploadProposalImage(quoteId, bytes, contentTypeForPath(d.themePath));
-    if (!carregada) return false;
-    // O recurso escolhe o seu próprio nome; a ordem mantém-se porque é a
-    // posição no array que manda, não o nome.
-    d.dest = carregada.path;
-    return true;
-  };
-
-  /** Melhor esforço: sem miniatura no tema não há nada a fazer, e não é erro. */
-  const copiarMiniatura = async (d: (typeof destinos)[number]): Promise<void> => {
-    try {
-      await sb.storage
-        .from(THEME_THUMB_BUCKET)
-        .copy(d.themePath, d.dest, { destinationBucket: PROPOSAL_THUMB_BUCKET });
-    } catch {
-      /* a foto entra na mesma; a grelha cai para o original */
-    }
-  };
-
-  // Com tecto: 40 fotos sem limite eram 80 chamadas ao Storage ao mesmo tempo,
-  // que é pedir para ser estrangulado. Oito de cada vez (16 chamadas em voo)
-  // mantém o ganho — o caminho crítico passa a ceil(N/8) + 1 idas em vez das
-  // 4×ceil(N/5) de antes — sem afogar o Supabase. Com UMA foto, que é o caso
-  // que doía, são duas idas e ponto final.
-  const ok = new Array<boolean>(destinos.length).fill(false);
-  let proxima = 0;
-  const trabalhador = async () => {
-    for (let i = proxima++; i < destinos.length; i = proxima++) {
-      const d = destinos[i];
-      // As duas cópias em paralelo — a miniatura não tem de esperar pela foto.
-      const [copiada] = await Promise.all([copiarFoto(d), copiarMiniatura(d)]);
-      ok[i] = copiada;
-    }
-  };
-  await Promise.all(
-    Array.from({ length: Math.min(COPIAS_EM_PARALELO, destinos.length) }, trabalhador),
-  );
-
-  const entraram = destinos.filter((_, i) => ok[i]);
-  const failed = destinos.filter((_, i) => !ok[i]).map((d) => d.themePath);
-  if (entraram.length === 0) return { images: [], failed };
-
-  // ── Ida 2: assinar tudo, dois pedidos, em paralelo ──────────────────────
-  const caminhos = entraram.map((d) => d.dest);
-  const [urls, thumbs] = await Promise.all([
-    signProposalPaths(caminhos),
-    signProposalThumbs(caminhos),
-  ]);
-
-  const images = entraram
-    .map((d) => {
-      const url = urls.get(d.dest) ?? "";
-      const thumbUrl = thumbs.get(d.dest);
-      return { path: d.dest, url, ...(thumbUrl ? { thumbUrl } : {}) };
+  const images = validos
+    .map((themePath) => {
+      const ref = refDeTema(themePath);
+      const url = urls.get(ref) ?? "";
+      const thumbUrl = thumbs.get(ref);
+      return { path: ref, url, sourcePath: themePath, ...(thumbUrl ? { thumbUrl } : {}) };
     })
     // Sem URL a foto é inútil para o estúdio — conta como falhada, com
     // honestidade, em vez de aparecer como uma célula vazia.
     .filter((im) => im.url);
 
-  const semUrl = entraram.filter((d) => !urls.get(d.dest)).map((d) => d.themePath);
-  return { images, failed: [...failed, ...semUrl] };
+  const semUrl = validos.filter((p) => !urls.get(refDeTema(p)));
+  return { images, failed: [...invalidos, ...semUrl] };
 }
 
 /**

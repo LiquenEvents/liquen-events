@@ -1027,9 +1027,10 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     return sources;
   }, [picker, doc.coverImages, doc.moodBoards, themeOrigins]);
 
-  // As fotos escolhidas já vêm COPIADAS para a pasta desta proposta pela rota
-  // /assets/importar, com os mesmos `path` que um carregamento manual daria —
-  // por isso entram no rascunho exatamente pelo mesmo caminho.
+  // As fotos escolhidas vêm REFERENCIADAS (`tema:<caminho>`) pela rota
+  // /assets/importar — não copiadas. Para o rascunho é indiferente: continua a
+  // ser uma string por foto, e quem a resolve (a grelha aqui, o gerador de PDF
+  // lá) sabe ler as duas famílias. O porquê está em `src/lib/theme-ref.ts`.
   //
   // O seletor entrega as fotos LOTE A LOTE (é assim que a barra de progresso
   // pode ser verdadeira), por isso isto corre várias vezes por importação —
@@ -1038,9 +1039,10 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     if (images.length === 0) return;
     setAssetUrls((prev) => {
       const next = { ...prev };
-      // A miniatura do TEMA viaja com a foto na cópia (ver
-      // `copiarMiniaturaParaProposta`), portanto uma foto escolhida da
-      // Biblioteca chega à grelha já leve.
+      // A miniatura é a DO TEMA — o mesmo `theme-thumbs/<pasta>/<x>.jpg` que o
+      // seletor acabou de mostrar. É esse o ganho da referência: o service
+      // worker já a tem no disco (guarda por caminho, sem token), portanto a
+      // célula desenha sem tocar na rede.
       for (const im of images) if (im.path && im.url) next[im.path] = im.thumbUrl || im.url;
       return next;
     });

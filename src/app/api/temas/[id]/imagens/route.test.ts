@@ -18,7 +18,10 @@ const st = vi.hoisted(() => ({
     total: 1,
     truncated: false,
   })),
-  del: vi.fn(async () => true),
+  /** Duplo de `apagarFotoDaBiblioteca`: a salvaguarda das propostas que
+   *  referenciam a foto tem casa própria (`theme-materializar.test.ts`); aqui
+   *  o que se prova é o guarda de caminhos e o tratamento das avarias. */
+  del: vi.fn(async (): Promise<{ ok: boolean; motivo?: "referencias" }> => ({ ok: true })),
   upload: vi.fn(async (id: string) => ({
     kind: "created" as const,
     image: { path: `${id}/nova.jpg`, url: "https://signed/nova" },
@@ -43,11 +46,11 @@ vi.mock("@/lib/theme-storage", async () => {
   return {
     ...real,
     listThemeImagePage: st.list,
-    deleteThemeImage: st.del,
     uploadThemeImage: st.upload,
     findThemeImageByBytes: st.byBytes,
   };
 });
+vi.mock("@/lib/theme-materializar", () => ({ apagarFotoDaBiblioteca: st.del }));
 
 import { GET, POST, DELETE } from "./route";
 
@@ -197,8 +200,18 @@ describe("DELETE /api/temas/[id]/imagens", () => {
   });
 
   it("devolve 502 quando o Storage não confirma a remoção", async () => {
-    st.del.mockResolvedValueOnce(false);
+    st.del.mockResolvedValueOnce({ ok: false });
     expect((await DELETE(...del("t-1/a.jpg"))).status).toBe(502);
+  });
+
+  /** Uma foto que está numa proposta e cuja salvaguarda falhou NÃO é apagada,
+   *  e a mensagem tem de dizer isso — senão ela repete a acção a achar que é
+   *  uma avaria do Storage. */
+  it("explica quando a foto ficou por apagar por estar numa proposta", async () => {
+    st.del.mockResolvedValueOnce({ ok: false, motivo: "referencias" });
+    const res = await DELETE(...del("t-1/a.jpg"));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toMatch(/proposta/i);
   });
 
   it("devolve 500 tratado (não um throw cru) quando a remoção rebenta", async () => {

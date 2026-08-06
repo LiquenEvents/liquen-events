@@ -2,6 +2,14 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { getSupabase } from "./supabase";
+import {
+  THEME_BUCKET,
+  THEME_SIGNED_TTL,
+  THEME_THUMB_BUCKET,
+  caminhoDoRefDeTema,
+  ehRefDeTema,
+  separarRefs,
+} from "./theme-ref";
 import { log } from "./logger";
 
 /**
@@ -429,11 +437,17 @@ export async function fetchProposalImageBytes(ref: string): Promise<Buffer | nul
     // O `kind` diz onde procurar sem expor o caminho todo: um caminho de bucket
     // que falha é outro problema (permissões, ficheiro apagado) de um URL que
     // falha (assinatura expirada, anfitrião errado).
+    // Uma foto da BIBLIOTECA que não resolve tem uma causa própria e uma
+    // resolução própria (foi apagada de um tema, apesar da salvaguarda do
+    // `theme-materializar`), por isso não pode ficar misturada com as fotos da
+    // pasta do pedido nos registos.
     const kind = ref.startsWith("data:")
       ? "data-uri"
       : /^https?:\/\//i.test(ref)
         ? "url"
-        : "caminho-do-bucket";
+        : ehRefDeTema(ref)
+          ? "biblioteca-de-temas"
+          : "caminho-do-bucket";
     log.warn("proposal-storage: imagem não resolveu, vai FALTAR no PDF", {
       kind,
       ref: ref.slice(0, 120),
@@ -482,9 +496,22 @@ async function fetchProposalImageBytesInner(ref: string): Promise<Buffer | null>
       return null;
     }
   }
-  // Bucket storage path.
   const sb = getSupabase();
   if (!sb) return null;
+  // Uma foto da Biblioteca de Temas, referenciada em vez de copiada. O bucket é
+  // outro; tudo o resto — o `download`, os bytes, o que o gerador faz a seguir —
+  // é igual. `ehRefDeTema` já validou a forma do caminho, portanto o que chega
+  // ao Storage nunca é uma travessia.
+  if (ehRefDeTema(ref)) {
+    try {
+      const { data, error } = await sb.storage.from(THEME_BUCKET).download(caminhoDoRefDeTema(ref));
+      if (error || !data) return null;
+      return Buffer.from(await data.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+  // Bucket storage path.
   try {
     const { data, error } = await sb.storage.from(PROPOSAL_BUCKET).download(ref);
     if (error || !data) return null;
@@ -592,39 +619,82 @@ export async function uploadProposalThumb(
  * da Biblioteca de Temas fazia exactamente isso — quatro idas por foto, das
  * quais duas eram assinaturas.
  */
-export async function signProposalPaths(paths: string[]): Promise<Map<string, string>> {
+/**
+ * Assina um lote contra UM bucket. `silencioso` para as derivadas: uma
+ * instalação sem miniaturas devolve um mapa vazio e a grelha cai para o
+ * original — isso é o comportamento normal, não um erro para os registos.
+ */
+async function assinarLote(
+  bucket: string,
+  paths: string[],
+  silencioso: boolean,
+  ttl: number,
+): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const sb = getSupabase();
   if (!sb || paths.length === 0) return out;
   try {
-    const { data, error } = await sb.storage
-      .from(PROPOSAL_BUCKET)
-      .createSignedUrls(paths, SIGNED_TTL);
-    if (error) log.error("proposal-storage: assinatura em lote falhou", error, { n: paths.length });
+    const { data, error } = await sb.storage.from(bucket).createSignedUrls(paths, ttl);
+    if (error && !silencioso)
+      log.error("proposal-storage: assinatura em lote falhou", error, { bucket, n: paths.length });
     for (const row of data ?? []) {
       if (row?.path && row.signedUrl) out.set(row.path, row.signedUrl);
     }
   } catch (e) {
-    log.error("proposal-storage: assinatura em lote falhou", e, { n: paths.length });
+    if (!silencioso)
+      log.error("proposal-storage: assinatura em lote falhou", e, { bucket, n: paths.length });
   }
   return out;
 }
 
-export async function signProposalThumbs(paths: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const sb = getSupabase();
-  if (!sb || paths.length === 0) return out;
-  try {
-    const { data } = await sb.storage
-      .from(PROPOSAL_THUMB_BUCKET)
-      .createSignedUrls(paths, SIGNED_TTL);
-    for (const row of data ?? []) {
-      if (row?.path && row.signedUrl) out.set(row.path, row.signedUrl);
-    }
-  } catch {
-    /* sem miniaturas nesta instalação — a grelha cai para os originais */
+/**
+ * Assina uma lista de referências de documento **contra o bucket certo para
+ * cada uma**, e devolve o mapa com a chave ORIGINAL.
+ *
+ * As duas famílias e porquê estão juntas: um mood board pode ter fotos
+ * carregadas à mão (`<pedido>/<uuid>.jpg`, no bucket da proposta) misturadas
+ * com fotos escolhidas da Biblioteca (`tema:<pasta>/<x>.jpg`, no bucket dos
+ * temas). Quem desenha a grelha não devia ter de saber a diferença — passa a
+ * lista toda e recebe um URL por referência.
+ *
+ * São dois pedidos, um por bucket, EM PARALELO — e não um pedido por foto. Com
+ * um lote só de proposta (o caso de hoje) o segundo pedido nem chega a existir,
+ * portanto isto custa exactamente o mesmo que custava.
+ *
+ * A chave do mapa é a referência tal como está no documento, `tema:` incluído.
+ * O Storage devolve o caminho SEM prefixo, por isso é aqui que ele volta a ser
+ * posto — se fosse omitido, quem chama procuraria pela chave que tem e não
+ * encontrava nada.
+ *
+ * Cada bucket com o SEU prazo. A pasta de um pedido assina a 10 anos porque é
+ * a pré-visualização dela própria; a biblioteca assina a 6 horas
+ * ({@link THEME_SIGNED_TTL}) porque é o activo do estúdio inteiro. Assinar um
+ * `tema:` com o prazo das propostas passaria calado e desfazia essa decisão.
+ */
+async function assinarRefs(
+  refs: string[],
+  bucketDaProposta: string,
+  bucketDoTema: string,
+  silencioso: boolean,
+): Promise<Map<string, string>> {
+  const { daBiblioteca, daProposta } = separarRefs(refs);
+  const [proprias, deTema] = await Promise.all([
+    assinarLote(bucketDaProposta, daProposta, silencioso, SIGNED_TTL),
+    assinarLote(bucketDoTema, daBiblioteca.map(caminhoDoRefDeTema), silencioso, THEME_SIGNED_TTL),
+  ]);
+  for (const ref of daBiblioteca) {
+    const url = deTema.get(caminhoDoRefDeTema(ref));
+    if (url) proprias.set(ref, url);
   }
-  return out;
+  return proprias;
+}
+
+export async function signProposalPaths(paths: string[]): Promise<Map<string, string>> {
+  return assinarRefs(paths, PROPOSAL_BUCKET, THEME_BUCKET, false);
+}
+
+export async function signProposalThumbs(paths: string[]): Promise<Map<string, string>> {
+  return assinarRefs(paths, PROPOSAL_THUMB_BUCKET, THEME_THUMB_BUCKET, true);
 }
 
 /**
@@ -658,8 +728,18 @@ export async function duplicarFotosParaPedido(
   const destino = quoteIdDestino.replace(/[^a-zA-Z0-9_-]/g, "");
   // Só caminhos do Storage. Uma imagem embutida (`data:`) viaja no documento e
   // não tem nada para copiar.
+  //
+  // Uma referência à Biblioteca (`tema:…`) também não: ela NÃO vive debaixo do
+  // pedido, e é precisamente por isso que o problema descrito acima não lhe
+  // toca. Copiar o caminho tal e qual é aqui a resposta certa — ela não aparece
+  // no mapa, quem chama mantém a referência, e duplicar uma proposta cheia de
+  // fotos da biblioteca passa a não custar chamada nenhuma ao Storage.
   const validos = [
-    ...new Set(caminhos.filter((p) => typeof p === "string" && p && !p.startsWith("data:"))),
+    ...new Set(
+      caminhos.filter(
+        (p) => typeof p === "string" && p && !p.startsWith("data:") && !ehRefDeTema(p),
+      ),
+    ),
   ];
   if (!sb || !destino || validos.length === 0) return mapa;
   if (!(await ensureBucket())) return mapa;
