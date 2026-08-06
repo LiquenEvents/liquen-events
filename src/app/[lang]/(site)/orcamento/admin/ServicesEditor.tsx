@@ -27,6 +27,7 @@ import {
   type ServiceGroup,
   type ServiceItem,
 } from "@/lib/proposal-doc";
+import BibliotecaServicos from "./BibliotecaServicos";
 
 /**
  * A secção «Serviços» do estúdio de propostas — grupos (a, b, c…) e as suas
@@ -165,6 +166,8 @@ export default function ServicesEditor({
   /** Pilha de anulação: fotografias dos grupos ANTES de cada ação estrutural. */
   const undoStack = useRef<{ groups: Groups; focus: FocusTarget }[]>([]);
   /** "Removido — anular", em vez de uma pergunta antes de cada remoção. */
+  /** Que grupo tem a gaveta da biblioteca aberta. `null` = nenhuma. */
+  const [bibliotecaAberta, setBibliotecaAberta] = useState<number | null>(null);
   const [removal, setRemoval] = useState<{
     label: string;
     groups: Groups;
@@ -718,13 +721,47 @@ export default function ServicesEditor({
                                 </SortableRow>
                               );
                             })}
-                            <button
-                              type="button"
-                              className={`${ADD_BTN} self-start pl-0.5`}
-                              onClick={() => addItem(gi)}
-                            >
-                              + Adicionar linha
-                            </button>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <button
+                                type="button"
+                                className={`${ADD_BTN} self-start pl-0.5`}
+                                onClick={() => addItem(gi)}
+                              >
+                                + Adicionar linha
+                              </button>
+                              {/* A biblioteca ao lado do escrever à mão, e não
+                                  em vez dele: escrever continua a ser o caminho
+                                  mais curto para o que ainda não existe. */}
+                              <button
+                                type="button"
+                                className={`${ADD_BTN} self-start`}
+                                aria-expanded={bibliotecaAberta === gi}
+                                onClick={() => setBibliotecaAberta((a) => (a === gi ? null : gi))}
+                              >
+                                ⌕ Da biblioteca
+                              </button>
+                            </div>
+                            {bibliotecaAberta === gi && (
+                              <BibliotecaServicos
+                                onFechar={() => setBibliotecaAberta(null)}
+                                onEscolher={(s) => {
+                                  onGroupsChange((prev) =>
+                                    prev.map((g, j) =>
+                                      j === gi
+                                        ? {
+                                            ...g,
+                                            items: [
+                                              ...g.items,
+                                              { label: s.nome, desc: s.descricao || undefined },
+                                            ],
+                                          }
+                                        : g,
+                                    ),
+                                  );
+                                  setBibliotecaAberta(null);
+                                }}
+                              />
+                            )}
                           </div>
                         </SortableContext>
                       </DndContext>
