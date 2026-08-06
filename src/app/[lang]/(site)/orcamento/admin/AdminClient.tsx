@@ -1866,7 +1866,25 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             safe-area inset) so the last row never hides under the tab bar. */}
         <div className="flex-1 min-w-0 flex flex-col pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/95 border-b border-[var(--bo-hairline)] pt-safe">
+          {/* A ESCADA DE PLANOS do back office, escrita uma vez para não voltar
+              a colidir:
+                10  detalhes dentro de um cartão (cabeçalhos de painel)
+                20  barras `sticky` DENTRO do conteúdo (a do total do estúdio)
+                30  o cabeçalho da vista e a barra de navegação de baixo
+                40  a gaveta de navegação e o seu fundo escuro
+                50+ diálogos e o Toast
+
+              Este cabeçalho estava a `z-20` — o MESMO plano da barra do total
+              do estúdio. Com o mesmo `z-index` quem manda é a ordem no DOM, e a
+              barra do estúdio vem depois: passava por cima do cabeçalho. Com o
+              fundo a 95% via-se o texto de uma a atravessar a outra, e era isso
+              que fazia "Escolha o cliente e escreva a proposta" aparecer por
+              cima do título.
+
+              O fundo passa a OPACO pela mesma razão: 5% de transparência num
+              ecrã com texto escuro por baixo chega para o tornar ilegível, e
+              aqui não há nada a ganhar com o efeito. */}
+          <header className="sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b border-[var(--bo-hairline)] pt-safe">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
               {/* Mobile menu — opens the full nav drawer without depending on the
                   bottom-nav "Mais" (which is hidden while a quote drawer is open). */}

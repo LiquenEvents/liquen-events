@@ -7,6 +7,8 @@ import {
   descreverAlvo,
   descreverCampo,
   descreverCulpado,
+  descreverTexto,
+  TEXTO_MIN,
 } from "./ergonomia-tactil.mjs";
 
 /**
@@ -88,6 +90,7 @@ async function expectErgonomiaTactil(page: Page, label: string) {
     camposPequenos: Parameters<typeof descreverCampo>[0][];
     foraDoEcra: { x: number; rotulo: string; texto: string; tag: string }[];
     overflow: { culpados: Parameters<typeof descreverCulpado>[0][] };
+    textoEsmagado: Parameters<typeof descreverTexto>[0][];
   };
 
   // A vista tem de ter sido mesmo desenhada — zero elementos interactivos quer
@@ -97,43 +100,72 @@ async function expectErgonomiaTactil(page: Page, label: string) {
     0,
   );
 
-  expect(
-    r.pequenos,
-    `"${label}": ${r.pequenos.length} alvo(s) abaixo de ${ALVO_MIN}x${ALVO_MIN}px:\n` +
-      r.pequenos.map(descreverAlvo).join("\n"),
-  ).toEqual([]);
+  /**
+   * TUDO O QUE ESTÁ MAL, DE UMA VEZ.
+   *
+   * Antes eram cinco `expect` em fila: o primeiro a falhar escondia os outros
+   * quatro, e corrigir uma vista passava a ser cinco voltas de "corrigir,
+   * correr, descobrir o seguinte" — com 1,5 minutos de passeio a cada volta.
+   * Agora falha uma vez e diz tudo o que encontrou.
+   */
+  const achados: string[] = [];
 
-  expect(
-    r.camposPequenos,
-    `"${label}": ${r.camposPequenos.length} campo(s) com letra < ${LETRA_CAMPO_MIN}px — ` +
-      `o Safari do iOS amplia a página ao focá-los e não desamplia:\n` +
-      r.camposPequenos.map(descreverCampo).join("\n"),
-  ).toEqual([]);
+  if (r.pequenos.length) {
+    achados.push(
+      `${r.pequenos.length} alvo(s) abaixo de ${ALVO_MIN}x${ALVO_MIN}px:\n` +
+        r.pequenos.map(descreverAlvo).join("\n"),
+    );
+  }
+
+  if (r.camposPequenos.length) {
+    achados.push(
+      `${r.camposPequenos.length} campo(s) com letra < ${LETRA_CAMPO_MIN}px — o Safari do iOS ` +
+        `amplia a página ao focá-los e não desamplia:\n` +
+        r.camposPequenos.map(descreverCampo).join("\n"),
+    );
+  }
 
   // Nada focável fora do ecrã. A gaveta fechada continua no DOM em `x = -244`;
   // sem `inert`, o TAB de um teclado externo e o varrimento do VoiceOver entram
   // lá dentro e o foco desaparece do ecrã.
-  expect(
-    r.foraDoEcra,
-    `"${label}": ${r.foraDoEcra.length} elemento(s) focáveis fora do ecrã — ` +
-      `o foco do teclado desaparece lá para dentro. Falta \`inert\`?\n` +
-      r.foraDoEcra.map((f) => `  x=${f.x}  "${f.rotulo || f.texto || f.tag}"`).join("\n"),
-  ).toEqual([]);
+  if (r.foraDoEcra.length) {
+    achados.push(
+      `${r.foraDoEcra.length} elemento(s) focáveis fora do ecrã — o foco do teclado desaparece ` +
+        `lá para dentro. Falta \`inert\`?\n` +
+        r.foraDoEcra.map((f) => `  x=${f.x}  "${f.rotulo || f.texto || f.tag}"`).join("\n"),
+    );
+  }
 
-  expect(
-    r.overflow.culpados,
-    `"${label}": ${r.overflow.culpados.length} elemento(s) para lá da margem direita a ` +
-      `${ECRA_ESTREITO.width}px. Ficam CORTADOS (o body tem overflow-x: clip), ` +
-      `portanto não há como chegar lá:\n` +
-      r.overflow.culpados.map(descreverCulpado).join("\n"),
-  ).toEqual([]);
+  // TEXTO ESMAGADO. O defeito que motivou esta verificação: no estúdio de
+  // propostas, um parágrafo irmão de três botões `shrink-0` dentro de um `flex`
+  // em linha ficava com ~30 px e passava a UMA PALAVRA POR LINHA — duas frases
+  // a ocupar dois ecrãs de scroll. Mede-se a largura RENDERIZADA porque é a
+  // única forma de o apanhar: no código não se vê, e a grelha de classes está
+  // toda correcta vista uma a uma.
+  if (r.textoEsmagado.length) {
+    achados.push(
+      `${r.textoEsmagado.length} bloco(s) de texto com menos de ${TEXTO_MIN}px de largura. ` +
+        `Texto corrido assim estreito parte uma palavra por linha — quase sempre é um parágrafo ` +
+        `dentro de um flex em linha com uma barra de botões \`shrink-0\` ao lado. A correcção é ` +
+        `empilhar abaixo de \`sm\`:\n` +
+        r.textoEsmagado.map(descreverTexto).join("\n"),
+    );
+  }
+
+  if (r.overflow.culpados.length) {
+    achados.push(
+      `${r.overflow.culpados.length} elemento(s) para lá da margem direita a ` +
+        `${ECRA_ESTREITO.width}px. Ficam CORTADOS (o body tem overflow-x: clip), portanto não ` +
+        `há como chegar lá:\n` +
+        r.overflow.culpados.map(descreverCulpado).join("\n"),
+    );
+  }
+
+  expect(achados, `"${label}": ${achados.length} problema(s)\n\n${achados.join("\n\n")}`).toEqual(
+    [],
+  );
 }
 
-// nav label → H1 heading. The five core items plus the "Mais" destinations whose
-// wide tables and image grids are the likeliest to push the page sideways on a
-// phone (Faturas, Propostas Aceites, Organização de propostas, Temas,
-// Estatísticas). Every label here must exist in nav.tsx — a destination that
-// isn't in the sidebar can't be walked.
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
@@ -191,6 +223,46 @@ test.describe("Back office — mobile", () => {
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
       await expectErgonomiaTactil(page, view.nav.source);
+
+      /**
+       * O ESTÚDIO SÓ EXISTE DEPOIS DE SE ESCOLHER O CLIENTE.
+       *
+       * "Fazer proposta" abre num escolhedor ("Passo 1 de 2 — Para quem é a
+       * proposta?"); o estúdio, que é onde vive quase todo o formulário, só é
+       * desenhado a seguir. Medir só o escolhedor dava um passo VERDE sobre um
+       * ecrã que não é o que se usa — e foi exactamente o que aconteceu: o
+       * parágrafo esmagado do estúdio viveu aqui sem nunca ser apanhado, porque
+       * o passeio parava um clique antes.
+       *
+       * Só entra se houver mesmo um pedido na lista; sem pedidos não há estúdio
+       * para medir, e inventar um aqui era escrever dados no meio de um passeio
+       * declaradamente de leitura.
+       */
+      if (view.nav.source === "^Fazer proposta$") {
+        const estudio = page.getByText(/Estúdio de propostas/i).first();
+        // O estúdio LEMBRA-SE do último cliente: à segunda visita abre já nele,
+        // sem passar pelo escolhedor. Tentar escolher aqui um cliente que não
+        // está no ecrã dava uma falha que não tem nada a ver com ergonomia — foi
+        // o que aconteceu à primeira versão deste passo.
+        if ((await estudio.count()) === 0) {
+          // NÃO se salta em silêncio: um passo que se salta sozinho é como o
+          // defeito do parágrafo esmagado sobreviveu tanto tempo.
+          const cartoes = page.locator("main li button");
+          await expect(
+            cartoes.first(),
+            "Sem cliente escolhido e sem ninguém na lista — o estúdio não chega a ser medido.",
+          ).toBeVisible();
+          await cartoes.first().click();
+        }
+        // `toHaveCount` e NÃO `toBeVisible`: quem julga o layout é a auditoria
+        // a seguir, não este passo de navegação. Com `toBeVisible` o passeio
+        // rebentava aqui quando o parágrafo estava esmagado a 0 px — ou seja,
+        // falhava a dizer "não cheguei ao estúdio" quando na verdade tinha
+        // chegado e encontrado o defeito. A presença prova a navegação; a
+        // largura é problema da auditoria.
+        await expect(estudio).toHaveCount(1);
+        await expectErgonomiaTactil(page, "Fazer proposta → estúdio");
+      }
     }
 
     expect(errors, `Unexpected runtime errors:\n${errors.join("\n")}`).toEqual([]);

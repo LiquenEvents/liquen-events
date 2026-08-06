@@ -37,6 +37,24 @@ export const LETRA_CAMPO_MIN = 16;
 export const ESPACO_MIN = 8;
 
 /**
+ * Largura mínima de renderização de um bloco de texto CORRIDO, em píxeis.
+ *
+ * Não é um capricho tipográfico: abaixo disto o texto passa a partir uma
+ * palavra por linha, e duas frases ocupam dois ecrãs de scroll. Acontece quando
+ * um parágrafo é irmão de uma barra de botões marcada `shrink-0` dentro de um
+ * `flex` em linha — os botões ficam com a largura que pedem e o texto encolhe
+ * até à palavra mais comprida.
+ *
+ * 100 px a 375 é conservador: cabem 4 a 5 palavras curtas por linha. Um
+ * parágrafo abaixo disto está partido, não apertado.
+ */
+export const TEXTO_MIN = 100;
+
+/** A partir de quantas letras um elemento conta como texto CORRIDO. Abaixo
+ *  disto são chips, contadores e rótulos, que são estreitos por desenho. */
+export const TEXTO_LETRAS_MIN = 40;
+
+/**
  * O auditor que corre DENTRO da página, como fonte para `page.evaluate`.
  *
  * É uma string e não uma função por uma razão prática: o guião `.mjs` e o
@@ -45,6 +63,8 @@ export const ESPACO_MIN = 8;
  */
 export const AUDITOR = `(() => {
   const ALVO_MIN = ${ALVO_MIN};
+  const TEXTO_MIN = ${TEXTO_MIN};
+  const TEXTO_LETRAS_MIN = ${TEXTO_LETRAS_MIN};
   const ESPACO_MIN = ${ESPACO_MIN};
   const LETRA_CAMPO_MIN = ${LETRA_CAMPO_MIN};
 
@@ -236,9 +256,50 @@ export const AUDITOR = `(() => {
     focoAntes.focus({ preventScroll: true });
   }
 
+  /**
+   * TEXTO ESMAGADO — parágrafos espremidos até à largura de uma palavra.
+   *
+   * Só se olha para texto CORRIDO (≥ TEXTO_LETRAS_MIN letras): um chip de
+   * estado ou um contador são estreitos de propósito e não têm nada a ver com
+   * este defeito. E só para os que estão VISÍVEIS — um painel fechado não conta.
+   */
+  const textoEsmagado = [];
+  for (const el of document.querySelectorAll("p, li, dd, blockquote, figcaption")) {
+    // NÃO se usa \`visivel()\` aqui, e esta é a linha que faz o cheque valer.
+    //
+    // O \`visivel()\` descarta tudo o que tenha largura zero — e a largura zero
+    // é PRECISAMENTE o pior caso deste defeito: um parágrafo espremido contra
+    // uma barra de botões \`shrink-0\` não fica estreito, fica com 0 px, e o
+    // Playwright chama-lhe "hidden". A primeira versão deste cheque usava
+    // \`visivel()\` e por isso ignorava exactamente aquilo que existe para
+    // apanhar. Só se viu ao repor o defeito de propósito.
+    //
+    // O que se descarta é só o que está mesmo escondido: \`display:none\`,
+    // \`visibility:hidden\`, um painel fechado, uma gaveta \`inert\`.
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") continue;
+    if (el.closest("[inert],[aria-hidden=true],[hidden]")) continue;
+    let escondidoPeloPai = false;
+    for (let pai = el.parentElement; pai; pai = pai.parentElement) {
+      const cp = getComputedStyle(pai);
+      if (cp.display === "none" || cp.visibility === "hidden") { escondidoPeloPai = true; break; }
+    }
+    if (escondidoPeloPai) continue;
+
+    const t = (el.textContent || "").trim();
+    if (t.length < TEXTO_LETRAS_MIN) continue;
+    const r = el.getBoundingClientRect();
+    // Altura zero com largura zero é um elemento fora de fluxo, não um
+    // parágrafo esmagado — só conta o que ocupa mesmo espaço vertical.
+    if (r.height === 0) continue;
+    if (r.width >= TEXTO_MIN) continue;
+    textoEsmagado.push({ ...assinatura(el), largura: Math.round(r.width), letras: t.length });
+  }
+
   return {
     examinados: interactivos.length,
     campos: document.querySelectorAll(CAMPOS).length,
+    textoEsmagado,
     pequenos,
     encostados,
     camposPequenos,
@@ -256,6 +317,12 @@ export function descreverAlvo(p) {
 export function descreverCampo(c) {
   const nome = c.rotulo || c.texto || `<${c.tag}${c.tipo ? ` type=${c.tipo}` : ""}>`;
   return `  ${c.fontSize}px  "${nome}"  (mínimo ${LETRA_CAMPO_MIN}px, senão o iOS amplia)`;
+}
+
+/** Uma linha por parágrafo esmagado. */
+export function descreverTexto(t) {
+  const amostra = (t.texto || "").slice(0, 50);
+  return `  ${t.largura}px de largura para ${t.letras} letras  "${amostra}…"  (mínimo ${TEXTO_MIN}px)`;
 }
 
 export function descreverCulpado(c) {

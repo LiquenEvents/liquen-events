@@ -1439,7 +1439,16 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-start justify-between gap-3 mb-4">
+      {/* EMPILHA no telemóvel, em vez de repartir a largura.
+          O que estava aqui era um `flex` em linha com o texto de um lado e três
+          botões do outro, marcados `shrink-0`. A 375 px os botões ficavam com
+          ~330 px e o parágrafo com o que sobrava: encolhia até à largura da
+          palavra mais comprida e passava a UMA PALAVRA POR LINHA — dois ecrãs
+          de scroll para ler duas frases. O `min-w-0` do lado do texto, que
+          existe para o truncar deixar de empurrar, aqui deixava-o chegar a zero.
+          É o padrão a evitar em todo o back office: texto e barra de acções na
+          mesma linha só a partir de `sm`. */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="bo-eyebrow">Estúdio de propostas (PDF)</p>
           <p className="mt-2 text-sm leading-relaxed text-foreground/55">
@@ -1447,7 +1456,9 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
             pré-visualizar antes de enviar.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        {/* `flex-wrap` e não `shrink-0`: com três botões a 375 px, um deles
+            saía pela margem direita e ficava cortado ("Limpa…"). */}
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           {/* A acção principal desta secção: quase todas as propostas são uma
               variação de uma anterior. É a única aqui a verde. */}
           <Button size="sm" onClick={() => setCopiarAberto(true)}>
@@ -2574,7 +2585,12 @@ function Section({
             onClick={alternar}
             aria-expanded={!fechada}
             aria-controls={corpoId}
-            className="group flex items-baseline gap-2 text-left"
+            /* `alvo-toque` + `py-2`: o cabeçalho de uma secção É o interruptor
+               que a abre e fecha, e media 20 px de altura — metade do mínimo de
+               44. Num telemóvel, abrir "Serviços" era acertar numa faixa da
+               espessura de uma linha de texto. O `items-baseline` mantém-se para
+               a seta e o título continuarem alinhados pela base. */
+            className="alvo-toque group -my-1 flex items-baseline gap-2 py-2 text-left"
           >
             <span
               aria-hidden
