@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { LQIP_EDGE, LQIP_MAX_CHARS, LQIP_QUALITY, planResize } from "./image-worker";
@@ -97,6 +97,39 @@ describe("LQIP — a imagem que viaja dentro do JSON", () => {
       `LQIP ${lqip} B contra miniatura ${miniatura} B — menos de 20× de diferença deixa de ` +
         `justificar inline.`,
     ).toBeLessThan(miniatura);
+  });
+
+  /**
+   * A MIGRAÇÃO TEM DE PRODUZIR O MESMO PLACEHOLDER QUE O NAVEGADOR.
+   *
+   * `scripts/migrar-lqip.mjs` gera o LQIP das fotos que já lá estavam, com
+   * `sharp`, em Node. O navegador gera o das novas, com `OffscreenCanvas`. São
+   * dois encoders diferentes — e podem ser, porque o resultado vai desfocado.
+   *
+   * O que NÃO pode ser diferente são os números: se a migração usasse 24 px ou
+   * q70, as 104 fotos migradas ficavam com um placeholder visivelmente distinto
+   * do das novas. E nota-se, porque o placeholder é a COR que aparece primeiro:
+   * meia biblioteca com um tom e meia com outro.
+   *
+   * O guião não pode importar do TypeScript (corre-se com `node`, sem
+   * compilação), por isso os valores estão lá escritos. Isto é o que os prende.
+   */
+  it("a migração usa exactamente os mesmos números que o navegador", () => {
+    const guiao = readFileSync("scripts/migrar-lqip.mjs", "utf-8");
+    const numero = (nome: string): number => {
+      const m = new RegExp(`const ${nome} = (\\d+)`).exec(guiao);
+      expect(m, `\`${nome}\` desapareceu de scripts/migrar-lqip.mjs`).not.toBeNull();
+      return Number(m![1]);
+    };
+    expect(numero("LQIP_EDGE"), "a migração reduz para um tamanho diferente do navegador").toBe(
+      LQIP_EDGE,
+    );
+    // O `sharp` toma a qualidade em 0–100 e o canvas em 0–1. Mesmo valor,
+    // escalas diferentes — é a conversão que se está a prender aqui.
+    expect(numero("LQIP_QUALITY"), "a migração encoda com outra qualidade").toBe(
+      Math.round(LQIP_QUALITY * 100),
+    );
+    expect(numero("LQIP_MAX_CHARS"), "a migração aceita um tecto diferente").toBe(LQIP_MAX_CHARS);
   });
 
   it("16 px é do LADO MAIOR, e a proporção mantém-se", () => {
