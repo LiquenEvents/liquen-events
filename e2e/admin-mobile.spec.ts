@@ -8,6 +8,7 @@ import {
   descreverCampo,
   descreverCulpado,
   descreverTexto,
+  descreverTapado,
   TEXTO_MIN,
 } from "./ergonomia-tactil.mjs";
 
@@ -91,6 +92,7 @@ async function expectErgonomiaTactil(page: Page, label: string) {
     foraDoEcra: { x: number; rotulo: string; texto: string; tag: string }[];
     overflow: { culpados: Parameters<typeof descreverCulpado>[0][] };
     textoEsmagado: Parameters<typeof descreverTexto>[0][];
+    tapados: Parameters<typeof descreverTapado>[0][];
   };
 
   // A vista tem de ter sido mesmo desenhada — zero elementos interactivos quer
@@ -149,6 +151,17 @@ async function expectErgonomiaTactil(page: Page, label: string) {
         `dentro de um flex em linha com uma barra de botões \`shrink-0\` ao lado. A correcção é ` +
         `empilhar abaixo de \`sm\`:\n` +
         r.textoEsmagado.map(descreverTexto).join("\n"),
+    );
+  }
+
+  // TAPADOS. Um botão do tamanho certo, dentro da margem, no ecrã — e com uma
+  // barra `sticky` por cima. Tocar ali toca na barra. Aconteceu duas vezes
+  // neste estúdio, e nenhum dos outros cheques o via.
+  if (r.tapados.length) {
+    achados.push(
+      `${r.tapados.length} elemento(s) interactivos por baixo de uma barra fixa — tocar neles ` +
+        `toca na barra:\n` +
+        r.tapados.map(descreverTapado).join("\n"),
     );
   }
 

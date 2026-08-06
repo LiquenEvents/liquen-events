@@ -2282,7 +2282,11 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                   doc.validUntilDays ? (
                     <button
                       type="button"
-                      className="text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
+                      /* `alvo-toque` + `py-2`: media 18 px de altura. Foi o CI
+                         a apanhá-lo e não a máquina de quem escreveu — só
+                         aparece quando a proposta tem uma validade diferente da
+                         preferida, e os dados locais não a tinham. */
+                      className="alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
                       onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
                     >
                       Passar a usar {doc.validUntilDays} dias em todas as propostas novas
@@ -2386,7 +2390,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         // próprio contexto de empilhamento — desenham-se POR CIMA desta barra, e o
         // texto do total aparecia misturado com o do campo por baixo. Vê-se na
         // captura de ecrã antes desta linha existir; nenhum teste apanhava.
-        className="sticky bottom-0 z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-3 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)]"
+        className="sticky bottom-0 z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3"
       >
         {step === "conteudo" && (
           <>
@@ -2395,33 +2399,65 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                 proposta». O valor vive cinco ecrãs abaixo do sítio onde ela
                 está a escrever os serviços; aqui acompanha-a por toda a
                 página, e muda enquanto ela escreve. */}
-            <p className="mr-auto text-xs text-foreground/55">
+            {/* UMA LINHA NO TELEMÓVEL.
+                Esta barra é fixa, e por baixo dela ainda vem a barra de
+                navegação e a do Safari. O texto completo ("Total 3000,00 € sem
+                IVA · o cliente paga 3690,00 € · guardado às 12:34") embrulhava
+                para três linhas e comia o pouco ecrã que sobrava.
+
+                O que fica no telemóvel é só o número que decide — o que o
+                CLIENTE paga —, e o resto do detalhe volta a partir de `sm`.
+                O "guardado às 12:34" vira um visto: é uma confirmação, e um
+                visto confirma tão bem como a frase, num décimo do espaço.
+                A hora continua lá para quem a procurar, no `title`. */}
+            <p className="mr-auto min-w-0 truncate text-xs text-foreground/55">
               {money.base > 0 ? (
                 <>
                   <span className="text-foreground/45">Total</span>{" "}
-                  <strong className="font-semibold text-foreground/85">{eur(money.base)}</strong>{" "}
-                  <span className="text-foreground/45">
+                  <strong className="font-semibold text-foreground/85">
+                    <span className="sm:hidden">{eur(money.gross)}</span>
+                    <span className="hidden sm:inline">{eur(money.base)}</span>
+                  </strong>{" "}
+                  <span className="hidden text-foreground/45 sm:inline">
                     sem IVA · o cliente paga {eur(money.gross)}
                   </span>
                   {desvio && (
                     <span className="ml-2 rounded-full bg-[#c98a2e]/15 px-2 py-0.5 text-[10px] text-[#8a5d13]">
-                      soma das linhas: {eur(desvio.soma)}
+                      <span className="hidden sm:inline">soma das linhas: </span>
+                      {eur(desvio.soma)}
                     </span>
                   )}
                 </>
               ) : (
-                "Preencha o conteúdo e avance para pré-visualizar."
+                <span className="hidden sm:inline">
+                  Preencha o conteúdo e avance para pré-visualizar.
+                </span>
               )}
-              {/* Discreto de propósito: é uma confirmação, não um aviso. Quem
-                  precisa dela procura-a; quem não precisa não tem de a ler. */}
               {(gravadoEm || porGravar) && (
-                <span className="ml-2 text-[11px] text-foreground/35">
-                  {porGravar
-                    ? "a guardar…"
-                    : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`}
+                <span
+                  className="ml-2 text-[11px] text-foreground/35"
+                  title={
+                    porGravar
+                      ? "a guardar…"
+                      : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
+                  }
+                >
+                  <span aria-hidden className="sm:hidden">
+                    {porGravar ? "…" : "✓"}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {porGravar
+                      ? "a guardar…"
+                      : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`}
+                  </span>
+                  {/* O visto sozinho não diz nada a quem usa leitor de ecrã. */}
+                  <span className="sr-only">{porGravar ? "a guardar" : "rascunho guardado"}</span>
                 </span>
               )}
             </p>

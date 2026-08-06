@@ -286,7 +286,13 @@ export const AUDITOR = `(() => {
     }
     if (escondidoPeloPai) continue;
 
-    const t = (el.textContent || "").trim();
+    // \`innerText\` e NÃO \`textContent\`: o primeiro é o texto RENDERIZADO, o
+    // segundo é tudo o que está no DOM. A diferença apanhou-me: uma linha que
+    // no telemóvel mostra só um visto, mas que tem a frase completa lá dentro
+    // num span escondido por CSS, contava 69 letras num elemento de
+    // 17 px e era acusada de esmagada. Estava certa — o que estava errado era
+    // a medição.
+    const t = (el.innerText || "").trim();
     if (t.length < TEXTO_LETRAS_MIN) continue;
     const r = el.getBoundingClientRect();
     // Altura zero com largura zero é um elemento fora de fluxo, não um
@@ -296,8 +302,74 @@ export const AUDITOR = `(() => {
     textoEsmagado.push({ ...assinatura(el), largura: Math.round(r.width), letras: t.length });
   }
 
+  /**
+   * TAPADOS POR UMA BARRA FIXA.
+   *
+   * O defeito que isto apanha, e que nenhum dos outros cheques apanhava: um
+   * botão ou campo que está no ecrã, com o tamanho certo e dentro da margem —
+   * mas com uma barra \`sticky\`/\`fixed\` desenhada por cima. Tocar ali toca na
+   * barra. Já aconteceu duas vezes neste estúdio: a barra do total tapou o
+   * "Título interno" e, depois, o "Valor (sem IVA)" — ou seja, precisamente o
+   * campo que a barra existe para acompanhar.
+   *
+   * Como se mede: pergunta-se ao browser QUEM está no ponto central do
+   * elemento. Se quem responde não é ele nem um filho seu, está tapado — e o
+   * culpado é o que vier de volta.
+   *
+   * Com um diálogo aberto isto não se mede: aí tapar o fundo é o que se quer.
+   */
+  const tapados = [];
+  if (!document.querySelector("[role=dialog][aria-modal=true]")) {
+    /** Quem está no ponto central deste elemento, se não for ele próprio? */
+    const barraPorCima = (el) => {
+      const r = caixaDeToque(el);
+      if (!r || r.width === 0 || r.height === 0) return null;
+      const x = Math.round(r.left + r.width / 2);
+      const y = Math.round(r.top + r.height / 2);
+      if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null;
+      const emCima = document.elementFromPoint(x, y);
+      if (!emCima || el === emCima || el.contains(emCima) || emCima.contains(el)) return null;
+      // Só interessa quando o que está por cima é mesmo uma barra presa ao
+      // ecrã. Um pseudo-elemento decorativo ou um rótulo sobreposto não é um
+      // problema de toque.
+      for (let p = emCima; p; p = p.parentElement) {
+        const pos = getComputedStyle(p).position;
+        if (pos === "fixed" || pos === "sticky") return p;
+      }
+      return null;
+    };
+
+    const scrollAntes = { x: scrollX, y: scrollY };
+    for (const el of interactivos) {
+      if (!barraPorCima(el)) continue;
+      /**
+       * ESTAR TAPADO AGORA NÃO CHEGA.
+       *
+       * Um botão a meio da página passa por baixo da barra de baixo enquanto se
+       * rola — e isso não é defeito nenhum, é o que uma barra fixa faz. O que é
+       * defeito é ficar tapado DEPOIS de se o trazer para o meio do ecrã: aí não
+       * há posição de scroll nenhuma que o liberte, e a única forma de lhe tocar
+       * é não haver nenhuma.
+       *
+       * Sem esta segunda medição o cheque acusava metade da página e deixava de
+       * se poder confiar nele — que é como um guarda morre.
+       */
+      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+      const barra = barraPorCima(el);
+      if (!barra) continue;
+      tapados.push({
+        ...assinatura(el),
+        porCima: assinatura(barra).texto || assinatura(barra).classes.slice(0, 60),
+      });
+    }
+    // Devolver a página ao sítio onde estava: as medições seguintes contam com
+    // ela ali, e um passeio que mexe no que mede não mede nada.
+    scrollTo(scrollAntes.x, scrollAntes.y);
+  }
+
   return {
     examinados: interactivos.length,
+    tapados,
     campos: document.querySelectorAll(CAMPOS).length,
     textoEsmagado,
     pequenos,
@@ -317,6 +389,12 @@ export function descreverAlvo(p) {
 export function descreverCampo(c) {
   const nome = c.rotulo || c.texto || `<${c.tag}${c.tipo ? ` type=${c.tipo}` : ""}>`;
   return `  ${c.fontSize}px  "${nome}"  (mínimo ${LETRA_CAMPO_MIN}px, senão o iOS amplia)`;
+}
+
+/** Uma linha por elemento tapado por uma barra. */
+export function descreverTapado(t) {
+  const nome = t.rotulo || t.texto || `<${t.tag}>`;
+  return `  "${nome}"  está por baixo de  "${t.porCima}"`;
 }
 
 /** Uma linha por parágrafo esmagado. */
