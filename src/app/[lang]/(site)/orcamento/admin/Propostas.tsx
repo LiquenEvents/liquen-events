@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
+import { MenuDeAccoes, TabelaOuCartoes, type AccaoDeItem } from "./ui";
 import { Button, Card, EmptyState, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { randomId } from "./util";
@@ -36,16 +37,6 @@ function expiryInfo(
   return { label: `Válida mais ${days} dias`, tone: "ok" };
 }
 
-interface RowProps {
-  p: Proposal;
-  linkedQuote?: Quote;
-  busy: boolean;
-  canOpenQuote: boolean;
-  onOpenQuote: (q: Quote) => void;
-  onUpdate: (id: string, status: ProposalStatus) => void;
-  onDelete: (id: string) => void;
-}
-
 /**
  * Uma linha da lista, memoizada.
  *
@@ -54,136 +45,38 @@ interface RowProps {
  * 104 ms (uma tarefa longa de 89 ms). A linha só depende da proposta, do pedido
  * ligado e de estar ocupada.
  */
-const ProposalRow = memo(function ProposalRow({
-  p,
-  linkedQuote,
-  busy,
-  canOpenQuote,
-  onOpenQuote,
-  onUpdate,
-  onDelete,
-}: RowProps) {
-  const exp = expiryInfo(p.validUntil);
+/** O estado da proposta. Partilhado pela tabela e pelo cartão de propósito: as
+ *  duas formas têm de dizer exactamente a mesma coisa. */
+function EstadoChip({ p }: { p: Proposal }) {
   const meta = metaFor(STATUS_META, p.status);
   return (
-    <div
-      className={`px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 motion-safe:transition-colors hover:bg-foreground/[0.02] ${p.status === "enviada" && exp?.tone === "expired" ? "opacity-60" : ""}`}
+    <span
+      className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
+      style={{ background: `${meta.color}1f`, color: meta.color }}
     >
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <p className="text-foreground/90 text-sm font-medium truncate">{p.clientName}</p>
-          <span
-            className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
-            style={{ background: `${meta.color}1f`, color: meta.color }}
-          >
-            {meta.label}
-          </span>
-          {exp && (
-            <span
-              className={`text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium ${
-                exp.tone === "expired"
-                  ? "bg-[#8a2a22]/10 text-[#8a2a22]"
-                  : exp.tone === "soon"
-                    ? "bg-[#b5894a]/12 text-[#a9781f]"
-                    : "bg-foreground/[0.05] text-foreground/45"
-              }`}
-            >
-              {exp.label}
-            </span>
-          )}
-        </div>
-        <p className="text-foreground/45 text-xs">
-          {p.clientEmail} · {p.lineItems.length} {p.lineItems.length !== 1 ? "itens" : "item"}
-          {p.sentAt &&
-            ` · enviada a ${new Date(p.sentAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`}
-        </p>
-      </div>
-
-      {/* Value + actions — share one row on phones, split out on desktop */}
-      <div className="flex items-center justify-between gap-3 sm:contents">
-        <p className="text-foreground/90 text-sm font-semibold shrink-0 tabular-nums">
-          {eur(p.total)}
-        </p>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          {p.status === "enviada" && (
-            <>
-              <Button
-                variant="subtle"
-                size="sm"
-                disabled={busy}
-                onClick={() => onUpdate(p.id, "aceite")}
-                title="O cliente aceitou: fecha o negócio e marca o pedido como ganho"
-                iconLeft={
-                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                    <path
-                      d="M2 6l2.5 2.5L10 3"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                }
-              >
-                Aceitar
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => onUpdate(p.id, "rejeitada")}
-                title="O cliente não avançou com esta proposta"
-              >
-                Recusar
-              </Button>
-            </>
-          )}
-          {linkedQuote && canOpenQuote && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenQuote(linkedQuote)}
-              title="Abrir o pedido deste cliente"
-              iconRight={<span aria-hidden="true">→</span>}
-            >
-              Ver pedido
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy}
-            onClick={() => onDelete(p.id)}
-            aria-label={`Apagar a proposta de ${p.clientName}`}
-            title="Apagar esta proposta"
-            className="text-foreground/40 hover:text-[#8a2a22]"
-            iconLeft={
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                <path d="M10 11v6M14 11v6" />
-              </svg>
-            }
-          >
-            Apagar
-          </Button>
-        </div>
-      </div>
-    </div>
+      {meta.label}
+    </span>
   );
-});
+}
+
+/** "Expira em 3 dias" / "Expirada". Nada quando não há validade definida. */
+function ValidadeChip({ p }: { p: Proposal }) {
+  const exp = expiryInfo(p.validUntil);
+  if (!exp) return null;
+  return (
+    <span
+      className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${
+        exp.tone === "expired"
+          ? "bg-[#8a2a22]/10 text-[#8a2a22]"
+          : exp.tone === "soon"
+            ? "bg-[#b5894a]/12 text-[#a9781f]"
+            : "bg-foreground/[0.05] text-foreground/45"
+      }`}
+    >
+      {exp.label}
+    </span>
+  );
+}
 
 interface Props {
   quotes?: Quote[];
@@ -423,6 +316,45 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
     );
   }
 
+  /**
+   * As acções de uma proposta, como DADOS — a forma é do `MenuDeAccoes`, que
+   * sabe se as pode esconder no hover ou se as tem de mostrar sempre.
+   *
+   * Antes eram quatro botões de texto soltos em cada linha: no computador
+   * enchiam a linha de ruído e roubavam largura ao que interessa; no telemóvel
+   * embrulhavam para a linha de baixo, com "Apagar" a acabar ao lado de
+   * "Aceitar".
+   */
+  const accoesDa = (p: Proposal): AccaoDeItem[] => {
+    const lista: AccaoDeItem[] = [];
+    if (p.status === "enviada") {
+      lista.push({
+        id: "aceitar",
+        rotulo: "Aceitar",
+        desativada: actionBusy === p.id,
+        onAccao: () => confirmAndUpdate(p.id, "aceite"),
+      });
+      lista.push({
+        id: "recusar",
+        rotulo: "Recusar",
+        desativada: actionBusy === p.id,
+        onAccao: () => confirmAndUpdate(p.id, "rejeitada"),
+      });
+    }
+    const pedido = quotesById.get(p.quoteId);
+    if (pedido && onOpenQuote) {
+      lista.push({ id: "pedido", rotulo: "Ver pedido", onAccao: () => handleOpenQuote(pedido) });
+    }
+    lista.push({
+      id: "apagar",
+      rotulo: "Apagar",
+      destrutiva: true,
+      desativada: actionBusy === p.id,
+      onAccao: () => deleteProposal(p.id),
+    });
+    return lista;
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* One calm line saying what this screen is for */}
@@ -519,19 +451,83 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
             }
           />
         ) : (
-          <div className="divide-y divide-foreground/[0.06]">
-            {filtered.map((p) => (
-              <ProposalRow
-                key={p.id}
-                p={p}
-                linkedQuote={quotesById.get(p.quoteId)}
-                busy={actionBusy === p.id}
-                canOpenQuote={!!onOpenQuote}
-                onOpenQuote={handleOpenQuote}
-                onUpdate={confirmAndUpdate}
-                onDelete={deleteProposal}
-              />
-            ))}
+          <div className="p-3 sm:p-4">
+            <TabelaOuCartoes
+              itens={filtered}
+              chaveDe={(p) => p.id}
+              legenda="Propostas"
+              ordemInicial={{ chave: "cliente", ascendente: true }}
+              colunas={[
+                {
+                  chave: "cliente",
+                  cabecalho: "Cliente",
+                  ordenar: (a, b) => a.clientName.localeCompare(b.clientName, "pt"),
+                  celula: (p) => (
+                    <span className="block">
+                      <span className="block truncate text-foreground/90">{p.clientName}</span>
+                      <span className="bo-text-muted block truncate text-xs">{p.clientEmail}</span>
+                    </span>
+                  ),
+                },
+                { chave: "estado", cabecalho: "Estado", celula: (p) => <EstadoChip p={p} /> },
+                { chave: "validade", cabecalho: "Validade", celula: (p) => <ValidadeChip p={p} /> },
+                {
+                  // Contexto útil, mas não é por isto que se procura uma
+                  // proposta: só aparece quando há mesmo espaço.
+                  chave: "itens",
+                  cabecalho: "Itens",
+                  soLargo: true,
+                  alinharADireita: true,
+                  celula: (p) => <span className="tabular-nums">{p.lineItems.length}</span>,
+                },
+                {
+                  chave: "valor",
+                  cabecalho: "Valor",
+                  alinharADireita: true,
+                  ordenar: (a, b) => a.total - b.total,
+                  celula: (p) => (
+                    <span className="font-semibold tabular-nums text-foreground/90">
+                      {eur(p.total)}
+                    </span>
+                  ),
+                },
+                {
+                  chave: "accoes",
+                  cabecalho: "",
+                  largura: "w-12",
+                  alinharADireita: true,
+                  celula: (p) => (
+                    <MenuDeAccoes
+                      sobre={p.clientName}
+                      accoes={accoesDa(p)}
+                      soltasNoEcraGrande={0}
+                    />
+                  ),
+                },
+              ]}
+              cartao={(p) => (
+                // O cartão mostra QUATRO coisas — cliente, estado, validade e
+                // valor. A tabela mostra seis; aqui as outras duas custavam a
+                // legibilidade das que decidem.
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground/90">
+                      {p.clientName}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <EstadoChip p={p} />
+                      <ValidadeChip p={p} />
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="text-sm font-semibold tabular-nums text-foreground/90">
+                      {eur(p.total)}
+                    </span>
+                    <MenuDeAccoes sobre={p.clientName} accoes={accoesDa(p)} />
+                  </div>
+                </div>
+              )}
+            />
           </div>
         )}
       </Card>

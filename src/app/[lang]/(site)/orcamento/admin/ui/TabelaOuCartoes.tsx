@@ -91,12 +91,12 @@ export function TabelaOuCartoes<T>({
               <button
                 type="button"
                 onClick={() => aoAbrir(item)}
-                className="alvo-toque block w-full rounded-xl border border-foreground/[0.08] bg-white p-3 text-left transition-colors hover:border-[#4d6350]/40"
+                className="alvo-toque group block w-full rounded-xl border border-foreground/[0.08] bg-white p-3 text-left transition-colors hover:border-[#4d6350]/40"
               >
                 {cartao(item)}
               </button>
             ) : (
-              <div className="rounded-xl border border-foreground/[0.08] bg-white p-3">
+              <div className="group rounded-xl border border-foreground/[0.08] bg-white p-3">
                 {cartao(item)}
               </div>
             )}
@@ -163,7 +163,10 @@ export function TabelaOuCartoes<T>({
               key={chaveDe(item)}
               onClick={aoAbrir ? () => aoAbrir(item) : undefined}
               className={cn(
-                "border-b border-foreground/[0.05] last:border-0",
+                // `group` para o `MenuDeAccoes` se poder revelar ao passar o
+                // rato pela LINHA inteira — e não só por cima do próprio botão,
+                // que obrigava a adivinhar onde ele está.
+                "group border-b border-foreground/[0.05] last:border-0",
                 aoAbrir && "cursor-pointer hover:bg-foreground/[0.03]",
               )}
             >
