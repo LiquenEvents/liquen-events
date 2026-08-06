@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 import { useCachedList } from "./useCachedList";
+import ModoDeCarga from "./ModoDeCarga";
 
 type Condition = PropItem["condition"];
 
@@ -116,6 +117,10 @@ export default function Inventario() {
   const [saving, setSaving] = useState(false);
   // A repartição por categoria é detalhe — o total é o que importa ao relance.
   const [showCatTotals, setShowCatTotals] = useState(false);
+  // O inventário tem DUAS tarefas, e não é a mesma com letra maior: aqui
+  // gere-se (editar, corrigir, exportar), no modo de carga percorre-se e
+  // risca-se. Ver ModoDeCarga.
+  const [aCarregar, setACarregar] = useState(false);
 
   async function add() {
     const payload = toPayload(form);
@@ -250,6 +255,11 @@ export default function Inventario() {
 
   const totalQty = filtered.reduce((s, i) => s + i.quantity, 0);
 
+  // O modo de carga trabalha sobre o que está À FRENTE dela — já filtrado pela
+  // procura e pela categoria. Carregar a carrinha é sempre sobre um
+  // subconjunto, nunca sobre o catálogo inteiro.
+  if (aCarregar) return <ModoDeCarga itens={filtered} onSair={() => setACarregar(false)} />;
+
   return (
     <div>
       {/* Toolbar */}
@@ -296,6 +306,16 @@ export default function Inventario() {
         }
         end={
           <>
+            {items.length > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setACarregar(true)}
+                title="Percorrer a lista e ir riscando o que já está na carrinha"
+              >
+                Modo de carga
+              </Button>
+            )}
             {items.length > 0 && (
               <Button
                 variant="secondary"
