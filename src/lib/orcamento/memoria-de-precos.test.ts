@@ -45,6 +45,14 @@ describe("agrupar o mesmo serviço escrito de maneiras diferentes", () => {
     expect(chaveDoServico("Mesa dos doces")).toBe(chaveDoServico("Doces da mesa"));
   });
 
+  it("o singular e o plural são o mesmo serviço", () => {
+    // "Arranjos de mesa" num mês e "Arranjos das mesas" no seguinte saíam da
+    // mesma cabeça e da mesma mão. Com três casos necessários para haver
+    // sugestão, cada plural a separar contas deixava a memória calada.
+    expect(chaveDoServico("Arranjos de mesa")).toBe(chaveDoServico("Arranjos das mesas"));
+    expect(chaveDoServico("Centro de mesa")).toBe(chaveDoServico("Centros de mesa"));
+  });
+
   it("serviços diferentes continuam diferentes", () => {
     expect(chaveDoServico("Arranjos de mesa")).not.toBe(chaveDoServico("Arco floral"));
   });

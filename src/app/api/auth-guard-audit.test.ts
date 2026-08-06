@@ -461,6 +461,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // O histórico devolve o que se cobrou em cada ronda de negociação, e com
   // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
+  // A memória de preços atravessa TODAS as propostas já enviadas: o que se
+  // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa
+  // resposta JSON.
+  { path: "./orcamento/[id]/memoria/route", methods: ["GET"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
   // A biblioteca visual: o vocabulário de etiquetas, a procura por etiquetas e
   // o etiquetar em lote. Tudo isto lê e escreve o trabalho de arrumação da

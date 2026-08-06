@@ -11,6 +11,7 @@ import {
   type ParametrosDeslocacao,
 } from "@/lib/orcamento/deslocacao";
 import { foraDoPadrao, padraoPara } from "@/lib/orcamento/padrao-de-preco";
+import { chaveDoServico, type Historico, type Omissao } from "@/lib/orcamento/memoria-de-precos";
 import { Button } from "./ui";
 
 /**
@@ -25,6 +26,8 @@ import { Button } from "./ui";
  *   • A DESLOCAÇÃO calculada a partir do local — quilómetros de ida e volta
  *     vezes o custo por quilómetro, com o preço do gasóleo que ela definiu.
  *   • Se o TOTAL está dentro do que ela costuma cobrar para um casamento assim.
+ *   • O que JÁ COBROU por cada linha em eventos parecidos, e o que costuma
+ *     incluir e falta aqui.
  *
  * ── NADA DAQUI ENTRA NO PDF ────────────────────────────────────────────────
  * Os custos vivem em `budgetCosts`, que o desenhador do PDF não lê — e há um
@@ -66,6 +69,9 @@ export default function PainelInterno({
   const [aberto, setAberto] = useState(false);
   const [parametros, setParametros] = useState<ParametrosDeslocacao>(PARAMETROS_OMISSAO);
   const [margemMinima, setMargemMinima] = useState(35);
+  const [memoria, setMemoria] = useState<{ historico: Historico[]; habituais: Omissao[] } | null>(
+    null,
+  );
 
   // Os números de que a conta depende vivem no servidor (ver
   // proposta-definicoes-store): o preço do gasóleo muda todas as semanas.
@@ -87,6 +93,26 @@ export default function PainelInterno({
     };
   }, []);
 
+  // A memória de preços. Vem do servidor porque a conta atravessa TODAS as
+  // propostas já enviadas — mandá-las para cá eram três megabytes de números de
+  // outros clientes por causa de uma sugestão. Lê-se uma vez por pedido: o que
+  // já foi cobrado não muda enquanto se escreve.
+  useEffect(() => {
+    let vivo = true;
+    fetch(`/api/orcamento/${quote.id}/memoria`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (vivo && j) setMemoria({ historico: j.historico ?? [], habituais: j.habituais ?? [] });
+      })
+      .catch(() => {
+        // Sem memória o painel é o que era. Não se avisa: não haver histórico
+        // é o estado normal de quem começou agora.
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [quote.id]);
+
   const linhas = useMemo(() => margensPorLinha(doc), [doc]);
   const total = useMemo(() => margemTotal(doc), [doc]);
   const custos = useMemo(() => custosDe(doc), [doc]);
@@ -104,6 +130,34 @@ export default function PainelInterno({
       ),
     [totalBruto, quote.guests, quote.location, quotes],
   );
+
+  /** O histórico ao alcance do nome de cada linha. */
+  const porChave = useMemo(() => {
+    const m = new Map<string, Historico>();
+    for (const h of memoria?.historico ?? []) m.set(chaveDoServico(h.nome), h);
+    return m;
+  }, [memoria]);
+
+  /**
+   * O que costuma incluir e NÃO está nesta proposta.
+   *
+   * A filtragem é aqui e não no servidor porque o que conta é o rascunho que
+   * está no ecrã — por gravar, e a mudar a cada linha escrita.
+   */
+  const esquecidos = useMemo(() => {
+    const presentes = new Set(
+      (doc.budgetItems ?? []).map((i) => chaveDoServico(i ?? "")).filter(Boolean),
+    );
+    // Os serviços também podem estar escritos como serviço e não como linha de
+    // orçamento — avisar sobre um que está ali em cima, escrito, seria dar-lhe
+    // razão para deixar de ler os avisos.
+    for (const g of doc.serviceGroups ?? [])
+      for (const it of g.items ?? []) {
+        const c = chaveDoServico(it.label ?? "");
+        if (c) presentes.add(c);
+      }
+    return (memoria?.habituais ?? []).filter((o) => !presentes.has(chaveDoServico(o.nome)));
+  }, [memoria, doc.budgetItems, doc.serviceGroups]);
 
   const magra = total !== null && total.percentagem < margemMinima;
 
@@ -157,37 +211,52 @@ export default function PainelInterno({
               <div className="mt-2 flex flex-col gap-1.5">
                 {(doc.budgetItems ?? []).map((item, i) => {
                   const l = linhas[i];
+                  const h = porChave.get(chaveDoServico(item ?? ""));
                   return (
-                    <div
-                      key={i}
-                      className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_5rem] items-center gap-2"
-                    >
-                      <span className="truncate text-xs text-foreground/70">
-                        {item || <span className="text-foreground/30">(sem nome)</span>}
-                      </span>
-                      <span className="text-right text-xs text-foreground/55">
-                        {l?.preco === null ? "—" : eur(l!.preco!)}
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        defaultValue={custos[i] === null ? "" : String(custos[i])}
-                        onBlur={(e) => onCusto(i, normalizarValor(e.target.value))}
-                        placeholder="—"
-                        aria-label={`Custo da linha ${i + 1}`}
-                        className="bo-input px-2 py-1.5 text-right text-xs"
-                      />
-                      <span
-                        className={`text-right text-xs ${
-                          l?.percentagem === null
-                            ? "text-foreground/25"
-                            : l!.percentagem! < margemMinima
-                              ? "text-[#b5654a]"
-                              : "text-foreground/60"
-                        }`}
-                      >
-                        {l?.percentagem === null ? "—" : `${l!.percentagem}%`}
-                      </span>
+                    <div key={i}>
+                      <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_5rem] items-center gap-2">
+                        <span className="truncate text-xs text-foreground/70">
+                          {item || <span className="text-foreground/30">(sem nome)</span>}
+                        </span>
+                        <span className="text-right text-xs text-foreground/55">
+                          {l?.preco === null ? "—" : eur(l!.preco!)}
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          defaultValue={custos[i] === null ? "" : String(custos[i])}
+                          onBlur={(e) => onCusto(i, normalizarValor(e.target.value))}
+                          placeholder="—"
+                          aria-label={`Custo da linha ${i + 1}`}
+                          className="bo-input px-2 py-1.5 text-right text-xs"
+                        />
+                        <span
+                          className={`text-right text-xs ${
+                            l?.percentagem === null
+                              ? "text-foreground/25"
+                              : l!.percentagem! < margemMinima
+                                ? "text-[#b5654a]"
+                                : "text-foreground/60"
+                          }`}
+                        >
+                          {l?.percentagem === null ? "—" : `${l!.percentagem}%`}
+                        </span>
+                      </div>
+                      {/* ── O QUE JÁ COBROU POR ISTO ─────────────────────
+                        Debaixo da linha e não numa coluna: é uma frase, e
+                        uma frase espremida em 5rem não se lê. Não escreve
+                        preço nenhum — mostra o que houve e ela decide. Um
+                        preço posto automaticamente seria a última vez que
+                        alguém pensava naquele número. */}
+                      {h && (
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-foreground/40">
+                          {`Já cobrou entre ${eur(h.min)} e ${eur(h.max)}, mediana ${eur(
+                            h.mediana,
+                          )}, em ${h.casos} ${h.casos === 1 ? "proposta" : "propostas"}${
+                            h.regiao ? ` na zona de ${h.regiao}` : " (média do país)"
+                          }`}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -214,6 +283,29 @@ export default function PainelInterno({
                 </p>
               )}
             </>
+          )}
+
+          {/* ── O QUE COSTUMA INCLUIR E AQUI FALTA ────────────────────
+              Responde à pergunta que só se faz tarde de mais: "esqueci-me de
+              alguma coisa?". Só nomeia o que entra na grande maioria das
+              propostas comparáveis — um serviço que entra em metade delas não é
+              um esquecimento, é uma escolha, e avisar sobre ele ensinava-a a
+              ignorar o aviso. */}
+          {esquecidos.length > 0 && (
+            <div className="mt-5 border-t border-foreground/[0.08] pt-4">
+              <span className="bo-eyebrow">Costuma incluir</span>
+              <ul className="mt-1.5 flex flex-col gap-1">
+                {esquecidos.map((o) => (
+                  <li key={o.nome} className="text-xs leading-relaxed text-foreground/55">
+                    <span className="text-foreground/75">{o.nome}</span>
+                    <span className="text-foreground/40">{` — em ${o.em} de ${o.de} propostas parecidas`}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/40">
+                Pode ser de propósito. Fica aqui só para não ser por esquecimento.
+              </p>
+            </div>
           )}
 
           {/* ── Deslocação ───────────────────────────────────────────── */}

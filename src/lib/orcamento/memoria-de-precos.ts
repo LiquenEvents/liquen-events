@@ -57,6 +57,24 @@ const VAZIAS = new Set([
   "na",
 ]);
 
+/**
+ * Singular grosseiro: tira o "s" final a palavras com quatro letras ou mais.
+ *
+ * "Arranjos de mesa" num mês e "Arranjos das mesas" no mês seguinte são o mesmo
+ * serviço para quem os escreveu, e eram dois para a memória. Com três casos
+ * necessários para haver sugestão, cada plural a separar contas era a diferença
+ * entre a memória responder e ficar calada para sempre.
+ *
+ * O corte às quatro letras é o que impede "mes" e "as" de aparecerem; e é uma
+ * regra grosseira de propósito, como o resto — um agrupamento errado a mais
+ * custa uma sugestão estranha, um agrupamento a menos custa não haver sugestão
+ * nenhuma. Não junta "flor" com "flores" (fica "flore"), e paciência: junta as
+ * duas escritas de "flores", que é o caso que aparece.
+ */
+function semPlural(palavra: string): string {
+  return palavra.length >= 4 && palavra.endsWith("s") ? palavra.slice(0, -1) : palavra;
+}
+
 export function chaveDoServico(nome: string): string {
   return nome
     .normalize("NFD")
@@ -65,6 +83,7 @@ export function chaveDoServico(nome: string): string {
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((p) => p && !VAZIAS.has(p))
+    .map(semPlural)
     .sort()
     .join(" ");
 }

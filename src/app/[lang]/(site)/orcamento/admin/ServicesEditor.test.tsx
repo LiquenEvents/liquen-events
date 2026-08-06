@@ -211,3 +211,56 @@ describe("alinhamento", () => {
     }
   });
 });
+
+describe("guardar na biblioteca", () => {
+  const chamadas = () =>
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter((c) =>
+      String(c[0]).includes("/api/servicos-catalogo"),
+    );
+
+  function comRede(ok = true) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok, status: ok ? 200 : 500, json: async () => ({}) })),
+    );
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("manda o nome e a descrição, e depois diz que já lá está", async () => {
+    comRede();
+    render(<Host initial={grupo(["Arco floral"])} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText("Guardar «Arco floral» na biblioteca"));
+
+    await screen.findByLabelText("«Arco floral» está na biblioteca");
+    const [url, init] = chamadas()[0] as [string, RequestInit];
+    expect(url).toBe("/api/servicos-catalogo");
+    expect(JSON.parse(String(init.body)).nome).toBe("Arco floral");
+    // E fica desligado: carregar outra vez sobre o mesmo serviço não acrescenta
+    // nada à biblioteca e só levanta a dúvida de se a primeira resultou.
+    expect(screen.getByLabelText("«Arco floral» está na biblioteca")).toBeDisabled();
+  });
+
+  it("uma linha em branco não tem botão nenhum", () => {
+    comRede();
+    render(<Host initial={grupo([""])} />);
+    // Guardar "" não é um serviço: é uma entrada em branco que alguém ia ter de
+    // ir apagar à biblioteca.
+    expect(screen.queryByLabelText(/na biblioteca/)).toBeNull();
+  });
+
+  it("se a gravação falhar, o botão volta a poder ser carregado", async () => {
+    comRede(false);
+    render(<Host initial={grupo(["Arco floral"])} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText("Guardar «Arco floral» na biblioteca"));
+
+    // Um visto sobre uma gravação que não aconteceu é pior do que não haver
+    // visto nenhum: manda-a embora convencida de que ficou guardado.
+    await screen.findByLabelText("Guardar «Arco floral» na biblioteca");
+    expect(screen.getByLabelText("Guardar «Arco floral» na biblioteca")).not.toBeDisabled();
+  });
+});

@@ -27,7 +27,7 @@ import {
   type ServiceGroup,
   type ServiceItem,
 } from "@/lib/proposal-doc";
-import BibliotecaServicos from "./BibliotecaServicos";
+import BibliotecaServicos, { guardarNaBiblioteca } from "./BibliotecaServicos";
 
 /**
  * A secção «Serviços» do estúdio de propostas — grupos (a, b, c…) e as suas
@@ -168,6 +168,40 @@ export default function ServicesEditor({
   /** "Removido — anular", em vez de uma pergunta antes de cada remoção. */
   /** Que grupo tem a gaveta da biblioteca aberta. `null` = nenhuma. */
   const [bibliotecaAberta, setBibliotecaAberta] = useState<number | null>(null);
+  /**
+   * O que já foi para a biblioteca, pelo NOME do serviço.
+   *
+   * Pelo nome e não pela posição: as linhas arrastam-se, duplicam-se e
+   * removem-se, e uma chave "grupo:linha" fazia o visto saltar para o serviço
+   * que ficou naquele lugar — a dizer "já está guardado" sobre uma coisa que
+   * não estava.
+   *
+   * O botão trocar de estado é a única confirmação que há; sem ela, a forma de
+   * saber se resultou era ir abrir a biblioteca. Não se limpa sozinho: o que a
+   * pergunta merece de resposta é "já lá está", não "esteve".
+   */
+  const [guardados, setGuardados] = useState<Record<string, "a-guardar" | "guardado">>({});
+
+  /**
+   * Manda para a biblioteca uma linha escrita à mão.
+   *
+   * Só aparece nas linhas COM nome: guardar "" na biblioteca não é um serviço,
+   * é uma entrada em branco que alguém vai ter de apagar. A descrição vai
+   * junto, porque é metade do serviço; a versão inglesa fica por escrever e o
+   * ecrã dos Serviços diz quantas faltam.
+   */
+  const guardar = useCallback(async (label: string, desc: string) => {
+    const chave = label.trim().toLowerCase();
+    setGuardados((g) => ({ ...g, [chave]: "a-guardar" }));
+    const ok = await guardarNaBiblioteca(label.trim(), desc.trim());
+    setGuardados((g) => {
+      // Falhou: volta ao estado de antes, para o botão poder ser carregado
+      // outra vez. Um visto sobre uma gravação que não aconteceu era pior do
+      // que não haver visto nenhum.
+      if (!ok) return Object.fromEntries(Object.entries(g).filter(([k]) => k !== chave));
+      return { ...g, [chave]: "guardado" };
+    });
+  }, []);
   const [removal, setRemoval] = useState<{
     label: string;
     groups: Groups;
@@ -708,6 +742,33 @@ export default function ServicesEditor({
                                         >
                                           <CopyIcon />
                                         </IconBtn>
+                                        {/* PARA A BIBLIOTECA.
+                                            Um serviço bem escrito à mão é
+                                            trabalho que se repete na proposta
+                                            seguinte — e hoje repetia-se a
+                                            escrever outra vez. Só aparece com
+                                            nome, e depois de guardado fica a
+                                            dizê-lo em vez de convidar a
+                                            carregar de novo. */}
+                                        {it.label.trim() && (
+                                          <IconBtn
+                                            label={
+                                              guardados[it.label.trim().toLowerCase()] ===
+                                              "guardado"
+                                                ? `«${it.label.trim()}» está na biblioteca`
+                                                : `Guardar «${it.label.trim()}» na biblioteca`
+                                            }
+                                            disabled={!!guardados[it.label.trim().toLowerCase()]}
+                                            onClick={() => void guardar(it.label, it.desc ?? "")}
+                                          >
+                                            {guardados[it.label.trim().toLowerCase()] ===
+                                            "guardado" ? (
+                                              <CheckIcon />
+                                            ) : (
+                                              <SaveIcon />
+                                            )}
+                                          </IconBtn>
+                                        )}
                                         <IconBtn
                                           label={`Remover linha ${ii + 1} do grupo ${gi + 1}`}
                                           onClick={() => removeItem(gi, ii)}
@@ -956,6 +1017,42 @@ function CopyIcon() {
         stroke="currentColor"
         strokeWidth="1.2"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** Guardar na biblioteca — uma prateleira com uma seta para dentro. */
+function SaveIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M7 1.5v6.5M4.5 5.8 7 8.3l2.5-2.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2 10.2v1.3a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.3"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** Já lá está. */
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 7.5 5.5 10.5 11.5 3.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );

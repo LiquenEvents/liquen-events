@@ -183,3 +183,101 @@ describe("valor fora do habitual", () => {
     expect(screen.queryByText(/costuma ficar entre/)).toBeNull();
   });
 });
+
+describe("a memória de preços", () => {
+  /** Substitui o `fetch` global para a memória responder alguma coisa. */
+  function comMemoria(memoria: Record<string, unknown>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          String(url).includes("/memoria")
+            ? { historico: [], habituais: [], ...memoria }
+            : { margemMinima: 35 },
+      })),
+    );
+  }
+
+  it("diz, por baixo da linha, o que já se cobrou por aquilo", async () => {
+    comMemoria({
+      historico: [
+        {
+          nome: "Arranjos de mesa",
+          min: 800,
+          max: 1200,
+          mediana: 1000,
+          casos: 7,
+          regiao: "Évora",
+          ultimaVez: "2026-05-01T10:00:00.000Z",
+        },
+      ],
+    });
+    montar();
+    await abrir();
+
+    // O intervalo, a mediana e QUANTOS casos: sem o número de casos, "já cobrou
+    // 1.000 €" tanto pode vir de vinte propostas como de uma.
+    const frase = await screen.findByText(/Já cobrou entre/);
+    expect(frase.textContent).toContain("mediana");
+    expect(frase.textContent).toContain("7 propostas");
+    expect(frase.textContent).toContain("na zona de Évora");
+  });
+
+  it("não escreve preço nenhum — só mostra", async () => {
+    comMemoria({
+      historico: [
+        {
+          nome: "Arranjos de mesa",
+          min: 800,
+          max: 1200,
+          mediana: 1000,
+          casos: 7,
+          regiao: null,
+          ultimaVez: "2026-05-01T10:00:00.000Z",
+        },
+      ],
+    });
+    const { onCusto } = montar();
+    await abrir();
+    await screen.findByText(/Já cobrou entre/);
+    // Um preço escrito automaticamente seria a última vez que alguém pensava
+    // naquele número.
+    expect(onCusto).not.toHaveBeenCalled();
+  });
+
+  it("avisa do que costuma incluir e falta aqui", async () => {
+    comMemoria({ habituais: [{ nome: "Arco floral", em: 9, de: 10 }] });
+    montar();
+    await abrir();
+    const aviso = await screen.findByText(/em 9 de 10 propostas parecidas/);
+    expect(aviso).toBeTruthy();
+    // E diz que pode ser de propósito: um aviso que trata uma escolha como erro
+    // ensina a ignorar avisos.
+    expect(screen.getByText(/Pode ser de propósito/)).toBeTruthy();
+  });
+
+  it("o que já está na proposta não aparece como esquecido", async () => {
+    // Está escrito nas linhas, com outro plural e outra caixa — e continua a
+    // ser o mesmo serviço.
+    comMemoria({ habituais: [{ nome: "Arranjos das mesas", em: 9, de: 10 }] });
+    montar();
+    await abrir();
+    await waitFor(() => expect(screen.queryByText(/propostas parecidas/)).toBeNull());
+  });
+
+  it("um serviço escrito só nos SERVIÇOS também conta como presente", async () => {
+    // Avisar sobre um serviço que está ali em cima, escrito, dava-lhe razão
+    // para deixar de ler os avisos.
+    comMemoria({ habituais: [{ nome: "Arco floral", em: 9, de: 10 }] });
+    montar({
+      doc: doc({
+        serviceGroups: [
+          { id: "g", letter: "a)", title: "Flores", items: [{ label: "Arco floral" }] },
+        ],
+      }),
+    });
+    await abrir();
+    await waitFor(() => expect(screen.queryByText(/propostas parecidas/)).toBeNull());
+  });
+});
