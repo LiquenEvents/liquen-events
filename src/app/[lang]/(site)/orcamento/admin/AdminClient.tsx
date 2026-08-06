@@ -43,6 +43,7 @@ import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, type View } from "./nav";
+import { useDesceu } from "./ui/adaptativo";
 import { Button, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
@@ -590,6 +591,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const quotesEtag = useRef<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
+  /** Já desceu o suficiente para o cabeçalho encolher? Ver `ui/adaptativo.ts`. */
+  const desceu = useDesceu();
   /** Pedido escolhido na vista "Fazer proposta".
    *
    *  Vive aqui e não dentro da vista porque a vista desmonta ao mudar de
@@ -1711,6 +1714,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </svg>
               Os meus dispositivos
             </button>
+            {/* A AJUDA MUDA-SE PARA AQUI NO TELEMÓVEL.
+                Estava na barra de topo, e um botão de 40 px mais o seu espaço
+                custavam 50 dos ~110 px que sobravam para o título — que por
+                isso saía "Visão…". Aqui é o sítio dela: é uma coisa que se lê
+                uma vez, ao lado do backup e da sessão, e não uma acção da
+                vista. No computador continua no topo, onde há espaço. */}
+            <button
+              onClick={() => setAjudaOpen(true)}
+              className="alvo-toque lg:hidden w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path
+                  d="M9.4 9a2.6 2.6 0 1 1 3.4 2.5c-.7.3-1.3.9-1.3 1.7v.3"
+                  strokeLinecap="round"
+                />
+                <path d="M12 17h.01" strokeLinecap="round" />
+              </svg>
+              Ajuda e glossário
+            </button>
             <div className="flex gap-1 pointer-coarse:gap-2">
               {/* A LISTA DE ATALHOS DE TECLADO NÃO APARECE NUM ECRÃ DE TOQUE.
                   É uma folha inteira a ensinar teclas — ⌘K, ?, G depois P — a
@@ -1894,8 +1924,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               O fundo passa a OPACO pela mesma razão: 5% de transparência num
               ecrã com texto escuro por baixo chega para o tornar ilegível, e
               aqui não há nada a ganhar com o efeito. */}
+          {/* O CABEÇALHO ENCOLHE ASSIM QUE ELA COMEÇA A DESCER.
+              Media 102 px num ecrã de 667. Com os 56 da barra de baixo, eram
+              158 px de moldura — quase um quarto do telemóvel — ocupados para
+              sempre por uma coisa que só se lê uma vez: o nome da vista.
+              A partir daqui fica a faixa com os botões, que é o que serve para
+              alguma coisa a meio de uma lista. No computador não encolhe nada:
+              lá o espaço não é o problema. */}
           <header className="sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b border-[var(--bo-hairline)] pt-safe">
-            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
+            <div
+              className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5 motion-safe:transition-[padding] duration-200 ${
+                desceu ? "py-1.5" : "py-2.5"
+              }`}
+            >
               {/* O ÚNICO ABRIDOR DA GAVETA no telemóvel. Era um de dois — o
                   outro era o botão "Mais" da barra de baixo, que abria
                   exactamente a mesma coisa a partir do canto oposto. Ficou
@@ -1919,16 +1960,30 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 </svg>
               </button>
               <div className="min-w-0">
+                {/* O SUBTÍTULO NÃO VAI PARA O TELEMÓVEL.
+                    "Pedidos de orçamento recebidos" por cima de "Pedidos" diz,
+                    com 9 px e um espaçamento de 0.35em, o que o título já diz —
+                    e custava 25 px de altura fixa. No computador, onde há
+                    espaço de sobra numa faixa que já existe, continua a dar
+                    contexto. */}
                 {VIEW_SUB[view] && (
-                  <p className="text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
+                  <p className="hidden lg:block text-foreground/35 text-[9px] tracking-[0.35em] uppercase mb-1.5 font-medium">
                     {VIEW_SUB[view]}
                   </p>
                 )}
+                {/* `truncate`: o título partia em duas linhas ("Visão / Geral")
+                    porque no telemóvel sobram-lhe ~110 px entre o menu e os
+                    quatro botões. Duas linhas de título é o dobro da altura
+                    para a mesma palavra. Uma linha, e o que não couber corta —
+                    o nome da vista está sempre também na barra de baixo ou na
+                    gaveta de onde se veio. */}
                 <h1
-                  className="text-foreground/88 font-bold leading-none"
+                  className="text-foreground/88 font-bold leading-none truncate motion-safe:transition-[font-size] duration-200"
                   style={{
                     fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(20px, 2.6vw, 30px)",
+                    // A meio de uma lista o título é o que menos falta faz —
+                    // por isso é ele que encolhe primeiro.
+                    fontSize: desceu ? "clamp(16px, 2.6vw, 30px)" : "clamp(19px, 2.6vw, 30px)",
                   }}
                 >
                   {VIEW_TITLES[view]}
@@ -1939,7 +1994,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   onClick={() => setAjudaOpen(true)}
                   aria-label="Ajuda e glossário"
                   title="Ajuda e glossário"
-                  className="alvo-toque w-10 h-10 flex items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
+                  // No telemóvel vive na gaveta (ver lá o porquê): aqui os
+                  // 50 px que ocupava eram quase metade do que sobrava para o
+                  // título da vista.
+                  className="alvo-toque hidden lg:flex w-10 h-10 items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
                   <svg
                     width="16"

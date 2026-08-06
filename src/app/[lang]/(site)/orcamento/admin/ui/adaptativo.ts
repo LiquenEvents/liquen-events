@@ -200,3 +200,39 @@ export function usePodeEsconderNoHover(): boolean {
   const { hover, toque } = useCapacidade();
   return hover && !toque;
 }
+
+/**
+ * JÁ DESCEU O SUFICIENTE PARA O CABEÇALHO ENCOLHER?
+ *
+ * Num telemóvel de 667 px de altura, o cabeçalho fixo do back office media
+ * 102 px e a barra de baixo 56: 158 px de moldura, quase um quarto do ecrã,
+ * ocupados para sempre por uma coisa que só se lê uma vez — o nome da vista.
+ *
+ * A solução não é tirar o cabeçalho (perdia-se o menu e a pesquisa) nem deixá-lo
+ * a rolar para fora (perdia-se o acesso a eles a meio de uma lista). É deixá-lo
+ * ENCOLHER assim que ela começa a descer: no topo mostra-se por inteiro, e a
+ * partir daí fica só a faixa com os botões.
+ *
+ * ── Notas de implementação ──────────────────────────────────────────────────
+ * · `passive: true` — este ouvinte NUNCA chama `preventDefault`, e dizê-lo ao
+ *   browser deixa-o continuar a fazer scroll sem esperar pelo JavaScript. Sem
+ *   isto, o gesto engasga-se exactamente onde se quer que seja fluido.
+ * · Começa em `false` no servidor E no primeiro desenho do browser, e só depois
+ *   mede: o HTML dos dois lados tem de ser igual ou há erro de hidratação.
+ * · A histerese (encolhe aos 24 px, volta a crescer aos 8) existe porque sem
+ *   ela, com o dedo parado em cima do limiar, o cabeçalho piscava entre os dois
+ *   tamanhos ao ritmo dos pixéis do scroll.
+ */
+export function useDesceu(limiar = 24, voltaAos = 8): boolean {
+  const [desceu, setDesceu] = useState(false);
+  useEffect(() => {
+    const ver = () => {
+      const y = window.scrollY;
+      setDesceu((antes) => (antes ? y > voltaAos : y > limiar));
+    };
+    ver();
+    window.addEventListener("scroll", ver, { passive: true });
+    return () => window.removeEventListener("scroll", ver);
+  }, [limiar, voltaAos]);
+  return desceu;
+}

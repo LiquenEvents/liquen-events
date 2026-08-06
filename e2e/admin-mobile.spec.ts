@@ -395,6 +395,69 @@ test.describe("Back office — mobile", () => {
   });
 
   /**
+   * O CABEÇALHO NÃO PODE VOLTAR A COMER O ECRÃ.
+   *
+   * Media 102 px num telemóvel de 667. Com os 56 px da barra de baixo eram
+   * 158 px de moldura — quase um quarto do ecrã — ocupados para sempre por uma
+   * coisa que só se lê uma vez: o nome da vista. E o título partia em duas
+   * linhas ("Visão / Geral"), o dobro da altura para a mesma palavra.
+   *
+   * O limite de 72 px não é redondo por acaso: é a altura de um cabeçalho de
+   * uma linha com um alvo de 44 px lá dentro e a folga que ele precisa. Acima
+   * disso, alguma coisa voltou a ser empilhada.
+   */
+  test("@movel phone: o cabeçalho cabe numa faixa, e encolhe ao descer", async ({ page }) => {
+    const loggedIn = await login(page);
+    if (process.env.CI) {
+      expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
+        true,
+      );
+    } else {
+      test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    }
+
+    const medir = () =>
+      page.evaluate(() => {
+        const h = document.querySelector("header");
+        const t = document.querySelector("header h1");
+        // Sem cabeçalho ou sem título não há nada a medir — e devolver zeros
+        // dava um teste verde sobre um ecrã que não montou.
+        if (!h || !t) throw new Error("Sem <header> ou sem <h1> no cabeçalho — a vista montou?");
+        const r = t.getBoundingClientRect();
+        const cs = getComputedStyle(t);
+        return {
+          altura: Math.round(h.getBoundingClientRect().height),
+          linhas: r.height / parseFloat(cs.fontSize),
+          titulo: (t.textContent ?? "").trim(),
+        };
+      });
+
+    const topo = await medir();
+    expect(
+      topo.altura,
+      `O cabeçalho mede ${topo.altura}px num ecrã de 667. Voltou a haver linhas empilhadas — ` +
+        `o subtítulo? o título em duas linhas?`,
+    ).toBeLessThanOrEqual(72);
+    // 1.5 e não 1: uma linha de Playfair mede um pouco mais do que o
+    // `font-size`, e comparar com 1 exacto seria um teste a tremer.
+    expect(
+      topo.linhas,
+      `O título "${topo.titulo}" está em mais do que uma linha — falta o \`truncate\`, ` +
+        `ou há CSS à mão a ganhar-lhe (foi o que o \`text-wrap: balance\` fez).`,
+    ).toBeLessThan(1.5);
+
+    // E encolhe mesmo ao descer — senão o "encolhe ao scroll" é só uma boa
+    // intenção escrita no código.
+    await page.evaluate(() => window.scrollTo(0, 400));
+    await page.waitForTimeout(400);
+    const descido = await medir();
+    expect(
+      descido.altura,
+      "O cabeçalho não encolheu ao descer 400px — o `useDesceu` está ligado?",
+    ).toBeLessThan(topo.altura);
+  });
+
+  /**
    * UMA NAVEGAÇÃO, NÃO DUAS.
    *
    * A barra de baixo leva os quatro destinos do dia; a gaveta leva o resto.

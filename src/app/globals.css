@@ -347,14 +347,28 @@ body {
 }
 
 /* Cleaner line breaks everywhere: balanced multi-line headings and
-   paragraphs without ugly orphan words. Gracefully ignored where unsupported. */
-h1,
-h2,
-h3 {
-  text-wrap: balance;
-}
-p {
-  text-wrap: pretty;
+   paragraphs without ugly orphan words. Gracefully ignored where unsupported.
+
+   EM `@layer base`, E NÃO SOLTO. `text-wrap` é um atalho: `text-wrap: balance`
+   escreve também o `text-wrap-mode`, que é metade do `white-space`. Fora de
+   camadas isso ganhava ao `white-space: nowrap` do `.truncate` do Tailwind —
+   e um `<h1 class="truncate">` continuava a partir em duas linhas, com o
+   `getComputedStyle` a dizer `white-space: normal` e o código a dizer o
+   contrário. Foi o que manteve "Visão / Geral" em duas linhas no cabeçalho do
+   telemóvel depois de o `truncate` já lá estar.
+
+   `base` é a camada certa para regras que vestem ELEMENTOS: é declarada antes
+   de `utilities`, portanto continua a valer onde ninguém pede nada e deixa de
+   ganhar a quem pede. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
 }
 
 /* ── Mobile base ── */
