@@ -690,3 +690,36 @@ describe("os números internos nunca saem no PDF", () => {
     expect(await fluxos(comCustos)).toBe(await fluxos(semCustos));
   });
 });
+
+describe("as notas internas nunca saem no PDF", () => {
+  /**
+   * "Cliente da AMARA, cuidado com o prazo" é uma frase que se escreve para si
+   * própria. Chegar ao cliente não é um bug com um erro visível — é uma frase
+   * sobre ele, escrita por quem lhe está a vender, dentro do documento que ele
+   * abriu com expectativa.
+   *
+   * Mesma técnica do teste dos custos, e pela mesma razão: compara-se o que
+   * fica DESENHADO, porque procurar as palavras no ficheiro não serve (o texto
+   * vai como códigos de glifo hexadecimais).
+   */
+  it("um documento com notas desenha exactamente o mesmo que um sem notas", async () => {
+    const semNotas = decoracaoDoc();
+    const comNotas = {
+      ...semNotas,
+      notasInternas: "Cliente da AMARA, cuidado com o prazo. Recusaram em 2025 por preço.",
+      notasPorSeccao: {
+        orcamento: "Margem apertada, não descer mais.",
+        servicos: "Ela quer eucalipto e mais nada.",
+      },
+    };
+
+    const fluxos = async (doc: Parameters<typeof renderProposalDocPdf>[0]) => {
+      const pdf = await PDFDocument.load(await renderProposalDocPdf(doc));
+      let texto = "";
+      for (let i = 0; i < pdf.getPageCount(); i += 1) texto += pageContent(pdf, i);
+      return texto;
+    };
+
+    expect(await fluxos(comNotas)).toBe(await fluxos(semNotas));
+  });
+});

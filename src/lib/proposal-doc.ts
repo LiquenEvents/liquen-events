@@ -243,6 +243,26 @@ export interface ProposalDoc {
   budgetScales?: (import("./orcamento/escala").Escala | null)[];
   /** Quantas pessoas por mesa, para as linhas "por mesa" (por omissão 10). */
   convidadosPorMesa?: number;
+
+  /**
+   * NOTAS INTERNAS — o que se sabe sobre este negócio e nunca se escreve ao
+   * cliente. "Cliente da AMARA, cuidado com o prazo." "Já recusaram uma
+   * proposta em 2025 por preço."
+   *
+   * Vivem no documento porque é ao documento que dizem respeito, e porque é
+   * assim que viajam com ele na cópia de segurança. NUNCA SÃO DESENHADAS: o
+   * gerador do PDF não as lê, e há um teste que compara as instruções de
+   * desenho com e sem notas para garantir que continua assim.
+   *
+   * O sítio onde isto podia correr mal é o de sempre — alguém acrescenta um
+   * rodapé "para conferir" e esquece-se de o tirar. É esse o teste.
+   */
+  notasInternas?: string;
+  /**
+   * Notas presas a uma secção ("nas flores, ela quer eucalipto e mais nada").
+   * A chave é o id da secção do estúdio: evento, servicos, orcamento, total…
+   */
+  notasPorSeccao?: Record<string, string>;
   totalLabel: string; // "Valor Total Decoração"
   totalText: string; // "3000,00 € + IVA" — kept as text to match the studio's format
   /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding
