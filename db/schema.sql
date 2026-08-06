@@ -179,6 +179,30 @@ create table if not exists public.overview_settings (
   updated_at  timestamptz not null default now()
 );
 
+-- ── A biblioteca de serviços ──
+-- O mesmo serviço aparecia escrito de maneira diferente conforme o dia. Não é
+-- um problema de arrumação: é o cliente a receber, na proposta, uma descrição
+-- escrita à pressa quando existia uma escrita com tempo.
+--
+-- Os dois idiomas vivem na MESMA linha. Um serviço com o português feito e o
+-- inglês por fazer é um serviço incompleto, não dois serviços — e separá-los
+-- deixava-os a divergir sem nada a assinalá-lo.
+create table if not exists public.service_catalog (
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  description    text not null default '',
+  name_en        text not null default '',
+  description_en text not null default '',
+  category       text not null default 'Outros',
+  -- Arquivado sai do seletor e continua nas propostas antigas, que é onde as
+  -- palavras dele ainda fazem sentido.
+  archived       boolean not null default false,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create index if not exists service_catalog_name_idx on public.service_catalog (name);
+
 -- ── Os números com que o estúdio faz contas ──
 -- O preço do combustível, o resto do custo por quilómetro, e a margem mínima
 -- abaixo da qual o estúdio avisa.
@@ -658,6 +682,7 @@ alter table public.quotes    enable row level security;
 alter table public.proposals enable row level security;
 -- Sem políticas: só a service_role lá chega, como em todas as outras.
 alter table public.proposal_settings enable row level security;
+alter table public.service_catalog enable row level security;
 alter table public.tasks     enable row level security;
 alter table public.suppliers enable row level security;
 alter table public.calendar_events enable row level security;

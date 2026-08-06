@@ -30,6 +30,7 @@ const stores = vi.hoisted(() => ({
   messageLinks: vi.fn(async () => [] as unknown[]),
   overviewSettings: vi.fn(async () => [] as unknown[]),
   propostaDefinicoes: vi.fn(async () => [] as unknown[]),
+  servicosCatalogo: vi.fn(async () => [] as unknown[]),
 }));
 
 /** Estado do cliente Supabase falso que serve os contadores de numeração. */
@@ -66,6 +67,9 @@ vi.mock("@/lib/message-links-store", () => ({ listLinks: stores.messageLinks }))
 // mock pode servir uma lista como todos os outros.
 vi.mock("@/lib/proposta-definicoes-store", () => ({
   listarDefinicoes: stores.propostaDefinicoes,
+}));
+vi.mock("@/lib/servicos-catalogo-store", () => ({
+  listarServicos: stores.servicosCatalogo,
 }));
 vi.mock("@/lib/overview-settings-store", () => ({
   readOverviewSettings: stores.overviewSettings,

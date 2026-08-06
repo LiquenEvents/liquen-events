@@ -28,6 +28,7 @@ import { mapper as themesMapper, listThemes } from "./themes-store";
 import { mapper as linksMapper, listLinks } from "./message-links-store";
 import { mapper as overviewMapper, type OverviewField } from "./overview-settings-store";
 import { mapper as definicoesMapper, listarDefinicoes } from "./proposta-definicoes-store";
+import { mapper as catalogoMapper, listarServicos } from "./servicos-catalogo-store";
 import {
   BACKUP_SCHEMA_MIN_VERSION,
   BACKUP_SCHEMA_VERSION,
@@ -131,6 +132,17 @@ const money = z.number().finite().min(0).max(1_000_000_000);
  * criava uma segunda verdade a envelhecer ao lado da primeira. Uma cópia de uma
  * versão anterior, com menos campos, tem de continuar a poder ser reposta.
  */
+const servicoCatalogoSchema = z.looseObject({
+  id,
+  nome: z.string().max(200),
+  descricao: text(2_000),
+  nomeEn: text(200),
+  descricaoEn: text(2_000),
+  categoria: text(120),
+  createdAt: stamp,
+  updatedAt: stamp,
+});
+
 const definicaoSchema = z.looseObject({
   id,
   valor: z.looseObject({}).default({}),
@@ -634,6 +646,15 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     schema: themeSchema,
     current: listThemes,
     stamp: (t) => t.updatedAt,
+  }),
+  asTarget({
+    key: "servicosCatalogo",
+    label: "Biblioteca de serviços",
+    table: catalogoMapper.table,
+    mapper: catalogoMapper,
+    schema: servicoCatalogoSchema,
+    current: listarServicos,
+    stamp: (s) => s.updatedAt,
   }),
   asTarget({
     key: "propostaDefinicoes",

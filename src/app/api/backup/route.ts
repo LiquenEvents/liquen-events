@@ -20,6 +20,7 @@ import { listThemes } from "@/lib/themes-store";
 import { listLinks } from "@/lib/message-links-store";
 import { readOverviewSettings } from "@/lib/overview-settings-store";
 import { listarDefinicoes } from "@/lib/proposta-definicoes-store";
+import { listarServicos } from "@/lib/servicos-catalogo-store";
 import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -130,6 +131,13 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
     key: "propostaDefinicoes",
     table: "proposal_settings",
     list: listarDefinicoes,
+  },
+  // A biblioteca de serviços é redacção — horas de escrever bem, que não se
+  // reconstroem de mais lado nenhum.
+  {
+    key: "servicosCatalogo",
+    table: "service_catalog",
+    list: listarServicos,
   },
 ] as const;
 

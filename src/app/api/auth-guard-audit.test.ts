@@ -307,6 +307,14 @@ vi.mock("@/lib/proposal-drafts", () =>
 // Parcial: o esquema Zod da rota lê OVERVIEW_FIELDS/MAX_* no topo do módulo e o
 // 409 depende da classe StaleWriteError real — só as duas funções de I/O é que
 // passam a espias.
+vi.mock("@/lib/servicos-catalogo-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/servicos-catalogo-store")>()),
+  listarServicos: H.afn("servicos-catalogo-store.listarServicos", async () => []),
+  criarServico: H.afn("servicos-catalogo-store.criarServico", async () => undefined),
+  actualizarServico: H.afn("servicos-catalogo-store.actualizarServico", async () => ({})),
+  apagarServico: H.afn("servicos-catalogo-store.apagarServico", async () => undefined),
+}));
+
 vi.mock("@/lib/proposta-definicoes-store", async (orig) => ({
   ...(await orig<typeof import("@/lib/proposta-definicoes-store")>()),
   listarDefinicoes: H.afn("proposta-definicoes-store.listarDefinicoes", async () => []),
@@ -479,6 +487,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // não expõe dados de clientes, mas ESCREVER muda o que todas as propostas
   // seguintes cobram de deslocação — é tão de sessão como o resto.
   { path: "./proposta-definicoes/route", methods: ["GET", "PUT"] },
+  // A biblioteca de serviços: as palavras que vão nas propostas. Ler já é
+  // interno; escrever muda o que sai em todas as propostas seguintes.
+  { path: "./servicos-catalogo/route", methods: ["GET", "POST"] },
+  { path: "./servicos-catalogo/[id]/route", methods: ["PATCH", "DELETE"] },
   // Passkeys. A LISTA e a REMOÇÃO são de sessão, como tudo o resto. O REGISTO
   // também, e é o ponto todo do desenho: transformar um aparelho numa chave só
   // pode ser feito por quem já provou ser quem diz. Sem esta guarda, um estranho
@@ -532,6 +544,14 @@ describe("ADMIN-SESSION routes reject the unauthenticated before touching the st
     const res = await fn(req("GET"), ctx());
     expect(res.status).not.toBe(401);
     expect(calls).toContain("themes-store.listThemes");
+  });
+
+  it("GET /api/servicos-catalogo passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./servicos-catalogo/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("servicos-catalogo-store.listarServicos");
   });
 
   it("GET /api/proposta-definicoes passes the guard for an authenticated admin (reaches the store)", async () => {
