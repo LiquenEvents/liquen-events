@@ -1512,6 +1512,27 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     "modelos-email": "Modelos de email",
   };
 
+  /**
+   * O NOME CURTO PARA O TELEMÓVEL — só onde o comprido não cabe.
+   *
+   * Entre o título e os botões do cabeçalho sobram ~179 px a 375. Dos onze
+   * destinos, dez cabem por inteiro; "Organização de propostas" precisa de 240
+   * e saía cortado a meio de uma palavra, que é pior do que qualquer abreviação
+   * escolhida por alguém.
+   *
+   * A primeira palavra e não uma sigla: é a palavra que ela acabou de ler no
+   * botão da gaveta para chegar aqui, portanto reconhece-se sem esforço. No
+   * computador continua o nome inteiro — não é o mesmo título encolhido, é o
+   * nome que serve cada sítio.
+   *
+   * Só entram aqui os que MEDIDAMENTE não cabem. O passeio do telemóvel falha
+   * se algum título for cortado, e é essa falha que manda acrescentar uma
+   * linha a esta tabela.
+   */
+  const VIEW_TITLES_CURTOS: Partial<Record<View, string>> = {
+    kanban: "Organização",
+  };
+
   const VIEW_SUB: Record<View, string> = {
     // Vazio de propósito: a própria Visão Geral já abre com data + saudação —
     // um eyebrow extra aqui era só mais texto.
@@ -1860,15 +1881,22 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           }`}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
-          {/* OS QUATRO DO DIA, E MAIS NADA.
-              Estavam aqui três destinos e um botão "Mais" que abria a gaveta —
-              a mesma gaveta que o hambúrguer do cabeçalho já abria, dois
-              cantos ao lado. Dois abridores para a mesma coisa, e os três
-              destinos escritos outra vez lá dentro.
-              Agora a barra leva os quatro destinos do dia (a lista e a razão
-              estão em `nav.tsx`), e a gaveta leva exactamente o resto. O
-              "Fazer proposta" — que é a tarefa que dá o dinheiro — estava a
-              dois toques e passa a um. */}
+          {/* OS QUATRO DO DIA, MAIS O ABRIDOR DA GAVETA.
+              Estavam aqui três destinos repetidos da gaveta e um "Mais" que
+              abria a mesma gaveta que o hambúrguer do cabeçalho já abria — dois
+              abridores em cantos opostos. A regra que ficou é outra: os quatro
+              destinos do dia vivem SÓ aqui, o resto vive SÓ na gaveta (a lista
+              e a razão estão em `nav.tsx`), e há **um** abridor de cada vez.
+
+              O abridor voltou para aqui, e não para o canto superior esquerdo,
+              por uma razão de mão: o polegar de quem segura o telemóvel chega
+              ao fundo do ecrã e não chega ao topo do lado oposto. Como o
+              Calendário, as Tarefas e os Temas passaram todos a viver na
+              gaveta, obrigá-la a esticar-se até ao canto para lá chegar era
+              trocar uma duplicação por um mau alcance.
+
+              Não voltam a ser dois: o hambúrguer do cabeçalho só aparece
+              quando ESTA barra não está — ver lá em cima. */}
           <div className="flex items-stretch">
             {BARRA_INFERIOR.map((id) => {
               const navItem = NAV.find((n) => n.id === id)!;
@@ -1889,15 +1917,43 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   >
                     {navItem.icon}
                   </span>
-                  {/* `text-center` e `leading-tight`: com quatro destinos cada
-                      um fica com ~93 px, e "Fazer proposta" precisa de partir
-                      em duas linhas em vez de ser cortado a meio. */}
+                  {/* `text-center` e `leading-tight`: com cinco células cada
+                      uma fica com 75 px, e "Fazer proposta" precisa de partir
+                      em duas linhas em vez de ser cortado a meio. 75 px continua
+                      bem acima dos 44 do alvo mínimo. */}
                   <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center">
                     {navItem.label}
                   </span>
                 </button>
               );
             })}
+            {/* O ABRIDOR DA GAVETA, ao alcance do polegar. Não é um destino —
+                é a porta para os que não cabem aqui. */}
+            <button
+              onClick={() => setNavOpen(true)}
+              aria-label="Mais destinos"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
+                !BARRA_INFERIOR.includes(view)
+                  ? "text-[var(--bo-accent)]"
+                  : "text-[var(--bo-text-faint)]"
+              }`}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+              </svg>
+              <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center">
+                Mais
+              </span>
+            </button>
           </div>
         </nav>
 
@@ -1937,28 +1993,32 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 desceu ? "py-1.5" : "py-2.5"
               }`}
             >
-              {/* O ÚNICO ABRIDOR DA GAVETA no telemóvel. Era um de dois — o
-                  outro era o botão "Mais" da barra de baixo, que abria
-                  exactamente a mesma coisa a partir do canto oposto. Ficou
-                  este: a barra de baixo desaparece enquanto uma proposta está
-                  aberta em detalhe, e uma navegação que às vezes não está lá
-                  não pode ser a única. */}
-              <button
-                onClick={() => setNavOpen(true)}
-                aria-label="Abrir menu"
-                className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] transition-colors"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+              {/* O SUPLENTE, e só suplente.
+                  O abridor da gaveta vive na barra de baixo, ao alcance do
+                  polegar. Só que essa barra desaparece enquanto uma proposta
+                  está aberta em detalhe — e uma navegação que às vezes não
+                  está lá não pode ser a única.
+                  Por isso este aparece exactamente quando a outra sai, e nunca
+                  ao mesmo tempo: continua a haver UM abridor de cada vez, que
+                  é a regra que esta arrumação existe para cumprir. */}
+              {selected && (
+                <button
+                  onClick={() => setNavOpen(true)}
+                  aria-label="Abrir menu"
+                  className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] transition-colors"
                 >
-                  <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
-                </svg>
-              </button>
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+                  </svg>
+                </button>
+              )}
               <div className="min-w-0">
                 {/* O SUBTÍTULO NÃO VAI PARA O TELEMÓVEL.
                     "Pedidos de orçamento recebidos" por cima de "Pedidos" diz,
@@ -1986,7 +2046,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     fontSize: desceu ? "clamp(16px, 2.6vw, 30px)" : "clamp(19px, 2.6vw, 30px)",
                   }}
                 >
-                  {VIEW_TITLES[view]}
+                  {/* Um só `<h1>`, com o texto a mudar por CSS. Dois `<h1>`
+                      irmãos dariam dois títulos de nível 1 na mesma página, e
+                      um leitor de ecrã anunciava ambos. */}
+                  {VIEW_TITLES_CURTOS[view] ? (
+                    <>
+                      <span className="lg:hidden">{VIEW_TITLES_CURTOS[view]}</span>
+                      <span className="hidden lg:inline">{VIEW_TITLES[view]}</span>
+                    </>
+                  ) : (
+                    VIEW_TITLES[view]
+                  )}
                 </h1>
               </div>
               <div className="ml-auto flex items-center gap-1.5 pointer-coarse:gap-2.5 sm:gap-2 shrink-0">

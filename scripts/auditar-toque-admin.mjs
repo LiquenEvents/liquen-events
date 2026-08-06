@@ -47,7 +47,12 @@ import { chromium } from "@playwright/test";
 // As regras e os limiares vivem num sítio só, partilhados com o passeio do
 // CI (`e2e/admin-mobile.spec.ts`). Duas cópias afastavam-se, e o relatório
 // passava a dizer uma coisa e o CI outra.
-import { AUDITOR, ECRA_ESTREITO } from "../e2e/ergonomia-tactil.mjs";
+import {
+  AUDITOR,
+  ECRA_ESTREITO,
+  abrirGaveta,
+  irParaDestinoMovel,
+} from "../e2e/ergonomia-tactil.mjs";
 import { existsSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -179,19 +184,10 @@ async function entrar(ctx, page) {
 }
 
 async function irPara(page, vista) {
-  await page.getByRole("button", { name: "Abrir menu" }).click();
-  const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
-  await nav.waitFor({ state: "visible" });
-  // O grupo "Mais" fica ABERTO depois do primeiro destino lá de dentro. Clicar
-  // outra vez fechava-o e o destino seguinte nunca aparecia — por isso a
-  // pergunta é sempre "o botão está à vista?", nunca "esta vista é das de
-  // dentro?".
-  const item = nav.getByRole("button", { name: vista, exact: true });
-  if ((await item.count()) === 0) {
-    const mais = nav.getByRole("button", { name: /^Mais$/ });
-    if (await mais.count()) await mais.first().click();
-  }
-  await item.first().click();
+  // O caminho depende do destino: os quatro do dia vivem na barra de baixo e
+  // já NÃO estão na gaveta. Vive em `e2e/ergonomia-tactil.mjs`, partilhado com
+  // os passeios — este varrimento e o CI têm de medir o mesmo ecrã.
+  await irParaDestinoMovel(page, vista);
   await page.waitForTimeout(900); // deixar o conteúdo assentar antes de medir
 }
 
@@ -234,7 +230,7 @@ async function main() {
   // Também a gaveta de navegação aberta — é ecrã a sério e não aparece em
   // nenhuma vista, porque as medições acima são feitas com ela fechada.
   try {
-    await page.getByRole("button", { name: "Abrir menu" }).click();
+    await abrirGaveta(page);
     await page.waitForTimeout(400);
     const r = await page.evaluate(AUDITOR);
     relatorio.push({ vista: "Gaveta de navegação (aberta)", ...r });

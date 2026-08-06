@@ -10,6 +10,8 @@ import {
   descreverTexto,
   descreverTapado,
   TEXTO_MIN,
+  abrirGaveta,
+  NA_BARRA_DE_BAIXO,
 } from "./ergonomia-tactil.mjs";
 
 /**
@@ -180,12 +182,12 @@ async function expectErgonomiaTactil(page: Page, label: string) {
 }
 
 /**
- * Os quatro destinos que vivem na barra de baixo do telemóvel — os mesmos que
- * o `BARRA_INFERIOR` de `nav.tsx`, aqui pelos RÓTULOS porque é por eles que um
- * passeio encontra um botão. Se as duas listas divergirem, o passeio procura na
- * barra um destino que está na gaveta (ou o contrário) e falha a dizer qual.
+ * Os quatro destinos que vivem na barra de baixo — vindos do módulo partilhado,
+ * que é o mesmo que os varrimentos usam para navegar. Uma segunda lista aqui
+ * podia divergir da primeira em silêncio, e o passeio passaria a procurar na
+ * barra um destino que está na gaveta (ou o contrário) sem dizer porquê.
  */
-const NA_BARRA = new Set(["Visão Geral", "Pedidos", "Fazer proposta", "Propostas"]);
+const NA_BARRA = new Set(NA_BARRA_DE_BAIXO);
 
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
@@ -195,7 +197,13 @@ const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
-  { nav: /^Organização de propostas$/, heading: /^Organização de propostas$/ },
+  {
+    nav: /^Organização de propostas$/,
+    // O único destino com nome curto no telemóvel: o comprido precisa de 240px
+    // no cabeçalho e há 179. O botão da gaveta continua a dizer o nome inteiro;
+    // o título da vista diz "Organização". Ver VIEW_TITLES_CURTOS.
+    heading: /^Organização( de propostas)?$/,
+  },
   { nav: /^Temas$/, heading: /^Temas$/ },
   { nav: /^Tarefas$/, heading: /^Tarefas$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
@@ -241,7 +249,7 @@ test.describe("Back office — mobile", () => {
         await item.click();
       } else {
         // A gaveta abre no hambúrguer do cabeçalho — o único abridor.
-        await page.getByRole("button", { name: /Abrir menu/i }).click();
+        await abrirGaveta(page);
         const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
         await expect(sidebar).toBeVisible();
         const item = sidebar.getByRole("button", { name: view.nav });
@@ -256,6 +264,27 @@ test.describe("Back office — mobile", () => {
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
       await expectErgonomiaTactil(page, view.nav.source);
+
+      // O TÍTULO NÃO PODE FICAR CORTADO A MEIO DE UMA PALAVRA.
+      // O `truncate` do cabeçalho impede-o de partir em duas linhas, mas em
+      // troca corta o que não couber — e "Organização de propostas" saía
+      // "Organiza…". A correcção é dar-lhe um nome curto para o telemóvel
+      // (VIEW_TITLES_CURTOS em AdminClient.tsx), e é esta falha que o manda
+      // fazer, com o nome e os dois números.
+      const titulo = await page.evaluate(() => {
+        const t = document.querySelector("header h1");
+        if (!t) throw new Error("Sem <h1> no cabeçalho — a vista montou?");
+        return {
+          texto: (t.textContent ?? "").trim(),
+          cabe: Math.round(t.clientWidth),
+          precisa: Math.round(t.scrollWidth),
+        };
+      });
+      expect(
+        titulo.precisa,
+        `O título "${titulo.texto}" fica cortado no telemóvel: precisa de ${titulo.precisa}px e ` +
+          `tem ${titulo.cabe}. Dê-lhe um nome curto em VIEW_TITLES_CURTOS.`,
+      ).toBeLessThanOrEqual(titulo.cabe + 1);
 
       /**
        * O ESTÚDIO SÓ EXISTE DEPOIS DE SE ESCOLHER O CLIENTE.
@@ -360,7 +389,7 @@ test.describe("Back office — mobile", () => {
     await expect(paleta).toHaveCount(0);
 
     // ── A folha de atalhos não se oferece a quem não tem teclas ───────────
-    await page.getByRole("button", { name: /Abrir menu/i }).tap();
+    await abrirGaveta(page);
     const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
     await expect(sidebar).toBeVisible();
     await expect(
@@ -480,13 +509,15 @@ test.describe("Back office — mobile", () => {
 
     const barra = page.getByRole("navigation", { name: /Destinos principais/i });
     const naBarra = (await barra.getByRole("button").allInnerTexts()).map((t) => t.trim());
+    // Os quatro do dia, e a seguir o abridor da gaveta — que não é um destino,
+    // é a porta para os que não cabem ali.
     expect(
       naBarra,
-      "A barra de baixo deixou de ser exactamente os quatro destinos do dia. " +
+      "A barra de baixo deixou de ser os quatro destinos do dia mais o abridor. " +
         "Ver BARRA_INFERIOR em nav.tsx — e, se mudou de propósito, mudar também o NA_BARRA deste ficheiro.",
-    ).toEqual([...NA_BARRA]);
+    ).toEqual([...NA_BARRA, "Mais"]);
 
-    await page.getByRole("button", { name: /Abrir menu/i }).click();
+    await abrirGaveta(page);
     const gaveta = page.getByRole("navigation", { name: /Navegação do back office/i });
     await expect(gaveta).toBeVisible();
     const naGaveta = (await gaveta.getByRole("button").allInnerTexts()).map((t) => t.trim());
@@ -506,11 +537,22 @@ test.describe("Back office — mobile", () => {
     ).toContain("Calendário");
     expect(naGaveta).toContain("Temas");
 
-    // O "Mais" da barra de baixo abria a mesma gaveta que o hambúrguer. Dois
-    // botões para a mesma coisa, em cantos opostos.
+    // UM ABRIDOR DE CADA VEZ, e nunca dois no mesmo ecrã. Havia o "Mais" da
+    // barra de baixo E o hambúrguer do cabeçalho a abrir a mesma gaveta, em
+    // cantos opostos. Agora o hambúrguer só entra quando a barra de baixo sai
+    // (com uma proposta aberta em detalhe) — portanto o que se conta é quantos
+    // estão VISÍVEIS, não quantos existem no código.
+    await page.getByRole("button", { name: /Fechar menu/i }).click();
+    // `getClientRects()` e não `toBeVisible`: a gaveta fechada continua no DOM
+    // (está `translate-x-full` para fora do ecrã), e o que interessa aqui é
+    // quantos abridores estão MESMO desenhados.
+    const abridoresAVista = await page
+      .getByRole("button", { name: /Mais destinos|Abrir menu/i })
+      .evaluateAll((els) => els.filter((e) => e.getClientRects().length > 0).length);
     expect(
-      naBarra.filter((t) => /^Mais$/i.test(t)),
-      "Voltou a haver um segundo abridor da gaveta na barra de baixo.",
-    ).toEqual([]);
+      abridoresAVista,
+      "Há mais do que um botão a abrir a gaveta no mesmo ecrã — voltámos a ter duas portas para " +
+        "o mesmo sítio, em cantos opostos.",
+    ).toBe(1);
   });
 });

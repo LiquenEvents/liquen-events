@@ -407,3 +407,63 @@ export function descreverCulpado(c) {
   const nome = c.rotulo || c.texto || `<${c.tag}>`;
   return `  corta ${c.corta}px para lá da margem  "${nome}"`;
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NAVEGAR NO TELEMÓVEL COMO ELA NAVEGA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A navegação do back office num ecrã estreito tem duas metades, e a regra é
+ * que nunca se sobrepõem:
+ *
+ *  · a BARRA DE BAIXO leva os quatro destinos do dia mais o abridor da gaveta;
+ *  · a GAVETA leva exactamente o resto.
+ *
+ * E há dois abridores no código, mas **nunca dois no ecrã**: o "Mais" da barra
+ * de baixo (o normal, ao alcance do polegar) e o hambúrguer do cabeçalho, que
+ * só entra quando a barra sai — enquanto uma proposta está aberta em detalhe.
+ *
+ * Isto vive aqui, e não copiado em três ficheiros, porque os passeios e os
+ * varrimentos têm de ir pelo mesmo caminho que ela: um deles a navegar de
+ * outra maneira mede um ecrã que ninguém usa. Foi assim que o parágrafo
+ * esmagado do estúdio sobreviveu tanto tempo.
+ */
+
+/** Os quatro do dia, pelos RÓTULOS — é por eles que um passeio acha um botão. */
+export const NA_BARRA_DE_BAIXO = ["Visão Geral", "Pedidos", "Fazer proposta", "Propostas"];
+
+/** Abre a gaveta pelo abridor que estiver à vista. */
+export async function abrirGaveta(page) {
+  const daBarra = page.getByRole("button", { name: /Mais destinos/i });
+  const doTopo = page.getByRole("button", { name: /Abrir menu/i });
+  const alvo = (await daBarra.isVisible().catch(() => false)) ? daBarra : doTopo;
+  await alvo.waitFor({ state: "visible", timeout: 10000 });
+  await alvo.click();
+}
+
+/**
+ * Vai para um destino pelo caminho por onde ele existe: a barra de baixo se for
+ * dos quatro, a gaveta se for do resto.
+ *
+ * `rotulo` é o texto do botão ("Calendário", "Fazer proposta"…).
+ */
+export async function irParaDestinoMovel(page, rotulo) {
+  if (NA_BARRA_DE_BAIXO.includes(rotulo)) {
+    await page
+      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("button", { name: rotulo, exact: true })
+      .click();
+    return;
+  }
+  await abrirGaveta(page);
+  const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
+  await nav.waitFor({ state: "visible" });
+  // O grupo "Mais" da coluna do computador fica ABERTO depois do primeiro
+  // destino lá de dentro; no telemóvel nem existe. Por isso a pergunta é
+  // sempre "o botão está à vista?", nunca "esta vista é das de dentro?".
+  const item = nav.getByRole("button", { name: rotulo, exact: true });
+  if ((await item.count()) === 0) {
+    await nav.getByRole("button", { name: "Mais", exact: true }).click();
+  }
+  await item.first().click();
+}

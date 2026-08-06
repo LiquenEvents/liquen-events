@@ -41,7 +41,7 @@
 
 import { chromium } from "@playwright/test";
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
-import { AUDITOR } from "../e2e/ergonomia-tactil.mjs";
+import { AUDITOR, irParaDestinoMovel } from "../e2e/ergonomia-tactil.mjs";
 
 const BASE = process.argv[2]?.startsWith("http") ? process.argv[2] : "http://localhost:3210";
 const arg = (n) => {
@@ -142,9 +142,17 @@ async function entrar(ctx, page) {
 const ehGaveta = (ap) => ap.largura < 1024;
 
 async function irPara(page, aparelho, rotulo) {
+  // NUM ECRÃ ESTREITO A NAVEGAÇÃO TEM DUAS METADES, e o caminho depende do
+  // destino: os quatro do dia estão na barra de baixo e já NÃO estão na
+  // gaveta. O caminho vive em `e2e/ergonomia-tactil.mjs`, partilhado com os
+  // passeios — um varrimento a navegar de outra maneira mede um ecrã que
+  // ninguém usa.
   if (ehGaveta(aparelho)) {
-    await page.getByRole("button", { name: "Abrir menu" }).click();
+    await irParaDestinoMovel(page, rotulo);
+    await page.waitForTimeout(1200);
+    return;
   }
+  // No computador a coluna está sempre lá, com a lista completa.
   const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
   await nav.waitFor({ state: "visible" });
   const item = nav.getByRole("button", { name: rotulo, exact: true });
