@@ -280,4 +280,94 @@ test.describe("Back office — mobile", () => {
 
     expect(errors, `Unexpected runtime errors:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  /**
+   * ZERO DEPENDÊNCIA DE TECLADO.
+   *
+   * Num telemóvel não há ⌘, não há Esc, não há setas. Tudo o que o back office
+   * só sabe fazer por tecla é, ali, uma coisa que não se pode fazer — e tudo o
+   * que ANUNCIA uma tecla é uma instrução impossível de seguir, a ocupar o
+   * pouco espaço que há.
+   *
+   * Este passeio corre num ecrã de toque (`hasTouch`, portanto
+   * `(pointer: coarse)` é verdade) e exige as duas metades: que não sobre
+   * nenhuma etiqueta de tecla à vista, e que as acções que só tinham atalho
+   * tenham um botão.
+   *
+   * O que fica de fora, de propósito, está escrito em NO-KEYBOARD.md.
+   */
+  test("@movel phone: nada precisa de teclado, e nada anuncia teclas", async ({ page }) => {
+    const loggedIn = await login(page);
+    if (process.env.CI) {
+      expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
+        true,
+      );
+    } else {
+      test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    }
+
+    /** As etiquetas de tecla que estão mesmo a ser desenhadas. */
+    const teclasAVista = async (onde: string) => {
+      const kbds = page.locator("kbd:visible");
+      const textos = await kbds.allInnerTexts();
+      expect(
+        textos,
+        `${onde}: ${textos.length} etiqueta(s) de tecla à vista num ecrã sem teclado. ` +
+          `Marque-as \`pointer-coarse:hidden\` — e, se a tecla era o único caminho, ` +
+          `ponha lá um botão antes de a esconder.`,
+      ).toEqual([]);
+    };
+
+    await teclasAVista("Visão Geral");
+
+    // ── A pesquisa global ────────────────────────────────────────────────
+    // O ⌘K continua a funcionar em quem tem teclado. Aqui interessa a outra
+    // ponta: chegar lá com o dedo, e sair de lá com o dedo.
+    const procurar = page.getByRole("button", { name: /^Pesquisar$/ });
+    await expect(
+      procurar,
+      "Sem botão de pesquisa no telemóvel — a pesquisa global ficaria só no ⌘K, que ali não existe.",
+    ).toHaveCount(1);
+    await procurar.tap();
+
+    const paleta = page.getByRole("dialog", { name: /Pesquisar e navegar/i });
+    await expect(paleta).toBeVisible();
+    await teclasAVista("paleta de comandos");
+
+    // Fechar tem de ser um CONTROLO. Tocar no fundo escuro também fecha, mas
+    // isso é uma coisa que se descobre por acaso, não um caminho.
+    await paleta.getByRole("button", { name: /^Fechar$/ }).tap();
+    await expect(paleta).toHaveCount(0);
+
+    // ── A folha de atalhos não se oferece a quem não tem teclas ───────────
+    await page.getByRole("button", { name: /Abrir menu/i }).tap();
+    const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
+    await expect(sidebar).toBeVisible();
+    await expect(
+      sidebar.getByRole("button", { name: /^Atalhos$/ }),
+      "A lista de atalhos de teclado continua a ocupar a gaveta num ecrã de toque.",
+    ).toHaveCount(0);
+
+    // ── Desfazer, no estúdio ─────────────────────────────────────────────
+    await sidebar
+      .getByRole("button", { name: /^Fazer proposta$/ })
+      .first()
+      .tap();
+    await expect(page.getByRole("heading", { level: 1, name: /^Fazer proposta$/ })).toBeVisible();
+    const estudio = page.getByText(/Estúdio de propostas/i).first();
+    if ((await estudio.count()) === 0) {
+      const cartoes = page.locator("main li button");
+      await expect(
+        cartoes.first(),
+        "Sem cliente escolhido e sem ninguém na lista — o estúdio não chega a ser medido.",
+      ).toBeVisible();
+      await cartoes.first().tap();
+    }
+    await expect(estudio).toHaveCount(1);
+    await expect(
+      page.getByRole("button", { name: /^Desfazer$/ }),
+      "Desfazer só existia como Cmd+Z — num telemóvel, um engano passava a ser definitivo.",
+    ).toHaveCount(1);
+    await teclasAVista("estúdio de propostas");
+  });
 });

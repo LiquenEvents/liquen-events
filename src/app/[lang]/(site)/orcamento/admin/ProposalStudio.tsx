@@ -363,6 +363,17 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
    */
   const historico = useRef<StudioDoc[]>([]);
   /**
+   * Há alguma coisa para desfazer? Isto É estado, ao contrário do histórico:
+   * é o que acende e apaga o botão "Desfazer".
+   *
+   * O botão existe porque o `Cmd+Z` não existe num telemóvel. Enquanto desfazer
+   * foi só um atalho de teclado, desfazer era uma coisa que só se podia fazer
+   * ao computador — e ela escreve propostas no telemóvel. Custa um redesenho a
+   * cada 800 ms (o mesmo instante em que o rascunho é gravado), não a cada
+   * tecla, que é a razão de o histórico continuar num `ref`.
+   */
+  const [podeDesfazer, setPodeDesfazer] = useState(false);
+  /**
    * O que ela já escreveu antes, para não voltar a escrever.
    *
    * Sai das propostas anteriores em vez de um catálogo à parte: um catálogo
@@ -572,6 +583,9 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
       if (!ultimo || JSON.stringify(ultimo) !== JSON.stringify(doc)) {
         historico.current = [...historico.current, doc].slice(-MAX_HISTORICO);
       }
+      // Dois, e não um: o último do histórico é o documento ACTUAL, portanto
+      // com uma só fotografia não há nada anterior para onde voltar.
+      setPodeDesfazer(historico.current.length >= 2);
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(doc));
         localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
@@ -773,7 +787,8 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
   }
 
   /**
-   * Cmd/Ctrl+Z — volta ao documento anterior.
+   * Volta ao documento anterior. Chamada pelo `Cmd/Ctrl+Z` e pelo botão
+   * "Desfazer" — o teclado é um atalho, não o caminho.
    *
    * O último elemento do histórico É o documento actual (foi lá posto pela
    * gravação); por isso desfazer tira DOIS e usa o penúltimo.
@@ -782,6 +797,7 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
     if (historico.current.length < 2) return false;
     const anterior = historico.current[historico.current.length - 2];
     historico.current = historico.current.slice(0, -1);
+    setPodeDesfazer(historico.current.length >= 2);
     setDoc(anterior);
     // O campo do total é estado à parte (aceita texto a meio de ser escrito),
     // por isso tem de acompanhar — senão desfazer devolvia o documento antigo
@@ -1466,6 +1482,23 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setNomeModelo(doc.eventType || "")}>
             Guardar como modelo
+          </Button>
+          {/* DESFAZER TEM DE SE PODER TOCAR.
+              Isto existia só como `Cmd+Z`, e num telemóvel não há `Cmd+Z`:
+              desfazer um engano era uma coisa que só se podia fazer sentada ao
+              computador. Fica ao lado de "Limpar rascunho" de propósito — é o
+              par dela, e é onde se vai procurar depois de estragar alguma
+              coisa. Apagado quando não há para onde voltar, para não prometer
+              o que não faz. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!podeDesfazer}
+            onClick={() => {
+              if (desfazer()) toast("Desfeito.", "info");
+            }}
+          >
+            Desfazer
           </Button>
           <Button variant="ghost" size="sm" onClick={clearDraft}>
             Limpar rascunho

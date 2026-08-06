@@ -1695,9 +1695,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               Os meus dispositivos
             </button>
             <div className="flex gap-1 pointer-coarse:gap-2">
+              {/* A LISTA DE ATALHOS DE TECLADO NÃO APARECE NUM ECRÃ DE TOQUE.
+                  É uma folha inteira a ensinar teclas — ⌘K, ?, G depois P — a
+                  quem não tem teclado. Ocupava metade da gaveta de navegação
+                  no telemóvel para não oferecer nada que ali se possa fazer.
+                  Continua a abrir com "?" em quem tem teclado, e o botão
+                  continua lá no computador. */}
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque pointer-coarse:hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Atalhos de teclado"
               >
                 <svg
@@ -1952,7 +1958,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 {view !== "temas" && (
                   <button
                     onClick={() => setPaletteOpen(true)}
-                    className="hidden sm:flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                    // `flex` e não `hidden sm:flex`: abaixo de 640 px o botão
+                    // desaparecia, e com ele a ÚNICA forma de chegar à pesquisa
+                    // global — porque a outra é o ⌘K, e num telemóvel não há ⌘.
+                    // A procura por nome de casal deixava de existir no
+                    // aparelho onde ela mais a usa. O rótulo continua a só
+                    // aparecer a partir de `md`; o que passa a estar sempre lá
+                    // é o alvo.
+                    // `min-w-11` a par do `min-h-11`: sem rótulo (abaixo de
+                    // `md`) o botão fica só com a lupa de 12 px e media 38 px
+                    // de largura — alto que chegue e estreito de mais.
+                    className="flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                    // Sem isto, abaixo de `md` (onde o rótulo está escondido) o
+                    // botão é uma lupa sem nome nenhum para o VoiceOver. O
+                    // `title` não serve: num telemóvel nunca chega a aparecer.
+                    aria-label="Pesquisar"
                     title="Pesquisar (Ctrl K)"
                   >
                     <svg
@@ -1967,7 +1987,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <path d="m21 21-4.3-4.3" strokeLinecap="round" />
                     </svg>
                     <span className="hidden md:inline">Pesquisar</span>
-                    <kbd className="text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
+                    {/* Num ecrã de toque não há ⌘ nenhum para carregar: a
+                        etiqueta anuncia uma tecla que o aparelho não tem. */}
+                    <kbd className="pointer-coarse:hidden text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
                       ⌘K
                     </kbd>
                   </button>

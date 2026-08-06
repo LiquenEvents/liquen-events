@@ -58,11 +58,19 @@ export default function AjudaGlossario({ open, onClose }: Props) {
           <p className="text-foreground/55 text-sm leading-relaxed mb-6">
             Bem-vindo(a). Esta janela explica, em poucas palavras, como funciona o back-office e o
             que significa cada termo que vai encontrar. Pode voltar aqui sempre que precisar — abre
-            com o botão “?” no topo ou com a tecla{" "}
-            <kbd className="text-[10px] text-foreground/55 bg-foreground/[0.06] border border-foreground/12 rounded px-1.5 py-0.5 leading-none">
-              ?
-            </kbd>
-            . Feche com Escape ou clicando fora.
+            com o botão “?” no topo
+            {/* A tecla e o "Escape" só se dizem a quem os tem. Num telemóvel a
+                frase mandava carregar em teclas que não existem; o botão “?” e
+                o × do canto são o caminho, e esses estão lá sempre. */}
+            <span className="pointer-coarse:hidden">
+              {" "}
+              ou com a tecla{" "}
+              <kbd className="text-[10px] text-foreground/55 bg-foreground/[0.06] border border-foreground/12 rounded px-1.5 py-0.5 leading-none">
+                ?
+              </kbd>
+            </span>
+            . Feche
+            <span className="pointer-coarse:hidden"> com Escape ou</span> no × do canto.
           </p>
 
           {/* ── Como funciona ── */}
