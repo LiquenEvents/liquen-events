@@ -1197,9 +1197,36 @@ body[data-menu-open] .whatsapp-fixed {
   border-radius: var(--bo-radius-lg, 1rem);
   box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
 }
+/* A LARGURA POR OMISSÃO DE UM CAMPO, E SÓ ELA, VIVE NUMA CAMADA.
+   ─────────────────────────────────────────────────────────────────────────
+   O `width: 100%` estava aqui em baixo, no meio da regra. Parece inofensivo e
+   não é: neste ficheiro TODO o CSS escrito à mão está FORA de camadas, e no
+   Tailwind v4 o que está fora de camadas ganha SEMPRE a `@layer utilities`.
+   Ou seja, `class="bo-input w-12"` dava um campo de 100%, e o `w-12` era
+   ignorado em silêncio — não há aviso nenhum, o campo simplesmente ocupa a
+   linha inteira e empurra o vizinho para fora.
+
+   Estava a acontecer em toda a parte: a letra do grupo no estúdio (`w-12`), as
+   quantidades do inventário (`w-24`, `w-20`), as horas do alinhamento
+   (`w-[100px]`), a mesa na lista de convidados (`w-14`), o filtro de categoria
+   (`sm:w-44`). No telemóvel o efeito é o pior possível — o campo largo come a
+   linha e o campo a seguir fica com 22 px, que é onde isto se apanhou.
+
+   A correcção é pôr SÓ esta declaração numa camada. `components` é declarada
+   pelo `@import "tailwindcss"` antes de `utilities`, portanto qualquer `w-*`
+   passa a ganhar. Fica a valer 100% onde ninguém pede largura (que é a
+   esmagadora maioria dos campos) e deixa de mentir onde alguém pede.
+
+   O resto da regra fica onde estava de propósito: o que se queria arrumar era
+   a largura, não a aparência. */
+@layer components {
+  .bo-input {
+    width: 100%;
+  }
+}
+
 /* Input / select fields inside the back office */
 .bo-input {
-  width: 100%;
   background: var(--bo-surface, #ffffff);
   /* ≥3:1 non-text contrast so the field boundary is identifiable (WCAG 1.4.11). */
   border: 1px solid var(--bo-control-border, rgba(42, 38, 32, 0.5));

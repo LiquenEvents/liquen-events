@@ -112,8 +112,11 @@ export default function ModelosParciais({
     }
   }
 
+  // `alvo-toque` leva estes dois a 44 px no telemóvel sem lhes mudar o aspecto:
+  // eram links de 16 px de altura, e num ecrã táctil isso é acertar numa linha
+  // de texto. No computador continuam a ser o que eram.
   const botao =
-    "text-xs text-foreground/50 underline-offset-2 hover:text-foreground/80 hover:underline";
+    "alvo-toque py-2 text-xs text-foreground/50 underline-offset-2 hover:text-foreground/80 hover:underline";
 
   return (
     <div ref={caixa} className={`relative inline-flex items-center gap-3 ${className ?? ""}`}>

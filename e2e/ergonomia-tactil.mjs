@@ -37,6 +37,24 @@ export const LETRA_CAMPO_MIN = 16;
 export const ESPACO_MIN = 8;
 
 /**
+ * Largura mínima de renderização de um bloco de texto CORRIDO, em píxeis.
+ *
+ * Não é um capricho tipográfico: abaixo disto o texto passa a partir uma
+ * palavra por linha, e duas frases ocupam dois ecrãs de scroll. Acontece quando
+ * um parágrafo é irmão de uma barra de botões marcada `shrink-0` dentro de um
+ * `flex` em linha — os botões ficam com a largura que pedem e o texto encolhe
+ * até à palavra mais comprida.
+ *
+ * 100 px a 375 é conservador: cabem 4 a 5 palavras curtas por linha. Um
+ * parágrafo abaixo disto está partido, não apertado.
+ */
+export const TEXTO_MIN = 100;
+
+/** A partir de quantas letras um elemento conta como texto CORRIDO. Abaixo
+ *  disto são chips, contadores e rótulos, que são estreitos por desenho. */
+export const TEXTO_LETRAS_MIN = 40;
+
+/**
  * O auditor que corre DENTRO da página, como fonte para `page.evaluate`.
  *
  * É uma string e não uma função por uma razão prática: o guião `.mjs` e o
@@ -45,6 +63,8 @@ export const ESPACO_MIN = 8;
  */
 export const AUDITOR = `(() => {
   const ALVO_MIN = ${ALVO_MIN};
+  const TEXTO_MIN = ${TEXTO_MIN};
+  const TEXTO_LETRAS_MIN = ${TEXTO_LETRAS_MIN};
   const ESPACO_MIN = ${ESPACO_MIN};
   const LETRA_CAMPO_MIN = ${LETRA_CAMPO_MIN};
 
@@ -236,9 +256,122 @@ export const AUDITOR = `(() => {
     focoAntes.focus({ preventScroll: true });
   }
 
+  /**
+   * TEXTO ESMAGADO — parágrafos espremidos até à largura de uma palavra.
+   *
+   * Só se olha para texto CORRIDO (≥ TEXTO_LETRAS_MIN letras): um chip de
+   * estado ou um contador são estreitos de propósito e não têm nada a ver com
+   * este defeito. E só para os que estão VISÍVEIS — um painel fechado não conta.
+   */
+  const textoEsmagado = [];
+  for (const el of document.querySelectorAll("p, li, dd, blockquote, figcaption")) {
+    // NÃO se usa \`visivel()\` aqui, e esta é a linha que faz o cheque valer.
+    //
+    // O \`visivel()\` descarta tudo o que tenha largura zero — e a largura zero
+    // é PRECISAMENTE o pior caso deste defeito: um parágrafo espremido contra
+    // uma barra de botões \`shrink-0\` não fica estreito, fica com 0 px, e o
+    // Playwright chama-lhe "hidden". A primeira versão deste cheque usava
+    // \`visivel()\` e por isso ignorava exactamente aquilo que existe para
+    // apanhar. Só se viu ao repor o defeito de propósito.
+    //
+    // O que se descarta é só o que está mesmo escondido: \`display:none\`,
+    // \`visibility:hidden\`, um painel fechado, uma gaveta \`inert\`.
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") continue;
+    if (el.closest("[inert],[aria-hidden=true],[hidden]")) continue;
+    let escondidoPeloPai = false;
+    for (let pai = el.parentElement; pai; pai = pai.parentElement) {
+      const cp = getComputedStyle(pai);
+      if (cp.display === "none" || cp.visibility === "hidden") { escondidoPeloPai = true; break; }
+    }
+    if (escondidoPeloPai) continue;
+
+    // \`innerText\` e NÃO \`textContent\`: o primeiro é o texto RENDERIZADO, o
+    // segundo é tudo o que está no DOM. A diferença apanhou-me: uma linha que
+    // no telemóvel mostra só um visto, mas que tem a frase completa lá dentro
+    // num span escondido por CSS, contava 69 letras num elemento de
+    // 17 px e era acusada de esmagada. Estava certa — o que estava errado era
+    // a medição.
+    const t = (el.innerText || "").trim();
+    if (t.length < TEXTO_LETRAS_MIN) continue;
+    const r = el.getBoundingClientRect();
+    // Altura zero com largura zero é um elemento fora de fluxo, não um
+    // parágrafo esmagado — só conta o que ocupa mesmo espaço vertical.
+    if (r.height === 0) continue;
+    if (r.width >= TEXTO_MIN) continue;
+    textoEsmagado.push({ ...assinatura(el), largura: Math.round(r.width), letras: t.length });
+  }
+
+  /**
+   * TAPADOS POR UMA BARRA FIXA.
+   *
+   * O defeito que isto apanha, e que nenhum dos outros cheques apanhava: um
+   * botão ou campo que está no ecrã, com o tamanho certo e dentro da margem —
+   * mas com uma barra \`sticky\`/\`fixed\` desenhada por cima. Tocar ali toca na
+   * barra. Já aconteceu duas vezes neste estúdio: a barra do total tapou o
+   * "Título interno" e, depois, o "Valor (sem IVA)" — ou seja, precisamente o
+   * campo que a barra existe para acompanhar.
+   *
+   * Como se mede: pergunta-se ao browser QUEM está no ponto central do
+   * elemento. Se quem responde não é ele nem um filho seu, está tapado — e o
+   * culpado é o que vier de volta.
+   *
+   * Com um diálogo aberto isto não se mede: aí tapar o fundo é o que se quer.
+   */
+  const tapados = [];
+  if (!document.querySelector("[role=dialog][aria-modal=true]")) {
+    /** Quem está no ponto central deste elemento, se não for ele próprio? */
+    const barraPorCima = (el) => {
+      const r = caixaDeToque(el);
+      if (!r || r.width === 0 || r.height === 0) return null;
+      const x = Math.round(r.left + r.width / 2);
+      const y = Math.round(r.top + r.height / 2);
+      if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null;
+      const emCima = document.elementFromPoint(x, y);
+      if (!emCima || el === emCima || el.contains(emCima) || emCima.contains(el)) return null;
+      // Só interessa quando o que está por cima é mesmo uma barra presa ao
+      // ecrã. Um pseudo-elemento decorativo ou um rótulo sobreposto não é um
+      // problema de toque.
+      for (let p = emCima; p; p = p.parentElement) {
+        const pos = getComputedStyle(p).position;
+        if (pos === "fixed" || pos === "sticky") return p;
+      }
+      return null;
+    };
+
+    const scrollAntes = { x: scrollX, y: scrollY };
+    for (const el of interactivos) {
+      if (!barraPorCima(el)) continue;
+      /**
+       * ESTAR TAPADO AGORA NÃO CHEGA.
+       *
+       * Um botão a meio da página passa por baixo da barra de baixo enquanto se
+       * rola — e isso não é defeito nenhum, é o que uma barra fixa faz. O que é
+       * defeito é ficar tapado DEPOIS de se o trazer para o meio do ecrã: aí não
+       * há posição de scroll nenhuma que o liberte, e a única forma de lhe tocar
+       * é não haver nenhuma.
+       *
+       * Sem esta segunda medição o cheque acusava metade da página e deixava de
+       * se poder confiar nele — que é como um guarda morre.
+       */
+      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+      const barra = barraPorCima(el);
+      if (!barra) continue;
+      tapados.push({
+        ...assinatura(el),
+        porCima: assinatura(barra).texto || assinatura(barra).classes.slice(0, 60),
+      });
+    }
+    // Devolver a página ao sítio onde estava: as medições seguintes contam com
+    // ela ali, e um passeio que mexe no que mede não mede nada.
+    scrollTo(scrollAntes.x, scrollAntes.y);
+  }
+
   return {
     examinados: interactivos.length,
+    tapados,
     campos: document.querySelectorAll(CAMPOS).length,
+    textoEsmagado,
     pequenos,
     encostados,
     camposPequenos,
@@ -256,6 +389,18 @@ export function descreverAlvo(p) {
 export function descreverCampo(c) {
   const nome = c.rotulo || c.texto || `<${c.tag}${c.tipo ? ` type=${c.tipo}` : ""}>`;
   return `  ${c.fontSize}px  "${nome}"  (mínimo ${LETRA_CAMPO_MIN}px, senão o iOS amplia)`;
+}
+
+/** Uma linha por elemento tapado por uma barra. */
+export function descreverTapado(t) {
+  const nome = t.rotulo || t.texto || `<${t.tag}>`;
+  return `  "${nome}"  está por baixo de  "${t.porCima}"`;
+}
+
+/** Uma linha por parágrafo esmagado. */
+export function descreverTexto(t) {
+  const amostra = (t.texto || "").slice(0, 50);
+  return `  ${t.largura}px de largura para ${t.letras} letras  "${amostra}…"  (mínimo ${TEXTO_MIN}px)`;
 }
 
 export function descreverCulpado(c) {

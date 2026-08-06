@@ -208,7 +208,11 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
             className="resize-none"
           />
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-[10px] text-foreground/30">
+            {/* Os dois botões ao lado fazem o mesmo e estão sempre lá; isto é
+                o atalho para quem tem teclado. Num ecrã de toque nomeia teclas
+                que não existem, e a dica ficava a competir por largura com os
+                botões que são o caminho a sério. */}
+            <span className="pointer-coarse:hidden text-[10px] text-foreground/30">
               Ctrl+Enter para guardar · Esc para cancelar
             </span>
             <div className="flex gap-2">

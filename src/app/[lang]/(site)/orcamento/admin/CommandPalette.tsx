@@ -168,9 +168,28 @@ export default function CommandPalette({
             placeholder="Pesquisar ou navegar…"
             className="flex-1 bg-transparent text-[15px] text-foreground/90 placeholder-foreground/35 focus:outline-none"
           />
-          <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5 text-[10px] tracking-wider text-foreground/45">
+          {/* FECHAR: uma tecla em quem tem teclado, um botão em quem não tem.
+              Aqui só havia a etiqueta "ESC". Num telemóvel isso é uma
+              instrução impossível de seguir, e o que restava para fechar era
+              tocar no fundo escuro — que não é um controlo, é uma coisa que se
+              descobre por acaso. */}
+          <kbd className="pointer-coarse:hidden rounded-md border border-foreground/15 px-1.5 py-0.5 text-[10px] tracking-wider text-foreground/45">
             ESC
           </kbd>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            // `flex pointer-fine:hidden` e NÃO `hidden pointer-coarse:flex`:
+            // o Tailwind arruma as classes de `display` todas no mesmo grupo, e
+            // dentro dele o `.hidden` sai DEPOIS do `.flex` — portanto ganhava
+            // à variante e o botão nunca aparecia, em ecrã de toque nenhum.
+            // Medido: `display: none`, 0x0. Com a variante do lado de quem
+            // esconde, a ordem passa a jogar a favor.
+            className="alvo-toque flex pointer-fine:hidden shrink-0 items-center justify-center rounded-lg text-xl leading-none text-foreground/45"
+          >
+            ×
+          </button>
         </div>
 
         <div className="max-h-[52dvh] overflow-y-auto overscroll-contain p-2">
@@ -250,7 +269,7 @@ export default function CommandPalette({
                       </span>
                     )}
                     {isActive && (
-                      <kbd className="shrink-0 rounded-md border border-[#4d6350]/25 px-1.5 py-0.5 text-[10px] text-[#4d6350]">
+                      <kbd className="pointer-coarse:hidden shrink-0 rounded-md border border-[#4d6350]/25 px-1.5 py-0.5 text-[10px] text-[#4d6350]">
                         ↵
                       </kbd>
                     )}
@@ -261,7 +280,11 @@ export default function CommandPalette({
           ))}
         </div>
 
-        <div className="flex items-center gap-4 border-t border-foreground/[0.07] px-4 py-2.5 text-[11px] text-foreground/45">
+        {/* O rodapé inteiro é instrução de teclado: setas, enter, escape. Num
+            ecrã de toque é uma barra a ocupar altura para dizer três coisas
+            que não se podem fazer — e a altura, num telemóvel, é o que falta
+            para ver os resultados. */}
+        <div className="pointer-coarse:hidden flex items-center gap-4 border-t border-foreground/[0.07] px-4 py-2.5 text-[11px] text-foreground/45">
           <span className="flex items-center gap-1.5">
             <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5">↑↓</kbd> navegar
           </span>

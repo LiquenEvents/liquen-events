@@ -102,3 +102,74 @@ describe("Propostas — estado fora do mapa", () => {
     expect(screen.getByText("recusada")).toBeTruthy();
   });
 });
+
+/**
+ * A MESMA LISTA EM DUAS FORMAS.
+ *
+ * O que aqui se guarda não é o aspecto: é que a informação que decide — cliente,
+ * estado, validade, valor — está presente nas DUAS, e que nenhuma acção
+ * desaparece por não haver rato.
+ */
+function simularAparelho(largura: number, toque: boolean) {
+  vi.stubGlobal("matchMedia", (mq: string) => {
+    const min = /min-width:\s*(\d+)px/.exec(mq);
+    const matches = min
+      ? largura >= Number(min[1])
+      : mq.includes("hover: hover")
+        ? !toque
+        : mq.includes("pointer: coarse")
+          ? toque
+          : false;
+    return {
+      matches,
+      media: mq,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => true,
+    } as unknown as MediaQueryList;
+  });
+}
+
+describe("Propostas — a lista muda de forma", () => {
+  it("no computador é uma tabela ordenável", async () => {
+    simularAparelho(1440, false);
+    render(
+      <ToastProvider>
+        <Propostas />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole("table", { name: "Propostas" })).toBeTruthy());
+    // Ordenar pelo valor é o que uma tabela faz e um cartão não: é por isso que
+    // a tabela existe no ecrã grande.
+    expect(screen.getByRole("button", { name: /Valor/ })).toBeTruthy();
+  });
+
+  it("no telemóvel são cartões — e não uma tabela apertada", async () => {
+    simularAparelho(375, true);
+    render(
+      <ToastProvider>
+        <Propostas />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole("list", { name: "Propostas" })).toBeTruthy());
+    expect(screen.queryByRole("table")).toBeNull();
+    // O que decide continua lá: quem é, e quanto.
+    expect(screen.getByText("Cliente Correcto")).toBeTruthy();
+  });
+
+  /** Num ecrã táctil, uma acção escondida no hover não existe. */
+  it("as acções continuam alcançáveis sem rato", async () => {
+    simularAparelho(375, true);
+    render(
+      <ToastProvider>
+        <Propostas />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("Cliente Correcto")).toBeTruthy());
+    const menu = screen.getByRole("button", { name: "Acções de Cliente Correcto" });
+    expect(menu.className).not.toContain("opacity-0");
+  });
+});

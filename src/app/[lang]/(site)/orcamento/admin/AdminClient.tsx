@@ -53,7 +53,7 @@ import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, type View } from "./nav";
-import { Button, SectionCard, Segmented } from "./ui";
+import { Button, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -285,6 +285,129 @@ function statusBadge(status: QuoteStatus): ReactNode {
 // is a stable string; onOpen/onToggle are stable callbacks), so memo skips
 // re-rendering each row. Saves, selection and filtering still update the list
 // because they change these props (via visibleQuotes / the booleans).
+
+/**
+ * AS COLUNAS DOS PEDIDOS — a forma de computador da mesma lista.
+ *
+ * A lista de pedidos é o ecrã onde ela passa mais tempo, e num monitor uma
+ * pilha de cartões grandes mostra oito pedidos onde cabiam vinte e cinco. A
+ * tabela existe para isso: ver muitos ao mesmo tempo, ordenar por quem espera
+ * há mais tempo, e varrer com os olhos.
+ *
+ * O CARTÃO continua a ser o do telemóvel, intacto — foi desenhado para o
+ * polegar e auditado ao toque. Isto não o substitui; convive com ele.
+ */
+function COLUNAS_DE_PEDIDOS(ctx: {
+  selectedIds: Set<string>;
+  toggleSelect: (id: string) => void;
+  todayStr: string;
+  atual?: string;
+}): Coluna<Quote>[] {
+  const diasAEsperar = (q: Quote) =>
+    Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
+  return [
+    {
+      chave: "sel",
+      cabecalho: "",
+      largura: "w-10",
+      celula: (q) => (
+        <label
+          className="flex cursor-pointer items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={ctx.selectedIds.has(q.id)}
+            onChange={() => ctx.toggleSelect(q.id)}
+            className="h-4 w-4 cursor-pointer accent-[#4d6350]"
+            aria-label={`Selecionar pedido de ${q.name}`}
+          />
+        </label>
+      ),
+    },
+    {
+      chave: "nome",
+      cabecalho: "Cliente",
+      ordenar: (a, b) => a.name.localeCompare(b.name, "pt"),
+      celula: (q) => (
+        <span className="block">
+          <span
+            className={`block truncate ${
+              ctx.atual === q.id ? "font-semibold text-[#4d6350]" : "text-foreground/85"
+            }`}
+          >
+            {q.name}
+          </span>
+          <span className="block truncate text-[11px] text-foreground/45">{q.email}</span>
+        </span>
+      ),
+    },
+    { chave: "estado", cabecalho: "Estado", celula: (q) => statusBadge(q.status) },
+    {
+      chave: "data",
+      cabecalho: "Data do evento",
+      ordenar: (a, b) => (a.date ?? "").localeCompare(b.date ?? ""),
+      celula: (q) => {
+        const cd = eventCountdown(q.date);
+        return (
+          <span className="whitespace-nowrap">
+            {q.date || "—"}
+            {cd && cd.tone !== "past" && (
+              <span
+                className={`ml-1.5 text-[10px] ${
+                  cd.tone === "today" || cd.tone === "soon"
+                    ? "font-medium text-[#b5654a]"
+                    : "text-foreground/45"
+                }`}
+              >
+                {cd.label}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      chave: "local",
+      cabecalho: "Local",
+      soLargo: true,
+      celula: (q) => <span className="block truncate">{q.location || "—"}</span>,
+    },
+    {
+      chave: "pax",
+      cabecalho: "Pax",
+      soLargo: true,
+      alinharADireita: true,
+      ordenar: (a, b) => (a.guests ?? 0) - (b.guests ?? 0),
+      celula: (q) => <span className="tabular-nums">{q.guests || "—"}</span>,
+    },
+    {
+      // A coluna que ela pediu, e a que muda o que se faz a seguir: quem está
+      // à espera há mais tempo. Ordenar por aqui é a pergunta "a quem devo
+      // responder já", que na pilha de cartões não se conseguia fazer.
+      chave: "espera",
+      cabecalho: "À espera",
+      alinharADireita: true,
+      ordenar: (a, b) => diasAEsperar(b) - diasAEsperar(a),
+      celula: (q) => {
+        const d = diasAEsperar(q);
+        const parado =
+          (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
+          d >= 14;
+        return (
+          <span
+            className={`tabular-nums whitespace-nowrap ${
+              parado ? "font-medium text-amber-600" : "text-foreground/60"
+            }`}
+          >
+            {d}d
+          </span>
+        );
+      },
+    },
+  ];
+}
+
 const QuoteCard = memo(function QuoteCard({
   q,
   isCurrent,
@@ -1755,9 +1878,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               Os meus dispositivos
             </button>
             <div className="flex gap-1 pointer-coarse:gap-2">
+              {/* A LISTA DE ATALHOS DE TECLADO NÃO APARECE NUM ECRÃ DE TOQUE.
+                  É uma folha inteira a ensinar teclas — ⌘K, ?, G depois P — a
+                  quem não tem teclado. Ocupava metade da gaveta de navegação
+                  no telemóvel para não oferecer nada que ali se possa fazer.
+                  Continua a abrir com "?" em quem tem teclado, e o botão
+                  continua lá no computador. */}
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className="alvo-toque pointer-coarse:hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                 title="Atalhos de teclado"
               >
                 <svg
@@ -1926,7 +2055,25 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             safe-area inset) so the last row never hides under the tab bar. */}
         <div className="flex-1 min-w-0 flex flex-col pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-20 bg-white/95 border-b border-[var(--bo-hairline)] pt-safe">
+          {/* A ESCADA DE PLANOS do back office, escrita uma vez para não voltar
+              a colidir:
+                10  detalhes dentro de um cartão (cabeçalhos de painel)
+                20  barras `sticky` DENTRO do conteúdo (a do total do estúdio)
+                30  o cabeçalho da vista e a barra de navegação de baixo
+                40  a gaveta de navegação e o seu fundo escuro
+                50+ diálogos e o Toast
+
+              Este cabeçalho estava a `z-20` — o MESMO plano da barra do total
+              do estúdio. Com o mesmo `z-index` quem manda é a ordem no DOM, e a
+              barra do estúdio vem depois: passava por cima do cabeçalho. Com o
+              fundo a 95% via-se o texto de uma a atravessar a outra, e era isso
+              que fazia "Escolha o cliente e escreva a proposta" aparecer por
+              cima do título.
+
+              O fundo passa a OPACO pela mesma razão: 5% de transparência num
+              ecrã com texto escuro por baixo chega para o tornar ilegível, e
+              aqui não há nada a ganhar com o efeito. */}
+          <header className="sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b border-[var(--bo-hairline)] pt-safe">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 py-4 lg:py-5">
               {/* Mobile menu — opens the full nav drawer without depending on the
                   bottom-nav "Mais" (which is hidden while a quote drawer is open). */}
@@ -1994,7 +2141,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 {view !== "temas" && (
                   <button
                     onClick={() => setPaletteOpen(true)}
-                    className="hidden sm:flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                    // `flex` e não `hidden sm:flex`: abaixo de 640 px o botão
+                    // desaparecia, e com ele a ÚNICA forma de chegar à pesquisa
+                    // global — porque a outra é o ⌘K, e num telemóvel não há ⌘.
+                    // A procura por nome de casal deixava de existir no
+                    // aparelho onde ela mais a usa. O rótulo continua a só
+                    // aparecer a partir de `md`; o que passa a estar sempre lá
+                    // é o alvo.
+                    // `min-w-11` a par do `min-h-11`: sem rótulo (abaixo de
+                    // `md`) o botão fica só com a lupa de 12 px e media 38 px
+                    // de largura — alto que chegue e estreito de mais.
+                    className="flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                    // Sem isto, abaixo de `md` (onde o rótulo está escondido) o
+                    // botão é uma lupa sem nome nenhum para o VoiceOver. O
+                    // `title` não serve: num telemóvel nunca chega a aparecer.
+                    aria-label="Pesquisar"
                     title="Pesquisar (Ctrl K)"
                   >
                     <svg
@@ -2009,7 +2170,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <path d="m21 21-4.3-4.3" strokeLinecap="round" />
                     </svg>
                     <span className="hidden md:inline">Pesquisar</span>
-                    <kbd className="text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
+                    {/* Num ecrã de toque não há ⌘ nenhum para carregar: a
+                        etiqueta anuncia uma tecla que o aparelho não tem. */}
+                    <kbd className="pointer-coarse:hidden text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
                       ⌘K
                     </kbd>
                   </button>
@@ -2559,17 +2722,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     />
                   </div>
                 )}
-                {visibleQuotes.map((q) => (
-                  <QuoteCard
-                    key={q.id}
-                    q={q}
-                    isCurrent={selected?.id === q.id}
-                    isSelected={selectedIds.has(q.id)}
-                    todayStr={todayStr}
-                    onOpen={openQuoteStable}
-                    onToggle={toggleSelect}
+                {visibleQuotes.length > 0 && (
+                  <TabelaOuCartoes
+                    itens={visibleQuotes}
+                    chaveDe={(q) => q.id}
+                    legenda="Pedidos"
+                    // O cartão do telemóvel é o QuoteCard, que já foi desenhado
+                    // e auditado ao toque — traz a sua própria moldura e o seu
+                    // próprio botão, e não pode ser embrulhado noutro.
+                    semMoldura
+                    cartao={(q) => (
+                      <QuoteCard
+                        q={q}
+                        isCurrent={selected?.id === q.id}
+                        isSelected={selectedIds.has(q.id)}
+                        todayStr={todayStr}
+                        onOpen={openQuoteStable}
+                        onToggle={toggleSelect}
+                      />
+                    )}
+                    aoAbrir={openQuoteStable}
+                    colunas={COLUNAS_DE_PEDIDOS({
+                      selectedIds,
+                      toggleSelect,
+                      todayStr,
+                      atual: selected?.id,
+                    })}
                   />
-                ))}
+                )}
                 {filtered.length > visibleCount && (
                   <button
                     type="button"

@@ -456,6 +456,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const historico = useRef<StudioDoc[]>([]);
   /**
+   * Há alguma coisa para desfazer? Isto É estado, ao contrário do histórico:
+   * é o que acende e apaga o botão "Desfazer".
+   *
+   * O botão existe porque o `Cmd+Z` não existe num telemóvel. Enquanto desfazer
+   * foi só um atalho de teclado, desfazer era uma coisa que só se podia fazer
+   * ao computador — e ela escreve propostas no telemóvel. Custa um redesenho a
+   * cada 800 ms (o mesmo instante em que o rascunho é gravado), não a cada
+   * tecla, que é a razão de o histórico continuar num `ref`.
+   */
+  const [podeDesfazer, setPodeDesfazer] = useState(false);
+  /**
    * O que ela já escreveu antes, para não voltar a escrever.
    *
    * Sai das propostas anteriores em vez de um catálogo à parte: um catálogo
@@ -680,6 +691,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (!ultimo || JSON.stringify(ultimo) !== JSON.stringify(doc)) {
         historico.current = [...historico.current, doc].slice(-MAX_HISTORICO);
       }
+      // Dois, e não um: o último do histórico é o documento ACTUAL, portanto
+      // com uma só fotografia não há nada anterior para onde voltar.
+      setPodeDesfazer(historico.current.length >= 2);
+
       // NADA DE MARCADORES PROVISÓRIOS NO RASCUNHO GRAVADO.
       //
       // Um `pending:<uuid>` é uma promessa viva na memória desta aba: a cópia
@@ -948,7 +963,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
 
   /**
-   * Cmd/Ctrl+Z — volta ao documento anterior.
+   * Volta ao documento anterior. Chamada pelo `Cmd/Ctrl+Z` e pelo botão
+   * "Desfazer" — o teclado é um atalho, não o caminho.
    *
    * O último elemento do histórico É o documento actual (foi lá posto pela
    * gravação); por isso desfazer tira DOIS e usa o penúltimo.
@@ -957,6 +973,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     if (historico.current.length < 2) return false;
     const anterior = historico.current[historico.current.length - 2];
     historico.current = historico.current.slice(0, -1);
+    setPodeDesfazer(historico.current.length >= 2);
     setDoc(anterior);
     // O campo do total é estado à parte (aceita texto a meio de ser escrito),
     // por isso tem de acompanhar — senão desfazer devolvia o documento antigo
@@ -1804,7 +1821,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-start justify-between gap-3 mb-4">
+      {/* EMPILHA no telemóvel, em vez de repartir a largura.
+          O que estava aqui era um `flex` em linha com o texto de um lado e três
+          botões do outro, marcados `shrink-0`. A 375 px os botões ficavam com
+          ~330 px e o parágrafo com o que sobrava: encolhia até à largura da
+          palavra mais comprida e passava a UMA PALAVRA POR LINHA — dois ecrãs
+          de scroll para ler duas frases. O `min-w-0` do lado do texto, que
+          existe para o truncar deixar de empurrar, aqui deixava-o chegar a zero.
+          É o padrão a evitar em todo o back office: texto e barra de acções na
+          mesma linha só a partir de `sm`. */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="bo-eyebrow">Estúdio de propostas (PDF)</p>
           <p className="mt-2 text-sm leading-relaxed text-foreground/55">
@@ -1812,7 +1838,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             pré-visualizar antes de enviar.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        {/* `flex-wrap` e não `shrink-0`: com três botões a 375 px, um deles
+            saía pela margem direita e ficava cortado ("Limpa…"). */}
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           {/* A acção principal desta secção: quase todas as propostas são uma
               variação de uma anterior. É a única aqui a verde. */}
           <Button size="sm" onClick={() => setCopiarAberto(true)}>
@@ -1820,6 +1848,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setNomeModelo(doc.eventType || "")}>
             Guardar como modelo
+          </Button>
+          {/* DESFAZER TEM DE SE PODER TOCAR.
+              Isto existia só como `Cmd+Z`, e num telemóvel não há `Cmd+Z`:
+              desfazer um engano era uma coisa que só se podia fazer sentada ao
+              computador. Fica ao lado de "Limpar rascunho" de propósito — é o
+              par dela, e é onde se vai procurar depois de estragar alguma
+              coisa. Apagado quando não há para onde voltar, para não prometer
+              o que não faz. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!podeDesfazer}
+            onClick={() => {
+              if (desfazer()) toast("Desfeito.", "info");
+            }}
+          >
+            Desfazer
           </Button>
           <Button variant="ghost" size="sm" onClick={clearDraft}>
             Limpar rascunho
@@ -2693,7 +2738,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   doc.validUntilDays ? (
                     <button
                       type="button"
-                      className="text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
+                      /* `alvo-toque` + `py-2`: media 18 px de altura. Foi o CI
+                         a apanhá-lo e não a máquina de quem escreveu — só
+                         aparece quando a proposta tem uma validade diferente da
+                         preferida, e os dados locais não a tinham. */
+                      className="alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
                       onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
                     >
                       Passar a usar {doc.validUntilDays} dias em todas as propostas novas
@@ -2837,7 +2886,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // próprio contexto de empilhamento — desenham-se POR CIMA desta barra, e o
         // texto do total aparecia misturado com o do campo por baixo. Vê-se na
         // captura de ecrã antes desta linha existir; nenhum teste apanhava.
-        className="sticky bottom-0 z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-3 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)]"
+        /* A barra encosta ao fundo do CONTEÚDO, mas por baixo dela ainda vem a
+           barra de navegação do back office (56 px, fixa, só abaixo de `lg`).
+           Com `bottom-0` a acção principal — "Pré-visualizar", "Enviar" —
+           ficava por baixo dela: tocar ali tocava na navegação e mudava de
+           vista. Foi o cheque de oclusão a apanhá-lo; à vista não se distingue
+           de um toque que não pegou.
+           A partir de `lg` a navegação passa a barra lateral e a folga deixa de
+           fazer sentido. */
+        className="sticky bottom-[calc(56px+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>
@@ -2846,33 +2903,65 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 proposta». O valor vive cinco ecrãs abaixo do sítio onde ela
                 está a escrever os serviços; aqui acompanha-a por toda a
                 página, e muda enquanto ela escreve. */}
-            <p className="mr-auto text-xs text-foreground/55">
+            {/* UMA LINHA NO TELEMÓVEL.
+                Esta barra é fixa, e por baixo dela ainda vem a barra de
+                navegação e a do Safari. O texto completo ("Total 3000,00 € sem
+                IVA · o cliente paga 3690,00 € · guardado às 12:34") embrulhava
+                para três linhas e comia o pouco ecrã que sobrava.
+
+                O que fica no telemóvel é só o número que decide — o que o
+                CLIENTE paga —, e o resto do detalhe volta a partir de `sm`.
+                O "guardado às 12:34" vira um visto: é uma confirmação, e um
+                visto confirma tão bem como a frase, num décimo do espaço.
+                A hora continua lá para quem a procurar, no `title`. */}
+            <p className="mr-auto min-w-0 truncate text-xs text-foreground/55">
               {money.base > 0 ? (
                 <>
                   <span className="text-foreground/45">Total</span>{" "}
-                  <strong className="font-semibold text-foreground/85">{eur(money.base)}</strong>{" "}
-                  <span className="text-foreground/45">
+                  <strong className="font-semibold text-foreground/85">
+                    <span className="sm:hidden">{eur(money.gross)}</span>
+                    <span className="hidden sm:inline">{eur(money.base)}</span>
+                  </strong>{" "}
+                  <span className="hidden text-foreground/45 sm:inline">
                     sem IVA · o cliente paga {eur(money.gross)}
                   </span>
                   {desvio && (
                     <span className="ml-2 rounded-full bg-[#c98a2e]/15 px-2 py-0.5 text-[10px] text-[#8a5d13]">
-                      soma das linhas: {eur(desvio.soma)}
+                      <span className="hidden sm:inline">soma das linhas: </span>
+                      {eur(desvio.soma)}
                     </span>
                   )}
                 </>
               ) : (
-                "Preencha o conteúdo e avance para pré-visualizar."
+                <span className="hidden sm:inline">
+                  Preencha o conteúdo e avance para pré-visualizar.
+                </span>
               )}
-              {/* Discreto de propósito: é uma confirmação, não um aviso. Quem
-                  precisa dela procura-a; quem não precisa não tem de a ler. */}
               {(gravadoEm || porGravar) && (
-                <span className="ml-2 text-[11px] text-foreground/35">
-                  {porGravar
-                    ? "a guardar…"
-                    : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`}
+                <span
+                  className="ml-2 text-[11px] text-foreground/35"
+                  title={
+                    porGravar
+                      ? "a guardar…"
+                      : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
+                  }
+                >
+                  <span aria-hidden className="sm:hidden">
+                    {porGravar ? "…" : "✓"}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {porGravar
+                      ? "a guardar…"
+                      : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`}
+                  </span>
+                  {/* O visto sozinho não diz nada a quem usa leitor de ecrã. */}
+                  <span className="sr-only">{porGravar ? "a guardar" : "rascunho guardado"}</span>
                 </span>
               )}
             </p>
@@ -3041,7 +3130,12 @@ function Section({
             onClick={alternar}
             aria-expanded={!fechada}
             aria-controls={corpoId}
-            className="group flex items-baseline gap-2 text-left"
+            /* `alvo-toque` + `py-2`: o cabeçalho de uma secção É o interruptor
+               que a abre e fecha, e media 20 px de altura — metade do mínimo de
+               44. Num telemóvel, abrir "Serviços" era acertar numa faixa da
+               espessura de uma linha de texto. O `items-baseline` mantém-se para
+               a seta e o título continuarem alinhados pela base. */
+            className="alvo-toque group -my-1 flex items-baseline gap-2 py-2 text-left"
           >
             <span
               aria-hidden

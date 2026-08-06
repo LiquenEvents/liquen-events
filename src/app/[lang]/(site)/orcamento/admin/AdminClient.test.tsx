@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, within, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
 import AdminClient from "./AdminClient";
@@ -324,6 +324,52 @@ describe("AdminClient shell", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar pedido de Diogo Reis" }));
 
     // The bulk-action bar announces the count.
+    expect(screen.getByText(/1 selecionado/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * A LISTA DE PEDIDOS MUDA DE FORMA.
+ *
+ * É o ecrã onde ela passa mais tempo. Num monitor, uma pilha de cartões grandes
+ * mostra oito pedidos onde cabiam vinte e cinco — e não deixa fazer a pergunta
+ * que decide o dia: quem está à espera há mais tempo.
+ */
+describe("Pedidos — cartões no telemóvel, tabela no computador", () => {
+  function simularComputador() {
+    vi.stubGlobal("matchMedia", (mq: string) => {
+      const min = /min-width:\s*(\d+)px/.exec(mq);
+      return {
+        matches: min ? 1440 >= Number(min[1]) : mq.includes("hover: hover"),
+        media: mq,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => true,
+      } as unknown as MediaQueryList;
+    });
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("no computador é uma tabela, com a coluna de quem espera há mais tempo", async () => {
+    simularComputador();
+    renderAdmin([makeQuote({ name: "Diogo Reis" }), makeQuote({ name: "Eva Lopes" })]);
+    navTo(/Pedidos/);
+    await waitFor(() => expect(screen.getByRole("table", { name: "Pedidos" })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /À espera/ })).toBeInTheDocument();
+  });
+
+  /** A selecção em lote tem de continuar a funcionar nas DUAS formas — é o que
+   *  permite responder a cinco pedidos de uma vez. */
+  it("a selecção em lote continua a funcionar na tabela", async () => {
+    simularComputador();
+    renderAdmin([makeQuote({ name: "Diogo Reis" })]);
+    navTo(/Pedidos/);
+    await waitFor(() => expect(screen.getByRole("table", { name: "Pedidos" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar pedido de Diogo Reis" }));
     expect(screen.getByText(/1 selecionado/)).toBeInTheDocument();
   });
 });
