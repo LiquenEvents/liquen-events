@@ -81,7 +81,13 @@ export function Segmented<T extends string>({
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
       className={cn(
-        "inline-flex items-center gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.04] p-1",
+        // `flex-wrap`: dois segmentos com rótulos compridos ("IVA incluído" e
+        // "+ IVA (acresce)") somam mais de 375 px e o segundo ficava cortado na
+        // margem. Encolhê-los cortava as palavras; abreviá-los tirava-lhes o
+        // sentido. Passar para a linha de baixo não custa nada e mantém as duas
+        // legíveis — num ecrã largo continuam lado a lado, porque só quebra
+        // quando não cabe.
+        "inline-flex flex-wrap items-center gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.04] p-1",
         className,
       )}
     >
