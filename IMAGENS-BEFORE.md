@@ -22,6 +22,26 @@ A biblioteca sintética tem **os tamanhos reais dos seis temas dela** — 14, 16
 **O estrangulamento entra depois do login**, de propósito: o que se está a medir
 é o pipeline de imagens, não o formulário de entrada.
 
+### Uma correcção a esta auditoria, feita depois de a publicar
+
+A primeira versão desta tabela dividia os píxeis do ficheiro pelos píxeis **CSS**
+e ignorava a densidade do ecrã. Está errado: num telemóvel a 2×, uma célula de
+122 px CSS pinta **244 píxeis reais**, e um ficheiro de 320 px é 1,3× — está
+certo, não é desperdício. A métrica antiga dizia 2,6× e acusava de excesso
+exactamente o tamanho que uma retina precisa.
+
+Os números acima já contam em **píxeis do ecrã**. O que a correcção muda:
+
+* no telemóvel, o excesso passa de "24/24" para **18/24** — as seis capas
+  estavam certas, e eram as tiras decorativas que estavam mal;
+* o pior caso do telemóvel passa de 9,8× para **4,9×**;
+* no computador (densidade 1×) nada muda: 24/24 e 9,3×.
+
+**A conclusão fica mais afiada, não mais suave.** A miniatura de 400 px está
+bem dimensionada para as células da grelha numa retina; o que não tem derivada
+nenhuma à sua medida são as **tiras de 43 px do cartão de tema**. É aí que está
+o desperdício, e não espalhado por tudo.
+
 ### O que ainda não foi medido
 
 Carregamento de fotos novas, mood boards já preenchidos dentro do estúdio, o
@@ -40,7 +60,8 @@ Sobre 104 fotografias reais de casamento do repositório:
 | Original (`theme-assets`) | 2200 px, JPEG q90 | **576 KB** | 58,5 MB |
 
 Não há mais nenhuma. **Uma imagem, dois tamanhos** — e o de 400 px serve tanto a
-célula de 43 px do cartão como a pré-visualização média do seletor.
+tira de 43 px do cartão como a célula de 137 px do seletor. Para a célula do
+seletor numa retina está certo; para a tira do cartão é 9,3× a mais.
 
 ---
 
@@ -56,12 +77,13 @@ célula de 43 px do cartão como a pré-visualização média do seletor.
 | **1.ª foto da biblioteca visível** | **1845 ms** | **2192 ms** | < 300 ms ❌ |
 | **Grelha completa** (24 fotos) | **3821 ms** | **4156 ms** | < 1 s ❌ |
 | **CLS** | **0,170** | **0,168** | 0 ❌ |
-| **Imagens acima de 2× do tamanho exibido** | **24 / 24** | **24 / 24** | 0 ❌ |
-| Pior excesso | **9,3×** | **9,8×** | ≤ 2× ❌ |
+| **Imagens acima de 2× do tamanho exibido** | **24 / 24** | **18 / 24** | 0 ❌ |
+| Pior excesso | **9,3×** | **4,9×** | ≤ 2× ❌ |
 
 Cada cartão mostra a capa mais três pré-visualizações. As pré-visualizações
-medem **43 × 42 px** no ecrã e o ficheiro tem **320 × 400** — é o mesmo
-ficheiro de 20 KB da capa, servido para uma tira do tamanho de uma unha.
+medem **43 × 42 px** no ecrã e o ficheiro tem 400 px de lado maior — é o mesmo
+ficheiro de 20 KB da capa, servido para uma tira do tamanho de uma unha. São
+**18 dos 24 pedidos** e ~360 KB dos 415 KB desta vista.
 
 ### 2. **Seletor de temas** — o modal do estúdio
 
@@ -76,7 +98,7 @@ ficheiro de 20 KB da capa, servido para uma tira do tamanho de uma unha.
 | **REABRIR** — tempo | **1835 ms** | < 50 ms ❌ |
 | **REABRIR** — pedidos que atravessam a rede | **9** | 0 ❌ |
 | **REABRIR** — bytes | **188 KB** | ≈ 0 ❌ |
-| Imagens acima de 2× | 7 / 14 | 0 ❌ |
+| Imagens acima de 2× | 7 / 14 (pior 2,9×) | 0 ❌ |
 
 **A reabertura é o número que mais dói**, e merece a explicação: a cache de
 módulo (`theme-picker-cache.ts`) faz o seu trabalho — **zero pedidos JSON**. O
@@ -133,7 +155,7 @@ trabalho ir só onde falta:
 | --- | --- | --- | --- |
 | 1 | **Não há blurhash/LQIP** | 1032–2192 ms de caixa vazia antes da primeira foto | 3 |
 | 2 | **Bucket privado + token rotativo** | Reabrir custa 9 pedidos / 188 KB / 1835 ms em vez de 0 | 2, 5 |
-| 3 | **Uma só derivada (400 px)** para células de 43 px | 24/24 acima de 2×, até **9,3×** | 1 |
+| 3 | **Não há derivada pequena** para as tiras de 43 px do cartão de tema | 18 dos 24 pedidos e ~360 KB dos 415 KB da vista Temas; até **9,3×** | 1 |
 | 4 | **CLS 0,17–0,18** | Salta debaixo do dedo | 3 |
 | 5 | **JPEG, não AVIF** | ~30–40% de bytes a mais para a mesma qualidade | 1 |
 | 6 | **As fotos são COPIADAS tema → proposta** | Duplica bytes no Storage e reprocessa no caminho da leitura | 6 |
