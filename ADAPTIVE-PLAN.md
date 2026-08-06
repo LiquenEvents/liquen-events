@@ -72,11 +72,15 @@ Três categorias, e o que cada uma merece:
 | **Tarefas** | *marcar feito entre visitas* | organizar, atribuir, prioridades | Telemóvel: lista com toque para concluir e nada mais. |
 | **Faturas → registar pagamento** | *recebi o sinal, registar já* | livro completo, numeração, análise | Telemóvel: um formulário empilhado com teclado numérico e vírgula; o livro vira cartões. |
 
-### Primários em DESKTOP — em telemóvel, rever e ajustar
+### Primários em DESKTOP — mas nenhum deles inacessível em telemóvel
+
+*(O estúdio de propostas ESTAVA nesta lista. Depois da correcção dela passou a
+ser dos dois — fica aqui à cabeça porque é onde vive a maior parte do trabalho,
+mas com a exigência de ser inteiro nos dois aparelhos.)*
 
 | Ecrã | Tarefa em desktop | Tarefa em telemóvel | O que muda |
 | --- | --- | --- | --- |
-| **Fazer proposta** (estúdio) | *criar a proposta de raiz* | *rever antes de enviar; corrigir um preço* | O caso mais difícil. Desktop: navegação lateral fixa, secções abertas, dois campos por linha, pré-visualização ao lado. Telemóvel: secções fechadas, um campo por linha, passos com progresso, barra fixa em baixo com "Guardado" + acção principal. **Assumo que ninguém cria uma proposta de raiz ao telemóvel** — e o desenho passa a dizer isso em vez de fingir que sim. |
+| **Fazer proposta** (estúdio) | *criar a proposta de raiz, sentada* | *criar na reunião com os noivos, e rever antes de enviar* | O caso mais difícil, e o que mais mudou depois da correcção dela (ver decisão 1). Desktop: navegação lateral fixa, secções abertas, dois campos por linha, pré-visualização ao lado. Telemóvel: **percurso por passos** com progresso, um campo por linha, barra fixa em baixo com "Guardado" e a acção principal, entrada por omissão a partir de um modelo, fotos direto da câmara. **Nada fica só no desktop.** |
 | **Organização de propostas** (kanban) | *arrastar entre fases* | *ver em que fase está* | Telemóvel: o arrasto horizontal em colunas não funciona com o polegar. Vira lista agrupada por fase, com mudança de fase por menu — não por arrasto. |
 | **Estatísticas** | *analisar, comparar, cruzar* | *os 3 números que interessam* | Telemóvel: um bloco de cada vez, números grandes em vez de gráficos apertados. |
 | **Temas** (gestão) | *arrumar a biblioteca, rever etiquetas* | *mostrar um moodboard a um casal* — que é **tablet**, não telemóvel | Já reformulado esta semana. Falta a folha inferior de selecção e a grelha de 2–3 colunas em telemóvel. |
@@ -105,11 +109,36 @@ adaptá-los um a um dentro de cada ecrã é como isto se desalinha outra vez.
 
 ## O que decidi e vale a pena discordar
 
-**1. O estúdio de propostas não vai ser criável em telemóvel.** Podia
-tentar-se; ficaria mau nos dois. Prefiro assumir "em telemóvel revê-se e
-ajusta-se" e fazer isso muito bem — secções fechadas, um campo por linha, e a
-certeza de que o que se toca guarda. Se me disseres que crias propostas no
-telemóvel, isto muda e é uma decisão diferente.
+**1. ~~O estúdio não vai ser criável em telemóvel.~~ CORRIGIDO — ela cria
+propostas nos dois.**
+
+> *"eu quero criar propostas no computador mas tambem quero no mobile"*
+
+A minha proposta estava errada, e ainda bem que foi contestada. Criar uma
+proposta ao telemóvel não é um caso raro a tolerar: é o que acontece **na
+reunião com os noivos**, com o casal à frente e as fotos já no telemóvel. Aliás
+é o aparelho onde as fotos estão — o que faz do telemóvel, nessa parte, o melhor
+dos dois.
+
+O que isto muda no desenho:
+
+- **Nada fica só no desktop.** Toda a secção, todo o campo e toda a acção têm de
+  ser alcançáveis no telemóvel. A diferença passa a ser de FORMA, não de
+  funcionalidade.
+- **Percurso guiado por passos** em vez de um rolo comprido: casal e data →
+  serviços → fotos → orçamento → rever e enviar. Com barra de progresso, e a
+  possibilidade de saltar directa a qualquer passo (não é um assistente que
+  prende).
+- **"A partir de um modelo" passa a ser a entrada por omissão no telemóvel.**
+  Já existe (fizemos os modelos e o "criar a partir de" na missão anterior) e é
+  o que torna isto viável de verdade: numa reunião, começar de um modelo é ter
+  80% escrito antes de tocar no ecrã. Começar do zero continua a um toque de
+  distância.
+- **Guardar a cada campo, e dizê-lo.** Numa reunião não há segunda oportunidade
+  para recuperar o que se perdeu.
+- **Carregar fotos direto da câmara e da galeria**, sem passar pelo computador.
+
+É mais trabalho do que a minha proposta original, e é o trabalho certo.
 
 **2. O kanban perde o arrasto em telemóvel.** Arrastar cartões entre colunas
 horizontais com o polegar, num ecrã de 375 px, é uma frustração garantida. A
