@@ -1893,26 +1893,42 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                     className={`flex-col gap-2 pl-1 ${reordenarGrupos ? "hidden sm:flex" : "flex"}`}
                   >
                     {g.items.map((it, ii) => (
-                      <div key={ii} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
-                        <input
-                          className={INPUT_SM}
-                          value={it.label}
-                          onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
-                          placeholder="Reunião inicial"
-                          aria-label="Item"
-                        />
-                        {!isDeco && (
+                      // O × AO LADO DO CAMPO, e não numa linha só dele.
+                      // Estava tudo empilhado num `flex-col` até `sm`, e num
+                      // orçamento de decoração (onde não há campo de descrição)
+                      // sobrava um × sozinho, centrado, a ocupar uma linha
+                      // inteira por cada item — um símbolo solto no meio do
+                      // cartão, sem nada que dissesse a que pertencia.
+                      // Agora a linha é sempre [campo(s)] [×]: os campos
+                      // empilham entre si no telemóvel, o × fica encostado à
+                      // direita do primeiro.
+                      <div key={ii} className="flex items-start gap-1.5">
+                        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row">
                           <input
                             className={INPUT_SM}
-                            value={it.desc ?? ""}
-                            onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
-                            placeholder="Descrição"
-                            aria-label="Descrição do item"
+                            value={it.label}
+                            onChange={(e) => updateServiceItem(gi, ii, { label: e.target.value })}
+                            // SEM EXEMPLO. Estava aqui "Reunião inicial", que é
+                            // uma linha de uma proposta de ORGANIZAÇÃO — num
+                            // orçamento de decoração não quer dizer nada, e um
+                            // exemplo a cinzento dentro de uma caixa lê-se como
+                            // conteúdo que já lá está. O campo vive debaixo do
+                            // título do grupo; é isso que diz o que ali vai.
+                            aria-label="Item"
                           />
-                        )}
+                          {!isDeco && (
+                            <input
+                              className={INPUT_SM}
+                              value={it.desc ?? ""}
+                              onChange={(e) => updateServiceItem(gi, ii, { desc: e.target.value })}
+                              placeholder="Descrição"
+                              aria-label="Descrição do item"
+                            />
+                          )}
+                        </div>
                         <button
                           type="button"
-                          className={`${REMOVE_BTN} sm:mt-2`}
+                          className={REMOVE_BTN}
                           onClick={() => removeServiceItem(gi, ii)}
                           aria-label="Remover item"
                         >
