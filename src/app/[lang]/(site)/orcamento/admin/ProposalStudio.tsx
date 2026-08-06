@@ -19,6 +19,7 @@ import {
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel } from "@/lib/orcamento/data";
 import PainelInterno from "./PainelInterno";
+import Conferencia from "./Conferencia";
 import { custosDe } from "@/lib/orcamento/margem";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
@@ -2523,6 +2524,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   </span>
                 </p>
               )}
+              {/* A PASSAGEM DE OLHOS. Depois do resumo (que diz o que vai
+                  seguir) e antes do botão (que o torna irreversível). */}
+              <Conferencia
+                doc={doc as ProposalDoc}
+                quote={quote}
+                quotes={quotes}
+                totalBruto={money.gross}
+              />
               {!canSend && fotosPorConfirmar === 0 && (
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
                   <span aria-hidden="true">⚠</span>
