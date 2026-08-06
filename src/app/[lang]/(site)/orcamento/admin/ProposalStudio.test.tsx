@@ -772,3 +772,45 @@ describe("O valor é UM só — o do pedido", () => {
     expect(campo).toHaveValue("3000");
   });
 });
+
+describe("linhas que escalam com os convidados", () => {
+  /**
+   * Metade das linhas de um orçamento de casamento é uma multiplicação, não um
+   * preço. O que se prende aqui é o que a torna confiável: a conta aparece, e
+   * mudar o tipo de escala não faz o total saltar debaixo dos pés.
+   */
+  it("mostra a conta ao lado do número quando a linha passa a ser por mesa", async () => {
+    renderStudio();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /\+ Adicionar item/ }));
+    const nome = screen.getAllByLabelText("Item de orçamento").at(-1)!;
+    await user.clear(nome);
+    await user.type(nome, "Arranjos de mesa");
+
+    // O pedido de teste não traz convidados; escreve-se o número no campo do
+    // Evento, que é de onde a conta os lê.
+    const campoConvidados = screen.getByLabelText("Convidados");
+    await user.clear(campoConvidados);
+    await user.type(campoConvidados, "120 pax");
+
+    const comoEscala = screen.getByLabelText(/Como escala Arranjos de mesa/);
+    await user.selectOptions(comoEscala, "por-mesa");
+
+    const unitario = screen.getByLabelText(/Preço por mesa de Arranjos de mesa/);
+    await user.clear(unitario);
+    await user.type(unitario, "45");
+    await user.tab();
+
+    // 120 convidados → 12 mesas de 10, a 45 € cada.
+    await waitFor(() => expect(screen.getByText(/12 mesas × /)).toBeTruthy());
+  });
+
+  it("uma linha fixa não mostra fórmula nenhuma", async () => {
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /\+ Adicionar item/ }));
+    expect(screen.queryByText(/mesas × /)).toBeNull();
+    expect(screen.queryByText(/pessoas × /)).toBeNull();
+  });
+});

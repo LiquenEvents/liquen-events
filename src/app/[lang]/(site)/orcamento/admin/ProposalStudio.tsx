@@ -22,6 +22,15 @@ import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import NotasInternas from "./NotasInternas";
 import { custosDe } from "@/lib/orcamento/margem";
+import {
+  CONVIDADOS_POR_MESA_OMISSAO,
+  convidadosDoDoc,
+  escalasDe,
+  formulaDaLinha,
+  recalcular,
+  totalDaLinha,
+  type TipoDeEscala,
+} from "@/lib/orcamento/escala";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
@@ -841,6 +850,46 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // total, e na barra fixa do fundo.
   const soma = somaDosItens(doc);
   const desvio = desalinhamento(doc, money.base);
+  /** Quantas pessoas, lido do campo do documento ("125 pax" → 125). */
+  const convidados = convidadosDoDoc(doc as ProposalDoc);
+  const escalasDoDoc = escalasDe(doc as ProposalDoc);
+
+  /**
+   * Trocar o tipo de escala de uma linha.
+   *
+   * Ao passar a escalonável, o unitário nasce do preço que já lá estava
+   * dividido pelas unidades — para o total não dar um salto no instante em que
+   * ela escolhe a opção. Ao voltar a fixa, o preço fica onde está: era o
+   * resultado da última multiplicação, e é um número que ela reconhece.
+   */
+  function definirEscala(i: number, tipo: TipoDeEscala) {
+    setDoc((d) => {
+      const escalas = escalasDe(d as ProposalDoc);
+      const porMesa = d.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO;
+      const proximas = escalas.map((e, j) => {
+        if (j !== i) return e;
+        if (tipo === "fixa") return null;
+        const unidades =
+          tipo === "por-mesa"
+            ? Math.max(1, Math.ceil(convidados / porMesa))
+            : Math.max(1, convidados);
+        const precoActual = (d.budgetAmounts ?? [])[i];
+        const base =
+          typeof precoActual === "number" && precoActual > 0 ? precoActual / unidades : 0;
+        return { tipo, unitario: Math.round(base * 100) / 100 };
+      });
+      return recalcular({ ...d, budgetScales: proximas }, convidados);
+    });
+  }
+
+  function definirUnitario(i: number, texto: string) {
+    const n = normalizarValor(texto);
+    setDoc((d) => {
+      const escalas = escalasDe(d as ProposalDoc);
+      const proximas = escalas.map((e, j) => (j === i && e ? { ...e, unitario: n ?? 0 } : e));
+      return recalcular({ ...d, budgetScales: proximas }, convidados);
+    });
+  }
   const duasFormas = asDuasFormas(money.base, doc.vatRate ?? DEFAULT_VAT_RATE);
 
   // ── O preço mudou na Gestão do pedido: aparece aqui ─────────────────────
@@ -2122,43 +2171,91 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     a mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único,
                     como nas suas propostas.
                   </p>
-                  {linhasDe(doc).map((l, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        className={`${INPUT_SM} flex-1`}
-                        value={l.item}
-                        onChange={(e) => updateBudgetItem(i, e.target.value)}
-                        placeholder="Decor Cerimónia"
-                        aria-label="Item de orçamento"
-                      />
-                      {/* A largura vai no invólucro e não no campo: `.bo-input`
+                  {linhasDe(doc).map((l, i) => {
+                    const escala = escalasDoDoc[i];
+                    return (
+                      <div key={i} className="flex flex-wrap items-center gap-2">
+                        <input
+                          className={`${INPUT_SM} flex-1`}
+                          value={l.item}
+                          onChange={(e) => updateBudgetItem(i, e.target.value)}
+                          placeholder="Decor Cerimónia"
+                          aria-label="Item de orçamento"
+                        />
+                        {/* COMO É QUE ESTA LINHA ESCALA. Metade das linhas de um
+                          orçamento de casamento não é um preço, é uma
+                          multiplicação — e quando os convidados mudam, refazer
+                          essas contas à mão é onde entra o erro que ninguém vê,
+                          porque o resultado continua a parecer um preço. */}
+                        <select
+                          value={escala?.tipo ?? "fixa"}
+                          onChange={(e) => definirEscala(i, e.target.value as TipoDeEscala)}
+                          aria-label={`Como escala ${l.item || "a linha sem nome"}`}
+                          className="bo-input w-32 shrink-0 px-2 py-2 text-xs"
+                        >
+                          <option value="fixa">Valor fixo</option>
+                          <option value="por-convidado">Por convidado</option>
+                          <option value="por-mesa">Por mesa</option>
+                        </select>
+                        {escala && (
+                          <span className="w-24 shrink-0">
+                            <input
+                              className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                              defaultValue={String(escala.unitario)}
+                              onBlur={(e) => definirUnitario(i, e.target.value)}
+                              placeholder="45"
+                              inputMode="decimal"
+                              aria-label={`Preço por ${escala.tipo === "por-mesa" ? "mesa" : "convidado"} de ${l.item || "linha sem nome"}`}
+                            />
+                          </span>
+                        )}
+                        {/* A largura vai no invólucro e não no campo: `.bo-input`
                         tem `width: 100%` escrito em CSS, que ganha a um
                         `w-28` do Tailwind. Sem isto o preço comia a linha
                         toda e o nome ficava numa caixa de trinta pixels — foi
                         o que a captura de ecrã mostrou. */}
-                      <span className="w-28 shrink-0">
-                        <input
-                          className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
-                          defaultValue={l.preco === null ? "" : String(l.preco)}
-                          // `onBlur` e não `onChange`: normalizar a cada tecla
-                          // apagava o que ela estava a escrever a meio ("1." vira
-                          // 1, e o "500" seguinte já não tinha onde entrar).
-                          onBlur={(e) => updateBudgetPrice(i, e.target.value)}
-                          placeholder="900"
-                          inputMode="decimal"
-                          aria-label={`Preço de ${l.item || "linha sem nome"}`}
-                        />
-                      </span>
-                      <button
-                        type="button"
-                        className={REMOVE_BTN}
-                        onClick={() => removeBudgetItem(i)}
-                        aria-label="Remover item"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <span className="w-28 shrink-0">
+                          <input
+                            className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                            defaultValue={l.preco === null ? "" : String(l.preco)}
+                            // `onBlur` e não `onChange`: normalizar a cada tecla
+                            // apagava o que ela estava a escrever a meio ("1." vira
+                            // 1, e o "500" seguinte já não tinha onde entrar).
+                            onBlur={(e) => updateBudgetPrice(i, e.target.value)}
+                            placeholder="900"
+                            inputMode="decimal"
+                            aria-label={`Preço de ${l.item || "linha sem nome"}`}
+                          />
+                        </span>
+                        <button
+                          type="button"
+                          className={REMOVE_BTN}
+                          onClick={() => removeBudgetItem(i)}
+                          aria-label="Remover item"
+                        >
+                          ×
+                        </button>
+                        {/* A fórmula ao lado do número: um total que muda sozinho
+                          e não explica porquê é um total em que se deixa de
+                          confiar à primeira surpresa. */}
+                        {escala && (
+                          <span className="w-full pl-1 text-[10px] text-foreground/40">
+                            {`${formulaDaLinha(
+                              escala,
+                              convidados,
+                              doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
+                            )} = ${eur(
+                              totalDaLinha(
+                                escala,
+                                convidados,
+                                doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
+                              ) ?? 0,
+                            )}`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
                       + Adicionar item
