@@ -47,6 +47,68 @@ function extrair<T>(nome: string): T {
 
 const ehFotoDaBiblioteca = extrair<(u: URL) => boolean>("ehFotoDaBiblioteca");
 const chaveSemToken = extrair<(u: URL) => string>("chaveSemToken");
+const vaiParaODisco = extrair<(r: unknown) => boolean>("vaiParaODisco");
+
+/** Uma resposta com o que interessa aqui: tipo, estado e content-type. */
+function resposta(o: { type?: string; ok?: boolean; contentType?: string | null }) {
+  return {
+    type: o.type ?? "basic",
+    ok: o.ok ?? true,
+    headers: { get: (n: string) => (n.toLowerCase() === "content-type" ? o.contentType : null) },
+  };
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DEFEITO QUE DEIXOU OS CARTÕES CINZENTOS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A primeira versão guardava qualquer resposta OPACA. Uma opaca tem
+ * `status: 0`, cabeçalhos vazios e corpo ilegível: uma fotografia e um 404 são
+ * a mesma coisa vistos daqui. Como a chave não tem token e a leitura é
+ * cache-first, uma derivada que ainda não existia — ou um token expirado —
+ * ficava gravada como FALHA PERMANENTE. Recarregar não resolvia.
+ *
+ * É o pior tipo de defeito de cache: não se manifesta como lentidão, manifesta-
+ * se como fotografias que desaparecem e não voltam.
+ */
+describe("o que o service worker aceita escrever no disco", () => {
+  it("guarda uma fotografia que se conseguiu ler", () => {
+    expect(vaiParaODisco(resposta({ ok: true, contentType: "image/jpeg" }))).toBe(true);
+  });
+
+  /** O TESTE QUE INTERESSA. */
+  it("NUNCA guarda uma resposta opaca — não se sabe se é uma foto ou um 404", () => {
+    expect(
+      vaiParaODisco(resposta({ type: "opaque", ok: false, contentType: null })),
+      "uma opaca voltou a ser escrita no disco: um 404 fica gravado para sempre",
+    ).toBe(false);
+  });
+
+  it("não guarda um erro que se conseguiu ler", () => {
+    expect(vaiParaODisco(resposta({ ok: false, contentType: "text/html" }))).toBe(false);
+  });
+
+  /** Um 200 com uma página de erro do Storage não é uma fotografia. */
+  it("não guarda o que não é imagem", () => {
+    expect(vaiParaODisco(resposta({ ok: true, contentType: "application/json" }))).toBe(false);
+    expect(vaiParaODisco(resposta({ ok: true, contentType: null }))).toBe(false);
+  });
+
+  it("não rebenta sem resposta nenhuma", () => {
+    expect(vaiParaODisco(null)).toBe(false);
+    expect(vaiParaODisco(undefined)).toBe(false);
+  });
+
+  /**
+   * O nome da cache é o que apaga, nos aparelhos dela, o que a v1 já escreveu:
+   * o `activate` deita fora todas as caches que não conhece. Sem esta subida,
+   * a correcção acima não chega a quem já tem os cartões cinzentos.
+   */
+  it("o nome da cache das fotos subiu, para limpar o que a v1 gravou", () => {
+    expect(FONTE).toContain('CACHE_FOTOS = "liquen-fotos-v2"');
+  });
+});
 
 const sb = (caminho: string) => new URL(`https://abc.supabase.co${caminho}`);
 

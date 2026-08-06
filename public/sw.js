@@ -49,7 +49,29 @@ const CACHE = "liquen-cache-v2";
      ficheiro já traça ao recusar guardar `/portal` e `/proposta`: o que
      identifica um cliente não vai para disco.
    ═══════════════════════════════════════════════════════════════════════════ */
-const CACHE_FOTOS = "liquen-fotos-v1";
+/* ── v2: PORQUE É QUE O NOME MUDOU, E PORQUE É QUE ISTO É IMPORTANTE ───────
+
+   A v1 guardava qualquer resposta OPACA. Uma resposta opaca (uma imagem
+   cross-origin pedida sem CORS) tem `status: 0` e um corpo ilegível: é
+   IMPOSSÍVEL distinguir uma fotografia de 20 KB de um 404 ou de um 403 de
+   token expirado. A v1 tratava as três da mesma maneira e escrevia-as no
+   disco — para sempre, porque a chave não tem token e a leitura é
+   cache-first.
+
+   O resultado, ao vivo: uma derivada que ainda não existe (as `theme-micro`
+   só nascem depois da migração) ou um token que expirou (a biblioteca assina
+   a 6 horas) ficava gravada como FALHA PERMANENTE. Recarregar não resolvia,
+   esperar não resolvia, e a página dos Temas ficou com os cartões cinzentos.
+
+   Duas correcções, e são precisas as duas:
+
+     1. só se guarda o que se conseguiu VERIFICAR — ver `buscarEGuardar`;
+     2. o nome mudou para v2, e o `activate` apaga as caches que não conhece.
+        É isto que limpa o que a v1 já escreveu nos aparelhos dela.
+
+   Se algum dia isto voltar a guardar sem verificar, o sintoma não é lentidão:
+   são fotografias que desaparecem e não voltam. */
+const CACHE_FOTOS = "liquen-fotos-v2";
 
 /** Tecto de entradas. 600 miniaturas ≈ 12 MB — folgado para a biblioteca dela
  *  e longe de qualquer limite de quota. Acima disto saem as mais antigas. */
@@ -69,6 +91,48 @@ function ehFotoDaBiblioteca(url) {
  *  deixar de partir a cache. */
 function chaveSemToken(url) {
   return `${url.origin}${url.pathname}`;
+}
+
+/**
+ * Vale a pena guardar? Só uma resposta que se conseguiu LER: um 200 com um
+ * `content-type` de imagem.
+ *
+ * A pergunta parece trivial e não é — é o defeito que a v1 tinha. Um `<img>`
+ * cross-origin pede sem CORS, e a resposta que chega ao service worker é
+ * OPACA: `status: 0`, cabeçalhos vazios, corpo ilegível. Uma fotografia e um
+ * 404 são indistinguíveis. Guardar sem distinguir é gravar a falha no disco.
+ */
+function vaiParaODisco(res) {
+  return !!res && res.type !== "opaque" && res.ok && /^image\//i.test(res.headers.get("content-type") || "");
+}
+
+/**
+ * Busca a fotografia de forma VERIFICÁVEL e guarda-a se for mesmo uma
+ * fotografia.
+ *
+ * Pede com `mode: "cors"` em vez de deixar passar o pedido original do `<img>`
+ * (que é `no-cors`): é a diferença entre uma resposta que se pode inspeccionar
+ * e uma opaca. O Supabase Storage serve estes objectos com CORS aberto — é o
+ * mesmo caminho que o cliente JS usa para descarregar ficheiros —, e a
+ * resposta serve na mesma para desenhar a imagem.
+ *
+ * Todos os caminhos de falha levam ao mesmo sítio: devolve-se alguma coisa e
+ * NÃO se guarda nada. Uma falha não escrita repete-se e resolve-se sozinha
+ * quando a causa passar; uma falha escrita fica para sempre.
+ */
+async function buscarEGuardar(request, url, cache, chave) {
+  let res;
+  try {
+    res = await fetch(url.href, { mode: "cors", credentials: "omit" });
+  } catch {
+    // Sem CORS (ou sem rede): serve-se pelo caminho normal, sem guardar.
+    return fetch(request);
+  }
+  if (vaiParaODisco(res)) {
+    await cache.put(chave, res.clone());
+    void aparar(cache);
+  }
+  return res;
 }
 
 /** Deita fora as mais antigas quando passa do tecto. A Cache Storage mantém a
@@ -148,17 +212,7 @@ self.addEventListener("fetch", (event) => {
         const chave = chaveSemToken(url);
         const guardada = await cache.match(chave);
         if (guardada) return guardada;
-        // Falhou a cache: vai à rede COM o token (é o pedido original) e
-        // guarda o resultado sob a chave sem ele.
-        const res = await fetch(request);
-        // `res.ok` é falso numa resposta opaca (uma imagem cross-origin sem
-        // CORS tem `status: 0`), e uma opaca é perfeitamente utilizável num
-        // `<img>`. Recusá-la aqui deixaria a cache sempre vazia.
-        if (res && (res.ok || res.type === "opaque")) {
-          await cache.put(chave, res.clone());
-          void aparar(cache);
-        }
-        return res;
+        return buscarEGuardar(request, url, cache, chave);
       })().catch(() => fetch(request)),
     );
     return;

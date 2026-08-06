@@ -462,6 +462,57 @@ async function expandDropEntries(entries: FileSystemEntry[]): Promise<{
   return { files, capped: files.length >= MAX_DROP_FILES || queue.length > 0 };
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA IMAGEM QUE SABE CAIR PARA O TAMANHO DE CIMA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O cartão de um tema pede a derivada mais pequena que serve — 96 px para uma
+ * tira, 400 px para a capa. Essas derivadas podem não existir: nascem no
+ * carregamento, e as fotos mais antigas (ou migradas em massa) não as têm.
+ *
+ * O servidor não consegue saber: assinar um caminho no Supabase Storage NÃO
+ * verifica que o ficheiro lá está, e devolve um URL bem formado para um objecto
+ * inexistente. Quem descobre é o navegador, com um 404, e até aqui o que
+ * acontecia a seguir era nada — ficava a célula vazia. Era isto que deixava os
+ * cartões cinzentos.
+ *
+ * `planoB` é o ORIGINAL, o único que veio da listagem da pasta e portanto o
+ * único que existe de certeza. Troca-se UMA vez: se o original também falhar,
+ * fica o fundo, porque insistir era um ciclo.
+ */
+function ImagemComPlanoB({
+  src,
+  planoB,
+  className,
+}: {
+  src: string;
+  planoB?: string;
+  className?: string;
+}) {
+  const [actual, setActual] = useState(src);
+  // Um `src` novo (outra capa escolhida, outra listagem) recomeça do princípio:
+  // sem isto, uma imagem que caiu para o original ficava lá presa.
+  const [visto, setVisto] = useState(src);
+  if (visto !== src) {
+    setVisto(src);
+    setActual(src);
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={actual}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        if (planoB && actual !== planoB) setActual(planoB);
+      }}
+      className={className}
+    />
+  );
+}
+
 export default function Temas() {
   const { toast } = useToast();
   // Sair da Biblioteca esquece o que o SELETOR de temas tinha guardado.
@@ -969,12 +1020,9 @@ export default function Temas() {
                   proporções diferentes umas das outras. */}
                 <div className="flex aspect-[4/3] w-full gap-px overflow-hidden bg-foreground/[0.04]">
                   {t.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <ImagemComPlanoB
                       src={t.coverUrl}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
+                      planoB={t.coverFallbackUrl}
                       className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
                     />
                   ) : (
@@ -988,14 +1036,11 @@ export default function Temas() {
                     dois buracos. */}
                   {t.coverUrl && t.previewUrls && t.previewUrls.length > 0 && (
                     <div className="flex w-1/4 shrink-0 flex-col gap-px">
-                      {t.previewUrls.slice(0, 3).map((u) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                      {t.previewUrls.slice(0, 3).map((u, k) => (
+                        <ImagemComPlanoB
                           key={u}
                           src={u}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
+                          planoB={t.previewFallbackUrls?.[k]}
                           className="min-h-0 w-full flex-1 object-cover"
                         />
                       ))}

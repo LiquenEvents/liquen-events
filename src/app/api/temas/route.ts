@@ -124,20 +124,33 @@ export async function GET(request: NextRequest) {
 
     const summaries: ThemeSummary[] = themes.map((t, i) => {
       const { names, ok, truncated } = listings[i];
-      const coverUrl = paraCapa(chosen[i]) ?? paraCapa(newest[i]);
+      // O caminho da capa, antes de se escolher que TAMANHO servir: é preciso
+      // para poder mandar também o original como plano B.
+      const capa = paraCapa(chosen[i]) ? chosen[i] : newest[i];
+      const coverUrl = paraCapa(capa);
       // A capa nunca se repete nas pré-visualizações: no cartão ela já está
       // à frente, e vê-la outra vez na pilha lê-se como um tema com fotos
       // repetidas.
-      const previewUrls = extras[i]
-        .map((p) => paraTira(p))
-        .filter((u): u is string => Boolean(u) && u !== coverUrl)
+      const tiras = extras[i]
+        .map((p) => ({ url: paraTira(p), original: urls.get(p) }))
+        .filter((x): x is { url: string; original: string | undefined } =>
+          Boolean(x.url && x.url !== coverUrl),
+        )
         .slice(0, PREVIEWS_POR_CARTAO);
+      const previewUrls = tiras.map((x) => x.url);
+      // O ORIGINAL de cada uma, para o navegador ter para onde cair quando a
+      // derivada não existir. Ver `ThemeSummary.previewFallbackUrls`: assinar
+      // um caminho NÃO garante que o ficheiro lá está, e era isso que deixava
+      // os cartões cinzentos.
+      const previewFallbackUrls = tiras.map((x) => x.original ?? "");
+      const coverFallbackUrl = capa ? urls.get(capa) : undefined;
       return {
         ...t,
         imageCount: ok ? names.length : null,
         ...(ok && truncated ? { truncated: true } : {}),
         coverUrl,
-        ...(previewUrls.length ? { previewUrls } : {}),
+        ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
+        ...(previewUrls.length ? { previewUrls, previewFallbackUrls } : {}),
       };
     });
     return NextResponse.json(summaries);

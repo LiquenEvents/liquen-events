@@ -142,6 +142,31 @@ export interface ThemeSummary extends ProposalTheme {
    * só, ou assinatura falhada), e nesse caso o cartão mostra o que tiver.
    */
   previewUrls?: string[];
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * O PLANO B, QUE TEM DE VIAJAR ATÉ AO NAVEGADOR
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * `coverUrl` e `previewUrls` trazem a DERIVADA mais adequada — 96 px para
+   * uma tira, 400 px para a capa. Essas derivadas podem não existir: nascem
+   * no carregamento, e as fotos anteriores a elas (ou migradas em massa) não
+   * as têm.
+   *
+   * E aqui está a armadilha que partiu a página: **assinar um caminho não
+   * verifica que o ficheiro existe.** O `createSignedUrls` devolve um URL
+   * perfeitamente formado para um objecto que não está lá — que depois dá
+   * 404 no `<img>`. O servidor achava que tinha plano B (o original é sempre
+   * assinado) mas nunca o chegava a usar, porque para ele a derivada
+   * "existia": estava no mapa.
+   *
+   * Quem descobre a verdade é o navegador, no `onError`. Por isso o plano B
+   * tem de ir com ele: o URL do ORIGINAL, que é o único que veio da LISTAGEM
+   * da pasta e portanto o único que existe de certeza.
+   *
+   * Alinhados por índice com `previewUrls`.
+   */
+  coverFallbackUrl?: string;
+  previewFallbackUrls?: string[];
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */
