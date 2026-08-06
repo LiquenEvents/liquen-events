@@ -1496,6 +1496,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     );
   }
 
+  /**
+   * As vistas onde as acções DE PEDIDOS da barra de topo — "Atualizar" e
+   * "+ Novo" — querem dizer alguma coisa.
+   *
+   * As duas são sobre pedidos e só sobre pedidos: o "Atualizar" volta a pedir
+   * `/api/orcamento` e o "+ Novo" abre o formulário de pedido novo. Estavam a
+   * aparecer em TODAS as vistas, e numa página de Temas isso é pior do que
+   * redundante — são dois botões que parecem ser sobre o que está no ecrã e não
+   * são. Ao lado do "Novo tema" da própria página, o "+ Novo" criava um pedido;
+   * o "Atualizar" recarregava uma lista que ali nem se vê, e a equipa carregava
+   * nele à espera de ver as fotos novas.
+   *
+   * Nas vistas que ficam de fora não há nada a substituir: cada uma trata do seu
+   * próprio carregamento e actualiza-se sozinha ao gravar (os Temas, por
+   * exemplo, actualizam o cartão no momento em que a foto entra).
+   */
+  const ACOES_DE_PEDIDOS: ReadonlySet<View> = new Set<View>([
+    "overview",
+    "pedidos",
+    "kanban",
+    "clientes",
+    "calendario",
+    "propostas",
+    "estatisticas",
+  ]);
+  const mostrarAccoesDePedidos = ACOES_DE_PEDIDOS.has(view);
+
   const VIEW_TITLES: Record<View, string> = {
     overview: "Visão Geral",
     pedidos: "Pedidos",
@@ -1956,45 +1983,54 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   </svg>
                 </button>
                 <NotificationBell />
-                <button
-                  onClick={() => setPaletteOpen(true)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
-                  title="Pesquisar (Ctrl K)"
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
+                {/* A vista dos Temas tem campo de procura próprio, e dois sítios
+                    para procurar na mesma página é uma escolha a mais sem ganho
+                    nenhum: o de dentro filtra os temas à medida que se escreve,
+                    este abre a navegação global. Só o BOTÃO sai — o atalho ⌘K
+                    continua a funcionar em todo o lado, aqui incluído. */}
+                {view !== "temas" && (
+                  <button
+                    onClick={() => setPaletteOpen(true)}
+                    className="hidden sm:flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                    title="Pesquisar (Ctrl K)"
                   >
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-                  </svg>
-                  <span className="hidden md:inline">Pesquisar</span>
-                  <kbd className="text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
-                    ⌘K
-                  </kbd>
-                </button>
-                <button
-                  onClick={() => setNewQuoteOpen(true)}
-                  aria-label="Novo pedido"
-                  className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
-                  title="Criar pedido manualmente"
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                    </svg>
+                    <span className="hidden md:inline">Pesquisar</span>
+                    <kbd className="text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
+                      ⌘K
+                    </kbd>
+                  </button>
+                )}
+                {mostrarAccoesDePedidos && (
+                  <button
+                    onClick={() => setNewQuoteOpen(true)}
+                    aria-label="Novo pedido"
+                    className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
+                    title="Criar pedido manualmente"
                   >
-                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                  </svg>
-                  <span className="hidden sm:inline">Novo</span>
-                </button>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                    >
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                    </svg>
+                    <span className="hidden sm:inline">Novo</span>
+                  </button>
+                )}
               </div>
             </div>
           </header>

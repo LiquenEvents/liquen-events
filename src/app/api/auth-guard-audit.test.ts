@@ -459,6 +459,12 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // conta tanto como escrever.
   { path: "./orcamento/[id]/proposta-rascunho/route", methods: ["GET", "PUT", "DELETE"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
+  // A biblioteca visual: o vocabulário de etiquetas, a procura por etiquetas e
+  // o etiquetar em lote. Tudo isto lê e escreve o trabalho de arrumação da
+  // equipa, e as fotos que devolve são URLs assinados de um bucket PRIVADO.
+  { path: "./biblioteca/etiquetas/route", methods: ["GET", "POST"] },
+  { path: "./biblioteca/fotos/route", methods: ["GET"] },
+  { path: "./biblioteca/etiquetar/route", methods: ["POST"] },
   { path: "./propostas/route", methods: ["GET"] },
   { path: "./propostas/[id]/route", methods: ["PATCH", "DELETE"] },
   // Copiar uma proposta lê o documento de OUTRA e escreve fotos no Storage.

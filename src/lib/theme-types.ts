@@ -36,6 +36,33 @@ export interface ProposalTheme {
    * apagar uma foto nunca deixa a ordem inválida.
    */
   photoOrder?: string[];
+  /**
+   * O que este tema É.
+   *
+   * `pasta` — as suas fotos são as da pasta com o mesmo id (como sempre foi).
+   * `filtro` — é uma pergunta guardada: as fotos são as que respondem à
+   *   `filterRule`, venham da pasta que vierem. É o que permite que a mesma foto
+   *   apareça em vários temas sem existir duas vezes.
+   * `manual` — uma lista de fotos escolhida à mão, para o que não encaixa em
+   *   etiqueta nenhuma.
+   *
+   * Ausente conta como `pasta`: é o comportamento de antes desta funcionalidade
+   * e o de qualquer base onde a migração ainda não correu.
+   */
+  kind?: "pasta" | "filtro" | "manual";
+  /** A regra, quando `kind` é `filtro` (ver `RegraDoTema`). */
+  filterRule?: import("./biblioteca-types").RegraDoTema;
+  /** Fixado no topo da lista. Os temas de que se usa em quase todas as
+   *  propostas não têm de ser procurados de cada vez. */
+  favorito?: boolean;
+  /**
+   * Fora da lista principal, sem ser apagado.
+   *
+   * Existe para haver uma alternativa a eliminar: um tema que já não se usa
+   * leva atrás as fotos quando é apagado, e essa decisão é definitiva. Arquivar
+   * tira-o da frente e deixa tudo onde está.
+   */
+  arquivado?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -83,6 +110,16 @@ export interface ThemeSummary extends ProposalTheme {
   /** URL assinado da foto do cartão: a escolhida (`coverPath`) ou, sem
    *  escolha — ou se a escolhida já não existir —, a foto mais recente. */
   coverUrl?: string;
+  /**
+   * Mais duas ou três fotos do tema, para o cartão dar uma ideia do CONJUNTO em
+   * vez de uma imagem só. A capa vem sempre à frente; estas são as seguintes.
+   *
+   * Não custam uma ida a mais ao Storage: os nomes já vinham na listagem que a
+   * rota faz por tema, e a assinatura de todos os temas continua a ser um único
+   * pedido — só com mais caminhos lá dentro. Podem faltar (tema com uma foto
+   * só, ou assinatura falhada), e nesse caso o cartão mostra o que tiver.
+   */
+  previewUrls?: string[];
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */
